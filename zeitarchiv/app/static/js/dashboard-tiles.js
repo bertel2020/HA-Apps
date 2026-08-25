@@ -99,6 +99,12 @@
     const echartsSeries = series.map((s, i) => {
       const color = PALETTE[i % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
+      const lineData = s.points.map(p => [p.ts * 1000, p.value, s.unit]);
+      if (s.chart_type === 'line' && lineData.length && data.window_end != null
+          && lineData[lineData.length - 1][0] < data.window_end * 1000) {
+        const last = lineData[lineData.length - 1];
+        lineData.push([data.window_end * 1000, last[1], last[2]]);
+      }
       const cfg = {
         // Angepasster Anzeigename (chart_editor.html, "Angezeigte Namen") hat
         // Vorrang vor dem Entität-eigenen friendly_name — dieselbe Regel wie
@@ -106,13 +112,14 @@
         name: displayName,
         type: s.chart_type,
         yAxisIndex: units.indexOf(s.unit),
-        data: s.points.map(p => [p.ts * 1000, p.value, s.unit]),
+        data: lineData,
         lineStyle: {width: 2, color},
         itemStyle: {color},
         barMaxWidth: 28,
       };
       if (s.chart_type === 'line') {
-        cfg.smooth = true;
+        cfg.smooth = false;
+        cfg.step = 'end';
         cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien

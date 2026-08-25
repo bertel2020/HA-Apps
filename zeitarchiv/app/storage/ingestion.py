@@ -59,6 +59,31 @@ def _event_exists(
     )
 
 
+def _timestamp_exists(
+    data_dir: Path,
+    entity_id: str,
+    ts: float,
+    last_ts: float | None,
+    tz: ZoneInfo,
+) -> bool:
+    """Prueft, ob fuer die Entitaet bereits ein Wert zum Zeitstempel liegt."""
+    # Der normale Live-Pfad liefert steigende Zeitstempel. Solange der neue
+    # Zeitstempel hinter dem Indexmaximum liegt, kann er noch nicht existieren
+    # und wir vermeiden das Lesen einer stetig wachsenden Monatsdatei.
+    if last_ts is None or ts > last_ts:
+        return False
+
+    hot_path = hotbuffer.hot_path(data_dir, entity_id, ts, tz)
+    if any(row_ts == ts for row_ts, _value, _event_id in hotbuffer.read_records(hot_path)):
+        return True
+
+    month = hotbuffer.month_key(ts, tz)
+    archive_path = entity_dir(data_dir, "archive", entity_id) / f"{month}.parquet"
+    if not archive_path.exists():
+        return False
+    return ts in set(pq.read_table(archive_path, columns=["ts"]).column("ts").to_pylist())
+
+
 class IngestionService:
     """Single-Writer-Grenze für Hot-Datei, Rotation und Index-Metadaten."""
 
@@ -139,7 +164,19 @@ class IngestionService:
                 self._complete(event, recorded=True)
                 return "recovered"
 
+            # Eine neue Event-ID darf keinen bereits vorhandenen Messpunkt
+            # erneut anhaengen (z. B. nach einem Neustart der Integration).
             entity = self._index.get_entity(event.entity_id)
+            if _timestamp_exists(
+                self._data_dir,
+                event.entity_id,
+                event.ts,
+                entity["last_ts"],
+                self._tz,
+            ):
+                self._complete(event, recorded=False)
+                return "duplicate"
+
             if not should_accept_write(entity["resolution"], entity["last_ts"], event.ts):
                 self._complete(event, recorded=False)
                 return "skipped"

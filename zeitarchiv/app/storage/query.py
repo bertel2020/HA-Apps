@@ -24,6 +24,7 @@ import pyarrow.parquet as pq
 from . import cleanup, rollup
 from .hotbuffer import hot_path, read_rows
 from .index import Index, filter_deleted_occurrences
+from .paths import entity_dir
 from ..limits import MAX_RAW_QUERY_POINTS
 
 RANGE_KEYS = ("hour", "day", "week", "month", "year", "decade")
@@ -158,17 +159,34 @@ def _read_hot_rows_filtered(
 
 
 def _boundary_value(data_dir: Path, entity_id: str, before_ts: float, tz: ZoneInfo) -> float | None:
-    """Letzter Zähler-Rohwert vor before_ts — erst im Hot Buffer des Monats suchen,
-    sonst in der Archivdatei des Vormonats (last_value_before_month). Funktioniert
-    unverändert auch für vergangene Monate: hot_path für einen längst rotierten
-    Monat existiert schlicht nicht mehr, read_rows liefert dann [] und der Fall
-    fällt korrekt auf last_value_before_month zurück."""
+    """Letzter Rohwert vor ``before_ts`` aus Hot Buffer oder Monatsarchiv."""
     before_local = datetime.fromtimestamp(before_ts, tz)
     rows = read_rows(hot_path(data_dir, entity_id, before_ts, tz))
-    prior = sorted(v for ts, v in rows if ts < before_ts)
+    prior = sorted((ts, value) for ts, value in rows if ts < before_ts)
     if prior:
-        return prior[-1]
-    return rollup.last_value_before_month(data_dir, entity_id, before_local.year, before_local.month)
+        return prior[-1][1]
+
+    # Bei historischen Fenstern liegt auch der aktuelle Fenstermonat bereits
+    # im Archiv. Rueckwaerts suchen, damit der letzte bekannte Wert selbst bei
+    # einem oder mehreren Monaten ohne Messpunkt weiter gilt.
+    current_month = before_local.strftime("%Y-%m")
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+    if not archive_dir.exists():
+        return None
+    for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
+        if path.stem > current_month:
+            continue
+        table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
+        candidates = [
+            (ts, value)
+            for ts, value in zip(
+                table.column("ts").to_pylist(), table.column("value").to_pylist()
+            )
+            if ts < before_ts
+        ]
+        if candidates:
+            return candidates[-1][1]
+    return None
 
 
 def _query_live_fine(
@@ -528,6 +546,26 @@ def query_series(
         for row in fine
     ]
 
+    # Standard-Linien stellen einen Zustand dar: der letzte bekannte Rohwert
+    # gilt bis zum naechsten Messpunkt. Ein Randpunkt am Fensteranfang verhindert
+    # daher eine kuenstliche Luecke bis zum ersten Wert innerhalb des Fensters.
+    if resolved_chart_type == "line" and aggregation_type == "standard":
+        boundary_value = _boundary_value(
+            data_dir, entity_id, window_start.timestamp(), tz
+        )
+        if boundary_value is not None and (
+            not points or points[0]["ts"] > window_start.timestamp()
+        ):
+            points.insert(
+                0,
+                {
+                    "ts": window_start.timestamp(),
+                    "value": boundary_value,
+                    "min": boundary_value,
+                    "max": boundary_value,
+                },
+            )
+
     return {
         "entity_id": entity_id,
         "aggregation_type": aggregation_type,
@@ -579,6 +617,15 @@ def query_raw_series(
             max_rows=MAX_RAW_QUERY_POINTS,
         )
     ]
+
+    boundary_value = _boundary_value(data_dir, entity_id, window_start.timestamp(), tz)
+    if boundary_value is not None and (
+        not points or points[0]["ts"] > window_start.timestamp()
+    ):
+        points.insert(
+            0,
+            {"ts": window_start.timestamp(), "value": boundary_value, "min": None, "max": None},
+        )
 
     return {
         "entity_id": entity_id,

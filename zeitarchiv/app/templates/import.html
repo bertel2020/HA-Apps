@@ -63,6 +63,11 @@
   .map-input:focus{outline:none;border-color:var(--accent-line);}
   .map-input::placeholder{color:var(--ink-faint);font-family:var(--font-display);}
   .unreadable-note{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .unit-conversion{margin-top:7px;padding:8px 10px;border:1px solid var(--warning, #c88719);border-radius:7px;background:var(--warning-soft, rgba(200,135,25,.1));}
+  .unit-warning{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.35;}
+  .factor-row{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .factor-input{width:94px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);font-family:var(--font-mono);}
+  .factor-help{display:block;margin-top:4px;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);}
 
   #import-output{margin-top:16px;}
 
@@ -96,6 +101,8 @@
   .symcon-import-table th:first-child,.symcon-import-table td:first-child{padding-left:10px;padding-right:4px;text-align:center;}
   .symcon-import-table th:nth-child(2),.symcon-import-table td:nth-child(2){padding-left:8px;padding-right:8px;}
   .symcon-import-table .period-cell{font-family:var(--font-display);white-space:nowrap;}
+  .symcon-row-count,.symcon-unit{display:block;}
+  .symcon-unit{margin-top:2px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
 
   .map-picker{display:flex;align-items:center;min-width:0;}
   .map-picker .map-input{padding-right:31px;}
@@ -154,8 +161,8 @@
          jeweils andere Reiter gerade den leeren Upload-/Dropzone-Zustand zeigt. -->
     <datalist id="entity-datalist">
       <option value="__ignore__">Ignorieren</option>
-      {% for entity_id, label in entity_options %}
-      <option value="{{ entity_id }}">{{ label }}</option>
+      {% for entity_id, label, unit in entity_options %}
+      <option value="{{ entity_id }}" data-unit="{{ unit }}">{{ label }}</option>
       {% endfor %}
     </datalist>
 
@@ -164,8 +171,8 @@
       <strong>So funktioniert die einmalige Migration aus Symcon:</strong>
       <ol class="import-steps">
         <li>Den Symcon-<code>db</code>-Ordner als ZIP-Datei hochladen. Zeitarchiv entpackt und scannt den Inhalt automatisch.</li>
-        <li>Optional die aus Symcon exportierte <code>settings.json</code> ergänzen. Sie liefert Klarnamen und übergeordnete Räume/Kategorien; der <code>db</code>-Ordner selbst enthält nur numerische Variablen-IDs.</li>
-        <li>Variablen markieren, vorhandenen Home-Assistant-Entitäten zuordnen, die Vorschau prüfen und anschließend den Import starten.</li>
+        <li>Optional die aus Symcon exportierte <code>settings.json</code> ergänzen. Sie liefert Klarnamen, übergeordnete Räume/Kategorien und Einheiten; der <code>db</code>-Ordner selbst enthält nur numerische Variablen-IDs.</li>
+        <li>Variablen markieren und Home-Assistant-Entitäten zuordnen. Bei abweichenden Einheiten den Hinweis prüfen und bei Bedarf einen Umrechnungsfaktor angeben, danach Vorschau und Import starten.</li>
       </ol>
       <p class="symcon-import-note">
         Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import
@@ -179,8 +186,8 @@
     {% if not settings_imported %}
     <div class="callout" id="settings-hint" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <span style="flex:1;min-width:220px;">
-        Noch keine <code>settings.json</code> importiert &mdash; optional, liefert Klarnamen je
-        Symcon-ID aus Symcons Objektbaum für eine zusätzliche Namensspalte in der Liste unten.
+        Noch keine <code>settings.json</code> importiert &mdash; optional, liefert Klarnamen und
+        Einheiten je Symcon-ID aus Symcons Objektbaum für die Liste unten.
       </span>
       <label class="btn" style="cursor:pointer;">
         settings.json importieren
@@ -244,7 +251,7 @@
           </colgroup>
           <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="Alle auf dieser Seite markieren"></th><th>Symcon-ID</th>{% if settings_imported %}<th>Symcon-Name</th>{% endif %}<th>Zeitraum</th><th>Datensätze</th><th>→ HA-Entität</th></tr>
           {% for row in rows %}
-          <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}"
+          <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}" data-symcon-unit="{{ row.symcon_unit or '' }}"
               data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}">
             <td>{% if row.readable %}<input type="checkbox" class="mark-checkbox" onchange="onMarkChange(this)">{% endif %}</td>
             <td class="mono">{{ row.variable_id }}</td>
@@ -263,14 +270,26 @@
             </td>
             {% endif %}
             <td class="period-cell">{% if row.period_start %}{{ row.period_start }} &ndash; {{ row.period_end }}{% else %}—{% endif %}</td>
-            <td{% if row.preview != "—" %} data-tooltip="Min · Max: {{ row.preview }}"{% endif %}>{{ row.row_count }}</td>
+            <td{% if row.preview != "—" %} data-tooltip="Min · Max: {{ row.preview }}"{% endif %}>
+              <span class="symcon-row-count">{{ row.row_count }}</span>
+              {% if row.symcon_unit %}<span class="symcon-unit">{{ row.symcon_unit }}</span>{% endif %}
+            </td>
             <td>
               {% if row.readable %}
               <span class="map-picker">
                 <input type="text" class="map-input" name="map_{{ row.variable_id }}" list="entity-datalist"
-                       placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)">
+                       placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)"
+                       oninput="updateUnitCheck(this)">
                 <button type="button" class="map-clear" title="Auswahl ändern" aria-label="Ausgewählte HA-Entität entfernen" onclick="clearMapping(this)">×</button>
               </span>
+              <div class="unit-conversion" hidden>
+                <div class="unit-warning"></div>
+                <label class="factor-row">Faktor
+                  <input class="factor-input" type="number" step="any" name="factor_{{ row.variable_id }}" value="1"
+                         oninput="this.dataset.userEdited='true'">
+                </label>
+                <span class="factor-help">Importwert = Symcon-Wert × Faktor</span>
+              </div>
               {% else %}
               <span class="unreadable-note">nicht lesbar{% if row.error %}: {{ row.error }}{% endif %}</span>
               {% endif %}
@@ -369,6 +388,51 @@
       input.focus();
       if (typeof input.showPicker === 'function') {
         try { input.showPicker(); } catch (e) {}
+      }
+    }
+
+    function normalizeUnit(unit) {
+      return String(unit || '').trim().toLocaleLowerCase('de-DE').replace(/\s+/g, '');
+    }
+
+    const UNIT_SCALES = {
+      'lx': ['illuminance', 1], 'klx': ['illuminance', 1000],
+      'w': ['power', 1], 'kw': ['power', 1000],
+      'wh': ['energy', 1], 'kwh': ['energy', 1000], 'mwh': ['energy', 1000000],
+      'v': ['voltage', 1], 'kv': ['voltage', 1000],
+      'a': ['current', 1], 'ma': ['current', 0.001],
+      'l': ['volume', 1], 'liter': ['volume', 1], 'm³': ['volume', 1000]
+    };
+
+    function suggestedFactor(sourceUnit, targetUnit) {
+      const source = UNIT_SCALES[normalizeUnit(sourceUnit)];
+      const target = UNIT_SCALES[normalizeUnit(targetUnit)];
+      if (!source || !target || source[0] !== target[0]) return 1;
+      return source[1] / target[1];
+    }
+
+    function updateUnitCheck(input) {
+      const row = input.closest('tr[data-variable-id]');
+      if (!row) return;
+      const panel = row.querySelector('.unit-conversion');
+      const factor = row.querySelector('.factor-input');
+      const option = Array.from(document.querySelectorAll('#entity-datalist option'))
+        .find(candidate => candidate.value === input.value);
+      const sourceUnit = row.dataset.symconUnit || '';
+      const targetUnit = option ? option.dataset.unit || '' : '';
+      const mismatch = sourceUnit && targetUnit && normalizeUnit(sourceUnit) !== normalizeUnit(targetUnit);
+      const targetChanged = factor.dataset.target !== input.value;
+      if (targetChanged) {
+        factor.dataset.target = input.value;
+        delete factor.dataset.userEdited;
+        factor.value = mismatch ? String(suggestedFactor(sourceUnit, targetUnit)) : '1';
+      }
+      panel.hidden = !mismatch;
+      if (mismatch) {
+        panel.querySelector('.unit-warning').textContent =
+          `Einheiten stimmen nicht überein: ${sourceUnit} → ${targetUnit}`;
+      } else if (!factor.dataset.userEdited) {
+        factor.value = '1';
       }
     }
 

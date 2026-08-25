@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 
 import csv
+import math
 import re
 import shutil
 import zipfile
@@ -114,12 +115,67 @@ _VARIABLE_ID_RE = re.compile(r"^\d+$")
 # CSV-Dateiname im db-Ordner (_VARIABLE_ID_RE), nur mit "ID"-Präfix.
 _SETTINGS_ID_RE = re.compile(r"^ID(\d+)$")
 
+# Symcon exportiert selbst angelegte Profile vollständig unter ``profiles``.
+# Die eingebauten ``~``-Profile stehen dagegen nur mit ihrem Namen an der
+# Variable. Für deren gebräuchliche Messprofile ergänzen wir die bekannte
+# Einheit als Fallback.
+_BUILTIN_PROFILE_UNITS = (
+    ("~Temperature", "°C"),
+    ("~Watt", "W"),
+    ("~Volt", "V"),
+    ("~Ampere", "A"),
+    ("~Electricity", "kWh"),
+    ("~WindSpeed.kmh", "km/h"),
+    ("~Humidity", "%"),
+    ("~Illumination", "lx"),
+    ("~Pressure", "mbar"),
+    ("~Hertz", "Hz"),
+    ("~CO2", "ppm"),
+    ("~SunAltitude", "°"),
+    ("~SunAzimuth", "°"),
+    ("~EEP_A50801_ILL", "lx"),
+    ("~EEP_A50801_SVC", "V"),
+    ("~EEP_A50801_TMP", "°C"),
+    ("~EltakoFAFT60_SVC", "V"),
+)
+
+
+def _profile_unit(entry: dict, profiles: dict) -> str | None:
+    data = entry.get("data")
+    if not isinstance(data, dict):
+        return None
+    custom_profile = data.get("customProfile")
+    standard_profile = data.get("profile")
+    profile_name = (
+        custom_profile.strip()
+        if isinstance(custom_profile, str) and custom_profile.strip()
+        else standard_profile.strip()
+        if isinstance(standard_profile, str) and standard_profile.strip()
+        else ""
+    )
+    if not profile_name:
+        return None
+
+    profile = profiles.get(profile_name)
+    if isinstance(profile, dict):
+        # Einheiten stehen normalerweise im Suffix. Prefix deckt Profile ab,
+        # die etwa ein Währungszeichen vor dem Zahlenwert darstellen.
+        for field in ("suffix", "prefix"):
+            unit = profile.get(field)
+            if isinstance(unit, str) and unit.strip():
+                return unit.strip()
+
+    for prefix, unit in _BUILTIN_PROFILE_UNITS:
+        if profile_name.startswith(prefix):
+            return unit
+    return None
+
 
 def extract_variable_names(raw: bytes | str) -> dict[str, dict[str, str | None]]:
     """Baut aus einer hochgeladenen settings.json (Symcons Objektbaum-Export,
-    Konzept "Offene Punkte") eine Variablen-ID → {name, parent}-Zuordnung —
-    rein informativ für die Namensspalte im Import-Assistenten, beeinflusst
-    Zuordnung/Import selbst nicht. Der db-Ordner allein hat keine Namen (siehe
+    Konzept "Offene Punkte") eine Variablen-ID → {name, parent, unit}-Zuordnung
+    — rein informativ für den Import-Assistenten, beeinflusst Zuordnung/Import
+    selbst nicht. Der db-Ordner allein hat keine Metadaten (siehe
     Moduldocstring); dieser Zusatz-Upload ist deshalb komplett optional.
 
     "parent" ist der Klarname des direkten übergeordneten Objekts (aus dessen
@@ -150,6 +206,9 @@ def extract_variable_names(raw: bytes | str) -> dict[str, dict[str, str | None]]
     objects = data.get("objects", data)
     if not isinstance(objects, dict):
         return {}
+    profiles = data.get("profiles", {})
+    if not isinstance(profiles, dict):
+        profiles = {}
 
     def _parent_name(entry: dict) -> str | None:
         parent_id = entry.get("parentID")
@@ -168,7 +227,11 @@ def extract_variable_names(raw: bytes | str) -> dict[str, dict[str, str | None]]
             continue
         name = entry.get("name")
         if isinstance(name, str) and name.strip():
-            result[match.group(1)] = {"name": name.strip(), "parent": _parent_name(entry)}
+            result[match.group(1)] = {
+                "name": name.strip(),
+                "parent": _parent_name(entry),
+                "unit": _profile_unit(entry, profiles),
+            }
     return result
 
 # Plausibilitätsgrenzen für Zeitstempel — alles außerhalb ist mit hoher
@@ -342,6 +405,7 @@ class ImportPlan:
     # Einlesen (nicht erst hier bei der Monats-Klassifizierung) aussortiert
     # wurden. Beim Symcon-Import immer 0 (dessen Parser zählt das nicht mit).
     skipped_rows: int = 0
+    factor: float = 1.0
 
 
 @dataclass
@@ -356,6 +420,16 @@ class ImportResult:
     skipped_rows: int = 0
     source_rows: int = 0
     duplicate_rows: int = 0
+    factor: float = 1.0
+
+
+def _scaled_raw_rows(variable: SymconVariable, factor: float) -> list[tuple[float, float]]:
+    if not math.isfinite(factor) or factor == 0 or abs(factor) > 1_000_000_000_000:
+        raise ValueError("Ungültiger Umrechnungsfaktor")
+    rows = raw_rows(variable)
+    if factor == 1.0:
+        return rows
+    return [(ts, value * factor) for ts, value in rows]
 
 
 def _classify_months(
@@ -422,7 +496,12 @@ def _group_by_month(
 
 
 def plan_import(
-    data_dir: Path, index: Index, variable: SymconVariable, entity_id: str, tz: ZoneInfo
+    data_dir: Path,
+    index: Index,
+    variable: SymconVariable,
+    entity_id: str,
+    tz: ZoneInfo,
+    factor: float = 1.0,
 ) -> ImportPlan:
     """Dry Run: berechnet, was import_variable() tun würde, ohne etwas zu
     schreiben (Konzept Abschnitt 03) — beliebig oft wiederholbar. Dünner
@@ -431,11 +510,12 @@ def plan_import(
     return plan_import_rows(
         data_dir,
         index,
-        raw_rows(variable),
+        _scaled_raw_rows(variable, factor),
         entity_id,
         tz,
         source_label=variable.variable_id,
         skipped_rows=variable.skipped_rows,
+        factor=factor,
     )
 
 
@@ -447,6 +527,7 @@ def plan_import_rows(
     tz: ZoneInfo,
     source_label: str = "",
     skipped_rows: int = 0,
+    factor: float = 1.0,
 ) -> ImportPlan:
     """Generischer Dry-Run-Kern: berechnet, was import_rows() für bereits
     geparste (ts, value)-Zeilen tun würde, ohne etwas zu schreiben — von
@@ -472,6 +553,7 @@ def plan_import_rows(
         rows_to_import=sum(len(rows) for _, _, _, rows in to_import),
         rows_to_merge=rows_to_merge,
         skipped_rows=skipped_rows,
+        factor=factor,
     )
 
 
@@ -482,6 +564,7 @@ def import_variable(
     entity_id: str,
     tz: ZoneInfo,
     on_month_done: Callable[[str, int], None] | None = None,
+    factor: float = 1.0,
 ) -> ImportResult:
     """Importiert die Rohdaten einer Symcon-Variable in eine bestehende
     Zeitarchiv-Entität — dünner Wrapper um import_rows() (siehe dort), liest
@@ -489,12 +572,13 @@ def import_variable(
     return import_rows(
         data_dir,
         index,
-        raw_rows(variable),
+        _scaled_raw_rows(variable, factor),
         entity_id,
         tz,
         source_label=variable.variable_id,
         skipped_rows=variable.skipped_rows,
         on_month_done=on_month_done,
+        factor=factor,
     )
 
 
@@ -507,6 +591,7 @@ def import_rows(
     source_label: str = "",
     skipped_rows: int = 0,
     on_month_done: Callable[[str, int], None] | None = None,
+    factor: float = 1.0,
 ) -> ImportResult:
     """Generischer Import-Kern: schreibt bereits geparste (ts, value)-Zeilen in
     eine bestehende Zeitarchiv-Entität — dieselbe Monats-Klassifizierung wie
@@ -530,6 +615,7 @@ def import_rows(
         skipped_months=to_skip,
         skipped_rows=skipped_rows,
         source_rows=len(rows),
+        factor=factor,
     )
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     archive_dir.mkdir(parents=True, exist_ok=True)

@@ -435,13 +435,19 @@
           // nicht (die wird zeitlich verschoben, um sie optisch zu überlagern). Das
           // Tooltip liest weiter unten bewusst dieses Feld statt des x-Werts, sonst
           // würde die Vorperiode im Tooltip die heutige statt ihre echte Zeit zeigen.
+          const mainData = this.points.map(p => [p.ts * 1000, p.value, p.ts * 1000]);
+          if (this.chartType === 'line' && mainData.length && this.windowEnd != null
+              && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
+            const last = mainData[mainData.length - 1];
+            mainData.push([this.windowEnd * 1000, last[1], last[2]]);
+          }
           const series = [{
             name: DISPLAY_NAME,
             type: this.chartType,
-            data: this.points.map(p => [p.ts * 1000, p.value, p.ts * 1000]),
+            data: mainData,
             itemStyle: {color: getComputedStyle(document.body).getPropertyValue(this.chartType === 'bar' ? '--chart-bar' : '--chart-line')},
             lineStyle: {width: 1.5},
-            smooth: this.chartType === 'line',
+            smooth: false,
             // Ohne Deckelung errechnet ECharts die Balkenbreite auf einer
             // Zeit-Achse aus dem Abstand zu benachbarten Punkten — bei nur
             // einem einzigen Punkt (z. B. "Jahr" einer Entität, die erst
@@ -487,9 +493,15 @@
               compareOffset, false, this.compareMode === 'year'
             );
             const seriesLabel = this.compareMode === 'year' ? previousYearPeriodLabel(this.range) : previousPeriodLabel(this.range);
+            const compareData = this.comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000]);
+            if (this.chartType === 'line' && compareData.length && this.windowEnd != null
+                && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
+              const last = compareData[compareData.length - 1];
+              compareData.push([this.windowEnd * 1000, last[1], last[2]]);
+            }
             const compareSeries = {
               name: compareLabel ? `${seriesLabel} (${compareLabel})` : seriesLabel, type: this.chartType,
-              data: this.comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000]),
+              data: compareData,
               itemStyle: {opacity: 0.45, color: getComputedStyle(document.body).getPropertyValue('--chart-bar')},
               lineStyle: {width: 1.5},
               barMaxWidth: 48,
@@ -497,8 +509,10 @@
             if (this.chartType === 'line' && !this.showPoints) {
               compareSeries.symbol = 'none';
             }
+            if (this.chartType === 'line') compareSeries.step = 'end';
             series.push(compareSeries);
           }
+          if (this.chartType === 'line') series[0].step = 'end';
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const option = {
             textStyle: {

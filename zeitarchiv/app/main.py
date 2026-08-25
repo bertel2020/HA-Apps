@@ -18,6 +18,7 @@ import functools
 import inspect
 import json
 import logging
+import math
 import os
 import platform
 import secrets
@@ -3579,7 +3580,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
 
 
 def _load_symcon_names() -> dict[str, dict[str, str | None]]:
-    """Lädt die zuletzt hochgeladene ID→{name, parent}-Zuordnung (siehe
+    """Lädt die zuletzt hochgeladene ID→{name, parent, unit}-Zuordnung (siehe
     SYMCON_NAMES_PATH) — leeres dict, falls noch keine settings.json importiert
     wurde oder die Datei nicht lesbar ist (z. B. manuell gelöscht). Normalisiert
     nebenbei eine ältere, noch flache {id: name}-Datei (vor der Parent-
@@ -3597,9 +3598,13 @@ def _load_symcon_names() -> dict[str, dict[str, str | None]]:
     result: dict[str, dict[str, str | None]] = {}
     for key, value in data.items():
         if isinstance(value, dict):
-            result[key] = {"name": value.get("name"), "parent": value.get("parent")}
+            result[key] = {
+                "name": value.get("name"),
+                "parent": value.get("parent"),
+                "unit": value.get("unit"),
+            }
         elif isinstance(value, str):
-            result[key] = {"name": value, "parent": None}
+            result[key] = {"name": value, "parent": None, "unit": None}
     return result
 
 
@@ -3624,6 +3629,7 @@ def _symcon_import_rows(
                 "variable_id": v.variable_id,
                 "symcon_name": info.get("name"),
                 "symcon_parent": info.get("parent"),
+                "symcon_unit": info.get("unit"),
                 "readable": v.readable,
                 "error": v.error,
                 "row_count": f"{v.row_count:,}".replace(",", "."),
@@ -3717,7 +3723,8 @@ def _import_page_context() -> dict:
     with _scan_cache.lock:
         variables = _scan_cache.variables or []
     entity_options = [
-        (row["entity_id"], row["friendly_name"] or row["entity_id"]) for row in index.list_entities()
+        (row["entity_id"], row["friendly_name"] or row["entity_id"], row["unit"] or "")
+        for row in index.list_entities()
     ]
     names = _load_symcon_names()
     return {
@@ -4075,7 +4082,9 @@ class _ImportProgress:
 _import_progress = _ImportProgress()
 
 
-def _run_import_background(mapped: list[tuple[symcon_import.SymconVariable, str]]) -> None:
+def _run_import_background(
+    mapped: list[tuple[symcon_import.SymconVariable, str, float]]
+) -> None:
     """Startet Planung und Schreibvorgang komplett im Hintergrund-Thread, damit
     /import/start sofort zurückkehrt — schon plan_import() liest für jede
     Variable alle Rohdaten neu ein und kann bei vielen zugeordneten Variablen
@@ -4107,24 +4116,29 @@ def _run_import_background(mapped: list[tuple[symcon_import.SymconVariable, str]
                 "variable_id": variable.variable_id,
                 "symcon_name": names.get(variable.variable_id, {}).get("name"),
                 "symcon_parent": names.get(variable.variable_id, {}).get("parent"),
+                "symcon_unit": names.get(variable.variable_id, {}).get("unit"),
                 "entity_id": target,
+                "target_unit": (index.get_entity(target) or {}).get("unit"),
+                "factor": factor,
             }
-            for variable, target in mapped
+            for variable, target, factor in mapped
         ],
     }
 
     def worker() -> dict | None:
-        plans: list[tuple[symcon_import.SymconVariable, str]] = []
+        plans: list[tuple[symcon_import.SymconVariable, str, float]] = []
         total_months = 0
-        for variable, target_entity_id in mapped:
+        for variable, target_entity_id, factor in mapped:
             with _import_progress.lock:
                 _import_progress.current_variable = variable.variable_id
             try:
-                plan = symcon_import.plan_import(DATA_DIR, index, variable, target_entity_id, TZ)
+                plan = symcon_import.plan_import(
+                    DATA_DIR, index, variable, target_entity_id, TZ, factor=factor
+                )
                 total_months += len(plan.months_to_import) + len(plan.months_to_merge)
             except ValueError:
                 pass  # scheitert gleich nochmal in der Import-Phase, landet dann in errors
-            plans.append((variable, target_entity_id))
+            plans.append((variable, target_entity_id, factor))
             with _import_progress.lock:
                 _import_progress.planned_variables += 1
                 _import_progress.total_months = total_months
@@ -4133,7 +4147,7 @@ def _run_import_background(mapped: list[tuple[symcon_import.SymconVariable, str]
             _import_progress.phase = "importing"
             _import_progress.current_variable = ""
 
-        for variable, target_entity_id in plans:
+        for variable, target_entity_id, factor in plans:
             with _import_progress.lock:
                 _import_progress.current_variable = variable.variable_id
 
@@ -4144,7 +4158,13 @@ def _run_import_background(mapped: list[tuple[symcon_import.SymconVariable, str]
 
             try:
                 result = symcon_import.import_variable(
-                    DATA_DIR, index, variable, target_entity_id, TZ, on_month_done=on_month_done
+                    DATA_DIR,
+                    index,
+                    variable,
+                    target_entity_id,
+                    TZ,
+                    on_month_done=on_month_done,
+                    factor=factor,
                 )
                 with _import_progress.lock:
                     _import_progress.results.append(result)
@@ -4162,7 +4182,7 @@ def _run_import_background(mapped: list[tuple[symcon_import.SymconVariable, str]
                 with storage_coordinator.exclusive():
                     worker()
                     reconciliation_report = _run_storage_reconciliation(
-                        entity_ids=sorted({target for _, target in mapped}), repair=True
+                        entity_ids=sorted({target for _, target, _ in mapped}), repair=True
                     )
         except Exception as exc:
             logger.exception("Symcon-Import unerwartet fehlgeschlagen")
@@ -4219,7 +4239,7 @@ def _import_progress_context() -> dict:
         }
 
 
-def _mapped_variables(form) -> list[tuple[symcon_import.SymconVariable, str]]:
+def _mapped_variables(form) -> list[tuple[symcon_import.SymconVariable, str, float]]:
     """Liest die map_<id>-Felder aus dem Formular und löst sie gegen die aktuell
     gescannten Variablen auf — "" und "__ignore__" heißen beide "überspringen".
     Nutzt den Scan-Cache (siehe _import_page_context) statt bei jedem Dry-Run-/
@@ -4236,7 +4256,18 @@ def _mapped_variables(form) -> list[tuple[symcon_import.SymconVariable, str]]:
         variable = variables.get(variable_id)
         if variable is None or not variable.readable:
             continue
-        mapped.append((variable, target_entity_id))
+        raw_factor = str(form.get(f"factor_{variable_id}", "1")).strip().replace(",", ".")
+        try:
+            factor = float(raw_factor)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"
+            ) from exc
+        if not math.isfinite(factor) or factor == 0 or abs(factor) > 1_000_000_000_000:
+            raise HTTPException(
+                status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"
+            )
+        mapped.append((variable, target_entity_id, factor))
     return mapped
 
 
@@ -4248,12 +4279,21 @@ async def import_dry_run(request: Request) -> HTMLResponse:
     def plan_locked():
         with _import_source_lock:
             mapped = _mapped_variables(form)
-            with storage_coordinator.entities([target for _, target in mapped]):
+            with storage_coordinator.entities([target for _, target, _ in mapped]):
                 plans = []
                 errors = []
-                for variable, target_entity_id in mapped:
+                for variable, target_entity_id, factor in mapped:
                     try:
-                        plans.append(symcon_import.plan_import(DATA_DIR, index, variable, target_entity_id, TZ))
+                        plans.append(
+                            symcon_import.plan_import(
+                                DATA_DIR,
+                                index,
+                                variable,
+                                target_entity_id,
+                                TZ,
+                                factor=factor,
+                            )
+                        )
                     except ValueError:
                         errors.append(f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden")
                 return plans, errors
@@ -4333,7 +4373,8 @@ def _csv_import_context(
     entity_id: str = "",
 ) -> dict:
     entity_options = [
-        (row["entity_id"], row["friendly_name"] or row["entity_id"]) for row in index.list_entities()
+        (row["entity_id"], row["friendly_name"] or row["entity_id"], row["unit"] or "")
+        for row in index.list_entities()
     ]
     base = {
         "entity_options": entity_options,

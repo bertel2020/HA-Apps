@@ -23,7 +23,7 @@ visualisiert sie.
 | **Schnelle Langzeitansichten** | Vorbereitete Rollups von Stunde bis Jahr |
 | **Eigene Dashboards** | Frei kombinierbare Charts und Vergleichstabellen |
 | **Datenpflege** | Ausreißer, Lücken und Duplikate untersuchen und bereinigen |
-| **Datenübernahme** | Symcon-ZIPs und frei zuordenbare CSV-Dateien importieren |
+| **Datenübernahme** | Symcon-ZIPs samt Einheitenprüfung und frei zuordenbare CSV-Dateien importieren |
 | **Sicherung** | Prüfbare ZIP-Backups mit Wiederherstellung und Zeitplan |
 
 ## Zusammenspiel
@@ -95,6 +95,7 @@ Die Entitätenliste ist durchsuchbar, filterbar und konfigurierbar. Jede
 Entität besitzt eine eigene Verlaufsansicht mit:
 
 - Linie oder Balken;
+- bei Linien den letzten Messwert bis zum nächsten Datenpunkt fortführen;
 - Navigation von Stunde bis Dekade;
 - laufendem oder rollierendem Zeitfenster;
 - Vergleich mit Vorperiode oder Vorjahr;
@@ -133,7 +134,10 @@ Bestandsschnappschuss.
 ### Import und Export
 
 - **Symcon:** ZIP des `db`-Ordners hochladen, optional eine `settings.json`
-  für Namen ergänzen, Variablen prüfen und HA-Entitäten zuordnen.
+  für Namen und Einheiten ergänzen, Variablen prüfen und HA-Entitäten
+  zuordnen. Weichen Quell- und Zieleinheit voneinander ab, erscheint ein
+  Hinweis und ein Umrechnungsfaktor kann angegeben werden, etwa `1000` für
+  `klx` nach `lx`.
 - **Eigene CSV:** Trennzeichen, Zeit-, Wert- und Zielspalte frei zuordnen und
   das Ergebnis vor dem Import prüfen.
 - **Reports:** Im dritten Import-Reiter bleibt jeder tatsächlich ausgeführte Import mit Quelle,
@@ -142,8 +146,11 @@ Bestandsschnappschuss.
 - **CSV-Export:** Die vollständige Rohdatenhistorie einer Entität bis zum
   Exportlimit herunterladen.
 
-Importe ergänzen fehlende Zeitstempel im laufenden Hot Buffer. Bestehende
-Monatsarchive werden dabei nicht überschrieben.
+Importe ergänzen fehlende Zeitstempel im laufenden Hot Buffer. Bereits
+vorhandene Messpunkte derselben Entität und desselben Zeitstempels werden
+auch bei abweichender Event-ID übersprungen; bestehende Monatsarchive werden
+dabei nicht überschrieben. Dieselbe Zeitstempelprüfung schützt auch die
+laufende Datenübernahme vor unmittelbar entstehenden Duplikaten.
 
 ## Speicherung und Aufbewahrung
 

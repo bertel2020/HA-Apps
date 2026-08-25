@@ -346,11 +346,17 @@
             // liefert.
             const chartType = s.chart_type;
             const displayName = this.entityNames[s.entity_id] || s.friendly_name;
+            const mainData = s.points.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit]);
+            if (chartType === 'line' && mainData.length && this.windowEnd != null
+                && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
+              const last = mainData[mainData.length - 1];
+              mainData.push([this.windowEnd * 1000, last[1], last[2], last[3]]);
+            }
             const main = {
               name: displayName,
               type: chartType,
               yAxisIndex: units.indexOf(s.unit),
-              data: s.points.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit]),
+              data: mainData,
               lineStyle: {width: 1.5, color},
               itemStyle: {color},
               // Deckelt die Balkenbreite auf einer Zeit-Achse — ohne diese
@@ -363,7 +369,8 @@
               barMaxWidth: 48,
             };
             if (chartType === 'line') {
-              main.smooth = true;
+              main.smooth = false;
+              main.step = 'end';
               // symbol nie explizit auf undefined setzen (nur weglassen oder auf
               // 'none') — siehe entity_detail.html, ECharts' interne Options-
               // Normalisierung stürzt sonst ab.
@@ -382,17 +389,24 @@
                 this.range, this.continuous, s.compare_window_start, s.compare_window_end, false
               );
               const seriesLabel = this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode';
+              const compareData = s.compare_points.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit]);
+              if (chartType === 'line' && compareData.length && this.windowEnd != null
+                  && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
+                const last = compareData[compareData.length - 1];
+                compareData.push([this.windowEnd * 1000, last[1], last[2], last[3]]);
+              }
               const cmp = {
                 name: `${displayName} (${seriesLabel}${compareLabel ? ', ' + compareLabel : ''})`,
                 type: chartType,
                 yAxisIndex: units.indexOf(s.unit),
-                data: s.compare_points.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit]),
+                data: compareData,
                 lineStyle: {width: 1.5, color, type: 'dashed', opacity: 0.5},
                 itemStyle: {color, opacity: 0.5},
                 barMaxWidth: 48,
               };
               if (chartType === 'line') {
-                cmp.smooth = true;
+                cmp.smooth = false;
+                cmp.step = 'end';
                 if (!this.showPoints) cmp.symbol = 'none';
               }
               echartsSeries.push(cmp);
