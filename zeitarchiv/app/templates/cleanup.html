@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Bearbeitungsbereich — {{ entity_id }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  h1.raw{font-family:var(--font-mono);font-size:calc(18.4px * var(--font-scale, 1));}
+  .h1-row{display:flex;align-items:center;gap:10px;}
+  .h1-row h1{margin:0;}
+  .fav-star{
+    background:none;border:none;cursor:pointer;font-size:calc(22px * var(--font-scale, 1));line-height:1;padding:2px;
+    color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+
+  /* Drei Reiter für die drei bisher getrennten Werkzeuge (Bereinigen/
+     Hinzufügen/Korrigieren, Konzept-Erweiterung "Bearbeitungsbereich") — eine
+     Seite, ein Datenmodell (Rohwerte derselben Entität), statt drei separate
+     Unterseiten. "Bereinigen"/"Korrigieren" teilen sich #controls/#rows-table
+     komplett (nur der "mode"-Wert im Formular unterscheidet, welche
+     Zeilen-Aktion _rows_table.html rendert, siehe dortiger Kommentar),
+     "Hinzufügen" ist ein eigenständiges, schlankes Formular ohne Tabelle. */
+  .edit-tabs{display:flex;gap:8px;margin:18px 0 4px;border-bottom:1px solid var(--border);}
+  .edit-tabs button{
+    background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;margin-bottom:-1px;
+    font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;
+  }
+  .edit-tabs button.active{color:var(--accent-line);border-bottom-color:var(--accent-line);font-weight:600;}
+  .edit-tabs button:hover:not(.active){color:var(--ink);}
+
+  .add-value-card{max-width:480px;margin-top:16px;}
+  .add-value-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;}
+  .add-value-row label{display:flex;flex-direction:column;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .add-value-row input{
+    font-family:inherit;font-size:calc(13.5px * var(--font-scale, 1));padding:8px 10px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+  }
+  .add-value-status{margin-top:10px;font-size:calc(12.5px * var(--font-scale, 1));}
+  .add-value-status.ok{color:var(--accent-line);}
+  .add-value-status.err{color:var(--danger);}
+
+  /* Korrigieren-Modus: Stift-Button statt Checkbox, Wert-Zelle wird per Klick
+     zu einem Inline-Formular (Zahl-Feld + ✓/✗) — siehe startCorrect() unten. */
+  .correct-edit-btn{background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:calc(14px * var(--font-scale, 1));padding:2px 4px;}
+  .correct-edit-btn:hover{color:var(--accent-line);}
+  .correct-inline{display:flex;align-items:center;gap:6px;}
+  .correct-inline input{
+    width:110px;font-family:inherit;font-size:inherit;padding:4px 6px;border-radius:6px;
+    border:1px solid var(--accent-line);background:var(--surface);color:var(--ink);
+  }
+  .correct-inline button{background:none;border:none;cursor:pointer;font-size:calc(14px * var(--font-scale, 1));padding:2px 4px;}
+  .correct-confirm{color:var(--accent-line);}
+  .correct-cancel{color:var(--ink-faint);}
+  /* Alarm-Filter (Ausreißer/Lücken/Duplikate) heben sich im Auswahlzustand
+     rot statt teal ab — anders als z. B. die Typ-Filter auf der Startseite,
+     weil diese Chips tatsächlich problematische Werte markieren. */
+  .filter-chip input:checked + span{background:var(--danger-soft);border-color:var(--danger);color:var(--danger);}
+  /* Zeitraum-Auswahl (Segmented Control) und Perioden-Navigation — identischer
+     Aufbau wie auf entity_detail.html, damit sich beide Werkzeuge gleich
+     bedienen: ein Zeitraum-Typ (Stunde/Tag/…/Gesamt) statt eines Dropdowns
+     mit festen Rollfenstern, davor/danach navigiert per ‹/›/Jetzt — beide in
+     einer Zeile, die Filter/Seitengröße eine Zeile darunter. #controls trägt
+     dafür (anders als die generische Regel in app.css) eine SENKRECHTE
+     Flex-Richtung, jede .toolbar-Zeile darin bleibt für sich genommen
+     waagerecht (Regel aus app.css). */
+  #controls{flex-direction:column;align-items:stretch;}
+  #controls > .toolbar{margin-bottom:0;}
+  .seg{
+    display:flex;border:1px solid var(--border);border-radius:8px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0;
+    scrollbar-width:none;
+  }
+  .seg::-webkit-scrollbar{display:none;}
+  .seg button{
+    flex:none;padding:7px 12px;font-size:calc(12.5px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
+    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  .nav{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .period-label{
+    min-width:130px;text-align:center;white-space:nowrap;
+    font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;border-radius:6px;
+  }
+  .period-label:hover:not(:disabled){color:var(--accent-line);}
+  .period-label:disabled{cursor:default;opacity:.5;}
+
+  /* Kalender-Widget für den Datums-Sprung (Konzept "Offene Punkte": ein
+     natives <input type="date"> konnte einzelne Tage MIT Lücke innerhalb des
+     Entität-Zeitraums nicht ausschließen, nur den Gesamtzeitraum eingrenzen). */
+  [x-cloak]{display:none!important;}
+  .cal-wrap{position:relative;display:inline-block;}
+  .calendar-popover{
+    /* left ist nur ein Platzhalter bis calendar-picker.js beim Öffnen die an
+       den Viewport geklemmte Position einträgt (siehe reposition() dort) —
+       ohne Klemmung ragt das Popover bei einem Anker nahe am Fensterrand
+       (schmale/mobile Fenster) über <html>s overflow-x:hidden hinaus,
+       wodurch ein Teil der Tage unklickbar wird, nicht nur abgeschnitten
+       aussieht. */
+    position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:12px;
+  }
+  .calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+  .calendar-header .navbtn{flex:none;}
+  .calendar-month-select,.calendar-year-select{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  }
+  .calendar-month-select{flex:1.4;min-width:0;}
+  .calendar-year-select{flex:1;min-width:0;}
+  /* CSS Grid statt Flexbox für Wochentag-Kopf/Tage-Raster: eine frühere
+     Flexbox-Variante (flex-wrap + feste %-Breite je Zelle) zerstückelte die
+     Wochen in mehrere, teils leere Zeilen sobald der Monat mit "leeren"
+     Füllzellen begann (jeder Monat, dessen 1. kein Montag ist — praktisch
+     jeder zweite) — sichtbar als große Lücken zwischen den Wochenreihen.
+     display:grid mit einer festen Spaltenzahl kennt dieses Wrap-Verhalten gar
+     nicht erst: jede Zelle landet unabhängig von ihrem Inhalt exakt in ihrer
+     Raster-Position. (Grid wurde früher wegen eines anderen, inzwischen
+     behobenen Bugs gemieden — CSS "zoom" brach die fr-Einheit-Berechnung in
+     Kombination mit aspect-ratio; seit die Schriftgröße-Einstellung kein
+     "zoom" mehr nutzt, siehe app.css, betrifft das nicht mehr.) */
+  .calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7, 1fr);}
+  .calendar-weekdays{margin-bottom:4px;}
+  .calendar-weekdays span{text-align:center;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+  .calendar-day{
+    height:32px;box-sizing:border-box;border:none;border-radius:6px;font-size:calc(12px * var(--font-scale, 1));background:transparent;color:var(--ink);
+    cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+  }
+  .calendar-day:hover:not(:disabled){background:var(--surface-alt);}
+  .calendar-day.blank{visibility:hidden;cursor:default;}
+  .calendar-day.out-of-range{color:var(--ink-faint);opacity:.3;}
+  .calendar-day.no-data{color:var(--ink-faint);text-decoration:line-through;opacity:.55;}
+  .calendar-day.has-data{color:var(--ink);font-weight:600;}
+  .calendar-day:disabled{cursor:default;}
+  .calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
+  .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+</style>
+</head>
+<body>
+  <!-- x-data hält neben "range" das zuletzt geladene Zeitfenster und einen
+       stabilen Zoom-Anker (siehe _rows_table.html) — calendarPicker() braucht
+       range/windowStart im .page-Scope (Alpine.$data), um zu
+       wissen, welcher Zeitraum-Typ gerade aktiv ist bzw. welche Periode
+       gerade angezeigt wird (siehe pickerMode/currentPeriodYm in
+       calendar-picker.js). Kein größeres entityChart()-artiges Objekt nötig:
+       die eigentliche Navigation läuft weiterhin über htmx-Formularfelder,
+       nicht über Alpine-Reaktivität. -->
+  <div class="page" x-data="{ range: 'day', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
+    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / <a href="{{ base }}/entities/{{ entity_id }}">{{ friendly_name or entity_id }}</a> / Bearbeitungsbereich</p>
+    <div class="h1-row">
+      <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
+      <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
+              title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
+    </div>
+    <p class="sub">
+      {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
+    </p>
+
+    <div class="edit-tabs">
+      <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">Bereinigen</button>
+      <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">Hinzufügen</button>
+      <button type="button" :class="{active: tab === 'correct'}" @click="setTab('correct')">Korrigieren</button>
+    </div>
+
+    <div x-show="tab === 'add'" x-cloak class="add-value-card">
+      <p class="sub" style="margin-top:12px;">Fügt einen einzelnen Rohwert nachträglich ein — z. B. um eine Lücke zu schließen, die ein Sensor-Aussetzer hinterlassen hat.</p>
+      <div class="add-value-row">
+        <label>Datum &amp; Uhrzeit
+          <input type="datetime-local" id="add-datetime" step="1">
+        </label>
+        <label>Wert
+          <input type="number" step="any" id="add-value" placeholder="0.0">
+        </label>
+        <button type="button" class="btn primary" onclick="submitAddValue()">Hinzufügen</button>
+      </div>
+      <p class="add-value-status" id="add-value-status"></p>
+    </div>
+
+    <div x-show="tab === 'cleanup' || tab === 'correct'" x-cloak>
+    <div id="controls" hx-trigger="load, change" hx-get="{{ base }}/entities/{{ entity_id }}/rows"
+         hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+      <div class="toolbar">
+        <div class="seg" id="range-seg">
+          <button type="button" data-range="hour" onclick="setRange('hour')">Stunde</button>
+          <button type="button" class="active" data-range="day" onclick="setRange('day')">Tag</button>
+          <button type="button" data-range="week" onclick="setRange('week')">Woche</button>
+          <button type="button" data-range="month" onclick="setRange('month')">Monat</button>
+          <button type="button" data-range="year" onclick="setRange('year')">Jahr</button>
+          <button type="button" data-range="all" onclick="setRange('all')">Gesamt</button>
+        </div>
+        <!-- Leer bis zum ersten hx-trigger="load"-Roundtrip — _rows_table.html
+             füllt dieses Element per hx-swap-oob (gleiche id), obwohl es
+             außerhalb von #rows-table (dem eigentlichen hx-target) liegt.
+             Nötig, weil Zeitraum-Chips (statisch, hier) und Perioden-Navigation
+             (serverseitig berechnet: Label/Pfeil-Sperren/Kalender-Grenzen) in
+             derselben Zeile stehen sollen, aber aus unterschiedlichen Quellen
+             kommen — ohne oob müsste entweder #controls selbst bei jedem
+             Zeitraum-/Filter-/Seiten-Wechsel mitsamt seiner eigenen
+             hx-trigger-Bindung ersetzt werden (riskant), oder die Navigation
+             bliebe von #rows-table's Antwort getrennt (wie zuvor). -->
+        <div class="nav" id="rows-nav"></div>
+      </div>
+      <div class="toolbar">
+        <label class="filter-chip"><input type="radio" name="filter" value="all" checked onchange="resetPage()"><span>Alle</span></label>
+        {% if outlier_detection_enabled %}
+        <label class="filter-chip"><input type="radio" name="filter" value="outliers" onchange="resetPage()"><span>Ausreißer</span></label>
+        {% endif %}
+        {% if gap_detection_enabled %}
+        <label class="filter-chip"><input type="radio" name="filter" value="gaps" onchange="resetPage()"><span>Lücken</span></label>
+        {% endif %}
+        <label class="filter-chip"><input type="radio" name="filter" value="duplicates" onchange="resetPage()"><span>Duplikate</span></label>
+        <select name="page_size" onchange="resetPage()" title="Zeilen pro Seite">
+          <option value="10">10 / Seite</option>
+          <option value="50" selected>50 / Seite</option>
+          <option value="100">100 / Seite</option>
+          <option value="500">500 / Seite</option>
+          <option value="1000">1000 / Seite</option>
+        </select>
+      </div>
+      <!-- range/offset/page sind hier die einzige Quelle der Wahrheit — sowohl die
+           Zeitraum-Chips als auch die ‹/›/Jetzt-Buttons/der Kalender-Sprung/Pager im
+           rows-table-Fragment schreiben nur hierhin und lösen dann "change" aus, statt
+           eigene, potenziell widersprüchliche Werte zu senden. Alle drei leben bewusst
+           außerhalb des per htmx ausgetauschten Fragments und bleiben so über Swaps
+           hinweg erhalten. -->
+      <input type="hidden" name="range" id="range-field" value="day">
+      <input type="hidden" name="offset" id="offset-field" value="0">
+      <input type="hidden" name="page" id="page-field" value="1">
+      <!-- mode unterscheidet "Bereinigen" (Löschen-Checkboxen+Aktionsleiste)
+           von "Korrigieren" (Stift-Button je Zeile, siehe _rows_table.html) —
+           beide teilen sich sonst dieselbe Zeilen-Tabelle samt Zeitraum-/
+           Filter-Navigation vollständig, nur diese eine Weiche unterscheidet
+           die Zeilen-Aktion. setTab() unten hält es synchron zu "tab". -->
+      <input type="hidden" name="mode" id="mode-field" value="cleanup">
+    </div>
+
+    <div id="rows-table"></div>
+    </div>
+  </div>
+
+  <script src="{{ base }}/static/vendor/htmx.min.js"></script>
+  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
+  <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script>
+    const BASE = {{ base | tojson }};
+    const ENTITY_ID = {{ entity_id | tojson }};
+
+    // Reiter-Umschalter (Konzept-Erweiterung "Bearbeitungsbereich") — "tab"
+    // steuert nur die Sichtbarkeit (x-show), "mode-field" ist zusätzlich die
+    // tatsächlich an den Server geschickte Zeilen-Aktion für "Bereinigen"
+    // ("cleanup") vs. "Korrigieren" ("correct"); "Hinzufügen" braucht kein
+    // mode, weil es #controls/#rows-table gar nicht anspricht (eigenständiges
+    // Formular, siehe submitAddValue()).
+    function setTab(tab) {
+      const pageData = Alpine.$data(document.querySelector('.page'));
+      pageData.tab = tab;
+      const modeField = document.getElementById('mode-field');
+      const newMode = tab === 'correct' ? 'correct' : 'cleanup';
+      if (modeField.value !== newMode) {
+        modeField.value = newMode;
+        modeField.dispatchEvent(new Event('change', {bubbles: true}));
+      }
+    }
+
+    async function submitAddValue() {
+      const statusEl = document.getElementById('add-value-status');
+      const dtStr = document.getElementById('add-datetime').value;
+      const valueStr = document.getElementById('add-value').value;
+      statusEl.className = 'add-value-status';
+      statusEl.textContent = '';
+      if (!dtStr || valueStr === '') {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = 'Bitte Datum/Uhrzeit und Wert angeben.';
+        return;
+      }
+      const ts = new Date(dtStr).getTime() / 1000;
+      const value = parseFloat(valueStr);
+      if (Number.isNaN(value)) {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = 'Ungültiger Wert.';
+        return;
+      }
+      try {
+        const res = await fetch(`${BASE}/entities/${ENTITY_ID}/rows/add`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ts, value}),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          statusEl.className = 'add-value-status err';
+          statusEl.textContent = err.detail || 'Hinzufügen fehlgeschlagen.';
+          return;
+        }
+        statusEl.className = 'add-value-status ok';
+        statusEl.textContent = '✓ Wert hinzugefügt.';
+        document.getElementById('add-value').value = '';
+      } catch (e) {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = 'Hinzufügen fehlgeschlagen.';
+      }
+    }
+
+    // Korrigieren: die Wert-Zelle einer Zeile wird per Klick auf den
+    // Stift-Button zu einem Inline-Formular (Zahl-Feld + ✓/✗) — dieselbe
+    // Zelle, kein separater Dialog, damit Zeitstempel/aktueller Wert der
+    // Zeile beim Bearbeiten sichtbar bleiben. Bei Erfolg wird die ganze
+    // Tabelle über #controls neu geladen (htmx.trigger), nicht nur die eine
+    // Zeile lokal aktualisiert — einfacher, und Korrekturen sind kein
+    // Vorgang, bei dem es auf jede Millisekunde ankäme.
+    function startCorrect(btn) {
+      // btn (Stift) sitzt in der ersten Spalte, .correct-value-cell (Wert)
+      // in der dritten — closest() findet nur Vorfahren, deshalb hier über
+      // die Zeile zur Geschwister-Zelle statt über eine (nicht vorhandene)
+      // gemeinsame Elternschaft.
+      const cell = btn.closest('tr').querySelector('.correct-value-cell');
+      const oldValue = cell.dataset.oldValue;
+      cell.dataset.editing = 'true';
+      cell.replaceChildren();
+      const wrapper = document.createElement('span');
+      wrapper.className = 'correct-inline';
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.value = oldValue;
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = 'correct-confirm';
+      confirm.title = 'Speichern';
+      confirm.textContent = '✓';
+      confirm.addEventListener('click', () => confirmCorrect(confirm));
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'correct-cancel';
+      cancel.title = 'Abbrechen';
+      cancel.textContent = '✗';
+      cancel.addEventListener('click', () => htmx.trigger('#controls', 'change'));
+      wrapper.append(input, confirm, cancel);
+      cell.append(wrapper);
+      input.focus();
+    }
+
+    async function confirmCorrect(btn) {
+      const cell = btn.closest('.correct-value-cell');
+      const input = cell.querySelector('input');
+      const newValue = parseFloat(input.value);
+      if (Number.isNaN(newValue)) { input.focus(); return; }
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${BASE}/entities/${ENTITY_ID}/rows/correct`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ts: parseFloat(cell.dataset.ts), old_value: parseFloat(cell.dataset.oldValue), new_value: newValue}),
+        });
+        if (!res.ok) { alert('Korrigieren fehlgeschlagen.'); btn.disabled = false; return; }
+        htmx.trigger('#controls', 'change');
+      } catch (e) {
+        alert('Korrigieren fehlgeschlagen.');
+        btn.disabled = false;
+      }
+    }
+
+    // range-field/offset-field (in #controls) sind die einzige Quelle der
+    // Wahrheit für die Zeitraum-Navigation — setRange()/setOffset() schreiben
+    // hinein und lösen "change" aus, wodurch #controls' bestehender
+    // hx-trigger="change" den Reload übernimmt. Kein weiterer Zustand nötig:
+    // beide Felder leben außerhalb des per htmx ausgetauschten Fragments und
+    // bleiben darum über Swaps hinweg erhalten.
+    //
+    // Der Zeitraum-TYP (range) lebt zusätzlich noch reaktiv im .page-x-data
+    // (siehe cleanup.html-Markup oben) — nicht als Ersatz für das Formularfeld
+    // (das bleibt die Quelle der Wahrheit für den htmx-Request), sondern weil
+    // _calendar_popover.html seine Sichtbarkeit (Monat-Auswahl/Pfeile/
+    // Tage-Raster) per Alpine-Scope-Kette daraus liest (siehe dortiger
+    // Kommentar) und calendarPicker()s pickerMode-Getter ebenfalls darauf
+    // zugreift.
+    function setRange(key) {
+      const field = document.getElementById('range-field');
+      if (key === field.value) return;
+      resetPage();
+      const pageData = Alpine.$data(document.querySelector('.page'));
+      // Dieselbe stabile Zoom-Logik wie im übergeordneten Verlauf: Als Anker
+      // dient das tatsächlich angezeigte Fenster. Der Anker bleibt auch über
+      // grobe Zwischenstufen und "Gesamt" erhalten, damit z. B.
+      // Tag→Monat→Stunde weiterhin zum ursprünglich gewählten Datum führt.
+      const anchorMs = pageData.rangeAnchorMs ?? PeriodNavigation.anchorForWindow(
+        pageData.windowStart, pageData.windowEnd, pageData.isCurrent
+      );
+      pageData.rangeAnchorMs = anchorMs;
+      const nextOffset = key === 'all' ? 0 : PeriodNavigation.offsetForRange(key, anchorMs);
+      document.getElementById('offset-field').value = String(nextOffset);
+      document.querySelectorAll('#range-seg button').forEach(b => b.classList.toggle('active', b.dataset.range === key));
+      pageData.range = key;
+      field.value = key;
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    function setOffset(v, preserveAnchor = false) {
+      resetPage();  // ein anderes Zeitfenster hat eine andere Zeilenmenge
+      if (!preserveAnchor) {
+        const pageData = Alpine.$data(document.querySelector('.page'));
+        pageData.rangeAnchorMs = null;
+      }
+      const field = document.getElementById('offset-field');
+      field.value = Math.min(v, 0);
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    function stepOffset(delta) {
+      const current = parseInt(document.getElementById('offset-field').value || '0', 10);
+      setOffset(current + delta);
+    }
+    // page-field analog zu offset-field: die Pager-Buttons im rows-table-Fragment
+    // schreiben nur hierhin. Jeder andere Control, der die zugrunde liegende
+    // Zeilenmenge ändert (Zeitraum, Filter, Zeilen/Seite), setzt page auf 1 zurück
+    // — sonst könnte z. B. "Duplikate" mit nur 2 Treffern auf einer Seite 5 landen,
+    // die es für diesen Filter gar nicht gibt.
+    function resetPage() {
+      document.getElementById('page-field').value = '1';
+    }
+    function setPage(v) {
+      document.getElementById('page-field').value = Math.max(1, v);
+      document.getElementById('page-field').dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    function stepPage(delta) {
+      const current = parseInt(document.getElementById('page-field').value || '1', 10);
+      setPage(current + delta);
+    }
+    // Vom Kalender-Widget (static/js/calendar-picker.js) beim Klick auf einen
+    // Tag mit Daten aufgerufen — rechnet den gewählten Tag in "wie viele
+    // Perioden des aktuell gewählten Zeitraum-Typs liegt er hinter der
+    // jeweils laufenden Periode" um, dieselbe Offset-Definition wie
+    // query._window() in query.py (0 = aktuell, -1 = eine Periode zurück, …),
+    // pro Zeitraum-Typ an dessen eigener Kalendergrenze ausgerichtet
+    // (Kalenderwoche Mo–So bei "week", Kalendermonat bei "month", …) —
+    // inhaltlich identisch zu jumpToDate() in entity_detail.html. 12 Uhr ist
+    // für Stunde/Tag ein stabiler Anker mitten im gewählten Datum und vermeidet
+    // Randfälle an Sommerzeitwechseln.
+    function jumpToDate(dateStr) {
+      if (!dateStr) return;
+      const rangeKey = document.getElementById('range-field').value;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const picked = new Date(y, m - 1, d, 12);
+      const pageData = Alpine.$data(document.querySelector('.page'));
+      pageData.rangeAnchorMs = picked.getTime();
+      const offset = rangeKey === 'all' ? 0 : PeriodNavigation.offsetForRange(rangeKey, pageData.rangeAnchorMs);
+      setOffset(offset, true);
+    }
+    function updateSelectedCount() {
+      const count = document.querySelectorAll('[name=ts]:checked').length;
+      const el = document.getElementById('selected-count');
+      if (el) el.textContent = count;
+      document.querySelectorAll('.needs-selection').forEach(btn => btn.disabled = count === 0);
+    }
+    // Header-Checkbox markiert/entmarkiert alle Zeilen der aktuell angezeigten
+    // Seite (serverseitiges Paging hier, Abschnitt 04/10 — im DOM stehen ohnehin
+    // nur die Zeilen der aktuellen Seite, "alle" und "alle dieser Seite" sind
+    // hier also dasselbe).
+    function toggleAllRows(headerCheckbox) {
+      document.querySelectorAll('[name=ts]').forEach(cb => { cb.checked = headerCheckbox.checked; });
+      updateSelectedCount();
+    }
+    document.body.addEventListener('change', e => { if (e.target.name === 'ts') updateSelectedCount(); });
+    document.body.addEventListener('htmx:afterSwap', updateSelectedCount);
+  </script>
+</body>
+</html>

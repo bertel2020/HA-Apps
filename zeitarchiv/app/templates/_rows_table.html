@@ -1,0 +1,102 @@
+<!-- hx-swap-oob: dieses Element sitzt in Wirklichkeit oben in #controls,
+     außerhalb von #rows-table (dem hx-target dieses Requests) — damit die
+     Zeitraum-Chips (statisch) und diese Navigation (serverseitig berechnet)
+     trotzdem in derselben Zeile stehen können, siehe Kommentar in
+     cleanup.html. htmx erkennt "id" hier und swappt gegen das gleichnamige
+     Element im Rest der Seite, statt es in #rows-table einzufügen. -->
+<div class="nav" id="rows-nav" hx-swap-oob="true">
+  <button class="btn navbtn" {% if range == 'all' %}disabled{% endif %} onclick="stepOffset(-1)" aria-label="Vorheriger Zeitraum">‹</button>
+  <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ base | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
+    <button type="button" class="period-label" :disabled="range === 'all'" @click="toggle()" :title="range === 'all' ? '' : 'Zu einem bestimmten Zeitpunkt springen'">{{ period_label }}</button>
+    {% include "_calendar_popover.html" %}
+  </div>
+  <button class="btn navbtn" {% if range == 'all' or offset >= 0 %}disabled{% endif %} onclick="stepOffset(1)" aria-label="Nächster Zeitraum">›</button>
+  <button class="chip" {% if offset == 0 %}disabled{% endif %} onclick="setOffset(0)">Jetzt</button>
+  <script>
+    // Das komplette serverseitig berechnete Fenster im .page-Scope nachziehen.
+    // Es steuert sowohl calendarPicker() als auch den stabilen Zoom-Anker beim
+    // Wechsel der Zeitraum-Auflösung (analog zu entity_detail.html).
+    (() => {
+      const pageData = window.Alpine ? Alpine.$data(document.querySelector('.page')) : null;
+      if (pageData) {
+        pageData.windowStart = {{ window_start_ts }};
+        pageData.windowEnd = {{ window_end_ts }};
+        pageData.isCurrent = {{ is_current | tojson }};
+      }
+    })();
+  </script>
+</div>
+
+{% if rows %}
+<div class="tbl-wrap">
+  <table class="dt compact">
+    <tr>
+      {% if mode == 'correct' %}
+      <th></th>
+      {% else %}
+      <th><input type="checkbox" onchange="toggleAllRows(this)" title="Alle auf dieser Seite auswählen"></th>
+      {% endif %}
+      <th>Zeitstempel</th><th>Wert</th><th>Status</th>
+    </tr>
+    {% for row in rows %}
+    <tr class="{{ 'flag' if row.flags else '' }}">
+      {% if mode == 'correct' %}
+      <td><button type="button" class="correct-edit-btn" title="Wert korrigieren" onclick="startCorrect(this)">✎</button></td>
+      {% else %}
+      <td><input type="checkbox" name="ts" value="{{ row.ts }}"></td>
+      {% endif %}
+      <td>{{ row.formatted_ts }}</td>
+      {% if mode == 'correct' %}
+      <td class="correct-value-cell" data-ts="{{ row.ts }}" data-old-value="{{ row.value }}">{{ row.formatted_value }}</td>
+      {% else %}
+      <td>{{ row.formatted_value }}</td>
+      {% endif %}
+      <td>
+        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}</span>{% endfor %}
+        {% if not row.flags %}&mdash;{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="tbl-wrap"><div class="empty">Keine Werte in diesem Zeitraum/Filter.</div></div>
+{% endif %}
+
+{% if pagination.page_size %}
+<div class="pager">
+  <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+  <button class="btn navbtn" onclick="stepPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
+  <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+  <button class="btn navbtn" onclick="stepPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+</div>
+{% endif %}
+
+<div class="actionbar">
+  {% if mode == 'correct' %}
+  <span style="color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));">✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.</span>
+  {% else %}
+  <strong><span id="selected-count">0</span> ausgewählt</strong>
+  <button class="btn primary needs-selection" disabled
+          hx-post="{{ base }}/entities/{{ entity_id }}/rows/delete"
+          hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
+          hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
+    Löschen
+  </button>
+  <button class="btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
+          hx-post="{{ base }}/entities/{{ entity_id }}/rows/undo-preview"
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+    Rückgängig (letzte Löschung)
+  </button>
+  <button class="btn btn-danger-outline"
+          {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"
+          {% elif filter != 'duplicates' %}disabled title="Erst den Filter „Duplikate” wählen"{% endif %}
+          hx-post="{{ base }}/entities/{{ entity_id }}/rows/duplicates-preview"
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+    Duplikate automatisch entfernen
+  </button>
+  {% endif %}
+  <span style="margin-left:auto;color:var(--ink-faint);font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));">
+    {{ counts.all }} gesamt{% if outlier_detection_enabled %} &middot; {{ counts.outliers }} Ausreißer{% endif %}{% if gap_detection_enabled %} &middot; {{ counts.gaps }} Lücken{% endif %} &middot; {{ counts.duplicates }} Duplikate
+  </span>
+</div>

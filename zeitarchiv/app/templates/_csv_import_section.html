@@ -1,0 +1,106 @@
+<div id="csv-section">
+{% if not csv_uploaded %}
+<div id="csv-upload-area">
+  <label class="dropzone" id="csv-dropzone" for="csv-file-input" role="button" tabindex="0">
+    <p>CSV-Datei hierher ziehen oder klicken zum Auswählen</p>
+    <p class="hint2">
+      Max. {{ import_limits.csv_upload_mib }} MiB. Wird gespeichert, bis du sie wieder löschst
+      &mdash; Spalten/Format wählst du im nächsten Schritt.
+    </p>
+    <input type="file" name="file" id="csv-file-input" accept=".csv" style="display:none;"
+           hx-post="import/csv/upload" hx-trigger="change" hx-encoding="multipart/form-data"
+           hx-target="#csv-section" hx-swap="outerHTML"
+           hx-on::response-error="alert('Bitte eine CSV-Datei hochladen.')">
+  </label>
+</div>
+{% else %}
+<form id="csv-form">
+  <div class="import-delete-row">
+    <button type="button" class="btn btn-danger import-delete-button"
+            hx-post="import/csv/delete" hx-target="#csv-section" hx-swap="outerHTML"
+            hx-confirm="Hochgeladene CSV-Datei und ihre aktuelle Importkonfiguration wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten."
+            data-confirm-label="Quelldaten löschen">Quelldaten löschen</button>
+  </div>
+  <div class="toolbar">
+    <span class="source-badge">{{ csv_filename }}</span>
+  </div>
+
+  <div class="csv-config">
+    <div class="field">
+      <label>Trennzeichen</label>
+      <select name="delimiter" hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
+        {% for value, label in delimiter_options %}
+        <option value="{{ value }}" {% if value == delimiter %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label class="checkbox-label">
+        <input type="checkbox" name="has_header" {% if has_header %}checked{% endif %}
+               hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
+        Datei hat eine Kopfzeile
+      </label>
+    </div>
+  </div>
+
+  {% if columns %}
+  <div class="tbl-wrap" style="margin:14px 0;">
+    <table class="dt compact">
+      <tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr>
+      {% for sample_row in sample_rows %}
+      <tr>{% for cell in sample_row %}<td class="mono">{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+  </div>
+  <p class="hint" style="margin:0 0 14px;">{{ total_lines }} Datenzeile(n) in der Datei &mdash; Vorschau zeigt die ersten {{ sample_rows | length }}.</p>
+
+  <div class="csv-config">
+    <div class="field">
+      <label>Zeitstempel-Spalte</label>
+      <select name="ts_col">
+        {% for col in columns %}
+        <option value="{{ loop.index0 }}" {% if loop.index0 == ts_col %}selected{% endif %}>{{ col }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Wert-Spalte</label>
+      <select name="value_col">
+        {% for col in columns %}
+        <option value="{{ loop.index0 }}" {% if loop.index0 == value_col %}selected{% endif %}>{{ col }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Zeitstempel-Format</label>
+      <select name="ts_format" onchange="toggleCustomTsPattern(this.value)">
+        {% for value, label in ts_format_options %}
+        <option value="{{ value }}" {% if value == ts_format %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field" id="custom-ts-pattern-field" style="{{ '' if ts_format == 'custom' else 'display:none;' }}">
+      <label>Eigenes Format (strptime, z. B. %d.%m.%Y %H:%M:%S)</label>
+      <input type="text" name="custom_pattern" class="map-input" value="{{ custom_pattern }}" placeholder="%d.%m.%Y %H:%M:%S">
+    </div>
+    <div class="field">
+      <label>→ HA-Entität</label>
+      <span class="map-picker">
+        <input type="text" class="map-input" name="entity_id" list="entity-datalist" value="{{ entity_id }}"
+               placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)">
+        <button type="button" class="map-clear" title="Auswahl ändern" aria-label="Ausgewählte HA-Entität entfernen" onclick="clearMapping(this)">×</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <button type="button" class="btn" hx-post="import/csv/dry-run" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
+    <button type="button" class="btn primary" hx-post="import/csv/start" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML">Import starten</button>
+  </div>
+  <div id="csv-import-output"></div>
+  {% else %}
+  <div class="empty">Datei enthält keine Zeilen.</div>
+  {% endif %}
+</form>
+{% endif %}
+</div>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — CSV-Export</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  th a{
+    display:block;width:100%;padding:8px 0;text-align:left;font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);text-decoration:none;
+  }
+  th a.active{color:var(--accent-line);}
+  th a:hover{color:var(--accent-line);}
+
+  /* Feste Spaltenbreiten wie in der Entitäten-Übersicht (_entities_table.html) —
+     aus echten Textmessungen abgeleitet (Header-Label und längster tatsächlich
+     vorkommender Wert je Spalte), nicht geschätzt. Entität bewusst schmaler als
+     ihr voller Inhaltsbedarf (Name/ID bis 376px) — Kürzung + Tooltip statt
+     einer Tabelle, die sich am längsten Entitätsnamen ausrichtet. */
+  table.export-dt{table-layout:fixed;min-width:730px;}
+  .col-entity{width:34%;}   /* Name+ID gekürzt mit Tooltip statt volle Breite */
+  .col-type{width:15%;}     /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
+  .col-unit{width:11%;}     /* Header "Einheit" ≈ 39px + Puffer */
+  .col-rows{width:14.5%;}   /* Header "Datensätze" ≈ 63px + Puffer */
+  .col-actions{width:25.5%;} /* Button "CSV herunterladen" ≈ 138px + Puffer */
+  .export-dt th.centered a{text-align:center;}
+  .export-dt td.centered{text-align:center;vertical-align:middle;}
+  .export-dt td.actions{text-align:right;}
+
+  /* Name und ID werden in der Zelle gekürzt; der gemeinsame zweizeilige
+     Entitäten-Tooltip sitzt direkt auf der nicht geclippten Tabellenzelle. */
+  td.entity .name{display:block;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  td.entity .id{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  td.entity .name.mono{font-family:var(--font-mono);font-weight:600;}
+
+  td.actions a.btn{white-space:nowrap;}
+  .empty-note{color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));padding:24px 0;}
+
+  .export-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Export</p>
+    <h1>CSV-Export</h1>
+    <p class="sub">Lädt die komplette Rohdaten-Historie einer Entität als CSV herunter &mdash; Hot Buffer und Archiv zusammengeführt, zur Löschung markierte Datensätze ausgeschlossen.</p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'export' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+
+        <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
+             hx-get="export-table" hx-include="#controls" hx-target="#export-table" hx-swap="innerHTML">
+          <input type="search" name="search" placeholder="Entität oder Name suchen …">
+          <label class="filter-chip"><input type="checkbox" name="type" value="all" checked onchange="onExportTypeAllChange(this)"><span>Alle</span></label>
+          <label class="filter-chip"><input type="checkbox" name="type" value="standard" onchange="onExportTypeSpecificChange(this)"><span>Standard</span></label>
+          <label class="filter-chip"><input type="checkbox" name="type" value="counter" onchange="onExportTypeSpecificChange(this)"><span>Zähler</span></label>
+          <label class="filter-chip"><input type="checkbox" name="type" value="switch" onchange="onExportTypeSpecificChange(this)"><span>Schalter</span></label>
+          <select name="unit" title="Nach Einheit filtern">
+            <option value="all">Alle Einheiten</option>
+            {% for opt in unit_options %}
+            <option value="{{ opt.value }}">{{ opt.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div id="export-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/vendor/htmx.min.js"></script>
+  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script>
+    function onExportTypeAllChange(checkbox) {
+      if (checkbox.checked) {
+        document.querySelectorAll('input[name=type]:not([value=all])').forEach(cb => cb.checked = false);
+      } else {
+        checkbox.checked = true;
+      }
+    }
+    function onExportTypeSpecificChange(checkbox) {
+      document.querySelector('input[name=type][value=all]').checked = false;
+      const anyChecked = Array.from(document.querySelectorAll('input[name=type]:not([value=all])')).some(cb => cb.checked);
+      if (!anyChecked) document.querySelector('input[name=type][value=all]').checked = true;
+    }
+  </script>
+</body>
+</html>

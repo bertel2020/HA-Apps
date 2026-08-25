@@ -1,0 +1,47 @@
+<div class="tbl-wrap">
+  {% if rows %}
+  <table class="dt export-dt">
+    <colgroup>
+      <col class="col-entity">
+      <col class="col-type">
+      <col class="col-unit">
+      <col class="col-rows">
+      <col class="col-actions">
+    </colgroup>
+    <tr>
+      {% for col in columns %}
+      <th class="{{ 'centered' if col.key == 'type' else '' }}">
+        <a href="export-table?sort={{ col.key }}&dir={{ col.next_dir }}&search={{ search | urlencode }}&unit={{ unit | urlencode }}{% for t in type %}&type={{ t }}{% endfor %}"
+           class="{{ 'active' if col.active else '' }}"
+           hx-get="export-table?sort={{ col.key }}&dir={{ col.next_dir }}"
+           hx-include="#controls" hx-target="#export-table" hx-swap="innerHTML">
+          {{ col.label }}{% if col.active %} {{ col.arrow }}{% endif %}
+        </a>
+      </th>
+      {% endfor %}
+      <th></th>
+    </tr>
+    {% for row in rows %}
+    <tr>
+      <td class="entity entity-tooltip-host" tabindex="0">
+        {% if row.friendly_name %}
+        <span class="name">{{ row.friendly_name }}</span>
+        <span class="id">{{ row.entity_id }}</span>
+        {% else %}
+        <span class="name mono">{{ row.entity_id }}</span>
+        {% endif %}
+        <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
+      </td>
+      <td class="centered"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>
+      <td>{{ row.unit or "—" }}</td>
+      <td>{{ "{:,}".format(row.row_count).replace(",", ".") }}</td>
+      <td class="actions">
+        <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" {% if row.row_count == 0 %}aria-disabled="true" style="pointer-events:none;opacity:.4;"{% endif %}>CSV herunterladen</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">{% if search or (type and type != ['all']) or (unit and unit != 'all') %}Keine Entität passt zu diesem Filter.{% else %}Noch keine Entitäten vorhanden.{% endif %}</div>
+  {% endif %}
+</div>

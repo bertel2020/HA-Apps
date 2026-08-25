@@ -1,0 +1,19 @@
+<div id="import-progress" style="border-top:1px solid var(--border);padding-top:16px;"
+     hx-get="import/progress" hx-trigger="every 500ms" hx-target="this" hx-swap="outerHTML">
+  {% if phase == "planning" %}
+  <h3 class="eyebrow" style="margin-bottom:10px;">Schritt 1/2 &middot; Berechne Vorschau&hellip;</h3>
+  <p style="margin:0 0 8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
+    {% if current_variable %}Symcon-ID <strong style="color:var(--ink);font-family:var(--font-mono);">{{ current_variable }}</strong> &middot; {% endif %}
+    <strong style="color:var(--ink);">{{ planned_variables }}</strong> von <strong style="color:var(--ink);">{{ total_variables }}</strong> Variablen geprüft
+  </p>
+  {% else %}
+  <h3 class="eyebrow" style="margin-bottom:10px;">Schritt 2/2 &middot; Import läuft&hellip;</h3>
+  <p style="margin:0 0 8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
+    {% if current_variable %}Symcon-ID <strong style="color:var(--ink);font-family:var(--font-mono);">{{ current_variable }}</strong> &middot; {% endif %}
+    <strong style="color:var(--ink);">{{ done_months }}</strong> von <strong style="color:var(--ink);">{{ total_months }}</strong> Monaten &middot; <strong style="color:var(--ink);">{{ rows_imported }}</strong> Datensätze geschrieben
+  </p>
+  {% endif %}
+  <div style="height:8px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--border);overflow:hidden;">
+    <div style="height:100%;width:{{ percent }}%;background:var(--accent-line);transition:width .3s ease;"></div>
+  </div>
+</div>

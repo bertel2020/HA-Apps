@@ -1,0 +1,50 @@
+<p>API-Token für die Home-Assistant-Integration &mdash; wird beim ersten Start automatisch sicher erzeugt und kann hier erneuert werden. Zum Einrichten der Integration (<strong>Einstellungen → Geräte &amp; Dienste → Zeitarchiv</strong>) hier kopieren.</p>
+
+<div class="field">
+  <label>Verbindungsstatus</label>
+  <div class="status-grid connection-status-grid">
+    <div class="connection-status-cards">
+      <div class="status-card">
+        <span class="hint">Letzter empfangener Wert</span>
+        <strong class="status-card-mono">{{ last_write_at or "Noch kein Wert" }}</strong>
+      </div>
+      <div class="status-card">
+        <span class="hint">Schreibzugriffe seit Start</span>
+        <strong>{{ write_requests_ok }}</strong>
+      </div>
+      <div class="status-card{% if auth_failures %} status-card-danger{% endif %}">
+        <span class="hint">Auth-Fehler seit Start</span>
+        <strong>{{ auth_failures }}</strong>
+        {% if last_auth_failure_at %}<span class="status-card-detail">Zuletzt {{ last_auth_failure_at }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="connection-status-note">
+      <p class="hint connection-status-note-item">
+        <strong>Zähler seit App-Neustart</strong>
+        <span>Seit {{ server_started_at }} · nicht historisch</span>
+      </p>
+      <p class="hint connection-status-note-item">
+        <strong>Bei Auth-Fehlern</strong>
+        <span>Meist ist der Token in der Home-Assistant-Integration ungültig, etwa nach „Neu generieren“. Werte einzelner Entitäten stehen in der <a href="entities">Entitäten-Übersicht</a>.</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="field">
+  <label>API-Token</label>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div class="val mono" id="token-value" data-token="{{ api_token }}" data-masked="true" style="flex:1;min-width:200px;">••••••••••••••••</div>
+    <button type="button" class="btn" onclick="toggleTokenVisibility(this)">Anzeigen</button>
+    <button type="button" class="btn" onclick="copyToken()">Kopieren</button>
+  </div>
+  <p class="hint" id="token-copy-status">&nbsp;</p>
+</div>
+<div style="display:flex;gap:8px;">
+  <button type="button" class="btn"
+          hx-post="settings/token/generate" hx-target="#verbindung-form" hx-swap="innerHTML"
+          hx-confirm="Neuen Token erzeugen? Der bisherige wird sofort ungültig — die Integration in Home Assistant muss danach mit dem neuen Wert aktualisiert werden.">
+    Neu generieren
+  </button>
+</div>
+{% if token_saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

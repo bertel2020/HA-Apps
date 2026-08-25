@@ -1,0 +1,101 @@
+<div id="backup-status">
+  {% if backup_message %}
+  <p style="margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);">
+    {{ backup_message }}
+  </p>
+  {% endif %}
+  {% if backup_error %}
+  <p style="margin:0 0 12px;color:var(--danger);">Letzter Lauf fehlgeschlagen: {{ backup_error }}</p>
+  {% endif %}
+  <div style="margin:0 0 14px;">
+    <strong style="display:block;margin-bottom:7px;">Vorhandenes Backup importieren</strong>
+    <form hx-post="backup/import" hx-encoding="multipart/form-data"
+          hx-target="#backup-status" hx-swap="outerHTML">
+      <label class="backup-dropzone" data-backup-dropzone for="backup-import-input"
+             role="button" tabindex="0">
+        <span>Backup-ZIP hierher ziehen oder klicken zum Auswählen</span>
+        <span class="backup-dropzone-hint">
+          Max. {{ import_limits.zip_upload_gib }} GiB Upload, {{ import_limits.zip_uncompressed_gib }} GiB entpackt
+          und {{ import_limits.zip_members }} Einträge. Wird vor der Übernahme vollständig geprüft.
+        </span>
+        <input type="file" name="file" id="backup-import-input"
+               accept=".zip,application/zip" required hidden>
+      </label>
+      <p class="backup-upload-state" data-backup-upload-state aria-live="polite">
+        <span class="htmx-indicator">Upload und Prüfung laufen&hellip;</span>
+      </p>
+    </form>
+  </div>
+  <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML">
+    Backup jetzt erstellen
+  </button>
+  {% if backups %}
+  <div class="tbl-wrap" style="margin-top:14px;">
+    <table class="dt">
+      <tr><th>Erstellt</th><th>Größe</th><th></th></tr>
+      {% for b in backups %}
+      <tr>
+        <td>{{ b.created_at }}</td>
+        <td>{{ b.size }}</td>
+        <td style="text-align:right;">
+          <span style="display:inline-flex;align-items:center;gap:10px;">
+            <button type="button" class="btn"
+                    hx-post="backup/verify/{{ b.filename }}"
+                    hx-target="#backup-status" hx-swap="outerHTML">
+              Prüfen
+            </button>
+            <button type="button" class="btn btn-danger"
+                    hx-post="backup/restore/{{ b.filename }}"
+                    hx-target="#backup-status" hx-swap="outerHTML"
+                    hx-confirm="Backup {{ b.created_at }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.">
+              Wiederherstellen
+            </button>
+            <a class="btn" href="backup/download/{{ b.filename }}">Herunterladen</a>
+            <button type="button" class="btn btn-danger"
+                    hx-post="backup/delete/{{ b.filename }}"
+                    hx-target="#backup-status" hx-swap="outerHTML"
+                    hx-confirm="Backup {{ b.created_at }} endgültig löschen?">
+              Löschen
+            </button>
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="hint" style="margin-top:10px;">Noch kein Backup erstellt.</p>
+  {% endif %}
+  {% if backup_jobs %}
+  <h3 style="margin:24px 0 10px;">Ausführungsverlauf</h3>
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Dauer</th><th>Größe</th></tr>
+      {% for job in backup_jobs %}
+      <tr title="{{ job.error or '' }}">
+        <td>{{ job.created_at }}</td>
+        <td>{{ job.trigger }}</td>
+        <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>
+        <td>{{ job.duration }}</td>
+        <td>{{ job.size }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  {% if backup_rollbacks %}
+  <h3 style="margin:24px 0 10px;">Restore-Rollbacks</h3>
+  <p class="hint">Diese Verzeichnisse enthalten den Datenstand unmittelbar vor einer Wiederherstellung.</p>
+  {% for rollback in backup_rollbacks %}
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--border);">
+    <code>{{ rollback }}</code>
+    <button type="button" class="btn btn-danger"
+            hx-post="backup/rollback/delete/{{ rollback }}"
+            hx-target="#backup-status" hx-swap="outerHTML"
+            hx-confirm="Rollback {{ rollback }} endgültig löschen?">
+      Rollback löschen
+    </button>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>

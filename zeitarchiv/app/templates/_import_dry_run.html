@@ -1,0 +1,31 @@
+<div style="border-top:1px solid var(--border);padding-top:16px;">
+  <h3 class="eyebrow">Vorschau (nichts wurde geschrieben)</h3>
+
+  {% for plan in plans %}
+  <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px;">
+    <p style="margin:0 0 4px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));">{{ plan.variable_id }} → {{ plan.entity_id }}</p>
+    <p style="margin:0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
+      <strong style="color:var(--ink);">{{ plan.rows_to_import }}</strong> Datensätze würden importiert{% if plan.months_to_import %} ({{ plan.months_to_import | join(', ') }}){% endif %}
+    </p>
+    {% if plan.months_to_merge %}
+    <p style="margin:4px 0 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
+      <strong style="color:var(--ink);">{{ plan.rows_to_merge }}</strong> Datensätze würden in den laufenden Monat zusammengeführt ({{ plan.months_to_merge | join(', ') }}) &mdash; bereits vorhandene Zeitstempel werden dabei übersprungen
+    </p>
+    {% endif %}
+    {% if plan.months_to_skip %}
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">Übersprungen (Archivdatei existiert bereits): {{ plan.months_to_skip | join(', ') }}</p>
+    {% endif %}
+    {% if plan.skipped_rows %}
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ plan.skipped_rows }} Zeile(n) beim Einlesen übersprungen (nicht als Zeitstempel/Wert lesbar)</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% for error in errors %}
+  <div style="border:1px solid var(--danger);background:var(--danger-soft);border-radius:10px;padding:12px 16px;margin-bottom:10px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);">{{ error }}</div>
+  {% endfor %}
+
+  {% if not plans and not errors %}
+  <p style="font-size:calc(13px * var(--font-scale, 1));color:var(--ink-faint);">Keine Zuordnungen ausgefüllt — nichts zu importieren.</p>
+  {% endif %}
+</div>

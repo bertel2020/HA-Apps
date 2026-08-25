@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — {{ entity_id }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  h1.raw{font-family:var(--font-mono);font-size:calc(18.4px * var(--font-scale, 1));}
+  .h1-row{display:flex;align-items:center;gap:10px;}
+  .h1-row h1{margin:0;}
+  .fav-star{
+    background:none;border:none;cursor:pointer;font-size:calc(22px * var(--font-scale, 1));line-height:1;padding:2px;
+    color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+  /* Zwei feste Zeilen statt einer einzigen flex-wrap-Zeile: jeder Control hat
+     einen festen Platz und wird bei Zustandswechseln nur aktiviert/deaktiviert
+     (:disabled/.active), nie aus dem Layout entfernt — sonst rutschen
+     nachfolgende Buttons bei jedem Klick an eine andere Stelle bzw. in eine
+     andere Zeile, je nachdem wie viel Platz die gerade sichtbaren Controls
+     brauchen. */
+  .toolbars{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+  .toolbar{margin-bottom:0;}
+  .seg{
+    display:flex;border:1px solid var(--border);border-radius:8px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0;
+    scrollbar-width:none;
+  }
+  .seg::-webkit-scrollbar{display:none;}
+  .seg.seg-hidden{display:none;}
+  .seg button{
+    flex:none;padding:7px 12px;font-size:calc(12.5px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
+    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  .seg button:disabled{opacity:.35;cursor:default;}
+  .nav{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .period-label{
+    min-width:130px;text-align:center;white-space:nowrap;
+    font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;border-radius:6px;
+  }
+  .period-label:hover:not(:disabled){color:var(--accent-line);}
+  .period-label:disabled{cursor:default;}
+
+  /* Kalender-Widget für den Datums-Sprung — Aufbau/Verhalten identisch zur
+     Bereinigungs-Seite (cleanup.html), siehe static/js/calendar-picker.js. */
+  [x-cloak]{display:none!important;}
+  .cal-wrap{position:relative;display:inline-block;}
+  .calendar-popover{
+    /* left ist nur ein Platzhalter bis calendar-picker.js beim Öffnen die an
+       den Viewport geklemmte Position einträgt (siehe reposition() dort) —
+       ohne Klemmung ragt ein zentriertes Popover bei einem Anker nahe am
+       Fensterrand (schmale/mobile Fenster) über <html>s overflow-x:hidden
+       hinaus, wodurch ein Teil der Tage unklickbar wird, nicht nur
+       abgeschnitten aussieht. */
+    position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:12px;text-align:left;
+  }
+  .calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+  .calendar-header .navbtn{flex:none;}
+  .calendar-month-select,.calendar-year-select{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  }
+  .calendar-month-select{flex:1.4;min-width:0;}
+  .calendar-year-select{flex:1;min-width:0;}
+  /* CSS Grid statt Flexbox für Wochentag-Kopf/Tage-Raster: eine frühere
+     Flexbox-Variante (flex-wrap + feste %-Breite je Zelle) zerstückelte die
+     Wochen in mehrere, teils leere Zeilen sobald der Monat mit "leeren"
+     Füllzellen begann (jeder Monat, dessen 1. kein Montag ist — praktisch
+     jeder zweite) — sichtbar als große Lücken zwischen den Wochenreihen.
+     display:grid mit einer festen Spaltenzahl kennt dieses Wrap-Verhalten gar
+     nicht erst: jede Zelle landet unabhängig von ihrem Inhalt exakt in ihrer
+     Raster-Position. (Grid wurde früher wegen eines anderen, inzwischen
+     behobenen Bugs gemieden — CSS "zoom" brach die fr-Einheit-Berechnung in
+     Kombination mit aspect-ratio; seit die Schriftgröße-Einstellung kein
+     "zoom" mehr nutzt, siehe app.css, betrifft das nicht mehr.) */
+  .calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7, 1fr);}
+  .calendar-weekdays{margin-bottom:4px;}
+  .calendar-weekdays span{text-align:center;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+  .calendar-day{
+    height:32px;box-sizing:border-box;border:none;border-radius:6px;font-size:calc(12px * var(--font-scale, 1));background:transparent;color:var(--ink);
+    cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+  }
+  .calendar-day:hover:not(:disabled){background:var(--surface-alt);}
+  .calendar-day.blank{visibility:hidden;cursor:default;}
+  .calendar-day.out-of-range{color:var(--ink-faint);opacity:.3;}
+  .calendar-day.no-data{color:var(--ink-faint);text-decoration:line-through;opacity:.55;}
+  .calendar-day.has-data{color:var(--ink);font-weight:600;}
+  .calendar-day:disabled{cursor:default;}
+  .calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
+  .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+  .card{overflow:hidden;}
+  #chart{width:100%;height:380px;max-width:100%;}
+  .stat-line{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .stat-line strong{color:var(--ink);font-variant-numeric:tabular-nums;}
+  @media (max-width:480px){
+    #chart{height:280px;}
+    .card{padding:14px;}
+  }
+</style>
+</head>
+<body>
+  <div class="page" x-data="entityChart()">
+    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / {{ friendly_name or entity_id }}</p>
+    <div class="h1-row">
+      <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
+      <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
+              title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
+    </div>
+    <p class="sub">
+      {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten →</a> &middot; <a href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration →</a> &middot; <a href="{{ base }}/entities">&larr; Zurück</a>
+    </p>
+
+    <div class="toolbars">
+      <div class="toolbar">
+        <div class="seg">
+          <template x-for="r in ranges" :key="r.key">
+            <button :class="{active: range === r.key}" @click="setRange(r.key)" x-text="r.label"></button>
+          </template>
+        </div>
+        <div class="nav">
+          <button class="btn navbtn" @click="goBack()" aria-label="Vorheriger Zeitraum">‹</button>
+          <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ base | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
+            <!-- Bei Zeitraum "Dekade" gibt es keinen sinnvollen Sprungziel-
+                 Kalender (siehe pickerMode in calendar-picker.js, dort auch
+                 "none") — der Button bleibt bestehen (für Layout-Konsistenz
+                 in der Toolbar), aber deaktiviert statt den Klick einfach
+                 ins Leere laufen zu lassen. -->
+            <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : 'Zu einem bestimmten Zeitpunkt springen'" x-text="periodLabel"></button>
+            {% include "_calendar_popover.html" %}
+          </div>
+          <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="Nächster Zeitraum">›</button>
+        </div>
+        <button class="chip" :class="{active: offset !== 0}" :disabled="offset === 0" @click="goToNow()">Jetzt</button>
+      </div>
+      <div class="toolbar">
+        <div class="seg">
+          <button :class="{active: chartType === 'line'}" :disabled="raw" @click="chartType='line'; load()">Linie</button>
+          <button :class="{active: chartType === 'bar'}" :disabled="raw" @click="chartType='bar'; load()">Balken</button>
+        </div>
+        <button class="chip" :class="{active: showPoints}" :disabled="chartType !== 'line'" @click="showPoints = !showPoints; render()">
+          Punkte
+        </button>
+        <button class="chip" :class="{active: continuous}" @click="toggleContinuous()">
+          Kontinuierlich
+        </button>
+        <button class="chip" :class="{active: raw}" :disabled="chartType !== 'line' || !['hour', 'day', 'week'].includes(range)" @click="toggleRaw()">
+          Rohwerte
+        </button>
+        <button class="chip" :class="{active: compare}" :disabled="raw" @click="toggleCompare()" x-text="compareLabel"></button>
+        <div class="seg" :class="{'seg-hidden': !(compare && !raw)}">
+          <button :class="{active: compareMode === 'previous'}" @click="compareMode='previous'; load()" x-text="comparePreviousLabel"></button>
+          <button :class="{active: compareMode === 'year'}" @click="compareMode='year'; load()" x-text="compareYearLabel"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="chart" x-show="points.length"></div>
+      <div class="empty" x-show="!points.length" x-text="loading ? 'Lädt …' : 'Keine Daten für diesen Zeitraum.'"></div>
+      <div class="stat-line" x-show="points.length">
+        <span>Punkte: <strong x-text="points.length"></strong></span>
+        <span x-show="!raw && (aggregationType === 'counter' || aggregationType === 'switch')">Summe: <strong x-text="fmtValue(total) + (UNIT ? ' ' + UNIT : '')"></strong></span>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
+  <script src="{{ base }}/static/vendor/echarts.min.js"></script>
+  <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
+  <script>
+    // Vom Kalender-Widget (static/js/calendar-picker.js) beim Klick auf einen
+    // Tag mit Daten aufgerufen — anders als auf der Bereinigungs-Seite (ein
+    // Tage-Block-Offset in einem versteckten Formularfeld) ist die Navigation
+    // hier ein Alpine-Zustand (range/offset in entityChart()), deshalb über
+    // Alpine.$data direkt an der Komponente gesetzt statt über ein DOM-Feld.
+    // Rechnet den gewählten Tag in "wie viele Perioden der aktuell gewählten
+    // Zeitraum-Auflösung liegt er hinter der jeweils laufenden Periode" um —
+    // dieselbe Offset-Definition wie _window() in query.py (0 = aktuell,
+    // -1 = eine Periode zurück, …), pro Zeitraum-Typ an dessen eigener
+    // Kalendergrenze ausgerichtet (Kalenderwoche Mo–So bei "week", Kalendermonat
+    // bei "month", …). 12 Uhr ist für Stunde/Tag ein stabiler Anker mitten im
+    // gewählten Datum und vermeidet Randfälle an Sommerzeitwechseln.
+    function jumpToDate(dateStr) {
+      const root = Alpine.$data(document.querySelector('.page'));
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const picked = new Date(y, m - 1, d, 12);
+      root._rangeAnchorMs = picked.getTime();
+      root.offset = PeriodNavigation.offsetForRange(root.range, root._rangeAnchorMs);
+      root.load();
+    }
+
+    const ENTITY_ID = {{ entity_id | tojson }};
+    const DISPLAY_NAME = {{ (friendly_name or entity_id) | tojson }};
+    const BASE = {{ base | tojson }};
+    const UNIT = {{ (unit or '') | tojson }};
+    // null = "Automatisch" (Konzept Abschnitt 03) — sonst feste Anzahl Nachkommastellen,
+    // pro Entität im Konfigurationsbereich einstellbar.
+    const DECIMALS = {{ decimals | tojson }};
+    const DEFAULT_CHART_TYPE = {{ ('bar' if aggregation_type in ('counter', 'switch') else 'line') | tojson }};
+
+    // Rohwerte kommen als JS-Floats mit Rauschen im letzten Bit (z. B. 0.0003999999998995918
+    // statt 0.0004) — bei DECIMALS=null (Automatisch) auf 4 signifikante Stellen runden statt
+    // fest auf 2 Nachkommastellen, sonst verschwinden kleine Zähler-Deltas (z. B. Wh-Bereich
+    // bei einer kWh-Einheit) optisch komplett zu "0.00", obwohl echte Werte vorhanden sind.
+    // Mit explizit gesetztem DECIMALS wird stattdessen immer auf genau diese Stellenzahl
+    // gerundet, auch wenn das Nullen anhängt.
+    function fmtValue(v) {
+      if (v == null || Number.isNaN(v)) return '';
+      if (DECIMALS != null) return v.toFixed(DECIMALS);
+      if (v === 0) return '0';
+      return Number(v.toPrecision(4)).toString();
+    }
+
+    // Eigenständige Funktion statt Alpine-Getter, damit sie sowohl für die
+    // aktuelle Periode (Toolbar-Label) als auch für die Vorperiode (Legenden-
+    // Beschriftung des Vergleichs-Serie in render()) genutzt werden kann.
+    // skipRelative unterdrückt "Heute"/"Gestern" — für die Vorjahres-Vergleichslabel
+    // wäre offset===-1 sonst als "Gestern" missverständlich, obwohl der Zeitraum ein
+    // ganzes Jahr zurückliegt und nur zufällig denselben rechnerischen offset teilt.
+    function formatPeriodLabel(range, continuous, windowStart, windowEnd, offset, isCurrent, skipRelative = false) {
+      if (windowStart == null || windowEnd == null) return '';
+      const start = new Date(windowStart * 1000);
+      // windowEnd ist exklusiv — für die Anzeige eine Sekunde zurück, sonst wirkt
+      // z. B. ein Monat so, als würde er schon im Folgemonat enden.
+      const end = new Date(windowEnd * 1000 - 1000);
+      const fmtDay = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const fmtDayMonth = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+      const fmtMonthYear = d => d.toLocaleDateString('de-DE', {month: 'long', year: 'numeric'});
+      const fmtTime = d => d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+      switch (range) {
+        case 'hour':
+          return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
+        case 'day':
+          if (!continuous) {
+            if (!skipRelative && offset === 0) return 'Heute';
+            if (!skipRelative && offset === -1) return 'Gestern';
+            return fmtDay(start);
+          }
+          return `${fmtDay(start)} – ${fmtDay(end)}`;
+        case 'week':
+          return `${fmtDayMonth(start)}–${fmtDayMonth(end)} ${end.getFullYear()}`;
+        case 'month':
+          if (continuous) return `${fmtDay(start)} – ${fmtDay(end)}`;
+          return isCurrent ? `${fmtMonthYear(start)} (bis heute)` : fmtMonthYear(start);
+        case 'year':
+          if (continuous) return `${fmtMonthYear(start)} – ${fmtMonthYear(end)}`;
+          return isCurrent ? `${start.getFullYear()} (bis heute)` : `${start.getFullYear()}`;
+        case 'decade':
+          return `${start.getFullYear()}–${end.getFullYear()}`;
+        default:
+          return '';
+      }
+    }
+
+    // Name der "Vorperiode" beim Vergleich compareMode="previous" — welche
+    // Periode genau eine zurückliegt, hängt vom Zeitraum-Typ ab ("Vortag" bei
+    // "Tag", "Vormonat" bei "Monat", …). Genutzt für den Umschalt-Button
+    // (Seg neben "Vorjahr") und die Legenden-Beschriftung der Vergleichs-Serie
+    // in render() — beide sollen dasselbe Wort zeigen. Eigenständige Funktion
+    // aus demselben Grund wie formatPeriodLabel oben (zwei Aufrufstellen,
+    // eine davon außerhalb des Alpine-Objekts).
+    function previousPeriodLabel(range) {
+      const labels = {
+        hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche',
+        month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade',
+      };
+      return labels[range] || 'Vorperiode';
+    }
+
+    // Gegenstück zu previousPeriodLabel für compareMode="year" — dieselbe
+    // Periode, aber genau ein Jahr zurück statt eine Periode zurück (bei
+    // "Jahr" fallen beide Modi auf dasselbe Wort "Vorjahr").
+    function previousYearPeriodLabel(range) {
+      const labels = {
+        hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche',
+        month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade',
+      };
+      return labels[range] || 'Vorjahreszeitraum';
+    }
+
+    // Bewusst außerhalb des Alpine-x-data-Objekts: Alpine macht jede Eigenschaft
+    // dort reaktiv, indem es sie in einen Proxy einwickelt. ECharts verlässt sich
+    // intern (zrender-Eventsystem, WeakMap-Lookups per Objekt-Identität) darauf,
+    // dass `this` innerhalb seiner Methoden das echte Objekt ist, nicht ein Proxy
+    // — als `this.chart` reaktiv war, brach das lautlos (kein Fehler, aber
+    // dispatchAction/Tooltip reagierten nie), plus ein zusätzlicher zrender-Crash
+    // bei jedem Redraw. Ein normaler Closure-Variable reicht hier, weil es genau
+    // eine Chart-Instanz pro Seite gibt.
+    let chartInstance = null;
+
+    function entityChart() {
+      return {
+        ranges: [
+          {key: 'hour', label: 'Stunde'}, {key: 'day', label: 'Tag'}, {key: 'week', label: 'Woche'},
+          {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}, {key: 'decade', label: 'Dekade'},
+        ],
+        range: 'day',
+        chartType: DEFAULT_CHART_TYPE,
+        showPoints: false,
+        compare: false,
+        compareMode: 'previous',
+        raw: false,
+        offset: 0,
+        continuous: false,
+        points: [],
+        comparePoints: [],
+        compareWindowStart: null,
+        compareWindowEnd: null,
+        aggregationType: null,
+        windowStart: null,
+        windowEnd: null,
+        isCurrent: true,
+        loading: false,
+        _requestId: 0,
+        // Bleibt über mehrere reine Auflösungswechsel hinweg erhalten. Ohne
+        // diesen separaten Anker würde z. B. der 22. eines laufenden Monats
+        // beim Zwischenschritt "Monat" zu offset=0 werden und beim Zurück-
+        // wechseln auf "Tag" fälschlich auf heute springen.
+        _rangeAnchorMs: null,
+        get total() { return this.points.reduce((sum, p) => sum + (p.value || 0), 0); },
+        get canGoForward() { return this.offset < 0; },
+        // Generischer Zeitraum-Name statt "Vortag"/"Vorjahr" — der Umschalt-
+        // Button selbst legt (anders als früher) nicht mehr fest, WELCHE
+        // Vorperiode verglichen wird (das entscheidet compareMode: "Vorperiode"
+        // oder "Vorjahr", siehe comparePreviousLabel/Seg daneben), er
+        // aktiviert nur den Vergleich für den aktuellen Zeitraum-Typ.
+        get compareLabel() {
+          const r = this.ranges.find(r => r.key === this.range);
+          return `${r ? r.label : 'Zeitraum'} vergleichen`;
+        },
+        get comparePreviousLabel() {
+          return previousPeriodLabel(this.range);
+        },
+        get compareYearLabel() {
+          return previousYearPeriodLabel(this.range);
+        },
+        get periodLabel() {
+          return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.offset, this.isCurrent);
+        },
+
+        setRange(key) {
+          if (key === this.range) return;
+          // Nicht auf offset=0 ("jetzt") zurückspringen: Aus dem tatsächlich
+          // angezeigten Serverfenster einen zeitlichen Anker bilden und diesen
+          // in den Offset der neuen Auflösung übersetzen. So bleibt beim
+          // Zoomen Tag→Stunde das Datum, Woche→Tag die Woche usw. erhalten.
+          const anchorMs = this._rangeAnchorMs ?? PeriodNavigation.anchorForWindow(
+            this.windowStart, this.windowEnd, this.isCurrent
+          );
+          this._rangeAnchorMs = anchorMs;
+          const nextOffset = PeriodNavigation.offsetForRange(key, anchorMs);
+          this.range = key;
+          this.compare = false;
+          this.raw = false;
+          this.offset = nextOffset;
+          this.continuous = false;
+          this.load();
+        },
+        goBack() { this._rangeAnchorMs = null; this.offset -= 1; this.load(); },
+        goForward() {
+          if (this.canGoForward) { this._rangeAnchorMs = null; this.offset += 1; this.load(); }
+        },
+        goToNow() { this._rangeAnchorMs = null; this.offset = 0; this.load(); },
+        toggleContinuous() { this._rangeAnchorMs = null; this.continuous = !this.continuous; this.load(); },
+        toggleCompare() { this.compare = !this.compare; if (this.compare) this.raw = false; this.load(); },
+        // Raw-Modus (Konzept Abschnitt 06/10 "Hohe Dichte") zeigt Einzelmesswerte
+        // statt Buckets — ein Periodenvergleich zweier Rohwert-Serien ergibt kaum
+        // lesbaren Sinn, deshalb schließen sich beide Modi gegenseitig aus, und
+        // Balken (eine Bucket-Summe pro Balken) weichen automatisch der Linie.
+        toggleRaw() {
+          this.raw = !this.raw;
+          if (this.raw) { this.compare = false; this.chartType = 'line'; }
+          this.load();
+        },
+
+        async load() {
+          // Schutz gegen Race-Bedingungen: wenn schnell zwischen Zeiträumen geklickt
+          // wird, kann eine ältere Anfrage nach einer neueren zurückkommen — ohne
+          // diese Prüfung würde dann kurzzeitig der falsche Zeitraum gerendert
+          // (Achsen-Skalierung/Daten aus zwei verschiedenen Anfragen gemischt).
+          const requestId = ++this._requestId;
+          this.loading = true;
+          const params = new URLSearchParams({
+            entity_id: ENTITY_ID, range: this.range, offset: String(this.offset),
+            continuous: String(this.continuous), compare: String(this.compare),
+            compare_mode: this.compareMode, raw: String(this.raw), chart_type: this.chartType,
+          });
+          const res = await fetch(`${BASE}/api/query?${params}`);
+          const data = await res.json();
+          if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
+          this.points = data.points || [];
+          this.comparePoints = data.compare_points || [];
+          this.compareWindowStart = data.compare_window_start ?? null;
+          this.compareWindowEnd = data.compare_window_end ?? null;
+          this.aggregationType = data.aggregation_type;
+          this.windowStart = data.window_start;
+          this.windowEnd = data.window_end;
+          this.isCurrent = data.is_current;
+          this.loading = false;
+          this.$nextTick(() => this.render());
+        },
+
+        render() {
+          if (!this.points.length) return;
+          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          // Kurze, zum Zeitraum passende Beschriftung statt immer Datum+Uhrzeit —
+          // sonst überlappen sich die Achsenbeschriftungen bei vielen Punkten.
+          const fmt = ts => {
+            const d = new Date(ts * 1000);
+            if (this.range === 'hour' || this.range === 'day') {
+              return d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+            }
+            if (this.range === 'week' || this.range === 'month') {
+              return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+            }
+            if (this.range === 'decade') {
+              return d.toLocaleDateString('de-DE', {year: 'numeric'});
+            }
+            return d.toLocaleDateString('de-DE', {month: 'short', year: 'numeric'});
+          };
+          // Drittes Element je Datenpunkt: die TATSÄCHLICHE Zeit (unverschoben) —
+          // bei der Hauptreihe identisch zum x-Wert, bei der Vorperiode weiter unten
+          // nicht (die wird zeitlich verschoben, um sie optisch zu überlagern). Das
+          // Tooltip liest weiter unten bewusst dieses Feld statt des x-Werts, sonst
+          // würde die Vorperiode im Tooltip die heutige statt ihre echte Zeit zeigen.
+          const series = [{
+            name: DISPLAY_NAME,
+            type: this.chartType,
+            data: this.points.map(p => [p.ts * 1000, p.value, p.ts * 1000]),
+            itemStyle: {color: getComputedStyle(document.body).getPropertyValue(this.chartType === 'bar' ? '--chart-bar' : '--chart-line')},
+            lineStyle: {width: 1.5},
+            smooth: this.chartType === 'line',
+            // Ohne Deckelung errechnet ECharts die Balkenbreite auf einer
+            // Zeit-Achse aus dem Abstand zu benachbarten Punkten — bei nur
+            // einem einzigen Punkt (z. B. "Jahr" einer Entität, die erst
+            // diesen Monat zu senden begann) fehlt dieser Bezugspunkt völlig,
+            // wodurch der Balken einen Großteil der (jetzt bewusst bis zum
+            // Fensterende reichenden, siehe xAxis min/max oben) Achse
+            // einnimmt, statt nur die tatsächliche Bucket-Breite. barMaxWidth
+            // greift nur in diesem Sparse-Fall, bei vielen Balken ist die
+            // Auto-Breite ohnehin längst kleiner als das Limit.
+            barMaxWidth: 48,
+          }];
+          // symbol nie explizit auf undefined setzen (nur weglassen oder auf 'none') —
+          // ECharts' interne Options-Normalisierung stürzt bei einem explizit
+          // undefined gesetzten Schlüssel ab (siehe Kommentar bei der Legende unten).
+          if (this.chartType === 'line' && !this.showPoints) {
+            series[0].symbol = 'none';
+          }
+          if (this.compare && this.comparePoints.length) {
+            // Die Vorperiode um die exakte Differenz der beiden Fenster-Startzeiten
+            // verschieben, NICHT per Array-Index auf die Hauptreihe mappen — Index-
+            // Mapping brach, sobald die aktuelle Periode weniger Punkte hatte als die
+            // Vorperiode (z. B. eine gerade erst begonnene Stunde vs. eine volle
+            // Vorstunde): die überzähligen Punkte fielen auf ihre ursprünglichen,
+            // unverschobenen Zeitstempel zurück, wodurch die Linie mitten im Chart
+            // rückwärts auf der Zeitachse sprang — sichtbar als eine einzelne lange,
+            // quer durchs Diagramm laufende Gerade. Ein fester Zeit-Offset bleibt
+            // dagegen für beliebig unterschiedlich lange Punktreihen korrekt.
+            const shiftMs = (this.compareWindowStart != null && this.windowStart != null)
+              ? (this.windowStart - this.compareWindowStart) * 1000
+              : 0;
+            // Label der Vorperiode aus ihrem eigenen, vom Server gelieferten Fenster
+            // — NICHT aus der (evtl. noch unvollständigen) Dauer der aktuellen
+            // Periode abgeleitet, sonst zeigt das Label bei einer gerade erst
+            // begonnenen Stunde nur die paar verstrichenen Minuten der Vorstunde
+            // statt der vollen Vorstunde. Bei compareMode="year" bleibt der offset
+            // gegenüber der Hauptperiode gleich (nur das Fenster ist serverseitig
+            // um ein Jahr verschoben) — offset-1 würde hier fälschlich "Gestern"
+            // statt des tatsächlichen Datums vor einem Jahr anzeigen, deshalb
+            // skipRelative=true für diesen Modus.
+            const compareOffset = this.compareMode === 'year' ? this.offset : this.offset - 1;
+            const compareLabel = formatPeriodLabel(
+              this.range, this.continuous, this.compareWindowStart, this.compareWindowEnd,
+              compareOffset, false, this.compareMode === 'year'
+            );
+            const seriesLabel = this.compareMode === 'year' ? previousYearPeriodLabel(this.range) : previousPeriodLabel(this.range);
+            const compareSeries = {
+              name: compareLabel ? `${seriesLabel} (${compareLabel})` : seriesLabel, type: this.chartType,
+              data: this.comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000]),
+              itemStyle: {opacity: 0.45, color: getComputedStyle(document.body).getPropertyValue('--chart-bar')},
+              lineStyle: {width: 1.5},
+              barMaxWidth: 48,
+            };
+            if (this.chartType === 'line' && !this.showPoints) {
+              compareSeries.symbol = 'none';
+            }
+            series.push(compareSeries);
+          }
+          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+          const option = {
+            textStyle: {
+              fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              fontSize: Math.round(12 * uiFontScale * 10) / 10,
+            },
+            // containLabel: reserviert automatisch genug Platz für die Y-Achsen-
+            // Beschriftung — ein fester left-Wert reichte bei längeren formatierten
+            // Werten (z. B. "0.0347 kWh" bei kleinen Zähler-Deltas) nicht immer aus
+            // und schnitt die führende Ziffer links ab, was wie eine falsche/
+            // unplausible Skala aussah, obwohl nur die Beschriftung geclippt war.
+            grid: {left: 10, right: 20, top: UNIT ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
+            // min/max explizit auf das Abfragefenster fixiert, statt ECharts
+            // per Default auf den tatsächlichen Datenbereich auto-fitten zu
+            // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
+            // letzten tatsächlichen Wert auf, z. B. bei einer Entität, die seit
+            // Stunden nichts mehr gemeldet hat, statt konsistent bis zum
+            // Fensterende (bei "Heute" also bis zur aktuellen Uhrzeit) zu reichen.
+            xAxis: {
+              type: 'time',
+              min: this.windowStart != null ? this.windowStart * 1000 : undefined,
+              max: this.windowEnd != null ? this.windowEnd * 1000 : undefined,
+              // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
+              // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
+              // einem Bucket: die Achse reichte weit über das eigentliche Fenster
+              // hinaus) — boundaryGap:[0,0] unterbindet dieses Auto-Polster, min/max
+              // bleiben dadurch die tatsächlichen Achsengrenzen.
+              boundaryGap: [0, 0],
+              axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
+            },
+            yAxis: {
+              type: 'value',
+              name: UNIT || undefined,
+              nameLocation: 'end',
+              nameTextStyle: {align: 'left'},
+              axisLabel: {formatter: v => UNIT ? `${fmtValue(v)} ${UNIT}` : fmtValue(v)},
+            },
+            tooltip: {
+              trigger: 'axis',
+              // Eigener Formatter statt valueFormatter: bei aktivem Vergleich teilen
+              // sich beide Serien sonst einen gemeinsamen Zeit-Header (den x-Wert der
+              // Achsenposition) — für die Vorperiode ist das aber der VERSCHOBENE,
+              // nicht der tatsächliche Zeitpunkt (siehe Kommentar bei shiftMs oben).
+              // Jede Zeile bekommt hier stattdessen ihre eigene echte Zeit aus dem
+              // dritten Datenfeld.
+              // Nur Zeit + Wert je Zeile — keine Serien-Bezeichnung mehr (Farbpunkt
+              // vom Marker reicht zur Unterscheidung zwischen Haupt- und Vorperiode).
+              formatter: params => params.map(p => {
+                const d = new Date(p.data[2]);
+                const pad = n => String(n).padStart(2, '0');
+                const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                const val = UNIT ? `${fmtValue(p.value[1])} ${UNIT}` : fmtValue(p.value[1]);
+                return `<div style="display:flex;justify-content:space-between;gap:18px;">`
+                     + `<span>${p.marker}${time}</span>`
+                     + `<strong style="margin-left:8px;">${val}</strong></div>`;
+              }).join(''),
+              // appendToBody: die Karte hat overflow:hidden (verhindert, dass die
+              // Zeitraum-Buttons das Seitenlayout sprengen) — ohne appendToBody
+              // würde das Tooltip an den Kartenrändern abgeschnitten statt sichtbar
+              // über den Chart hinauszuragen.
+              appendToBody: true,
+            },
+            series,
+          };
+          // legend nur setzen, wenn wirklich gebraucht — ein explizit auf undefined
+          // gesetzter Komponenten-Key (statt ihn wegzulassen) lässt ECharts beim
+          // internen Normalisieren mit einer TypeError abstürzen, wodurch nicht nur
+          // die Legende fehlt, sondern serverseitig auch das komplette Tooltip nie
+          // rendert (der Fehler reißt den ganzen Render-Zyklus ab).
+          if (this.compare) option.legend = {bottom: 0};
+          chartInstance.setOption(option, true);
+          chartInstance.resize();
+        },
+
+        init() {
+          this.load();
+          window.addEventListener('resize', () => chartInstance && chartInstance.resize());
+          // ResizeObserver zusätzlich zu window-resize: die Kartenbreite kann sich
+          // auch ohne Fenster-Resize ändern (z. B. wenn die Toolbar umbricht).
+          new ResizeObserver(() => chartInstance && chartInstance.resize()).observe(document.getElementById('chart'));
+        },
+      };
+    }
+  </script>
+</body>
+</html>

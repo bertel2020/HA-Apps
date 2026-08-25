@@ -1,0 +1,37 @@
+{% if rows %}
+<div class="tbl-wrap">
+  <table class="dt" style="min-width:680px;">
+    <thead><tr><th>Entität</th><th>Messzeitpunkt</th><th>Markiert am</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td>
+          <a href="entities/{{ row.entity_id }}/cleanup"
+             onclick="document.getElementById('marked-points-dialog').close()">
+            <strong>{{ row.friendly_name or row.entity_id }}</strong>
+          </a>
+          {% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}
+        </td>
+        <td class="nowrap">{{ row.measured_at }}</td>
+        <td class="nowrap">{{ row.marked_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">Keine passenden markierten Datensätze gefunden.</div>
+{% endif %}
+
+<div class="pager">
+  <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+  <button class="btn navbtn" type="button"
+          hx-get="settings/purge/marked?page={{ pagination.page - 1 }}"
+          hx-include="#marked-points-search" hx-target="#marked-points-list"
+          {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
+  <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+  <button class="btn navbtn" type="button"
+          hx-get="settings/purge/marked?page={{ pagination.page + 1 }}"
+          hx-include="#marked-points-search" hx-target="#marked-points-list"
+          {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+</div>

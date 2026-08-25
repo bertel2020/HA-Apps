@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Backup / Restore</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Backup / Restore</p>
+    <h1>Backup / Restore</h1>
+    <p class="sub">Kompletten Datenbestand als ZIP-Datei sichern &mdash; manuell oder nach Zeitplan.</p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'backup' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        {% include "_settings_backup_form.html" %}
+      </div>
+    </div>
+  </div>
+  <script src="static/vendor/htmx.min.js"></script>
+  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="static/js/backup-import.js?v={{ js_v }}"></script>
+</body>
+</html>

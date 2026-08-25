@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Konfiguration — {{ entity_id }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  h1.raw{font-family:var(--font-mono);font-size:calc(18.4px * var(--font-scale, 1));}
+  .config-card{max-width:none;margin:20px 0 0;}
+  .config-card-header{margin-bottom:20px;}
+  .config-card-header h2{margin:0 0 4px;}
+  .config-card-header .hint{margin:0;}
+  #config-form{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 24px;
+  }
+  #config-form .field{margin:0;min-width:0;}
+  #config-form .field select{width:100%;min-width:0;}
+  #config-form .save-status{grid-column:1/-1;margin:0;}
+  .preview{grid-column:1/-1;margin-top:4px;padding-top:22px;border-top:1px solid var(--border);}
+  /* Uhrzeit auf derselben Zeile wie das Datum statt als eigene kleinere Zeile
+     darunter (wie in der Entitäten-Übersichtstabelle, wo die zweizeilige Form
+     für die dort eng bemessenen Spalten passt) — sonst wären "Erster/Letzter
+     Wert" allein durch die Uhrzeit-Zeile höher als die übrigen Kacheln in
+     derselben Reihe. */
+  .stat .ts-time{display:inline;font-family:inherit;font-size:inherit;font-weight:inherit;color:inherit;margin:0 0 0 8px;}
+  .entity-data-management{margin-top:28px;padding-top:22px;border-top:1px solid var(--border);}
+  .entity-data-management > .hint{margin:0 0 14px;}
+  .entity-data-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+  .entity-data-action{
+    display:flex;flex-direction:column;align-items:flex-start;gap:14px;
+    padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);
+  }
+  .entity-data-action > div{flex:1;}
+  .entity-data-action strong{display:block;margin-bottom:3px;}
+  .entity-data-action p{margin:0;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
+  .entity-data-action.danger{border-color:var(--danger);background:var(--danger-soft);}
+  .entity-data-action.danger strong{color:var(--danger);}
+  @media (max-width:700px){
+    #config-form,.entity-data-actions{grid-template-columns:1fr;}
+    #config-form .save-status,.preview{grid-column:1;}
+  }
+  @media (max-width:480px){
+    .config-card{padding:18px 16px;}
+    .entity-data-action .btn{width:100%;}
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / <a href="{{ base }}/entities/{{ entity_id }}">{{ friendly_name or entity_id }}</a> / Konfiguration</p>
+    <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
+    <p class="sub">
+      {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
+    </p>
+
+    <div class="stat-row">
+      <div class="stat"><div class="label">Typ</div><div class="value">{{ type_label }}</div></div>
+      <div class="stat"><div class="label">Einheit</div><div class="value">{{ unit }}</div></div>
+      <div class="stat"><div class="label">Datensätze</div><div class="value">{{ row_count }}</div></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="label">Erster Wert</div><div class="value">{{ first_ts }}{% if first_ts_time %}<span class="ts-time">{{ first_ts_time }}</span>{% endif %}</div></div>
+      <div class="stat"><div class="label">Letzter Wert</div><div class="value">{{ last_ts }}{% if last_ts_time %}<span class="ts-time">{{ last_ts_time }}</span>{% endif %}</div></div>
+      <div class="stat"><div class="label">Größe</div><div class="value">{{ size }}</div></div>
+    </div>
+
+    <div class="config-card">
+      <div class="config-card-header">
+        <h2>Konfiguration</h2>
+        <p class="hint">Individuelle Archivierungs-, Darstellungs- und Prüfregeln für diese Entität.</p>
+      </div>
+      <div id="config-form">
+        {% include "_entity_config_form.html" %}
+      </div>
+
+      <section class="entity-data-management" aria-labelledby="data-management-title">
+        <h2 id="data-management-title" style="margin:0 0 4px;">Datenverwaltung</h2>
+        <p class="hint">Endgültige Aktionen für die archivierten Daten dieser Entität.</p>
+
+        <div class="entity-data-actions">
+          <div class="entity-data-action">
+            <div>
+              <strong>Archivierte Werte löschen</strong>
+              <p>Entfernt alle Werte, Archive und Aggregationen. Die Entität und ihre Konfiguration bleiben erhalten.</p>
+            </div>
+            <button type="button" class="btn btn-danger-outline" id="delete-all-values-btn" onclick="deleteAllValues()">
+              Alle Werte löschen
+            </button>
+          </div>
+
+          <div class="entity-data-action danger">
+            <div>
+              <strong>Entität aus Zeitarchiv entfernen</strong>
+              <p>Löscht alle archivierten Werte und die individuelle Zeitarchiv-Konfiguration dieser Entität.</p>
+            </div>
+            <button type="button" class="btn btn-danger" id="delete-entity-btn" onclick="deleteEntity()">
+              Entität entfernen
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="{{ base }}/static/vendor/htmx.min.js"></script>
+  <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script>
+    const BASE = {{ base | tojson }};
+    const ENTITY_ID = {{ entity_id | tojson }};
+
+    async function deleteAllValues() {
+      const confirmed = await window.appConfirm(
+        `Wirklich ALLE archivierten Werte von ${ENTITY_ID} endgültig löschen? ` +
+        'Hot Buffer, Monatsarchive, Rollups und Löschmarkierungen werden entfernt. ' +
+        'Die Entität und ihre Konfiguration bleiben bestehen. Dies kann nicht rückgängig gemacht werden.',
+        {danger: true, confirmLabel: 'Alle Werte löschen'}
+      );
+      if (!confirmed) return;
+      const button = document.getElementById('delete-all-values-btn');
+      button.disabled = true;
+      try {
+        const response = await fetch(`${BASE}/entities/${ENTITY_ID}/values/delete-all`, {method: 'POST'});
+        if (!response.ok) throw new Error('delete failed');
+        window.location.reload();
+      } catch (error) {
+        button.disabled = false;
+        alert('Die Werte konnten nicht gelöscht werden.');
+      }
+    }
+
+    async function deleteEntity() {
+      const confirmed = await window.appConfirm(
+        `Entität ${ENTITY_ID} vollständig aus Zeitarchiv entfernen? ` +
+        'Alle Werte und ihre individuelle Zeitarchiv-Konfiguration werden endgültig gelöscht. ' +
+        'Wenn die Home-Assistant-Integration diese Entität weiter sendet, wird sie automatisch neu angelegt. ' +
+        'Dies kann nicht rückgängig gemacht werden.',
+        {danger: true, confirmLabel: 'Entität entfernen'}
+      );
+      if (!confirmed) return;
+      const button = document.getElementById('delete-entity-btn');
+      button.disabled = true;
+      try {
+        const response = await fetch(`${BASE}/entities/${ENTITY_ID}/delete`, {method: 'POST'});
+        if (!response.ok) throw new Error('delete failed');
+        window.location.href = `${BASE}/entities`;
+      } catch (error) {
+        button.disabled = false;
+        alert('Die Entität konnte nicht entfernt werden.');
+      }
+    }
+  </script>
+</body>
+</html>

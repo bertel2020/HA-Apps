@@ -1,0 +1,31 @@
+<form id="logging-form">
+  <div style="display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;">
+    <div class="field" style="margin:0;">
+      <label for="log-level">Anwendungs-Loglevel</label>
+      <select id="log-level" name="log_level"
+              hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
+              hx-target="#logging-form" hx-swap="outerHTML">
+        {% for key, label in log_level_options %}
+        <option value="{{ key }}" {% if key == log_level %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field" style="margin:0;">
+      <label for="access-log-mode">HTTP-Anfragen protokollieren</label>
+      <select id="access-log-mode" name="access_log_mode"
+              hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
+              hx-target="#logging-form" hx-swap="outerHTML">
+        {% for key, label in access_log_options %}
+        <option value="{{ key }}" {% if key == access_log_mode %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <p class="hint">
+    Wirkt sofort und bleibt nach Neustarts erhalten. „Alle Anfragen“ umfasst auch die häufigen
+    Schreibzugriffe der Home-Assistant-Integration und sollte nur zur Fehlersuche aktiviert werden.
+    Token, Passwörter und Authorization-Header werden unabhängig vom Loglevel maskiert.
+  </p>
+  <p style="margin:10px 0 0;"><a href="logs">Protokoll öffnen →</a></p>
+  {% if logging_saved %}<p class="save-status">✓ Gespeichert und aktiviert</p>{% endif %}
+</form>

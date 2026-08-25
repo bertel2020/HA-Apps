@@ -1,0 +1,100 @@
+<p class="hint" style="margin:0 0 14px;">Löscht Werte, die älter als die je Entität konfigurierte Aufbewahrungsfrist sind (Standardwert im Bereich "Archivierung" oben, Override je Entität auf deren Konfigurationsseite) &mdash; <strong>endgültig, nicht rückgängig zu machen</strong>. Entitäten mit "Unbegrenzt" bleiben davon immer unangetastet.</p>
+
+<div class="settings-subsection">
+<h3 class="settings-subsection-title">Automatische Durchsetzung</h3>
+<div class="status-grid">
+  <div class="status-card">
+    <span class="hint">Begrenzte Entitäten</span>
+    <strong>{{ limited_retention_count }}</strong>
+  </div>
+  <div class="status-card">
+    <span class="hint">Nächster Lauf</span>
+    <strong>{{ retention_next_run }}</strong>
+  </div>
+  <div class="status-card">
+    <span class="hint">Letzter Erfolg</span>
+    <strong>{{ retention_last_success }}</strong>
+  </div>
+  <div class="status-card">
+    <span class="hint">Letzter Fehler</span>
+    <strong>{{ retention_last_failure }}</strong>
+  </div>
+</div>
+
+<form id="retention-schedule-form"
+      hx-post="settings/retention-enforcement" hx-trigger="change"
+      hx-target="#retention-form" hx-swap="innerHTML" hx-include="#retention-schedule-form">
+  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+    <div class="field" style="margin:0;">
+      <label>Automatische Anwendung</label>
+      <select name="retention_enforcement">
+        <option value="off" {% if not retention_enforcement_enabled %}selected{% endif %}>Aus</option>
+        <option value="on" {% if retention_enforcement_enabled %}selected{% endif %}>An &mdash; täglich</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0;">
+      <label>Uhrzeit ({{ retention_timezone }})</label>
+      <input type="time" name="retention_enforcement_time" value="{{ retention_enforcement_time }}" required>
+    </div>
+  </div>
+</form>
+
+<p class="hint">Der Planer läuft unabhängig von Seitenaufrufen. Nach einer Downtime wird höchstens ein verpasster Lauf nachgeholt. Backup, Import, Rotation und Retention greifen niemals gleichzeitig auf den Datenbestand zu.</p>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;">
+  <button type="button" class="btn"
+          hx-post="settings/retention-enforcement/preview" hx-target="#retention-form" hx-swap="innerHTML">
+    Vorschau
+  </button>
+  <button type="button" class="btn btn-danger" {% if retention_running %}disabled{% endif %}
+          hx-post="settings/retention-enforcement/run" hx-target="#retention-form" hx-swap="innerHTML"
+          hx-confirm="Werte jenseits der konfigurierten Aufbewahrungsfrist jetzt endgültig löschen? Das lässt sich nicht rückgängig machen.">
+    {% if retention_running %}Retention läuft&hellip;{% else %}Jetzt anwenden{% endif %}
+  </button>
+</div>
+
+{% if result %}<p class="save-status">{{ result }}</p>{% endif %}
+</div>
+
+<div class="settings-subsection">
+<h3 class="settings-subsection-title">Bestand und Fälligkeit nach Aufbewahrungsfrist</h3>
+<div class="tbl-wrap">
+  <table class="dt" style="min-width:900px;">
+    <tr><th>Aufbewahrung</th><th>Entitäten</th><th>Bestand</th><th>Größe</th><th>Jetzt fällig</th><th>Freigebbar</th><th>Nächster Ablauf</th></tr>
+    {% for row in by_retention %}
+    <tr>
+      <td class="label">{{ row.label }}</td>
+      <td>{{ row.entity_count }}</td>
+      <td>{{ row.total_rows }}</td>
+      <td>{{ row.total_size }}</td>
+      <td>{{ row.rows_due }}{% if row.entities_due %}<span class="ts-time">{{ row.entities_due }} Entitäten · {{ row.months_due }} Monate</span>{% endif %}</td>
+      <td>{{ row.bytes_due }}</td>
+      <td class="nowrap">{{ row.next_expiration }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+<p class="hint" style="margin-top:10px;">Vorschau aktualisiert: <strong>{{ retention_preview_generated_at }}</strong></p>
+</div>
+
+{% if retention_jobs %}
+<div class="settings-subsection">
+<h3 class="settings-subsection-title">Ausführungsverlauf</h3>
+<div class="tbl-wrap">
+  <table class="dt">
+    <tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Entitäten</th><th>Zeilen</th><th>Monate</th><th>Freigegeben</th></tr>
+    {% for job in retention_jobs %}
+    <tr title="{{ job.error or '' }}">
+      <td>{{ job.created_at }}</td>
+      <td>{{ job.trigger }}</td>
+      <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>
+      <td>{{ job.entities_affected }}</td>
+      <td>{{ job.rows_deleted }}</td>
+      <td>{{ job.months_deleted }}</td>
+      <td>{{ job.bytes_freed }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+</div>
+{% endif %}

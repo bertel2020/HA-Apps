@@ -1,0 +1,71 @@
+<div class="tbl-wrap">
+  {% if rows %}
+  <table class="dt entities-dt">
+    <colgroup>
+      <col class="col-fav">
+      <col class="col-entity">
+      {% if 'type' in visible_columns %}<col class="col-type">{% endif %}
+      {% if 'first_ts' in visible_columns %}<col class="col-date">{% endif %}
+      {% if 'last_ts' in visible_columns %}<col class="col-date">{% endif %}
+      {% if 'resolution' in visible_columns %}<col class="col-resolution">{% endif %}
+      {% if 'retention' in visible_columns %}<col class="col-retention">{% endif %}
+      {% if 'unit' in visible_columns %}<col class="col-unit">{% endif %}
+      {% if 'rows' in visible_columns %}<col class="col-rows">{% endif %}
+      {% if 'size' in visible_columns %}<col class="col-size">{% endif %}
+    </colgroup>
+    <tr>
+      <th class="col-fav"></th>
+      {% for col in columns %}
+      <th class="{{ col.col_class }}">
+        <a href="entities-table?sort={{ col.key }}&dir={{ col.next_dir }}&search={{ search | urlencode }}&unit={{ unit | urlencode }}{% for t in type %}&type={{ t }}{% endfor %}"
+           class="{{ 'active' if col.active else '' }}"
+           hx-get="entities-table?sort={{ col.key }}&dir={{ col.next_dir }}"
+           hx-include="#controls" hx-target="#entities-table" hx-swap="innerHTML">
+          {{ col.label }}{% if col.active %} {{ col.arrow }}{% endif %}
+        </a>
+      </th>
+      {% endfor %}
+    </tr>
+    {% for row in rows %}
+    <tr>
+      <td class="fav-cell col-fav">
+        <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
+                title="Favorit" onclick="toggleFavorite('entities/{{ row.entity_id }}/favorite', this)">★</button>
+      </td>
+      <td class="entity col-entity">
+        <a href="entities/{{ row.entity_id }}" class="entity-tooltip-host">
+          {% if row.friendly_name %}
+            <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+          {% else %}
+            <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+          {% endif %}
+          <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
+        </a>
+      </td>
+      {% if 'type' in visible_columns %}<td class="va-mid col-type"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>{% endif %}
+      {% if 'first_ts' in visible_columns %}<td class="col-date">{{ row.first_ts }}{% if row.first_ts_time %}<span class="ts-time">{{ row.first_ts_time }}</span>{% endif %}</td>{% endif %}
+      {% if 'last_ts' in visible_columns %}<td class="col-date">{{ row.last_ts }}{% if row.last_ts_time %}<span class="ts-time">{{ row.last_ts_time }}</span>{% endif %}</td>{% endif %}
+      {% if 'resolution' in visible_columns %}<td class="va-mid col-resolution">{{ row.resolution_label }}</td>{% endif %}
+      {% if 'retention' in visible_columns %}<td class="va-mid col-retention">{{ row.retention_label }}</td>{% endif %}
+      {% if 'unit' in visible_columns %}<td class="va-mid col-unit">{{ row.unit or "—" }}</td>{% endif %}
+      {% if 'rows' in visible_columns %}<td class="va-mid col-rows">{{ "{:,}".format(row.row_count).replace(",", ".") }}</td>{% endif %}
+      {% if 'size' in visible_columns %}<td class="va-mid col-size">{{ row.size }}</td>{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">Keine Entitäten gefunden.</div>
+  {% endif %}
+</div>
+
+<div class="pager" style="justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    {% if pagination.page_size %}
+    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+    <button class="btn navbtn" onclick="stepEntitiesPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
+    <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+    <button class="btn navbtn" onclick="stepEntitiesPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+    {% endif %}
+  </div>
+  <span class="pager-stand">Stand: {{ generated_at }}</span>
+</div>

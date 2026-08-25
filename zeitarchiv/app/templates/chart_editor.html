@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — {{ chart_name or "Neuer Chart" }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .chart-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .chart-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
+
+  .entity-picker-field{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+  .entity-picker{
+    max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;
+    background:var(--surface);margin-top:8px;
+    /* Mehrspaltig statt einer langen einzelnen Liste — bei vielen Entitäten
+       bleibt die Auswahl so überschaubar, ohne die volle Breite des jetzt
+       einspaltigen Layouts (kein Entitäts-Picker mehr neben dem Chart, siehe
+       settings-layout/settings-nav) ungenutzt zu lassen. */
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  }
+  .entity-picker-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);cursor:pointer;}
+  .entity-picker-row:hover{background:var(--surface-alt);}
+  .entity-picker-row input{margin-top:3px;flex-shrink:0;}
+  .entity-picker-row .names{display:flex;flex-direction:column;min-width:0;}
+  .entity-picker-row .name{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entity-picker-row .id{font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .entity-names-field{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+  .entity-names-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;max-width:560px;}
+  .entity-name-row{display:flex;align-items:center;gap:10px;}
+  .entity-name-default{flex:0 0 200px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entity-name-row input{
+    flex:1;font-size:calc(13px * var(--font-scale, 1));padding:7px 10px;border-radius:7px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+  }
+
+  .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow-x:auto;max-width:100%;}
+  .seg button{
+    flex:none;padding:7px 12px;font-size:calc(12.5px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
+    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+
+  .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0;}
+  .period-label{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);display:block;margin-bottom:14px;}
+  #chart{width:100%;height:420px;max-width:100%;}
+  .card{overflow:hidden;}
+  .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
+  .save-row input[type=text]{
+    font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));padding:9px 14px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:200px;
+  }
+</style>
+</head>
+<body>
+  <div class="page" x-data="chartEditor()">
+    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/charts">Charts</a> / {{ chart_name or "Neuer Chart" }}</p>
+    <h1>Charts</h1>
+    <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ base }}/charts/new">+ Neuer Chart</a> &middot; <a href="{{ base }}/charts">&larr; Zurück</a></p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'charts' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        <div class="chart-title-row">
+          <h2 x-text="editing ? (chartId ? 'Chart bearbeiten' : 'Neuer Chart') : (name || 'Neuer Chart')"></h2>
+          {% if chart_id %}
+          <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
+          {% endif %}
+        </div>
+        <p class="sub" x-show="editing">Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.</p>
+
+        <div class="entity-picker-field" x-show="editing">
+          <label>Entitäten</label>
+          <input type="search" class="search" placeholder="Entität oder Name suchen …" style="width:100%;" oninput="filterEntityPicker(this.value)">
+          <div class="entity-picker" id="entity-picker">
+            {% for opt in entity_options %}
+            <label class="entity-picker-row" data-search="{{ (opt.label ~ ' ' ~ opt.entity_id) | lower }}">
+              <input type="checkbox" value="{{ opt.entity_id }}"
+                     {% if opt.entity_id in selected_entity_ids %}checked{% endif %}
+                     @change="toggleEntity('{{ opt.entity_id }}', $event.target.checked)">
+              <span class="names">
+                <span class="name">{{ opt.label }}</span>
+                <span class="id">{{ opt.entity_id }}</span>
+              </span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="entity-names-field" x-show="editing && selectedCount > 0">
+          <label>Angezeigte Namen (optional)</label>
+          <div class="entity-names-list">
+            {% for opt in entity_options %}
+            <div class="entity-name-row" x-show="selectedEntityIds.has('{{ opt.entity_id }}')">
+              <span class="entity-name-default">{{ opt.label }}</span>
+              <input type="text" placeholder="{{ opt.label }}" x-model="entityNames['{{ opt.entity_id }}']">
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="toolbar" x-show="editing">
+          <div class="seg">
+            {% for key, label in range_options %}
+            <button :class="{active: range === '{{ key }}'}" @click="setRange('{{ key }}')">{{ label }}</button>
+            {% endfor %}
+          </div>
+          <button class="chip" x-show="hasLineSeries" :class="{active: showPoints}" @click="showPoints = !showPoints; render()">Punkte</button>
+          <button class="chip" :class="{active: continuous}" @click="toggleContinuous()">Kontinuierlich</button>
+          <button class="chip" :class="{active: raw}" :disabled="!['hour', 'day', 'week'].includes(range)" @click="toggleRaw()">Rohwerte</button>
+        </div>
+        <div class="toolbar" x-show="editing">
+          <button class="chip" :class="{active: compare}" :disabled="raw" @click="toggleCompare()" x-text="compareLabel"></button>
+          <div class="seg" x-show="compare">
+            <button :class="{active: compareMode === 'previous'}" @click="compareMode='previous'; load()">Vorperiode</button>
+            <button :class="{active: compareMode === 'year'}" @click="compareMode='year'; load()">Vorjahr</button>
+          </div>
+        </div>
+
+        <span class="period-label" x-text="periodLabel"></span>
+
+        <div class="card">
+          <div id="chart" x-show="hasData"></div>
+          <div class="empty" x-show="!hasData" x-text="loading ? 'Lädt …' : (selectedCount === 0 ? 'Bitte mindestens eine Entität auswählen.' : 'Keine Daten für diesen Zeitraum.')"></div>
+        </div>
+
+        <div class="save-row" x-show="editing">
+          <input type="text" placeholder="Name des Charts …" x-model="name">
+          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if chart_id else "Chart erstellen" }}</button>
+          {% if chart_id %}
+          <button type="button" class="btn btn-danger" @click="deleteChart()">Löschen</button>
+          {% endif %}
+          <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
+  <script src="{{ base }}/static/vendor/echarts.min.js"></script>
+  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script>
+    const BASE = {{ base | tojson }};
+    const CHART_ID = {{ chart_id | tojson }};
+    const CHART_NAME = {{ chart_name | tojson }};
+    const RANGE_KEY = {{ range_key | tojson }};
+    const CONTINUOUS = {{ continuous | tojson }};
+    const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
+    const ENTITY_NAMES = {{ entity_names | tojson }};
+
+    // Feste Farbfolge statt ECharts' Auto-Zuordnung — nur so lässt sich bei
+    // aktivem Vergleich (siehe render()) die Vorperiode-Serie jeder Entität
+    // eindeutig ihrer Hauptserie zuordnen. Gedeckte, erdige Töne passend zum
+    // --accent-line/--accent-bar-Paar der Oberfläche, nicht die grellen
+    // ECharts-Standardfarben.
+    const PALETTE = Array.from({length: 8}, (_, i) =>
+      getComputedStyle(document.documentElement).getPropertyValue(`--chart-${i + 1}`).trim()
+    );
+    const UI_FONT_SCALE = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+
+    function fmtNum(v) {
+      if (v == null || Number.isNaN(v)) return '';
+      if (v === 0) return '0';
+      return Number(v.toPrecision(4)).toString();
+    }
+
+    function filterEntityPicker(value) {
+      const q = value.trim().toLowerCase();
+      document.querySelectorAll('#entity-picker .entity-picker-row').forEach(row => {
+        row.style.display = (!q || row.dataset.search.includes(q)) ? '' : 'none';
+      });
+    }
+
+    // Dieselbe Perioden-Beschriftungslogik wie auf der Entität-eigenen Chart-
+    // Seite (entity_detail.html) — hier bewusst ohne Vorperiode/Offset-
+    // Navigation, ein abgelegtes Chart zeigt beim Ansehen immer die aktuelle
+    // Periode (offset bleibt fest bei 0, siehe load()).
+    function formatPeriodLabel(range, continuous, windowStart, windowEnd, isCurrent) {
+      if (windowStart == null || windowEnd == null) return '';
+      const start = new Date(windowStart * 1000);
+      const end = new Date(windowEnd * 1000 - 1000);
+      const fmtDay = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const fmtDayMonth = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+      const fmtMonthYear = d => d.toLocaleDateString('de-DE', {month: 'long', year: 'numeric'});
+      const fmtTime = d => d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+      switch (range) {
+        case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
+        case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? 'Heute' : fmtDay(start));
+        case 'week': return `${fmtDayMonth(start)}–${fmtDayMonth(end)} ${end.getFullYear()}`;
+        case 'month': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? `${fmtMonthYear(start)} (bis heute)` : fmtMonthYear(start));
+        case 'year': return continuous ? `${fmtMonthYear(start)} – ${fmtMonthYear(end)}` : (isCurrent ? `${start.getFullYear()} (bis heute)` : `${start.getFullYear()}`);
+        case 'decade': return `${start.getFullYear()}–${end.getFullYear()}`;
+        default: return '';
+      }
+    }
+
+    // Bewusst außerhalb von x-data (siehe entity_detail.html: ECharts verlässt
+    // sich auf `this` als echtes Objekt, nicht Alpines reaktiven Proxy).
+    let chartInstance = null;
+
+    function chartEditor() {
+      return {
+        chartId: CHART_ID,
+        range: RANGE_KEY,
+        continuous: CONTINUOUS,
+        selectedEntityIds: new Set(SELECTED_ENTITY_IDS),
+        name: CHART_NAME,
+        entityNames: {...ENTITY_NAMES},
+        series: [],
+        windowStart: null,
+        windowEnd: null,
+        isCurrent: true,
+        compare: false,
+        compareMode: 'previous',
+        showPoints: false,
+        raw: false,
+        // Ein bereits gespeichertes Chart öffnet sich im reinen Anzeige-Modus
+        // (nur Chart + Zeitraum/Vergleich) — der "Anpassen"-Button schaltet
+        // erst dann Entitäts-Auswahl und Speichern/Löschen sichtbar. Ein noch
+        // ungespeichertes neues Chart hat nichts anzuzeigen, startet also
+        // direkt im Bearbeiten-Modus.
+        editing: !CHART_ID,
+        loading: false,
+        saving: false,
+        savedMessage: '',
+        _requestId: 0,
+
+        get selectedCount() { return this.selectedEntityIds.size; },
+        get hasData() { return this.series.some(s => s.points.length > 0); },
+        // "Punkte" markiert einzelne Datenpunkte auf einer Linie — für
+        // Balken-Serien (Zähler/Schalter, siehe chart_type-Kommentar bei
+        // render()) ohne jede Wirkung, deshalb nur sichtbar, wenn mindestens
+        // eine der aktuell geladenen Serien tatsächlich als Linie gerendert wird.
+        get hasLineSeries() { return this.series.some(s => s.chart_type === 'line'); },
+        get periodLabel() {
+          return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.isCurrent);
+        },
+        get compareLabel() {
+          const labels = {
+            hour: 'Vorherige Stunde vergleichen', day: 'Vortag vergleichen', week: 'Vorwoche vergleichen',
+            month: 'Vormonat vergleichen', year: 'Vorjahr vergleichen', decade: 'Vorherige Dekade vergleichen',
+          };
+          return labels[this.range] || 'Vorperiode vergleichen';
+        },
+
+        toggleEntity(entityId, checked) {
+          if (checked) this.selectedEntityIds.add(entityId); else this.selectedEntityIds.delete(entityId);
+          this.load();
+        },
+        setRange(key) {
+          this.range = key;
+          // Rohwerte gibt es (wie auf der Entität-eigenen Chart-Seite) nur für
+          // die kleineren Zeiträume — ohne diesen Reset bliebe raw bei einem
+          // Wechsel z. B. zu "Jahr" unsichtbar aktiv (Chip ausgegraut/disabled,
+          // aber der Zustand dahinter noch true) und load() würde weiter raw=true
+          // an einen Zeitraum senden, für den die Umschaltfläche gar nicht mehr
+          // erreichbar ist.
+          if (!['hour', 'day', 'week'].includes(key)) this.raw = false;
+          this.load();
+        },
+        toggleContinuous() { this.continuous = !this.continuous; this.load(); },
+        toggleCompare() { this.compare = !this.compare; this.load(); },
+        // Raw-Modus (Rohwerte) und Periodenvergleich schließen sich gegenseitig
+        // aus — dieselbe Begründung wie auf der Entität-eigenen Chart-Seite:
+        // ein Vergleich zweier Rohwert-Serien ergibt kaum lesbaren Sinn.
+        toggleRaw() {
+          this.raw = !this.raw;
+          if (this.raw) this.compare = false;
+          this.load();
+        },
+
+        async load() {
+          if (this.selectedEntityIds.size === 0) {
+            this.series = [];
+            this.$nextTick(() => this.render());
+            return;
+          }
+          const requestId = ++this._requestId;
+          this.loading = true;
+          const params = new URLSearchParams({
+            entity_ids: Array.from(this.selectedEntityIds).join(','),
+            range: this.range, offset: '0', continuous: String(this.continuous),
+            compare: String(this.compare), compare_mode: this.compareMode,
+            raw: String(this.raw),
+          });
+          const res = await fetch(`${BASE}/api/query-multi?${params}`);
+          const data = await res.json();
+          if (requestId !== this._requestId) return;
+          this.series = data.series || [];
+          this.windowStart = data.window_start ?? null;
+          this.windowEnd = data.window_end ?? null;
+          this.isCurrent = data.is_current ?? true;
+          this.loading = false;
+          this.$nextTick(() => this.render());
+        },
+
+        render() {
+          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (!this.hasData) { chartInstance.clear(); return; }
+          const fmt = ts => {
+            const d = new Date(ts * 1000);
+            if (this.range === 'hour' || this.range === 'day') {
+              return d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+            }
+            if (this.range === 'week' || this.range === 'month') {
+              return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+            }
+            if (this.range === 'decade') {
+              return d.toLocaleDateString('de-DE', {year: 'numeric'});
+            }
+            return d.toLocaleDateString('de-DE', {month: 'short', year: 'numeric'});
+          };
+          // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
+          // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
+          // wechselseitig links/rechts, weitere Achsen pro Seite nach außen versetzt.
+          const units = [...new Set(this.series.map(s => s.unit))];
+          const yAxis = units.map((u, i) => ({
+            type: 'value',
+            name: u || undefined,
+            nameLocation: 'end',
+            position: i % 2 === 0 ? 'left' : 'right',
+            offset: Math.floor(i / 2) * 55,
+            axisLabel: {formatter: v => u ? `${fmtNum(v)} ${u}` : fmtNum(v)},
+          }));
+          // Feste Farbe je Entität (statt ECharts' Auto-Zuordnung) — nur so lässt
+          // sich bei aktivem Vergleich die Vorperiode-Serie einer Entität optisch
+          // eindeutig ihrer Hauptserie zuordnen (dieselbe Farbe, nur blasser +
+          // gestrichelt), auch wenn mehrere Entitäten gleichzeitig überlagert sind.
+          // Balken statt Linie für Zähler/Schalter — dieselbe Regel wie auf der
+          // Entität-eigenen Chart-Seite (entity_detail.html, DEFAULT_CHART_TYPE):
+          // Zähler zeigen Bucket-Summen, ein Schalter eine Einschaltdauer je
+          // Bucket — beides liest sich als Balken natürlicher als als Linie.
+          const echartsSeries = [];
+          this.series.forEach((s, i) => {
+            const color = PALETTE[i % PALETTE.length];
+            // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
+            // sonst "line", im Raw-Modus immer "line") statt hier redundant aus
+            // aggregation_type neu abgeleitet zu werden — sonst würde z. B. ein
+            // Zähler im Raw-Modus fälschlich weiter als Balken gerendert, obwohl
+            // der Server für Rohwerte (ungebuckelte Einzelmesswerte) immer Linie
+            // liefert.
+            const chartType = s.chart_type;
+            const displayName = this.entityNames[s.entity_id] || s.friendly_name;
+            const main = {
+              name: displayName,
+              type: chartType,
+              yAxisIndex: units.indexOf(s.unit),
+              data: s.points.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit]),
+              lineStyle: {width: 1.5, color},
+              itemStyle: {color},
+              // Deckelt die Balkenbreite auf einer Zeit-Achse — ohne diese
+              // fehlt ECharts bei sehr wenigen Punkten (z. B. "Jahr" einer
+              // gerade erst begonnenen Entität, ein einziger Balken) der
+              // Bezugspunkt für eine sinnvolle Auto-Breite, wodurch der Balken
+              // einen Großteil der (bewusst bis zum Fensterende reichenden)
+              // Achse einnehmen kann. Bei vielen Balken liegt die Auto-Breite
+              // ohnehin längst unter dem Limit.
+              barMaxWidth: 48,
+            };
+            if (chartType === 'line') {
+              main.smooth = true;
+              // symbol nie explizit auf undefined setzen (nur weglassen oder auf
+              // 'none') — siehe entity_detail.html, ECharts' interne Options-
+              // Normalisierung stürzt sonst ab.
+              if (!this.showPoints) main.symbol = 'none';
+            }
+            echartsSeries.push(main);
+            if (this.compare && s.compare_points && s.compare_points.length) {
+              // Vorperiode um die exakte Fensterdifferenz verschieben, nicht per
+              // Array-Index mappen — siehe derselbe Kommentar/Grund in
+              // entity_detail.html (unterschiedlich lange Punktreihen).
+              const shiftMs = (s.compare_window_start != null && this.windowStart != null)
+                ? (this.windowStart - s.compare_window_start) * 1000
+                : 0;
+              const compareOffset = this.compareMode === 'year' ? 0 : -1;
+              const compareLabel = formatPeriodLabel(
+                this.range, this.continuous, s.compare_window_start, s.compare_window_end, false
+              );
+              const seriesLabel = this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode';
+              const cmp = {
+                name: `${displayName} (${seriesLabel}${compareLabel ? ', ' + compareLabel : ''})`,
+                type: chartType,
+                yAxisIndex: units.indexOf(s.unit),
+                data: s.compare_points.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit]),
+                lineStyle: {width: 1.5, color, type: 'dashed', opacity: 0.5},
+                itemStyle: {color, opacity: 0.5},
+                barMaxWidth: 48,
+              };
+              if (chartType === 'line') {
+                cmp.smooth = true;
+                if (!this.showPoints) cmp.symbol = 'none';
+              }
+              echartsSeries.push(cmp);
+            }
+          });
+          chartInstance.setOption({
+            textStyle: {
+              fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              fontSize: Math.round(12 * UI_FONT_SCALE * 10) / 10,
+            },
+            grid: {left: 10, right: 10, top: 20, bottom: 70, containLabel: true},
+            // min/max explizit auf das Abfragefenster fixiert, statt ECharts
+            // per Default auf den tatsächlichen Datenbereich auto-fitten zu
+            // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
+            // letzten tatsächlichen Wert auf, z. B. bei einer Entität, die seit
+            // Stunden nichts mehr gemeldet hat, statt konsistent bis zum
+            // Fensterende (bei "Heute" also bis zur aktuellen Uhrzeit) zu reichen.
+            xAxis: {
+              type: 'time',
+              min: this.windowStart != null ? this.windowStart * 1000 : undefined,
+              max: this.windowEnd != null ? this.windowEnd * 1000 : undefined,
+              // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
+              // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
+              // einem Bucket) — boundaryGap:[0,0] unterbindet dieses Auto-Polster,
+              // min/max bleiben dadurch die tatsächlichen Achsengrenzen.
+              boundaryGap: [0, 0],
+              axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
+            },
+            yAxis,
+            // Legende unterhalb statt oberhalb des Charts (Konzept: bei vielen
+            // überlagerten Entitäten + aktivem Vergleich verdoppelt sich die
+            // Eintragszahl, oben brach das zuverlässig in mehrere Zeilen um und
+            // überlappte die Y-Achsen-Beschriftung). type:'scroll' statt des
+            // Standard-Umbruchs hält die Legende auf einer Zeile mit Pfeilen
+            // zum Durchblättern, wenn sie nicht komplett passt.
+            legend: {bottom: 0, type: 'scroll'},
+            tooltip: {
+              trigger: 'axis',
+              // Eigener Formatter statt valueFormatter, aus demselben Grund wie in
+              // entity_detail.html: bei aktivem Vergleich hat jede Zeile ihre eigene
+              // tatsächliche Zeit im dritten Datenfeld, nicht die (bei der
+              // Vorperiode verschobene) Achsenposition.
+              formatter: params => params.map(p => {
+                const d = new Date(p.data[2]);
+                const pad = n => String(n).padStart(2, '0');
+                const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                const unit = p.data[3];
+                const val = unit ? `${fmtNum(p.value[1])} ${unit}` : fmtNum(p.value[1]);
+                return `<div style="display:flex;justify-content:space-between;gap:18px;">`
+                     + `<span>${p.marker}${p.seriesName}</span>`
+                     + `<strong style="margin-left:8px;">${val}</strong></div>`
+                     + `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);">${time}</div>`;
+              }).join(''),
+              appendToBody: true,
+            },
+            series: echartsSeries,
+          }, true);
+          chartInstance.resize();
+        },
+
+        async save() {
+          if (!this.name.trim()) { alert('Bitte einen Namen für das Chart angeben.'); return; }
+          if (this.selectedEntityIds.size === 0) { alert('Bitte mindestens eine Entität auswählen.'); return; }
+          this.saving = true;
+          this.savedMessage = '';
+          // Nur Namen tatsächlich ausgewählter Entitäten mitschicken — eine
+          // abgewählte Entität soll ihren früher gesetzten Anzeigenamen nicht
+          // stumm für den Fall aufheben, dass sie später wieder angehakt wird.
+          const entityNames = {};
+          this.selectedEntityIds.forEach(id => {
+            if (this.entityNames[id] && this.entityNames[id].trim()) entityNames[id] = this.entityNames[id].trim();
+          });
+          const body = {
+            name: this.name.trim(),
+            entity_ids: Array.from(this.selectedEntityIds),
+            range_key: this.range,
+            continuous: this.continuous,
+            entity_names: entityNames,
+          };
+          try {
+            const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;
+            const res = await fetch(url, {
+              method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              alert(err.detail || 'Speichern fehlgeschlagen.');
+              return;
+            }
+            const data = await res.json();
+            if (!CHART_ID) {
+              window.location.href = `${BASE}/charts/${data.id}`;
+              return;
+            }
+            this.savedMessage = '✓ Gespeichert';
+            this.editing = false;
+            setTimeout(() => { this.savedMessage = ''; }, 2000);
+          } finally {
+            this.saving = false;
+          }
+        },
+
+        async deleteChart() {
+          if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+          await fetch(`${BASE}/charts/${CHART_ID}/delete`, {method: 'POST'});
+          window.location.href = `${BASE}/charts`;
+        },
+
+        init() {
+          this.load();
+          window.addEventListener('resize', () => chartInstance && chartInstance.resize());
+          new ResizeObserver(() => chartInstance && chartInstance.resize()).observe(document.getElementById('chart'));
+        },
+      };
+    }
+  </script>
+</body>
+</html>

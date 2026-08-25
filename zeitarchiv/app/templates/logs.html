@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Protokoll</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .log-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+  .log-toolbar select{min-height:38px;}
+  .log-toolbar input[type="search"]{flex:1;min-width:190px;}
+  .log-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0;color:var(--ink-faint);font-size:calc(12px * var(--font-scale,1));}
+  #log-output{box-sizing:border-box;width:100%;height:560px;overflow:auto;margin:0;padding:16px;
+    border:1px solid var(--border);border-radius:12px;background:#17201d;color:#e7eee9;
+    font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale,1));line-height:1.55;
+    white-space:pre-wrap;overflow-wrap:anywhere;tab-size:2;}
+  @media(max-width:700px){
+    #log-output{height:430px;}
+    .log-toolbar>*{max-width:100%;}
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Protokoll</p>
+    <h1>Protokoll</h1>
+    <p class="sub">Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll. &middot; <a href="settings#protokollierung">Protokollierung einstellen →</a></p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'logs' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        <section>
+          <div class="log-toolbar">
+            <select id="log-filter" aria-label="Loglevel filtern">
+              {% for key, label in log_filter_options %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+            <input id="log-search" class="search" type="search" placeholder="Protokoll durchsuchen …" aria-label="Protokoll durchsuchen">
+            <button type="button" class="btn" id="log-refresh">Jetzt aktualisieren</button>
+            <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> Automatisch</label>
+            <a class="btn" id="log-download" href="logs/download">Herunterladen</a>
+          </div>
+          <div class="log-meta">
+            <span id="log-source">Quelle wird geladen …</span>
+            <span id="log-status" aria-live="polite"></span>
+          </div>
+          <pre id="log-output" tabindex="0" aria-label="Zeitarchiv-Protokoll">Protokoll wird geladen …</pre>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const output = document.getElementById('log-output');
+      const source = document.getElementById('log-source');
+      const status = document.getElementById('log-status');
+      const level = document.getElementById('log-filter');
+      const search = document.getElementById('log-search');
+      const auto = document.getElementById('log-auto');
+      const download = document.getElementById('log-download');
+      let sequence = 0;
+      let searchTimer = null;
+
+      function params() {
+        const query = new URLSearchParams({level: level.value, search: search.value});
+        return query;
+      }
+
+      async function refreshLogs() {
+        const requestId = ++sequence;
+        status.textContent = 'Wird aktualisiert …';
+        try {
+          const response = await fetch(`api/logs?${params()}&limit=500`);
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          const data = await response.json();
+          if (requestId !== sequence) return;
+          const wasNearBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 80;
+          output.textContent = data.lines.length ? data.lines.join('\n') : 'Keine passenden Protokolleinträge.';
+          source.textContent = `Quelle: ${data.source}${data.fallback ? ' (Fallback)' : ''}`;
+          status.textContent = `${data.count} Zeilen · ${new Date(data.generated_at * 1000).toLocaleTimeString('de-DE')}`;
+          download.href = `logs/download?${params()}`;
+          if (wasNearBottom) output.scrollTop = output.scrollHeight;
+        } catch (error) {
+          if (requestId !== sequence) return;
+          status.textContent = 'Aktualisierung fehlgeschlagen';
+          output.textContent = 'Protokoll konnte nicht geladen werden.';
+        }
+      }
+
+      document.getElementById('log-refresh').addEventListener('click', refreshLogs);
+      level.addEventListener('change', refreshLogs);
+      search.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(refreshLogs, 250);
+      });
+      setInterval(() => { if (auto.checked) refreshLogs(); }, 5000);
+      refreshLogs();
+    })();
+  </script>
+</body>
+</html>

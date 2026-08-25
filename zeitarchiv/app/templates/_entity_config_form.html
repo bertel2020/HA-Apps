@@ -1,0 +1,67 @@
+<div class="field">
+  <label>Auflösung</label>
+  <select name="resolution" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
+          hx-target="#config-form" hx-swap="innerHTML">
+    {% for key, label in resolution_options %}
+    <option value="{{ key }}" {% if key == resolution %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <p class="hint">Wie oft ein Rohwert dieser Entität höchstens übernommen wird — "Rohdaten" heißt jede Zustandsänderung.</p>
+</div>
+<div class="field">
+  <label>Aufbewahrung</label>
+  <select name="retention" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
+          hx-target="#config-form" hx-swap="innerHTML">
+    {% for key, label in retention_options %}
+    <option value="{{ key }}" {% if key == retention %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <p class="hint">Überschreibt den globalen Standard für diese Entität. Die automatische Durchsetzung wird unter Einstellungen → Aufbewahrung konfiguriert.</p>
+</div>
+<div class="field">
+  <label>Nachkommastellen</label>
+  <select name="decimals" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
+          hx-target="#config-form" hx-swap="innerHTML">
+    {% for key, label in decimals_options %}
+    <option value="{{ key }}" {% if key == decimals %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <p class="hint">"Automatisch" kürzt überflüssige Nullen (4 W statt 4.000 W), eine feste Zahl rundet Werte und Charts immer auf genau diese Stellenzahl.</p>
+</div>
+<div class="field">
+  <label>Lücken-Erkennung</label>
+  <select name="gap_threshold" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
+          hx-target="#config-form" hx-swap="innerHTML">
+    {% for key, label in gap_threshold_options %}
+    <option value="{{ key }}" {% if key == gap_threshold %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <p class="hint">Ab welcher Pause seit dem vorherigen Wert die Bereinigungs-Seite eine Lücke markiert. "Aus" blendet den Lücken-Filter dort aus.</p>
+</div>
+<div class="field">
+  <label>Ausreißer-Erkennung</label>
+  <select name="outlier_threshold" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
+          hx-target="#config-form" hx-swap="innerHTML">
+    {% for key, label in outlier_threshold_options %}
+    <option value="{{ key }}" {% if key == outlier_threshold %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <p class="hint">Ab welchem prozentualen Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Wert als Ausreißer markiert. "Aus" blendet den Ausreißer-Filter dort aus.</p>
+</div>
+{% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+
+<div class="preview">
+  <h3 class="eyebrow">Vorschau: letzte 10 Werte</h3>
+  {% if preview_rows %}
+  <div class="tbl-wrap">
+    <table class="dt compact">
+      <tr><th>Zeitstempel</th><th>Wert</th></tr>
+      {% for row in preview_rows %}
+      <tr><td>{{ row.formatted_ts }}</td><td>{{ row.formatted_value }}{% if unit and unit != "—" %} {{ unit }}{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="hint" style="margin:0;">Noch keine Werte für diese Entität vorhanden.</p>
+  {% endif %}
+</div>

@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Import</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .callout{
+    border:1px solid var(--border);border-left-width:4px;border-left-color:var(--accent-bar);
+    border-radius:10px;padding:14px 18px;margin-bottom:20px;background:var(--surface);font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);
+  }
+  .callout strong{color:var(--ink);}
+  .callout .import-steps{margin:8px 0 10px;padding-left:20px;}
+  .callout .import-steps li + li{margin-top:5px;}
+  .callout .symcon-import-note{margin:0;}
+
+  .dropzone{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;
+    border:2px dashed var(--border);border-radius:14px;padding:48px 24px;text-align:center;
+    color:var(--ink-muted);cursor:pointer;background:var(--surface);transition:border-color .15s,background .15s,color .15s;
+  }
+  .dropzone:hover,.dropzone:focus-visible,.dropzone.dragging{
+    border-color:var(--accent-line);background:var(--accent-line-soft);color:var(--ink);outline:none;
+  }
+  .dropzone p{margin:0;font-size:calc(14px * var(--font-scale, 1));}
+  .dropzone .hint2{margin-top:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  .upload-progress{border:1px solid var(--border);border-radius:14px;padding:24px 28px;background:var(--surface);}
+  .upload-progress .label{display:flex;justify-content:space-between;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);margin-bottom:10px;}
+  .upload-progress .label strong{color:var(--ink);font-family:var(--font-mono);}
+  .upload-progress .bar{height:8px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--border);overflow:hidden;}
+  .upload-progress .bar-fill{height:100%;width:0%;background:var(--accent-line);transition:width .15s linear;}
+  .upload-progress .filename{margin:10px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+  .upload-error{margin-top:12px;border:1px solid var(--danger);background:var(--danger-soft);border-radius:10px;padding:12px 16px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+
+  .source-badge{font-family:var(--font-mono);padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);}
+  .import-delete-row{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
+  .import-delete-row .btn-danger{font-weight:600;}
+  .import-delete-button{min-width:154px;}
+  .import-filter-toolbar{flex-wrap:nowrap;overflow:hidden;}
+  .import-filter-toolbar .search{flex:1 1 180px;min-width:130px;}
+  .import-filter-toolbar .count-chip{flex:none;}
+  .count-chip{
+    font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));padding:6px 12px;border-radius:999px;border:1px solid var(--border);
+    color:var(--ink-muted);background:var(--surface);margin:0;line-height:1.4;cursor:default;
+    -webkit-appearance:none;appearance:none;
+  }
+  .count-chip.warn{border-color:var(--danger);color:var(--danger);background:var(--danger-soft);}
+  .count-chip.active{border-color:var(--accent-line);color:var(--accent-line);background:var(--accent-line-soft);}
+  button.count-chip{cursor:pointer;}
+  button.count-chip.warn:hover{opacity:.85;}
+  button.count-chip.warn.active{background:var(--danger);color:var(--danger-contrast);}
+
+  tr.unreadable td{color:var(--ink-faint);background:var(--danger-soft);}
+  tr.marked{background:var(--accent-line-soft);}
+  .map-input{
+    font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));padding:6px 10px;border-radius:7px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;min-width:0;
+  }
+  .map-input:focus{outline:none;border-color:var(--accent-line);}
+  .map-input::placeholder{color:var(--ink-faint);font-family:var(--font-display);}
+  .unreadable-note{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  #import-output{margin-top:16px;}
+
+  /* Variablen-Name (fett) + darunter der aufgelöste Symcon-Parent (Raum/
+     Kategorie, aus parentID) — hilft beim Wiedererkennen, wenn derselbe
+     Variablenname in mehreren Räumen vorkommt (z. B. mehrfach "Temperatur IST").
+     Kein Zeilenumbruch bei langen Namen — stattdessen abgeschnitten mit
+     [data-tooltip] (app.css). Feste Pixel-max-width statt einer Prozent-
+     Spaltenbreite, weil #import-table sonst kein table-layout:fixed nutzt
+     (die übrigen Spalten sollen weiter am eigenen Inhalt ausrichten) — ein
+     fester px-Wert auf dem Span selbst wirkt unabhängig vom Tabellen-Layout.
+     data-tooltip sitzt auf einem Wrapper OHNE eigenes overflow, die Kürzung
+     (overflow:hidden/ellipsis) auf dem Kind-Span darin — sitzen beide auf
+     demselben Element, schneidet dessen eigenes overflow:hidden das eigene
+     Tooltip mit ab (siehe derselbe Fix in export.html). */
+  .symcon-name-cell{display:block;min-width:0;max-width:180px;}
+  .symcon-name-wrap,.symcon-parent-wrap{display:block;max-width:180px;}
+  .symcon-name,.symcon-parent{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .symcon-name{font-weight:600;color:var(--ink);}
+  .symcon-parent{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+  .symcon-name-tooltip .symcon-tooltip-parent{display:block;max-width:520px;white-space:normal;line-height:1.4;font-family:var(--font-display);font-size:calc(11px * var(--font-scale, 1));color:inherit;}
+
+  /* Feste, kompakte Spalten verhindern, dass technische Kurzspalten unnötig
+     Platz verbrauchen. Die HA-Zuordnung erhält den verbleibenden Raum. */
+  table.symcon-import-table{table-layout:fixed;min-width:790px;}
+  .symcon-col-check{width:40px;}
+  .symcon-col-id{width:82px;}
+  .symcon-col-name{width:185px;}
+  .symcon-col-period{width:190px;}
+  .symcon-col-rows{width:92px;}
+  .symcon-import-table th:first-child,.symcon-import-table td:first-child{padding-left:10px;padding-right:4px;text-align:center;}
+  .symcon-import-table th:nth-child(2),.symcon-import-table td:nth-child(2){padding-left:8px;padding-right:8px;}
+  .symcon-import-table .period-cell{font-family:var(--font-display);white-space:nowrap;}
+
+  .map-picker{display:flex;align-items:center;min-width:0;}
+  .map-picker .map-input{padding-right:31px;}
+  .map-clear{
+    width:26px;height:26px;margin-left:-29px;z-index:1;border:0;border-radius:5px;
+    background:transparent;color:var(--ink-faint);font:600 calc(15px * var(--font-scale, 1))/1 var(--font-display);cursor:pointer;
+  }
+  .map-clear:hover,.map-clear:focus-visible{background:var(--surface-alt);color:var(--ink);outline:none;}
+  .map-picker .map-input:placeholder-shown + .map-clear{visibility:hidden;pointer-events:none;}
+
+  @media (max-width:1050px){
+    .import-filter-toolbar{flex-wrap:wrap;overflow:visible;}
+  }
+
+  /* Reiter, die den Symcon-Assistenten und den eigenen CSV-Import sauber
+     getrennt auf derselben Import-Seite halten, statt sich zu vermischen. */
+  .import-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+  .import-tab-btn{
+    font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
+    background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;margin-bottom:-1px;
+    cursor:pointer;
+  }
+  .import-tab-btn.active{color:var(--accent-line);border-bottom-color:var(--accent-line);}
+  .import-tab-btn:hover:not(.active){color:var(--ink);}
+
+  .csv-config{display:flex;flex-wrap:wrap;gap:20px 28px;}
+  .csv-config .field{margin-bottom:0;min-width:200px;}
+  /* .field label{display:block;...} (app.css) hat höhere Spezifität als eine
+     einzelne Klasse — label.checkbox-label statt .checkbox-label, damit
+     display:flex tatsächlich gewinnt statt vom Cascade-Konflikt verschluckt zu werden. */
+  .field label.checkbox-label{display:flex;align-items:center;gap:8px;font-size:calc(13.5px * var(--font-scale, 1));
+    font-weight:400;color:var(--ink);cursor:pointer;margin-top:8px;margin-bottom:0;text-transform:none;}
+  .checkbox-label input{width:16px;height:16px;cursor:pointer;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Import</p>
+    <h1>Import</h1>
+    <p class="sub">Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als eigene CSV-Datei mit freier Spalten-/Format-Zuordnung.</p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'symcon-import' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+
+    <div class="import-tabs">
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">Symcon</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">Eigene CSV-Datei</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">Reports</button>
+    </div>
+
+    <!-- Gemeinsame Datalist für beide Reiter (Konzept Abschnitt 04/10, "Dropdown
+         bei sehr vielen Entitäten") — bewusst auf Seitenebene statt in einem der
+         beiden Formulare verschachtelt, damit sie auch verfügbar ist, wenn der
+         jeweils andere Reiter gerade den leeren Upload-/Dropzone-Zustand zeigt. -->
+    <datalist id="entity-datalist">
+      <option value="__ignore__">Ignorieren</option>
+      {% for entity_id, label in entity_options %}
+      <option value="{{ entity_id }}">{{ label }}</option>
+      {% endfor %}
+    </datalist>
+
+    <div id="tab-symcon" class="import-tab"{% if active_import_tab != 'symcon' %} style="display:none;"{% endif %}>
+    <div class="callout">
+      <strong>So funktioniert die einmalige Migration aus Symcon:</strong>
+      <ol class="import-steps">
+        <li>Den Symcon-<code>db</code>-Ordner als ZIP-Datei hochladen. Zeitarchiv entpackt und scannt den Inhalt automatisch.</li>
+        <li>Optional die aus Symcon exportierte <code>settings.json</code> ergänzen. Sie liefert Klarnamen und übergeordnete Räume/Kategorien; der <code>db</code>-Ordner selbst enthält nur numerische Variablen-IDs.</li>
+        <li>Variablen markieren, vorhandenen Home-Assistant-Entitäten zuordnen, die Vorschau prüfen und anschließend den Import starten.</li>
+      </ol>
+      <p class="symcon-import-note">
+        Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import
+        nur noch nicht vorhandene Zeitstempel. Danach berechnet Zeitarchiv die Rollups automatisch
+        neu. Unlesbare Dateien werden gekennzeichnet, Bool-Werte auf 1/0 normalisiert und reine
+        Textvariablen nicht importiert. Die hochgeladenen Quelldaten bleiben bis „Quelldaten löschen“
+        gespeichert; ein neuer ZIP-Upload ersetzt sie vollständig.
+      </p>
+    </div>
+
+    {% if not settings_imported %}
+    <div class="callout" id="settings-hint" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span style="flex:1;min-width:220px;">
+        Noch keine <code>settings.json</code> importiert &mdash; optional, liefert Klarnamen je
+        Symcon-ID aus Symcons Objektbaum für eine zusätzliche Namensspalte in der Liste unten.
+      </span>
+      <label class="btn" style="cursor:pointer;">
+        settings.json importieren
+        <input type="file" id="settings-json-input" accept=".json" style="display:none;"
+               onchange="if(this.files.length) uploadSettingsJson(this.files[0]);">
+      </label>
+    </div>
+    {% endif %}
+
+    {% if scanning %}
+    <div id="upload-area">
+      <div class="upload-progress">
+        <div class="label"><span>Schritt 2/2 &middot; Scanne Variablen&hellip;</span><strong id="upload-percent"></strong></div>
+        <div class="bar"><div class="bar-fill" id="upload-bar" style="opacity:.4;width:100%;"></div></div>
+        <p class="filename">Bereits entpackte Daten werden eingelesen &mdash; bei vielen Variablen kann das dauern.</p>
+      </div>
+    </div>
+    <script>document.addEventListener('DOMContentLoaded', () => pollUploadProgress());</script>
+    {% elif not source_exists %}
+    <div id="upload-area">
+      <label class="dropzone" id="dropzone" for="zip-input" role="button" tabindex="0">
+        <p>ZIP-Datei mit dem Symcon-<code>db</code>-Ordner hierher ziehen oder klicken zum Auswählen</p>
+        <p class="hint2">
+          Max. {{ import_limits.zip_upload_gib }} GiB Upload, {{ import_limits.zip_uncompressed_gib }} GiB entpackt
+          und {{ import_limits.zip_members }} Einträge. Bleibt gespeichert, bis du die Daten wieder löschst.
+        </p>
+        <input type="file" name="file" id="zip-input" accept=".zip" style="display:none;">
+      </label>
+    </div>
+    {% else %}
+    <form method="post" action="import/delete" class="import-delete-row"
+          onsubmit="confirmSymconDelete(event, this)">
+      <button type="submit" class="btn btn-danger import-delete-button">Quelldaten löschen</button>
+    </form>
+    <form method="post" action="import/start" id="import-form">
+      <div class="toolbar import-filter-toolbar">
+        <input type="search" class="search" placeholder="Symcon-ID oder Name suchen …" oninput="onImportSearch(this.value)" style="min-width:160px;">
+        <span class="count-chip">{{ rows | selectattr('readable') | list | length }} Variablen erkannt</span>
+        {% set unreadable_count = rows | rejectattr('readable') | list | length %}
+        {% if unreadable_count %}
+        <button type="button" class="count-chip warn active" id="hide-unreadable-btn" onclick="toggleHideUnreadable(this)"
+                title="Nicht lesbare Zeilen ein-/ausblenden">{{ unreadable_count }} nicht lesbar</button>
+        {% endif %}
+        <span class="count-chip" id="marked-count">0 markiert</span>
+        <select id="import-page-size" onchange="setImportPageSize(this.value)" title="Zeilen pro Seite">
+          <option value="10">10 / Seite</option>
+          <option value="50" selected>50 / Seite</option>
+          <option value="100">100 / Seite</option>
+          <option value="500">500 / Seite</option>
+          <option value="1000">1000 / Seite</option>
+        </select>
+      </div>
+
+      {% if rows %}
+      <div class="tbl-wrap">
+        <table id="import-table" class="dt symcon-import-table">
+          <colgroup>
+            <col class="symcon-col-check"><col class="symcon-col-id">
+            {% if settings_imported %}<col class="symcon-col-name">{% endif %}
+            <col class="symcon-col-period"><col class="symcon-col-rows"><col class="symcon-col-entity">
+          </colgroup>
+          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="Alle auf dieser Seite markieren"></th><th>Symcon-ID</th>{% if settings_imported %}<th>Symcon-Name</th>{% endif %}<th>Zeitraum</th><th>Datensätze</th><th>→ HA-Entität</th></tr>
+          {% for row in rows %}
+          <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}"
+              data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}">
+            <td>{% if row.readable %}<input type="checkbox" class="mark-checkbox" onchange="onMarkChange(this)">{% endif %}</td>
+            <td class="mono">{{ row.variable_id }}</td>
+            {% if settings_imported %}
+            <td>
+              {% if row.symcon_name %}
+              <span class="symcon-name-cell entity-tooltip-host" tabindex="0">
+                <span class="symcon-name-wrap"><span class="symcon-name">{{ row.symcon_name }}</span></span>
+                {% if row.symcon_parent %}<span class="symcon-parent-wrap"><span class="symcon-parent">{{ row.symcon_parent }}</span></span>{% endif %}
+                <span class="entity-tooltip symcon-name-tooltip" role="tooltip">
+                  <strong>{{ row.symcon_name }}</strong>
+                  <span class="symcon-tooltip-parent">{{ row.symcon_parent or "Keine übergeordnete Kategorie" }}</span>
+                </span>
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            {% endif %}
+            <td class="period-cell">{% if row.period_start %}{{ row.period_start }} &ndash; {{ row.period_end }}{% else %}—{% endif %}</td>
+            <td{% if row.preview != "—" %} data-tooltip="Min · Max: {{ row.preview }}"{% endif %}>{{ row.row_count }}</td>
+            <td>
+              {% if row.readable %}
+              <span class="map-picker">
+                <input type="text" class="map-input" name="map_{{ row.variable_id }}" list="entity-datalist"
+                       placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)">
+                <button type="button" class="map-clear" title="Auswahl ändern" aria-label="Ausgewählte HA-Entität entfernen" onclick="clearMapping(this)">×</button>
+              </span>
+              {% else %}
+              <span class="unreadable-note">nicht lesbar{% if row.error %}: {{ row.error }}{% endif %}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <!-- Client-seitige Paginierung statt serverseitigem Reload (anders als bei
+           Bereinigung/Entitäten, Abschnitt 04/10): alle Zeilen inkl. ihrer
+           Zuordnungs-Felder bleiben dauerhaft im Formular — sonst gingen bereits
+           gesetzte Zuordnungen auf ausgeblendeten "Seiten" beim Absenden verloren.
+           Paging blendet Zeilen nur sichtbar/unsichtbar. -->
+      <div class="pager">
+        <span class="pager-range" id="import-pager-range"></span>
+        <button type="button" class="btn navbtn" id="import-pager-prev" onclick="stepImportPage(-1)">‹</button>
+        <span class="pager-page" id="import-pager-page"></span>
+        <button type="button" class="btn navbtn" id="import-pager-next" onclick="stepImportPage(1)">›</button>
+      </div>
+
+      <!-- entity-datalist wird auf Seitenebene gerendert (siehe oben) — hier nur
+           per list="entity-datalist" referenziert, damit sie auch verfügbar ist,
+           wenn dieser Reiter gar keine Zeilen zeigt (leerer/Scan-Zustand). -->
+
+      <div class="actionbar">
+        <button type="button" class="btn" hx-post="import/dry-run" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
+        <button type="button" class="btn primary" hx-post="import/start" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML">Import starten</button>
+        <span>Nur ausgefüllte Zuordnungen werden berücksichtigt.</span>
+      </div>
+      <div id="import-output" hx-get="import/progress" hx-trigger="load" hx-swap="innerHTML"></div>
+      {% else %}
+      <div class="empty">Keine Symcon-Variablen im hochgeladenen Archiv gefunden.</div>
+      {% endif %}
+    </form>
+    {% endif %}
+    </div>
+
+    <div id="tab-csv" class="import-tab"{% if active_import_tab != 'csv' %} style="display:none;"{% endif %}>
+    <div class="callout">
+      <strong>So funktioniert der Import einer eigenen CSV-Datei:</strong>
+      <ol class="import-steps">
+        <li>Eine CSV-Datei hochladen und Trennzeichen sowie vorhandene Kopfzeile festlegen.</li>
+        <li>Zeitstempel- und Wertspalte auswählen und das Zeitformat angeben: Unix-Sekunden, Unix-Millisekunden, ISO 8601 oder ein eigenes Muster.</li>
+        <li>Eine vorhandene Home-Assistant-Entität als Ziel wählen, die Vorschau prüfen und den Import starten.</li>
+      </ol>
+      <p class="symcon-import-note">Bestehende Monatsarchive bleiben unverändert; im laufenden Hot Buffer werden nur fehlende Zeitstempel ergänzt. Die hochgeladene CSV-Datei bleibt bis „Quelldaten löschen“ gespeichert.</p>
+    </div>
+    {% include "_csv_import_section.html" %}
+    </div>
+
+    <div id="tab-reports" class="import-tab"{% if active_import_tab != 'reports' %} style="display:none;"{% endif %}>
+      {% include "_reports_panel.html" %}
+    </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="static/vendor/htmx.min.js"></script>
+  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script>
+    function showImportTab(name) {
+      const url = new URL(window.location.href);
+      if (name === 'reports' && url.searchParams.get('tab') !== 'reports') {
+        url.searchParams.set('tab', 'reports');
+        window.location.href = url;
+        return;
+      }
+      document.getElementById('tab-symcon').style.display = name === 'symcon' ? '' : 'none';
+      document.getElementById('tab-csv').style.display = name === 'csv' ? '' : 'none';
+      document.getElementById('tab-reports').style.display = name === 'reports' ? '' : 'none';
+      document.getElementById('tab-btn-symcon').classList.toggle('active', name === 'symcon');
+      document.getElementById('tab-btn-csv').classList.toggle('active', name === 'csv');
+      document.getElementById('tab-btn-reports').classList.toggle('active', name === 'reports');
+      if (name === 'symcon') url.searchParams.delete('tab');
+      else url.searchParams.set('tab', name);
+      history.replaceState(null, '', url);
+    }
+
+    function toggleCustomTsPattern(value) {
+      const field = document.getElementById('custom-ts-pattern-field');
+      if (field) field.style.display = value === 'custom' ? '' : 'none';
+    }
+
+    function selectMappingValue(input) {
+      if (input.value) input.select();
+    }
+
+    function clearMapping(button) {
+      const input = button.closest('.map-picker').querySelector('.map-input');
+      input.value = '';
+      input.dispatchEvent(new Event('input', {bubbles: true}));
+      input.dispatchEvent(new Event('change', {bubbles: true}));
+      input.focus();
+      if (typeof input.showPicker === 'function') {
+        try { input.showPicker(); } catch (e) {}
+      }
+    }
+
+    async function confirmSymconDelete(event, form) {
+      event.preventDefault();
+      const confirmed = await appConfirm(
+        'Hochgeladene Symcon-Quelldaten einschließlich der optionalen settings.json wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten.',
+        {danger: true, confirmLabel: 'Quelldaten löschen'}
+      );
+      if (confirmed) form.submit();
+    }
+
+    // Beide Uploadfelder sind echte Tastaturziele. Delegiert binden, damit
+    // auch die per htmx neu eingesetzte CSV-Dropzone weiter funktioniert.
+    document.addEventListener('keydown', (e) => {
+      const zone = e.target.closest && e.target.closest('.dropzone');
+      if (!zone || (e.key !== 'Enter' && e.key !== ' ')) return;
+      const input = zone.querySelector('input[type="file"]');
+      if (!input) return;
+      e.preventDefault();
+      input.click();
+    });
+
+    // CSV-Dropzone: delegierte Events auf document statt direkter Bindung ans
+    // Element — #csv-section wird nach jedem Upload/Löschen/Vorschau-Wechsel
+    // per htmx neu ins DOM geswapped, eine direkte addEventListener-Bindung
+    // wäre nach dem ersten Swap tot. Der eigentliche Upload läuft komplett über
+    // htmx (hx-post mit hx-encoding="multipart/form-data" auf dem File-Input,
+    // siehe _csv_import_section.html) — hier wird nur die gedroppte Datei ins
+    // Input geschrieben und ein change-Event ausgelöst, damit htmx die Datei
+    // aufnimmt; die reine Klick-Auswahl deckt das umschließende <label> nativ ab.
+    ['dragover', 'dragleave', 'drop'].forEach(evt => {
+      document.addEventListener(evt, (e) => {
+        const zone = e.target.closest && e.target.closest('#csv-dropzone');
+        if (!zone) return;
+        e.preventDefault();
+        if (evt === 'dragover') zone.classList.add('dragging');
+        if (evt === 'dragleave') zone.classList.remove('dragging');
+        if (evt === 'drop') {
+          zone.classList.remove('dragging');
+          const input = document.getElementById('csv-file-input');
+          if (input && e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
+      });
+    });
+
+    // Drag & Drop + Klick-Auswahl fürs Upload-Feld — reines <input type="file">
+    // in einem <label> deckt "klicken zum Auswählen" schon ab, die Events hier
+    // sind nur für den Drop-Fall und die visuelle Rückmeldung nötig. Der
+    // eigentliche Upload läuft über XMLHttpRequest statt eines normalen
+    // Formular-Submits, weil nur XHR (nicht fetch) Fortschritts-Events beim
+    // Hochladen liefert — bei ZIPs mit mehreren hundert MB sonst ein "hängt
+    // das jetzt?"-Moment ohne jede Rückmeldung.
+    // uploadArea/pollUploadProgress bewusst außerhalb von "if (dropzone)": beim
+    // Aufruf von /import auf einen bereits entpackten, aber noch nicht
+    // gescannten Ordner (z. B. nach einem Server-Neustart) rendert die Seite
+    // direkt die Scan-Fortschrittsanzeige ohne Dropzone — braucht das Polling
+    // trotzdem, nur ohne den Upload-Teil davor.
+    const uploadArea = document.getElementById('upload-area');
+
+    function appendUploadError(container, message, fullWidth = false) {
+      const error = document.createElement('div');
+      error.className = 'upload-error';
+      if (fullWidth) error.style.width = '100%';
+      error.textContent = String(message);
+      container.appendChild(error);
+    }
+
+    function renderUploadProgress(container, labelText, percent, detailText, uploadMode = false) {
+      container.replaceChildren();
+      const box = document.createElement('div');
+      box.className = 'upload-progress';
+      const label = document.createElement('div');
+      label.className = 'label';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = labelText;
+      const percentLabel = document.createElement('strong');
+      percentLabel.textContent = percent === null ? '' : percent + '%';
+      if (uploadMode) percentLabel.id = 'upload-percent';
+      label.append(labelSpan, percentLabel);
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      const fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      if (uploadMode) fill.id = 'upload-bar';
+      fill.style.width = (percent === null ? 100 : percent) + '%';
+      if (percent === null) fill.style.opacity = '.4';
+      bar.appendChild(fill);
+      box.append(label, bar);
+      if (detailText) {
+        const detail = document.createElement('p');
+        detail.className = 'filename';
+        detail.textContent = detailText;
+        box.appendChild(detail);
+      }
+      container.appendChild(box);
+      return { fill, percentLabel };
+    }
+
+    // Nach dem reinen Byte-Upload läuft Entpacken + Scannen serverseitig im
+    // Hintergrund weiter (bei tausenden Dateien nicht mehr trivial schnell) —
+    // hier per fetch()-Polling verfolgt, mit eigenem Schritt-Label je Phase,
+    // statt die Fortschrittsanzeige nach dem Upload einfach einfrieren zu lassen.
+    const PHASE_LABELS = { extracting: 'Wird entpackt', scanning: 'Scanne Variablen' };
+    function pollUploadProgress() {
+      fetch('import/upload-progress').then(r => r.json()).then(state => {
+        if (state.phase === 'done') {
+          location.reload();
+          return;
+        }
+        if (state.phase === 'error') {
+          appendUploadError(uploadArea, state.error);
+          return;
+        }
+        const label = PHASE_LABELS[state.phase] || 'Wird verarbeitet';
+        const pct = state.total ? Math.round((state.done / state.total) * 100) : null;
+        const stepNum = state.phase === 'scanning' ? '2/2' : '1/2';
+        renderUploadProgress(
+          uploadArea,
+          `Schritt ${stepNum} · ${label}…`,
+          pct,
+          state.total ? `${state.done} von ${state.total}` : ''
+        );
+        setTimeout(pollUploadProgress, 400);
+      });
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    if (dropzone) {
+      const input = document.getElementById('zip-input');
+
+      function uploadZip(file) {
+        const progress = renderUploadProgress(
+          uploadArea,
+          'Wird hochgeladen…',
+          0,
+          `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`,
+          true
+        );
+        const bar = progress.fill;
+        const percentLabel = progress.percentLabel;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'import/upload');
+        xhr.upload.addEventListener('progress', (e) => {
+          if (!e.lengthComputable) return;
+          const pct = Math.round((e.loaded / e.total) * 100);
+          bar.style.width = pct + '%';
+          percentLabel.textContent = pct + '%';
+        });
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            pollUploadProgress();
+          } else {
+            let message = 'ZIP konnte nicht verarbeitet werden.';
+            try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
+            appendUploadError(uploadArea, message);
+          }
+        };
+        xhr.onerror = () => {
+          appendUploadError(uploadArea, 'Upload fehlgeschlagen — Verbindung unterbrochen.');
+        };
+        xhr.send(formData);
+      }
+
+      input.addEventListener('change', () => { if (input.files.length) uploadZip(input.files[0]); });
+      ['dragover', 'dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, e => e.preventDefault()));
+      dropzone.addEventListener('dragover', () => dropzone.classList.add('dragging'));
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragging'));
+      dropzone.addEventListener('drop', (e) => {
+        dropzone.classList.remove('dragging');
+        if (e.dataTransfer.files.length) uploadZip(e.dataTransfer.files[0]);
+      });
+    }
+
+    // settings.json-Zusatz-Upload: anders als der ZIP-Upload synchron ohne
+    // eigene Fortschrittsanzeige (reiner JSON-Text, Parsen dauert Millisekunden)
+    // — bei Erfolg lädt die Seite neu, damit die Namensspalte + der Wegfall
+    // dieses Hinweises serverseitig gerendert erscheinen statt es hier per JS
+    // nachzubauen.
+    function uploadSettingsJson(file) {
+      const hint = document.getElementById('settings-hint');
+      const formData = new FormData();
+      formData.append('file', file);
+      fetch('import/settings-upload', { method: 'POST', body: formData }).then(async (r) => {
+        if (r.ok) {
+          location.reload();
+          return;
+        }
+        let message = 'settings.json konnte nicht verarbeitet werden.';
+        try { message = (await r.json()).detail || message; } catch (e) {}
+        appendUploadError(hint, message, true);
+      }).catch(() => {
+        appendUploadError(hint, 'Upload fehlgeschlagen — Verbindung unterbrochen.', true);
+      });
+    }
+
+    // Markieren-Checkbox: sortiert die Zeile rein clientseitig an den
+    // Tabellenanfang (bzw. zurück in die ID-Reihenfolge beim Entmarkieren) —
+    // reine Navigationshilfe bei vielen erkannten Variablen, entscheidet nicht
+    // über den Import (das macht weiterhin die Zuordnung in der letzten Spalte).
+    function onMarkChange(checkbox) {
+      checkbox.closest('tr').classList.toggle('marked', checkbox.checked);
+      refreshMarkedRows();
+    }
+
+    // Header-Checkbox markiert/entmarkiert alle Zeilen der aktuell sichtbaren
+    // Seite (clientseitiges Paging hier, Abschnitt 04/10 — anders als bei
+    // Bereinigung bleiben ausgeblendete Zeilen im DOM, deshalb nur die
+    // tatsächlich sichtbaren umschalten, nicht den ganzen Datensatz).
+    function toggleAllImportRows(headerCheckbox) {
+      const table = document.getElementById('import-table');
+      if (!table) return;
+      Array.from(table.querySelectorAll('tr[data-variable-id]')).forEach(row => {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('.mark-checkbox');
+        if (!cb) return;
+        cb.checked = headerCheckbox.checked;
+        row.classList.toggle('marked', headerCheckbox.checked);
+      });
+      refreshMarkedRows();
+    }
+
+    function refreshMarkedRows() {
+      const table = document.getElementById('import-table');
+      const rows = Array.from(table.querySelectorAll('tr[data-variable-id]'));
+      rows.sort((a, b) => {
+        const aMarked = a.classList.contains('marked');
+        const bMarked = b.classList.contains('marked');
+        if (aMarked !== bMarked) return aMarked ? -1 : 1;
+        return Number(a.dataset.variableId) - Number(b.dataset.variableId);
+      });
+      rows.forEach(r => table.appendChild(r));
+      const markedCount = table.querySelectorAll('tr.marked').length;
+      const chip = document.getElementById('marked-count');
+      chip.classList.toggle('active', markedCount > 0);
+      chip.textContent = markedCount + ' markiert';
+      applyImportPaging();  // Markieren ändert die Zeilenreihenfolge -> sichtbaren Bereich neu berechnen
+    }
+
+    // Client-seitige Paginierung (siehe Kommentar bei der Pager-Markup oben):
+    // blendet nur Zeilen aus, entfernt nie etwas aus dem Formular. hideUnreadable
+    // und importSearch filtern zusätzlich VOR der Seitenberechnung heraus, damit
+    // "50/Seite" sich auf die tatsächlich relevanten Zeilen bezieht statt auf
+    // ausgeblendete Zeilen mitzuzählen.
+    let importPageSize = 50;
+    let importPage = 1;
+    let hideUnreadable = true;  // Standard: nicht lesbare Zeilen erstmal ausblenden (Chip startet "aktiv")
+    let importSearch = '';
+    function toggleHideUnreadable(btn) {
+      hideUnreadable = !hideUnreadable;
+      btn.classList.toggle('active', hideUnreadable);
+      importPage = 1;
+      applyImportPaging();
+    }
+    function onImportSearch(value) {
+      importSearch = value.trim().toLowerCase();
+      importPage = 1;
+      applyImportPaging();
+    }
+    function applyImportPaging() {
+      const table = document.getElementById('import-table');
+      if (!table) return;
+      const allRows = Array.from(table.querySelectorAll('tr[data-variable-id]'));
+      const isFilteredOut = row =>
+        (hideUnreadable && row.classList.contains('unreadable')) ||
+        (importSearch &&
+          !row.dataset.variableId.toLowerCase().includes(importSearch) &&
+          !(row.dataset.search || '').includes(importSearch));
+      const filteredOut = allRows.filter(isFilteredOut);
+      filteredOut.forEach(row => { row.style.display = 'none'; });
+      const rows = allRows.filter(row => !isFilteredOut(row));
+
+      const total = rows.length;
+      const size = importPageSize;
+      const totalPages = Math.max(1, Math.ceil(total / size));
+      importPage = Math.max(1, Math.min(importPage, totalPages));
+      const start = (importPage - 1) * size;
+      const end = Math.min(start + size, total);
+      rows.forEach((row, i) => { row.style.display = (i >= start && i < end) ? '' : 'none'; });
+
+      const range = document.getElementById('import-pager-range');
+      if (range) range.textContent = total ? `${start + 1}–${end} von ${total}` : '0 von 0';
+      const pageLabel = document.getElementById('import-pager-page');
+      if (pageLabel) pageLabel.textContent = `Seite ${importPage} / ${totalPages}`;
+      const prevBtn = document.getElementById('import-pager-prev');
+      if (prevBtn) prevBtn.disabled = importPage <= 1;
+      const nextBtn = document.getElementById('import-pager-next');
+      if (nextBtn) nextBtn.disabled = importPage >= totalPages;
+    }
+    function setImportPageSize(value) {
+      const parsed = parseInt(value, 10);
+      importPageSize = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 1000) : 50;
+      importPage = 1;
+      applyImportPaging();
+    }
+    function stepImportPage(delta) {
+      importPage += delta;
+      applyImportPaging();
+    }
+    applyImportPaging();
+  </script>
+</body>
+</html>

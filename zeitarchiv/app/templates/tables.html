@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Tabellen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px;}
+  .chart-card{display:flex;flex-direction:column;gap:8px;position:relative;}
+  .chart-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:22px;}
+  .chart-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  .chart-card .actions{display:flex;gap:8px;margin-top:auto;padding-top:10px;}
+  .fav-star{
+    position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;
+    font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Tabellen</p>
+    <h1>Tabellen</h1>
+    <p class="sub">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen — Zeilen (Entität/Gruppe/Formel) × Spalten (Zeitraum). &middot; <a href="tables/new">+ Neue Tabelle</a></p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'tables' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        {% if rows %}
+        <div class="chart-grid">
+          {% for row in rows %}
+          <div class="card chart-card">
+            <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
+                    title="Favorit" onclick="toggleFavorite('tables/{{ row.id }}/favorite', this)">★</button>
+            <h3><a href="tables/{{ row.id }}">{{ row.name }}</a></h3>
+            <div class="meta">{{ row.row_count }} Zeile{{ 'n' if row.row_count != 1 else '' }} &middot; {{ row.column_count }} Spalte{{ 'n' if row.column_count != 1 else '' }}</div>
+            <div class="actions">
+              <a class="btn" href="tables/{{ row.id }}">Ansehen</a>
+              <button type="button" class="btn btn-danger" onclick="deleteTable({{ row.id }}, this)">Löschen</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">Noch keine Tabelle angelegt — <a href="tables/new">jetzt eine erstellen →</a></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script>
+    document.querySelector('.settings-panel').addEventListener('favorite-changed', () => {
+      window.location.reload();
+    });
+
+    async function deleteTable(id, btn) {
+      if (!await appConfirm('Diese Tabelle wirklich löschen?', {danger: true})) return;
+      btn.disabled = true;
+      fetch(`tables/${id}/delete`, {method: 'POST'}).then(r => {
+        if (r.ok) {
+          btn.closest('.chart-card').remove();
+        } else {
+          btn.disabled = false;
+          alert('Löschen fehlgeschlagen.');
+        }
+      }).catch(() => { btn.disabled = false; alert('Löschen fehlgeschlagen.'); });
+    }
+  </script>
+</body>
+</html>

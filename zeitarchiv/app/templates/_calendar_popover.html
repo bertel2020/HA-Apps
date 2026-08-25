@@ -1,0 +1,84 @@
+<!-- Umfang richtet sich nach dem Zeitraum der einbindenden Seite: "range" im
+     .page-x-data eine Ebene weiter oben im DOM (entity_detail.html:
+     entityChart(), cleanup.html: das schlanke { range: 'day' } daneben) —
+     direkt per Alpine-Scope-Kette gelesen statt über calendarPicker()s
+     eigenen pickerMode-Getter: ein Getter, der Alpine.$data() nutzt, um auf
+     den Eltern-Scope zuzugreifen, wird von Alpines Reaktivität beim Auswerten
+     von x-show/x-if NICHT als Abhängigkeit erkannt — die Sichtbarkeit blieb
+     dann auf dem Stand beim ersten Öffnen des Popovers hängen, statt bei
+     einem Range-Wechsel live nachzuziehen. Ein direkter Ausdruck wie unten
+     wird dagegen normal über die Scope-Kette aufgelöst und bleibt reaktiv.
+     "day"/"hour"/"week": Monat+Jahr+Tage-Raster wie bisher. "month": nur
+     Monat+Jahr, ein Tag ergäbe bei Zeitraum "Monat" keinen Sinn — Auswahl
+     springt direkt (siehe pickMonth() in calendar-picker.js, dort lebt
+     weiterhin der pickerMode-Getter für Event-Handler wie
+     onMonthChange/prevMonth — dort ist er unproblematisch, weil jeder Aufruf
+     den aktuellen Wert frisch beim Klick liest, statt sich auf Alpines
+     automatische Neuauswertung zu verlassen). "year": nur Jahr. "decade"
+     (nur entity_detail.html) und "all" (nur cleanup.html, dort "Gesamt"):
+     kein Kalender — der auslösende Button ist dann schon deaktiviert, dieses
+     Popover bleibt ungeöffnet.
+
+     "typeof range === 'undefined' || …" statt einfach "range !== 'year'":
+     ein Popover ohne "range" im Eltern-Scope (aktuell keine der beiden
+     Seiten mehr, aber ein günstiger Fallback für künftige Einbindungen ohne
+     Zeitraum-Konzept) würde bei "range !== 'year'" allein einen
+     ReferenceError auslösen, den Alpines with()-basierte Auswertung intern
+     verschluckt und die ganze Bedingung dabei still zu undefined (= falsy)
+     macht — Monat-Auswahl/Pfeile/Tage-Raster blieben dann unsichtbar, obwohl
+     nichts sie einschränken sollte. typeof wirft bei einem undeklarierten
+     Bezeichner nie — das ist der einzige Grund, warum die Bedingung so
+     umständlich aussieht. -->
+<div class="calendar-popover" x-ref="popover" x-show="open" x-cloak @click.outside="open = false" @keydown.escape.window="open = false">
+  <div class="calendar-header">
+    <button type="button" class="btn navbtn" x-show="typeof range === 'undefined' || (range !== 'year' && range !== 'month')" @click="prevMonth()" :disabled="loading || !canGoPrevMonth" aria-label="Vorheriger Monat">‹</button>
+    <!-- :selected je <option> statt :value/x-model am <select>: beide banden
+         den initial angezeigten Wert nicht zuverlässig an month/year (zeigte
+         beim Öffnen immer die erste Option, "Januar", unabhängig vom
+         tatsächlichen Monat) — Alpine wertet die Bindung am <select> aus,
+         bevor die per x-for erzeugten <option>-Elemente überhaupt existieren,
+         und wiederholt das (ohne erneute Änderung von month/year) danach
+         nicht mehr. :selected auf der Option selbst läuft dagegen erst, wenn
+         die jeweilige Option schon im DOM ist, keine Wettlaufsituation. -->
+    <select class="calendar-month-select" x-show="typeof range === 'undefined' || range !== 'year'" @change="onMonthChange($event.target.value)" :disabled="loading" aria-label="Monat">
+      <template x-for="(name, idx) in monthNames" :key="idx">
+        <option :value="idx + 1" :selected="idx + 1 === month" x-text="name"></option>
+      </template>
+    </select>
+    <select class="calendar-year-select" @change="onYearChange($event.target.value)" :disabled="loading" aria-label="Jahr">
+      <template x-for="y in yearOptions" :key="y">
+        <option :value="y" :selected="y === year" x-text="y"></option>
+      </template>
+    </select>
+    <button type="button" class="btn navbtn" x-show="typeof range === 'undefined' || (range !== 'year' && range !== 'month')" @click="nextMonth()" :disabled="loading || !canGoNextMonth" aria-label="Nächster Monat">›</button>
+  </div>
+  <template x-if="typeof range === 'undefined' || (range !== 'month' && range !== 'year' && range !== 'decade' && range !== 'all')">
+    <div>
+      <div class="calendar-weekdays">
+        <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+      </div>
+      <div class="calendar-grid">
+        <template x-for="(cell, idx) in days" :key="idx">
+          <!-- Modifier heißt bewusst "blank", nicht "empty" — app.css definiert
+               bereits eine GLOBALE .empty-Klasse für Leerzustands-Boxen
+               (padding:32px, zentrierter Text, z. B. "Keine Daten für diesen
+               Zeitraum") für ganz andere Elemente app-weit. Mit "empty" hier
+               kollidierte das: jede Füllzelle vor dem 1. eines Monats erbte
+               unbeabsichtigt dieses padding:32px, wodurch CSS Grids automatische
+               Mindestgrößen-Berechnung die ganze Zeile auf 64px aufblies — sichtbar
+               als große Lücke nach der ersten Zeile, in jedem Monat, dessen 1.
+               nicht auf einen Montag fällt (== jede Zeile mit mindestens einer
+               Füllzelle). -->
+          <button type="button" class="calendar-day"
+                  :class="{blank: !cell, 'out-of-range': cell && !cell.inRange, 'no-data': cell && cell.inRange && !cell.hasData, 'has-data': cell && cell.inRange && cell.hasData}"
+                  :disabled="!cell || !cell.inRange || !cell.hasData"
+                  :title="cell && cell.inRange && !cell.hasData ? 'Keine Daten an diesem Tag' : ''"
+                  x-text="cell ? cell.day : ''"
+                  @click="pick(cell)"></button>
+        </template>
+      </div>
+      <p class="calendar-loading" x-show="loading">Lädt&hellip;</p>
+      <button type="button" class="btn calendar-today-btn" @click="goToday()">Heute</button>
+    </div>
+  </template>
+</div>

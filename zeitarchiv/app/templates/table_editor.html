@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — {{ table_name or "Neue Tabelle" }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .chart-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .chart-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
+  .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
+  .save-row input[type=text]{
+    font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));padding:9px 14px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:200px;
+  }
+  [x-cloak]{display:none!important;}
+
+  .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:none;}
+  .seg button{
+    flex:none;padding:6px 10px;font-size:calc(12px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
+    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+
+  h3.tbl-h{font-size:calc(14px * var(--font-scale, 1));font-weight:700;margin:22px 0 4px;}
+  p.tbl-hint{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin:0 0 12px;max-width:100%;}
+
+  /* Spalten (Zeiträume) — waagerecht scrollbare Karten-Reihe, eine Karte je
+     Spalte plus eine "+"-Karte am Ende. .settings-panel sitzt in einer
+     Grid-Spalte (1fr) — ohne min-width:0 würde diese Spalte (und damit die
+     ganze Seite) sich an den intrinsischen Inhalt von .tbl-columns
+     anpassen ("min-size:auto"-Falle bei Grid/Flex), statt dass
+     overflow-x:auto hier greift. Deshalb min-width:0 auf beiden Ebenen. */
+  .settings-panel{min-width:0;}
+  .tbl-columns{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;min-width:0;}
+  .tbl-col-card{
+    flex:none;width:190px;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);
+    padding:10px 12px;display:flex;flex-direction:column;gap:7px;cursor:grab;
+  }
+  .tbl-col-card.dragging{opacity:.4;}
+  .tbl-col-card input[type=text],.tbl-col-card select,.tbl-col-card input[type=number]{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 8px;border-radius:6px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;
+  }
+  .tbl-col-card label.cbx{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .tbl-field-label{
+    font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.04em;
+    color:var(--ink-faint);margin-bottom:-3px;
+  }
+  .tbl-col-remove{align-self:flex-end;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(15px * var(--font-scale, 1));padding:0;line-height:1;}
+  .tbl-col-remove:hover{color:var(--danger);}
+  .tbl-col-add{
+    flex:none;width:64px;border:1px dashed var(--border);border-radius:10px;background:var(--surface);
+    color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));cursor:pointer;
+  }
+  .tbl-col-add:hover{color:var(--accent-line);border-color:var(--accent-line);}
+
+  /* Zeilen (Größen) — vertikale Liste, ein Kärtchen je Zeile. */
+  .tbl-rows{display:flex;flex-direction:column;gap:8px;}
+  .tbl-row-card{
+    display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:10px;
+    background:var(--surface);padding:10px 12px;
+  }
+  .tbl-row-letter{
+    flex:none;width:24px;height:24px;border-radius:999px;background:var(--surface-alt);color:var(--ink-muted);
+    font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));font-weight:600;display:flex;align-items:center;justify-content:center;
+    margin-top:2px;
+  }
+  .tbl-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;}
+  .tbl-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .tbl-row-top input[type=text]{
+    font-family:inherit;font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:140px;
+  }
+  .tbl-row-top label.cbx{display:flex;align-items:center;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
+  .tbl-row-remove{flex:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(16px * var(--font-scale, 1));padding:0 2px;line-height:1;margin-top:4px;}
+  .tbl-row-remove:hover{color:var(--danger);}
+  .tbl-row-move{display:flex;gap:2px;margin-left:auto;}
+  .tbl-row-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
+  .tbl-row-move button:hover{color:var(--accent-line);}
+  .tbl-row-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
+  .tbl-separator-editor-hint{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  .tbl-entity-select{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);max-width:320px;width:100%;
+  }
+  .tbl-formula-input{
+    font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;max-width:320px;
+  }
+  .tbl-formula-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  /* Gruppen-Picker: Button + Popover, dasselbe Positionierungsmuster wie das
+     Kalender-Widget (cal-wrap/calendar-popover) — position:relative am
+     Anker, position:absolute am Popover selbst. */
+  .tbl-group-wrap{position:relative;display:inline-block;}
+  .tbl-group-btn{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 10px;border-radius:6px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);cursor:pointer;max-width:320px;
+    text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .tbl-group-popover{
+    position:absolute;top:calc(100% + 6px);left:0;z-index:30;width:280px;max-height:260px;overflow-y:auto;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
+  }
+  .tbl-group-popover input[type=search]{
+    width:100%;font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 8px;border-radius:6px;border:1px solid var(--border);
+    background:var(--surface-alt);color:var(--ink);margin-bottom:6px;
+  }
+  .tbl-group-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
+  .tbl-group-row:hover{background:var(--surface-alt);}
+  .tbl-group-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .tbl-add-row-bar{display:flex;gap:8px;margin-top:10px;}
+
+  /* Live-Vorschau — Buchstaben-Kürzel (A/B/C, dasselbe Rund-Badge wie
+     .tbl-row-letter bei den Zeilen-Kärtchen oben) als ECHTE, zusätzliche
+     erste Tabellenspalte (nicht als separate Nebenstruktur) — dadurch immer
+     exakt auf Höhe der jeweiligen Zeile, unabhängig von Dichte/Zebra/
+     Schriftgröße, ganz ohne Pixel-Werte raten zu müssen. Nur beim
+     Bearbeiten sichtbar (x-show="editing" je Zelle), nicht Teil des
+     eigentlichen Ergebnisses/der angehefteten Dashboard-Kachel. Weil diese
+     Spalte strukturell IMMER die erste ist (x-show blendet nur aus, ändert
+     aber nichts an der DOM-Position), können sich Beschriftungs-Spalte
+     (sticky/Hervorhebung) und die rechtsbündigen Werte-Spalten nicht mehr
+     auf :first-child verlassen — deshalb die explizite .tbl-label-col-
+     Klasse auf der eigentlichen Beschriftungs-Spalte statt :first-child. */
+  .tbl-preview{overflow-x:auto;}
+  .tbl-preview td,.tbl-preview th{white-space:nowrap;}
+  .tbl-preview th:not(.tbl-preview-letter-col):not(.tbl-label-col){text-align:right;}
+  .tbl-preview td.tbl-num{text-align:right;font-variant-numeric:tabular-nums;}
+  .tbl-preview tr.tbl-bold td{font-weight:700;color:var(--ink);}
+  .tbl-preview td.tbl-error{color:var(--danger);}
+  .tbl-preview td.tbl-label-col,.tbl-preview th.tbl-label-col{
+    position:sticky;left:0;background:var(--surface);z-index:1;
+  }
+  table.dt.compact th.tbl-preview-letter-col,table.dt.compact td.tbl-preview-letter-col{
+    padding:2px 6px;text-align:center;width:1%;
+  }
+  table.dt.compact tr.tbl-separator-row td{
+    padding:10px 12px;border:0;background:transparent !important;box-shadow:none !important;
+  }
+  .tbl-separator-line{display:block;width:100%;height:2px;border-radius:999px;background:var(--border-strong, var(--border));}
+
+  /* Darstellungs-Optionen (Konzept-Erweiterung "professionelles UI-Design")
+     — dieselben Klassennamen wie auf der Dashboard-Kachel (entities.html),
+     damit eine angeheftete Tabelle dort identisch aussieht. */
+  .tbl-style-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+  .tbl-style-legend{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:3px;}
+  .tbl-style-legend li{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  .tbl-style-legend strong{color:var(--ink-muted);font-weight:600;}
+  .tbl-style-zebra tr:nth-child(even) td{background:var(--surface-alt);}
+  .tbl-style-zebra.tbl-style-header-accent tr:nth-child(even) td{background:var(--surface-alt);}
+  .tbl-style-border-grid td,.tbl-style-border-grid th{border:1px solid var(--border);}
+  /* table.dt.compact (die Tabelle trägt "dt compact" immer als Basis-Klasse,
+     siehe unten) definiert in app.css bereits border-bottom/padding mit
+     höherer Spezifität (2 Klassen + 2 Typ-Selektoren) als eine einfache
+     .tbl-style-*-Regel je erreichen könnte — ohne die volle Kette
+     "table.dt.compact.tbl-style-*" hier zu wiederholen, hätten "Ohne
+     Rahmen" und "Kompakt" schlicht keine sichtbare Wirkung. */
+  table.dt.compact.tbl-style-border-none td,table.dt.compact.tbl-style-border-none th{border-bottom:none;}
+  table.dt.compact.tbl-style-compact td,table.dt.compact.tbl-style-compact th{padding:2px 8px;}
+  .tbl-style-header-accent tr:first-child th{background:var(--accent-line);color:var(--accent-contrast);}
+  /* Dezent statt vollflächig satt: sanft eingefärbte Fläche (color-mix aus
+     Akzentfarbe + Oberfläche, funktioniert automatisch hell/dunkel, da
+     beide Zutaten Theme-Variablen sind) plus schmaler Akzentstreifen links
+     — liest sich als "markierte Spalte", nicht als Button. !important, weil
+     Zebra/Kopfzeile-Kombinationen (Zeile drüber) sonst je nach Kombination
+     höhere Selektor-Spezifität haben als eine einfache "erste Spalte"-Regel
+     je erreichen könnte. Kein font-weight hier — das ist eine eigene,
+     unabhängige Option (.tbl-style-first-col-bold). Nur td, nicht th: die
+     Kopfzeile bleibt unverändert (eigene Option "Kopfzeile hervorheben"),
+     die Eck-Zelle soll nicht in einer davon unabhängigen dritten Farbe
+     erscheinen. */
+  .tbl-style-first-col-accent td.tbl-label-col{
+    background:color-mix(in srgb, var(--accent-line) 13%, var(--surface)) !important;
+    color:var(--accent-line) !important;
+    box-shadow:inset 3px 0 0 var(--accent-line);
+  }
+  /* Bei aktivem Zebra-Muster übernimmt die erste Spalte dessen Streifung
+     statt einer durchgängig gleichen Fläche — dieselbe tr:nth-child(even)-
+     Zuordnung wie die normale Zebra-Regel oben, nur als etwas kräftigerer
+     Farbton derselben Mischung statt eines optisch unverwandten Grautons. */
+  .tbl-style-first-col-accent.tbl-style-zebra tr:nth-child(even) td.tbl-label-col{
+    background:color-mix(in srgb, var(--accent-line) 24%, var(--surface)) !important;
+  }
+  .tbl-style-first-col-bold td.tbl-label-col{font-weight:700;}
+</style>
+</head>
+<body>
+  <div class="page" x-data="tableEditor()">
+    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/tables">Tabellen</a> / {{ table_name or "Neue Tabelle" }}</p>
+    <h1>Tabellen</h1>
+    <p class="sub">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen — Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum). &middot; <a href="{{ base }}/tables/new">+ Neue Tabelle</a> &middot; <a href="{{ base }}/tables">&larr; Zurück</a></p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'tables' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        <div class="chart-title-row">
+          <h2 x-text="editing ? (tableId ? 'Tabelle bearbeiten' : 'Neue Tabelle') : (name || 'Neue Tabelle')"></h2>
+          {% if table_id %}
+          <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
+          {% endif %}
+        </div>
+        <p class="sub" x-show="editing">Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum) — dieselbe Perioden-Logik wie bei Charts, nur tabellarisch statt grafisch. Zeigt beim Ansehen immer aktuelle Werte, kein eingefrorener Schnappschuss.</p>
+
+        <template x-if="editing">
+          <div>
+            <h3 class="tbl-h">Spalten (Zeiträume)</h3>
+            <p class="tbl-hint">Jede Spalte ist ein Zeitraum, frei benannt (z. B. "Heute", "Aug VJ", "2026") — Bezeichnung und tatsächliche Berechnung (Zeitraum-Typ/Versatz) sind getrennt. Ohne eigene Beschriftung wird der vorgeschlagene Name (grau) übernommen. Der Versatz steuert, welche Periode gemeint ist: 0 = aktuell, -1 = eine Periode zurück, -2 = zwei Perioden zurück usw. (nie positiv) — für "Vorjahresmonat" bei Zeitraum-Typ "Monat" z. B. -12, die Einheit wird direkt im Feld angezeigt. Per Ziehen lassen sich die Spalten neu anordnen.</p>
+            <div class="tbl-columns">
+              <template x-for="col in columns" :key="col.uid">
+                <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid">
+                  <button type="button" class="tbl-col-remove" title="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
+                  <span class="tbl-field-label">Beschriftung</span>
+                  <input type="text" :placeholder="suggestColumnLabel(col)" x-model="col.label">
+                  <span class="tbl-field-label">Zeitraum-Typ</span>
+                  <select x-model="col.range_key" @change="load()">
+                    {% for key, label in range_options %}
+                    <option value="{{ key }}">{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <span class="tbl-field-label" x-text="`Versatz (${versatzUnit(col)})`"></span>
+                  <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
+                </div>
+              </template>
+              <button type="button" class="tbl-col-add" @click="addColumn()" title="Spalte hinzufügen">+</button>
+            </div>
+
+            <h3 class="tbl-h">Zeilen (Größen)</h3>
+            <p class="tbl-hint">
+              <strong>Entität</strong>: eine einzelne Entität. <strong>Gruppe</strong>: mehrere Entitäten zu einer Summen-Zeile zusammengefasst.
+              <strong>Formel</strong>: referenziert andere Zeilen über ihr Buchstaben-Kürzel (links), z. B. <code>A / B * 100</code> — nur Zeilen OBERHALB der Formel-Zeile sind referenzierbar.
+              <strong>Trennlinie</strong>: trennt zwei Bereiche rein optisch und benötigt keine Daten.
+            </p>
+            <div class="tbl-rows">
+              <template x-for="(row, idx) in rows" :key="row.uid">
+                <div class="tbl-row-card">
+                  <div class="tbl-row-letter" x-text="row.row_type === 'separator' ? '—' : rowLetters[row.uid]"></div>
+                  <div class="tbl-row-main">
+                    <div class="tbl-row-top">
+                      <div class="seg">
+                        <button type="button" :class="{active: row.row_type === 'entity'}" @click="setRowType(row, 'entity')">Entität</button>
+                        <button type="button" :class="{active: row.row_type === 'group'}" @click="setRowType(row, 'group')">Gruppe</button>
+                        <button type="button" :class="{active: row.row_type === 'formula'}" @click="setRowType(row, 'formula')">Formel</button>
+                        <button type="button" :class="{active: row.row_type === 'separator'}" @click="setRowType(row, 'separator')">Trennlinie</button>
+                      </div>
+                      <input type="text" x-show="row.row_type !== 'separator'" :placeholder="suggestRowLabel(row) || 'Beschriftung …'" x-model="row.label">
+                      <label class="cbx" x-show="row.row_type !== 'separator'"><input type="checkbox" x-model="row.bold"> Fett</label>
+                      <div class="tbl-row-move">
+                        <button type="button" title="Zeile nach oben" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
+                        <button type="button" title="Zeile nach unten" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
+                      </div>
+                      <button type="button" class="tbl-row-remove" title="Zeile entfernen" @click="removeRow(row.uid)">×</button>
+                    </div>
+
+                    <select class="tbl-entity-select" x-show="row.row_type === 'entity'"
+                            @change="row.entity_ids = $event.target.value ? [$event.target.value] : []; load()">
+                      <option value="">Entität wählen …</option>
+                      {% for opt in entity_options %}
+                      <option value="{{ opt.entity_id }}" :selected="row.entity_ids[0] === '{{ opt.entity_id }}'">{{ opt.label }}</option>
+                      {% endfor %}
+                    </select>
+
+                    <div class="tbl-group-wrap" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
+                      <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
+                              x-text="row.entity_ids.length ? row.entity_ids.length + ' Entität' + (row.entity_ids.length !== 1 ? 'en' : '') + ' ausgewählt' : 'Entitäten wählen …'"></button>
+                      <div class="tbl-group-popover" x-show="row.pickerOpen" x-cloak>
+                        <input type="search" placeholder="Suchen …" x-model="row.search">
+                        {% for opt in entity_options %}
+                        <label class="tbl-group-row" x-show='!row.search || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.search.toLowerCase())'>
+                          <input type="checkbox" value="{{ opt.entity_id }}"
+                                 :checked="row.entity_ids.includes('{{ opt.entity_id }}')"
+                                 @change="toggleGroupEntity(row, '{{ opt.entity_id }}')">
+                          <span>{{ opt.label }}</span>
+                        </label>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                    <template x-if="row.row_type === 'formula'">
+                      <div>
+                        <input type="text" class="tbl-formula-input" placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()">
+                        <span class="tbl-field-label">Einheit (optional)</span>
+                        <input type="text" class="tbl-formula-input" :placeholder="suggestFormulaUnit(row) || 'Automatisch übernehmen'" x-model="row.formula_unit" @change="load()">
+                        <p class="tbl-formula-hint">Verfügbar: <span x-text="rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)'"></span></p>
+                        <p class="tbl-formula-hint">Ohne eigene Einheit wird die Einheit der ersten referenzierten Ausgangszeile übernommen.</p>
+                      </div>
+                    </template>
+                    <p class="tbl-separator-editor-hint" x-show="row.row_type === 'separator'">Durchgehende Linie über die gesamte Tabellenbreite.</p>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="tbl-add-row-bar">
+              <button type="button" class="btn" @click="addRow('entity')">+ Entität</button>
+              <button type="button" class="btn" @click="addRow('group')">+ Gruppe</button>
+              <button type="button" class="btn" @click="addRow('formula')">+ Formel</button>
+              <button type="button" class="btn" @click="addRow('separator')">+ Trennlinie</button>
+            </div>
+
+            <h3 class="tbl-h">Darstellung</h3>
+            <p class="tbl-hint">Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).</p>
+            <div class="tbl-style-bar">
+              <button type="button" class="chip" :class="{active: style.zebra}" title="Abwechselnder Zeilenhintergrund, erleichtert das zeilenweise Lesen" @click="style.zebra = !style.zebra">Zebra-Streifen</button>
+              <button type="button" class="chip" :class="{active: style.header_accent}" title="Kopfzeile (Zeiträume) in der Akzentfarbe" @click="style.header_accent = !style.header_accent">Kopfzeile hervorheben</button>
+              <button type="button" class="chip" :class="{active: style.first_col_accent}" title="Erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt — berücksichtigt aktives Zebra-Muster" @click="style.first_col_accent = !style.first_col_accent">Erste Spalte hervorheben</button>
+              <button type="button" class="chip" :class="{active: style.first_col_bold}" title="Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung" @click="style.first_col_bold = !style.first_col_bold">Beschriftung fett</button>
+              <div class="seg">
+                <button type="button" :class="{active: style.borders === 'horizontal'}" title="Nur waagerechte Linien zwischen den Zeilen" @click="style.borders = 'horizontal'">Horizontal</button>
+                <button type="button" :class="{active: style.borders === 'grid'}" title="Linien um jede einzelne Zelle" @click="style.borders = 'grid'">Gitter</button>
+                <button type="button" :class="{active: style.borders === 'none'}" title="Keine Linien zwischen den Zeilen" @click="style.borders = 'none'">Ohne Rahmen</button>
+              </div>
+              <div class="seg">
+                <button type="button" :class="{active: style.density === 'comfortable'}" title="Normaler Zeilenabstand" @click="style.density = 'comfortable'">Komfortabel</button>
+                <button type="button" :class="{active: style.density === 'compact'}" title="Schmalerer Zeilenabstand, mehr Zeilen auf einen Blick" @click="style.density = 'compact'">Kompakt</button>
+              </div>
+            </div>
+            <ul class="tbl-style-legend">
+              <li><strong>Zebra-Streifen:</strong> abwechselnder Zeilenhintergrund für leichteres zeilenweises Lesen.</li>
+              <li><strong>Kopfzeile hervorheben:</strong> Kopfzeile (Zeiträume) in der Akzentfarbe.</li>
+              <li><strong>Erste Spalte hervorheben:</strong> erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt, berücksichtigt ein aktives Zebra-Muster.</li>
+              <li><strong>Beschriftung fett:</strong> Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung.</li>
+              <li><strong>Rahmen:</strong> Horizontal (nur Linien zwischen Zeilen) &middot; Gitter (Linien um jede Zelle) &middot; Ohne Rahmen (keine Linien).</li>
+              <li><strong>Dichte:</strong> Komfortabel (normaler Zeilenabstand) &middot; Kompakt (schmalerer Zeilenabstand, mehr Zeilen auf einen Blick).</li>
+            </ul>
+
+            <h3 class="tbl-h">Vorschau</h3>
+          </div>
+        </template>
+
+        <div class="tbl-wrap tbl-preview">
+          <table class="dt compact" :class="TableCompute.styleClasses(style)">
+            <tr>
+              <th x-show="editing" class="tbl-preview-letter-col"></th>
+              <th class="tbl-label-col">&nbsp;</th>
+              <template x-for="col in columns" :key="col.uid"><th x-text="col.label.trim() || suggestColumnLabel(col)"></th></template>
+            </tr>
+            <template x-for="(row, idx) in rows" :key="row.uid">
+              <tr :class="{'tbl-bold': row.bold && row.row_type !== 'separator', 'tbl-separator-row': row.row_type === 'separator'}">
+                <td x-show="editing && row.row_type !== 'separator'" class="tbl-preview-letter-col"><div class="tbl-row-letter" x-text="rowLetters[row.uid]"></div></td>
+                <td x-show="row.row_type !== 'separator'" class="tbl-label-col" x-text="resolvedRowLabel(row)"></td>
+                <template x-for="col in columns" :key="col.uid">
+                  <td x-show="row.row_type !== 'separator'" class="tbl-num" :class="{'tbl-error': cellError(row, col)}" x-text="cellText(row, col)"></td>
+                </template>
+                <td x-show="row.row_type === 'separator'" :colspan="columns.length + (editing ? 2 : 1)"><span class="tbl-separator-line" aria-hidden="true"></span></td>
+              </tr>
+            </template>
+            <tr x-show="!rows.length || !columns.length"><td :colspan="columns.length + (editing ? 2 : 1)" style="text-align:center;color:var(--ink-faint);">Bitte mindestens eine Spalte und eine Zeile anlegen.</td></tr>
+          </table>
+        </div>
+        <p class="tbl-hint" x-show="loading" style="margin-top:8px;">Lädt …</p>
+
+        <div class="save-row" x-show="editing">
+          <input type="text" placeholder="Name der Tabelle …" x-model="name">
+          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if table_id else "Tabelle erstellen" }}</button>
+          {% if table_id %}
+          <button type="button" class="btn btn-danger" @click="deleteTable()">Löschen</button>
+          {% endif %}
+          <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
+  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
+  <script>
+    const BASE = {{ base | tojson }};
+    const TABLE_ID = {{ table_id | tojson }};
+    const TABLE_NAME = {{ table_name | tojson }};
+    const INITIAL_COLUMNS = {{ columns | tojson }};
+    const INITIAL_ROWS = {{ rows | tojson }};
+    const INITIAL_STYLE = {{ style | tojson }};
+    const DEFAULT_STYLE = {zebra: false, borders: 'horizontal', density: 'comfortable', header_accent: false, first_col_accent: false, first_col_bold: false};
+    const ENTITY_OPTIONS = {{ entity_options | tojson }};
+    const ENTITY_LABEL_BY_ID = Object.fromEntries(ENTITY_OPTIONS.map(o => [o.entity_id, o.label]));
+
+    let _uidSeq = 0;
+    function uid() { return `u${++_uidSeq}`; }
+
+    // Namensvorschläge für Spalten (Zeitraum-Typ + Versatz) — dieselbe
+    // Wortwahl wie compareLabel/comparePreviousLabel auf der Entität-eigenen
+    // Chart-Seite (entity_detail.html), hier nur als Platzhalter/Default
+    // statt als Button-Beschriftung. Werden nur verwendet, wenn die Spalte
+    // keine eigene Beschriftung hat (Platzhalter im Feld UND Fallback beim
+    // Speichern).
+    const RANGE_LABELS = {hour: 'Stunde', day: 'Tag', week: 'Woche', month: 'Monat', year: 'Jahr', decade: 'Dekade'};
+    const PREVIOUS_LABELS = {hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche', month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade'};
+    const PLURAL_UNITS = {hour: 'Stunden', day: 'Tagen', week: 'Wochen', month: 'Monaten', year: 'Jahren', decade: 'Dekaden'};
+    // Einheit für die Versatz-Feldbeschriftung ("Versatz (Wochen)") — Plural
+    // ohne Dativ-"n", anders als PLURAL_UNITS oben (für Fließtext wie
+    // "Vor 3 Monaten" gedacht). Statisch je Zeitraum-Typ, unabhängig vom
+    // aktuellen Zahlenwert — deshalb an der Feldbeschriftung statt im Feld
+    // selbst, das bleibt dadurch ein normales, unverändertes Zahlenfeld
+    // (Spinner-Pfeile bleiben rechtsbündig wie bei jedem anderen Zahlenfeld).
+    const UNIT_PLURAL_SIMPLE = {hour: 'Stunden', day: 'Tage', week: 'Wochen', month: 'Monate', year: 'Jahre', decade: 'Dekaden'};
+
+    function suggestColumnLabel(col) {
+      const offset = col.offset || 0;
+      if (offset === 0) return RANGE_LABELS[col.range_key] || 'Zeitraum';
+      if (offset === -1) return PREVIOUS_LABELS[col.range_key] || 'Vorperiode';
+      const unit = PLURAL_UNITS[col.range_key] || 'Perioden';
+      return offset < 0 ? `Vor ${Math.abs(offset)} ${unit}` : `In ${offset} ${unit}`;
+    }
+
+    function versatzUnit(col) {
+      return UNIT_PLURAL_SIMPLE[col.range_key] || 'Perioden';
+    }
+
+    // Namensvorschlag für eine Entität-Zeile ohne eigene Beschriftung — der
+    // friendly_name der gewählten Entität. Gruppen/Formeln haben keine
+    // einzelne Entität, die dafür herhalten könnte, deshalb dort kein
+    // Vorschlag (leerer String, Aufrufer fällt dann auf "Beschriftung …"
+    // bzw. "(ohne Namen)" zurück).
+    function suggestRowLabel(row) {
+      if (row.row_type === 'entity' && row.entity_ids.length === 1) {
+        return ENTITY_LABEL_BY_ID[row.entity_ids[0]] || '';
+      }
+      return '';
+    }
+
+    // Spalten per Drag & Drop neu anordnen — dasselbe native HTML5-DnD-Muster
+    // wie bei den Dashboard-Kacheln (dashboard-tiles.js, setupDragAndDrop()),
+    // hier per Event-Delegation auf den (statischen) .tbl-columns-Container
+    // statt pro Karte gebunden, damit neu hinzugefügte Karten (addColumn())
+    // automatisch mit erfasst werden, ohne die Listener neu anhängen zu
+    // müssen. Die Karten selbst werden von Alpines x-for gerendert — das
+    // Array (this.columns) ist die Quelle der Wahrheit, DOM-Reihenfolge
+    // während des Ziehens ist nur eine visuelle Vorschau, die am Ende des
+    // Drags ins Array zurückübertragen wird.
+    function setupColumnDrag() {
+      const container = document.querySelector('.tbl-columns');
+      if (!container || container.dataset.dragBound) return;
+      container.dataset.dragBound = '1';
+      let draggedEl = null;
+      container.addEventListener('dragstart', e => {
+        const card = e.target.closest('.tbl-col-card');
+        if (!card) return;
+        draggedEl = card;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', card.dataset.colUid || '');
+      });
+      container.addEventListener('dragover', e => {
+        if (!draggedEl) return;
+        e.preventDefault();
+        const card = e.target.closest('.tbl-col-card');
+        if (!card || card === draggedEl) return;
+        const rect = card.getBoundingClientRect();
+        const before = (e.clientX - rect.left) < rect.width / 2;
+        card.parentNode.insertBefore(draggedEl, before ? card : card.nextSibling);
+      });
+      container.addEventListener('dragend', () => {
+        if (draggedEl) {
+          draggedEl.classList.remove('dragging');
+          const uids = Array.from(container.querySelectorAll('.tbl-col-card')).map(el => el.dataset.colUid);
+          const pageData = Alpine.$data(document.querySelector('.page'));
+          pageData.columns.sort((a, b) => uids.indexOf(a.uid) - uids.indexOf(b.uid));
+        }
+        draggedEl = null;
+      });
+    }
+
+    function tableEditor() {
+      return {
+        tableId: TABLE_ID,
+        name: TABLE_NAME,
+        editing: !TABLE_ID,
+        columns: INITIAL_COLUMNS.map(c => ({...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
+        rows: INITIAL_ROWS.map(r => ({formula_unit: '', ...r, uid: uid(), pickerOpen: false, search: ''})),
+        style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
+        values: {},  // col.uid -> row.uid -> {value, unit, error} | null
+        loading: false,
+        saving: false,
+        savedMessage: '',
+        _loadSeq: 0,
+
+        get rowLetters() {
+          const m = {};
+          let dataIndex = 0;
+          this.rows.forEach(r => {
+            m[r.uid] = r.row_type === 'separator' ? null : String.fromCharCode(65 + ((dataIndex++) % 26));
+          });
+          return m;
+        },
+
+        addColumn() {
+          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false});
+        },
+        removeColumn(colUid) {
+          this.columns = this.columns.filter(c => c.uid !== colUid);
+          this.load();
+        },
+        addRow(type) {
+          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', bold: false, pickerOpen: false, search: ''});
+          this.load();
+        },
+        setRowType(row, type) {
+          row.row_type = type;
+          if (type === 'entity') row.entity_ids = row.entity_ids.slice(0, 1);
+          if (type === 'separator') {
+            row.label = '';
+            row.entity_ids = [];
+            row.formula = '';
+            row.formula_unit = '';
+            row.bold = false;
+          }
+          this.load();
+        },
+        moveRow(rowUid, direction) {
+          const index = this.rows.findIndex(r => r.uid === rowUid);
+          const target = index + direction;
+          if (index < 0 || target < 0 || target >= this.rows.length) return;
+          const [row] = this.rows.splice(index, 1);
+          this.rows.splice(target, 0, row);
+          this.load();
+        },
+        removeRow(rowUid) {
+          this.rows = this.rows.filter(r => r.uid !== rowUid);
+          this.load();
+        },
+        toggleGroupEntity(row, entityId) {
+          const i = row.entity_ids.indexOf(entityId);
+          if (i === -1) row.entity_ids.push(entityId); else row.entity_ids.splice(i, 1);
+          this.load();
+        },
+
+        suggestRowLabel(row) { return suggestRowLabel(row); },
+        suggestColumnLabel(col) { return suggestColumnLabel(col); },
+        suggestFormulaUnit(row) {
+          for (const col of this.columns) {
+            const cell = this.values[col.uid] && this.values[col.uid][row.uid];
+            if (cell && cell.unit) return cell.unit;
+          }
+          return '';
+        },
+        versatzUnit(col) { return versatzUnit(col); },
+        clampOffset(col) { if (col.offset > 0) col.offset = 0; },
+        // Tatsächlich angezeigter/gespeicherter Name — eigene Beschriftung,
+        // sonst der Vorschlag (friendly_name der Entität), sonst zuletzt
+        // "(ohne Namen)". Eine Methode statt zweier getrennter Stellen, damit
+        // Vorschau-Tabelle und save() garantiert denselben Namen verwenden.
+        resolvedRowLabel(row) {
+          if (row.row_type === 'separator') return '';
+          return row.label.trim() || suggestRowLabel(row) || '(ohne Namen)';
+        },
+
+        cellText(row, col) {
+          const cell = this.values[col.uid] && this.values[col.uid][row.uid];
+          return TableCompute.cellText(cell);
+        },
+        cellError(row, col) {
+          const cell = this.values[col.uid] && this.values[col.uid][row.uid];
+          return !!(cell && cell.error);
+        },
+
+        // Rechenkern in static/js/table-compute.js (TableCompute.computeValues) —
+        // von der Dashboard-Kachel für dieselbe Tabelle genutzt, damit beide
+        // garantiert dieselben Werte zeigen. Das arbeitet auf einfachen,
+        // Index-basierten Arrays statt der hier üblichen uid-Objekte, deshalb
+        // hier nur die Umwandlung dorthin und die Ergebnisse zurück in
+        // this.values[col.uid][row.uid].
+        async load() {
+          if (!this.columns.length || !this.rows.length) { this.values = {}; return; }
+          const requestId = ++this._loadSeq;
+          this.loading = true;
+          const plainColumns = this.columns.map(c => ({range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year}));
+          const plainRows = this.rows.map(r => ({
+            row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
+            formula_unit: r.formula_unit || '',
+          }));
+          const computed = await TableCompute.computeValues(BASE, plainColumns, plainRows);
+          if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
+          const newValues = {};
+          this.columns.forEach((col, ci) => {
+            newValues[col.uid] = {};
+            this.rows.forEach((row, ri) => { newValues[col.uid][row.uid] = computed[ci][ri]; });
+          });
+          this.values = newValues;
+          this.loading = false;
+        },
+
+        async save() {
+          if (!this.name.trim()) { alert('Bitte einen Namen für die Tabelle angeben.'); return; }
+          if (!this.columns.length) { alert('Bitte mindestens eine Spalte anlegen.'); return; }
+          if (!this.rows.length) { alert('Bitte mindestens eine Zeile anlegen.'); return; }
+          for (const row of this.rows) {
+            if ((row.row_type === 'entity' || row.row_type === 'group') && !row.entity_ids.length) {
+              alert(`Zeile "${this.resolvedRowLabel(row)}" braucht mindestens eine Entität.`);
+              return;
+            }
+            if (row.row_type === 'formula' && !row.formula.trim()) {
+              alert(`Zeile "${this.resolvedRowLabel(row)}" braucht eine Formel.`);
+              return;
+            }
+          }
+          this.saving = true;
+          this.savedMessage = '';
+          const body = {
+            name: this.name.trim(),
+            columns: this.columns.map(c => ({
+              label: c.label.trim() || suggestColumnLabel(c), range_key: c.range_key, offset: c.offset || 0,
+              year_over_year: !!c.year_over_year,
+            })),
+            rows: this.rows.map(r => ({
+              label: this.resolvedRowLabel(r), row_type: r.row_type,
+              entity_ids: r.row_type === 'separator' ? [] : r.entity_ids,
+              formula: r.row_type === 'separator' ? '' : r.formula,
+              formula_unit: r.row_type === 'formula' ? (r.formula_unit || '').trim() : '',
+              bold: r.row_type === 'separator' ? false : !!r.bold,
+            })),
+            style: this.style,
+          };
+          try {
+            const url = TABLE_ID ? `${BASE}/tables/${TABLE_ID}` : `${BASE}/tables`;
+            const res = await fetch(url, {
+              method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              alert(err.detail || 'Speichern fehlgeschlagen.');
+              return;
+            }
+            const data = await res.json();
+            if (!TABLE_ID) {
+              window.location.href = `${BASE}/tables/${data.id}`;
+              return;
+            }
+            this.savedMessage = '✓ Gespeichert';
+            this.editing = false;
+            setTimeout(() => { this.savedMessage = ''; }, 2000);
+          } finally {
+            this.saving = false;
+          }
+        },
+
+        async deleteTable() {
+          if (!await appConfirm('Diese Tabelle wirklich löschen?', {danger: true})) return;
+          await fetch(`${BASE}/tables/${TABLE_ID}/delete`, {method: 'POST'});
+          window.location.href = `${BASE}/tables`;
+        },
+
+        init() {
+          this.load();
+          // .tbl-columns steckt in einem x-if="editing" — bei jedem Wechsel
+          // auf "editing" wird der Container neu erzeugt (der
+          // dragBound-Marker geht dabei verloren), deshalb hier neu binden,
+          // nicht nur einmalig beim ersten Laden.
+          this.$watch('editing', v => { if (v) this.$nextTick(() => setupColumnDrag()); });
+          if (this.editing) this.$nextTick(() => setupColumnDrag());
+        },
+      };
+    }
+  </script>
+</body>
+</html>

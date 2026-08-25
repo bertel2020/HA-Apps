@@ -1,0 +1,68 @@
+<form id="backup-schedule-form" hx-post="backup/schedule" hx-trigger="change" hx-target="#backup-schedule-form" hx-swap="outerHTML" hx-include="#backup-schedule-form"
+      style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border);">
+  <div class="status-grid">
+    <div class="status-card">
+      <span class="hint">Nächster Lauf</span>
+      <strong>{{ backup_next_run }}</strong>
+    </div>
+    <div class="status-card">
+      <span class="hint">Letzter Erfolg</span>
+      <strong>{{ backup_last_success }}</strong>
+    </div>
+    <div class="status-card">
+      <span class="hint">Letzter Fehler</span>
+      <strong>{{ backup_last_failure }}</strong>
+    </div>
+  </div>
+  {% for warning in backup_warnings %}
+  <p style="margin:0 0 10px;padding:10px 12px;border:1px solid var(--danger);border-radius:8px;color:var(--danger);">
+    {{ warning }}
+  </p>
+  {% endfor %}
+  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
+  <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
+    Automatisch erstellen
+    <select name="backup_schedule">
+      {% for value, label in backup_schedule_options %}
+      <option value="{{ value }}" {% if value == backup_schedule %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
+    Uhrzeit ({{ backup_timezone|default('lokal') }})
+    <input type="time" name="backup_schedule_time" value="{{ backup_schedule_time }}" required>
+  </label>
+  {% if backup_schedule == 'weekly' %}
+  <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
+    Wochentag
+    <select name="backup_schedule_weekday">
+      {% for value, label in backup_weekday_options %}
+      <option value="{{ value }}" {% if value == backup_schedule_weekday %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% else %}
+  <input type="hidden" name="backup_schedule_weekday" value="{{ backup_schedule_weekday }}">
+  {% endif %}
+  <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
+    Anzahl behalten
+    <select name="backup_keep_count">
+      {% for value, label in backup_keep_count_options %}
+      <option value="{{ value }}" {% if value == backup_keep_count %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
+    Max. Alter
+    <select name="backup_keep_days">
+      {% for value, label in backup_keep_days_options %}
+      <option value="{{ value }}" {% if value == backup_keep_days %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  </div>
+  <p class="hint" style="margin:12px 0 0;">
+    Portable Backups liegen lokal auf diesem Gerät. Für einen Geräteausfall zusätzlich automatische
+    Home-Assistant-Backups auf einem NAS, in Home Assistant Cloud oder an einem anderen externen Ziel einrichten.
+  </p>
+</form>

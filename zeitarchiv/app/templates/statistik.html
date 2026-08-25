@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Statistik</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  #growth-chart{width:100%;height:280px;max-width:100%;}
+  .section-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px;}
+  .section-header h2{margin:0;}
+  /* .seg ist bewusst pro Seite dupliziert (kein gemeinsames app.css-Bit) —
+     dieselben Regeln wie z. B. entity_detail.html/chart_editor.html, damit
+     die Zeitraum-Auswahl hier identisch aussieht statt auf Browser-Default-
+     Button-Chrome zurückzufallen. */
+  .seg{
+    display:flex;border:1px solid var(--border);border-radius:8px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0;
+    scrollbar-width:none;
+  }
+  .seg::-webkit-scrollbar{display:none;}
+  .seg button{
+    flex:none;padding:7px 12px;font-size:calc(12.5px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
+    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  .storage-card{display:flex;gap:32px;flex-wrap:wrap;align-items:center;}
+  #storage-pie{flex:0 0 260px;width:260px;height:260px;}
+  .storage-card .tbl-wrap{flex:1;min-width:280px;}
+  .storage-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:8px;vertical-align:middle;}
+  .storage-category-link{font-weight:600;white-space:nowrap;}
+  /* Die längste Kategorie bleibt bei normaler Schriftgröße einzeilig. Die
+     beiden Zahlenspalten rücken dafür etwas nach rechts, behalten aber genug
+     Platz für Werte bis in den GB-/100-%-Bereich. Unterhalb dieser Breite
+     übernimmt .tbl-wrap das horizontale Scrollen, statt Text zu überlagern. */
+  table.storage-usage-table{min-width:600px;}
+  .storage-usage-table td:first-child{white-space:nowrap;}
+  .stats-col-storage-label{width:55%;}
+  .stats-col-storage-size{width:26%;}
+  .stats-col-storage-percent{width:19%;}
+  @media (max-width:480px){
+    #growth-chart{height:220px;}
+    #storage-pie{width:100%;}
+    .card{padding:14px;}
+  }
+  td.entity a{color:inherit;text-decoration:none;display:block;}
+  td.entity a:hover .name{color:var(--accent-line);}
+  td.entity .name{font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);overflow-wrap:break-word;}
+  td.entity .id{
+    display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
+    max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;
+  }
+
+  /* Nach Typ / Nach Auflösung / Nach Aufbewahrung sind drei getrennte Tabellen,
+     die optisch untereinander wie eine durchgehende Spaltenstruktur wirken
+     sollen — ohne gemeinsame, feste Breiten sizet jede Tabelle ihre Spalten
+     unabhängig anhand des eigenen Inhalts, wodurch sie gegeneinander
+     verrutschen (unterschiedlich lange erste Spalte: "Typ" vs. "Auflösung" vs.
+     "Aufbewahrung"). Breiten aus den längsten tatsächlich vorkommenden Werten
+     je Spalte abgeleitet, nicht geschätzt: "Aufbewahrung" (12 Zeichen) ist die
+     längste Beschriftung/den längsten Wert der ersten Spalte über alle drei
+     Tabellen hinweg, "1.861.710" (Datensätze) und "795.8 KB" (Größe) die
+     längsten Werte ihrer Spalten. */
+  table.stats-dt{table-layout:fixed;min-width:480px;}
+  .stats-col-label{width:32%;}
+  .stats-col-count{width:20%;}
+  .stats-col-rows{width:26%;}
+  .stats-col-size{width:22%;}
+
+  /* Erkannte Duplikate haben nur 2 Spalten (Entität +
+     Anzahl), sollen aber trotzdem bündig zu den 4-spaltigen Tabellen oben
+     wirken — die Wert-Spalte ("Datensätze"/"Duplikate") bekommt deshalb
+     dieselbe Breite/Position wie die Spalte "Größe" oben (32%+20%+26%=78%
+     davor, 22% Wert-Spalte), damit sie exakt unterhalb von "Größe" sitzt statt
+     unterhalb von "Datensätze" (Text ist überall linksbündig). */
+  .stats-col-entity{width:78%;}
+  .stats-col-value{width:22%;}
+  /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
+     Untertext auch dann bündig, wenn nur einzelne Titel umbrechen. */
+  .retention-summary .stat .label{min-height:3em;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Statistik</p>
+    <h1>Statistik</h1>
+    <p class="sub">Archiv-weite Kennzahlen — Aufschlüsselung nach Typ, Auflösung und Aufbewahrung, Wachstum über Zeit.</p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'statistik' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+
+    <div class="stat-row">
+      <div class="stat"><div class="label">Entitäten</div><div class="value">{{ entity_count }}</div></div>
+      <div class="stat"><div class="label">Datensätze gesamt</div><div class="value">{{ total_rows }}</div></div>
+      <div class="stat"><div class="label">Größe</div><div class="value">{{ total_size }}</div></div>
+    </div>
+
+    <div class="section-header">
+      <h2>Wachstum über Zeit</h2>
+      {% if has_growth_history %}
+      <div class="seg" id="growth-range-seg">
+        {% for key, label in growth_range_options %}
+        <button type="button" data-range="{{ key }}" class="{{ 'active' if key == 'month' else '' }}" onclick="setGrowthRange('{{ key }}')">{{ label }}</button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="card">
+      <div id="growth-chart" style="{{ '' if has_growth_history else 'display:none;' }}"></div>
+      {% if not has_growth_history %}
+      <div class="empty">
+        Noch nicht genug Verlaufsdaten &mdash; Zeitarchiv speichert unabhängig von Seitenaufrufen
+        stündlich einen Schnappschuss (Entitäten, Datensätze, Größe). Sobald mehr als ein
+        Schnappschuss vorliegt, erscheint hier der Wachstumsverlauf.
+      </div>
+      {% endif %}
+    </div>
+
+    <h2>Speichernutzung</h2>
+    <div class="card storage-card">
+      <div id="storage-pie"></div>
+      <div class="tbl-wrap">
+        <table class="dt stats-dt storage-usage-table">
+          <colgroup>
+            <col class="stats-col-storage-label"><col class="stats-col-storage-size"><col class="stats-col-storage-percent">
+          </colgroup>
+          <tr><th>Kategorie</th><th>Größe</th><th>Anteil</th></tr>
+          {% for row in storage_breakdown %}
+          <tr data-storage-label="{{ row.label }}">
+            <td class="label"><span class="storage-dot" data-key="{{ row.key }}"></span>{% if row.href %}<a class="storage-category-link" href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}</td>
+            <td>{{ row.size }}</td>
+            <td>{{ row.percent }} %</td>
+          </tr>
+          {% endfor %}
+          <tr><td class="label"><strong>Gesamt</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr>
+        </table>
+      </div>
+    </div>
+    <h2>Nach Typ</h2>
+    <div class="tbl-wrap">
+      <table class="dt stats-dt">
+        <colgroup>
+          <col class="stats-col-label"><col class="stats-col-count"><col class="stats-col-rows"><col class="stats-col-size">
+        </colgroup>
+        <tr><th>Typ</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr>
+        {% for row in by_type %}
+        <tr><td class="label">{{ row.label }}</td><td>{{ row.entity_count }}</td><td>{{ row.total_rows }}</td><td>{{ row.total_size }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <h2>Nach Auflösung</h2>
+    <div class="tbl-wrap">
+      <table class="dt stats-dt">
+        <colgroup>
+          <col class="stats-col-label"><col class="stats-col-count"><col class="stats-col-rows"><col class="stats-col-size">
+        </colgroup>
+        <tr><th>Auflösung</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr>
+        {% for row in by_resolution %}
+        <tr><td class="label">{{ row.label }}</td><td>{{ row.entity_count }}</td><td>{{ row.total_rows }}</td><td>{{ row.total_size }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <h2>Aufbewahrung und endgültiges Löschen</h2>
+    <div class="stat-row retention-summary">
+      <div class="stat">
+        <div class="label">Aktuell durch Aufbewahrung fällig</div>
+        <div class="value">{{ retention_due_rows }}</div>
+        <div class="sub-value">{{ retention_due_entities }} Entitäten · {{ retention_due_months }} Monatsdateien</div>
+      </div>
+      <div class="stat">
+        <div class="label">Voraussichtlich freigebbar</div>
+        <div class="value">{{ retention_due_size }}</div>
+        <div class="sub-value">Archivdateien</div>
+      </div>
+      <div class="stat">
+        <div class="label">Letzte 30 Tage endgültig gelöscht</div>
+        <div class="value">{{ retention_history_30d_rows }}</div>
+        <div class="sub-value">{{ retention_history_30d_size }} freigegeben</div>
+      </div>
+      <div class="stat">
+        <div class="label">Insgesamt durch Aufbewahrung gelöscht</div>
+        <div class="value">{{ retention_history_all_rows }}</div>
+        <div class="sub-value">{{ retention_history_all_size }} freigegeben</div>
+      </div>
+    </div>
+
+    <h2>Erkannte Duplikate (letzte 30 Tage)</h2>
+    <div class="tbl-wrap">
+      {% if duplicates_by_entity %}
+      <table class="dt stats-dt">
+        <colgroup>
+          <col class="stats-col-entity"><col class="stats-col-value">
+        </colgroup>
+        <tr><th>Entität</th><th>Duplikate</th></tr>
+        {% for row in duplicates_by_entity %}
+        <tr>
+          <td class="entity">
+            <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+              {% if row.friendly_name %}
+              <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+              {% else %}
+              <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+              {% endif %}
+              <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
+            </a>
+          </td>
+          <td>{{ row.count }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <div class="empty">Keine Duplikate in den letzten 30 Tagen gefunden.</div>
+      {% endif %}
+    </div>
+    {% if duplicates_by_entity %}
+    <p class="hint" style="margin-top:14px;">{{ duplicates_total }} doppelte Zeitstempel insgesamt in den letzten 30 Tagen &mdash; entfernbar über "Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite.</p>
+    {% endif %}
+
+    <p class="hint" style="text-align:right;margin-top:24px;">Stand: {{ generated_at }}</p>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="static/vendor/echarts.min.js"></script>
+  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script>
+    const GROWTH_POINTS = {{ growth_points | tojson }};
+    const STORAGE_BREAKDOWN = {{ storage_breakdown | tojson }};
+    const themeStyle = getComputedStyle(document.documentElement);
+    const chartColor = number => themeStyle.getPropertyValue(`--chart-${number}`).trim();
+    // Dieselbe schemaabhängige Farbfolge wie die Multi-Entitäts-Charts.
+    const STORAGE_COLORS = {
+      archive: chartColor(1), rollup: chartColor(2), hot: chartColor(3),
+      backups: chartColor(4), import: chartColor(5), index: chartColor(8),
+    };
+
+    function fmtSize(bytes) {
+      if (bytes <= 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let value = bytes, i = 0;
+      while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+      return (i === 0 ? Math.round(value) : value.toFixed(1)) + ' ' + units[i];
+    }
+
+    let growthChart = null;
+    function renderGrowth(points) {
+      if (points.length < 2) return;
+      if (!growthChart) growthChart = echarts.init(document.getElementById('growth-chart'));
+      const rowsData = points.map(p => [p.ts * 1000, p.total_rows]);
+      const sizeData = points.map(p => [p.ts * 1000, p.total_size_bytes]);
+      const inkMuted = getComputedStyle(document.body).getPropertyValue('--ink-muted');
+      const fontMono = getComputedStyle(document.body).getPropertyValue('--font-mono');
+      const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+      growthChart.setOption({
+        textStyle: {fontFamily: fontMono, color: inkMuted, fontSize: Math.round(12 * uiFontScale * 10) / 10},
+        // Kein eigener yAxis-Titel ("Datensätze"/"Größe") mehr — stand bei
+        // wenig Platz über der Achse (Zeitraum-Auswahl direkt darüber) und war
+        // ohnehin redundant zur Legende unten, die dieselbe Zuordnung schon
+        // per Farbe herstellt.
+        grid: {left: 10, right: 10, top: 16, bottom: 40, containLabel: true},
+        xAxis: {type: 'time'},
+        yAxis: [
+          {type: 'value', axisLabel: {formatter: v => v.toLocaleString('de-DE')}},
+          {type: 'value', axisLabel: {formatter: fmtSize}, splitLine: {show: false}},
+        ],
+        legend: {bottom: 0, textStyle: {color: inkMuted}},
+        tooltip: {
+          trigger: 'axis',
+          formatter: params => {
+            const d = new Date(params[0].value[0]);
+            const pad = n => String(n).padStart(2, '0');
+            const time = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            return `${time}<br>` + params.map(p =>
+              `${p.marker}${p.seriesName}: <strong>${p.seriesIndex === 0 ? p.value[1].toLocaleString('de-DE') : fmtSize(p.value[1])}</strong>`
+            ).join('<br>');
+          },
+        },
+        series: [
+          {
+            name: 'Datensätze', type: 'line', yAxisIndex: 0, data: rowsData,
+            itemStyle: {color: getComputedStyle(document.body).getPropertyValue('--chart-line')},
+            lineStyle: {width: 1.5}, showSymbol: false,
+          },
+          {
+            name: 'Größe', type: 'line', yAxisIndex: 1, data: sizeData,
+            itemStyle: {color: getComputedStyle(document.body).getPropertyValue('--chart-bar')},
+            lineStyle: {width: 1.5}, showSymbol: false,
+          },
+        ],
+      });
+      growthChart.resize();
+    }
+
+    let growthRangeSeq = 0;
+    async function setGrowthRange(range) {
+      document.querySelectorAll('#growth-range-seg button').forEach(b => b.classList.toggle('active', b.dataset.range === range));
+      const requestId = ++growthRangeSeq;
+      const res = await fetch(`api/stats-snapshots?range=${range}`);
+      const data = await res.json();
+      if (requestId !== growthRangeSeq) return;
+      renderGrowth(data.points || []);
+    }
+
+    if (GROWTH_POINTS.length >= 2) {
+      renderGrowth(GROWTH_POINTS);
+      window.addEventListener('resize', () => growthChart && growthChart.resize());
+      new ResizeObserver(() => growthChart && growthChart.resize()).observe(document.getElementById('growth-chart'));
+    }
+
+    if (STORAGE_BREAKDOWN.some(row => row.bytes > 0)) {
+      document.querySelectorAll('.storage-dot').forEach(el => {
+        el.style.background = STORAGE_COLORS[el.dataset.key] || 'var(--ink-faint)';
+      });
+      const pie = echarts.init(document.getElementById('storage-pie'));
+      const inkMuted = getComputedStyle(document.body).getPropertyValue('--ink-muted');
+      const fontMono = getComputedStyle(document.body).getPropertyValue('--font-mono');
+      const surface = getComputedStyle(document.body).getPropertyValue('--surface');
+      const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+      // Kein eigenes Legende-Element — die Tabelle daneben zeigt bereits jede
+      // Kategorie mit demselben Farbpunkt, vollständiger Größe und Anteil auf
+      // einen Blick, ohne die Umbruch-/Scroll-Klemme, in die eine ECharts-
+      // Legende bei sechs sehr ungleich großen Kategorien sonst gerät. Der
+      // Donut bleibt damit rein visuell (Proportionen + Tooltip), die Tabelle
+      // übernimmt die Rolle der Legende vollständig.
+      pie.setOption({
+        textStyle: {fontFamily: fontMono, color: inkMuted, fontSize: Math.round(12 * uiFontScale * 10) / 10},
+        tooltip: {
+          trigger: 'item',
+          formatter: p => `${p.marker}${p.name}: <strong>${fmtSize(p.value)}</strong> (${p.percent}%)`,
+        },
+        series: [{
+          type: 'pie',
+          radius: ['52%', '85%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: true,
+          itemStyle: {borderColor: surface, borderWidth: 2},
+          label: {show: false},
+          labelLine: {show: false},
+          emphasis: {
+            scaleSize: 6,
+            itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'},
+          },
+          data: STORAGE_BREAKDOWN.filter(row => row.bytes > 0).map(row => ({
+            name: row.label, value: row.bytes, itemStyle: {color: STORAGE_COLORS[row.key]},
+          })),
+        }],
+      });
+      window.addEventListener('resize', () => pie.resize());
+      new ResizeObserver(() => pie.resize()).observe(document.getElementById('storage-pie'));
+
+      // Tabellenzeile übernimmt die Funktion einer Legende: Hover markiert das
+      // zugehörige Segment im Donut (ECharts' highlight/downplay-Aktionen),
+      // Klick öffnet den Tooltip an derselben Stelle — Tabelle und Chart
+      // bleiben dadurch spürbar verbunden statt zwei getrennte Ansichten.
+      document.querySelectorAll('.storage-dot').forEach(dot => {
+        const row = dot.closest('tr');
+        if (!row) return;
+        const label = row.dataset.storageLabel;
+        row.style.cursor = 'default';
+        row.addEventListener('mouseenter', () => {
+          pie.dispatchAction({type: 'highlight', seriesIndex: 0, name: label});
+          pie.dispatchAction({type: 'showTip', seriesIndex: 0, name: label});
+        });
+        row.addEventListener('mouseleave', () => {
+          pie.dispatchAction({type: 'downplay', seriesIndex: 0, name: label});
+          pie.dispatchAction({type: 'hideTip'});
+        });
+      });
+    }
+  </script>
+</body>
+</html>

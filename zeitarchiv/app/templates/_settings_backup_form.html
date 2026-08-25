@@ -1,0 +1,15 @@
+<p class="hint" style="margin:0 0 14px;">
+  Sichert den kompletten Datenbestand (Index, Archiv, Rollups, laufender Monat) als ZIP-Datei
+  &mdash; zusätzlich zu, nicht statt der automatischen Snapshots von Home Assistant (die <code>/data</code>
+  ohnehin mit erfassen). Sinnvoll für eine explizite, portable Kopie: Umzug auf eine neue HA-Instanz,
+  ein Restore-Test, oder falls Supervisor-Snapshots nicht genutzt werden. Symcon-/CSV-Import-Rohdaten und
+  Log-Dateien sind bewusst nicht enthalten &mdash; kein Teil des eigentlichen Archivs, jederzeit neu
+  hochladbar. Kann zusätzlich automatisch nach Zeitplan erstellt werden; ältere Backups lassen sich
+  nach Anzahl und/oder Alter automatisch aufräumen.
+</p>
+{% include "_settings_backup_schedule_form.html" %}
+{% if running %}
+{% include "_settings_backup_progress.html" %}
+{% else %}
+{% include "_settings_backup_ready.html" %}
+{% endif %}

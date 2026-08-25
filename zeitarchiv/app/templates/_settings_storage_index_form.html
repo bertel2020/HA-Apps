@@ -1,0 +1,69 @@
+<h3 class="settings-subsection-title">Indexkonsistenz</h3>
+<p class="hint" style="margin:0 0 14px;">
+  Vergleicht den schnellen SQLite-Index mit Parquet-Archiv und Hot Buffer. Die Prüfung liest nur;
+  eine Reparatur ersetzt ausschließlich abgeleitete Zähler, Größen und Zeitgrenzen.
+</p>
+{% if storage_audit %}
+<div class="status-grid">
+  <div class="status-card">
+    <span class="hint">Letzte Prüfung</span>
+    <strong class="status-card-mono">{{ storage_audit.checked_at_label }}</strong>
+  </div>
+  <div class="status-card">
+    <span class="hint">Geprüfte Entitäten</span>
+    <strong>{{ storage_audit.entities_checked }}</strong>
+  </div>
+  <div class="status-card{% if storage_audit.rows or storage_audit.errors %} status-card-danger{% endif %}">
+    <span class="hint">Abweichungen</span>
+    <strong>{{ storage_audit.rows | length }}</strong>
+    {% if storage_audit.repaired %}<span class="status-card-detail">repariert</span>{% endif %}
+  </div>
+</div>
+
+{% if storage_audit.rows %}
+<div class="tbl-wrap">
+  <table class="dt compact">
+    <thead><tr><th>Entität</th><th>Index</th><th>Tatsächlich</th><th>Differenz</th><th>Archivgröße</th></tr></thead>
+    <tbody>
+    {% for row in storage_audit.rows %}
+      <tr>
+        <td><strong>{{ row.friendly_name or row.entity_id }}</strong>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}</td>
+        <td>{{ row.indexed_visible_rows_label }}</td>
+        <td>{{ row.actual_visible_rows_label }}</td>
+        <td>{{ row.difference_label }}</td>
+        <td>{{ row.indexed_size_label }} → {{ row.actual_size_label }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if storage_audit.repaired %}
+<p class="save-status">✓ {{ storage_audit.rows | length }} Abweichung{% if storage_audit.rows | length != 1 %}en{% endif %} repariert.</p>
+{% else %}
+<p class="hint" style="color:var(--danger);">Die Vorschau hat noch nichts verändert.</p>
+{% endif %}
+{% elif not storage_audit.errors %}
+<div class="empty">Index und gespeicherte Rohdaten sind konsistent.</div>
+{% endif %}
+
+{% if storage_audit.errors %}
+<p class="hint" style="color:var(--danger);">
+  {{ storage_audit.errors | length }} Entität{% if storage_audit.errors | length != 1 %}en konnten{% else %} konnte{% endif %} nicht vollständig geprüft werden.
+</p>
+{% endif %}
+{% endif %}
+
+<div class="toolbar" style="margin:16px 0 0;">
+  <button type="button" class="btn"
+          hx-post="settings/storage-index/check" hx-target="#storage-index-form" hx-swap="innerHTML">
+    Index prüfen
+  </button>
+  {% if storage_audit and storage_audit.rows and not storage_audit.repaired %}
+  <button type="button" class="btn btn-danger-outline"
+          hx-post="settings/storage-index/repair" hx-target="#storage-index-form" hx-swap="innerHTML"
+          hx-confirm="Die angezeigten Indexabweichungen jetzt anhand der gespeicherten Rohdaten korrigieren? Rohwerte und Rollups werden nicht verändert."
+          data-confirm-label="Index reparieren">
+    Index reparieren
+  </button>
+  {% endif %}
+</div>

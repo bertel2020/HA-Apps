@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Einstellungen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>
+  :root{--font-scale:{{ font_scale_value }};}
+  .about-copyright{
+    display:flex;align-items:center;gap:8px;margin-top:20px;padding-top:14px;
+    border-top:1px solid var(--border);font-size:calc(12px * var(--font-scale,1));color:var(--ink-faint);
+  }
+  .about-copyright .copyright-mark{font-family:var(--font-mono);color:var(--ink-muted);}
+  .about-copyright a{color:var(--ink-muted);font-weight:600;text-decoration:none;}
+  .about-copyright a:hover,.about-copyright a:focus-visible{color:var(--accent-line);text-decoration:underline;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Einstellungen</p>
+    <h1>Einstellungen</h1>
+    <p class="sub">Globale Konfiguration &mdash; unabhängig von einzelnen Entitäten.</p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'darstellung' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        <section id="darstellung" class="settings-section">
+          <h2 class="settings-section-title">Darstellung</h2>
+          <div id="darstellung-form">
+            {% include "_settings_darstellung_form.html" %}
+          </div>
+        </section>
+
+        <section id="archivierung" class="settings-section">
+          <h2 class="settings-section-title">Archivierung</h2>
+          <p>Standard-Auflösung und -Aufbewahrung für neu erkannte Entitäten. Wirkt nur beim erstmaligen Erkennen &mdash; bereits archivierte Entitäten behalten ihre individuelle Einstellung aus der jeweiligen Konfigurationsseite.</p>
+          <div id="archivierung-form">
+            {% include "_settings_archivierung_form.html" %}
+          </div>
+        </section>
+
+        <section id="rotation" class="settings-section">
+          <h2 class="settings-section-title">Rotation</h2>
+          <div id="rotation-form">
+            {% include "_settings_rotation_form.html" %}
+          </div>
+        </section>
+
+        <section id="speicherplatz" class="settings-section">
+          <h2 class="settings-section-title">Speicherplatz</h2>
+          <p class="settings-section-description">Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.</p>
+          <div class="settings-subsection">
+            <div id="storage-index-form">
+              {% include "_settings_storage_index_form.html" %}
+            </div>
+          </div>
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Endgültige Bereinigung</h3>
+            <div id="purge-form">
+              {% include "_settings_purge_form.html" %}
+            </div>
+          </div>
+          <dialog id="marked-points-dialog" class="detail-dialog" aria-labelledby="marked-points-title">
+            <div class="detail-dialog-header">
+              <div>
+                <h2 id="marked-points-title">Markierte Datensätze</h2>
+                <p class="hint">Read-only-Übersicht der noch rückgängig machbaren Löschmarkierungen.</p>
+              </div>
+              <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+            </div>
+            <input id="marked-points-search" class="search" type="search" name="search"
+                   placeholder="Entität durchsuchen …" aria-label="Markierte Datensätze durchsuchen"
+                   hx-get="settings/purge/marked" hx-trigger="input changed delay:300ms, search"
+                   hx-target="#marked-points-list" hx-swap="innerHTML">
+            <div id="marked-points-list" style="margin-top:14px;">
+              <p class="hint">Liste wird beim Öffnen geladen …</p>
+            </div>
+          </dialog>
+        </section>
+
+        <section id="aufbewahrung" class="settings-section">
+          <h2 class="settings-section-title">Aufbewahrung</h2>
+          <div id="retention-form">
+            {% include "_settings_retention_form.html" %}
+          </div>
+        </section>
+
+        <section id="verbindung" class="settings-section">
+          <h2 class="settings-section-title">Verbindung</h2>
+          <div id="verbindung-form">
+            {% include "_settings_verbindung_form.html" %}
+          </div>
+        </section>
+
+        <section id="protokollierung" class="settings-section">
+          <h2 class="settings-section-title">Protokollierung</h2>
+          <div id="logging-settings">
+            {% include "_settings_logging_form.html" %}
+          </div>
+        </section>
+
+        <section id="ueber" class="settings-section">
+          <h2 class="settings-section-title">Über Zeitarchiv</h2>
+          <p>Home-Assistant-App zur langfristigen Archivierung und Auswertung von Entitäts-Zeitreihen &mdash; platzsparende Parquet+zstd-Speicherung, Charts, Tabellen, Import/Export und sichere Datenpflege.</p>
+          <div class="field">
+            <label>Version</label>
+            <div class="val mono">{{ app_version }}</div>
+          </div>
+          <div class="field">
+            <label>Zeitzone</label>
+            <div class="val mono">{{ timezone }}</div>
+          </div>
+          <div class="field">
+            <label>Datenverzeichnis</label>
+            <div class="val mono">{{ data_dir }}</div>
+          </div>
+          <div class="actionbar" style="justify-content:flex-start;">
+            <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md" target="_blank" rel="noopener noreferrer">Dokumentation</a>
+            <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
+            <a class="btn" href="https://github.com/bertel2020/HA-Apps/issues" target="_blank" rel="noopener noreferrer">Fehler melden</a>
+            <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
+          </div>
+          <p class="hint">Der Diagnosebericht enthält Betriebs-, Speicher- und nicht geheime Konfigurationsdaten, aber keine API-Token, Messwerte oder Entitäts-IDs.</p>
+          <footer class="about-copyright">
+            <span class="copyright-mark" aria-hidden="true">©</span>
+            <span>2026 <a href="https://github.com/bertel2020" target="_blank" rel="noopener noreferrer">bertel2020</a></span>
+          </footer>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/vendor/htmx.min.js"></script>
+  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script>
+    function toggleTokenVisibility(btn) {
+      const el = document.getElementById('token-value');
+      const masked = el.dataset.masked === 'true';
+      el.textContent = masked ? el.dataset.token : '••••••••••••••••';
+      el.dataset.masked = masked ? 'false' : 'true';
+      btn.textContent = masked ? 'Verbergen' : 'Anzeigen';
+    }
+    function copyToken() {
+      const el = document.getElementById('token-value');
+      const status = document.getElementById('token-copy-status');
+      const text = el.dataset.token;
+      const showStatus = (msg) => {
+        status.textContent = msg;
+        setTimeout(() => { status.textContent = ' '; }, 2500);
+      };
+      // navigator.clipboard existiert nur in sicheren Kontexten (HTTPS oder
+      // localhost) — die App wird hier aber typischerweise über einfaches
+      // HTTP im lokalen Netz erreicht (Home-Assistant-Add-on ohne eigenes
+      // Zertifikat), wo navigator.clipboard schlicht undefined ist. Bisher
+      // führte das zu einem stillen TypeError beim Aufruf von .writeText
+      // (Button "tat nichts"). Fallback über ein unsichtbares Textfeld +
+      // execCommand('copy') funktioniert auch dort noch.
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(
+          () => showStatus('In Zwischenablage kopiert.'),
+          () => showStatus('Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.')
+        );
+        return;
+      }
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      temp.style.position = 'fixed';
+      temp.style.opacity = '0';
+      document.body.appendChild(temp);
+      temp.focus();
+      temp.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(temp);
+      showStatus(ok ? 'In Zwischenablage kopiert.' : 'Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.');
+    }
+
+    // Scroll-Spy für die Einstellungen-Navigation: alle Abschnitte oben
+    // (Archivierung … Über Zeitarchiv) liegen auf DERSELBEN Seite, nav_active
+    // wird also serverseitig nur einmal beim Laden auf "archivierung" gesetzt
+    // — ohne dieses Skript bliebe der erste Eintrag unabhängig vom
+    // tatsächlichen Scroll-/Anker-Stand dauerhaft hervorgehoben.
+    (function () {
+      const nav = document.querySelector('.settings-nav');
+      if (!nav) return;
+      const navLinks = Array.from(nav.querySelectorAll('a[href*="#"]'));
+      const sections = navLinks
+        .map(a => document.getElementById(a.getAttribute('href').split('#')[1]))
+        .filter(Boolean);
+      if (!sections.length) return;
+
+      function setActive(id) {
+        navLinks.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href').split('#')[1] === id);
+        });
+      }
+
+      // "Aktuell" ist der Abschnitt, von dem GERADE DER GRÖSSTE ANTEIL seiner
+      // eigenen Höhe im Viewport sichtbar ist (Anteil, nicht Pixelhöhe — sonst
+      // gewinnt ein großer Abschnitt allein durch seine Größe). Zwei frühere
+      // Varianten scheiterten bei hohen Viewports/kurzen Abschnitten nahe dem
+      // Seitenende: ein fester Pixel-Schwellwert ("Überschrift hat Marke X
+      // überschritten") setzt voraus, dass darunter noch genug Scroll-Weg
+      // übrig ist, um dorthin zu gelangen — reicht der Rest der Seite dafür
+      // nicht mehr aus (z. B. "Verbindung" kurz vor "Über Zeitarchiv"), wird
+      // der Abschnitt nie aktiv. Der Sichtbarkeits-Anteil braucht dagegen
+      // keinen bestimmten Scroll-Weg zu erreichen und funktioniert für jede
+      // Seitenlänge/jeden Viewport gleich.
+      function updateActiveSection() {
+        const viewportHeight = window.innerHeight;
+        let current = sections[0];
+        let bestRatio = -1;
+        for (const section of sections) {
+          const rect = section.getBoundingClientRect();
+          if (rect.height <= 0) continue;
+          const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+          const ratio = visibleHeight / rect.height;
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            current = section;
+          }
+        }
+        setActive(current.id);
+      }
+
+      updateActiveSection();
+      window.addEventListener('scroll', updateActiveSection, {passive: true});
+    })();
+  </script>
+</body>
+</html>

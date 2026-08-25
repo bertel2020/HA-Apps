@@ -1,0 +1,11 @@
+<p class="hint" style="margin:0 0 14px;">Passiert normalerweise automatisch beim nächsten Schreibvorgang einer Entität in einen neuen Monat &mdash; eine Entität, die komplett aufhört Werte zu senden, würde ihre letzte Hot-Datei sonst nie von selbst archivieren.</p>
+<div class="stat-row" style="margin-bottom:16px;">
+  <div class="stat" style="flex:0 1 220px;">
+    <div class="label">Ausstehende Rotation</div>
+    <div class="value">{{ stale_count }}</div>
+    <div class="sub-value">Entität{{ "en" if stale_count != 1 else "" }}</div>
+  </div>
+</div>
+<button type="button" class="btn" hx-post="settings/rotation" hx-target="#rotation-form" hx-swap="innerHTML"
+        hx-confirm="Ausstehende Entitäten jetzt rotieren (letzte Hot-Datei ins Archiv verschieben)?">Jetzt rotieren</button>
+{% if result %}<p class="save-status">✓ {{ result }}</p>{% endif %}

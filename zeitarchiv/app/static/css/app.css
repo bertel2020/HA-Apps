@@ -1,0 +1,370 @@
+:root{
+  --bg:#F5F6F1; --surface:#FFFFFF; --surface-alt:#EEF1E9; --border:#E1E6DB; --border-strong:#CDD5C4;
+  --ink:#131C17; --ink-muted:#4B584E; --ink-faint:#8A9484;
+  --accent-line:#0C6B5D; --accent-bar:#B15E1B; --accent-line-soft:#E1F1EC; --accent-bar-soft:#F7E8D6;
+  --accent-contrast:#FFFFFF; --danger:#A23B36; --danger-soft:#F4DEDB; --danger-contrast:#FFFFFF;
+  --chart-line:#0C6B5D; --chart-bar:#B15E1B;
+  --chart-1:#0C6B5D; --chart-2:#B15E1B; --chart-3:#3B6FA0; --chart-4:#8B5FBF;
+  --chart-5:#C4472B; --chart-6:#4C8C4A; --chart-7:#B0932A; --chart-8:#5C6B73;
+  --font-display:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  --shadow:0 1px 2px rgba(19,28,23,.06), 0 1px 1px rgba(19,28,23,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-color-mode]),:root[data-color-mode="auto"]{
+    --bg:#0E1512; --surface:#171F1B; --surface-alt:#1E2822; --border:#2A362F; --border-strong:#3A483E;
+    --ink:#E8ECE4; --ink-muted:#9FAC9B; --ink-faint:#66756A;
+    --accent-line:#4FC3AE; --accent-bar:#E2A15E; --accent-line-soft:#173430; --accent-bar-soft:#3A2A18;
+    --accent-contrast:#0E1512; --danger:#E28A85; --danger-soft:#3A201E; --danger-contrast:#0E1512;
+    --shadow:0 1px 2px rgba(0,0,0,.35);
+  }
+}
+:root[data-color-mode="dark"]{
+  --bg:#0E1512; --surface:#171F1B; --surface-alt:#1E2822; --border:#2A362F; --border-strong:#3A483E;
+  --ink:#E8ECE4; --ink-muted:#9FAC9B; --ink-faint:#66756A;
+  --accent-line:#4FC3AE; --accent-bar:#E2A15E; --accent-line-soft:#173430; --accent-bar-soft:#3A2A18;
+  --accent-contrast:#0E1512; --danger:#E28A85; --danger-soft:#3A201E; --danger-contrast:#0E1512;
+  --shadow:0 1px 2px rgba(0,0,0,.35);
+}
+
+/* Optionales, an Home Assistants aktuelle Core-Tokens angelehntes Schema.
+   Funktionales Blau ist im hellen Modus dunkler als das Marken-/Chartblau,
+   damit Links und weiße Buttontexte ausreichend kontrastreich bleiben. */
+:root[data-color-scheme="home_assistant"]{
+  --bg:#F3F3F3; --surface:#FFFFFF; --surface-alt:#F3F3F3; --border:#E6E6E6; --border-strong:#CCCCCC;
+  --ink:#202020; --ink-muted:#5E5E5E; --ink-faint:#7A7A7A;
+  --accent-line:#006787; --accent-bar:#C94E00; --accent-line-soft:#DFF3FC; --accent-bar-soft:#FFF0E4;
+  --accent-contrast:#FFFFFF; --danger:#B30532; --danger-soft:#FFF0EF; --danger-contrast:#FFFFFF;
+  --chart-line:#009AC7; --chart-bar:#C94E00;
+  --chart-1:#009AC7; --chart-2:#C94E00; --chart-3:#00883C; --chart-4:#8A5FC7;
+  --chart-5:#DC3146; --chart-6:#18BCF2; --chart-7:#B77A00; --chart-8:#5E5E5E;
+  --shadow:0 1px 2px rgba(20,20,20,.08),0 1px 1px rgba(20,20,20,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-color-scheme="home_assistant"]:not([data-color-mode]),
+  :root[data-color-scheme="home_assistant"][data-color-mode="auto"]{
+    --bg:#141414; --surface:#202020; --surface-alt:#363636; --border:#4A4A4A; --border-strong:#5E5E5E;
+    --ink:#F3F3F3; --ink-muted:#CCCCCC; --ink-faint:#989898;
+    --accent-line:#37C8FD; --accent-bar:#FF9342; --accent-line-soft:#002E3E; --accent-bar-soft:#5E1C00;
+    --accent-contrast:#141414; --danger:#FD8F90; --danger-soft:#3E0913; --danger-contrast:#141414;
+    --chart-line:#37C8FD; --chart-bar:#FF9342;
+    --chart-1:#37C8FD; --chart-2:#FF9342; --chart-3:#5DC36F; --chart-4:#B99AF0;
+    --chart-5:#FD8F90; --chart-6:#7BD4FB; --chart-7:#FFD166; --chart-8:#B1B1B1;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-color-scheme="home_assistant"][data-color-mode="dark"]{
+  --bg:#141414; --surface:#202020; --surface-alt:#363636; --border:#4A4A4A; --border-strong:#5E5E5E;
+  --ink:#F3F3F3; --ink-muted:#CCCCCC; --ink-faint:#989898;
+  --accent-line:#37C8FD; --accent-bar:#FF9342; --accent-line-soft:#002E3E; --accent-bar-soft:#5E1C00;
+  --accent-contrast:#141414; --danger:#FD8F90; --danger-soft:#3E0913; --danger-contrast:#141414;
+  --chart-line:#37C8FD; --chart-bar:#FF9342;
+  --chart-1:#37C8FD; --chart-2:#FF9342; --chart-3:#5DC36F; --chart-4:#B99AF0;
+  --chart-5:#FD8F90; --chart-6:#7BD4FB; --chart-7:#FFD166; --chart-8:#B1B1B1;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+
+:root[data-color-mode="light"]{color-scheme:light;}
+:root[data-color-mode="dark"]{color-scheme:dark;}
+:root:not([data-color-mode]),:root[data-color-mode="auto"]{color-scheme:light dark;}
+
+*{box-sizing:border-box;}
+/* overflow-x nur auf html, nicht zusätzlich auf body: sonst befördert die
+   CSS-Overflow-Regel (nicht-"visible" auf einer Achse zwingt die andere Achse
+   von "visible" auf "auto") auch body zu einem eigenen Scroll-Container — der
+   aber selbst nie tatsächlich scrollt (das tut html), wodurch position:sticky
+   für alle Nachfahren bricht, weil es sich auf diesen "toten" Container statt
+   auf den echten Viewport-Scroller bezieht. */
+html{max-width:100%;overflow-x:hidden;}
+body{max-width:100%;}
+/* Globale Schriftgröße (Einstellungen, Bereich "Darstellung") — --font-scale
+   wird pro Seite im <head> gesetzt (main.py _font_scale_context) und von
+   einzelnen font-size-Deklarationen hier und in den Seiten-eigenen
+   <style>-Blöcken per calc(Npx * var(--font-scale, 1)) aufgegriffen. Bewusst
+   KEIN CSS "zoom" (frühere Version) — das skalierte zwar die ganze Seite in
+   einem Rutsch, verschob dabei aber messbar die Maus-Koordinaten-Berechnung
+   von <canvas>-Inhalten (ECharts) relativ zu ihrer eigenen Bounding-Box,
+   sichtbar als "Mauszeiger wirkt versetzt" auf jedem Chart und als scheinbar
+   nicht klickbare Legenden. Der reine Multiplikator hier berührt nie ein
+   <canvas> oder eine Maus-Koordinate. Skaliert bewusst nur Schriftgrößen,
+   nicht Abstände/Breiten (bleiben in px). */
+body{background:var(--bg);color:var(--ink);font-family:var(--font-display);margin:0;padding:32px 24px 64px;font-size:calc(15px * var(--font-scale, 1));line-height:1.5;-webkit-font-smoothing:antialiased;}
+.page{max-width:1120px;margin:0 auto;min-width:0;}
+button{font-family:inherit;}
+code,.mono{font-family:var(--font-mono);}
+
+.crumb{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);margin:0 0 6px;}
+.crumb a{color:inherit;}
+h1{font-size:calc(24px * var(--font-scale, 1));font-weight:700;margin:0 0 4px;word-break:break-word;}
+h1.raw{font-family:var(--font-mono);font-size:calc(20px * var(--font-scale, 1));}
+h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 12px;}
+.sub{color:var(--ink-muted);font-size:calc(13.5px * var(--font-scale, 1));margin:0 0 20px;}
+.sub a{color:var(--accent-line);}
+
+/* Kachelreihe (Übersicht/Statistik/Konfiguration) */
+.stat-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+.stat{flex:1 1 160px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0;box-shadow:var(--shadow);}
+a.stat{display:block;text-decoration:none;color:inherit;transition:border-color .12s,transform .12s;}
+a.stat:hover{border-color:var(--accent-line);transform:translateY(-1px);}
+a.stat:hover .label{color:var(--accent-line);}
+.stat .label{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:500;margin-bottom:6px;}
+.stat .value{font-family:var(--font-display);font-size:calc(19px * var(--font-scale, 1));font-weight:700;font-variant-numeric:tabular-nums;word-break:break-word;}
+.stat .sub-value{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;font-variant-numeric:tabular-nums;}
+.ts-time{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);margin-top:1px;}
+.nowrap{white-space:nowrap;}
+.sparkline{display:block;width:100%;height:22px;margin-top:6px;overflow:visible;}
+.sparkline path.area{fill:var(--accent-line-soft);stroke:none;}
+.sparkline path.line{fill:none;stroke:var(--chart-line);stroke-width:1.5;vector-effect:non-scaling-stroke;}
+
+/* Toolbar / Filter-Chips / Suche */
+#controls,.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+#controls input[type="search"],.search,#controls select,#controls input[type="date"],#controls input[type="time"],select,input[type="date"],input[type="time"]{
+  font-family:var(--font-display);font-size:calc(13px * var(--font-scale, 1));padding:7px 11px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px;box-sizing:border-box;
+}
+input[type="date"],input[type="time"]{color-scheme:inherit;}
+#controls input[type="search"],.search{min-width:200px;}
+.filter-chip{display:inline-flex;}
+.filter-chip input{position:absolute;opacity:0;pointer-events:none;}
+.filter-chip span,.chip{
+  font-size:calc(13px * var(--font-scale, 1));font-weight:500;padding:7px 13px;border-radius:999px;border:1px solid var(--border);
+  color:var(--ink-muted);cursor:pointer;display:inline-block;background:var(--surface);
+  font-family:inherit;margin:0;line-height:1.4;-webkit-appearance:none;appearance:none;white-space:nowrap;
+}
+.filter-chip input:checked + span,.chip.active{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+.chip:disabled{opacity:.35;cursor:default;}
+
+/* Datentabellen */
+.tbl-wrap{
+  max-width:100%;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  border:1px solid var(--border);border-radius:12px;background:var(--surface);
+}
+table.dt{width:100%;border-collapse:collapse;font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));}
+table.dt th{
+  text-align:left;padding:8px 14px;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
+  border-bottom:1.5px solid var(--border-strong);white-space:nowrap;
+}
+table.dt td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--ink-muted);vertical-align:top;font-variant-numeric:tabular-nums;}
+table.dt tr:last-child td{border-bottom:none;}
+table.dt tbody tr:hover td{background:var(--surface-alt);}
+table.dt tr.flag td{background:var(--danger-soft);color:var(--ink);}
+table.dt.compact th{padding:4px 14px;}
+table.dt.compact td{padding:2px 14px;}
+.table-resize-enabled{position:relative;}
+.table-resize-actions{
+  display:flex;justify-content:flex-end;padding:5px 8px;border-bottom:1px solid var(--border);background:var(--surface-alt);
+}
+.table-resize-actions[hidden]{display:none;}
+.table-resize-reset{
+  border:0;background:transparent;color:var(--accent-line);font-family:inherit;
+  font-size:calc(11.5px * var(--font-scale, 1));padding:2px 5px;cursor:pointer;text-decoration:underline;
+}
+table.dt th{position:relative;}
+.table-column-resize-handle{
+  position:absolute;top:0;right:0;width:8px;height:100%;z-index:5;display:block;
+  cursor:col-resize;touch-action:none;pointer-events:auto;background:transparent;
+}
+.table-column-resize-handle::after{
+  content:"";position:absolute;top:20%;bottom:20%;left:3px;width:1px;background:var(--border-strong);opacity:0;
+}
+table.dt th:hover .table-column-resize-handle::after,.table-column-resize-handle:focus::after{opacity:1;}
+.table-column-resize-handle:focus{outline:2px solid var(--accent-line);outline-offset:-2px;}
+body.table-column-resizing{cursor:col-resize;user-select:none;}
+td.label,td.strong{color:var(--ink);font-weight:600;}
+td.mono{font-family:var(--font-mono);}
+
+.flag-badge{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;background:var(--danger);color:var(--danger-contrast);margin-right:4px;}
+.badge{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border);}
+.badge.counter{color:var(--accent-bar);border-color:var(--accent-bar);}
+.badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
+.badge.switch{color:var(--ink-muted);}
+[data-tooltip]{cursor:help;position:relative;}
+[data-tooltip]:hover::after{
+  content:attr(data-tooltip);position:absolute;left:0;bottom:calc(100% + 6px);
+  background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;
+  font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);white-space:normal;width:max-content;max-width:min(520px,calc(100vw - 48px));overflow-wrap:anywhere;z-index:30;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;
+}
+/* Entitäten-Tooltips brauchen echtes Markup statt content:attr(...), damit
+   Friendly Name und Entity-ID unterschiedlich formatiert, aber immer als zwei
+   getrennte Zeilen erscheinen. max-content richtet die Box an der längeren
+   Zeile aus; die Viewport-Grenze verhindert unnötiges Überlaufen. */
+.entity-tooltip-host{position:relative;cursor:help;}
+.entity-tooltip{
+  display:none;position:absolute;left:0;bottom:calc(100% + 6px);z-index:40;
+  width:max-content;max-width:min(720px,calc(100vw - 48px));box-sizing:border-box;
+  padding:7px 10px;border-radius:7px;background:var(--ink);color:var(--bg);
+  box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;text-align:left;
+}
+.entity-tooltip-host:hover>.entity-tooltip,.entity-tooltip-host:focus-within>.entity-tooltip{display:block;}
+.entity-tooltip strong,.entity-tooltip code{display:block;white-space:nowrap;line-height:1.4;}
+.entity-tooltip strong{font-family:var(--font-display);font-size:calc(11.5px * var(--font-scale, 1));font-weight:700;}
+.entity-tooltip code{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:inherit;}
+.empty{padding:32px;text-align:center;color:var(--ink-faint);}
+
+/* Eyebrow-Überschrift für Vorschau-/Status-Fragmente (Import-Assistent,
+   Duplikate-Bestätigung, Konfigurationsseite) — eine einheitliche Kennzeichnung
+   für "das hier ist eine Vorschau/ein Zwischenstand", statt jede Stelle mit
+   einem eigenen Inline-Style leicht unterschiedlich zu gestalten. */
+.eyebrow{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.04em;color:var(--ink-muted);margin:0 0 12px;}
+
+/* Buttons */
+.btn{font-size:calc(13px * var(--font-scale, 1));padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);cursor:pointer;font-family:inherit;white-space:nowrap;display:inline-block;text-decoration:none;line-height:1.4;}
+.btn:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong);}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.primary,.btn-primary{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+.btn.primary:hover:not(:disabled){opacity:.92;background:var(--accent-line);}
+.btn-danger,.btn.danger{border-color:var(--danger);color:var(--danger);background:var(--surface);}
+.btn-danger:hover,.btn.danger:hover{background:var(--danger-soft);}
+.btn-danger-outline{border-color:var(--danger);color:var(--danger);}
+.btn-danger-outline:disabled{border-color:var(--border);color:var(--ink-faint);}
+.navbtn{width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
+.navbtn:disabled{opacity:.35;cursor:default;}
+
+/* Pager */
+.pager{display:flex;align-items:center;gap:10px;margin-top:10px;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.pager-page{white-space:nowrap;}
+.pager-range{color:var(--ink-faint);}
+
+/* Aktionsleiste unter Tabellen */
+.actionbar{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);flex-wrap:wrap;}
+
+/* Einstellungen */
+.settings-layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:20px;align-items:start;min-width:0;}
+.settings-nav{
+  background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;padding:10px;
+  display:flex;flex-direction:column;gap:2px;position:sticky;top:24px;
+}
+.settings-nav a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:7px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);text-decoration:none;}
+.settings-nav a:hover{background:var(--surface);}
+.settings-nav a.active{background:var(--accent-line-soft);color:var(--accent-line);font-weight:600;}
+.settings-nav a span.tag{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));color:var(--ink-faint);}
+.settings-nav .nav-divider{height:1px;background:var(--border);margin:6px 8px;}
+.settings-panel{min-width:0;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 24px;}
+.settings-section{scroll-margin-top:24px;}
+.settings-section + .settings-section{margin-top:32px;padding-top:26px;border-top:1px solid var(--border);}
+.settings-panel .settings-section-title{
+  margin:0 0 8px;font-size:calc(17px * var(--font-scale, 1));font-weight:700;line-height:1.3;color:var(--ink);
+}
+.settings-panel p.settings-section-description{margin:0 0 18px;color:var(--ink-muted);}
+.settings-subsection{min-width:0;}
+.settings-subsection + .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+.settings-panel .settings-subsection-title{
+  margin:0 0 6px;font-size:calc(14.5px * var(--font-scale, 1));font-weight:700;line-height:1.35;color:var(--ink-muted);
+}
+.settings-minor-section{margin-top:20px;}
+.settings-panel .settings-minor-title{
+  margin:0 0 6px;font-size:calc(13px * var(--font-scale, 1));font-weight:700;line-height:1.4;color:var(--ink-faint);
+}
+.settings-panel h3{font-size:calc(15px * var(--font-scale, 1));font-weight:700;margin:0 0 6px;line-height:1.35;}
+.settings-panel p{color:var(--ink-muted);font-size:calc(13.5px * var(--font-scale, 1));max-width:100%;margin:0 0 16px;}
+/* .settings-panel p ist spezifischer als die globale .hint-Regel. Ohne diese
+   explizite Variante wurden Hinweise je nach HTML-Element 12 oder 13,5 px
+   groß. Hinweise sind jetzt überall dieselbe typografische Ebene. */
+.settings-panel .hint,.settings-panel p.hint{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);max-width:100%;line-height:1.55;}
+.settings-panel .field{margin-bottom:14px;}
+.settings-panel .val{border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:calc(13.5px * var(--font-scale, 1));background:var(--surface-alt);max-width:420px;}
+.settings-panel .val.mono{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+.settings-panel .disabled-note{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-style:italic;}
+@media (max-width:640px){
+  .settings-layout{grid-template-columns:1fr;}
+  .settings-nav{flex-direction:row;flex-wrap:wrap;top:12px;}
+}
+
+/* Konfigurations-Formular (entity_config.html) */
+.field{margin-bottom:20px;}
+.field:last-of-type{margin-bottom:0;}
+.field label{display:block;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:600;margin-bottom:8px;}
+.field select{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);min-width:200px;cursor:pointer;}
+.field select:hover{border-color:var(--accent-line);}
+.hint{margin:8px 0 0;font-size:calc(12.5px * var(--font-scale, 1));line-height:1.55;color:var(--ink-faint);}
+.save-status{margin:10px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);font-weight:600;}
+.config-card,.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;}
+
+/* Große, on-demand geladene Detailansichten innerhalb der App. Native
+   <dialog>-Semantik hält Fokus und Tastaturbedienung korrekt im Dialog. */
+.detail-dialog{width:min(860px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;
+  padding:20px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.28);}
+.detail-dialog::backdrop{background:rgba(14,21,18,.48);}
+.detail-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px;}
+.detail-dialog-header h2{margin:0 0 3px;font-size:calc(16px * var(--font-scale, 1));}
+.detail-dialog-header .hint{margin:0;}
+.detail-dialog .search{width:100%;}
+
+/* Einheitliche Semantik für Formularflächen: editierbar = weiß/Surface,
+   readonly oder deaktiviert = gedämpfte Alternativfläche. Die !important-
+   Deklaration korrigiert auch ältere seitenlokale Regeln, ohne deren Layout,
+   Schrift oder Fokusdarstellung anzutasten. */
+input:is([type="text"],[type="search"],[type="date"],[type="time"],[type="datetime-local"],[type="number"],[type="password"],[type="url"],[type="email"]):not([readonly]):not(:disabled),
+select:not(:disabled),textarea:not([readonly]):not(:disabled){background:var(--surface)!important;}
+input:is([type="text"],[type="search"],[type="date"],[type="time"],[type="datetime-local"],[type="number"],[type="password"],[type="url"],[type="email"])[readonly],
+input:is([type="text"],[type="search"],[type="date"],[type="time"],[type="datetime-local"],[type="number"],[type="password"],[type="url"],[type="email"]):disabled,
+select:disabled,textarea[readonly],textarea:disabled{background:var(--surface-alt)!important;color:var(--ink-muted);cursor:default;}
+
+/* Statuskacheln für Planer und Wartungsbereiche. Dieselbe Klasse verhindert,
+   dass Backup und Retention bei Typografie/Farbe auseinanderlaufen. */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px;}
+.status-card{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);min-width:0;}
+.status-card .hint{display:block;margin:0 0 3px;}
+.status-card strong{display:block;font-size:calc(15px * var(--font-scale, 1));line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
+.status-card .status-card-mono{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);}
+.status-card .status-card-detail{display:block;margin-top:4px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+.status-card.status-card-danger{border-color:var(--danger);background:var(--danger-soft);}
+.status-card.status-card-danger strong,.status-card.status-card-danger .status-card-detail{color:var(--danger);}
+
+/* Verbindungsstatus nutzt dieselben Statuskacheln wie Backup und Retention.
+   Das innere Raster enthält ausschließlich die drei Kennzahlen: So bleiben
+   ihre Spalten und Zeilen auch nach einem responsiven Umbruch exakt gleich,
+   ohne die höhere Hinweiskarte in die Höhenberechnung einzubeziehen. */
+.connection-status-grid{display:block;margin-bottom:16px;}
+.connection-status-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr;gap:10px;margin-bottom:10px;}
+.connection-status-note{
+  display:grid;grid-template-columns:minmax(250px,.8fr) minmax(0,1.4fr);gap:12px 24px;
+  padding:12px 14px;border:1px solid var(--border);border-left:4px solid var(--accent-bar);border-radius:10px;background:var(--surface-alt);
+}
+.settings-panel .connection-status-note p.hint{margin:0;}
+.connection-status-note-item{display:flex;flex-direction:column;gap:2px;}
+.connection-status-note-item strong{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
+@media (max-width:900px){
+  .connection-status-cards{grid-template-columns:1fr;}
+  .connection-status-note{grid-template-columns:1fr;}
+}
+
+.htmx-indicator{opacity:0;}
+.htmx-request .htmx-indicator{opacity:1;}
+
+.backup-dropzone{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:112px;
+  border:2px dashed var(--border);border-radius:12px;padding:22px;text-align:center;
+  color:var(--ink-muted);cursor:pointer;background:var(--surface);
+  transition:border-color .15s,background .15s,color .15s;
+}
+.backup-dropzone:hover,.backup-dropzone:focus-visible,.backup-dropzone.dragging{
+  border-color:var(--accent-line);background:var(--accent-line-soft);color:var(--ink);outline:none;
+}
+.backup-dropzone-hint{margin-top:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+.backup-upload-state{min-height:18px;margin:6px 0 0!important;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+
+footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+
+@media (max-width:480px){
+  body{padding:20px 16px 48px;}
+  .stat-row{gap:8px;}
+}
+
+/* Eigenes Bestätigungs-Popup (confirm-dialog.js) statt window.confirm()/hx-confirm
+   im Browser-Default-Look — ersetzt sowohl htmx:confirm als auch direkte
+   appConfirm()-Aufrufe (z. B. Chart löschen). */
+.confirm-overlay{
+  position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.4);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .12s ease;
+}
+.confirm-overlay.open{opacity:1;pointer-events:auto;}
+.confirm-dialog{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  box-shadow:var(--shadow);padding:20px 22px;max-width:380px;width:100%;
+  transform:translateY(4px) scale(.98);transition:transform .12s ease;
+}
+.confirm-overlay.open .confirm-dialog{transform:translateY(0) scale(1);}
+.confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);}
+.confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}

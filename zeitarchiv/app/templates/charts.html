@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Charts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px;}
+  .chart-card{display:flex;flex-direction:column;gap:8px;position:relative;}
+  .chart-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:22px;}
+  .chart-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  .chart-card .entity-tooltip-host{min-width:0;}
+  .chart-card .entity-names{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .chart-card .actions{display:flex;gap:8px;margin-top:auto;padding-top:10px;}
+  .fav-star{
+    position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;
+    font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Charts</p>
+    <h1>Charts</h1>
+    <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="charts/new">+ Neuer Chart</a></p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'charts' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+        {% if rows %}
+        <div class="chart-grid">
+          {% for row in rows %}
+          <div class="card chart-card">
+            <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
+                    title="Favorit" onclick="toggleFavorite('charts/{{ row.id }}/favorite', this)">★</button>
+            <h3><a href="charts/{{ row.id }}">{{ row.name }}</a></h3>
+            <div class="entity-tooltip-host" tabindex="0">
+              <div class="entity-names">{{ row.entity_names }}</div>
+              <span class="entity-tooltip" role="tooltip"><strong>{{ row.entity_tooltip_names }}</strong><code>{{ row.entity_tooltip_ids }}</code></span>
+            </div>
+            <div class="meta">{{ row.entity_count }} Entität{{ 'en' if row.entity_count != 1 else '' }} &middot; {{ row.range_label }}</div>
+            <div class="actions">
+              <a class="btn" href="charts/{{ row.id }}">Ansehen</a>
+              <button type="button" class="btn btn-danger" onclick="deleteChart({{ row.id }}, this)">Löschen</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">Noch keine Charts abgelegt — <a href="charts/new">jetzt eins erstellen →</a></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script>
+    // Diese Seite lädt (anders als die Entitäten-Übersicht) nicht per htmx —
+    // ein einfacher Reload nach dem Umschalten reicht, damit Favoriten
+    // (Sortierung: is_favorite zuerst, siehe list_saved_charts()) an ihre
+    // neue Position wandern, statt nur lokal die Stern-Farbe zu drehen.
+    document.querySelector('.settings-panel').addEventListener('favorite-changed', () => {
+      window.location.reload();
+    });
+
+    async function deleteChart(id, btn) {
+      if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+      btn.disabled = true;
+      fetch(`charts/${id}/delete`, {method: 'POST'}).then(r => {
+        if (r.ok) {
+          btn.closest('.chart-card').remove();
+        } else {
+          btn.disabled = false;
+          alert('Löschen fehlgeschlagen.');
+        }
+      }).catch(() => { btn.disabled = false; alert('Löschen fehlgeschlagen.'); });
+    }
+  </script>
+</body>
+</html>

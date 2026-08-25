@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Entitäten</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  /* .settings-panel sitzt in einer Grid-Spalte (1fr) — ohne min-width:0
+     würde diese Spalte (und damit die ganze Seite) sich an den intrinsischen
+     Inhalt der (jetzt fest breiten statt gestauchten) Tabelle anpassen
+     ("min-size:auto"-Falle bei Grid/Flex, dieselbe wie bei .tbl-columns in
+     table_editor.html), statt dass .tbl-wrap's overflow-x:auto hier greift. */
+  .settings-panel{min-width:0;}
+  th a{
+    display:block;width:100%;padding:8px 0;text-align:inherit;font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);text-decoration:none;white-space:nowrap;
+  }
+  th a.active{color:var(--accent-line);}
+  th a:hover{color:var(--accent-line);}
+  /* Feste Pixelbreiten statt Prozent — Prozent hätte sich mit dem globalen
+     table.dt{width:100%} auf jede Fensterbreite gestreckt (bei wenigen
+     sichtbaren Spalten unnötig breit, bei vielen gleichzeitig gestaucht statt
+     einfach zu scrollen). width:fit-content überschreibt das bewusst: die
+     Tabelle ist immer exakt die Summe ihrer sichtbaren Spalten breit, nie
+     mehr, nie gestaucht — width:auto hätte sich hier (Browser-Eigenheit bei
+     table-layout:fixed) trotzdem am verfügbaren Platz orientiert statt an
+     der deklarierten Spaltensumme, fit-content/min-content nicht. Reicht der
+     Platz nicht (viele Spalten gleichzeitig aktiv), greift .tbl-wrap's
+     overflow-x:auto statt umzubrechen — deshalb white-space:nowrap auf jeder
+     Zelle. Breiten aus echten Textmessungen (Header-Label und längster
+     realistischer Datenwert je Spalte) plus Zellpadding (2×14px); Entität
+     zusätzlich über max-width auf .name/.id begrenzt (siehe unten), sonst
+     bestimmt die oft sehr lange ungekürzte entity_id die Spaltenbreite statt
+     der hier deklarierten. */
+  table.entities-dt{table-layout:fixed;width:fit-content;}
+  .entities-dt th,.entities-dt td{white-space:nowrap;}
+  .col-fav{width:40px;}
+  .col-entity{width:230px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + etwas mehr Puffer */
+  .col-type{width:100px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
+  .col-date{width:112px;}      /* "22.05.2014" ≈ 73px + Puffer */
+  .col-resolution{width:92px;} /* "Rohdaten" ≈ 59px + Puffer */
+  .col-retention{width:104px;} /* Header "Aufbewahrung" ≈ 82px + Puffer */
+  .col-unit{width:72px;}       /* Header "Einheit" ≈ 40px + Puffer */
+  .col-rows{width:100px;}      /* "1.857.990" ≈ 65px + Puffer */
+  .col-size{width:84px;}       /* "14.8 MB" ≈ 51px + Puffer */
+  /* Ausrichtung je Spalte statt Position (:not(:first-child)) — dieselbe
+     Klasse steuert oben schon die Breite, für th UND td gemeinsam, damit
+     Kopf- und Datenzeile nie auseinanderlaufen. Favorit + Typ zentriert;
+     die sichtbaren Bestandsdaten (Zeitpunkte, Einheit, Datensätze, Größe)
+     sind wie Entität linksbündig. Nur die optionalen Konfigurationsspalten
+     bleiben rechtsbündig. th a{text-align:inherit} lässt die Ausrichtung vom
+     <th> auf den Sortierlink durchreichen. */
+  .entities-dt th.col-fav,.entities-dt td.col-fav,
+  .entities-dt th.col-type,.entities-dt td.col-type{text-align:center;}
+  .entities-dt th.col-date,.entities-dt td.col-date,
+  .entities-dt th.col-size,.entities-dt td.col-size{text-align:left;}
+  /* Diese beiden Bestandswerte bleiben ausdrücklich linksbündig — auch wenn
+     spätere generische Zahlen-/Headerregeln ergänzt werden. */
+  .entities-dt th.col-unit,.entities-dt td.col-unit,
+  .entities-dt th.col-rows,.entities-dt td.col-rows{text-align:left!important;}
+  .entities-dt th.col-resolution,.entities-dt td.col-resolution,
+  .entities-dt th.col-retention,.entities-dt td.col-retention{text-align:right;}
+  /* Einfache (einzeilige) Spalten zusätzlich vertikal zentrieren — Entität
+     und Erster/Letzter Wert bleiben oben ausgerichtet (vertical-align:top,
+     geerbt von table.dt td), weil sie zweizeiligen Inhalt (Name+ID bzw.
+     Datum+Uhrzeit) tragen, der oben angeschlagen besser lesbar bleibt. */
+  .entities-dt td.va-mid{vertical-align:middle;}
+  /* Kein overflow:hidden hier (nur auf .name/.id einzeln, siehe unten) — das
+     data-tooltip lebt als ::after-Pseudoelement auf genau diesem <a>
+     (position:relative als sein Anker) und würde von overflow:hidden auf
+     demselben Element mit abgeschnitten, weil es sich per bottom:calc(100%+…)
+     bewusst OBERHALB der eigenen Box positioniert. */
+  td.entity a{color:inherit;text-decoration:none;display:block;}
+  td.entity a:hover .name{color:var(--accent-line);}
+  /* max-width = col-entity(230px) minus Zellpadding (2×14px) — ohne das
+     bestimmt bei table-layout:fixed + width:auto trotzdem der ungekürzte
+     Inhalt (v. a. die oft sehr lange entity_id im Mono-Font) die tatsächlich
+     gerenderte Spaltenbreite, nicht die hier deklarierte .col-entity-Breite
+     (Browser fallen für "auto" auf intrinsic/Content-Sizing zurück, sobald
+     ein Kind ohne eigene Breitenbegrenzung eine große Mindestbreite meldet). */
+  td.entity .name{
+    display:block;max-width:202px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  td.entity .id{
+    display:block;max-width:202px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
+    overflow:hidden;text-overflow:ellipsis;cursor:help;
+  }
+  /* Favoriten-Stern — eigene, schmale Spalte ganz links (keine Sortierung,
+     deshalb kein <a> im Header wie bei den übrigen Spalten). Aktiv/inaktiv
+     über Füll- vs. Umriss-Zeichen statt einer Farbe allein, damit der
+     Zustand auch ohne Farbwahrnehmung erkennbar bleibt. */
+  .fav-star{
+    background:none;border:none;cursor:pointer;font-size:calc(16px * var(--font-scale, 1));line-height:1;padding:2px;
+    color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+
+  /* Spalten-Auswahl — Button + Popover, dasselbe Positionierungsmuster wie
+     der Gruppen-Picker in table_editor.html (position:relative am Anker,
+     position:absolute am Popover), hier nur in reinem JS statt Alpine (diese
+     Seite lädt kein Alpine). */
+  .col-picker-wrap{position:relative;display:inline-block;}
+  .col-picker-popover{
+    position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
+    display:none;
+  }
+  .col-picker-popover.open{display:block;}
+  .col-picker-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
+  .col-picker-row:hover{background:var(--surface-alt);}
+</style>
+</head>
+<body>
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Entitäten</p>
+    <h1>Entitäten</h1>
+    <p class="sub">Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.</p>
+
+    <div class="settings-layout">
+      {% set nav_active = 'entitaeten' %}
+      {% include "_settings_nav.html" %}
+      <div class="settings-panel">
+
+        <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
+             hx-get="entities-table" hx-include="#controls" hx-target="#entities-table" hx-swap="innerHTML">
+          <input type="search" name="search" placeholder="Entität oder Name suchen …" onchange="resetEntitiesPage()">
+          <span id="type-filter-wrap" style="display:{{ 'inline' if 'type' in visible_columns else 'none' }};">
+            <label class="filter-chip"><input type="checkbox" name="type" value="all" checked onchange="onTypeAllChange(this); resetEntitiesPage()"><span>Alle</span></label>
+            <label class="filter-chip"><input type="checkbox" name="type" value="standard" onchange="onTypeSpecificChange(this); resetEntitiesPage()"><span>Standard</span></label>
+            <label class="filter-chip"><input type="checkbox" name="type" value="counter" onchange="onTypeSpecificChange(this); resetEntitiesPage()"><span>Zähler</span></label>
+            <label class="filter-chip"><input type="checkbox" name="type" value="switch" onchange="onTypeSpecificChange(this); resetEntitiesPage()"><span>Schalter</span></label>
+          </span>
+          <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>★ Nur Favoriten</span></label>
+          <select name="unit" id="unit-filter-select" onchange="resetEntitiesPage()" title="Nach Einheit filtern"
+                  style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">
+            <option value="all">Alle Einheiten</option>
+            {% for opt in unit_options %}
+            <option value="{{ opt.value }}">{{ opt.label }}</option>
+            {% endfor %}
+          </select>
+          <select name="page_size" onchange="resetEntitiesPage()" title="Zeilen pro Seite">
+            <option value="10">10 / Seite</option>
+            <option value="50" selected>50 / Seite</option>
+            <option value="100">100 / Seite</option>
+            <option value="500">500 / Seite</option>
+            <option value="1000">1000 / Seite</option>
+          </select>
+          <!-- page ist hier die einzige Quelle der Wahrheit für die Seiten-Navigation
+               (analog zum offset-field-Muster bei Bereinigung, Abschnitt 04) — der Pager
+               im entities-table-Fragment schreibt nur hierhin. -->
+          <input type="hidden" name="page" id="page-field" value="1">
+          <!-- Unterscheidet "Spalten-Auswahl kam bewusst aus diesem Formular mit"
+               von "columns fehlt einfach im Request" (z. B. ein direkter Aufruf von
+               /entities-table ohne dieses Feld) — sonst würde Letzteres die
+               gespeicherte Auswahl versehentlich auf "keine Spalte sichtbar"
+               zurücksetzen, siehe Kommentar bei der Route in main.py. -->
+          <input type="hidden" name="columns_submitted" value="1">
+          <div class="col-picker-wrap">
+            <button type="button" class="btn" onclick="toggleColumnPicker()">Spalten ▾</button>
+            <div class="col-picker-popover" id="col-picker-popover">
+              {% for key, label in column_options %}
+              <label class="col-picker-row">
+                <input type="checkbox" name="columns" value="{{ key }}" {% if key in visible_columns %}checked{% endif %}
+                       onchange="onColumnToggle('{{ key }}', this.checked); resetEntitiesPage()">
+                <span>{{ label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div id="entities-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/vendor/htmx.min.js"></script>
+  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script>
+    // Die Liste bleibt beim gewählten sort (kein automatisches Nach-oben-
+    // Sortieren von Favoriten, siehe list_entities()) — ein Umschalten ändert
+    // also nie die Reihenfolge, kann die Zeile aber aus der aktiven "Nur
+    // Favoriten"-Ansicht verschwinden lassen, deshalb hier die ganze Tabelle
+    // per htmx neu laden statt nur die Stern-Klasse lokal zu drehen (macht
+    // toggleFavorite() in favorite-toggle.js bereits, das reicht für die
+    // Optik der geklickten Zeile, aber nicht dafür, sie ggf. auszublenden).
+    document.getElementById('entities-table').addEventListener('favorite-changed', () => {
+      htmx.trigger('#controls', 'change');
+    });
+  </script>
+  <script>
+    // "Alle" und die konkreten Typ-Chips schließen sich gegenseitig aus: "Alle"
+    // abwählen ergibt ohne Ersatz keinen Sinn (dann wäre nichts mehr gewählt),
+    // umgekehrt hebt jede konkrete Auswahl "Alle" auf. Mehrere konkrete Typen
+    // lassen sich gleichzeitig anhaken (Mehrfachauswahl) — läuft synchron im
+    // "change"-Event der angeklickten Checkbox, bevor es zu #controls hochblubbert
+    // und htmx den Reload auslöst, die DOM-Änderungen sind also rechtzeitig gesetzt.
+    function onTypeAllChange(checkbox) {
+      if (checkbox.checked) {
+        document.querySelectorAll('input[name=type]:not([value=all])').forEach(cb => cb.checked = false);
+      } else {
+        checkbox.checked = true;
+      }
+    }
+    function onTypeSpecificChange(checkbox) {
+      document.querySelector('input[name=type][value=all]').checked = false;
+      const anyChecked = Array.from(document.querySelectorAll('input[name=type]:not([value=all])')).some(cb => cb.checked);
+      if (!anyChecked) document.querySelector('input[name=type][value=all]').checked = true;
+    }
+
+    // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —
+    // jeder Control, der die zugrunde liegende Trefferliste ändert (Suche, Typ-
+    // Filter, Zeilen/Seite), setzt page zurück auf 1.
+    function resetEntitiesPage() {
+      document.getElementById('page-field').value = '1';
+    }
+    function setEntitiesPage(v) {
+      const field = document.getElementById('page-field');
+      field.value = Math.max(1, v);
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    function stepEntitiesPage(delta) {
+      const current = parseInt(document.getElementById('page-field').value || '1', 10);
+      setEntitiesPage(current + delta);
+    }
+  </script>
+  <script>
+    // Spalten-Popover — reines Vanilla-JS (diese Seite lädt kein Alpine),
+    // dasselbe Öffnen/Schließen-Muster wie der Gruppen-Picker in
+    // table_editor.html, nur ohne dessen reaktiven @click.outside.
+    function toggleColumnPicker() {
+      document.getElementById('col-picker-popover').classList.toggle('open');
+    }
+    document.addEventListener('click', (e) => {
+      const wrap = document.querySelector('.col-picker-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        document.getElementById('col-picker-popover').classList.remove('open');
+      }
+    });
+
+    // Filter, die zu einer gerade ausgeblendeten Spalte gehören (aktuell nur
+    // Typ und Einheit), sofort mitausblenden UND zurücksetzen — ein aktiver,
+    // aber unsichtbarer Filter wäre sonst verwirrend ("warum fehlen Zeilen,
+    // ich sehe doch gar keinen Filter dafür?"). Die eigentliche Spalte selbst
+    // holt sich der reguläre htmx-Reload von #controls (change-Trigger),
+    // das hier ist nur der Filter-Teil, den htmx nicht mitbekommt (er liegt
+    // in #controls selbst, wird also nicht neu vom Server gerendert).
+    function onColumnToggle(key, visible) {
+      if (key === 'type') {
+        document.getElementById('type-filter-wrap').style.display = visible ? 'inline' : 'none';
+        if (!visible) {
+          document.querySelectorAll('input[name=type]').forEach(cb => cb.checked = cb.value === 'all');
+        }
+      }
+      if (key === 'unit') {
+        const select = document.getElementById('unit-filter-select');
+        select.style.display = visible ? 'inline-block' : 'none';
+        if (!visible) select.value = 'all';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<div style="border-top:1px solid var(--border);padding-top:16px;">
+  <h3 class="eyebrow">Duplikate entfernen &mdash; Bestätigung</h3>
+
+  {% if total_to_delete %}
+  <p style="margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
+    <strong style="color:var(--ink);">{{ total_to_delete }}</strong> Zeile(n) würden entfernt &mdash; je mehrfach vorkommendem
+    Zeitstempel bleibt ein Datensatz erhalten, alle weiteren werden gelöscht.
+  </p>
+  <div class="tbl-wrap" style="max-height:240px;overflow-y:auto;">
+    <table class="dt compact">
+      <tr><th>Zeitstempel</th><th>Wert</th></tr>
+      {% for row in preview_rows %}
+      <tr><td>{{ row.formatted_ts }}</td><td>{{ row.formatted_value }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% if truncated %}
+  <p style="margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">&hellip; und {{ truncated }} weitere.</p>
+  {% endif %}
+
+  <form id="confirm-duplicates-form">
+    {% for ts in all_timestamps %}<input type="hidden" name="ts" value="{{ ts }}">{% endfor %}
+  </form>
+  <div class="actionbar" style="margin-top:14px;">
+    <button class="btn primary"
+            hx-post="{{ base }}/entities/{{ entity_id }}/rows/delete"
+            hx-include="#confirm-duplicates-form input, #controls" hx-target="#rows-table" hx-swap="innerHTML">
+      Ja, {{ total_to_delete }} Zeile(n) entfernen
+    </button>
+    <button class="btn"
+            hx-get="{{ base }}/entities/{{ entity_id }}/rows"
+            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+      Abbrechen
+    </button>
+  </div>
+  {% else %}
+  <p style="margin:0 0 14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">Keine Duplikate im aktuellen Zeitraum gefunden.</p>
+  <button class="btn"
+          hx-get="{{ base }}/entities/{{ entity_id }}/rows"
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+    Zurück
+  </button>
+  {% endif %}
+</div>

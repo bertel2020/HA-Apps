@@ -1,0 +1,70 @@
+<p class="hint" style="margin:0 0 14px;">Entfernt zur Löschung markierte Datensätze (Bereinigungs-Werkzeug) physisch und gibt den Speicherplatz frei &mdash; im laufenden Monat (Hot Buffer) ebenso wie in bereits archivierten Monaten (Parquet-Archiv). Für archivierte Monate werden dabei automatisch auch die zugehörigen Rollup-Dateien (Stunde/Tag bis Jahr) neu berechnet, damit Rohdaten und Diagramme konsistent bleiben.</p>
+{% set totals = purge_preview.totals %}
+<div class="settings-minor-section">
+    <h4 class="settings-minor-title">Vorschau der Bereinigung</h4>
+    <p class="hint" style="margin:0 0 14px;">Diese Vorschau verändert keine Daten.</p>
+    <div class="stat-row" style="margin-bottom:14px;">
+      <div class="stat">
+        <div class="label">Physisch entfernbar</div>
+        <div class="value">{{ totals.removable_rows }}</div>
+        <div class="sub-value">von {{ totals.marked_rows }} markierten Datensätzen</div>
+      </div>
+      <div class="stat">
+        <div class="label">Hot Buffer</div>
+        <div class="value">{{ totals.hot_rows }}</div>
+        <div class="sub-value">Datensätze im laufenden Monat</div>
+      </div>
+      <div class="stat">
+        <div class="label">Archiv</div>
+        <div class="value">{{ totals.archive_rows }}</div>
+        <div class="sub-value">Datensätze in {{ totals.archive_months }} Monatsdatei{% if totals.archive_months != 1 %}en{% endif %}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Betroffene Entitäten</div>
+        <div class="value">{{ totals.entities_affected }}</div>
+        <div class="sub-value">mit physisch entfernbaren Daten</div>
+      </div>
+    </div>
+    {% if totals.not_removable_rows %}
+      <p class="hint" style="margin:0 0 14px;color:var(--danger);">
+        {{ totals.not_removable_rows }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} {% if totals.not_removable_rows == 1 %}konnte{% else %}konnten{% endif %} keiner vorhandenen Rohdatenzeile zugeordnet werden und {% if totals.not_removable_rows == 1 %}würde deshalb{% else %}würden deshalb{% endif %} nicht entfernt.
+      </p>
+    {% endif %}
+    {% if purge_preview.rows %}
+      <div class="tbl-wrap">
+        <table class="dt">
+          <thead><tr><th>Entität</th><th>Entfernbar</th><th>Hot Buffer</th><th>Archiv</th><th>Monate</th></tr></thead>
+          <tbody>
+          {% for row in purge_preview.rows[:50] %}
+            <tr>
+              <td><strong>{{ row.friendly_name or row.entity_id }}</strong>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}</td>
+              <td>{{ row.removable_rows }} / {{ row.marked_rows }}</td>
+              <td>{{ row.hot_rows }}</td>
+              <td>{{ row.archive_rows }}</td>
+              <td>{{ row.archive_months }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if purge_preview.rows|length > 50 %}<p class="hint">Es werden die ersten 50 von {{ purge_preview.rows|length }} Entitäten angezeigt.</p>{% endif %}
+    {% else %}
+      <div class="empty">Aktuell sind keine Datensätze zur Löschung markiert.</div>
+    {% endif %}
+</div>
+<div class="toolbar" style="margin:16px 0 0;">
+  <button type="button" class="btn"
+          hx-get="settings/purge/marked" hx-include="#marked-points-search"
+          hx-target="#marked-points-list" hx-swap="innerHTML"
+          onclick="document.getElementById('marked-points-dialog').showModal()"
+          {% if totals.marked_rows == 0 %}disabled{% endif %}>
+    Markierte Datensätze anzeigen
+  </button>
+  <button type="button" class="btn btn-danger"
+          hx-post="settings/purge" hx-target="#purge-form" hx-swap="innerHTML"
+          hx-confirm="Zur Löschung markierte Datensätze jetzt endgültig physisch entfernen? Das lässt sich nicht rückgängig machen."
+          {% if totals.marked_rows == 0 %}disabled{% endif %}>
+    Jetzt bereinigen
+  </button>
+</div>
+{% if result %}<p class="save-status">✓ {{ result }}</p>{% endif %}

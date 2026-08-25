@@ -1,0 +1,34 @@
+<style>
+  .report-cards{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:18px}
+  .report-card{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:12px 14px}
+  .report-card strong{display:block;font-family:var(--font-mono);font-size:calc(20px * var(--font-scale,1))}
+  .report-card span{font-size:calc(12px * var(--font-scale,1));color:var(--ink-faint)}
+  .report-filter{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:16px}
+  .report-filter .field{margin:0;min-width:135px}.report-filter .search{flex:1;min-width:190px}
+  .report-filter label{display:block;font-size:calc(11px * var(--font-scale,1));color:var(--ink-faint);margin-bottom:4px}
+  .report-status{font-weight:600}.report-status-success{color:var(--accent-line)}
+  .report-status-partial{color:var(--ink-muted)}.report-status-failed{color:var(--danger)}
+  .report-actions{text-align:right;white-space:nowrap}.report-empty{padding:24px 0;color:var(--ink-faint)}
+  @media(max-width:900px){.report-cards{grid-template-columns:repeat(2,1fr)}}
+</style>
+<div class="report-cards">
+  <div class="report-card"><strong>{{ total_reports }}</strong><span>Gesamt</span></div>
+  <div class="report-card"><strong>{{ counts.success }}</strong><span>Erfolgreich</span></div>
+  <div class="report-card"><strong>{{ counts.partial }}</strong><span>Teilweise</span></div>
+  <div class="report-card"><strong>{{ counts.no_changes }}</strong><span>Ohne Änderungen</span></div>
+  <div class="report-card"><strong>{{ counts.failed }}</strong><span>Fehlgeschlagen</span></div>
+</div>
+<form class="report-filter" method="get" action="import">
+  <input type="hidden" name="tab" value="reports">
+  <input class="search" type="search" name="search" value="{{ search }}" placeholder="Datei, Symcon-ID oder Entität …">
+  <div class="field"><label for="report-source">Quelle</label><select id="report-source" name="source"><option value="all">Alle Quellen</option><option value="symcon" {% if source == 'symcon' %}selected{% endif %}>Symcon</option><option value="csv" {% if source == 'csv' %}selected{% endif %}>CSV</option></select></div>
+  <div class="field"><label for="report-status">Status</label><select id="report-status" name="status"><option value="all">Alle Status</option>{% for value,label in status_options.items() %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="report-date-from">Von</label><input id="report-date-from" type="date" name="date_from" value="{{ date_from }}"></div>
+  <div class="field"><label for="report-date-to">Bis</label><input id="report-date-to" type="date" name="date_to" value="{{ date_to }}"></div>
+  <button class="btn" type="submit">Filtern</button>
+</form>
+{% if reports %}
+<div class="tbl-wrap"><table class="dt"><tr><th>Zeitpunkt</th><th>Quelle</th><th>Status</th><th>Ziele</th><th>Importiert</th><th>Übersprungen</th><th>Dauer</th><th></th></tr>
+{% for report in reports %}<tr><td class="mono">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary.targets }}</td><td>{{ report.rows_written }}</td><td>{{ report.rows_skipped }}</td><td>{{ '%.1f' | format(report.duration_seconds) }} s</td><td class="report-actions"><a class="btn" href="reports/{{ report.id }}">Details</a></td></tr>{% endfor %}
+</table></div>
+{% else %}<p class="report-empty">Keine passenden Import-Reports vorhanden.</p>{% endif %}
