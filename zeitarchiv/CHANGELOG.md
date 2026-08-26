@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.30.1 - 2026-08-27
+
+### Behoben
+
+- Die Importseite lieferte bei Symcon-Variablen mit mindestens 1.000
+  Datensätzen einen „Internal Server Error“, weil die Datensatzanzahl vor dem
+  Rendern doppelt formatiert wurde.
+
 ## 0.30.0 - 2026-08-27
 
 ### Neu

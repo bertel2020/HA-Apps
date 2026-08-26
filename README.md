@@ -8,7 +8,7 @@ werden.
 
 | App | Version | Beschreibung | Dokumentation |
 | --- | --- | --- | --- |
-| Zeitarchiv | 0.30.0 | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Charts, Import und Backup. | [Anleitung](zeitarchiv/README.md) |
+| Zeitarchiv | 0.30.1 | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Charts, Import und Backup. | [Anleitung](zeitarchiv/README.md) |
 
 Weitere Apps können später als zusätzlicher Ordner im Repository-Stamm ergänzt
 und in dieser Tabelle eingetragen werden.

@@ -3942,7 +3942,11 @@ def _symcon_import_rows(
                 "symcon_unit": info.get("unit"),
                 "readable": v.readable,
                 "error": v.error,
-                "row_count": format_int(v.row_count),
+                # Als Zahl an Jinja weitergeben: import.html formatiert den
+                # Wert zentral über den format_int-Filter. Vorformatierte
+                # Strings wie "53.663" würden dort beim zweiten int()-Aufruf
+                # einen ValueError und damit HTTP 500 auslösen.
+                "row_count": v.row_count,
                 "period_start": period_start,
                 "period_end": period_end,
                 "preview": preview,

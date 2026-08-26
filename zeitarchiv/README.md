@@ -15,7 +15,7 @@ Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
 visualisiert sie.
 
-Version 0.30.0 bringt mehrere Dashboards: Kacheln lassen sich jetzt auf
+Seit Version 0.30.0 gibt es mehrere Dashboards: Kacheln lassen sich jetzt auf
 beliebig viele benannte Dashboards verteilen statt nur auf die eine
 Startseite. Dazu ein drittes Farbschema „Modern" (Zinc/Indigo).
 
