@@ -28,6 +28,8 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .coordinator import StorageCoordinator
+from .paths import entity_dir, storage_area_dir, validate_entity_id
 from ..limits import (
     MAX_ZIP_COMPRESSION_RATIO,
     MAX_ZIP_MEMBERS,
@@ -45,6 +47,92 @@ RESTORE_ROLLBACK_RE = re.compile(r"^\.zeitarchiv-restore-rollback-\d{8}T\d{6}Z$"
 BACKUP_FILENAME_RE = re.compile(
     r"^zeitarchiv-backup-\d{4}-\d{2}-\d{2}-\d{6}\.zip$"
 )
+BACKUP_SOURCE_SNAPSHOT_RE = re.compile(r"^\.backup-source-\d+-[0-9a-f]{12}$")
+
+
+def cleanup_stale_source_snapshots(backups_dir: Path) -> int:
+    """Entfernt ausschließlich abgebrochene interne Backup-Snapshots."""
+    if not backups_dir.is_dir():
+        return 0
+    removed = 0
+    for path in backups_dir.iterdir():
+        if path.is_dir() and BACKUP_SOURCE_SNAPSHOT_RE.fullmatch(path.name):
+            shutil.rmtree(path)
+            removed += 1
+    return removed
+
+
+def _copy_sqlite_database(source_path: Path, destination_path: Path) -> None:
+    """Erzeugt über SQLite selbst einen transaktionskonsistenten Snapshot."""
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    source = sqlite3.connect(f"file:{source_path.resolve()}?mode=ro", uri=True)
+    destination = sqlite3.connect(destination_path)
+    try:
+        source.backup(destination)
+    finally:
+        destination.close()
+        source.close()
+
+
+def _copy_tree(source: Path, destination: Path) -> None:
+    if source.is_dir():
+        shutil.copytree(source, destination, copy_function=shutil.copy2)
+
+
+def create_source_snapshot(
+    data_dir: Path,
+    snapshot_dir: Path,
+    entity_ids: list[str],
+    coordinator: StorageCoordinator,
+) -> None:
+    """Kopiert eine stabile Backup-Quelle mit kurzen, gezielten Sperren.
+
+    SQLite und die kleinen globalen Dateien werden unter einer kurzen globalen
+    Sperre kopiert. Archiv, Rollups und Hot Buffer werden danach pro Entität
+    unter deren eigener Sperre kopiert. So bleiben die Dateien einer Entität
+    untereinander konsistent, während Writes anderer Entitäten weiterlaufen.
+
+    Der SQLite-Index kann gegenüber später kopierten Entitäten einen etwas
+    älteren Stand enthalten. Er ist ein abgeleiteter Cache und wird nach einem
+    Restore beim Start ohnehin gegen die kopierten Dateien reconciliert.
+    """
+    if snapshot_dir.exists():
+        raise ValueError("Backup-Snapshot-Verzeichnis existiert bereits")
+    snapshot_dir.mkdir(parents=True)
+
+    ids = sorted(set(entity_ids))
+    for entity_id in ids:
+        validate_entity_id(entity_id)
+
+    # Diese Dateien sind global, aber klein. Nur für ihre kurze Kopie müssen
+    # sämtliche Storage-Operationen pausieren.
+    with coordinator.exclusive():
+        index_path = data_dir / "index.sqlite"
+        if index_path.is_file():
+            _copy_sqlite_database(index_path, snapshot_dir / "index.sqlite")
+        _copy_tree(data_dir / "reports", snapshot_dir / "reports")
+        names_path = data_dir / "symcon_names.json"
+        if names_path.is_file():
+            shutil.copy2(names_path, snapshot_dir / names_path.name)
+
+    hot_root = storage_area_dir(data_dir, "hot")
+    for entity_id in ids:
+        with coordinator.entity(entity_id):
+            _copy_tree(
+                entity_dir(data_dir, "archive", entity_id),
+                snapshot_dir / "archive" / entity_id,
+            )
+            _copy_tree(
+                entity_dir(data_dir, "rollup", entity_id),
+                snapshot_dir / "rollup" / entity_id,
+            )
+            if hot_root.is_dir():
+                hot_destination = snapshot_dir / "hot"
+                for source in sorted(hot_root.glob(f"{entity_id}-*.csv")):
+                    if not source.is_file():
+                        continue
+                    hot_destination.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, hot_destination / source.name)
 
 
 def resolve_backup_path(backups_dir: Path, filename: str) -> Path | None:
@@ -121,15 +209,7 @@ def create_backup(
     sqlite_snapshot = dest_path.with_suffix(dest_path.suffix + ".sqlite-snapshot")
     try:
         if consistent_sqlite and (data_dir / "index.sqlite").exists():
-            source = sqlite3.connect(
-                f"file:{(data_dir / 'index.sqlite').resolve()}?mode=ro", uri=True
-            )
-            destination = sqlite3.connect(sqlite_snapshot)
-            try:
-                source.backup(destination)
-            finally:
-                destination.close()
-                source.close()
+            _copy_sqlite_database(data_dir / "index.sqlite", sqlite_snapshot)
 
         manifest_files: list[dict] = []
         with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_STORED) as zf:

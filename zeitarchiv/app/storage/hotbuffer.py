@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+from collections.abc import Iterator
 from zoneinfo import ZoneInfo
 
 from .paths import hot_file_path, storage_area_dir, validate_entity_id
@@ -62,20 +63,17 @@ def append_many(data_dir: Path, entity_id: str, rows: list[tuple[float, float]],
 
 def read_rows(path: Path) -> list[tuple[float, float]]:
     """Liest eine Hot-CSV-Datei als (ts, value)-Paare — leer, falls die Datei fehlt."""
-    if not path.exists():
-        return []
-    return [(ts, value) for ts, value, _event_id in read_records(path)]
+    return [(ts, value) for ts, value, _event_id in iter_records(path)]
 
 
-def read_records(path: Path) -> list[HotRecord]:
-    """Liest alte Zwei-Spalten- und neue Drei-Spalten-Hot-Dateien.
+def iter_records(path: Path) -> Iterator[HotRecord]:
+    """Streamt alte Zwei-Spalten- und neue Drei-Spalten-Hot-Dateien.
 
     Die optionale dritte Spalte trägt die stabile Event-ID des Live-
     Schreibpfads. Importierte/ältere Zeilen haben bewusst keine ID.
     """
     if not path.exists():
-        return []
-    rows: list[HotRecord] = []
+        return
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -85,8 +83,22 @@ def read_records(path: Path) -> list[HotRecord]:
             if len(parts) < 2:
                 continue
             event_id = (parts[2] or None) if len(parts) == 3 else None
-            rows.append((float(parts[0]), float(parts[1]), event_id))
-    return rows
+            yield (float(parts[0]), float(parts[1]), event_id)
+
+
+def read_records(path: Path) -> list[HotRecord]:
+    """Materialisiert ``iter_records()`` für Aufrufer, die alle Zeilen brauchen."""
+    return list(iter_records(path))
+
+
+def contains_event_id(path: Path, event_id: str) -> bool:
+    """Bricht die Suche ab, sobald die Event-ID gefunden wurde."""
+    return any(row_event_id == event_id for _ts, _value, row_event_id in iter_records(path))
+
+
+def contains_timestamp(path: Path, ts: float) -> bool:
+    """Bricht die Suche ab, sobald der Zeitstempel gefunden wurde."""
+    return any(row_ts == ts for row_ts, _value, _event_id in iter_records(path))
 
 
 def find_stale_hot_files(data_dir: Path, entity_id: str, current_ts: float, tz: ZoneInfo) -> list[Path]:

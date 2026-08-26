@@ -253,13 +253,14 @@ def _read_rollup_rows(
     path = rollup.rollup_path(data_dir, entity_id, level)
     if not path.exists():
         return []
-    table = pq.read_table(path)
+    table = pq.read_table(
+        path,
+        filters=[("bucket_start", ">=", start_ts), ("bucket_start", "<", end_ts)],
+    )
     rows = []
     columns = table.column_names
     for i in range(table.num_rows):
         bucket_start = table.column("bucket_start")[i].as_py()
-        if not (start_ts <= bucket_start < end_ts):
-            continue
         kwargs = {"bucket_start": bucket_start}
         for col in ("value", "min_value", "max_value", "on_seconds"):
             if col in columns:

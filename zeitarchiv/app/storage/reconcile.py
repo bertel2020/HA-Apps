@@ -58,12 +58,17 @@ def _entity_storage_stats(data_dir: Path, entity_id: str) -> dict:
     hot_dir = storage_area_dir(data_dir, "hot")
     hot_files = sorted(hot_dir.glob(f"{entity_id}-*.csv")) if hot_dir.exists() else []
     for path in hot_files:
-        rows = hotbuffer.read_rows(path)
-        row_count += len(rows)
-        if rows:
-            timestamps = [row[0] for row in rows]
-            first_values.append(min(timestamps))
-            last_values.append(max(timestamps))
+        hot_count = 0
+        hot_first: float | None = None
+        hot_last: float | None = None
+        for ts, _value, _event_id in hotbuffer.iter_records(path):
+            hot_count += 1
+            hot_first = ts if hot_first is None else min(hot_first, ts)
+            hot_last = ts if hot_last is None else max(hot_last, ts)
+        row_count += hot_count
+        if hot_first is not None:
+            first_values.append(hot_first)
+            last_values.append(hot_last)
 
     return {
         "row_count": row_count,

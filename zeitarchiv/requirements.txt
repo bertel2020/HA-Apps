@@ -1,5 +1,25 @@
-fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
-pyarrow>=16.0.0
-jinja2>=3.1.0
-python-multipart>=0.0.9
+# Vollständig aufgelöste Laufzeitabhängigkeiten für Python 3.12/Linux.
+# Generiert aus requirements.in; nicht von Hand aktualisieren.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.14.2
+click==8.5.0
+fastapi==0.141.1
+h11==0.16.0
+httptools==0.8.0
+idna==3.19
+jinja2==3.1.6
+markupsafe==3.0.3
+pyarrow==25.0.1
+pydantic==2.13.4
+pydantic-core==2.46.4
+python-dotenv==1.2.3
+python-multipart==0.0.32
+pyyaml==6.0.3
+starlette==1.6.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+uvicorn==0.52.4
+uvloop==0.22.1
+watchfiles==1.2.0
+websockets==17.1

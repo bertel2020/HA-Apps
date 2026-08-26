@@ -1,5 +1,5 @@
 name: "Zeitarchiv"
-version: "0.12.0"
+version: "0.20.0"
 slug: "zeitarchiv"
 description: "Kompaktes Zeitreihen-Archiv für Home Assistant"
 arch:

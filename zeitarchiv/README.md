@@ -15,6 +15,10 @@ Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
 visualisiert sie.
 
+Version 0.20.0 bündelt Verbesserungen an Performance, Stabilität,
+Datensicherheit und interner Wartbarkeit. Das bestehende Bedien- und
+Speicherkonzept bleibt dabei erhalten.
+
 ## Auf einen Blick
 
 | | |

@@ -11,6 +11,7 @@ import json
 import sqlite3
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from .paths import validate_entity_id
@@ -21,6 +22,32 @@ COUNTER_STATE_CLASSES = {"total", "total_increasing"}
 DEFAULT_RESOLUTION = "raw"
 DEFAULT_RETENTION = "unlimited"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
+
+_RESOLUTION_SECONDS = {
+    "30s": 30,
+    "1min": 60,
+    "5min": 5 * 60,
+    "15min": 15 * 60,
+    "1h": 60 * 60,
+}
+
+
+def should_accept_write(
+    resolution: str,
+    last_ts: float | None,
+    new_ts: float,
+) -> bool:
+    """Prüft den Mindestabstand zum letzten tatsächlich gespeicherten Wert.
+
+    ``raw`` speichert jedes Event. Unbekannte Werte werden ebenfalls wie
+    ``raw`` behandelt, damit eine beschädigte oder zukünftige Einstellung
+    nicht unbemerkt Messwerte verwirft. Die Intervalle laufen relativ zum
+    letzten akzeptierten Zeitstempel und sind nicht an Uhrzeit-Buckets gebunden.
+    """
+    interval = _RESOLUTION_SECONDS.get(resolution)
+    if interval is None or last_ts is None:
+        return True
+    return new_ts - last_ts >= interval
 
 def should_accept_value(
     value_filter: str,
@@ -102,6 +129,10 @@ CREATE TABLE IF NOT EXISTS deleted_points (
     ts REAL NOT NULL,
     deleted_at REAL NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_ts
+    ON deleted_points(entity_id, ts);
+CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_deleted_at
+    ON deleted_points(entity_id, deleted_at);
 
 -- Archiv-weite Schnappschüsse für die Statistik-Übersicht (Konzept Abschnitt 03,
 -- "Verlaufs-Sparkline"/"Allgemeine Statistik-Übersicht"). Der interne
@@ -177,6 +208,8 @@ CREATE TABLE IF NOT EXISTS ingested_events (
 );
 CREATE INDEX IF NOT EXISTS idx_ingested_events_status
     ON ingested_events(status);
+CREATE INDEX IF NOT EXISTS idx_ingested_events_status_completed
+    ON ingested_events(status, completed_at);
 
 -- Abgelegte Charts (Konzept "Offene Punkte": eigener Bereich zum Erstellen und
 -- "Ablegen" von Charts, inkl. Multi-Entitäts-Charts). entity_ids als
@@ -376,6 +409,22 @@ class Index:
             )
             self._conn.execute("DROP TABLE deleted_points_old")
 
+        # Beim Neuaufbau der alten deleted_points-Tabelle werden deren Indizes
+        # zusammen mit der umbenannten Alttabelle entfernt. Deshalb hier nach
+        # sämtlichen Schema-Migrationen idempotent erneut sicherstellen.
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_ts "
+            "ON deleted_points(entity_id, ts)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_deleted_at "
+            "ON deleted_points(entity_id, deleted_at)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ingested_events_status_completed "
+            "ON ingested_events(status, completed_at)"
+        )
+
         sc_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_charts)")}
         if "entity_names" not in sc_columns:
             # Optionale, individuelle Anzeigenamen je Entität innerhalb eines
@@ -455,30 +504,53 @@ class Index:
         state_class: str | None,
         unit: str | None,
         friendly_name: str | None = None,
+        on_type_change: Callable[[str, str], None] | None = None,
     ) -> str:
         """Gibt den Aggregationstyp zurück; legt die Entität bei Bedarf neu an.
 
-        friendly_name/unit werden bei jedem Aufruf nachgezogen (nicht nur beim Anlegen) —
-        HA-Anzeigenamen/Einheiten können sich ändern oder fehlten beim ersten Schreiben
-        noch, und bereits archivierte Entitäten aus Phase 1 hatten noch keinen Namen."""
+        Metadaten werden bei jedem Aufruf nachgezogen. Ändert sich der daraus
+        abgeleitete Aggregationstyp, muss ``on_type_change`` zuerst die
+        persistierten Rollups migrieren; ohne Handler wird der potenziell
+        inkonsistente Typwechsel bewusst abgelehnt.
+        """
         validate_entity_id(entity_id)
         aggregation_type = derive_type(domain, state_class)
         with self._lock, self._conn:
             row = self._conn.execute(
-                "SELECT aggregation_type, friendly_name, unit FROM entities WHERE entity_id = ?",
+                "SELECT aggregation_type, state_class, friendly_name, unit "
+                "FROM entities WHERE entity_id = ?",
                 (entity_id,),
             ).fetchone()
             if row is not None:
-                if friendly_name and friendly_name != row["friendly_name"]:
-                    self._conn.execute(
-                        "UPDATE entities SET friendly_name = ? WHERE entity_id = ?",
-                        (friendly_name, entity_id),
-                    )
-                if unit and unit != row["unit"]:
-                    self._conn.execute(
-                        "UPDATE entities SET unit = ? WHERE entity_id = ?", (unit, entity_id)
-                    )
-                return row["aggregation_type"]
+                old_type = row["aggregation_type"]
+                if aggregation_type != old_type:
+                    if on_type_change is None:
+                        raise ValueError(
+                            f"Aggregationstyp von {entity_id} änderte sich von "
+                            f"{old_type} zu {aggregation_type}; Rollup-Migration erforderlich"
+                        )
+                    on_type_change(old_type, aggregation_type)
+                self._conn.execute(
+                    """UPDATE entities
+                       SET aggregation_type = ?, state_class = ?,
+                           friendly_name = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE friendly_name END,
+                           unit = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE unit END,
+                           updated_at = ?
+                       WHERE entity_id = ?""",
+                    (
+                        aggregation_type,
+                        state_class,
+                        friendly_name,
+                        friendly_name,
+                        friendly_name,
+                        unit,
+                        unit,
+                        unit,
+                        time.time(),
+                        entity_id,
+                    ),
+                )
+                return aggregation_type
 
             # Globale Standardwerte kommen aus der settings-Tabelle (Einstellungen-
             # Bereich, "Archivierung") statt der Modulkonstante — self.get_setting()
@@ -530,7 +602,7 @@ class Index:
     def claim_ingest_event(self, event_id: str, entity_id: str, ts: float) -> dict:
         """Reserviert eine Event-ID oder liefert ihren bestehenden Zustand."""
         with self._lock, self._conn:
-            self._conn.execute(
+            cursor = self._conn.execute(
                 "INSERT OR IGNORE INTO ingested_events "
                 "(event_id, entity_id, ts, status, created_at) VALUES (?, ?, ?, 'processing', ?)",
                 (event_id, entity_id, ts, time.time()),
@@ -539,7 +611,7 @@ class Index:
                 "SELECT entity_id, ts, status, recorded FROM ingested_events WHERE event_id = ?",
                 (event_id,),
             ).fetchone()
-            return dict(row)
+            return {**dict(row), "is_new": cursor.rowcount == 1}
 
     def list_processing_ingest_events(self) -> list[dict]:
         """Offene Event-Claims für die Crash-Recovery beim App-Start."""

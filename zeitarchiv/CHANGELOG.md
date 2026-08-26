@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.0 - 2026-08-26
+
+### Geändert
+
+- Allgemeine Performance-, Stabilitäts- und Wartbarkeitsverbesserungen in
+  Aufnahme, Speicherung, Rollups, Backup und Startablauf.
+- Robustere Datenmigrationen, reproduzierbare Abhängigkeiten und eine
+  modularere interne Struktur bei unverändertem Bedienkonzept.
+- Die automatisierte Testsuite wurde an den aktuellen Funktionsstand angepasst
+  und vollständig erfolgreich ausgeführt.
+
 ## 0.12.0 - 2026-08-26
 
 ### Neu

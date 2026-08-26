@@ -60,6 +60,17 @@ def _prune_rollup_file_by_month(path: Path, tz: ZoneInfo, deleted_months: set[tu
     noch da sind — Roh- und Rollup-Daten würden auseinanderlaufen."""
     if not path.exists() or not deleted_months:
         return
+    dataset_dir = path if path.is_dir() else None
+    if dataset_dir is not None:
+        for year, month in deleted_months:
+            segment = dataset_dir / f"{year:04d}-{month:02d}.parquet"
+            if segment.exists():
+                segment.unlink()
+        path = dataset_dir / "legacy.parquet"
+        if not path.exists():
+            if not any(dataset_dir.iterdir()):
+                dataset_dir.rmdir()
+            return
     table = pq.read_table(path)
     starts = table.column("bucket_start").to_pylist()
     keep_mask = [
@@ -70,6 +81,8 @@ def _prune_rollup_file_by_month(path: Path, tz: ZoneInfo, deleted_months: set[tu
         return
     if not any(keep_mask):
         path.unlink()
+        if dataset_dir is not None and not any(dataset_dir.iterdir()):
+            dataset_dir.rmdir()
         return
     pq.write_table(table.filter(keep_mask), path, compression="zstd")
 
@@ -87,6 +100,17 @@ def _prune_year_rollup(data_dir: Path, entity_id: str, tz: ZoneInfo, deleted_mon
     fully_gone_years = affected_years - remaining_years
     if not fully_gone_years:
         return
+    dataset_dir = path if path.is_dir() else None
+    if dataset_dir is not None:
+        for year in fully_gone_years:
+            segment = dataset_dir / f"{year:04d}.parquet"
+            if segment.exists():
+                segment.unlink()
+        path = dataset_dir / "legacy.parquet"
+        if not path.exists():
+            if not any(dataset_dir.iterdir()):
+                dataset_dir.rmdir()
+            return
     table = pq.read_table(path)
     starts = table.column("bucket_start").to_pylist()
     keep_mask = [datetime.fromtimestamp(s, tz).year not in fully_gone_years for s in starts]
@@ -94,6 +118,8 @@ def _prune_year_rollup(data_dir: Path, entity_id: str, tz: ZoneInfo, deleted_mon
         return
     if not any(keep_mask):
         path.unlink()
+        if dataset_dir is not None and not any(dataset_dir.iterdir()):
+            dataset_dir.rmdir()
         return
     pq.write_table(table.filter(keep_mask), path, compression="zstd")
 

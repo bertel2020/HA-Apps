@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import calendar
 import dataclasses
-import functools
-import inspect
 import json
 import logging
 import math
@@ -29,10 +27,9 @@ import zipfile
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated, Optional
-from urllib.parse import urlencode
+from typing import Annotated
 
-from fastapi import FastAPI, File, Header, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import (
     HTMLResponse,
@@ -72,10 +69,8 @@ from .limits import (
     MAX_CSV_UPLOAD_BYTES,
     MAX_EXPORT_ROWS,
     MAX_IMPORT_ROWS_PER_ENTITY,
-    MAX_MULTI_QUERY_ENTITIES,
     MAX_SETTINGS_UPLOAD_BYTES,
     MAX_UI_ANALYSIS_ROWS,
-    MAX_WRITE_EVENTS,
     MAX_ZIP_MEMBERS,
     MAX_ZIP_UNCOMPRESSED_BYTES,
     MAX_ZIP_UPLOAD_BYTES,
@@ -105,11 +100,14 @@ from .storage import (
 )
 from .storage import query as query_mod
 from .storage.index import DEFAULT_RESOLUTION, DEFAULT_RETENTION, Index
-from .storage.ingestion import IngestEvent, IngestionService, legacy_event_id
+from .storage.ingestion import IngestionService
 from .storage.coordinator import StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
+from . import api_routes
+from .report_routes import ReportDependencies, ReportService
+from .route_support import storage_locked
 
 logger = logging.getLogger(__name__)
 trace_logger = logging.getLogger("zeitarchiv.trace")
@@ -332,6 +330,11 @@ templates.env.globals["import_limits"] = {
 }
 
 index = Index(DATA_DIR / "index.sqlite")
+_previous_shutdown_clean = index.get_setting("storage_clean_shutdown", "0") == "1"
+# Bereits beim Prozessaufbau als "läuft/unsauber" markieren. Nur der reguläre
+# Shutdown setzt den Wert zurück; ein Crash erzwingt beim nächsten Start den
+# synchronen Sicherheitsabgleich.
+index.set_setting("storage_clean_shutdown", "0")
 configure_logging(
     index.get_setting("log_level", DEFAULT_LOG_LEVEL) or DEFAULT_LOG_LEVEL,
     index.get_setting("access_log_mode", DEFAULT_ACCESS_LOG_MODE) or DEFAULT_ACCESS_LOG_MODE,
@@ -375,6 +378,9 @@ def _run_storage_reconciliation(
 
 
 _storage_reconcile_last: dict | None = None
+_storage_reconcile_thread: threading.Thread | None = None
+_storage_reconcile_stop = threading.Event()
+_storage_reconcile_completed = False
 # Beim ersten Start (und defensiv auch nach einem manuell geleerten DB-Wert)
 # muss vor dem Öffnen eines HTTP-Listeners ein nicht-leerer Token existieren.
 # ZEITARCHIV_API_TOKEN ist ausschließlich der explizite Override für den
@@ -388,8 +394,12 @@ if _recovered_ingest_events:
         "%d unvollständig abgeschlossene Zeitarchiv-Events wiederhergestellt",
         _recovered_ingest_events,
     )
-with storage_coordinator.exclusive():
-    _run_storage_reconciliation(repair=True)
+_requires_synchronous_reconciliation = bool(_restore_startup_result) or not _previous_shutdown_clean
+if _requires_synchronous_reconciliation:
+    with storage_coordinator.exclusive():
+        _run_storage_reconciliation(repair=True)
+else:
+    logger.info("Speicherindex-Abgleich wird nach dem Start im Hintergrund ausgeführt")
 logger.info(
     "Zeitarchiv gestartet · Datenverzeichnis=%s · Loglevel=%s · HTTP-Protokoll=%s",
     DATA_DIR,
@@ -403,238 +413,38 @@ def _current_api_token() -> str:
     return ensure_api_token(index)
 
 
-_REPORT_STATUS_LABELS = {
-    "success": "Erfolgreich",
-    "partial": "Teilweise erfolgreich",
-    "no_changes": "Keine Änderungen",
-    "failed": "Fehlgeschlagen",
-}
-_REPORT_SOURCE_LABELS = {"symcon": "Symcon", "csv": "CSV"}
-
-
-def _report_view(report: dict) -> dict:
-    """Ergänzt einen gespeicherten Report ausschließlich um UI-Anzeigewerte."""
-    try:
-        finished = datetime.fromisoformat(report["finished_at"]).astimezone(TZ)
-        finished_label = finished.strftime("%d.%m.%Y %H:%M:%S")
-        finished_date = finished.date().isoformat()
-    except (KeyError, TypeError, ValueError):
-        finished_label, finished_date = "—", ""
-    summary = report.get("summary", {})
-    return {
-        **report,
-        "finished_label": finished_label,
-        "finished_date": finished_date,
-        "source_label": _REPORT_SOURCE_LABELS.get(report.get("source_type"), "Unbekannt"),
-        "status_label": _REPORT_STATUS_LABELS.get(report.get("status"), "Unbekannt"),
-        "source_size": format_size(int(report.get("source", {}).get("size_bytes", 0) or 0)),
-        "rows_written": int(summary.get("rows_imported", 0)) + int(summary.get("rows_merged", 0)),
-        "rows_skipped": int(summary.get("rows_duplicate", 0)) + int(summary.get("rows_invalid", 0)),
-    }
-
-
-_REPORT_SORT_COLUMNS = [
-    ("finished_at", "Zeitpunkt"),
-    ("source_type", "Quelle"),
-    ("status", "Status"),
-    ("targets", "Ziele"),
-    ("rows_written", "Importiert"),
-    ("rows_skipped", "Übersprungen"),
-    ("duration_seconds", "Dauer"),
-]
-
-
-def _report_sort_value(report: dict, key: str):
-    if key == "targets":
-        return report.get("summary", {}).get("targets", 0)
-    value = report.get(key)
-    return value if value is not None else ""
-
-
-def _reports_context(
-    source: str = "all",
-    status: str = "all",
-    search: str = "",
-    date_from: str = "",
-    date_to: str = "",
-    sort: str = "finished_at",
-    direction: str = "desc",
-    page: int = 1,
-    page_size: int = 50,
-) -> dict:
-    with storage_coordinator.exclusive():
-        all_reports = [_report_view(report) for report in import_reports.list_all(DATA_DIR)]
-    needle = search.strip().lower()
-
-    def matches(report: dict) -> bool:
-        if source != "all" and report.get("source_type") != source:
-            return False
-        if status != "all" and report.get("status") != status:
-            return False
-        if date_from and report["finished_date"] < date_from:
-            return False
-        if date_to and report["finished_date"] > date_to:
-            return False
-        return not needle or needle in json.dumps(report, ensure_ascii=False).lower()
-
-    if sort not in dict(_REPORT_SORT_COLUMNS):
-        sort = "finished_at"
-    if direction not in ("asc", "desc"):
-        direction = "desc"
-    matched_reports = [report for report in all_reports if matches(report)]
-    matched_reports.sort(key=lambda r: _report_sort_value(r, sort), reverse=(direction == "desc"))
-    reports, pagination = _paginate(matched_reports, page, page_size)
-    counts = {
-        key: sum(report.get("status") == key for report in all_reports)
-        for key in _REPORT_STATUS_LABELS
-    }
-
-    def _next_dir(column: str) -> str:
-        return "asc" if sort == column and direction == "desc" else "desc"
-
-    columns = [
-        {
-            "key": key,
-            "label": label,
-            "next_dir": _next_dir(key),
-            "active": sort == key,
-            "arrow": ("↑" if direction == "asc" else "↓") if sort == key else "",
-        }
-        for key, label in _REPORT_SORT_COLUMNS
-    ]
-    return {
-        "reports": reports,
-        "total_reports": len(all_reports),
-        "counts": counts,
-        "source": source,
-        "status": status,
-        "search": search,
-        "date_from": date_from,
-        "date_to": date_to,
-        "sort": sort,
-        "direction": direction,
-        "columns": columns,
-        "pagination": pagination,
-        "status_options": _REPORT_STATUS_LABELS,
-    }
-
-
-@app.get("/reports", response_class=RedirectResponse)
-def reports_page(
-    request: Request,
-    source: str = "all",
-    status: str = "all",
-    search: str = "",
-    date_from: str = "",
-    date_to: str = "",
-    page: int = 1,
-    page_size: int = 50,
-) -> RedirectResponse:
-    """Kompatibilitäts-URL: Reports befinden sich jetzt im Import-Reiter."""
-    app_root = _app_root_context(request)["app_root"]
-    query = urlencode(
-        {
-            "tab": "reports",
-            "source": source,
-            "status": status,
-            "search": search,
-            "date_from": date_from,
-            "date_to": date_to,
-            "page": page,
-            "page_size": page_size,
-        }
-    )
-    return RedirectResponse(url=f"{app_root}/import?{query}", status_code=307)
-
-
-@app.get("/reports/{report_id}", response_class=HTMLResponse)
-def report_detail(request: Request, report_id: str) -> HTMLResponse:
-    with storage_coordinator.exclusive():
-        report = import_reports.load(DATA_DIR, report_id)
-    if report is None:
-        raise HTTPException(status_code=404, detail="Report nicht gefunden")
-    return templates.TemplateResponse(
-        request, "report_detail.html", {"report": _report_view(report), "base": ".."}
-    )
-
-
-@app.get("/reports/{report_id}/download")
-def report_download(report_id: str) -> Response:
-    with storage_coordinator.exclusive():
-        path = import_reports.download_path(DATA_DIR, report_id)
-        if path is None:
-            raise HTTPException(status_code=404, detail="Report nicht gefunden")
-        content = path.read_bytes()
-    return Response(
-        content=content,
-        media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{path.name}"'},
-    )
-
-
-@app.post("/reports/{report_id}/delete", response_class=RedirectResponse)
-def report_delete(request: Request, report_id: str) -> RedirectResponse:
-    with storage_coordinator.exclusive():
-        if not import_reports.delete(DATA_DIR, report_id):
-            raise HTTPException(status_code=404, detail="Report nicht gefunden")
-    app_root = _app_root_context(request)["app_root"]
-    return RedirectResponse(url=f"{app_root}/import?tab=reports", status_code=303)
-
-
-@app.post("/reports/delete-all", response_class=RedirectResponse)
-def reports_delete_all(request: Request) -> RedirectResponse:
-    with storage_coordinator.exclusive():
-        import_reports.delete_all(DATA_DIR)
-    app_root = _app_root_context(request)["app_root"]
-    return RedirectResponse(url=f"{app_root}/import?tab=reports", status_code=303)
-
-
-# Reine In-Memory-Zähler seit Prozessstart (bewusst nicht persistiert — für
-# die Einstellungen, Bereich "Verbindung": zeigen, ob GERADE Anfragen von der
-# HA-Integration ankommen und ob dabei Auth-Fehler auftreten, z. B. weil dort
-# noch ein alter Token hinterlegt ist, nachdem er hier neu generiert wurde.
-# Ein Neustart der App setzt sie zurück — das ist hier gewollt, es geht um
-# den aktuellen Betriebszustand, nicht um eine historische Statistik (die
-# liefert bereits get_last_write_ts()/die Entitäten-Tabelle je Entität).
-_SERVER_STARTED_AT = time.time()
-_CONNECTION_STATS = {
-    "write_requests_ok": 0,
-    "auth_failures": 0,
-    "last_auth_failure_ts": None,
-}
-
-# Einmalige Aufzeichnung des nächsten /api/write-Requests (Konzept
-# "Debugging: nächsten Schreibvorgang aufzeichnen") — bewusst kein
-# Dauer-Logging der übertragenen Werte (siehe zeitarchiv.trace unten): scharf
-# geschaltet über die Protokollierung-Einstellungen, deaktiviert sich nach
-# genau einem Treffer selbst wieder. Prozess-lokal wie _CONNECTION_STATS,
-# kein Neustart-übergreifender Zustand nötig.
-_write_capture_lock = threading.Lock()
-_write_capture: dict = {"armed": False, "captured_at": None, "payload": None}
-
-# Zeitlich begrenztes Tracing einer einzelnen Entität (Konzept "Debugging:
-# Entity-Trace") — loggt Rohwerte (Zeitstempel + Wert) nur für die
-# eingetragene entity_id und nur bis expires_at, dann automatisch wieder aus.
-_entity_trace_lock = threading.Lock()
-_entity_trace: dict = {"entity_id": None, "started_at": None, "expires_at": None}
+_api_state = api_routes.ApiState()
+_SERVER_STARTED_AT = _api_state.server_started_at
+_CONNECTION_STATS = _api_state.connection_stats
+_write_capture_lock = _api_state.write_capture_lock
+_write_capture = _api_state.write_capture
+_entity_trace_lock = _api_state.entity_trace_lock
+_entity_trace = _api_state.entity_trace
 _ENTITY_TRACE_DURATION_SECONDS = 15 * 60
-
-
-class EventIn(BaseModel):
-    event_id: Optional[str] = Field(
-        default=None, min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_-]+$"
+app.include_router(
+    api_routes.create_api_router(
+        api_routes.ApiDependencies(
+            data_dir=DATA_DIR,
+            index=index,
+            tz=TZ,
+            coordinator=storage_coordinator,
+            ingestion=ingestion_service,
+            api_token=_current_api_token,
+            app_version=APP_VERSION,
+        ),
+        _api_state,
     )
-    entity_id: EntityId
-    domain: str
-    ts: float
-    value: float
-    state_class: Optional[str] = None
-    unit: Optional[str] = None
-    friendly_name: Optional[str] = None
+)
 
-
-class WriteRequest(BaseModel):
-    events: list[EventIn] = Field(min_length=1, max_length=MAX_WRITE_EVENTS)
+_report_service = ReportService(ReportDependencies(
+    data_dir=DATA_DIR,
+    tz=TZ,
+    coordinator=storage_coordinator,
+    templates=templates,
+    app_root_context=_app_root_context,
+))
+_reports_context = _report_service.context
+app.include_router(_report_service.router())
 
 
 class UploadLimitExceeded(ValueError):
@@ -677,249 +487,7 @@ async def _result_limit_handler(
 
 
 def _storage_locked(entity_ids_getter):
-    """Decorator für synchrone FastAPI-Handler mit Entitäts-Dateizugriff."""
-
-    def decorate(func):
-        signature = inspect.signature(func)
-
-        @functools.wraps(func)
-        def wrapped(*args, **kwargs):
-            bound = signature.bind(*args, **kwargs)
-            bound.apply_defaults()
-            resolved = entity_ids_getter(bound.arguments)
-            entity_ids = [resolved] if isinstance(resolved, str) else list(resolved)
-            with storage_coordinator.entities(entity_ids):
-                return func(*args, **kwargs)
-
-        return wrapped
-
-    return decorate
-
-
-def _limited_multi_entity_ids(args: dict) -> list[str]:
-    ids = [item.strip() for item in args["entity_ids"].split(",") if item.strip()]
-    if len(ids) > MAX_MULTI_QUERY_ENTITIES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage",
-        )
-    return ids
-
-
-def _check_auth(authorization: str | None) -> None:
-    token = _current_api_token()
-    expected = f"Bearer {token}"
-    if authorization is None or not secrets.compare_digest(authorization, expected):
-        _CONNECTION_STATS["auth_failures"] += 1
-        _CONNECTION_STATS["last_auth_failure_ts"] = time.time()
-        raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
-
-
-@app.get("/api/health")
-def health(authorization: str | None = Header(default=None)) -> dict:
-    _check_auth(authorization)
-    return {"status": "ok", "version": APP_VERSION}
-
-
-@app.post("/api/write")
-def write(payload: WriteRequest, authorization: str | None = Header(default=None)) -> dict:
-    _check_auth(authorization)
-    _CONNECTION_STATS["write_requests_ok"] += 1
-
-    # Einmalige Aufzeichnung (siehe _write_capture oben): scharf geschaltet
-    # über settings/logging/capture-write, deaktiviert sich hier sofort
-    # wieder selbst — trifft absichtlich GENAU diesen einen Request, nicht
-    # nur "den nächsten nach dem Scharfschalten sichtbaren" (kein Fenster,
-    # in dem ein zweiter Request unbemerkt durchrutschen könnte).
-    with _write_capture_lock:
-        if _write_capture["armed"]:
-            _write_capture["armed"] = False
-            _write_capture["captured_at"] = time.time()
-            _write_capture["payload"] = payload.model_dump()
-
-    now = time.time()
-    with _entity_trace_lock:
-        trace_entity = _entity_trace["entity_id"]
-        trace_active = bool(trace_entity) and (_entity_trace["expires_at"] or 0) > now
-    if trace_active:
-        for event in payload.events:
-            if event.entity_id == trace_entity:
-                trace_logger.debug(
-                    "Trace %s · ts=%s · value=%s · unit=%s · domain=%s",
-                    event.entity_id, event.ts, event.value, event.unit or "—", event.domain,
-                )
-
-    counts = {"written": 0, "skipped": 0, "filtered": 0, "duplicate": 0, "recovered": 0}
-    for event in payload.events:
-        event_data = event.model_dump()
-        event_id = event.event_id or legacy_event_id(
-            {key: value for key, value in event_data.items() if key != "event_id"}
-        )
-        result = ingestion_service.ingest(
-            IngestEvent(
-                event_id=event_id,
-                entity_id=event.entity_id,
-                domain=event.domain,
-                ts=event.ts,
-                value=event.value,
-                state_class=event.state_class,
-                unit=event.unit,
-                friendly_name=event.friendly_name,
-            )
-        )
-        counts[result] += 1
-
-    logger.debug(
-        "Schreibbatch verarbeitet · Events=%d · geschrieben=%d · übersprungen=%d · wertgleich gefiltert=%d · Duplikate=%d · wiederhergestellt=%d",
-        len(payload.events),
-        counts["written"],
-        counts["skipped"],
-        counts["filtered"],
-        counts["duplicate"],
-        counts["recovered"],
-    )
-    return counts
-
-
-@app.get("/api/query")
-@_storage_locked(lambda args: args["entity_id"])
-def api_query(
-    entity_id: str,
-    range: str = Query("day", alias="range"),
-    offset: int = 0,
-    continuous: bool = False,
-    compare: bool = False,
-    compare_mode: str = "previous",
-    raw: bool = False,
-    chart_type: str | None = None,
-) -> dict:
-    _validate_entity_id_or_400(entity_id)
-    if chart_type not in (None, "line", "bar"):
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
-    now = datetime.now(TZ)
-    if raw:
-        # Hohe Dichte (Konzept Abschnitt 06/10): ungebucketer Rohwert-Verlauf statt
-        # Aggregation — Periodenvergleich ergibt für Einzelmesswerte keinen Sinn,
-        # deshalb ignoriert dieser Zweig compare/compare_mode bewusst.
-        return query_mod.query_raw_series(
-            DATA_DIR, index, entity_id, range, TZ, now, offset=offset, continuous=continuous
-        )
-    result = query_mod.query_series(
-        DATA_DIR, index, entity_id, range, TZ, now, offset=offset,
-        continuous=continuous, chart_type=chart_type
-    )
-    if compare:
-        if compare_mode == "year":
-            # Vorjahresvergleich: dieselbe Periode, nur das Fenster um ein Jahr
-            # zurückverschoben (Konzept Abschnitt 06/10) — anders als bei
-            # compare_mode="previous" bleibt der offset dabei unverändert.
-            compare_result = query_mod.query_series(
-                DATA_DIR, index, entity_id, range, TZ, now, offset=offset,
-                continuous=continuous, year_over_year=True, chart_type=chart_type
-            )
-        else:
-            # Periodenvergleich ist eine Verschiebung um genau eine weitere Stufe
-            # zurück (bei range="year" ein Jahr, bei "month" ein Monat, …) — dieselbe
-            # offset-Mechanik, die auch die Vor/Zurück-Navigation nutzt, statt "jetzt"
-            # künstlich zu verschieben. Funktioniert dadurch einheitlich für alle Zeiträume.
-            compare_result = query_mod.query_series(
-                DATA_DIR, index, entity_id, range, TZ, now, offset=offset - 1,
-                continuous=continuous, chart_type=chart_type
-            )
-        result["compare_points"] = compare_result["points"]
-        result["compare_window_start"] = compare_result["window_start"]
-        result["compare_window_end"] = compare_result["window_end"]
-    return result
-
-
-@app.get("/api/query-multi")
-@_storage_locked(_limited_multi_entity_ids)
-def api_query_multi(
-    entity_ids: str,
-    range: str = Query("day", alias="range"),
-    offset: int = 0,
-    continuous: bool = False,
-    year_over_year: bool = False,
-    compare: bool = False,
-    compare_mode: str = "previous",
-    raw: bool = False,
-) -> dict:
-    """Wie /api/query, aber für mehrere Entitäten gleichzeitig (Konzept
-    "Offene Punkte": Multi-Entitäts-Charts) — für den Chart-Ablage-Bereich UND
-    für den Vergleichstabellen-Bereich (table_editor.html), der jede Spalte
-    (Zeitraum-Typ + Offset + optional "Vorjahr") über genau diesen Endpunkt
-    einmal für alle in der Spalte vorkommenden Entitäten abfragt und die
-    Zellenwerte (Summe/Durchschnitt je Zeile) client-seitig aus den
-    zurückgegebenen Buckets bildet — kein eigener Aggregations-Code hierfür.
-    entity_ids ist kommagetrennt statt eines wiederholten Query-Parameters,
-    damit der Aufruf mit einer einzigen URLSearchParams-Zuweisung im Frontend
-    zusammenbleibt. Ruft query_series() unverändert pro Entität auf (kein
-    eigener Multi-Entitäts-Code in query.py) — jede Entität kann ihre eigene
-    Auflösung/ihren eigenen Aggregationstyp behalten. compare/compare_mode
-    funktionieren wie bei /api/query, nur je Entität einzeln aufgerufen —
-    das Frontend zeichnet die Vergleichsserie je Entität in derselben Farbe
-    wie deren Hauptserie (nur blasser/gestrichelt), damit die Zuordnung bei
-    mehreren überlagerten Entitäten nachvollziehbar bleibt. year_over_year
-    verschiebt (anders als compare_mode="year") die HAUPTserie selbst um ein
-    Jahr zurück, statt eine zusätzliche Vergleichsserie danebenzustellen —
-    genau das braucht eine Tabellenspalte wie "Aug VJ"."""
-    now = datetime.now(TZ)
-    ids = [e.strip() for e in entity_ids.split(",") if e.strip()]
-    if len(ids) > MAX_MULTI_QUERY_ENTITIES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage",
-        )
-    for entity_id in ids:
-        _validate_entity_id_or_400(entity_id)
-    series = []
-    window_start = window_end = period_end = None
-    is_current = True
-    for entity_id in ids:
-        entity = index.get_entity(entity_id)
-        if raw:
-            # Wie /api/query: Rohwerte statt Buckets, Periodenvergleich ergibt für
-            # Einzelmesswerte keinen Sinn und wird hier bewusst ignoriert (siehe
-            # derselbe Kommentar bei /api/query oben).
-            result = query_mod.query_raw_series(
-                DATA_DIR, index, entity_id, range, TZ, now, offset=offset, continuous=continuous
-            )
-        else:
-            result = query_mod.query_series(
-                DATA_DIR, index, entity_id, range, TZ, now, offset=offset, continuous=continuous, year_over_year=year_over_year
-            )
-        entry = {
-            "entity_id": entity_id,
-            "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
-            "unit": (entity["unit"] if entity else None) or "",
-            "decimals": decimals_to_int(entity["decimals"]) if entity else None,
-            "display_mode": (entity["display_mode"] if entity else None) or "onoff",
-            "aggregation_type": result["aggregation_type"],
-            "chart_type": result["chart_type"],
-            "points": result["points"],
-        }
-        if compare and not raw:
-            if compare_mode == "year":
-                compare_result = query_mod.query_series(
-                    DATA_DIR, index, entity_id, range, TZ, now, offset=offset, continuous=continuous, year_over_year=True
-                )
-            else:
-                compare_result = query_mod.query_series(
-                    DATA_DIR, index, entity_id, range, TZ, now, offset=offset - 1, continuous=continuous
-                )
-            entry["compare_points"] = compare_result["points"]
-            entry["compare_window_start"] = compare_result["window_start"]
-            entry["compare_window_end"] = compare_result["window_end"]
-        series.append(entry)
-        if window_start is None:
-            window_start = result["window_start"]
-            window_end = result["window_end"]
-            period_end = result["period_end"]
-            is_current = result["is_current"]
-    return {
-        "series": series, "window_start": window_start, "window_end": window_end,
-        "period_end": period_end, "is_current": is_current,
-    }
+    return storage_locked(storage_coordinator, entity_ids_getter)
 
 
 def _sparkline_paths(values: list[float], width: float = 84, height: float = 28, pad: float = 2) -> dict[str, str] | None:
@@ -1859,44 +1427,59 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
     def worker() -> None:
         started_at = time.time()
         index.update_backup_job(job_id, status="running", started_at=started_at)
+        snapshot_dir = BACKUPS_DIR / f".backup-source-{job_id}-{secrets.token_hex(6)}"
         try:
-            with storage_coordinator.exclusive():
-                BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-                dest_path = BACKUPS_DIR / f"zeitarchiv-backup-{datetime.now(TZ).strftime('%Y-%m-%d-%H%M%S')}.zip"
-                backup.create_backup(
-                    DATA_DIR,
-                    dest_path,
-                    on_progress=on_progress,
-                    consistent_sqlite=True,
-                    metadata={"timezone": str(TZ), "trigger": trigger},
-                )
-                keep_count_raw = index.get_setting("backup_keep_count", "unlimited")
-                keep_days_raw = index.get_setting("backup_keep_days", "unlimited")
-                keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
-                keep_days = retention_mod.RETENTION_DAYS.get(keep_days_raw)
-                cleanup_error = None
-                try:
-                    backup.prune_backups(BACKUPS_DIR, keep_count, keep_days, time.time())
-                except OSError as exc:
-                    cleanup_error = f"Backup gültig; alte Sicherungen konnten nicht bereinigt werden: {exc}"[:2000]
-                    logger.exception("Alte Backups konnten nicht bereinigt werden")
-                finished_at = time.time()
-                index.update_backup_job(
-                    job_id,
-                    status="success",
-                    finished_at=finished_at,
-                    filename=dest_path.name,
-                    size_bytes=dest_path.stat().st_size,
-                    error=cleanup_error,
-                )
-                index.set_setting("backup_last_success", str(finished_at))
-                logger.info(
-                    "Backup erfolgreich · Job=%d · Datei=%s · Größe=%s · Dauer=%.1f s",
-                    job_id,
-                    dest_path.name,
-                    format_size(dest_path.stat().st_size),
-                    max(0.0, finished_at - started_at),
-                )
+            BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+            backup.cleanup_stale_source_snapshots(BACKUPS_DIR)
+            entity_ids = [row["entity_id"] for row in index.list_entities()]
+            backup.create_source_snapshot(
+                DATA_DIR,
+                snapshot_dir,
+                entity_ids,
+                storage_coordinator,
+            )
+            with _backup_progress.lock:
+                _backup_progress.total = backup.estimate_file_count(snapshot_dir)
+
+            dest_path = BACKUPS_DIR / f"zeitarchiv-backup-{datetime.now(TZ).strftime('%Y-%m-%d-%H%M%S')}.zip"
+            backup.create_backup(
+                snapshot_dir,
+                dest_path,
+                on_progress=on_progress,
+                consistent_sqlite=True,
+                metadata={
+                    "timezone": str(TZ),
+                    "trigger": trigger,
+                    "snapshot_mode": "entity-consistent",
+                },
+            )
+            keep_count_raw = index.get_setting("backup_keep_count", "unlimited")
+            keep_days_raw = index.get_setting("backup_keep_days", "unlimited")
+            keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
+            keep_days = retention_mod.RETENTION_DAYS.get(keep_days_raw)
+            cleanup_error = None
+            try:
+                backup.prune_backups(BACKUPS_DIR, keep_count, keep_days, time.time())
+            except OSError as exc:
+                cleanup_error = f"Backup gültig; alte Sicherungen konnten nicht bereinigt werden: {exc}"[:2000]
+                logger.exception("Alte Backups konnten nicht bereinigt werden")
+            finished_at = time.time()
+            index.update_backup_job(
+                job_id,
+                status="success",
+                finished_at=finished_at,
+                filename=dest_path.name,
+                size_bytes=dest_path.stat().st_size,
+                error=cleanup_error,
+            )
+            index.set_setting("backup_last_success", str(finished_at))
+            logger.info(
+                "Backup erfolgreich · Job=%d · Datei=%s · Größe=%s · Dauer=%.1f s",
+                job_id,
+                dest_path.name,
+                format_size(dest_path.stat().st_size),
+                max(0.0, finished_at - started_at),
+            )
         except Exception as exc:
             logger.exception("Backup konnte nicht erstellt werden")
             finished_at = time.time()
@@ -1911,6 +1494,7 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
             with _backup_progress.lock:
                 _backup_progress.error = error
         finally:
+            shutil.rmtree(snapshot_dir, ignore_errors=True)
             with _backup_progress.lock:
                 _backup_progress.running = False
                 _backup_progress.job_id = None
@@ -1948,6 +1532,44 @@ _maintenance_scheduler_stop = threading.Event()
 _maintenance_scheduler_thread: threading.Thread | None = None
 
 
+def _background_storage_reconciliation() -> None:
+    """Prüft einen normalen, sauber beendeten Bestand entitätsweise.
+
+    Dadurch ist der HTTP-Listener sofort verfügbar und ein großer Bestand hält
+    nie sämtliche Entitäten gleichzeitig an. Nach Restore/Crash wird dieser
+    Pfad bewusst nicht verwendet; dort lief der Abgleich bereits synchron.
+    """
+    global _storage_reconcile_last, _storage_reconcile_completed
+    started_at = time.time()
+    reports: list[dict] = []
+    entities = [entity["entity_id"] for entity in index.list_entities()]
+    for entity_id in entities:
+        if _storage_reconcile_stop.is_set():
+            return
+        with storage_coordinator.entity(entity_id):
+            reports.append(
+                reconcile.audit_storage_metadata(
+                    DATA_DIR, index, TZ, entity_ids=[entity_id], repair=True
+                )
+            )
+    _storage_reconcile_last = {
+        "checked_at": time.time(),
+        "started_at": started_at,
+        "entities_checked": sum(report["entities_checked"] for report in reports),
+        "mismatches": [item for report in reports for item in report["mismatches"]],
+        "errors": [item for report in reports for item in report["errors"]],
+        "repaired": any(report["repaired"] for report in reports),
+        "background": True,
+    }
+    _storage_reconcile_completed = True
+    logger.info(
+        "Speicherindex-Hintergrundabgleich beendet · Entitäten=%d · Abweichungen=%d · Fehler=%d",
+        _storage_reconcile_last["entities_checked"],
+        len(_storage_reconcile_last["mismatches"]),
+        len(_storage_reconcile_last["errors"]),
+    )
+
+
 def _maintenance_scheduler_loop() -> None:
     """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
     while not _maintenance_scheduler_stop.is_set():
@@ -1964,7 +1586,17 @@ def _maintenance_scheduler_loop() -> None:
 
 @app.on_event("startup")
 def _start_maintenance_scheduler() -> None:
-    global _maintenance_scheduler_thread
+    global _maintenance_scheduler_thread, _storage_reconcile_thread
+    if not _requires_synchronous_reconciliation and (
+        _storage_reconcile_thread is None or not _storage_reconcile_thread.is_alive()
+    ):
+        _storage_reconcile_stop.clear()
+        _storage_reconcile_thread = threading.Thread(
+            target=_background_storage_reconciliation,
+            name="zeitarchiv-storage-reconcile",
+            daemon=True,
+        )
+        _storage_reconcile_thread.start()
     if _maintenance_scheduler_thread is not None and _maintenance_scheduler_thread.is_alive():
         return
     _maintenance_scheduler_stop.clear()
@@ -1981,6 +1613,13 @@ def _stop_maintenance_scheduler() -> None:
     _maintenance_scheduler_stop.set()
     if _maintenance_scheduler_thread is not None:
         _maintenance_scheduler_thread.join(timeout=5)
+    _storage_reconcile_stop.set()
+    if _storage_reconcile_thread is not None:
+        _storage_reconcile_thread.join(timeout=5)
+    # Ein abgebrochener Hintergrundabgleich gilt vorsichtshalber nicht als
+    # sauberer Shutdown; dann wird beim nächsten Start synchron geprüft.
+    if _requires_synchronous_reconciliation or _storage_reconcile_completed:
+        index.set_setting("storage_clean_shutdown", "1")
 
 
 _BACKUP_SORT_COLUMNS = [("created_at", "Erstellt"), ("size_bytes", "Größe")]

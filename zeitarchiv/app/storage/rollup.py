@@ -17,6 +17,9 @@ Daraus folgen die persistierten Rollup-Stufen:
 from __future__ import annotations
 
 import calendar
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
@@ -277,15 +280,38 @@ def _fine_rows_to_table(rows: list[FineRow], aggregation_type: str) -> pa.Table:
     )
 
 
-def _append_table(path: Path, new_rows: pa.Table) -> None:
+def _segment_dir(path: Path) -> Path:
+    """Stellt ein Parquet-Dataset-Verzeichnis her, ohne Legacy-Daten zu lesen.
+
+    Frühere Versionen speicherten je Stufe genau eine Datei. Sie wird beim
+    ersten neuen Segment per Rename als ``legacy.parquet`` in ein Dataset
+    übernommen; das ist unabhängig von der Historiengröße und vermeidet ein
+    vollständiges Dekomprimieren und Neuschreiben.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        existing = pq.read_table(path)
-        combined = pa.concat_tables([existing, new_rows])
+    staging = path.with_name(f".{path.name}.segments-migration")
+    if not path.exists() and staging.exists():
+        staging.replace(path)
+    if path.is_file():
+        staging.mkdir(exist_ok=True)
+        path.replace(staging / "legacy.parquet")
+        staging.replace(path)
     else:
-        combined = new_rows
-    combined = combined.sort_by("bucket_start")
-    pq.write_table(combined, path, compression="zstd")
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _append_table(path: Path, new_rows: pa.Table, segment_key: str) -> None:
+    """Schreibt genau ein unveränderliches Periodensegment atomar.
+
+    Derselbe Schlüssel wird bei einer gezielten Neuberechnung ersetzt. Andere
+    Monate/Jahre werden weder gelesen noch neu komprimiert.
+    """
+    dataset_dir = _segment_dir(path)
+    target = dataset_dir / f"{segment_key}.parquet"
+    temporary = dataset_dir / f".{segment_key}.tmp.parquet"
+    pq.write_table(new_rows.sort_by("bucket_start"), temporary, compression="zstd")
+    temporary.replace(target)
 
 
 def _aggregate_fine_to_month(rows: list[FineRow], aggregation_type: str, month_start_ts: float) -> FineRow:
@@ -336,12 +362,17 @@ def append_completed_month(
         rows_raw, aggregation_type, level, tz, boundary_value, month_end.timestamp()
     )
     if fine_rows:
-        _append_table(rollup_path(data_dir, entity_id, level), _fine_rows_to_table(fine_rows, aggregation_type))
+        _append_table(
+            rollup_path(data_dir, entity_id, level),
+            _fine_rows_to_table(fine_rows, aggregation_type),
+            _month_str(year, month),
+        )
 
     month_row = _aggregate_fine_to_month(fine_rows, aggregation_type, month_start.timestamp())
     _append_table(
         rollup_path(data_dir, entity_id, "monat"),
         _fine_rows_to_table([month_row], aggregation_type),
+        _month_str(year, month),
     )
 
     if aggregation_type == "counter":
@@ -356,24 +387,31 @@ def _maybe_append_year(data_dir: Path, entity_id: str, year: int, tz: ZoneInfo) 
     monat_path = rollup_path(data_dir, entity_id, "monat")
     if not monat_path.exists():
         return
-    table = pq.read_table(monat_path)
     year_start = datetime(year, 1, 1, tzinfo=tz).timestamp()
     year_end = datetime(year + 1, 1, 1, tzinfo=tz).timestamp()
-    mask = [(year_start <= ts < year_end) for ts in table.column("bucket_start").to_pylist()]
-    months_in_year = sum(mask)
+    table = pq.read_table(
+        monat_path,
+        filters=[("bucket_start", ">=", year_start), ("bucket_start", "<", year_end)],
+    )
+    months_in_year = table.num_rows
     if months_in_year < 12:
         return  # Jahr noch nicht vollständig archiviert
 
     jahr_path = rollup_path(data_dir, entity_id, "jahr")
     if jahr_path.exists():
-        existing_years = pq.read_table(jahr_path, columns=["bucket_start"]).column("bucket_start").to_pylist()
-        if year_start in existing_years:
+        existing_years = pq.read_table(
+            jahr_path,
+            columns=["bucket_start"],
+            filters=[("bucket_start", "=", year_start)],
+        )
+        if existing_years.num_rows:
             return  # schon geschrieben
 
-    total = sum(v for v, keep in zip(table.column("value").to_pylist(), mask) if keep)
+    total = sum(table.column("value").to_pylist())
     _append_table(
         jahr_path,
         pa.table({"bucket_start": [year_start], "value": [total]}, schema=_fine_schema("counter")),
+        f"{year:04d}",
     )
 
 
@@ -383,6 +421,18 @@ def _remove_rows_for_month(path: Path, tz: ZoneInfo, year: int, month: int) -> N
     Rohdaten-Bestand eines bereits archivierten Monats verändert hat."""
     if not path.exists():
         return
+    dataset_dir = path if path.is_dir() else None
+    if dataset_dir is not None:
+        segment = path / f"{_month_str(year, month)}.parquet"
+        if segment.exists():
+            segment.unlink()
+        # Nur die einmalig übernommene Legacy-Datei kann zusätzlich Zeilen
+        # dieses Monats enthalten. Periodensegmente bleiben unangetastet.
+        path = path / "legacy.parquet"
+        if not path.exists():
+            if not any(dataset_dir.iterdir()):
+                dataset_dir.rmdir()
+            return
     table = pq.read_table(path)
     starts = table.column("bucket_start").to_pylist()
     keep_mask = [
@@ -393,6 +443,8 @@ def _remove_rows_for_month(path: Path, tz: ZoneInfo, year: int, month: int) -> N
         return
     if not any(keep_mask):
         path.unlink()
+        if dataset_dir is not None and not any(dataset_dir.iterdir()):
+            dataset_dir.rmdir()
         return
     pq.write_table(table.filter(keep_mask), path, compression="zstd")
 
@@ -400,6 +452,16 @@ def _remove_rows_for_month(path: Path, tz: ZoneInfo, year: int, month: int) -> N
 def _remove_row_for_year(path: Path, tz: ZoneInfo, year: int) -> None:
     if not path.exists():
         return
+    dataset_dir = path if path.is_dir() else None
+    if dataset_dir is not None:
+        segment = path / f"{year:04d}.parquet"
+        if segment.exists():
+            segment.unlink()
+        path = path / "legacy.parquet"
+        if not path.exists():
+            if not any(dataset_dir.iterdir()):
+                dataset_dir.rmdir()
+            return
     table = pq.read_table(path)
     starts = table.column("bucket_start").to_pylist()
     keep_mask = [datetime.fromtimestamp(s, tz).year != year for s in starts]
@@ -407,6 +469,8 @@ def _remove_row_for_year(path: Path, tz: ZoneInfo, year: int) -> None:
         return
     if not any(keep_mask):
         path.unlink()
+        if dataset_dir is not None and not any(dataset_dir.iterdir()):
+            dataset_dir.rmdir()
         return
     pq.write_table(table.filter(keep_mask), path, compression="zstd")
 
@@ -435,3 +499,72 @@ def replace_month(
     Zähler-Entitäten."""
     remove_month(data_dir, entity_id, aggregation_type, year, month, tz)
     append_completed_month(data_dir, entity_id, aggregation_type, month_table, year, month, tz)
+
+
+def rebuild_entity_rollups(
+    data_dir: Path,
+    entity_id: str,
+    aggregation_type: str,
+    tz: ZoneInfo,
+) -> None:
+    """Baut alle abgeschlossenen Rollups aus unveränderten Roharchiven neu.
+
+    Der vollständige Ersatz wird außerhalb des aktiven Rollup-Verzeichnisses
+    erzeugt. Erst nach erfolgreicher Berechnung wird auf demselben Dateisystem
+    per Rename umgeschaltet; Fehler lassen den bisherigen Stand unangetastet.
+    Der Aufrufer hält dabei die Entitätssperre.
+    """
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+    (data_dir / "rollup").mkdir(parents=True, exist_ok=True)
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=f".{entity_id}-type-rebuild-", dir=data_dir)
+    )
+    target_dir = entity_dir(data_dir, "rollup", entity_id)
+    previous_dir = staging_root / "previous-rollup"
+    replacement_dir = entity_dir(staging_root, "rollup", entity_id)
+    switched = False
+    try:
+        staged_archive_parent = staging_root / "archive"
+        staged_archive_parent.mkdir(parents=True, exist_ok=True)
+        if archive_dir.exists():
+            staged_archive_dir = staged_archive_parent / entity_id
+            staged_archive_dir.mkdir(parents=True, exist_ok=True)
+            for source in archive_dir.glob("*.parquet"):
+                target = staged_archive_dir / source.name
+                try:
+                    os.link(source, target)
+                except OSError:
+                    shutil.copy2(source, target)
+
+        archive_files = sorted(archive_dir.glob("*.parquet")) if archive_dir.exists() else []
+        for archive_path in archive_files:
+            try:
+                year, month = (int(part) for part in archive_path.stem.split("-"))
+            except ValueError:
+                continue
+            table = pq.read_table(archive_path)
+            append_completed_month(
+                staging_root,
+                entity_id,
+                aggregation_type,
+                table,
+                year,
+                month,
+                tz,
+            )
+
+        replacement_dir.mkdir(parents=True, exist_ok=True)
+        if target_dir.exists():
+            target_dir.replace(previous_dir)
+        try:
+            replacement_dir.replace(target_dir)
+            switched = True
+        except Exception:
+            if previous_dir.exists() and not target_dir.exists():
+                previous_dir.replace(target_dir)
+            raise
+    finally:
+        # Nach erfolgreichem Umschalten enthält staging_root nur noch den alten
+        # Rollup-Stand. Bei einem Fehler wurde dieser oben zurückgeschaltet.
+        if switched or not previous_dir.exists():
+            shutil.rmtree(staging_root, ignore_errors=True)
