@@ -383,6 +383,23 @@
       form.submit();
     }
 
+    function jumpReportsPage(v) {
+      const form = document.getElementById('report-filter');
+      const page = document.getElementById('report-page');
+      if (!form || !page) return;
+      page.value = v;
+      form.submit();
+    }
+
+    function goToReportsPage(input) {
+      const total = parseInt(input.max || '1', 10);
+      let v = parseInt(input.value, 10);
+      if (!Number.isFinite(v)) v = 1;
+      v = Math.min(Math.max(1, v), total);
+      input.value = v;
+      jumpReportsPage(v);
+    }
+
     function resetReportsPage() {
       const form = document.getElementById('report-filter');
       const page = document.getElementById('report-page');

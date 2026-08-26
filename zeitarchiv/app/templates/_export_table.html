@@ -50,9 +50,11 @@
 <div class="pager" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
     <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+    <button class="btn navbtn" onclick="setExportPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
     <button class="btn navbtn" onclick="stepExportPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+    <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToExportPage(this)"> / {{ pagination.total_pages }}</span>
     <button class="btn navbtn" onclick="stepExportPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+    <button class="btn navbtn" onclick="setExportPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
   </div>
   <select name="page_size" title="Zeilen pro Seite"
           hx-get="export-table" hx-include="#controls" hx-target="#export-table" hx-swap="innerHTML"

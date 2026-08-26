@@ -62,9 +62,11 @@
   <div style="display:flex;align-items:center;gap:10px;">
     {% if pagination.page_size %}
     <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+    <button class="btn navbtn" onclick="setEntitiesPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
     <button class="btn navbtn" onclick="stepEntitiesPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+    <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToEntitiesPage(this)"> / {{ pagination.total_pages }}</span>
     <button class="btn navbtn" onclick="stepEntitiesPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+    <button class="btn navbtn" onclick="setEntitiesPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
     {% endif %}
   </div>
   <div style="display:flex;align-items:center;gap:10px;">

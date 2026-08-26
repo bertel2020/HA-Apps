@@ -76,6 +76,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
+from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
     DEFAULT_ACCESS_LOG_MODE,
@@ -998,6 +999,12 @@ def settings_view(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/settings/ram", response_class=HTMLResponse)
+def settings_ram(request: Request) -> HTMLResponse:
+    # Per htmx nachgeladen statt Teil von settings_view() (Supervisor-Aufruf soll Seitenaufbau nicht blockieren).
+    return templates.TemplateResponse(request, "_settings_ram.html", {"ram_text": supervisor_stats.describe_memory_usage()})
+
+
 @app.get("/backup", response_class=HTMLResponse)
 def backup_view(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "backup.html", _backup_context())
@@ -1576,6 +1583,7 @@ def _maintenance_scheduler_loop() -> None:
         try:
             if index.record_stats_snapshot_if_stale():
                 logger.debug("Stündlicher Statistik-Schnappschuss gespeichert")
+            supervisor_stats.maybe_record_memory_snapshot(index)
             _refresh_retention_overview_if_stale()
             _run_backup_schedule_if_due(datetime.now(TZ))
             _run_retention_enforcement_if_due(datetime.now(TZ))
@@ -2034,8 +2042,8 @@ def _storage_breakdown() -> list[dict]:
         {"key": "rollup", "label": "Rollups", "bytes": _dir_size(DATA_DIR / "rollup")},
         {"key": "hot", "label": "Laufender Monat (Hot Buffer)", "bytes": _dir_size(DATA_DIR / "hot")},
         {"key": "index", "label": "Index", "bytes": index_path.stat().st_size if index_path.exists() else 0},
-        {"key": "reports", "label": "Import-Reports", "bytes": _dir_size(DATA_DIR / "reports")},
         {"key": "backups", "label": "Backups", "bytes": _dir_size(DATA_DIR / "backups")},
+        {"key": "reports", "label": "Import-Reports", "bytes": _dir_size(DATA_DIR / "reports")},
         {
             "key": "import",
             "label": "Import-Zwischendateien",
@@ -3240,6 +3248,9 @@ def _paginate(items: list, page: int, page_size: int) -> tuple[list, dict]:
 # Bereinigungs-spezifischer Ergänzung ohne Chart-Entsprechung.
 CLEANUP_RANGE_KEYS = ("hour", "day", "week", "month", "year", "all")
 
+# "Jahr" kann wie "Gesamt" MAX_UI_ANALYSIS_ROWS überschreiten (stiller 413, htmx swappt 4xx nicht ein) — beide laufen über den Streaming-Pfad.
+_STREAMING_RANGE_KEYS = ("year", "all")
+
 _MONTH_NAMES_DE = (
     "Januar", "Februar", "März", "April", "Mai", "Juni",
     "Juli", "August", "September", "Oktober", "November", "Dezember",
@@ -3302,12 +3313,8 @@ def _rows_fragment(
 
     gap_threshold = entity["gap_threshold"]
     outlier_threshold = entity["outlier_threshold"]
-    if range_key == "all":
-        # "Gesamt" kann Millionen Rohwerte umfassen. Statt list_raw_rows() und
-        # MAX_UI_ANALYSIS_ROWS materialisiert die Analyse nur die angeforderte
-        # Seite; Anzahl und Markierungen entstehen in zwei Streaming-Durchläufen.
-        # Auch alte URLs mit page_size=0 bleiben auf das größte UI-Format
-        # begrenzt und heben den Speichervorteil des Streaming-Pfads nicht auf.
+    if range_key in _STREAMING_RANGE_KEYS:
+        # Können Millionen Rohwerte umfassen: materialisiert nur die angeforderte Seite (zwei Streaming-Durchläufe).
         effective_page_size = 1000 if page_size <= 0 else min(page_size, 1000)
 
         def rows_factory():

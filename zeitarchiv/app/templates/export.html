@@ -130,6 +130,14 @@
       const current = parseInt(document.getElementById('export-page-field').value || '1', 10);
       setExportPage(current + delta);
     }
+    function goToExportPage(input) {
+      const total = parseInt(input.max || '1', 10);
+      let v = parseInt(input.value, 10);
+      if (!Number.isFinite(v)) v = 1;
+      v = Math.min(Math.max(1, v), total);
+      input.value = v;
+      setExportPage(v);
+    }
   </script>
 </body>
 </html>

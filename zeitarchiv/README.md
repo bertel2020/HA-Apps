@@ -15,9 +15,11 @@ Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
 visualisiert sie.
 
-Version 0.20.0 bündelt Verbesserungen an Performance, Stabilität,
-Datensicherheit und interner Wartbarkeit. Das bestehende Bedien- und
-Speicherkonzept bleibt dabei erhalten.
+Version 0.20.1 zeigt den aktuellen RAM-Verbrauch unter „Über Zeitarchiv",
+erleichtert die Seitennavigation um eine direkte Seitenwahl sowie Erste-/
+Letzte-Seite-Sprung und behebt einen Fehler, durch den der Zeitraum „Jahr"
+im Bearbeitungsbereich bei sehr datenreichen Entitäten ohne Rückmeldung
+hängen blieb.
 
 ## Auf einen Blick
 

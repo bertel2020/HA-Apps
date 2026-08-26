@@ -49,14 +49,23 @@
     <div style="display:flex;align-items:center;gap:10px;">
       <span class="pager-range">{{ backup_pagination.start }}&ndash;{{ backup_pagination.end }} von {{ backup_pagination.total }}</span>
       <button class="btn navbtn"
+              hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=1&page_size={{ backup_pagination.page_size }}"
+              hx-target="#backup-table-wrap" hx-swap="outerHTML"
+              {% if backup_pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+      <button class="btn navbtn"
               hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.page - 1 }}&page_size={{ backup_pagination.page_size }}"
               hx-target="#backup-table-wrap" hx-swap="outerHTML"
               {% if backup_pagination.page <= 1 %}disabled{% endif %}>‹</button>
-      <span class="pager-page">Seite {{ backup_pagination.page }} / {{ backup_pagination.total_pages }}</span>
+      <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ backup_pagination.total_pages }}" value="{{ backup_pagination.page }}"
+        onchange="htmx.ajax('GET', 'backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=' + Math.min(Math.max(1, parseInt(this.value, 10) || 1), {{ backup_pagination.total_pages }}) + '&page_size={{ backup_pagination.page_size }}', {target: '#backup-table-wrap', swap: 'outerHTML'})"> / {{ backup_pagination.total_pages }}</span>
       <button class="btn navbtn"
               hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.page + 1 }}&page_size={{ backup_pagination.page_size }}"
               hx-target="#backup-table-wrap" hx-swap="outerHTML"
               {% if backup_pagination.page >= backup_pagination.total_pages %}disabled{% endif %}>›</button>
+      <button class="btn navbtn"
+              hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.total_pages }}&page_size={{ backup_pagination.page_size }}"
+              hx-target="#backup-table-wrap" hx-swap="outerHTML"
+              {% if backup_pagination.page >= backup_pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
     </div>
     <select onchange="htmx.ajax('GET', 'backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=1&page_size=' + this.value, {target: '#backup-table-wrap', swap: 'outerHTML'})" title="Zeilen pro Seite">
       {% for size in [10, 20, 50, 100] %}

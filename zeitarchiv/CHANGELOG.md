@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.20.1 - 2026-08-26
+
+### Neu
+
+- Unter **Einstellungen → Über Zeitarchiv** zeigt eine neue Zeile den
+  aktuellen RAM-Verbrauch der App.
+- Seitennavigation (Entitäten, Bereinigung, Export, Import-Reports, Backup):
+  Eingabefeld zur direkten Seitenwahl sowie Sprung zur ersten/letzten Seite.
+
+### Geändert
+
+- Speichernutzung (Statistik): „Import-Reports" steht jetzt nach „Backups"
+  in Liste und Diagramm.
+
+### Behoben
+
+- Im Bearbeitungsbereich einer Entität blieb der Zeitraum „Jahr" bei sehr
+  datenreichen Entitäten (mehr als 500.000 Rohwerte im Jahr) ohne
+  Fehlermeldung auf dem vorherigen Zeitraum stehen. „Jahr" nutzt jetzt
+  denselben speicherschonenden Abfragepfad wie „Gesamt" und funktioniert
+  unabhängig von der Datenmenge.
+
 ## 0.20.0 - 2026-08-26
 
 ### Geändert

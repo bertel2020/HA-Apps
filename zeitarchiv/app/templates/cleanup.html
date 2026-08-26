@@ -452,6 +452,14 @@
       const current = parseInt(document.getElementById('page-field').value || '1', 10);
       setPage(current + delta);
     }
+    function goToPage(input) {
+      const total = parseInt(input.max || '1', 10);
+      let v = parseInt(input.value, 10);
+      if (!Number.isFinite(v)) v = 1;
+      v = Math.min(Math.max(1, v), total);
+      input.value = v;
+      setPage(v);
+    }
     // Vom Kalender-Widget (static/js/calendar-picker.js) beim Klick auf einen
     // Tag mit Daten aufgerufen — rechnet den gewählten Tag in "wie viele
     // Perioden des aktuell gewählten Zeitraum-Typs liegt er hinter der

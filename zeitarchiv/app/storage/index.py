@@ -145,6 +145,18 @@ CREATE TABLE IF NOT EXISTS stats_snapshots (
     total_size_bytes INTEGER NOT NULL
 );
 
+-- RAM-Verbrauch dieses Addon-Containers, stündlich über die Supervisor-API
+-- abgefragt (Konzept "Über Zeitarchiv": RAM-Anzeige). Eigene Tabelle statt
+-- Erweiterung von stats_snapshots, weil die Quelle eine andere ist (externer
+-- Supervisor-Aufruf statt eigener Index-Aggregation) und optional bleibt —
+-- ohne Supervisor (z. B. lokale Entwicklung) bleibt sie einfach leer, ohne
+-- stats_snapshots zu beeinträchtigen.
+CREATE TABLE IF NOT EXISTS memory_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts REAL NOT NULL,
+    memory_usage_bytes INTEGER NOT NULL
+);
+
 -- App-eigene globale Einstellungen (Konzept Abschnitt 03, "Einstellungen"-
 -- Bereich) — bewusst eine eigene Tabelle statt der Supervisor-options.json:
 -- die schreibt/verwaltet der Supervisor selbst, ein Zugriff von hier aus würde
@@ -1348,6 +1360,34 @@ class Index:
             rows = self._conn.execute(
                 "SELECT ts, entity_count, total_rows, total_size_bytes FROM stats_snapshots "
                 "WHERE ts >= ? ORDER BY ts",
+                (since_ts,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def is_memory_snapshot_due(self, min_interval_seconds: float = 3600) -> bool:
+        """Ob der nächste stündliche RAM-Schnappschuss fällig ist — getrennt
+        vom eigentlichen Schreiben (record_memory_snapshot), weil das
+        Auslesen des Werts selbst ein externer Netzwerkaufruf an den
+        Supervisor ist (main._maintenance_scheduler_loop), der nicht bei
+        jedem 30s-Planer-Tick unnötig wiederholt werden soll."""
+        with self._lock, self._conn:
+            latest_row = self._conn.execute("SELECT MAX(ts) AS latest FROM memory_snapshots").fetchone()
+            latest = latest_row["latest"] if latest_row else None
+            return latest is None or time.time() - latest >= min_interval_seconds
+
+    def record_memory_snapshot(self, memory_usage_bytes: int) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO memory_snapshots (ts, memory_usage_bytes) VALUES (?, ?)",
+                (time.time(), memory_usage_bytes),
+            )
+
+    def get_memory_snapshots(self, since_ts: float) -> list[dict]:
+        """Für eine künftige RAM-Verlaufsanzeige (noch ungenutzt) — Gegenstück
+        zu get_stats_snapshots()."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT ts, memory_usage_bytes FROM memory_snapshots WHERE ts >= ? ORDER BY ts",
                 (since_ts,),
             ).fetchall()
             return [dict(row) for row in rows]
