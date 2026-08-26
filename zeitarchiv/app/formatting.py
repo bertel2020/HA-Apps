@@ -14,10 +14,10 @@ def format_size(size_bytes: int) -> str:
     for unit in units:
         if value < 1024 or unit == units[-1]:
             if unit == "B":
-                return f"{int(value)} {unit}"
-            return f"{value:.1f} {unit}"
+                return f"{format_int(int(value))} {unit}"
+            return f"{_localize_number_text(f'{value:.1f}')} {unit}"
         value /= 1024
-    return f"{value:.1f} TB"  # unreachable, beruhigt nur Type-Checker
+    return f"{_localize_number_text(f'{value:.1f}')} TB"  # unreachable, beruhigt nur Type-Checker
 
 
 def format_timestamp(ts: float | None, tz: ZoneInfo) -> str:
@@ -40,6 +40,53 @@ def format_time(ts: float | None, tz: ZoneInfo) -> str:
     return datetime.fromtimestamp(ts, tz).strftime("%H:%M:%S")
 
 
+# Zentrale Stelle für das Zahlenformat der Oberfläche — aktuell nur Deutsch
+# (Komma als Dezimal-, Punkt als Tausendertrennzeichen). Eine künftige
+# Sprachumschaltung (z. B. Englisch, NUMBER_LOCALE="en-US") ändert nur diese
+# eine Konstante bzw. wählt den Eintrag dynamisch (z. B. aus einer
+# Nutzereinstellung) — format_value()/format_int() selbst kennen kein
+# hartcodiertes Trennzeichen mehr. Dasselbe Prinzip wie auf der JS-Seite
+# (static/js/number-format.js, window.NumberFormat.LOCALE).
+NUMBER_SEPARATORS = {
+    "de-DE": {"decimal": ",", "thousands": "."},
+    "en-US": {"decimal": ".", "thousands": ","},
+}
+NUMBER_LOCALE = "de-DE"
+
+
+def _group_thousands(int_text: str, sep: str) -> str:
+    negative = int_text.startswith("-")
+    digits = int_text[1:] if negative else int_text
+    groups = []
+    while len(digits) > 3:
+        groups.insert(0, digits[-3:])
+        digits = digits[:-3]
+    groups.insert(0, digits)
+    grouped = sep.join(groups)
+    return f"-{grouped}" if negative else grouped
+
+
+def _localize_number_text(text: str, locale: str = NUMBER_LOCALE) -> str:
+    """Wandelt einen Punkt-Dezimal-String (z. B. "1234.5") ins Oberflächen-
+    format des angegebenen locale um, inkl. Tausendergruppierung."""
+    seps = NUMBER_SEPARATORS[locale]
+    int_part, _, frac_part = text.partition(".")
+    grouped = _group_thousands(int_part, seps["thousands"])
+    return f"{grouped}{seps['decimal']}{frac_part}" if frac_part else grouped
+
+
+def format_int(value: int, signed: bool = False) -> str:
+    """Tausendergruppierte Ganzzahl im aktuellen Oberflächenformat
+    (NUMBER_LOCALE) — für Zeilen-/Datensatzzähler u. Ä. in der GUI.
+    signed=True erzwingt ein führendes "+" bei positiven Werten (z. B. für
+    eine Differenzanzeige "+42" / "-15"), wie Pythons eigenes "{:+}"."""
+    value = int(value)
+    text = _localize_number_text(str(value))
+    if signed and value >= 0:
+        text = f"+{text}"
+    return text
+
+
 def format_value(value: float, decimals: int | None = None) -> str:
     """decimals=None (Standard/"Automatisch"): bis zu 3 Nachkommastellen, aber
     überflüssige Nullen abgeschnitten — ein ganzzahliger Rohwert (z. B. 4 W) zeigt
@@ -47,11 +94,31 @@ def format_value(value: float, decimals: int | None = None) -> str:
     Zähler-Rohwert wie 6403.06) lesbar bleibt statt auf eine feste
     Nachkommastellenzahl aufgefüllt zu werden. Mit explizitem decimals (pro
     Entität konfigurierbar, Konzept Abschnitt 03) wird stattdessen immer genau
-    auf diese Anzahl gerundet/aufgefüllt — auch wenn das Nullen anhängt."""
+    auf diese Anzahl gerundet/aufgefüllt — auch wenn das Nullen anhängt.
+    Ergebnis im Oberflächenformat (NUMBER_LOCALE), inkl. Tausendergruppierung."""
     if decimals is not None:
-        return f"{value:.{decimals}f}"
-    text = f"{value:.3f}".rstrip("0").rstrip(".")
-    return text if text and text not in ("-", "") else "0"
+        text = f"{value:.{decimals}f}"
+    else:
+        text = f"{value:.3f}".rstrip("0").rstrip(".")
+        if not text or text in ("-", ""):
+            text = "0"
+    return _localize_number_text(text)
+
+
+def parse_localized_number(text: str, locale: str = NUMBER_LOCALE) -> float:
+    """Gegenstück zu format_value()/format_int() für Freitext-Zahleneingaben im
+    Oberflächenformat (z. B. ein vom Nutzer getippter Umrechnungsfaktor beim
+    Symcon-Import) — Dezimal-/Tausendertrennzeichen kommen aus NUMBER_SEPARATORS
+    statt hartcodiert zu sein, damit eine künftige Sprachumschaltung automatisch
+    mitzieht. Dasselbe Prinzip wie NumberFormat.parse() auf der JS-Seite
+    (static/js/number-format.js)."""
+    seps = NUMBER_SEPARATORS[locale]
+    normalized = text.strip()
+    if seps["thousands"]:
+        normalized = normalized.replace(seps["thousands"], "")
+    if seps["decimal"] != ".":
+        normalized = normalized.replace(seps["decimal"], ".")
+    return float(normalized)
 
 
 def decimals_to_int(value: str | None) -> int | None:
@@ -92,12 +159,17 @@ DECIMALS_LABELS = {
     "2": "2 Nachkommastellen",
     "3": "3 Nachkommastellen",
 }
+VALUE_FILTER_LABELS = {
+    "off": "Aus",
+    "decimals": "Gleiche gerundete Werte filtern",
+}
 GAP_THRESHOLD_LABELS = {
     "1": "1 Minute",
     "5": "5 Minuten",
     "15": "15 Minuten",
     "30": "30 Minuten",
-    "60": "60 Minuten",
+    "60": "1 Stunde",
+    "1440": "1 Tag",
     "off": "Aus",
 }
 OUTLIER_THRESHOLD_LABELS = {

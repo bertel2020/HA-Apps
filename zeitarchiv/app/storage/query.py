@@ -75,8 +75,9 @@ def _shift_year(dt: datetime, years: int) -> datetime:
 
 def _window(
     range_key: str, now_local: datetime, offset: int = 0, continuous: bool = False
-) -> tuple[datetime, datetime]:
-    """Berechnet [Anfang, Ende) für einen Zeitraum.
+) -> tuple[datetime, datetime, datetime]:
+    """Berechnet [Anfang, Ende) für einen Zeitraum, sowie das ungekappte
+    natürliche Periodenende (drittes Rückgabeelement).
 
     offset verschiebt um ganze Perioden (0 = aktuell, -1 = eine Periode zurück, …).
     Vorwärts über "jetzt" hinaus ergibt keinen Sinn, deshalb hart auf 0 gedeckelt.
@@ -87,6 +88,15 @@ def _window(
     Monatserster/1. Januar/Dekadengrenze, am aktuellen "jetzt" gedeckelt), mit
     continuous=True stattdessen ein rollierendes Fenster gleicher Länge, das genau
     bei "jetzt" (bzw. bei offset Perioden davor) endet statt an der Kalendergrenze.
+
+    Das zweite Rückgabeelement (Ende) ist weiterhin bei "jetzt" gedeckelt — es
+    steuert, welche Daten tatsächlich abgefragt werden (siehe Modul-Kommentar
+    oben, Rollup/Live-Split). Das dritte Element (natürliches Ende) ist NIE
+    gedeckelt und dient nur der Anzeige: eine laufende Woche/Monat/… soll auch
+    ohne Daten in der Zukunft bis zur vollen Kalendergrenze angezeigt werden
+    (z. B. Woche bis Sonntag), nicht nur bis "jetzt". Bei continuous ist es
+    identisch zum gedeckelten Ende, da ein rollierendes Fenster keine
+    Kalendergrenze hat, die es überschreiten könnte.
     """
     offset = min(offset, 0)
     midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -94,24 +104,27 @@ def _window(
     if range_key == "hour":
         if continuous:
             anchor = now_local + timedelta(hours=offset)
-            return anchor - timedelta(hours=1), anchor
+            return anchor - timedelta(hours=1), anchor, anchor
         hour_start = now_local.replace(minute=0, second=0, microsecond=0) + timedelta(hours=offset)
-        return hour_start, min(hour_start + timedelta(hours=1), now_local)
+        natural_end = hour_start + timedelta(hours=1)
+        return hour_start, min(natural_end, now_local), natural_end
 
     if range_key == "day":
         if continuous:
             anchor = now_local + timedelta(days=offset)
-            return anchor - timedelta(days=1), anchor
+            return anchor - timedelta(days=1), anchor, anchor
         start = midnight + timedelta(days=offset)
-        return start, min(start + timedelta(days=1), now_local)
+        natural_end = start + timedelta(days=1)
+        return start, min(natural_end, now_local), natural_end
 
     if range_key == "week":
         if continuous:
             anchor = now_local + timedelta(days=7 * offset)
-            return anchor - timedelta(days=7), anchor
+            return anchor - timedelta(days=7), anchor, anchor
         # Kalenderwoche Montag–Sonntag (ISO), nicht die rollierenden letzten 7 Tage.
         week_start = midnight - timedelta(days=midnight.weekday()) + timedelta(days=7 * offset)
-        return week_start, min(week_start + timedelta(days=7), now_local)
+        natural_end = week_start + timedelta(days=7)
+        return week_start, min(natural_end, now_local), natural_end
 
     if range_key == "month":
         if continuous:
@@ -119,32 +132,32 @@ def _window(
             # (was ist ein Monat vor dem 31. Januar?) — 30 Tage sind eine bewusst
             # einfache, eindeutige Definition für die rollierende Variante.
             anchor = now_local + timedelta(days=30 * offset)
-            return anchor - timedelta(days=30), anchor
+            return anchor - timedelta(days=30), anchor, anchor
         total_months = (now_local.year * 12 + (now_local.month - 1)) + offset
         year, month = divmod(total_months, 12)
         month += 1
         start = midnight.replace(year=year, month=month, day=1)
         end_year, end_month = (year + 1, 1) if month == 12 else (year, month + 1)
         natural_end = start.replace(year=end_year, month=end_month)
-        return start, min(natural_end, now_local)
+        return start, min(natural_end, now_local), natural_end
 
     if range_key == "year":
         if continuous:
             anchor = now_local.replace(year=now_local.year + offset)
-            return anchor.replace(year=anchor.year - 1), anchor
+            return anchor.replace(year=anchor.year - 1), anchor, anchor
         year = now_local.year + offset
         start = midnight.replace(year=year, month=1, day=1)
         natural_end = start.replace(year=year + 1)
-        return start, min(natural_end, now_local)
+        return start, min(natural_end, now_local), natural_end
 
     if range_key == "decade":
         if continuous:
             anchor = now_local.replace(year=now_local.year + 10 * offset)
-            return anchor.replace(year=anchor.year - 10), anchor
+            return anchor.replace(year=anchor.year - 10), anchor, anchor
         decade_start_year = (now_local.year // 10) * 10 + 10 * offset
         start = midnight.replace(year=decade_start_year, month=1, day=1)
         natural_end = start.replace(year=decade_start_year + 10)
-        return start, min(natural_end, now_local)
+        return start, min(natural_end, now_local), natural_end
 
     raise ValueError(f"Unbekannter Zeitraum: {range_key}")
 
@@ -510,7 +523,7 @@ def query_series(
     aggregation_type = entity["aggregation_type"]
     resolved_chart_type = _resolved_chart_type(aggregation_type, chart_type)
     now_local = now.astimezone(tz)
-    window_start, window_end = _window(range_key, now_local, offset, continuous)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
     if year_over_year:
         # Vorjahresvergleich verschiebt nur das Fenster um ein Jahr zurück, NICHT
         # now_local — der Rollup/Live-Split (Datei-Modulgrenze in diesem Modul,
@@ -519,6 +532,7 @@ def query_series(
         # immer schon vollständig in der Vergangenheit.
         window_start = _shift_year(window_start, -1)
         window_end = _shift_year(window_end, -1)
+        period_end = _shift_year(period_end, -1)
 
     if range_key in ("hour", "day"):
         fine = _query_live_fine(
@@ -573,6 +587,7 @@ def query_series(
         "points": points,
         "window_start": window_start.timestamp(),
         "window_end": window_end.timestamp(),
+        "period_end": period_end.timestamp(),
         "is_current": offset == 0,
     }
 
@@ -602,7 +617,7 @@ def query_raw_series(
 
     aggregation_type = entity["aggregation_type"]
     now_local = now.astimezone(tz)
-    window_start, window_end = _window(range_key, now_local, offset, continuous)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
 
     points = [
         {"ts": ts, "value": value, "min": None, "max": None}
@@ -634,5 +649,6 @@ def query_raw_series(
         "points": points,
         "window_start": window_start.timestamp(),
         "window_end": window_end.timestamp(),
+        "period_end": period_end.timestamp(),
         "is_current": offset == 0,
     }

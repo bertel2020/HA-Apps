@@ -20,23 +20,33 @@ COUNTER_STATE_CLASSES = {"total", "total_increasing"}
 
 DEFAULT_RESOLUTION = "raw"
 DEFAULT_RETENTION = "unlimited"
+VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 
-# Sekunden je Auflösungsstufe — "raw" (0) heißt: nie drosseln, jede
-# Zustandsänderung annehmen. Für den Schreibpfad in main.py (Konzept Abschnitt 03).
-RESOLUTION_SECONDS = {"raw": 0, "30s": 30, "1min": 60, "5min": 300, "15min": 900, "1h": 3600}
+def should_accept_value(
+    value_filter: str,
+    decimals: str,
+    last_value: float | None,
+    last_ts: float | None,
+    new_value: float,
+    new_ts: float,
+) -> bool:
+    """Prüft den optionalen Wertänderungsfilter einer Entität.
 
-
-def should_accept_write(resolution: str, last_ts: float | None, new_ts: float) -> bool:
-    """True, wenn ein neuer Rohwert gemäß der konfigurierten Auflösung angenommen
-    werden soll — bei "raw" (oder unbekannter Auflösung) immer, sonst nur wenn seit
-    dem letzten AKZEPTIERTEN Wert mindestens das konfigurierte Intervall vergangen
-    ist. last_ts stammt bewusst aus dem zuletzt angenommenen Wert (nicht aus dem
-    letzten überhaupt gesendeten), sonst würde häufiges Senden die Drosselung
-    unterlaufen, indem jeder Versuch die Uhr neu startet."""
-    interval = RESOLUTION_SECONDS.get(resolution, 0)
-    if interval <= 0 or last_ts is None:
+    ``decimals`` entspricht der sichtbaren Genauigkeit: ``auto`` zeigt höchstens
+    drei Nachkommastellen und wird deshalb wie ``3`` behandelt. Auch bei
+    unverändertem gerundetem Wert wird spätestens alle sechs Stunden ein
+    Lebenszeichen gespeichert, damit lange konstante Verläufe und ``last_ts``
+    nicht vollständig stehen bleiben.
+    """
+    if value_filter != "decimals" or last_value is None or last_ts is None:
         return True
-    return new_ts - last_ts >= interval
+    try:
+        precision = 3 if decimals == "auto" else max(0, min(int(decimals), 12))
+    except (TypeError, ValueError):
+        precision = 3
+    if round(last_value, precision) != round(new_value, precision):
+        return True
+    return new_ts - last_ts >= VALUE_FILTER_HEARTBEAT_SECONDS
 
 # Allowlist für ORDER BY — Spaltennamen lassen sich in SQLite nicht parametrisieren,
 # also nie direkt einen Request-Parameter in die Query interpolieren. Die Werte
@@ -64,6 +74,7 @@ CREATE TABLE IF NOT EXISTS entities (
     resolution TEXT NOT NULL DEFAULT 'raw',
     retention TEXT NOT NULL DEFAULT 'unlimited',
     decimals TEXT NOT NULL DEFAULT 'auto',
+    value_filter TEXT NOT NULL DEFAULT 'off',
     gap_threshold TEXT NOT NULL DEFAULT '15',
     outlier_threshold TEXT NOT NULL DEFAULT '25',
     unit TEXT,
@@ -71,6 +82,7 @@ CREATE TABLE IF NOT EXISTS entities (
     friendly_name TEXT,
     first_ts REAL,
     last_ts REAL,
+    last_value REAL,
     row_count INTEGER NOT NULL DEFAULT 0,
     size_bytes INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
@@ -179,6 +191,10 @@ CREATE TABLE IF NOT EXISTS saved_charts (
     entity_ids TEXT NOT NULL,
     range_key TEXT NOT NULL DEFAULT 'day',
     continuous INTEGER NOT NULL DEFAULT 0,
+    resolution_preset TEXT NOT NULL DEFAULT 'auto',
+    dynamic_y_axis INTEGER NOT NULL DEFAULT 1,
+    dashboard_animation INTEGER NOT NULL DEFAULT 1,
+    chart_stats INTEGER NOT NULL DEFAULT 1,
     is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
@@ -318,6 +334,10 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN friendly_name TEXT")
         if "decimals" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
+        if "value_filter" not in columns:
+            self._conn.execute("ALTER TABLE entities ADD COLUMN value_filter TEXT NOT NULL DEFAULT 'off'")
+        if "last_value" not in columns:
+            self._conn.execute("ALTER TABLE entities ADD COLUMN last_value REAL")
         if "gap_threshold" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN gap_threshold TEXT NOT NULL DEFAULT '15'")
         if "outlier_threshold" not in columns:
@@ -364,6 +384,22 @@ class Index:
             self._conn.execute("ALTER TABLE saved_charts ADD COLUMN dashboard_position INTEGER")
         if "is_favorite" not in sc_columns:
             self._conn.execute("ALTER TABLE saved_charts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
+        if "resolution_preset" not in sc_columns:
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN resolution_preset TEXT NOT NULL DEFAULT 'auto'"
+            )
+        if "dynamic_y_axis" not in sc_columns:
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN dynamic_y_axis INTEGER NOT NULL DEFAULT 1"
+            )
+        if "dashboard_animation" not in sc_columns:
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN dashboard_animation INTEGER NOT NULL DEFAULT 1"
+            )
+        if "chart_stats" not in sc_columns:
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN chart_stats INTEGER NOT NULL DEFAULT 1"
+            )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -468,7 +504,7 @@ class Index:
             )
             return aggregation_type
 
-    def record_write(self, entity_id: str, ts: float) -> None:
+    def record_write(self, entity_id: str, ts: float, value: float | None = None) -> None:
         """Aktualisiert Datensatzanzahl sowie ersten/letzten Zeitstempel nach einem Schreibvorgang."""
         with self._lock, self._conn:
             self._conn.execute(
@@ -477,10 +513,11 @@ class Index:
                 SET row_count = row_count + 1,
                     first_ts = COALESCE(first_ts, ?),
                     last_ts = ?,
+                    last_value = COALESCE(?, last_value),
                     updated_at = ?
                 WHERE entity_id = ?
                 """,
-                (ts, ts, time.time(), entity_id),
+                (ts, ts, value, time.time(), entity_id),
             )
 
     def claim_ingest_event(self, event_id: str, entity_id: str, ts: float) -> dict:
@@ -516,7 +553,8 @@ class Index:
             return cursor.rowcount
 
     def complete_ingest_event(
-        self, event_id: str, entity_id: str, ts: float, *, recorded: bool
+        self, event_id: str, entity_id: str, ts: float, *, recorded: bool,
+        value: float | None = None,
     ) -> None:
         """Committed Event-Abschluss und Metadaten atomar in SQLite."""
         with self._lock, self._conn:
@@ -533,11 +571,15 @@ class Index:
                     UPDATE entities
                     SET row_count = row_count + 1,
                         first_ts = MIN(COALESCE(first_ts, ?), ?),
+                        last_value = CASE
+                            WHEN ? IS NOT NULL AND (last_ts IS NULL OR ? >= last_ts) THEN ?
+                            ELSE last_value
+                        END,
                         last_ts = MAX(COALESCE(last_ts, ?), ?),
                         updated_at = ?
                     WHERE entity_id = ?
                     """,
-                    (ts, ts, ts, ts, time.time(), entity_id),
+                    (ts, ts, value, ts, value, ts, ts, time.time(), entity_id),
                 )
             self._conn.execute(
                 "UPDATE ingested_events SET status = 'done', recorded = ?, completed_at = ? "
@@ -577,6 +619,7 @@ class Index:
         resolution: str | None = None,
         retention: str | None = None,
         decimals: str | None = None,
+        value_filter: str | None = None,
         gap_threshold: str | None = None,
         outlier_threshold: str | None = None,
     ) -> None:
@@ -596,6 +639,9 @@ class Index:
         if decimals is not None:
             updates.append("decimals = ?")
             params.append(decimals)
+        if value_filter is not None:
+            updates.append("value_filter = ?")
+            params.append(value_filter)
         if gap_threshold is not None:
             updates.append("gap_threshold = ?")
             params.append(gap_threshold)
@@ -655,7 +701,7 @@ class Index:
                 (first_ts, time.time(), entity_id),
             )
 
-    def bump_ts_bounds(self, entity_id: str, ts: float) -> None:
+    def bump_ts_bounds(self, entity_id: str, ts: float, value: float | None = None) -> None:
         """Erweitert first_ts/last_ts, falls ts außerhalb des bisher bekannten
         Bereichs liegt — für den Bearbeitungsbereich (nachträglich hinzugefügte
         Werte, Konzept-Erweiterung): anders als ein regulärer Live-Write über
@@ -667,10 +713,14 @@ class Index:
             self._conn.execute(
                 """UPDATE entities
                    SET first_ts = MIN(COALESCE(first_ts, ?), ?),
+                       last_value = CASE
+                           WHEN ? IS NOT NULL AND (last_ts IS NULL OR ? >= last_ts) THEN ?
+                           ELSE last_value
+                       END,
                        last_ts = MAX(COALESCE(last_ts, ?), ?),
                        updated_at = ?
                    WHERE entity_id = ?""",
-                (ts, ts, ts, ts, time.time(), entity_id),
+                (ts, ts, value, ts, value, ts, ts, time.time(), entity_id),
             )
 
     def list_entities(
@@ -861,14 +911,29 @@ class Index:
             return cur.rowcount
 
     def create_saved_chart(
-        self, name: str, entity_ids: list[str], range_key: str, continuous: bool, entity_names: dict[str, str] | None = None
+        self,
+        name: str,
+        entity_ids: list[str],
+        range_key: str,
+        continuous: bool,
+        entity_names: dict[str, str] | None = None,
+        resolution_preset: str = "auto",
+        dynamic_y_axis: bool = True,
+        dashboard_animation: bool = True,
+        chart_stats: bool = True,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
             cur = self._conn.execute(
-                "INSERT INTO saved_charts (name, entity_ids, range_key, continuous, entity_names, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (name, json.dumps(entity_ids), range_key, int(continuous), json.dumps(entity_names or {}), now, now),
+                "INSERT INTO saved_charts "
+                "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
+                "dynamic_y_axis, dashboard_animation, chart_stats, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    name, json.dumps(entity_ids), range_key, int(continuous),
+                    json.dumps(entity_names or {}), resolution_preset,
+                    int(dynamic_y_axis), int(dashboard_animation), int(chart_stats), now, now,
+                ),
             )
             return cur.lastrowid
 
@@ -880,18 +945,30 @@ class Index:
         range_key: str,
         continuous: bool,
         entity_names: dict[str, str] | None = None,
+        resolution_preset: str = "auto",
+        dynamic_y_axis: bool = True,
+        dashboard_animation: bool = True,
+        chart_stats: bool = True,
     ) -> None:
         with self._lock, self._conn:
             self._conn.execute(
-                "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, entity_names = ?, updated_at = ? "
-                "WHERE id = ?",
-                (name, json.dumps(entity_ids), range_key, int(continuous), json.dumps(entity_names or {}), time.time(), chart_id),
+                "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
+                "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
+                "chart_stats = ?, updated_at = ? WHERE id = ?",
+                (
+                    name, json.dumps(entity_ids), range_key, int(continuous),
+                    json.dumps(entity_names or {}), resolution_preset,
+                    int(dynamic_y_axis), int(dashboard_animation), int(chart_stats), time.time(), chart_id,
+                ),
             )
 
     def _row_to_saved_chart(self, row: sqlite3.Row) -> dict:
         d = dict(row)
         d["entity_ids"] = json.loads(d["entity_ids"])
         d["continuous"] = bool(d["continuous"])
+        d["dynamic_y_axis"] = bool(d.get("dynamic_y_axis", 1))
+        d["dashboard_animation"] = bool(d.get("dashboard_animation", 1))
+        d["chart_stats"] = bool(d.get("chart_stats", 1))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["is_favorite"] = bool(d["is_favorite"])
         return d
@@ -1237,7 +1314,7 @@ class Index:
             )
             self._conn.execute(
                 """UPDATE entities
-                   SET first_ts = NULL, last_ts = NULL, row_count = 0,
+                   SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
                        size_bytes = 0, updated_at = ?
                    WHERE entity_id = ?""",
                 (time.time(), entity_id),
@@ -1257,13 +1334,15 @@ class Index:
                 "DELETE FROM entities WHERE entity_id = ?", (entity_id,)
             )
 
-    def mark_deleted(self, entity_id: str, timestamps: list[float]) -> None:
+    def mark_deleted(
+        self, entity_id: str, timestamps: list[float], *, deleted_at: float | None = None
+    ) -> None:
         """Markiert jedes Vorkommen in timestamps einzeln als gelöscht — kommt ein
         Zeitstempel darin mehrfach vor (z. B. weil zwei Duplikat-Zeilen mit
         demselben Zeitstempel einzeln ausgewählt wurden), wird entsprechend
         mehrfach vermerkt. get_deleted_counts() liest das als Anzahl zurück, statt
         pauschal "dieser Zeitstempel ist komplett gelöscht" zu markieren."""
-        now = time.time()
+        now = time.time() if deleted_at is None else deleted_at
         with self._lock, self._conn:
             self._conn.executemany(
                 "INSERT INTO deleted_points (entity_id, ts, deleted_at) VALUES (?, ?, ?)",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -14,8 +15,11 @@ import pyarrow.parquet as pq
 
 from . import hotbuffer, rotate
 from .coordinator import StorageCoordinator
-from .index import Index, should_accept_write
+from .index import Index, should_accept_value
 from .paths import entity_dir, validate_entity_id
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -103,7 +107,11 @@ class IngestionService:
 
     def _complete(self, event: IngestEvent, *, recorded: bool) -> None:
         self._index.complete_ingest_event(
-            event.event_id, event.entity_id, event.ts, recorded=recorded
+            event.event_id,
+            event.entity_id,
+            event.ts,
+            recorded=recorded,
+            value=event.value if recorded else None,
         )
         self._completions_since_prune += 1
         if self._completions_since_prune >= _PRUNE_EVERY_COMPLETIONS:
@@ -134,7 +142,7 @@ class IngestionService:
         return recovered
 
     def ingest(self, event: IngestEvent) -> str:
-        """Liefert ``written``, ``skipped``, ``duplicate`` oder ``recovered``."""
+        """Liefert ``written``, ``filtered``, ``duplicate`` oder ``recovered``."""
         if self._coordinator is not None:
             with self._coordinator.entity(event.entity_id):
                 return self._ingest_locked(event)
@@ -177,9 +185,24 @@ class IngestionService:
                 self._complete(event, recorded=False)
                 return "duplicate"
 
-            if not should_accept_write(entity["resolution"], entity["last_ts"], event.ts):
+            if not should_accept_value(
+                entity["value_filter"],
+                entity["decimals"],
+                entity["last_value"],
+                entity["last_ts"],
+                event.value,
+                event.ts,
+            ):
                 self._complete(event, recorded=False)
-                return "skipped"
+                return "filtered"
+
+            counter_decrease = (
+                entity["state_class"] == "total_increasing"
+                and entity["last_value"] is not None
+                and entity["last_ts"] is not None
+                and event.ts > entity["last_ts"]
+                and event.value < entity["last_value"]
+            )
 
             rotate.rotate_if_needed(
                 self._data_dir, event.entity_id, event.ts, self._index, self._tz
@@ -193,4 +216,12 @@ class IngestionService:
                 event_id=event.event_id,
             )
             self._complete(event, recorded=True)
+            if counter_decrease:
+                logger.warning(
+                    "Zählerrückgang gespeichert · Entität=%s · Vorwert=%s · Wert=%s · Zeitstempel=%s",
+                    event.entity_id,
+                    entity["last_value"],
+                    event.value,
+                    event.ts,
+                )
             return "written"

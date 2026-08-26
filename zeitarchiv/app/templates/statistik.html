@@ -230,6 +230,7 @@
   </div>
 
   <script src="static/vendor/echarts.min.js"></script>
+  <script src="static/js/number-format.js?v={{ js_v }}"></script>
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script>
     const GROWTH_POINTS = {{ growth_points | tojson }};
@@ -247,7 +248,7 @@
       const units = ['B', 'KB', 'MB', 'GB', 'TB'];
       let value = bytes, i = 0;
       while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
-      return (i === 0 ? Math.round(value) : value.toFixed(1)) + ' ' + units[i];
+      return NumberFormat.fmt(value, i === 0 ? 0 : 1) + ' ' + units[i];
     }
 
     let growthChart = null;
@@ -268,7 +269,7 @@
         grid: {left: 10, right: 10, top: 16, bottom: 40, containLabel: true},
         xAxis: {type: 'time'},
         yAxis: [
-          {type: 'value', axisLabel: {formatter: v => v.toLocaleString('de-DE')}},
+          {type: 'value', axisLabel: {formatter: v => v.toLocaleString(NumberFormat.LOCALE)}},
           {type: 'value', axisLabel: {formatter: fmtSize}, splitLine: {show: false}},
         ],
         legend: {bottom: 0, textStyle: {color: inkMuted}},
@@ -279,7 +280,7 @@
             const pad = n => String(n).padStart(2, '0');
             const time = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             return `${time}<br>` + params.map(p =>
-              `${p.marker}${p.seriesName}: <strong>${p.seriesIndex === 0 ? p.value[1].toLocaleString('de-DE') : fmtSize(p.value[1])}</strong>`
+              `${p.marker}${p.seriesName}: <strong>${p.seriesIndex === 0 ? p.value[1].toLocaleString(NumberFormat.LOCALE) : fmtSize(p.value[1])}</strong>`
             ).join('<br>');
           },
         },

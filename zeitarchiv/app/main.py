@@ -26,6 +26,7 @@ import shutil
 import threading
 import time
 import zipfile
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated, Optional
@@ -54,7 +55,9 @@ from .formatting import (
     OUTLIER_THRESHOLD_LABELS,
     RESOLUTION_LABELS,
     RETENTION_LABELS,
+    VALUE_FILTER_LABELS,
     decimals_to_int,
+    format_int,
     format_resolution,
     format_retention,
     format_size,
@@ -62,6 +65,7 @@ from .formatting import (
     format_timestamp,
     format_type,
     format_value,
+    parse_localized_number,
 )
 from .limits import (
     MAX_CSV_UPLOAD_BYTES,
@@ -206,6 +210,11 @@ COLOR_MODE_LABELS = {
     "light": "Hell",
     "dark": "Dunkel",
 }
+# Vormals eine pro-Chart-Einstellung (saved_charts.dashboard_animation) — gilt
+# jetzt global für alle Dashboard-Kacheln (Einstellungen → Darstellung), da
+# eine Kachel-für-Kachel-Steuerung in der Praxis kaum genutzt wurde und die
+# Chart-Bearbeitung dafür unnötig überladen hat.
+DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
 
 
 def _font_scale_context(request: Request) -> dict:
@@ -221,11 +230,15 @@ def _font_scale_context(request: Request) -> dict:
         color_scheme = "zeitarchiv"
     if color_mode not in COLOR_MODE_LABELS:
         color_mode = "auto"
+    dashboard_animation = index.get_setting("dashboard_animation", "1")
+    if dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
+        dashboard_animation = "1"
     return {
         "font_scale_value": FONT_SCALE.get(font_scale, FONT_SCALE["1"]),
         "dashboard_row_height": DASHBOARD_ROW_HEIGHT[font_scale],
         "color_scheme": color_scheme,
         "color_mode": color_mode,
+        "dashboard_animation_enabled": dashboard_animation == "1",
     }
 
 
@@ -313,7 +326,7 @@ templates.env.globals["import_limits"] = {
     "zip_upload_gib": MAX_ZIP_UPLOAD_BYTES // (1024 * 1024 * 1024),
     "csv_upload_mib": MAX_CSV_UPLOAD_BYTES // (1024 * 1024),
     "zip_uncompressed_gib": MAX_ZIP_UNCOMPRESSED_BYTES // (1024 * 1024 * 1024),
-    "zip_members": f"{MAX_ZIP_MEMBERS:,}".replace(",", "."),
+    "zip_members": format_int(MAX_ZIP_MEMBERS),
 }
 
 index = Index(DATA_DIR / "index.sqlite")
@@ -418,12 +431,34 @@ def _report_view(report: dict) -> dict:
     }
 
 
+_REPORT_SORT_COLUMNS = [
+    ("finished_at", "Zeitpunkt"),
+    ("source_type", "Quelle"),
+    ("status", "Status"),
+    ("targets", "Ziele"),
+    ("rows_written", "Importiert"),
+    ("rows_skipped", "Übersprungen"),
+    ("duration_seconds", "Dauer"),
+]
+
+
+def _report_sort_value(report: dict, key: str):
+    if key == "targets":
+        return report.get("summary", {}).get("targets", 0)
+    value = report.get(key)
+    return value if value is not None else ""
+
+
 def _reports_context(
     source: str = "all",
     status: str = "all",
     search: str = "",
     date_from: str = "",
     date_to: str = "",
+    sort: str = "finished_at",
+    direction: str = "desc",
+    page: int = 1,
+    page_size: int = 50,
 ) -> dict:
     with storage_coordinator.exclusive():
         all_reports = [_report_view(report) for report in import_reports.list_all(DATA_DIR)]
@@ -440,11 +475,31 @@ def _reports_context(
             return False
         return not needle or needle in json.dumps(report, ensure_ascii=False).lower()
 
-    reports = [report for report in all_reports if matches(report)]
+    if sort not in dict(_REPORT_SORT_COLUMNS):
+        sort = "finished_at"
+    if direction not in ("asc", "desc"):
+        direction = "desc"
+    matched_reports = [report for report in all_reports if matches(report)]
+    matched_reports.sort(key=lambda r: _report_sort_value(r, sort), reverse=(direction == "desc"))
+    reports, pagination = _paginate(matched_reports, page, page_size)
     counts = {
         key: sum(report.get("status") == key for report in all_reports)
         for key in _REPORT_STATUS_LABELS
     }
+
+    def _next_dir(column: str) -> str:
+        return "asc" if sort == column and direction == "desc" else "desc"
+
+    columns = [
+        {
+            "key": key,
+            "label": label,
+            "next_dir": _next_dir(key),
+            "active": sort == key,
+            "arrow": ("↑" if direction == "asc" else "↓") if sort == key else "",
+        }
+        for key, label in _REPORT_SORT_COLUMNS
+    ]
     return {
         "reports": reports,
         "total_reports": len(all_reports),
@@ -454,6 +509,10 @@ def _reports_context(
         "search": search,
         "date_from": date_from,
         "date_to": date_to,
+        "sort": sort,
+        "direction": direction,
+        "columns": columns,
+        "pagination": pagination,
         "status_options": _REPORT_STATUS_LABELS,
     }
 
@@ -466,6 +525,8 @@ def reports_page(
     search: str = "",
     date_from: str = "",
     date_to: str = "",
+    page: int = 1,
+    page_size: int = 50,
 ) -> RedirectResponse:
     """Kompatibilitäts-URL: Reports befinden sich jetzt im Import-Reiter."""
     app_root = _app_root_context(request)["app_root"]
@@ -477,6 +538,8 @@ def reports_page(
             "search": search,
             "date_from": date_from,
             "date_to": date_to,
+            "page": page,
+            "page_size": page_size,
         }
     )
     return RedirectResponse(url=f"{app_root}/import?{query}", status_code=307)
@@ -512,6 +575,14 @@ def report_delete(request: Request, report_id: str) -> RedirectResponse:
     with storage_coordinator.exclusive():
         if not import_reports.delete(DATA_DIR, report_id):
             raise HTTPException(status_code=404, detail="Report nicht gefunden")
+    app_root = _app_root_context(request)["app_root"]
+    return RedirectResponse(url=f"{app_root}/import?tab=reports", status_code=303)
+
+
+@app.post("/reports/delete-all", response_class=RedirectResponse)
+def reports_delete_all(request: Request) -> RedirectResponse:
+    with storage_coordinator.exclusive():
+        import_reports.delete_all(DATA_DIR)
     app_root = _app_root_context(request)["app_root"]
     return RedirectResponse(url=f"{app_root}/import?tab=reports", status_code=303)
 
@@ -637,7 +708,7 @@ def write(payload: WriteRequest, authorization: str | None = Header(default=None
     _check_auth(authorization)
     _CONNECTION_STATS["write_requests_ok"] += 1
 
-    counts = {"written": 0, "skipped": 0, "duplicate": 0, "recovered": 0}
+    counts = {"written": 0, "skipped": 0, "filtered": 0, "duplicate": 0, "recovered": 0}
     for event in payload.events:
         event_data = event.model_dump()
         event_id = event.event_id or legacy_event_id(
@@ -658,10 +729,11 @@ def write(payload: WriteRequest, authorization: str | None = Header(default=None
         counts[result] += 1
 
     logger.debug(
-        "Schreibbatch verarbeitet · Events=%d · geschrieben=%d · übersprungen=%d · Duplikate=%d · wiederhergestellt=%d",
+        "Schreibbatch verarbeitet · Events=%d · geschrieben=%d · übersprungen=%d · wertgleich gefiltert=%d · Duplikate=%d · wiederhergestellt=%d",
         len(payload.events),
         counts["written"],
         counts["skipped"],
+        counts["filtered"],
         counts["duplicate"],
         counts["recovered"],
     )
@@ -760,7 +832,7 @@ def api_query_multi(
     for entity_id in ids:
         _validate_entity_id_or_400(entity_id)
     series = []
-    window_start = window_end = None
+    window_start = window_end = period_end = None
     is_current = True
     for entity_id in ids:
         entity = index.get_entity(entity_id)
@@ -779,6 +851,7 @@ def api_query_multi(
             "entity_id": entity_id,
             "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
             "unit": (entity["unit"] if entity else None) or "",
+            "decimals": decimals_to_int(entity["decimals"]) if entity else None,
             "aggregation_type": result["aggregation_type"],
             "chart_type": result["chart_type"],
             "points": result["points"],
@@ -799,8 +872,12 @@ def api_query_multi(
         if window_start is None:
             window_start = result["window_start"]
             window_end = result["window_end"]
+            period_end = result["period_end"]
             is_current = result["is_current"]
-    return {"series": series, "window_start": window_start, "window_end": window_end, "is_current": is_current}
+    return {
+        "series": series, "window_start": window_start, "window_end": window_end,
+        "period_end": period_end, "is_current": is_current,
+    }
 
 
 def _sparkline_paths(values: list[float], width: float = 84, height: float = 28, pad: float = 2) -> dict[str, str] | None:
@@ -1019,7 +1096,7 @@ def entities_view(request: Request) -> HTMLResponse:
     context = {
         "entity_count": overview["entity_count"],
         "type_breakdown": type_breakdown,
-        "total_rows": f"{overview['total_rows']:,}".replace(",", "."),
+        "total_rows": format_int(overview['total_rows']),
         "total_size": format_size(overview["total_size_bytes"]),
         "rows_sparkline": _sparkline_paths([s["total_rows"] for s in snapshots]),
         "size_sparkline": _sparkline_paths([s["total_size_bytes"] for s in snapshots]),
@@ -1092,9 +1169,9 @@ def _settings_storage_index_context(report: dict | None = None) -> dict:
     for row in report["mismatches"]:
         rows.append({
             **row,
-            "indexed_visible_rows_label": f"{row['indexed_visible_rows']:,}".replace(",", "."),
-            "actual_visible_rows_label": f"{row['actual_visible_rows']:,}".replace(",", "."),
-            "difference_label": f"{row['actual_visible_rows'] - row['indexed_visible_rows']:+,}".replace(",", "."),
+            "indexed_visible_rows_label": format_int(row['indexed_visible_rows']),
+            "actual_visible_rows_label": format_int(row['actual_visible_rows']),
+            "difference_label": format_int(row['actual_visible_rows'] - row['indexed_visible_rows'], signed=True),
             "indexed_size_label": format_size(row["indexed_size_bytes"]),
             "actual_size_label": format_size(row["actual_size_bytes"]),
         })
@@ -1145,9 +1222,9 @@ def _settings_retention_context(result: str | None = None) -> dict:
         by_retention.append({
             "label": format_retention(row["retention"]),
             "entity_count": row["entity_count"],
-            "total_rows": f"{row['total_rows']:,}".replace(",", "."),
+            "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
-            "rows_due": f"{rows_due:,}".replace(",", "."),
+            "rows_due": format_int(rows_due),
             "months_due": months_due,
             "entities_due": int(due.get("entities_due", 0) or 0),
             "bytes_due": format_size(int(due.get("bytes_due", 0) or 0)),
@@ -1210,6 +1287,9 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
     color_mode = index.get_setting("color_mode", "auto")
     if color_mode not in COLOR_MODE_LABELS:
         color_mode = "auto"
+    dashboard_animation = index.get_setting("dashboard_animation", "1")
+    if dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
+        dashboard_animation = "1"
     return {
         "font_scale": index.get_setting("font_scale", "1"),
         "font_scale_options": list(FONT_SCALE_LABELS.items()),
@@ -1218,6 +1298,8 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         "color_scheme_options": list(COLOR_SCHEME_LABELS.items()),
         "color_mode": color_mode,
         "color_mode_options": list(COLOR_MODE_LABELS.items()),
+        "dashboard_animation": dashboard_animation,
+        "dashboard_animation_options": list(DASHBOARD_ANIMATION_LABELS.items()),
         "saved": saved,
     }
 
@@ -1367,6 +1449,11 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         raise HTTPException(status_code=400, detail="Ungültiger Darstellungsmodus")
     if color_mode is not None:
         index.set_setting("color_mode", str(color_mode))
+    dashboard_animation = form.get("dashboard_animation")
+    if dashboard_animation is not None and dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültige Dashboard-Animation")
+    if dashboard_animation is not None:
+        index.set_setting("dashboard_animation", str(dashboard_animation))
     return templates.TemplateResponse(
         request, "_settings_darstellung_form.html", _settings_darstellung_context(saved=True)
     )
@@ -2177,7 +2264,7 @@ def statistik_view(request: Request) -> HTMLResponse:
         {
             "label": format_type(row["aggregation_type"]),
             "entity_count": row["entity_count"],
-            "total_rows": f"{row['total_rows']:,}".replace(",", "."),
+            "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
         }
         for row in index.get_stats_by_type()
@@ -2186,7 +2273,7 @@ def statistik_view(request: Request) -> HTMLResponse:
         {
             "label": format_resolution(row["resolution"]),
             "entity_count": row["entity_count"],
-            "total_rows": f"{row['total_rows']:,}".replace(",", "."),
+            "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
         }
         for row in index.get_stats_by_resolution()
@@ -2204,7 +2291,7 @@ def statistik_view(request: Request) -> HTMLResponse:
         {
             "entity_id": row["entity_id"],
             "friendly_name": row["friendly_name"],
-            "count": f"{row['count']:,}".replace(",", "."),
+            "count": format_int(row['count']),
         }
         for row in duplicate_rows
     ]
@@ -2231,23 +2318,23 @@ def statistik_view(request: Request) -> HTMLResponse:
         "statistik.html",
         {
             "entity_count": overview["entity_count"],
-            "total_rows": f"{overview['total_rows']:,}".replace(",", "."),
+            "total_rows": format_int(overview['total_rows']),
             "total_size": format_size(overview["total_size_bytes"]),
             "by_type": by_type,
             "by_resolution": by_resolution,
-            "retention_due_rows": f"{int(retention_totals.get('rows_deleted', 0) or 0):,}".replace(",", "."),
+            "retention_due_rows": format_int(int(retention_totals.get('rows_deleted', 0) or 0)),
             "retention_due_entities": int(retention_totals.get("entities_affected", 0) or 0),
             "retention_due_months": int(retention_totals.get("months_deleted", 0) or 0),
             "retention_due_size": format_size(int(retention_totals.get("bytes_freed", 0) or 0)),
-            "retention_history_30d_rows": f"{retention_history_30d['rows_deleted']:,}".replace(",", "."),
+            "retention_history_30d_rows": format_int(retention_history_30d['rows_deleted']),
             "retention_history_30d_size": format_size(retention_history_30d["bytes_freed"]),
-            "retention_history_all_rows": f"{retention_history_all['rows_deleted']:,}".replace(",", "."),
+            "retention_history_all_rows": format_int(retention_history_all['rows_deleted']),
             "retention_history_all_size": format_size(retention_history_all["bytes_freed"]),
             "growth_points": growth_points,
             "has_growth_history": len(growth_points) >= 2,
             "growth_range_options": _GROWTH_RANGE_OPTIONS,
             "duplicates_by_entity": duplicates_by_entity,
-            "duplicates_total": f"{sum(row['count'] for row in duplicate_rows):,}".replace(",", "."),
+            "duplicates_total": format_int(sum(row['count'] for row in duplicate_rows)),
             "storage_breakdown": storage_breakdown,
             "storage_total_size": format_size(storage_total_bytes),
             "generated_at": f"{format_timestamp(now.timestamp(), TZ)} {format_time(now.timestamp(), TZ)}",
@@ -2557,7 +2644,7 @@ def _entity_config_context(entity) -> dict:
         "friendly_name": entity["friendly_name"],
         "type_label": format_type(entity["aggregation_type"]),
         "unit": entity["unit"] or "—",
-        "row_count": f"{_visible_row_count(entity):,}".replace(",", "."),
+        "row_count": format_int(_visible_row_count(entity)),
         "first_ts": format_timestamp(entity["first_ts"], TZ),
         "first_ts_time": format_time(entity["first_ts"], TZ),
         "last_ts": format_timestamp(entity["last_ts"], TZ),
@@ -2566,11 +2653,13 @@ def _entity_config_context(entity) -> dict:
         "resolution": entity["resolution"],
         "retention": entity["retention"],
         "decimals": decimals,
+        "value_filter": entity["value_filter"],
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
         "resolution_options": list(RESOLUTION_LABELS.items()),
         "retention_options": list(RETENTION_LABELS.items()),
         "decimals_options": list(DECIMALS_LABELS.items()),
+        "value_filter_options": list(VALUE_FILTER_LABELS.items()),
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
         "preview_rows": preview_rows,
@@ -2598,6 +2687,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     resolution = form.get("resolution")
     retention = form.get("retention")
     decimals = form.get("decimals")
+    value_filter = form.get("value_filter")
     gap_threshold = form.get("gap_threshold")
     outlier_threshold = form.get("outlier_threshold")
     if resolution is not None and resolution not in RESOLUTION_LABELS:
@@ -2606,6 +2696,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail="Ungültige Aufbewahrung")
     if decimals is not None and decimals not in DECIMALS_LABELS:
         raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Angabe")
+    if value_filter is not None and value_filter not in VALUE_FILTER_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültiger Wertänderungsfilter")
     if gap_threshold is not None and gap_threshold not in GAP_THRESHOLD_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Lücken-Schwellwert")
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
@@ -2617,6 +2709,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 resolution=str(resolution) if resolution is not None else None,
                 retention=str(retention) if retention is not None else None,
                 decimals=str(decimals) if decimals is not None else None,
+                value_filter=str(value_filter) if value_filter is not None else None,
                 gap_threshold=str(gap_threshold) if gap_threshold is not None else None,
                 outlier_threshold=str(outlier_threshold) if outlier_threshold is not None else None,
             )
@@ -2688,6 +2781,7 @@ _CHART_RANGE_OPTIONS = [
     ("hour", "Stunde"), ("day", "Tag"), ("week", "Woche"),
     ("month", "Monat"), ("year", "Jahr"), ("decade", "Dekade"),
 ]
+_CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse"}
 
 
 @app.get("/charts", response_class=HTMLResponse)
@@ -2715,7 +2809,13 @@ def charts_list(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "charts.html", {"rows": rows})
 
 
-def _chart_editor_context(chart: dict | None) -> dict:
+def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> dict:
+    """prefill füllt ein NEUES (chart=None) Chart mit Startwerten vor, z. B. von
+    "Als Chart speichern" auf der Entität-eigenen Chart-Seite (entity_detail.html)
+    — übernimmt die dort gerade betrachtete Entität + Zeitraum-Einstellungen,
+    damit nur noch ein Name vergeben und gespeichert werden muss. Ein
+    bestehendes Chart (chart != None) ignoriert prefill immer, dessen eigene
+    gespeicherte Werte haben Vorrang."""
     entity_options = [
         {
             "entity_id": row["entity_id"],
@@ -2723,22 +2823,57 @@ def _chart_editor_context(chart: dict | None) -> dict:
         }
         for row in index.list_entities()
     ]
+    prefill = prefill or {}
     return {
         "chart_id": chart["id"] if chart else None,
-        "chart_name": chart["name"] if chart else "",
-        "selected_entity_ids": chart["entity_ids"] if chart else [],
-        "range_key": chart["range_key"] if chart else "day",
-        "continuous": chart["continuous"] if chart else False,
+        "chart_name": chart["name"] if chart else prefill.get("name", ""),
+        "selected_entity_ids": chart["entity_ids"] if chart else prefill.get("entity_ids", []),
+        "range_key": chart["range_key"] if chart else prefill.get("range_key", "day"),
+        "continuous": chart["continuous"] if chart else prefill.get("continuous", False),
+        "resolution_preset": chart["resolution_preset"] if chart else prefill.get("resolution_preset", "auto"),
+        "dynamic_y_axis": chart["dynamic_y_axis"] if chart else True,
+        "chart_stats": chart["chart_stats"] if chart else True,
         "entity_names": chart["entity_names"] if chart else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
+        # compare/compare_mode sind (wie im Chart-Editor selbst) reine
+        # Laufzeit-Ansichtseinstellungen, kein gespeichertes Chart-Feld — nur
+        # der Anfangszustand eines gerade erst über prefill eröffneten neuen
+        # Charts kann sie daher überhaupt sinnvoll setzen.
+        "compare": prefill.get("compare", False) if not chart else False,
+        "compare_mode": prefill.get("compare_mode", "previous") if not chart else "previous",
         "base": "..",
     }
 
 
 @app.get("/charts/new", response_class=HTMLResponse)
-def charts_new(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(None))
+def charts_new(
+    request: Request,
+    entity_id: str | None = None,
+    name: str | None = None,
+    range: str = Query("day", alias="range"),
+    continuous: bool = False,
+    resolution_preset: str = "auto",
+    compare: bool = False,
+    compare_mode: str = "previous",
+) -> HTMLResponse:
+    prefill = None
+    if entity_id:
+        try:
+            entity_id = validate_entity_id(entity_id)
+        except ValueError:
+            entity_id = None
+    if entity_id:
+        prefill = {
+            "entity_ids": [entity_id],
+            "name": (name or "").strip(),
+            "range_key": range if range in dict(_CHART_RANGE_OPTIONS) else "day",
+            "continuous": continuous,
+            "resolution_preset": resolution_preset if resolution_preset in _CHART_RESOLUTION_PRESETS else "auto",
+            "compare": compare,
+            "compare_mode": compare_mode if compare_mode in ("previous", "year") else "previous",
+        }
+    return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(None, prefill))
 
 
 class _SaveChartBody(BaseModel):
@@ -2747,6 +2882,9 @@ class _SaveChartBody(BaseModel):
     range_key: str
     continuous: bool = False
     entity_names: dict[str, str] = {}
+    resolution_preset: str = "auto"
+    dynamic_y_axis: bool = True
+    chart_stats: bool = True
 
 
 @app.post("/charts")
@@ -2757,8 +2895,14 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Bitte mindestens eine Entität auswählen")
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
         raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+    if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
+        raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
-    chart_id = index.create_saved_chart(body.name.strip(), body.entity_ids, body.range_key, body.continuous, entity_names)
+    chart_id = index.create_saved_chart(
+        body.name.strip(), body.entity_ids, body.range_key, body.continuous,
+        entity_names, body.resolution_preset, body.dynamic_y_axis,
+        chart_stats=body.chart_stats,
+    )
     return {"id": chart_id}
 
 
@@ -2780,8 +2924,14 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Bitte mindestens eine Entität auswählen")
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
         raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+    if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
+        raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
-    index.update_saved_chart(chart_id, body.name.strip(), body.entity_ids, body.range_key, body.continuous, entity_names)
+    index.update_saved_chart(
+        chart_id, body.name.strip(), body.entity_ids, body.range_key,
+        body.continuous, entity_names, body.resolution_preset,
+        body.dynamic_y_axis, chart_stats=body.chart_stats,
+    )
     return {"id": chart_id}
 
 
@@ -2822,6 +2972,8 @@ def _dashboard_tiles_context() -> dict:
                 "kind": "chart", "id": c["id"], "name": c["name"],
                 "entity_ids": c["entity_ids"], "range_key": c["range_key"],
                 "continuous": c["continuous"], "entity_names": c["entity_names"],
+                "resolution_preset": c["resolution_preset"],
+                "dynamic_y_axis": c["dynamic_y_axis"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
         elif p["item_type"] == "table":
@@ -3128,6 +3280,7 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
             "outlier_detection_enabled": entity["outlier_threshold"] != "off",
+            "counter_decrease_enabled": entity["state_class"] == "total_increasing",
             "is_favorite": bool(entity["is_favorite"]),
         },
     )
@@ -3197,7 +3350,8 @@ def _rows_window(range_key: str, offset: int, now: datetime, first_ts: float | N
     if range_key == "all":
         start = datetime.fromtimestamp(first_ts, TZ) if first_ts else now
         return start, now
-    return query_mod._window(range_key, now, min(offset, 0), continuous=False)
+    start, end, _period_end = query_mod._window(range_key, now, min(offset, 0), continuous=False)
+    return start, end
 
 
 def _rows_period_label(range_key: str, offset: int, window_start: datetime, window_end: datetime, now: datetime) -> str:
@@ -3270,6 +3424,8 @@ def _rows_fragment(
             outlier_threshold_percent=(
                 None if outlier_threshold == "off" else float(outlier_threshold)
             ),
+            decimals=entity["decimals"],
+            counter_decrease_enabled=entity["state_class"] == "total_increasing",
         )
         counts = analysis["counts"]
         pagination = analysis["pagination"]
@@ -3301,11 +3457,19 @@ def _rows_fragment(
             rows, None if gap_threshold == "off" else float(gap_threshold)
         )
         duplicates = cleanup.detect_duplicates(rows)
+        repetitions = cleanup.detect_repetitions(rows, entity["decimals"])
+        counter_decreases = (
+            cleanup.detect_counter_decreases(rows)
+            if entity["state_class"] == "total_increasing"
+            else {}
+        )
         counts = {
             "all": len(rows),
             "outliers": len(outliers),
             "gaps": len(gaps),
             "duplicates": len(duplicates),
+            "repetitions": len(repetitions),
+            "counter_decreases": len(counter_decreases),
         }
         if filter_ == "outliers":
             rows = [(ts, value) for ts, value in rows if ts in outliers]
@@ -3313,6 +3477,10 @@ def _rows_fragment(
             rows = [(ts, value) for ts, value in rows if ts in gaps]
         elif filter_ == "duplicates":
             rows = [(ts, value) for ts, value in rows if ts in duplicates]
+        elif filter_ == "repetitions":
+            rows = [(ts, value) for ts, value in rows if ts in repetitions]
+        elif filter_ == "counter_decreases":
+            rows = [(ts, value) for ts, value in rows if ts in counter_decreases]
 
         rows = list(reversed(rows))
         page_rows, pagination = _paginate(rows, page, page_size)
@@ -3330,6 +3498,8 @@ def _rows_fragment(
                         ("Ausreißer", outliers),
                         ("Lücke", gaps),
                         ("Duplikat", duplicates),
+                        ("Wiederholung", repetitions),
+                        ("Zählerrückgang", counter_decreases),
                     )
                     if ts in reasons
                 ],
@@ -3358,9 +3528,12 @@ def _rows_fragment(
             "window_end_ts": window_end.timestamp(),
             "is_current": offset == 0,
             "counts": counts,
+            "range_row_count_label": format_int(counts['all']),
+            "total_row_count_label": format_int(_visible_row_count(entity)),
             "pagination": pagination,
             "gap_detection_enabled": gap_threshold != "off",
             "outlier_detection_enabled": outlier_threshold != "off",
+            "counter_decrease_enabled": entity["state_class"] == "total_increasing",
             "undo_available": bool(index.get_last_deleted_batch(entity_id)),
             "first_date": first_date,
             "last_date": last_date,
@@ -3579,6 +3752,92 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
     )
 
 
+_REPETITIONS_PREVIEW_LIMIT = 50
+
+
+@app.post("/entities/{entity_id}/rows/repetitions-preview", response_class=HTMLResponse)
+async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
+    """Zeigt gerundet gleiche Folgewerte vor dem Soft-Delete zur Bestätigung."""
+    entity = _require_entity(entity_id)
+    decimals_int = decimals_to_int(entity["decimals"])
+    form = await request.form()
+    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    now = datetime.now(TZ)
+    offset = 0 if range_key == "all" else min(offset, 0)
+    window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
+
+    def load_preview() -> tuple[int, list[tuple[float, float]]]:
+        with storage_coordinator.entity(entity_id):
+            rows = cleanup.iter_raw_rows(
+                DATA_DIR, index, entity_id,
+                window_start.timestamp(), window_end.timestamp(), TZ, now=now
+            )
+            newest: deque[tuple[float, float]] = deque(maxlen=_REPETITIONS_PREVIEW_LIMIT)
+            total = 0
+            for row in cleanup.iter_repeated_rows(rows, entity["decimals"]):
+                newest.append(row)
+                total += 1
+            return total, list(reversed(newest))
+
+    total_to_delete, newest_rows = await run_in_threadpool(load_preview)
+    preview_rows = [
+        {
+            "formatted_value": format_value(value, decimals_int),
+            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m. %H:%M:%S"),
+        }
+        for ts, value in newest_rows
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "_repetitions_preview.html",
+        {
+            "entity_id": entity_id,
+            "total_to_delete": total_to_delete,
+            "preview_rows": preview_rows,
+            "truncated": max(0, total_to_delete - _REPETITIONS_PREVIEW_LIMIT),
+            "filter": filter_,
+            "range": range_key,
+            "offset": offset,
+            "page": page,
+            "page_size": page_size,
+            "base": "../..",
+        },
+    )
+
+
+@app.post("/entities/{entity_id}/rows/repetitions-delete", response_class=HTMLResponse)
+async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
+    """Verdichtet den gewählten Zeitraum streaming-basiert und soft-delete-sicher."""
+    entity = _require_entity(entity_id)
+    form = await request.form()
+    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    now = datetime.now(TZ)
+    offset = 0 if range_key == "all" else min(offset, 0)
+    window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
+
+    def delete_locked() -> HTMLResponse:
+        with storage_coordinator.entity(entity_id):
+            rows = cleanup.iter_raw_rows(
+                DATA_DIR, index, entity_id,
+                window_start.timestamp(), window_end.timestamp(), TZ, now=now
+            )
+            batch: list[float] = []
+            deleted_at = time.time()
+            for ts, _value in cleanup.iter_repeated_rows(rows, entity["decimals"]):
+                batch.append(ts)
+                if len(batch) >= 10_000:
+                    index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                    batch = []
+            if batch:
+                index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+            return _rows_fragment(
+                request, entity_id, filter_, range_key, offset, page, page_size, mode
+            )
+
+    return await run_in_threadpool(delete_locked)
+
+
 def _load_symcon_names() -> dict[str, dict[str, str | None]]:
     """Lädt die zuletzt hochgeladene ID→{name, parent, unit}-Zuordnung (siehe
     SYMCON_NAMES_PATH) — leeres dict, falls noch keine settings.json importiert
@@ -3632,7 +3891,7 @@ def _symcon_import_rows(
                 "symcon_unit": info.get("unit"),
                 "readable": v.readable,
                 "error": v.error,
-                "row_count": f"{v.row_count:,}".replace(",", "."),
+                "row_count": format_int(v.row_count),
                 "period_start": period_start,
                 "period_end": period_end,
                 "preview": preview,
@@ -3869,6 +4128,10 @@ def import_page(
     search: str = "",
     date_from: str = "",
     date_to: str = "",
+    sort: str = "finished_at",
+    dir: str = "desc",
+    page: int = 1,
+    page_size: int = 50,
 ) -> HTMLResponse:
     """Symcon-Import-Assistent (Konzept Abschnitt 03) — der db-Ordner kommt als
     ZIP-Upload über die Oberfläche (kein Bind-Mount mehr nötig), entpackt unter
@@ -3888,7 +4151,7 @@ def import_page(
     active_tab = tab if tab in {"symcon", "csv", "reports"} else "symcon"
     common_context = {
         "active_import_tab": active_tab,
-        **_reports_context(source, status, search, date_from, date_to),
+        **_reports_context(source, status, search, date_from, date_to, sort, dir, page, page_size),
     }
     source_exists = SYMCON_IMPORT_DIR.exists() and any(SYMCON_IMPORT_DIR.iterdir())
     if source_exists:
@@ -4090,6 +4353,35 @@ def _run_import_background(
     Variable alle Rohdaten neu ein und kann bei vielen zugeordneten Variablen
     spürbar dauern; würde das synchron vor der Antwort laufen, sähe der Import
     bei genug Variablen ohne jede Rückmeldung erst nach einer Weile "fertig" aus."""
+    started_at = datetime.now(timezone.utc)
+    names = _load_symcon_names()
+    try:
+        source_meta = json.loads(SYMCON_SOURCE_META_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        source_meta = {"filename": "Symcon-db-ZIP", "size_bytes": _dir_size(SYMCON_IMPORT_DIR)}
+    target_units = {}
+    for _, target, _ in mapped:
+        entity = index.get_entity(target)
+        target_units[target] = entity["unit"] if entity is not None else None
+    configuration = {
+        "settings_imported": bool(names),
+        "mappings": [
+            {
+                "variable_id": variable.variable_id,
+                "symcon_name": names.get(variable.variable_id, {}).get("name"),
+                "symcon_parent": names.get(variable.variable_id, {}).get("parent"),
+                "symcon_unit": names.get(variable.variable_id, {}).get("unit"),
+                "entity_id": target,
+                "target_unit": target_units[target],
+                "factor": factor,
+            }
+            for variable, target, factor in mapped
+        ],
+    }
+
+    # Erst nach erfolgreicher Vorbereitung als laufend markieren. Schlägt z. B.
+    # das Auflösen einer Zielentität fehl, darf kein Phantom-Import im Status
+    # hängen bleiben, der alle weiteren Startversuche bis zum Neustart blockiert.
     with _import_progress.lock:
         _import_progress.started = True
         _import_progress.running = True
@@ -4102,28 +4394,6 @@ def _run_import_background(
         _import_progress.current_variable = ""
         _import_progress.results = []
         _import_progress.errors = []
-
-    started_at = datetime.now(timezone.utc)
-    names = _load_symcon_names()
-    try:
-        source_meta = json.loads(SYMCON_SOURCE_META_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        source_meta = {"filename": "Symcon-db-ZIP", "size_bytes": _dir_size(SYMCON_IMPORT_DIR)}
-    configuration = {
-        "settings_imported": bool(names),
-        "mappings": [
-            {
-                "variable_id": variable.variable_id,
-                "symcon_name": names.get(variable.variable_id, {}).get("name"),
-                "symcon_parent": names.get(variable.variable_id, {}).get("parent"),
-                "symcon_unit": names.get(variable.variable_id, {}).get("unit"),
-                "entity_id": target,
-                "target_unit": (index.get_entity(target) or {}).get("unit"),
-                "factor": factor,
-            }
-            for variable, target, factor in mapped
-        ],
-    }
 
     def worker() -> dict | None:
         plans: list[tuple[symcon_import.SymconVariable, str, float]] = []
@@ -4232,7 +4502,7 @@ def _import_progress_context() -> dict:
             "total_months": total_months,
             "done_months": done_months,
             "percent": percent,
-            "rows_imported": f"{_import_progress.rows_imported:,}".replace(",", "."),
+            "rows_imported": format_int(_import_progress.rows_imported),
             "current_variable": _import_progress.current_variable,
             "results": list(_import_progress.results),
             "errors": list(_import_progress.errors),
@@ -4256,9 +4526,9 @@ def _mapped_variables(form) -> list[tuple[symcon_import.SymconVariable, str, flo
         variable = variables.get(variable_id)
         if variable is None or not variable.readable:
             continue
-        raw_factor = str(form.get(f"factor_{variable_id}", "1")).strip().replace(",", ".")
+        raw_factor = str(form.get(f"factor_{variable_id}", "1"))
         try:
-            factor = float(raw_factor)
+            factor = parse_localized_number(raw_factor)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"

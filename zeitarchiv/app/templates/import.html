@@ -142,7 +142,7 @@
   <div class="page">
     <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Import</p>
     <h1>Import</h1>
-    <p class="sub">Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als eigene CSV-Datei mit freier Spalten-/Format-Zuordnung.</p>
+    <p class="sub">Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als CSV-Datei mit freier Spalten-/Format-Zuordnung.</p>
 
     <div class="settings-layout">
       {% set nav_active = 'symcon-import' %}
@@ -151,7 +151,7 @@
 
     <div class="import-tabs">
       <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">Symcon</button>
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">Eigene CSV-Datei</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">CSV-Datei</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">Reports</button>
     </div>
 
@@ -330,7 +330,7 @@
 
     <div id="tab-csv" class="import-tab"{% if active_import_tab != 'csv' %} style="display:none;"{% endif %}>
     <div class="callout">
-      <strong>So funktioniert der Import einer eigenen CSV-Datei:</strong>
+      <strong>So funktioniert der Import einer CSV-Datei:</strong>
       <ol class="import-steps">
         <li>Eine CSV-Datei hochladen und Trennzeichen sowie vorhandene Kopfzeile festlegen.</li>
         <li>Zeitstempel- und Wertspalte auswählen und das Zeitformat angeben: Unix-Sekunden, Unix-Millisekunden, ISO 8601 oder ein eigenes Muster.</li>
@@ -352,6 +352,7 @@
   <script src="static/vendor/htmx.min.js"></script>
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="static/js/number-format.js?v={{ js_v }}"></script>
   <script>
     function showImportTab(name) {
       const url = new URL(window.location.href);
@@ -369,6 +370,31 @@
       if (name === 'symcon') url.searchParams.delete('tab');
       else url.searchParams.set('tab', name);
       history.replaceState(null, '', url);
+    }
+
+    function stepReportsPage(delta) {
+      const form = document.getElementById('report-filter');
+      const page = document.getElementById('report-page');
+      if (!form || !page) return;
+      page.value = Math.max(1, {{ pagination.page }} + delta);
+      form.submit();
+    }
+
+    function resetReportsPage() {
+      const form = document.getElementById('report-filter');
+      const page = document.getElementById('report-page');
+      if (!form || !page) return;
+      page.value = 1;
+      form.submit();
+    }
+
+    async function confirmReportsDelete(event, form) {
+      event.preventDefault();
+      const confirmed = await appConfirm(
+        'Alle Import-Reports endgültig löschen? Diese Aktion lässt sich nicht rückgängig machen.',
+        {danger: true, confirmLabel: 'Alle Reports löschen'}
+      );
+      if (confirmed) form.submit();
     }
 
     function toggleCustomTsPattern(value) {
@@ -572,7 +598,7 @@
           uploadArea,
           'Wird hochgeladen…',
           0,
-          `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB`,
+          `${file.name} · ${NumberFormat.fmt(file.size / 1024 / 1024, 1)} MB`,
           true
         );
         const bar = progress.fill;

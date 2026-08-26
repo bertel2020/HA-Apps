@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.11.0 - 2026-08-26
+
+### Neu
+
+- Gespeicherte Charts unterstützen eine zeitraumabhängige Anzeigeauflösung
+  (mit Anzeige der tatsächlich aktiven Auflösung bei „Automatisch“) und eine
+  optionale dynamische Y-Achse. Ein laufender Zeitraum zeigt dabei immer bis
+  zur vollen Kalendergrenze (z. B. bis Sonntag), auch ohne Daten in der
+  Zukunft.
+- Charts zeigen Minimum, Maximum und Durchschnitt wahlweise direkt in der
+  Legende an, zusammen mit der Ein-/Ausblendung einzelner Entitäten. Die
+  Vergleichsfunktion sitzt in einem Auswahlmenü, benennt beide Optionen
+  passend zum Zeitraum (z. B. „Vortag“, „Vorjahrestag“) und zeigt die aktive
+  Wahl direkt im Button. Seltener geänderte Chart-Einstellungen sind in
+  einem Optionen-Menü gebündelt.
+- Entitäten in gespeicherten Charts sowie Spalten und Zeilen in
+  Vergleichstabellen lassen sich per Ziehen oder über Pfeil-Buttons neu
+  anordnen; Formel-Referenzen (A/B/C …) werden beim Umsortieren automatisch
+  korrigiert.
+- „Als Chart speichern“ auf der Entität-eigenen Chart-Seite übernimmt
+  Entität, Zeitraum und Vergleichseinstellung in ein neues, mehrere
+  Entitäten fähiges Chart.
+- Die Dashboard-Kachel-Animation ist jetzt eine globale Einstellung unter
+  Darstellung statt einer Einstellung je Chart.
+- Import-Reports lassen sich nach jeder Spalte sortieren, filtern automatisch
+  nach Quelle/Status und öffnen die Details per Klick auf die Zeile. Sie
+  besitzen außerdem Seitennavigation und eine bestätigte Aktion zum Löschen
+  aller Reports.
+- Ein optionaler Wertänderungsfilter verwirft gerundet gleiche eingehende
+  Folgewerte, behält aber spätestens alle sechs Stunden ein Lebenszeichen.
+- Der Bearbeitungsbereich erkennt und verdichtet vorhandene gerundet gleiche
+  Folgewerte. Für `total_increasing`-Zähler markiert er niedrigere Folgewerte
+  als mögliche Zähler-Resets, ohne diese automatisch zu löschen.
+- Die Lückenerkennung bietet zusätzlich „1 Tag“ als Schwellwert.
+
+### Geändert
+
+- Liniencharts werden in Entitätsansicht, gespeicherten Charts und Dashboard
+  wieder geglättet dargestellt.
+- Eingehende Werte werden unabhängig von der konfigurierten zeitlichen
+  Mindestauflösung angenommen; Duplikat- und Wertänderungsfilter bleiben aktiv.
+- Die Kennzahlen des Bearbeitungsbereichs stehen als kompakte Statusleiste
+  zwischen Entitätskopf und Tabs. Sie unterscheiden „insgesamt“ von
+  „im Zeitraum“ und heben erkannte Auffälligkeiten hervor.
+- Die Lückenschwelle „60 Minuten“ heißt nun „1 Stunde“.
+- Das Zahlenformat der Oberfläche ist jetzt durchgängig deutsch (Komma als
+  Dezimal-, Punkt als Tausendertrennzeichen) statt vorher an manchen Stellen
+  uneinheitlich Punkt/Komma.
+- Der CSV-Import-Reiter heißt „CSV-Datei“ statt „Eigene CSV-Datei“.
+
+### Behoben
+
+- Der Symcon-Import startet wieder korrekt, wenn Entitätsdaten als
+  `sqlite3.Row` vorliegen; ein Fehler vor dem eigentlichen Lauf hinterlässt
+  außerdem keinen fälschlich laufenden Importstatus mehr.
+- Werte mit vielen Nachkommastellen erzeugen bei aktiviertem Wertfilter keine
+  ungebremsten, gerundet identischen Folgeeinträge mehr.
+- Die dynamische Y-Achse in Charts hatte bisher keine sichtbare Wirkung
+  (ECharts erzwang weiterhin die Einbindung der Null) und wirkt jetzt
+  tatsächlich.
+- Formel-Konstanten in Vergleichstabellen akzeptieren jetzt auch ein Komma
+  als Dezimaltrennzeichen (z. B. „A * 3,5“).
+
 ## 0.10.0 - 2026-08-25
 
 ### Neu

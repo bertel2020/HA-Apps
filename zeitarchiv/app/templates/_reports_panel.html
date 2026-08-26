@@ -1,14 +1,37 @@
 <style>
-  .report-cards{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:18px}
+  .report-cards{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:20px}
   .report-card{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:12px 14px}
   .report-card strong{display:block;font-family:var(--font-mono);font-size:calc(20px * var(--font-scale,1))}
   .report-card span{font-size:calc(12px * var(--font-scale,1));color:var(--ink-faint)}
-  .report-filter{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:16px}
-  .report-filter .field{margin:0;min-width:135px}.report-filter .search{flex:1;min-width:190px}
+  /* Filter + "Alle Reports löschen" auf einer gemeinsamen Zeile statt eines
+     isoliert darüber schwebenden Buttons — zwei getrennte <form>-Elemente
+     (unterschiedliche method/action), aber optisch EIN Toolbar-Block. */
+  .report-toolbar{display:flex;flex-wrap:wrap;gap:12px 20px;justify-content:space-between;align-items:end;margin-bottom:18px}
+  .report-filter{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:0}
+  .report-filter .field{margin:0;min-width:135px}
   .report-filter label{display:block;font-size:calc(11px * var(--font-scale,1));color:var(--ink-faint);margin-bottom:4px}
-  .report-status{font-weight:600}.report-status-success{color:var(--accent-line)}
+  .report-delete-form{margin:0;flex:none}
+  .report-status{font-weight:600;white-space:nowrap}.report-status-success{color:var(--accent-line)}
   .report-status-partial{color:var(--ink-muted)}.report-status-failed{color:var(--danger)}
-  .report-actions{text-align:right;white-space:nowrap}.report-empty{padding:24px 0;color:var(--ink-faint)}
+  .report-empty{padding:24px 0;color:var(--ink-faint)}
+  /* Feste statt der Browser-Auto-Breite je Spalte — sonst brechen "Zeitpunkt"
+     und "Status" bei knappem Platz mitten im Text um (z. B. "Teilweise
+     erfolgreich" zweizeilig), während die eigentlich schmalen Zahlenspalten
+     zu viel Raum bekommen. Ziele/Importiert/Übersprungen/Dauer bewusst ohne
+     feste Breite — sind schon von Natur aus kurz, brauchen keine Vorgabe. */
+  .report-table th:nth-child(1),.report-table td:nth-child(1){width:150px}
+  .report-table th:nth-child(2),.report-table td:nth-child(2){width:80px}
+  .report-table th:nth-child(3),.report-table td:nth-child(3){width:170px}
+  .report-row{cursor:pointer}
+  /* Sortierbare Spaltenköpfe — dieselbe Optik wie die Entitäten-/Export-
+     Tabelle (export.html: th a{...}), damit sortierbare Tabellen app-weit
+     gleich aussehen. */
+  .report-table th a{
+    display:block;width:100%;padding:8px 0;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));
+    font-weight:600;color:var(--ink-faint);text-decoration:none;
+  }
+  .report-table th a.active{color:var(--accent-line);}
+  .report-table th a:hover{color:var(--accent-line);}
   @media(max-width:900px){.report-cards{grid-template-columns:repeat(2,1fr)}}
 </style>
 <div class="report-cards">
@@ -18,17 +41,33 @@
   <div class="report-card"><strong>{{ counts.no_changes }}</strong><span>Ohne Änderungen</span></div>
   <div class="report-card"><strong>{{ counts.failed }}</strong><span>Fehlgeschlagen</span></div>
 </div>
-<form class="report-filter" method="get" action="import">
-  <input type="hidden" name="tab" value="reports">
-  <input class="search" type="search" name="search" value="{{ search }}" placeholder="Datei, Symcon-ID oder Entität …">
-  <div class="field"><label for="report-source">Quelle</label><select id="report-source" name="source"><option value="all">Alle Quellen</option><option value="symcon" {% if source == 'symcon' %}selected{% endif %}>Symcon</option><option value="csv" {% if source == 'csv' %}selected{% endif %}>CSV</option></select></div>
-  <div class="field"><label for="report-status">Status</label><select id="report-status" name="status"><option value="all">Alle Status</option>{% for value,label in status_options.items() %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-  <div class="field"><label for="report-date-from">Von</label><input id="report-date-from" type="date" name="date_from" value="{{ date_from }}"></div>
-  <div class="field"><label for="report-date-to">Bis</label><input id="report-date-to" type="date" name="date_to" value="{{ date_to }}"></div>
-  <button class="btn" type="submit">Filtern</button>
-</form>
+<div class="report-toolbar">
+  <form class="report-filter" id="report-filter" method="get" action="import">
+    <input type="hidden" name="tab" value="reports">
+    <input type="hidden" name="page" id="report-page" value="1">
+    <div class="field"><label for="report-source">Quelle</label><select id="report-source" name="source" onchange="resetReportsPage()"><option value="all">Alle Quellen</option><option value="symcon" {% if source == 'symcon' %}selected{% endif %}>Symcon</option><option value="csv" {% if source == 'csv' %}selected{% endif %}>CSV</option></select></div>
+    <div class="field"><label for="report-status">Status</label><select id="report-status" name="status" onchange="resetReportsPage()"><option value="all">Alle Status</option>{% for value,label in status_options.items() %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <select name="page_size" onchange="resetReportsPage()" title="Zeilen pro Seite">
+      {% for size in [10, 50, 100, 500, 1000] %}<option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>{% endfor %}
+    </select>
+  </form>
+  <form class="report-delete-form" method="post" action="reports/delete-all" onsubmit="confirmReportsDelete(event, this)">
+    <button class="btn btn-danger" type="submit" {% if not total_reports %}disabled{% endif %}>Alle Reports löschen</button>
+  </form>
+</div>
 {% if reports %}
-<div class="tbl-wrap"><table class="dt"><tr><th>Zeitpunkt</th><th>Quelle</th><th>Status</th><th>Ziele</th><th>Importiert</th><th>Übersprungen</th><th>Dauer</th><th></th></tr>
-{% for report in reports %}<tr><td class="mono">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary.targets }}</td><td>{{ report.rows_written }}</td><td>{{ report.rows_skipped }}</td><td>{{ '%.1f' | format(report.duration_seconds) }} s</td><td class="report-actions"><a class="btn" href="reports/{{ report.id }}">Details</a></td></tr>{% endfor %}
+<div class="tbl-wrap"><table class="dt report-table"><tr>
+  {% for col in columns %}
+  <th><a href="import?tab=reports&amp;sort={{ col.key }}&amp;dir={{ col.next_dir }}&amp;source={{ source | urlencode }}&amp;status={{ status | urlencode }}&amp;page_size={{ pagination.page_size }}"
+         class="{{ 'active' if col.active else '' }}">{{ col.label }}{% if col.active %} {{ col.arrow }}{% endif %}</a></th>
+  {% endfor %}
+</tr>
+{% for report in reports %}<tr class="report-row" onclick="location.href='reports/{{ report.id }}'"><td class="mono nowrap">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary.targets }}</td><td>{{ report.rows_written }}</td><td>{{ report.rows_skipped }}</td><td>{{ '%.1f' | format(report.duration_seconds) }} s</td></tr>{% endfor %}
 </table></div>
 {% else %}<p class="report-empty">Keine passenden Import-Reports vorhanden.</p>{% endif %}
+<div class="pager">
+  <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+  <button type="button" class="btn navbtn" onclick="stepReportsPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
+  <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+  <button type="button" class="btn navbtn" onclick="stepReportsPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+</div>

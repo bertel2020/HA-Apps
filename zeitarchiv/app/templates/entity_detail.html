@@ -31,7 +31,6 @@
     scrollbar-width:none;
   }
   .seg::-webkit-scrollbar{display:none;}
-  .seg.seg-hidden{display:none;}
   .seg button{
     flex:none;padding:7px 12px;font-size:calc(12.5px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
     background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
@@ -116,10 +115,15 @@
     </div>
     <p class="sub">
       {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten →</a> &middot; <a href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration →</a> &middot; <a href="{{ base }}/entities">&larr; Zurück</a>
+      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ base }}/entities">&larr; Zurück</a>
     </p>
 
     <div class="toolbars">
+      <!-- Zeitraum + Navigation zuerst (bestimmt WELCHER Ausschnitt gezeigt
+           wird), Vergleichen + Optionen-Menü ans Ende der Zeile — alles
+           Weitere (wie er gezeichnet wird: Linie/Balken, Punkte,
+           Kontinuierlich, Rohwerte) sitzt im Menü, damit hier nur eine
+           einzige, kompakte Zeile bleibt. -->
       <div class="toolbar">
         <div class="seg">
           <template x-for="r in ranges" :key="r.key">
@@ -140,25 +144,60 @@
           <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="Nächster Zeitraum">›</button>
         </div>
         <button class="chip" :class="{active: offset !== 0}" :disabled="offset === 0" @click="goToNow()">Jetzt</button>
-      </div>
-      <div class="toolbar">
-        <div class="seg">
-          <button :class="{active: chartType === 'line'}" :disabled="raw" @click="chartType='line'; load()">Linie</button>
-          <button :class="{active: chartType === 'bar'}" :disabled="raw" @click="chartType='bar'; load()">Balken</button>
+        <div class="menu-wrap" @click.outside="compareMenuOpen = false">
+          <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
+            <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
+          </button>
+          <div class="menu-popover" x-show="compareMenuOpen" x-cloak
+               x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+            <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
+            <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
+            <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-text="compareYearLabel"></button>
+          </div>
         </div>
-        <button class="chip" :class="{active: showPoints}" :disabled="chartType !== 'line'" @click="showPoints = !showPoints; render()">
-          Punkte
-        </button>
-        <button class="chip" :class="{active: continuous}" @click="toggleContinuous()">
-          Kontinuierlich
-        </button>
-        <button class="chip" :class="{active: raw}" :disabled="chartType !== 'line' || !['hour', 'day', 'week'].includes(range)" @click="toggleRaw()">
-          Rohwerte
-        </button>
-        <button class="chip" :class="{active: compare}" :disabled="raw" @click="toggleCompare()" x-text="compareLabel"></button>
-        <div class="seg" :class="{'seg-hidden': !(compare && !raw)}">
-          <button :class="{active: compareMode === 'previous'}" @click="compareMode='previous'; load()" x-text="comparePreviousLabel"></button>
-          <button :class="{active: compareMode === 'year'}" @click="compareMode='year'; load()" x-text="compareYearLabel"></button>
+        <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
+          <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
+            Optionen <span class="chevron">▾</span>
+          </button>
+          <div class="menu-popover" x-show="optionsMenuOpen" x-cloak
+               x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+            <div class="menu-section-label">Daten</div>
+            <label class="menu-row">
+              <span class="menu-row-label">Kontinuierlich</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="continuous" @change="toggleContinuous()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <label class="menu-row">
+              <span class="menu-row-label">Rohwerte</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="raw" :disabled="chartType !== 'line' || !['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <div class="menu-divider"></div>
+            <div class="menu-section-label">Darstellung</div>
+            <div class="menu-row">
+              <span class="menu-row-label">Diagrammtyp</span>
+              <div class="seg">
+                <button :class="{active: chartType === 'line'}" :disabled="raw" @click="chartType='line'; load()">Linie</button>
+                <button :class="{active: chartType === 'bar'}" :disabled="raw" @click="chartType='bar'; load()">Balken</button>
+              </div>
+            </div>
+            <label class="menu-row">
+              <span class="menu-row-label">Punkte</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="showPoints" :disabled="chartType !== 'line'" @change="showPoints = !showPoints; render()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <div class="menu-divider"></div>
+            <div class="menu-section-label">Aktionen</div>
+            <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
+            <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
+            <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
+          </div>
         </div>
       </div>
     </div>
@@ -176,6 +215,7 @@
 
   <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/vendor/echarts.min.js"></script>
+  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
@@ -216,11 +256,10 @@
     // bei einer kWh-Einheit) optisch komplett zu "0.00", obwohl echte Werte vorhanden sind.
     // Mit explizit gesetztem DECIMALS wird stattdessen immer auf genau diese Stellenzahl
     // gerundet, auch wenn das Nullen anhängt.
+    // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe
+    // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
     function fmtValue(v) {
-      if (v == null || Number.isNaN(v)) return '';
-      if (DECIMALS != null) return v.toFixed(DECIMALS);
-      if (v === 0) return '0';
-      return Number(v.toPrecision(4)).toString();
+      return NumberFormat.fmt(v, DECIMALS);
     }
 
     // Eigenständige Funktion statt Alpine-Getter, damit sie sowohl für die
@@ -311,6 +350,8 @@
         showPoints: false,
         compare: false,
         compareMode: 'previous',
+        optionsMenuOpen: false,
+        compareMenuOpen: false,
         raw: false,
         offset: 0,
         continuous: false,
@@ -321,6 +362,9 @@
         aggregationType: null,
         windowStart: null,
         windowEnd: null,
+        // Natürliches, NIE an "jetzt" gedeckeltes Periodenende (vom Server,
+        // query._window()) — siehe derselbe Kommentar in chart_editor.html.
+        periodEnd: null,
         isCurrent: true,
         loading: false,
         _requestId: 0,
@@ -331,20 +375,32 @@
         _rangeAnchorMs: null,
         get total() { return this.points.reduce((sum, p) => sum + (p.value || 0), 0); },
         get canGoForward() { return this.offset < 0; },
-        // Generischer Zeitraum-Name statt "Vortag"/"Vorjahr" — der Umschalt-
-        // Button selbst legt (anders als früher) nicht mehr fest, WELCHE
-        // Vorperiode verglichen wird (das entscheidet compareMode: "Vorperiode"
-        // oder "Vorjahr", siehe comparePreviousLabel/Seg daneben), er
-        // aktiviert nur den Vergleich für den aktuellen Zeitraum-Typ.
-        get compareLabel() {
-          const r = this.ranges.find(r => r.key === this.range);
-          return `${r ? r.label : 'Zeitraum'} vergleichen`;
+        // "Als Chart speichern" (Optionen-Menü) — übergibt die aktuell
+        // betrachtete Entität + Zeitraum-/Vergleichs-Einstellungen an
+        // /charts/new, das sie als Startwerte in den (Mehrentitäten-)Chart-
+        // Editor vorausfüllt statt dort blank zu starten. Auflösung gibt es
+        // auf dieser Seite nicht (immer volle Auflösung) — /charts/new fällt
+        // dafür serverseitig auf "Automatisch" zurück.
+        get saveAsChartUrl() {
+          const params = new URLSearchParams({
+            entity_id: ENTITY_ID, name: DISPLAY_NAME,
+            range: this.range, continuous: String(this.continuous),
+            compare: String(this.compare), compare_mode: this.compareMode,
+          });
+          return `${BASE}/charts/new?${params}`;
         },
         get comparePreviousLabel() {
           return previousPeriodLabel(this.range);
         },
         get compareYearLabel() {
           return previousYearPeriodLabel(this.range);
+        },
+        // Zeigt im Button selbst, WELCHER Vergleich aktiv ist (statt nur
+        // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
+        // die beiden Label-Getter oben automatisch an den Zeitraum an.
+        get compareButtonLabel() {
+          if (!this.compare) return 'Vergleichen';
+          return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
         get periodLabel() {
           return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.offset, this.isCurrent);
@@ -374,7 +430,18 @@
         },
         goToNow() { this._rangeAnchorMs = null; this.offset = 0; this.load(); },
         toggleContinuous() { this._rangeAnchorMs = null; this.continuous = !this.continuous; this.load(); },
-        toggleCompare() { this.compare = !this.compare; if (this.compare) this.raw = false; this.load(); },
+        setCompareMode(mode) {
+          this.compare = true;
+          this.compareMode = mode;
+          this.raw = false;
+          this.compareMenuOpen = false;
+          this.load();
+        },
+        disableCompare() {
+          this.compare = false;
+          this.compareMenuOpen = false;
+          this.load();
+        },
         // Raw-Modus (Konzept Abschnitt 06/10 "Hohe Dichte") zeigt Einzelmesswerte
         // statt Buckets — ein Periodenvergleich zweier Rohwert-Serien ergibt kaum
         // lesbaren Sinn, deshalb schließen sich beide Modi gegenseitig aus, und
@@ -407,6 +474,7 @@
           this.aggregationType = data.aggregation_type;
           this.windowStart = data.window_start;
           this.windowEnd = data.window_end;
+          this.periodEnd = data.period_end ?? data.window_end;
           this.isCurrent = data.is_current;
           this.loading = false;
           this.$nextTick(() => this.render());
@@ -447,7 +515,7 @@
             data: mainData,
             itemStyle: {color: getComputedStyle(document.body).getPropertyValue(this.chartType === 'bar' ? '--chart-bar' : '--chart-line')},
             lineStyle: {width: 1.5},
-            smooth: false,
+            smooth: this.chartType === 'line',
             // Ohne Deckelung errechnet ECharts die Balkenbreite auf einer
             // Zeit-Achse aus dem Abstand zu benachbarten Punkten — bei nur
             // einem einzigen Punkt (z. B. "Jahr" einer Entität, die erst
@@ -509,10 +577,9 @@
             if (this.chartType === 'line' && !this.showPoints) {
               compareSeries.symbol = 'none';
             }
-            if (this.chartType === 'line') compareSeries.step = 'end';
+            if (this.chartType === 'line') compareSeries.smooth = true;
             series.push(compareSeries);
           }
-          if (this.chartType === 'line') series[0].step = 'end';
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const option = {
             textStyle: {
@@ -535,7 +602,11 @@
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
-              max: this.windowEnd != null ? this.windowEnd * 1000 : undefined,
+              // periodEnd statt windowEnd: eine laufende Periode (z. B. Woche)
+              // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die
+              // noch datenlose Zukunft — windowEnd (an "jetzt" gedeckelt) bleibt
+              // nur für den Linien-Haltepunkt maßgeblich (siehe periodEnd oben).
+              max: this.periodEnd != null ? this.periodEnd * 1000 : undefined,
               // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
               // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
               // einem Bucket: die Achse reichte weit über das eigentliche Fenster

@@ -48,7 +48,9 @@ Die Verantwortlichkeiten bleiben bewusst getrennt:
 - Die **Integration** entscheidet, welche Home-Assistant-Entitäten gesendet
   werden, und hält Übertragungsfehler von Home Assistant fern.
 - Die **App** entscheidet über Auflösung, Aufbewahrung, Speicherung,
-  Aggregation und Darstellung.
+  Aggregation und Darstellung. Die Entitäts-Auflösung dient der Darstellung;
+  eingehende Werte werden nicht mehr über einen zeitlichen Mindestabstand
+  verworfen.
 
 ## Installation
 
@@ -87,7 +89,9 @@ wartet die App auf Daten, archiviert aber nichts.
 
 Die Startseite zeigt Archivkennzahlen und bis zu 18 frei angeordnete Kacheln.
 Charts und Tabellen lassen sich mischen, per Drag-and-drop sortieren und in
-Größen von 1×1 bis 3×3 darstellen.
+Größen von 1×1 bis 3×3 darstellen. Die Ein-/Ausblend-Animation der
+Kachel-Charts gilt zentral für alle Kacheln und lässt sich unter
+**Einstellungen → Darstellung** deaktivieren.
 
 ### Entitäten und Verläufe
 
@@ -95,24 +99,62 @@ Die Entitätenliste ist durchsuchbar, filterbar und konfigurierbar. Jede
 Entität besitzt eine eigene Verlaufsansicht mit:
 
 - Linie oder Balken;
-- bei Linien den letzten Messwert bis zum nächsten Datenpunkt fortführen;
+- geglättete Linien oder Balken;
 - Navigation von Stunde bis Dekade;
 - laufendem oder rollierendem Zeitfenster;
 - Vergleich mit Vorperiode oder Vorjahr;
-- individuell einstellbarer Auflösung, Aufbewahrung und Rundung.
+- individuell einstellbarer Auflösung, Aufbewahrung und Rundung;
+- optionalem Wertänderungsfilter, der gerundet gleiche Folgewerte überspringt
+  und mindestens alle sechs Stunden ein Lebenszeichen behält.
+
+Ein laufender, nicht-kontinuierlicher Zeitraum zeigt dabei immer bis zur
+vollen Kalendergrenze (z. B. bis Sonntag bei „Woche"), auch bevor für die
+restliche Periode bereits Daten vorliegen. Über „Als Chart speichern" im
+Optionen-Menü lässt sich die aktuelle Ansicht direkt als eigenständiges,
+mehrere Entitäten fähiges Chart ablegen.
 
 ### Charts und Tabellen
 
 Eigene Charts können mehrere Entitäten überlagern. Unterschiedliche Einheiten
-erhalten getrennte Y-Achsen. Vergleichstabellen unterstützen einzelne
-Entitäten, Summengruppen, Formeln, Trennzeilen und frei gewählte Zeitspalten.
+erhalten getrennte Y-Achsen, Linien werden geglättet. Bei „Automatisch"
+zeigt ein kleiner Hinweis direkt an, welche Auflösung das gerade tatsächlich
+bedeutet (z. B. „≈ 1 Stunde"). Minimum, Maximum und Durchschnitt des
+aktuellen Zeitraums stehen wahlweise direkt in der Legende, zusammen mit der
+Ein-/Ausblendung einzelner Entitäten. Der aktivierbare Vergleich benennt
+Vorperiode und Vorjahresperiode passend zum Zeitraum, beispielsweise
+„Vortag“ und „Vorjahrestag“, und zeigt die gewählte Option direkt im Button.
+Seltener geänderte Einstellungen (Auflösung, Punkte, Kontinuierlich,
+Rohwerte, dynamische Y-Achse, Legenden-Statistik) sitzen gesammelt in einem
+Optionen-Menü. In einem Chart lassen sich mehrere Entitäten sowohl per
+Ziehen als auch über Pfeil-Buttons neu anordnen — das bestimmt Legenden-,
+Statistik- und Farbreihenfolge.
+
+Vergleichstabellen unterstützen einzelne Entitäten, Summengruppen, Formeln,
+Trennzeilen und frei gewählte Zeitspalten. Eine Trennzeile zieht eine
+durchgehende Linie über die gesamte Tabellenbreite, rein optisch zur
+Gliederung, ohne eigene Daten. Spalten und Zeilen lassen sich
+per Ziehen oder über Pfeil-Buttons neu anordnen; beim Umsortieren von Zeilen
+werden die Buchstaben-Referenzen (A/B/C …) in Formel-Zeilen automatisch
+korrigiert, sodass eine Formel weiterhin dieselbe Zeile referenziert wie vor
+dem Verschieben. Eine Formel-Zeile übernimmt ohne eigene Angabe die Einheit
+der ersten referenzierten Zeile. Die Darstellung (Zebra-Streifen, Kopfzeile/
+erste Spalte hervorheben, Beschriftung fett, Rahmen horizontal/Gitter/ohne,
+Dichte komfortabel/kompakt) ist rein optisch und wirkt sich nie auf die
+berechneten Werte aus.
 
 ### Bereinigung
 
 Der Bearbeitungsbereich einer Entität erkennt konfigurierbare Ausreißer,
-Lücken und doppelte Zeitstempel. Markierungen sind zunächst weich und können
-rückgängig gemacht werden. Erst **Einstellungen → Speicherplatz** entfernt
-markierte Werte physisch und berechnet betroffene Rollups neu.
+Lücken, doppelte Zeitstempel und gerundet gleiche Folgewerte. Wiederholungen
+lassen sich mit derselben Sechs-Stunden-Lebenszeichenregel auch nachträglich
+verdichten. Bei steigenden Zählern (`total_increasing`) werden niedrigere
+Folgewerte als mögliche Zähler-Resets protokolliert und unter
+„Zählerrückgänge“ markiert; sie bleiben standardmäßig gespeichert.
+Die Kopfzeile zeigt sowohl die Datensatzanzahl im gewählten Zeitraum als auch
+den sichtbaren Gesamtbestand der Entität.
+Markierungen sind zunächst weich und können rückgängig gemacht
+werden. Erst **Einstellungen → Speicherplatz** entfernt markierte Werte
+physisch und berechnet betroffene Rollups neu.
 
 Zusätzlich stehen zwei bewusst getrennte, endgültige Aktionen bereit:
 
@@ -138,11 +180,14 @@ Bestandsschnappschuss.
   zuordnen. Weichen Quell- und Zieleinheit voneinander ab, erscheint ein
   Hinweis und ein Umrechnungsfaktor kann angegeben werden, etwa `1000` für
   `klx` nach `lx`.
-- **Eigene CSV:** Trennzeichen, Zeit-, Wert- und Zielspalte frei zuordnen und
+- **CSV-Datei:** Trennzeichen, Zeit-, Wert- und Zielspalte frei zuordnen und
   das Ergebnis vor dem Import prüfen.
 - **Reports:** Im dritten Import-Reiter bleibt jeder tatsächlich ausgeführte Import mit Quelle,
   Zuordnung, Laufzeit, importierten und übersprungenen Datensätzen sowie
-  möglichen Fehlern nachvollziehbar und kann als JSON heruntergeladen werden.
+  möglichen Fehlern nachvollziehbar. Die Liste lässt sich nach Quelle und
+  Status filtern (wirkt sofort bei Auswahl) und nach jeder Spalte sortieren;
+  ein Klick auf eine Zeile öffnet die Detailansicht mit JSON-Download.
+  Reports sind seitenweise darstellbar und können gesammelt gelöscht werden.
 - **CSV-Export:** Die vollständige Rohdatenhistorie einer Entität bis zum
   Exportlimit herunterladen.
 
@@ -219,7 +264,7 @@ und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
 
 | Bereich | Zweck |
 | --- | --- |
-| Darstellung | Farbschema, Hell-/Dunkelmodus und Schriftgröße |
+| Darstellung | Farbschema, Hell-/Dunkelmodus, Schriftgröße und Dashboard-Kachel-Animation |
 | Archivierung | Standards für Auflösung und Aufbewahrung neuer Entitäten |
 | Rotation | Ausstehende Monatsrotationen prüfen und ausführen |
 | Speicherplatz | Speicherindex prüfen/reparieren sowie Löschmarkierungen endgültig anwenden |

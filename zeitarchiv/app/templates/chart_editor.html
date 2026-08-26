@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
+  [x-cloak]{display:none!important;}
   .chart-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
   .chart-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
 
@@ -36,6 +37,23 @@
     flex:1;font-size:calc(13px * var(--font-scale, 1));padding:7px 10px;border-radius:7px;
     border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
   }
+  .entity-name-row.dragging{opacity:.4;}
+  /* Eigener Ziehgriff statt der ganzen Zeile (samt Eingabefeld) draggable zu
+     machen — ein Drag-Start, der auf dem input landet, wird vom Browser als
+     Textauswahl/Fokus behandelt statt als natives Drag, was sich wie "erst
+     der zweite Versuch klappt" anfühlt. dragstart bricht deshalb ab
+     (preventDefault), wenn er nicht von .drag-handle ausgeht. */
+  .drag-handle{
+    flex:none;width:14px;height:20px;cursor:grab;opacity:.55;
+    background-image:radial-gradient(circle, var(--ink-faint) 1.3px, transparent 1.4px);
+    background-size:6px 6px;background-repeat:repeat;
+  }
+  .drag-handle:hover{opacity:1;}
+  .entity-name-row.dragging .drag-handle{cursor:grabbing;}
+  .entity-name-move{display:flex;gap:2px;flex-shrink:0;}
+  .entity-name-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
+  .entity-name-move button:hover{color:var(--accent-line);}
+  .entity-name-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
 
   .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow-x:auto;max-width:100%;}
   .seg button{
@@ -49,6 +67,28 @@
   .period-label{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);display:block;margin-bottom:14px;}
   #chart{width:100%;height:420px;max-width:100%;}
   .card{overflow:hidden;}
+  /* Eigene Legende statt ECharts' eingebauter (dort stummgeschaltet, siehe
+     render()) — jeder Chip ist gleichzeitig Serien-Umschalter UND (bei
+     aktivem "Statistik in Legende") Min/Max/Ø-Anzeige derselben Entität,
+     eine Zeile statt getrennter Legende + Statistik-Kacheln darunter. */
+  .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+  .chart-legend-item{
+    display:flex;align-items:baseline;gap:9px;max-width:100%;
+    padding:6px 13px;border-radius:20px;border:1px solid var(--border);
+    background:var(--surface-alt);cursor:pointer;font:inherit;color:inherit;
+    transition:opacity .15s ease,border-color .15s ease;
+  }
+  .chart-legend-item:hover{border-color:var(--accent-line);}
+  .chart-legend-item.inactive{opacity:.4;}
+  .chart-legend-item .dot{width:9px;height:9px;border-radius:999px;flex:none;}
+  .chart-legend-item .name{
+    font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1));
+  }
+  .chart-legend-item .values{
+    display:flex;gap:9px;flex:none;font-family:var(--font-mono);color:var(--ink-muted);
+    white-space:nowrap;font-size:calc(11px * var(--font-scale, 1));
+  }
   .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
   .save-row input[type=text]{
     font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));padding:9px 14px;border-radius:8px;
@@ -93,32 +133,101 @@
         </div>
 
         <div class="entity-names-field" x-show="editing && selectedCount > 0">
-          <label>Angezeigte Namen (optional)</label>
-          <div class="entity-names-list">
-            {% for opt in entity_options %}
-            <div class="entity-name-row" x-show="selectedEntityIds.has('{{ opt.entity_id }}')">
-              <span class="entity-name-default">{{ opt.label }}</span>
-              <input type="text" placeholder="{{ opt.label }}" x-model="entityNames['{{ opt.entity_id }}']">
-            </div>
-            {% endfor %}
+          <label>Angezeigte Namen &amp; Reihenfolge (optional)</label>
+          <p class="sub" style="margin:4px 0 0;">Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.</p>
+          <div class="entity-names-list" id="entity-names-list">
+            <template x-for="(id, idx) in selectedEntityIds" :key="id">
+              <div class="entity-name-row" draggable="true" :data-entity-id="id">
+                <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true"></span>
+                <span class="entity-name-default" x-text="labelFor(id)"></span>
+                <input type="text" :placeholder="labelFor(id)" x-model="entityNames[id]" @input="render()">
+                <span class="entity-name-move">
+                  <button type="button" title="Nach oben" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
+                  <button type="button" title="Nach unten" :disabled="idx === selectedEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
+                </span>
+              </div>
+            </template>
           </div>
         </div>
 
+        <!-- Zeitraum & Daten: welcher Ausschnitt und wie er geholt wird
+             (Kalenderperiode, rollierend, Roh- statt Bucket-Werte). -->
+        <!-- Zeitraum direkt daneben Vergleichen (beides bestimmt, WELCHER
+             Ausschnitt gezeigt wird) — alles Weitere (wie er gezeichnet wird:
+             Auflösung, Punkte, Y-Achse, Statistik in Legende) sitzt im
+             Optionen-Menü, damit hier nur eine einzige, kompakte Zeile bleibt. -->
         <div class="toolbar" x-show="editing">
           <div class="seg">
             {% for key, label in range_options %}
             <button :class="{active: range === '{{ key }}'}" @click="setRange('{{ key }}')">{{ label }}</button>
             {% endfor %}
           </div>
-          <button class="chip" x-show="hasLineSeries" :class="{active: showPoints}" @click="showPoints = !showPoints; render()">Punkte</button>
-          <button class="chip" :class="{active: continuous}" @click="toggleContinuous()">Kontinuierlich</button>
-          <button class="chip" :class="{active: raw}" :disabled="!['hour', 'day', 'week'].includes(range)" @click="toggleRaw()">Rohwerte</button>
-        </div>
-        <div class="toolbar" x-show="editing">
-          <button class="chip" :class="{active: compare}" :disabled="raw" @click="toggleCompare()" x-text="compareLabel"></button>
-          <div class="seg" x-show="compare">
-            <button :class="{active: compareMode === 'previous'}" @click="compareMode='previous'; load()">Vorperiode</button>
-            <button :class="{active: compareMode === 'year'}" @click="compareMode='year'; load()">Vorjahr</button>
+          <div class="menu-wrap" @click.outside="compareMenuOpen = false">
+            <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
+              <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
+            </button>
+            <div class="menu-popover" x-show="compareMenuOpen" x-cloak
+                 x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+              <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
+              <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
+              <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-text="compareYearLabel"></button>
+            </div>
+          </div>
+          <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
+            <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
+              Optionen <span class="chevron">▾</span>
+            </button>
+            <div class="menu-popover" x-show="optionsMenuOpen" x-cloak
+                 x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+              <div class="menu-section-label">Daten</div>
+              <div class="menu-row">
+                <span class="menu-row-label">Auflösung
+                  <span class="menu-note" x-show="resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
+                </span>
+                <select x-model="resolutionPreset" @change="render()">
+                  <template x-for="option in resolutionOptions" :key="option.value">
+                    <option :value="option.value" x-text="option.label"></option>
+                  </template>
+                </select>
+              </div>
+              <label class="menu-row">
+                <span class="menu-row-label">Kontinuierlich</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="continuous" @change="toggleContinuous()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
+              <label class="menu-row">
+                <span class="menu-row-label">Rohwerte</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
+              <div class="menu-divider"></div>
+              <div class="menu-section-label">Darstellung</div>
+              <label class="menu-row" x-show="hasLineSeries">
+                <span class="menu-row-label">Punkte</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
+              <label class="menu-row">
+                <span class="menu-row-label">Dynamische Y-Achse</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="dynamicYAxis" @change="dynamicYAxis = !dynamicYAxis; render()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
+              <label class="menu-row">
+                <span class="menu-row-label">Statistik in Legende</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -127,6 +236,27 @@
         <div class="card">
           <div id="chart" x-show="hasData"></div>
           <div class="empty" x-show="!hasData" x-text="loading ? 'Lädt …' : (selectedCount === 0 ? 'Bitte mindestens eine Entität auswählen.' : 'Keine Daten für diesen Zeitraum.')"></div>
+        </div>
+        <!-- Ersetzt ECharts' eigene Legende komplett (dort per legend.show:false
+             stummgeschaltet, siehe render()) — ein Klick auf einen Chip
+             blendet die jeweilige Serie über dieselbe legendToggleSelect-
+             Action ein/aus, die eine native Legende auch nutzen würde. Bei
+             aktivem "Statistik in Legende" zeigt jeder Chip zusätzlich
+             Min/Max/Ø derselben Entität — eine Zeile, zwei Zwecke, statt
+             Legende und Statistik-Kacheln getrennt untereinander. -->
+        <div class="chart-legend" x-show="hasData">
+          <template x-for="stat in seriesStats" :key="stat.entityId">
+            <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
+                    @click="toggleLegendItem(stat.entityId, stat.name)">
+              <span class="dot" :style="{background: stat.color}"></span>
+              <span class="name" x-text="stat.name"></span>
+              <span class="values" x-show="chartStats">
+                <span>Min <strong x-text="stat.min"></strong></span>
+                <span>Max <strong x-text="stat.max"></strong></span>
+                <span>Ø <strong x-text="stat.average"></strong></span>
+              </span>
+            </button>
+          </template>
         </div>
 
         <div class="save-row" x-show="editing">
@@ -144,6 +274,7 @@
   <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/vendor/echarts.min.js"></script>
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
     const CHART_ID = {{ chart_id | tojson }};
@@ -152,6 +283,18 @@
     const CONTINUOUS = {{ continuous | tojson }};
     const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
     const ENTITY_NAMES = {{ entity_names | tojson }};
+    const ENTITY_LABELS = Object.fromEntries(
+      ({{ entity_options | tojson }}).map(opt => [opt.entity_id, opt.label])
+    );
+    const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
+    const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};
+    const CHART_STATS = {{ chart_stats | tojson }};
+    // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
+    // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
+    // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart
+    // gespeichert (siehe save()-Body weiter unten).
+    const COMPARE = {{ compare | tojson }};
+    const COMPARE_MODE = {{ compare_mode | tojson }};
 
     // Feste Farbfolge statt ECharts' Auto-Zuordnung — nur so lässt sich bei
     // aktivem Vergleich (siehe render()) die Vorperiode-Serie jeder Entität
@@ -163,11 +306,9 @@
     );
     const UI_FONT_SCALE = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
 
-    function fmtNum(v) {
-      if (v == null || Number.isNaN(v)) return '';
-      if (v === 0) return '0';
-      return Number(v.toPrecision(4)).toString();
-    }
+    // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe
+    // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
+    const fmtNum = NumberFormat.fmt;
 
     function filterEntityPicker(value) {
       const q = value.trim().toLowerCase();
@@ -199,26 +340,222 @@
       }
     }
 
+    function previousPeriodLabel(range) {
+      return ({
+        hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche',
+        month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade',
+      })[range] || 'Vorperiode';
+    }
+
+    function previousYearPeriodLabel(range) {
+      return ({
+        hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche',
+        month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade',
+      })[range] || 'Vorjahreszeitraum';
+    }
+
+    const RESOLUTION_SECONDS = {
+      hour: {medium: 5 * 60, coarse: 15 * 60},
+      day: {medium: 30 * 60, coarse: 60 * 60},
+      week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60},
+      month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60},
+      year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60},
+      decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
+    };
+    const RESOLUTION_LABELS = {
+      hour: {medium: '5 Minuten', coarse: '15 Minuten'},
+      day: {medium: '30 Minuten', coarse: '1 Stunde'},
+      week: {medium: '6 Stunden', coarse: '1 Tag'},
+      month: {medium: '1 Tag', coarse: '1 Woche'},
+      year: {medium: '1 Monat', coarse: '3 Monate'},
+      decade: {medium: '1 Jahr', coarse: '2 Jahre'},
+    };
+
+    // Zeigt bei "Automatisch" die tatsächlich vom Server gelieferte Auflösung
+    // an (Konzept "Auto-Auflösung anzeigen") — statt die Server-Logik hier zu
+    // duplizieren (die je nach Zähler/Standard/Schalter UND pro Entität
+    // unterschiedlich ausfällt, siehe FINE_LEVEL/BAR_RESOLUTION in query.py),
+    // wird die Auflösung direkt aus dem Abstand der tatsächlich gelieferten
+    // Punkte abgelesen — datengetrieben, also immer korrekt, unabhängig von
+    // Aggregationstyp und ohne eigene Kopie der Backend-Logik. Median statt
+    // Minimum/Durchschnitt, damit einzelne Lücken (z. B. eine Pause in den
+    // Messwerten) das Ergebnis nicht verzerren.
+    function detectResolutionSeconds(points) {
+      if (!points || points.length < 2) return null;
+      const gaps = [];
+      for (let i = 1; i < points.length; i++) {
+        const gap = points[i].ts - points[i - 1].ts;
+        if (gap > 0) gaps.push(gap);
+      }
+      if (!gaps.length) return null;
+      gaps.sort((a, b) => a - b);
+      return gaps[Math.floor(gaps.length / 2)];
+    }
+
+    const DURATION_UNITS = [
+      [365 * 24 * 3600, 'Jahr', 'Jahre'],
+      [30 * 24 * 3600, 'Monat', 'Monate'],
+      [7 * 24 * 3600, 'Woche', 'Wochen'],
+      [24 * 3600, 'Tag', 'Tage'],
+      [3600, 'Stunde', 'Stunden'],
+      [60, 'Minute', 'Minuten'],
+      [1, 'Sekunde', 'Sekunden'],
+    ];
+    function fmtDurationLabel(seconds) {
+      if (seconds == null) return '';
+      for (const [unitSeconds, singular, plural] of DURATION_UNITS) {
+        if (seconds >= unitSeconds * 0.9) {
+          const n = Math.max(1, Math.round(seconds / unitSeconds));
+          return `${n} ${n === 1 ? singular : plural}`;
+        }
+      }
+      return `${Math.round(seconds)} Sekunden`;
+    }
+
+    function resamplePoints(points, range, preset, aggregationType, windowStart) {
+      const seconds = RESOLUTION_SECONDS[range] && RESOLUTION_SECONDS[range][preset];
+      if (!seconds || !points.length || windowStart == null) return points;
+      const groups = new Map();
+      points.forEach(point => {
+        const bucket = Math.floor((point.ts - windowStart) / seconds);
+        const entry = groups.get(bucket) || {values: [], minima: [], maxima: []};
+        if (Number.isFinite(point.value)) entry.values.push(point.value);
+        if (Number.isFinite(point.min)) entry.minima.push(point.min);
+        if (Number.isFinite(point.max)) entry.maxima.push(point.max);
+        groups.set(bucket, entry);
+      });
+      return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]).map(([bucket, entry]) => {
+        const value = aggregationType === 'standard'
+          ? entry.values.reduce((sum, v) => sum + v, 0) / entry.values.length
+          : entry.values.reduce((sum, v) => sum + v, 0);
+        return {
+          ts: windowStart + bucket * seconds,
+          value,
+          min: entry.minima.length ? Math.min(...entry.minima) : value,
+          max: entry.maxima.length ? Math.max(...entry.maxima) : value,
+        };
+      }).filter(point => Number.isFinite(point.value));
+    }
+
     // Bewusst außerhalb von x-data (siehe entity_detail.html: ECharts verlässt
     // sich auf `this` als echtes Objekt, nicht Alpines reaktiven Proxy).
     let chartInstance = null;
+
+    // Ziehen zum Umsortieren der "Angezeigte Namen"-Liste. Anders als bei den
+    // Dashboard-Kacheln (dashboard-tiles.js, setupDragAndDrop() — dort reines
+    // DOM ohne konkurrierendes Framework) werden die Zeilen hier von Alpines
+    // x-for gerendert. Während des Ziehens per insertBefore direkt im DOM zu
+    // verschieben (die ursprüngliche Fassung) gerät mit Alpines eigener,
+    // keyed x-for-Verwaltung derselben Elemente in Konflikt: die Statistik-
+    // Kacheln (die NIE manuell angefasst werden) aktualisieren sich sofort
+    // korrekt, aber die manuell verschobene Zeile selbst hinkt hinterher und
+    // "springt" erst beim nächsten x-for-Durchlauf an ihre neue Position.
+    // Deshalb hier stattdessen: WÄHREND des Ziehens direkt das reaktive Array
+    // (selectedEntityIds) umsortieren und dem DOM die Neupositionierung
+    // vollständig überlassen — Alpine bleibt die einzige Instanz, die diese
+    // Knoten je bewegt.
+    function setupEntityDrag(component) {
+      const container = document.getElementById('entity-names-list');
+      if (!container || container.dataset.dragBound) return;
+      container.dataset.dragBound = '1';
+      let draggedId = null;
+      let draggedEl = null;
+      // dragstart selbst kann nicht prüfen, ob der Griff angefasst wurde —
+      // event.target ist dort laut Spec immer das draggable-Element (die
+      // ganze Zeile), nicht der tatsächlich angeklickte Kindknoten. Deshalb
+      // hier per mousedown merken, dort ist event.target noch der reale
+      // Klick-Zielknoten wie bei jedem anderen Maus-Event.
+      let handleGrabbed = false;
+      container.addEventListener('mousedown', e => {
+        handleGrabbed = !!e.target.closest('.drag-handle');
+      });
+      container.addEventListener('dragstart', e => {
+        const row = e.target.closest('.entity-name-row');
+        if (!row) return;
+        // Nur vom Ziehgriff aus starten — sonst interpretiert der Browser
+        // einen Drag-Start auf dem input als Textauswahl/Fokus statt als
+        // natives Drag (siehe Kommentar bei .drag-handle oben).
+        if (!handleGrabbed) { e.preventDefault(); return; }
+        draggedEl = row;
+        draggedId = row.dataset.entityId;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', draggedId || '');
+      });
+      container.addEventListener('dragover', e => {
+        if (!draggedId) return;
+        e.preventDefault();
+        const row = e.target.closest('.entity-name-row');
+        if (!row || row.dataset.entityId === draggedId) return;
+        const fromIdx = component.selectedEntityIds.indexOf(draggedId);
+        const overIdx = component.selectedEntityIds.indexOf(row.dataset.entityId);
+        if (fromIdx === -1 || overIdx === -1) return;
+        const rect = row.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < rect.height / 2;
+        let targetIdx = overIdx + (before ? 0 : 1);
+        if (targetIdx > fromIdx) targetIdx -= 1;
+        if (targetIdx === fromIdx) return;
+        const [id] = component.selectedEntityIds.splice(fromIdx, 1);
+        component.selectedEntityIds.splice(targetIdx, 0, id);
+      });
+      container.addEventListener('dragend', () => {
+        if (draggedEl) draggedEl.classList.remove('dragging');
+        if (draggedId) component.load();
+        draggedEl = null;
+        draggedId = null;
+      });
+    }
 
     function chartEditor() {
       return {
         chartId: CHART_ID,
         range: RANGE_KEY,
         continuous: CONTINUOUS,
-        selectedEntityIds: new Set(SELECTED_ENTITY_IDS),
+        // Array statt Set — die Reihenfolge ist hier bedeutungsvoll (bestimmt
+        // Legenden-/Statistik-Reihenfolge und Farbzuordnung) und muss per
+        // Auf/Ab-Buttons in der "Angezeigte Namen"-Liste änderbar sein, was ein
+        // Set nicht abbilden kann.
+        selectedEntityIds: [...SELECTED_ENTITY_IDS],
         name: CHART_NAME,
         entityNames: {...ENTITY_NAMES},
         series: [],
         windowStart: null,
         windowEnd: null,
+        // Natürliches, NIE an "jetzt" gedeckeltes Periodenende (vom Server,
+        // query._window()) — bestimmt die X-Achsen-Ausdehnung, damit eine
+        // laufende Woche/Monat/… immer bis zur vollen Kalendergrenze
+        // angezeigt wird (z. B. bis Sonntag), auch ohne Daten in der Zukunft.
+        // windowEnd (an "jetzt" gedeckelt) bleibt weiterhin maßgeblich dafür,
+        // bis wohin der letzte bekannte Linienwert gehalten wird — dort wird
+        // bewusst NICHT in die Zukunft fortgeschrieben.
+        periodEnd: null,
         isCurrent: true,
-        compare: false,
-        compareMode: 'previous',
+        // Explizit in load() gesetzt statt als Getter über this.series
+        // berechnet — ein Getter, der this.series nur verschachtelt über
+        // detectResolutionSeconds() liest, wurde von Alpines
+        // Abhängigkeits-Tracking nach dem asynchronen Neuladen nicht
+        // zuverlässig neu ausgewertet (zeigte den Badge z. B. erst nach
+        // manuellem Umschalten von resolutionPreset, nie automatisch nach
+        // load()). Eine direkt zugewiesene Property umgeht das vollständig.
+        autoResolutionLabel: '',
+        compare: COMPARE,
+        compareMode: COMPARE_MODE,
         showPoints: false,
         raw: false,
+        resolutionPreset: RESOLUTION_PRESET,
+        dynamicYAxis: DYNAMIC_Y_AXIS,
+        // Min/Max/Ø in der Legende statt einer separaten Kachel-Reihe (siehe
+        // render(): die Legende wird komplett selbst gebaut statt ECharts'
+        // eigene zu zeigen, damit Statistik und Serien-Umschalter ein
+        // einziges Element sind). legendHiddenIds statt eines Set — direkte
+        // .includes()-Aufrufe in Template-Ausdrücken sind bei Alpine
+        // zuverlässig reaktiv, ein Set (oder ein Getter, der verschachtelt
+        // darauf zugreift) war es an anderer Stelle in dieser Datei
+        // nachweislich nicht (siehe autoResolutionLabel-Kommentar oben).
+        chartStats: CHART_STATS,
+        legendHiddenIds: [],
+        optionsMenuOpen: false,
+        compareMenuOpen: false,
         // Ein bereits gespeichertes Chart öffnet sich im reinen Anzeige-Modus
         // (nur Chart + Zeitraum/Vergleich) — der "Anpassen"-Button schaltet
         // erst dann Entitäts-Auswahl und Speichern/Löschen sichtbar. Ein noch
@@ -230,26 +567,81 @@
         savedMessage: '',
         _requestId: 0,
 
-        get selectedCount() { return this.selectedEntityIds.size; },
+        get selectedCount() { return this.selectedEntityIds.length; },
+        labelFor(entityId) { return ENTITY_LABELS[entityId] || entityId; },
         get hasData() { return this.series.some(s => s.points.length > 0); },
         // "Punkte" markiert einzelne Datenpunkte auf einer Linie — für
         // Balken-Serien (Zähler/Schalter, siehe chart_type-Kommentar bei
         // render()) ohne jede Wirkung, deshalb nur sichtbar, wenn mindestens
         // eine der aktuell geladenen Serien tatsächlich als Linie gerendert wird.
         get hasLineSeries() { return this.series.some(s => s.chart_type === 'line'); },
+        get resolutionOptions() {
+          const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
+          return [
+            {value: 'auto', label: 'Automatisch'},
+            {value: 'medium', label: labels.medium},
+            {value: 'coarse', label: labels.coarse},
+          ];
+        },
+        // Ermittelt, welche Auflösung "Automatisch" gerade tatsächlich bedeutet
+        // (siehe detectResolutionSeconds oben) — aus der ersten Serie mit genug
+        // Rohpunkten, da die Server-Auflösung je nach Aggregationstyp zwischen
+        // Entitäten derselben Serie ohnehin variieren kann. Von load() nach
+        // jedem Neuladen in this.autoResolutionLabel geschrieben (siehe
+        // Kommentar dort zum Grund, warum kein Getter).
+        computeAutoResolutionLabel() {
+          for (const s of this.series) {
+            const seconds = detectResolutionSeconds(s.points);
+            if (seconds != null) return fmtDurationLabel(seconds);
+          }
+          return '';
+        },
+        get seriesStats() {
+          return this.series.map((s, i) => {
+            const values = s.points.map(p => p.value).filter(Number.isFinite);
+            const minima = s.points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
+            const maxima = s.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
+            const unit = s.unit ? ` ${s.unit}` : '';
+            const formatted = value => `${fmtNum(value, s.decimals)}${unit}`;
+            return {
+              entityId: s.entity_id,
+              name: this.entityNames[s.entity_id] || s.friendly_name,
+              color: PALETTE[i % PALETTE.length],
+              min: minima.length ? formatted(Math.min(...minima)) : '—',
+              max: maxima.length ? formatted(Math.max(...maxima)) : '—',
+              average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+            };
+          });
+        },
         get periodLabel() {
           return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.isCurrent);
         },
-        get compareLabel() {
-          const labels = {
-            hour: 'Vorherige Stunde vergleichen', day: 'Vortag vergleichen', week: 'Vorwoche vergleichen',
-            month: 'Vormonat vergleichen', year: 'Vorjahr vergleichen', decade: 'Vorherige Dekade vergleichen',
-          };
-          return labels[this.range] || 'Vorperiode vergleichen';
+        get comparePreviousLabel() { return previousPeriodLabel(this.range); },
+        get compareYearLabel() { return previousYearPeriodLabel(this.range); },
+        // Zeigt im Button selbst, WELCHER Vergleich aktiv ist (statt nur
+        // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
+        // die beiden Label-Getter oben automatisch an den Zeitraum an.
+        get compareButtonLabel() {
+          if (!this.compare) return 'Vergleichen';
+          return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
 
         toggleEntity(entityId, checked) {
-          if (checked) this.selectedEntityIds.add(entityId); else this.selectedEntityIds.delete(entityId);
+          const idx = this.selectedEntityIds.indexOf(entityId);
+          if (checked) { if (idx === -1) this.selectedEntityIds.push(entityId); }
+          else if (idx !== -1) this.selectedEntityIds.splice(idx, 1);
+          this.load();
+        },
+        // Verschiebt eine Entität in der Anzeige-/Abfragereihenfolge (bestimmt
+        // Legenden-, Statistik- und Farbreihenfolge sowie die gespeicherte
+        // Reihenfolge) um eine Position nach oben (-1) oder unten (+1) — dieselbe
+        // Splice-Logik wie moveRow() in table_editor.html.
+        moveEntity(entityId, delta) {
+          const idx = this.selectedEntityIds.indexOf(entityId);
+          const target = idx + delta;
+          if (idx === -1 || target < 0 || target >= this.selectedEntityIds.length) return;
+          const [id] = this.selectedEntityIds.splice(idx, 1);
+          this.selectedEntityIds.splice(target, 0, id);
           this.load();
         },
         setRange(key) {
@@ -264,7 +656,30 @@
           this.load();
         },
         toggleContinuous() { this.continuous = !this.continuous; this.load(); },
-        toggleCompare() { this.compare = !this.compare; this.load(); },
+        setCompareMode(mode) {
+          this.compare = true;
+          this.compareMode = mode;
+          this.compareMenuOpen = false;
+          this.load();
+        },
+        disableCompare() {
+          this.compare = false;
+          this.compareMenuOpen = false;
+          this.load();
+        },
+        // Serien-Umschalter der eigenen Legende (siehe render(): ECharts'
+        // eigene Legende ist stummgeschaltet, legend.selected wird stattdessen
+        // aus legendHiddenIds gebaut) — legendToggleSelect wirkt sofort auf
+        // den bestehenden Chart, ohne auf den nächsten render() zu warten;
+        // legendHiddenIds hält den Zustand für genau diesen nächsten render()
+        // fest (setOption(..., true) baut die Optionen sonst komplett neu auf
+        // und würde die Auswahl sofort wieder verwerfen).
+        toggleLegendItem(entityId, seriesName) {
+          const idx = this.legendHiddenIds.indexOf(entityId);
+          if (idx === -1) this.legendHiddenIds.push(entityId);
+          else this.legendHiddenIds.splice(idx, 1);
+          if (chartInstance) chartInstance.dispatchAction({type: 'legendToggleSelect', name: seriesName});
+        },
         // Raw-Modus (Rohwerte) und Periodenvergleich schließen sich gegenseitig
         // aus — dieselbe Begründung wie auf der Entität-eigenen Chart-Seite:
         // ein Vergleich zweier Rohwert-Serien ergibt kaum lesbaren Sinn.
@@ -275,15 +690,16 @@
         },
 
         async load() {
-          if (this.selectedEntityIds.size === 0) {
+          if (this.selectedEntityIds.length === 0) {
             this.series = [];
+            this.autoResolutionLabel = '';
             this.$nextTick(() => this.render());
             return;
           }
           const requestId = ++this._requestId;
           this.loading = true;
           const params = new URLSearchParams({
-            entity_ids: Array.from(this.selectedEntityIds).join(','),
+            entity_ids: this.selectedEntityIds.join(','),
             range: this.range, offset: '0', continuous: String(this.continuous),
             compare: String(this.compare), compare_mode: this.compareMode,
             raw: String(this.raw),
@@ -292,8 +708,10 @@
           const data = await res.json();
           if (requestId !== this._requestId) return;
           this.series = data.series || [];
+          this.autoResolutionLabel = this.computeAutoResolutionLabel();
           this.windowStart = data.window_start ?? null;
           this.windowEnd = data.window_end ?? null;
+          this.periodEnd = data.period_end ?? null;
           this.isCurrent = data.is_current ?? true;
           this.loading = false;
           this.$nextTick(() => this.render());
@@ -319,14 +737,35 @@
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
           // wechselseitig links/rechts, weitere Achsen pro Seite nach außen versetzt.
           const units = [...new Set(this.series.map(s => s.unit))];
-          const yAxis = units.map((u, i) => ({
-            type: 'value',
-            name: u || undefined,
-            nameLocation: 'end',
-            position: i % 2 === 0 ? 'left' : 'right',
-            offset: Math.floor(i / 2) * 55,
-            axisLabel: {formatter: v => u ? `${fmtNum(v)} ${u}` : fmtNum(v)},
-          }));
+          // Eine Achse kann mehrere Entitäten mit gleicher Einheit aber
+          // unterschiedlicher Nachkommastellen-Einstellung bündeln — dann gilt
+          // die "strengste" (kleinste) Rundung aller beteiligten Entitäten, damit
+          // kein Wert unpassend abgeschnitten wirkt.
+          const unitDecimals = new Map();
+          this.series.forEach(s => {
+            if (s.decimals == null) return;
+            const current = unitDecimals.get(s.unit);
+            if (current == null || s.decimals < current) unitDecimals.set(s.unit, s.decimals);
+          });
+          const dynamicYAxis = this.dynamicYAxis;
+          const yAxis = units.map((u, i) => {
+            const decimals = unitDecimals.get(u);
+            return {
+              type: 'value',
+              name: u || undefined,
+              nameLocation: 'end',
+              position: i % 2 === 0 ? 'left' : 'right',
+              offset: Math.floor(i / 2) * 55,
+              min: dynamicYAxis ? undefined : value => Math.min(0, value.min),
+              max: dynamicYAxis ? undefined : value => Math.max(0, value.max),
+              // ECharts erzwingt bei einer value-Achse standardmäßig (scale:
+              // false) IMMER die Einbindung der Null, auch wenn min/max
+              // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
+              // also keine sichtbare Wirkung gegenüber der festen Variante.
+              scale: dynamicYAxis,
+              axisLabel: {formatter: v => u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)},
+            };
+          });
           // Feste Farbe je Entität (statt ECharts' Auto-Zuordnung) — nur so lässt
           // sich bei aktivem Vergleich die Vorperiode-Serie einer Entität optisch
           // eindeutig ihrer Hauptserie zuordnen (dieselbe Farbe, nur blasser +
@@ -336,6 +775,11 @@
           // Zähler zeigen Bucket-Summen, ein Schalter eine Einschaltdauer je
           // Bucket — beides liest sich als Balken natürlicher als als Linie.
           const echartsSeries = [];
+          // Für legend.selected unten — nur die Hauptserie ist über die
+          // eigene Legende (siehe HTML-Template) umschaltbar, nicht die
+          // Vergleichs-Nebenserie (die folgt dem "Vergleichen"-Menü als
+          // Ganzes, siehe setCompareMode()/disableCompare()).
+          const legendSelected = {};
           this.series.forEach((s, i) => {
             const color = PALETTE[i % PALETTE.length];
             // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
@@ -346,11 +790,16 @@
             // liefert.
             const chartType = s.chart_type;
             const displayName = this.entityNames[s.entity_id] || s.friendly_name;
-            const mainData = s.points.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit]);
+            legendSelected[displayName] = !this.legendHiddenIds.includes(s.entity_id);
+            const mainPoints = resamplePoints(
+              s.points, this.range, this.resolutionPreset,
+              s.aggregation_type, this.windowStart
+            );
+            const mainData = mainPoints.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals]);
             if (chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
-              mainData.push([this.windowEnd * 1000, last[1], last[2], last[3]]);
+              mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4]]);
             }
             const main = {
               name: displayName,
@@ -369,8 +818,7 @@
               barMaxWidth: 48,
             };
             if (chartType === 'line') {
-              main.smooth = false;
-              main.step = 'end';
+              main.smooth = true;
               // symbol nie explizit auf undefined setzen (nur weglassen oder auf
               // 'none') — siehe entity_detail.html, ECharts' interne Options-
               // Normalisierung stürzt sonst ab.
@@ -389,11 +837,15 @@
                 this.range, this.continuous, s.compare_window_start, s.compare_window_end, false
               );
               const seriesLabel = this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode';
-              const compareData = s.compare_points.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit]);
+              const comparePoints = resamplePoints(
+                s.compare_points, this.range, this.resolutionPreset,
+                s.aggregation_type, s.compare_window_start
+              );
+              const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit, s.decimals]);
               if (chartType === 'line' && compareData.length && this.windowEnd != null
                   && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
                 const last = compareData[compareData.length - 1];
-                compareData.push([this.windowEnd * 1000, last[1], last[2], last[3]]);
+                compareData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4]]);
               }
               const cmp = {
                 name: `${displayName} (${seriesLabel}${compareLabel ? ', ' + compareLabel : ''})`,
@@ -405,8 +857,7 @@
                 barMaxWidth: 48,
               };
               if (chartType === 'line') {
-                cmp.smooth = false;
-                cmp.step = 'end';
+                cmp.smooth = true;
                 if (!this.showPoints) cmp.symbol = 'none';
               }
               echartsSeries.push(cmp);
@@ -418,7 +869,10 @@
               color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
               fontSize: Math.round(12 * UI_FONT_SCALE * 10) / 10,
             },
-            grid: {left: 10, right: 10, top: 20, bottom: 70, containLabel: true},
+            // bottom nur noch für die X-Achsen-Beschriftung reserviert — die
+            // Legende lebt jetzt als eigenes HTML-Element unterhalb der Karte
+            // (siehe legend weiter unten), nicht mehr im Chart selbst.
+            grid: {left: 10, right: 10, top: 20, bottom: 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -428,7 +882,11 @@
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
-              max: this.windowEnd != null ? this.windowEnd * 1000 : undefined,
+              // periodEnd statt windowEnd: eine laufende Periode (z. B. Woche)
+              // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die
+              // noch datenlose Zukunft — windowEnd (an "jetzt" gedeckelt) bleibt
+              // nur für den Linien-Haltepunkt maßgeblich (siehe periodEnd oben).
+              max: (this.periodEnd ?? this.windowEnd) != null ? (this.periodEnd ?? this.windowEnd) * 1000 : undefined,
               // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
               // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
               // einem Bucket) — boundaryGap:[0,0] unterbindet dieses Auto-Polster,
@@ -437,13 +895,16 @@
               axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
             },
             yAxis,
-            // Legende unterhalb statt oberhalb des Charts (Konzept: bei vielen
-            // überlagerten Entitäten + aktivem Vergleich verdoppelt sich die
-            // Eintragszahl, oben brach das zuverlässig in mehrere Zeilen um und
-            // überlappte die Y-Achsen-Beschriftung). type:'scroll' statt des
-            // Standard-Umbruchs hält die Legende auf einer Zeile mit Pfeilen
-            // zum Durchblättern, wenn sie nicht komplett passt.
-            legend: {bottom: 0, type: 'scroll'},
+            // ECharts' eigene Legende ist unsichtbar (show:false) — die
+            // sichtbare Legende ist das eigene HTML-Element unterhalb der
+            // Karte (siehe Template, .chart-legend), das gleichzeitig Serien-
+            // Umschalter UND Min/Max/Ø-Anzeige ist. legendToggleSelect-
+            // Actions (toggleLegendItem()) wirken trotzdem auf diese
+            // unsichtbare Legendeninstanz, deshalb braucht es sie weiterhin
+            // (nur eben nicht gerendert) — data explizit, sonst kennt sie die
+            // Vergleichs-Nebenserien nicht, deren Namen nicht in selected
+            // vorkommen.
+            legend: {show: false, data: echartsSeries.map(s => s.name), selected: legendSelected},
             tooltip: {
               trigger: 'axis',
               // Eigener Formatter statt valueFormatter, aus demselben Grund wie in
@@ -455,7 +916,8 @@
                 const pad = n => String(n).padStart(2, '0');
                 const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
                 const unit = p.data[3];
-                const val = unit ? `${fmtNum(p.value[1])} ${unit}` : fmtNum(p.value[1]);
+                const decimals = p.data[4];
+                const val = unit ? `${fmtNum(p.value[1], decimals)} ${unit}` : fmtNum(p.value[1], decimals);
                 return `<div style="display:flex;justify-content:space-between;gap:18px;">`
                      + `<span>${p.marker}${p.seriesName}</span>`
                      + `<strong style="margin-left:8px;">${val}</strong></div>`
@@ -470,7 +932,7 @@
 
         async save() {
           if (!this.name.trim()) { alert('Bitte einen Namen für das Chart angeben.'); return; }
-          if (this.selectedEntityIds.size === 0) { alert('Bitte mindestens eine Entität auswählen.'); return; }
+          if (this.selectedEntityIds.length === 0) { alert('Bitte mindestens eine Entität auswählen.'); return; }
           this.saving = true;
           this.savedMessage = '';
           // Nur Namen tatsächlich ausgewählter Entitäten mitschicken — eine
@@ -482,10 +944,13 @@
           });
           const body = {
             name: this.name.trim(),
-            entity_ids: Array.from(this.selectedEntityIds),
+            entity_ids: this.selectedEntityIds,
             range_key: this.range,
             continuous: this.continuous,
             entity_names: entityNames,
+            resolution_preset: this.resolutionPreset,
+            dynamic_y_axis: this.dynamicYAxis,
+            chart_stats: this.chartStats,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;
@@ -520,6 +985,7 @@
           this.load();
           window.addEventListener('resize', () => chartInstance && chartInstance.resize());
           new ResizeObserver(() => chartInstance && chartInstance.resize()).observe(document.getElementById('chart'));
+          this.$nextTick(() => setupEntityDrag(this));
         },
       };
     }

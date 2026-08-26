@@ -29,6 +29,16 @@
   <p class="hint">"Automatisch" kürzt überflüssige Nullen (4 W statt 4.000 W), eine feste Zahl rundet Werte und Charts immer auf genau diese Stellenzahl.</p>
 </div>
 <div class="field">
+  <label>Wertänderungsfilter</label>
+  <select name="value_filter" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
+          hx-target="#config-form" hx-swap="innerHTML">
+    {% for key, label in value_filter_options %}
+    <option value="{{ key }}" {% if key == value_filter %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <p class="hint">Überspringt aufeinanderfolgende Werte, die nach der gewählten Nachkommastellen-Regel gleich sind. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.</p>
+</div>
+<div class="field">
   <label>Lücken-Erkennung</label>
   <select name="gap_threshold" hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change"
           hx-target="#config-form" hx-swap="innerHTML">

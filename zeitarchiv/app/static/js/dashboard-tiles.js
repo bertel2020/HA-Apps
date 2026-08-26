@@ -26,6 +26,32 @@
     getComputedStyle(document.documentElement).getPropertyValue('--font-scale')
   ) || 1;
   const scaledFont = size => Math.round(size * UI_FONT_SCALE * 10) / 10;
+  const RESOLUTION_SECONDS = {
+    hour: {medium: 5 * 60, coarse: 15 * 60},
+    day: {medium: 30 * 60, coarse: 60 * 60},
+    week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60},
+    month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60},
+    year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60},
+    decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
+  };
+
+  function resamplePoints(points, range, preset, aggregationType, windowStart) {
+    const seconds = RESOLUTION_SECONDS[range] && RESOLUTION_SECONDS[range][preset];
+    if (!seconds || !points.length || windowStart == null) return points;
+    const groups = new Map();
+    points.forEach(point => {
+      const bucket = Math.floor((point.ts - windowStart) / seconds);
+      const values = groups.get(bucket) || [];
+      if (Number.isFinite(point.value)) values.push(point.value);
+      groups.set(bucket, values);
+    });
+    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]).map(([bucket, values]) => ({
+      ts: windowStart + bucket * seconds,
+      value: aggregationType === 'standard'
+        ? values.reduce((sum, value) => sum + value, 0) / values.length
+        : values.reduce((sum, value) => sum + value, 0),
+    })).filter(point => Number.isFinite(point.value));
+  }
 
   const instances = new Map();  // chartId -> echarts instance
   let observer = null;
@@ -46,6 +72,9 @@
     const entityNames = JSON.parse(el.dataset.entityNames || '{}');
     const range = el.dataset.range || 'day';
     const continuous = el.dataset.continuous === 'true';
+    const resolutionPreset = el.dataset.resolutionPreset || 'auto';
+    const dynamicYAxis = el.dataset.dynamicYAxis === 'true';
+    const animation = el.dataset.animation !== 'false';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -86,24 +115,45 @@
     // größeren Watt-Spanne rechnerisch bei ~0 verschwinden, statt sichtbar zu
     // sein. Kompakt gehalten: kein Achsenname, nur die Zahl.
     const units = [...new Set(series.map(s => s.unit))];
-    const yAxis = units.map((u, i) => ({
-      type: 'value',
-      position: i % 2 === 0 ? 'left' : 'right',
-      offset: Math.floor(i / 2) * 46,
-      axisLabel: {fontSize: scaledFont(10), color: inkFaint, formatter: v => fmtCompactNumber(v)},
-      axisLine: {show: false},
-      axisTick: {show: false},
-      splitLine: {lineStyle: {color: borderColor, type: 'dashed'}},
-    }));
+    // Strengste (kleinste) Nachkommastellen-Einstellung aller Entitäten einer
+    // gemeinsamen Achse — dieselbe Regel wie in chart_editor.html.
+    const unitDecimals = new Map();
+    series.forEach(s => {
+      if (s.decimals == null) return;
+      const current = unitDecimals.get(s.unit);
+      if (current == null || s.decimals < current) unitDecimals.set(s.unit, s.decimals);
+    });
+    const yAxis = units.map((u, i) => {
+      const decimals = unitDecimals.get(u);
+      return {
+        type: 'value',
+        position: i % 2 === 0 ? 'left' : 'right',
+        offset: Math.floor(i / 2) * 46,
+        min: dynamicYAxis ? undefined : value => Math.min(0, value.min),
+        max: dynamicYAxis ? undefined : value => Math.max(0, value.max),
+        // Siehe chart_editor.html: ohne scale:true erzwingt ECharts bei einer
+        // value-Achse per Default immer die Einbindung der Null, auch bei
+        // undefined min/max — "Dynamische Y-Achse" hätte sonst keine
+        // sichtbare Wirkung.
+        scale: dynamicYAxis,
+        axisLabel: {fontSize: scaledFont(10), color: inkFaint, formatter: v => fmtCompactNumber(v, decimals)},
+        axisLine: {show: false},
+        axisTick: {show: false},
+        splitLine: {lineStyle: {color: borderColor, type: 'dashed'}},
+      };
+    });
 
     const echartsSeries = series.map((s, i) => {
       const color = PALETTE[i % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
-      const lineData = s.points.map(p => [p.ts * 1000, p.value, s.unit]);
+      const displayPoints = resamplePoints(
+        s.points, range, resolutionPreset, s.aggregation_type, data.window_start
+      );
+      const lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, s.decimals]);
       if (s.chart_type === 'line' && lineData.length && data.window_end != null
           && lineData[lineData.length - 1][0] < data.window_end * 1000) {
         const last = lineData[lineData.length - 1];
-        lineData.push([data.window_end * 1000, last[1], last[2]]);
+        lineData.push([data.window_end * 1000, last[1], last[2], last[3]]);
       }
       const cfg = {
         // Angepasster Anzeigename (chart_editor.html, "Angezeigte Namen") hat
@@ -118,8 +168,7 @@
         barMaxWidth: 28,
       };
       if (s.chart_type === 'line') {
-        cfg.smooth = false;
-        cfg.step = 'end';
+        cfg.smooth = true;
         cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
@@ -132,13 +181,18 @@
     });
 
     chart.setOption({
+      animation,
       textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
       color: PALETTE,
       grid: {left: 6, right: 6, top: 10, bottom: 20, containLabel: true},
       xAxis: {
         type: 'time',
         min: data.window_start != null ? data.window_start * 1000 : undefined,
-        max: data.window_end != null ? data.window_end * 1000 : undefined,
+        // period_end statt window_end: eine laufende Periode (z. B. Woche)
+        // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die noch
+        // datenlose Zukunft — window_end (an "jetzt" gedeckelt) bleibt nur für
+        // den Linien-Haltepunkt oben (lineData.push(...)) maßgeblich.
+        max: (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 : undefined,
         boundaryGap: [0, 0],
         axisLabel: {formatter: v => fmtAxis(range, v / 1000), fontSize: scaledFont(10), color: inkFaint, hideOverlap: true},
         axisLine: {lineStyle: {color: borderColor}},
@@ -157,9 +211,10 @@
           const header = d.toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
           const rows = params.map(p => {
             const unit = p.data[2] || '';
+            const decimals = p.data[3];
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
                  + `<span>${p.marker}${p.seriesName}</span>`
-                 + `<strong style="margin-left:8px;">${fmtCompactNumber(p.data[1])}${unit ? ' ' + unit : ''}</strong></div>`;
+                 + `<strong style="margin-left:8px;">${fmtCompactNumber(p.data[1], decimals)}${unit ? ' ' + unit : ''}</strong></div>`;
           }).join('');
           return `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}`;
         },
@@ -168,16 +223,9 @@
     });
   }
 
-  // Kompakte Zahl-Formatierung für Achsenbeschriftung/Tooltip der Kacheln —
-  // dieselbe 4-signifikante-Stellen-Regel wie fmtValue() auf der Entität-
-  // eigenen Chart-Seite (entity_detail.html) bei "Automatisch", nur ohne
-  // Zugriff auf eine pro-Entität konfigurierte feste Nachkommastellenzahl
-  // (die Kachel kennt nur den Aggregations-Query, keine Entitäts-Einstellungen).
-  function fmtCompactNumber(v) {
-    if (v == null || Number.isNaN(v)) return '';
-    if (v === 0) return '0';
-    return Number(v.toPrecision(4)).toLocaleString('de-DE');
-  }
+  // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe
+  // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
+  const fmtCompactNumber = NumberFormat.fmt;
 
   // Kompakte Vorschau einer Vergleichstabelle-Kachel — dieselbe Rechenlogik
   // wie der volle Editor (static/js/table-compute.js), nur reduziert

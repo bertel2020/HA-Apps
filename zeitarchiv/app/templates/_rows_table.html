@@ -27,6 +27,16 @@
   </script>
 </div>
 
+<div class="entity-stats" id="rows-summary" hx-swap-oob="true" aria-live="polite">
+  <div class="entity-stat"><strong>{{ total_row_count_label }}</strong><span>insgesamt</span></div>
+  <div class="entity-stat"><strong>{{ range_row_count_label }}</strong><span>im Zeitraum</span></div>
+  {% if outlier_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.outliers else '' }}"><strong>{{ counts.outliers }}</strong><span>Ausreißer</span></div>{% endif %}
+  {% if gap_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.gaps else '' }}"><strong>{{ counts.gaps }}</strong><span>Lücken</span></div>{% endif %}
+  <div class="entity-stat {{ 'has-issues' if counts.duplicates else '' }}"><strong>{{ counts.duplicates }}</strong><span>Duplikate</span></div>
+  <div class="entity-stat {{ 'has-issues' if counts.repetitions else '' }}"><strong>{{ counts.repetitions }}</strong><span>Wiederholungen</span></div>
+  {% if counter_decrease_enabled %}<div class="entity-stat {{ 'has-issues' if counts.counter_decreases else '' }}"><strong>{{ counts.counter_decreases }}</strong><span>Zählerrückgänge</span></div>{% endif %}
+</div>
+
 {% if rows %}
 <div class="tbl-wrap">
   <table class="dt compact">
@@ -95,8 +105,12 @@
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Duplikate automatisch entfernen
   </button>
+  <button class="btn btn-danger-outline"
+          {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"
+          {% elif filter != 'repetitions' %}disabled title="Erst den Filter „Wiederholungen” wählen"{% endif %}
+          hx-post="{{ base }}/entities/{{ entity_id }}/rows/repetitions-preview"
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+    Wiederholungen verdichten
+  </button>
   {% endif %}
-  <span style="margin-left:auto;color:var(--ink-faint);font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));">
-    {{ counts.all }} gesamt{% if outlier_detection_enabled %} &middot; {{ counts.outliers }} Ausreißer{% endif %}{% if gap_detection_enabled %} &middot; {{ counts.gaps }} Lücken{% endif %} &middot; {{ counts.duplicates }} Duplikate
-  </span>
 </div>

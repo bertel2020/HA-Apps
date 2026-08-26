@@ -18,6 +18,26 @@
   .fav-star.active{color:#D9A22B;opacity:1;}
   .fav-star:hover{color:#D9A22B;opacity:1;}
 
+  /* Kompakte Entitäts-Kennzahlen zwischen Kopf und Werkzeug-Tabs. Das Element
+     wird bei jedem Tabellen-Request per htmx OOB aktualisiert, bleibt optisch
+     aber ein stabiler Teil des Seitenkopfs. */
+  .entity-stats{
+    display:flex;align-items:stretch;flex-wrap:wrap;margin:14px 0 2px;
+    border:1px solid var(--border);border-left:3px solid var(--accent-line);
+    border-radius:9px;background:var(--surface-alt);overflow:hidden;
+    color:var(--ink-muted);font-family:var(--font-mono);
+  }
+  .entity-stat{display:flex;align-items:baseline;gap:6px;padding:9px 13px;white-space:nowrap;}
+  .entity-stat + .entity-stat{border-left:1px solid var(--border);}
+  .entity-stat strong{color:var(--ink);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;}
+  .entity-stat span{font-size:calc(11.5px * var(--font-scale, 1));}
+  .entity-stat.has-issues strong,.entity-stat.has-issues span{color:var(--danger);}
+  .entity-stats-loading{padding:9px 13px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  @media (max-width:720px){
+    .entity-stat + .entity-stat{border-left:none;}
+    .entity-stat{padding:8px 10px;}
+  }
+
   /* Drei Reiter für die drei bisher getrennten Werkzeuge (Bereinigen/
      Hinzufügen/Korrigieren, Konzept-Erweiterung "Bearbeitungsbereich") — eine
      Seite, ein Datenmodell (Rohwerte derselben Entität), statt drei separate
@@ -163,6 +183,10 @@
       <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
 
+    <div class="entity-stats" id="rows-summary" aria-live="polite">
+      <span class="entity-stats-loading">Kennzahlen werden geladen …</span>
+    </div>
+
     <div class="edit-tabs">
       <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">Bereinigen</button>
       <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">Hinzufügen</button>
@@ -216,6 +240,10 @@
         <label class="filter-chip"><input type="radio" name="filter" value="gaps" onchange="resetPage()"><span>Lücken</span></label>
         {% endif %}
         <label class="filter-chip"><input type="radio" name="filter" value="duplicates" onchange="resetPage()"><span>Duplikate</span></label>
+        <label class="filter-chip"><input type="radio" name="filter" value="repetitions" onchange="resetPage()"><span>Wiederholungen</span></label>
+        {% if counter_decrease_enabled %}
+        <label class="filter-chip"><input type="radio" name="filter" value="counter_decreases" onchange="resetPage()"><span>Zählerrückgänge</span></label>
+        {% endif %}
         <select name="page_size" onchange="resetPage()" title="Zeilen pro Seite">
           <option value="10">10 / Seite</option>
           <option value="50" selected>50 / Seite</option>

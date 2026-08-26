@@ -6,6 +6,16 @@
 // Columns-/Rows-Arrays (Index statt Alpine-uid), nicht auf dem reaktiven
 // Zustand des Editors.
 window.TableCompute = (() => {
+  // Akzeptiertes Dezimaltrennzeichen für Zahl-Literale in Formeln, aus dem
+  // zentralen Oberflächenformat abgeleitet (static/js/number-format.js) statt
+  // hart auf "," verdrahtet — ein deutschsprachiger Nutzer tippt in einer
+  // Formel-Konstante natürlicherweise Komma (z. B. "A * 3,5"), das bisher am
+  // Parser scheiterte ("Unerwartetes Zeichen ','"). "." bleibt IMMER zusätzlich
+  // gültig (unabhängig vom Trennzeichen der aktuellen Sprache), da Formeln als
+  // Mini-Code gelesen werden, nicht als natürlichsprachige Zahl — keine
+  // Tausendertrennung hier, das wäre in einer Formel ohnehin nicht sinnvoll.
+  const FORMULA_DECIMAL_SEP = (window.NumberFormat && window.NumberFormat.DECIMAL_SEP) || ',';
+
   // Sicherer, kleiner Formel-Interpreter statt eval()/Function() — Formeln
   // stehen zwar nur in der eigenen Datenbank (kein Angriffsvektor von
   // außen), ein handgebauter Parser bleibt trotzdem die sauberere Wahl
@@ -51,9 +61,10 @@ window.TableCompute = (() => {
         return v;
       }
       const start = pos;
-      while (peek() && /[0-9.]/.test(peek())) pos++;
+      while (peek() && (/[0-9.]/.test(peek()) || peek() === FORMULA_DECIMAL_SEP)) pos++;
       if (pos === start) throw new Error(`Unerwartetes Zeichen "${peek() ?? ''}"`);
-      return parseFloat(s.slice(start, pos));
+      const numText = s.slice(start, pos);
+      return parseFloat(FORMULA_DECIMAL_SEP === '.' ? numText : numText.replace(FORMULA_DECIMAL_SEP, '.'));
     }
     const result = parseExpr();
     if (pos < s.length) throw new Error('Unerwarteter Rest in der Formel');
@@ -61,11 +72,9 @@ window.TableCompute = (() => {
     return result;
   }
 
-  function fmtNum(v) {
-    if (v == null || Number.isNaN(v)) return '';
-    if (v === 0) return '0';
-    return Number(v.toPrecision(4)).toLocaleString('de-DE');
-  }
+  // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe
+  // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
+  const fmtNum = (window.NumberFormat && window.NumberFormat.fmt) || (v => String(v));
 
   function cellText(cell) {
     if (!cell) return '–';

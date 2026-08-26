@@ -91,6 +91,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--font-display);margi
 .page{max-width:1120px;margin:0 auto;min-width:0;}
 button{font-family:inherit;}
 code,.mono{font-family:var(--font-mono);}
+/* Tastatur-Fokusring in der Akzentfarbe statt des browsereigenen (meist
+   blauen) Defaults — sonst wirkt z. B. ein gerade fokussiertes Auswahlfeld
+   optisch inkonsistent neben einem per Maus gehoverten (dort bereits grün,
+   siehe .field select:hover). :focus-visible statt :focus, damit ein reiner
+   Maus-Klick weiterhin keinen Ring zeigt, nur echte Tastaturnavigation. */
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
+  outline:2px solid var(--accent-line);outline-offset:1px;
+}
 
 .crumb{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);margin:0 0 6px;}
 .crumb a{color:inherit;}
@@ -132,6 +140,75 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 }
 .filter-chip input:checked + span,.chip.active{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
 .chip:disabled{opacity:.35;cursor:default;}
+
+/* Optionen-Menü — Dropdown für seltener geänderte Chart-Einstellungen
+   (Auflösung, Punkte, Kontinuierlich, Rohwerte, Y-Achse, Statistik in
+   Legende/Linie-Balken), damit die Haupt-Toolbar auf Zeitraum + Vergleichen
+   beschränkt bleibt statt über mehrere Zeilen zu wachsen. Dasselbe
+   Positionierungsmuster wie der Gruppen-Picker (table_editor.html,
+   .tbl-group-wrap/-popover): position:relative am Anker, position:absolute
+   am Popover selbst. Der Auslöser-Button ist bewusst ein waschechter .chip
+   (nicht nachgebaut) — .menu-btn ergänzt hier nur noch das Pfeil-Layout,
+   damit er von Vergleichen & Co. optisch nicht zu unterscheiden ist. */
+.menu-wrap{position:relative;display:inline-flex;}
+.menu-btn{display:inline-flex;align-items:center;gap:6px;}
+.menu-btn .chevron{font-size:.7em;opacity:.6;transition:transform .15s ease;}
+.menu-btn.active .chevron{transform:rotate(180deg);}
+.menu-popover{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:30;min-width:260px;
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
+  padding:8px;display:flex;flex-direction:column;gap:1px;
+}
+.menu-section-label{
+  font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);padding:8px 10px 4px;
+}
+.menu-row{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 10px;border-radius:9px;
+  font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;transition:background .1s ease;
+}
+.menu-row:hover{background:var(--surface-alt);}
+/* Auswahl-Zeile (z. B. "Vergleichen": Aus/Vortag/Vorjahrestag) statt Toggle —
+   dieselbe Hervorhebung wie ein aktiver .chip, kein Häkchen-Symbol. */
+.menu-row.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+.menu-row.active:hover{background:var(--accent-line);}
+button.menu-row{border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+/* Feste Breite statt der nativen Auto-Breite nach Options-Text — sonst
+   ändert sich die Form des Menüs sichtbar, sobald eine kürzere/längere
+   Option gewählt wird ("Automatisch" vs. "1 Stunde" vs. "30 Minuten"). */
+.menu-row select{font-family:var(--font-mono);width:150px;flex:none;}
+.menu-row-label{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
+/* Menü-Zeilen können auch reine Navigations-Links sein (a.menu-row) statt
+   Einstellungen — Browser-Standard für Links zurückgesetzt, damit sie sich
+   optisch nicht von den Toggle-/Auswahl-Zeilen im selben Menü unterscheiden. */
+a.menu-row{text-decoration:none;}
+.menu-row-arrow{color:var(--ink-faint);flex:none;}
+.menu-note{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+.menu-divider{height:1px;background:var(--border);margin:5px 6px;}
+/* Sanftes Einblenden des Popovers (x-transition:enter in den Templates) —
+   nur enter, kein leave, ein Zuklappen darf ruhig sofort verschwinden. */
+.menu-pop-enter{transition:opacity .12s ease-out,transform .12s ease-out;}
+.menu-pop-enter-start{opacity:0;transform:translateY(-4px) scale(.98);}
+.menu-pop-enter-end{opacity:1;transform:translateY(0) scale(1);}
+
+/* Toggle-Switch statt nackter Checkbox in Menü-Zeilen — dieselbe grüne
+   Akzentfarbe wie ein aktiver .chip, damit "An" in der ganzen Oberfläche
+   immer gleich aussieht, nur als kompakter Schalter statt Pille. */
+.menu-toggle{position:relative;flex:none;width:34px;height:20px;}
+.menu-toggle input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1;}
+.menu-toggle .track{
+  position:absolute;inset:0;border-radius:999px;background:var(--border-strong, var(--border));
+  transition:background .15s ease;
+}
+.menu-toggle .thumb{
+  position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:var(--surface);
+  box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s ease;
+}
+.menu-toggle input:checked ~ .track{background:var(--accent-line);}
+.menu-toggle input:checked ~ .track .thumb{transform:translateX(14px);}
+.menu-toggle input:disabled{cursor:default;}
+.menu-toggle input:disabled ~ .track{opacity:.4;}
+.menu-row:has(input:disabled){cursor:default;color:var(--ink-faint);}
 
 /* Datentabellen */
 .tbl-wrap{

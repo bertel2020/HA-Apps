@@ -27,7 +27,10 @@
     <a class="dtile-body" href="charts/{{ tile.id }}" draggable="false"
        data-entity-ids='{{ tile.entity_ids | tojson }}'
        data-entity-names='{{ tile.entity_names | tojson }}'
-       data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}">
+       data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
+       data-resolution-preset="{{ tile.resolution_preset }}"
+       data-dynamic-y-axis="{{ 'true' if tile.dynamic_y_axis else 'false' }}"
+       data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>
     </a>

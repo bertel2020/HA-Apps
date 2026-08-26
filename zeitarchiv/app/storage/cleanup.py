@@ -1,4 +1,5 @@
-"""Bereinigungs-Werkzeug: Rohdaten lesen, Ausreißer/Lücken/Duplikate markieren,
+"""Bereinigungs-Werkzeug: Rohdaten lesen, Ausreißer/Lücken/Duplikate/Wiederholungen/
+Zählerrückgänge markieren,
 nie destruktiv löschen (Konzept Abschnitt 04).
 
 Löschen ist ein Soft-Delete über index.deleted_points — Zeitstempel werden aus
@@ -13,7 +14,7 @@ from __future__ import annotations
 import calendar
 import statistics
 from collections import deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -24,7 +25,7 @@ import pyarrow.parquet as pq
 from . import rollup
 from .hotbuffer import append as hot_append
 from .hotbuffer import hot_path, read_rows
-from .index import Index, filter_deleted_occurrences
+from .index import Index, filter_deleted_occurrences, should_accept_value
 from .paths import entity_dir
 
 
@@ -73,6 +74,8 @@ def analyze_raw_rows_page(
     page_size: int,
     gap_threshold_minutes: float | None,
     outlier_threshold_percent: float | None,
+    decimals: str = "auto",
+    counter_decrease_enabled: bool = False,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -96,7 +99,14 @@ def analyze_raw_rows_page(
         gap_threshold_minutes * 60 if gap_threshold_minutes is not None else None
     )
 
-    counts = {"all": total_rows, "outliers": 0, "gaps": 0, "duplicates": 0}
+    counts = {
+        "all": total_rows,
+        "outliers": 0,
+        "gaps": 0,
+        "duplicates": 0,
+        "repetitions": 0,
+        "counter_decreases": 0,
+    }
     total_matches = 0
     previous_ts: float | None = None
     previous_value: float | None = None
@@ -104,8 +114,14 @@ def analyze_raw_rows_page(
     group_rows: list[dict] = []
     group_outlier: str | None = None
     group_gap: str | None = None
+    last_kept_ts: float | None = None
+    last_kept_value: float | None = None
+    counter_previous_ts: float | None = None
+    counter_previous_value: float | None = None
 
-    selected_filter = filter_ if filter_ in {"all", "outliers", "gaps", "duplicates"} else "all"
+    selected_filter = filter_ if filter_ in {
+        "all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases"
+    } else "all"
 
     def flush_group() -> None:
         nonlocal total_matches, group_rows
@@ -121,20 +137,33 @@ def analyze_raw_rows_page(
         if duplicate_reason is not None:
             counts["duplicates"] += 1
 
-        group_matches = (
-            selected_filter == "all"
-            or (selected_filter == "outliers" and group_outlier is not None)
-            or (selected_filter == "gaps" and group_gap is not None)
-            or (selected_filter == "duplicates" and duplicate_reason is not None)
-        )
-        if group_matches:
-            for row in group_rows:
+        for row in group_rows:
+            repetition_reason = row.pop("repetition_reason")
+            counter_decrease_reason = row.pop("counter_decrease_reason")
+            if repetition_reason is not None:
+                counts["repetitions"] += 1
+            if counter_decrease_reason is not None:
+                counts["counter_decreases"] += 1
+            row_matches = (
+                selected_filter == "all"
+                or (selected_filter == "outliers" and group_outlier is not None)
+                or (selected_filter == "gaps" and group_gap is not None)
+                or (selected_filter == "duplicates" and duplicate_reason is not None)
+                or (selected_filter == "repetitions" and repetition_reason is not None)
+                or (
+                    selected_filter == "counter_decreases"
+                    and counter_decrease_reason is not None
+                )
+            )
+            if row_matches:
                 row["flags"] = [
                     {"label": label, "reason": reason}
                     for label, reason in (
                         ("Ausreißer", group_outlier),
                         ("Lücke", group_gap),
                         ("Duplikat", duplicate_reason),
+                        ("Wiederholung", repetition_reason),
+                        ("Zählerrückgang", counter_decrease_reason),
                     )
                     if reason is not None
                 ]
@@ -168,7 +197,36 @@ def analyze_raw_rows_page(
                     f"({previous_value:.3g})"
                 )
 
-        group_rows.append({"ts": ts, "value": value})
+        if should_accept_value(
+            "decimals", decimals, last_kept_value, last_kept_ts, value, ts
+        ):
+            last_kept_ts, last_kept_value = ts, value
+            repetition_reason = None
+        else:
+            repetition_reason = _repetition_reason(decimals)
+
+        counter_decrease_reason = None
+        if counter_decrease_enabled:
+            if (
+                counter_previous_ts is not None
+                and counter_previous_value is not None
+                and ts > counter_previous_ts
+                and value < counter_previous_value
+            ):
+                counter_decrease_reason = _counter_decrease_reason(
+                    counter_previous_value, value
+                )
+            # Bei identischem Zeitstempel bleibt das erste Vorkommen die
+            # Referenz; weitere Vorkommen behandelt bereits der Duplikatfilter.
+            if counter_previous_ts is None or ts > counter_previous_ts:
+                counter_previous_ts, counter_previous_value = ts, value
+
+        group_rows.append({
+            "ts": ts,
+            "value": value,
+            "repetition_reason": repetition_reason,
+            "counter_decrease_reason": counter_decrease_reason,
+        })
         previous_ts = ts
         previous_value = value
     flush_group()
@@ -296,6 +354,83 @@ def detect_duplicates(rows: list[tuple[float, float]]) -> dict[float, str]:
     for ts, _ in rows:
         seen[ts] = seen.get(ts, 0) + 1
     return {ts: f"{count}× derselbe Zeitstempel" for ts, count in seen.items() if count > 1}
+
+
+def _repetition_reason(decimals: str) -> str:
+    precision = "3 (Automatisch)" if decimals == "auto" else decimals
+    return f"Gleicher gerundeter Folgewert bei {precision} Nachkommastellen"
+
+
+def iter_repeated_rows(
+    rows: Iterable[tuple[float, float]], decimals: str
+) -> Iterator[tuple[float, float]]:
+    """Findet aufeinanderfolgende Werte, die nach der Anzeige-Rundung gleich sind.
+
+    Dieselbe Sechs-Stunden-Lebenszeichenregel wie im Live-Schreibpfad bleibt
+    erhalten. Dadurch wird eine lange konstante Phase stark verdichtet, ohne
+    vollständig aus dem Zeitverlauf zu verschwinden.
+    """
+    last_kept_ts: float | None = None
+    last_kept_value: float | None = None
+    for ts, value in rows:
+        if should_accept_value(
+            "decimals", decimals, last_kept_value, last_kept_ts, value, ts
+        ):
+            last_kept_ts, last_kept_value = ts, value
+        else:
+            yield ts, value
+
+
+def repeated_rows_to_delete(
+    rows: Iterable[tuple[float, float]], decimals: str
+) -> list[tuple[float, float]]:
+    """Materialisierte Variante für begrenzte Zeitfenster und Tests."""
+    return list(iter_repeated_rows(rows, decimals))
+
+
+def detect_repetitions(
+    rows: list[tuple[float, float]], decimals: str
+) -> dict[float, str]:
+    """Markiert die von ``repeated_rows_to_delete`` erkannten Zeilen."""
+    reason = _repetition_reason(decimals)
+    return {ts: reason for ts, _value in repeated_rows_to_delete(rows, decimals)}
+
+
+def _counter_decrease_reason(previous_value: float, value: float) -> str:
+    difference = previous_value - value
+    if previous_value:
+        percentage = difference / abs(previous_value) * 100
+        return (
+            f"Vorwert {previous_value:.12g} → {value:.12g}; "
+            f"Rückgang um {difference:.12g} ({percentage:.1f} %)"
+        )
+    return (
+        f"Vorwert {previous_value:.12g} → {value:.12g}; "
+        f"Rückgang um {difference:.12g}"
+    )
+
+
+def detect_counter_decreases(
+    rows: Iterable[tuple[float, float]],
+) -> dict[float, str]:
+    """Markiert den ersten niedrigeren Wert nach einem höheren Zählerstand.
+
+    Ein Rückgang beginnt eine neue mögliche Zählerperiode. Deshalb wird nur
+    die Rückgangskante markiert; anschließend steigende Werte werden nicht
+    gegen das historische Maximum geprüft. Bei Zeitstempel-Duplikaten bleibt
+    das erste Vorkommen die Referenz, passend zur Duplikatbereinigung.
+    """
+    decreases: dict[float, str] = {}
+    previous_ts: float | None = None
+    previous_value: float | None = None
+    for ts, value in rows:
+        if previous_ts is not None and ts > previous_ts:
+            if previous_value is not None and value < previous_value:
+                decreases[ts] = _counter_decrease_reason(previous_value, value)
+            previous_ts, previous_value = ts, value
+        elif previous_ts is None:
+            previous_ts, previous_value = ts, value
+    return decreases
 
 
 def duplicate_rows_to_delete(rows: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -696,7 +831,7 @@ def add_raw_value(
         )
 
     index.add_row_count(entity_id, 1)
-    index.bump_ts_bounds(entity_id, ts)
+    index.bump_ts_bounds(entity_id, ts, value)
 
 
 def correct_raw_value(

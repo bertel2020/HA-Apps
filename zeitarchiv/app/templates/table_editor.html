@@ -38,7 +38,7 @@
   .tbl-columns{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;min-width:0;}
   .tbl-col-card{
     flex:none;width:190px;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);
-    padding:10px 12px;display:flex;flex-direction:column;gap:7px;cursor:grab;
+    padding:10px 12px;display:flex;flex-direction:column;gap:7px;
   }
   .tbl-col-card.dragging{opacity:.4;}
   .tbl-col-card input[type=text],.tbl-col-card select,.tbl-col-card input[type=number]{
@@ -47,11 +47,28 @@
   }
   .tbl-col-card label.cbx{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
   .tbl-field-label{
-    font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.04em;
+    display:block;font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.04em;
     color:var(--ink-faint);margin-bottom:-3px;
   }
-  .tbl-col-remove{align-self:flex-end;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(15px * var(--font-scale, 1));padding:0;line-height:1;}
+  .tbl-col-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;}
+  .tbl-col-remove{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(15px * var(--font-scale, 1));padding:0;line-height:1;}
   .tbl-col-remove:hover{color:var(--danger);}
+  .tbl-col-move{display:flex;gap:2px;flex:none;}
+  .tbl-col-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
+  .tbl-col-move button:hover{color:var(--accent-line);}
+  .tbl-col-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
+  /* Eigener Ziehgriff statt der ganzen (Eingabefeld-dichten) Karte draggable
+     zu machen — ein Drag-Start, der auf einem input/select landet, wird vom
+     Browser als Textauswahl/Fokus behandelt statt als natives Drag, was sich
+     wie "erst der zweite Versuch klappt" anfühlt. dragstart bricht deshalb
+     ab (preventDefault), wenn er nicht von .drag-handle ausgeht. */
+  .drag-handle{
+    flex:none;width:14px;height:20px;cursor:grab;opacity:.55;
+    background-image:radial-gradient(circle, var(--ink-faint) 1.3px, transparent 1.4px);
+    background-size:6px 6px;background-repeat:repeat;
+  }
+  .drag-handle:hover{opacity:1;}
+  .tbl-col-card.dragging .drag-handle,.tbl-row-card.dragging .drag-handle{cursor:grabbing;}
   .tbl-col-add{
     flex:none;width:64px;border:1px dashed var(--border);border-radius:10px;background:var(--surface);
     color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));cursor:pointer;
@@ -64,6 +81,7 @@
     display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:10px;
     background:var(--surface);padding:10px 12px;
   }
+  .tbl-row-card.dragging{opacity:.4;}
   .tbl-row-letter{
     flex:none;width:24px;height:24px;border-radius:999px;background:var(--surface-alt);color:var(--ink-muted);
     font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));font-weight:600;display:flex;align-items:center;justify-content:center;
@@ -82,7 +100,6 @@
   .tbl-row-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
   .tbl-row-move button:hover{color:var(--accent-line);}
   .tbl-row-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
-  .tbl-separator-editor-hint{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
 
   .tbl-entity-select{
     font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
@@ -92,7 +109,12 @@
     font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
     border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;max-width:320px;
   }
-  .tbl-formula-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  /* Formel + Einheit nebeneinander in einer Zeile — Einheit deutlich
+     schmaler, da typische Einheiten (kWh, °C, m³ …) nur wenige Zeichen
+     brauchen, während die Formel selbst der eigentliche Eingabefokus bleibt. */
+  .tbl-formula-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;}
+  .tbl-formula-field{display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px;max-width:320px;}
+  .tbl-formula-unit-field{flex:0 1 110px;min-width:90px;max-width:110px;}
 
   /* Gruppen-Picker: Button + Popover, dasselbe Positionierungsmuster wie das
      Kalender-Widget (cal-wrap/calendar-popover) — position:relative am
@@ -149,10 +171,7 @@
   /* Darstellungs-Optionen (Konzept-Erweiterung "professionelles UI-Design")
      — dieselben Klassennamen wie auf der Dashboard-Kachel (entities.html),
      damit eine angeheftete Tabelle dort identisch aussieht. */
-  .tbl-style-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
-  .tbl-style-legend{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:3px;}
-  .tbl-style-legend li{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .tbl-style-legend strong{color:var(--ink-muted);font-weight:600;}
+  .tbl-style-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
   .tbl-style-zebra tr:nth-child(even) td{background:var(--surface-alt);}
   .tbl-style-zebra.tbl-style-header-accent tr:nth-child(even) td{background:var(--surface-alt);}
   .tbl-style-border-grid td,.tbl-style-border-grid th{border:1px solid var(--border);}
@@ -212,11 +231,18 @@
         <template x-if="editing">
           <div>
             <h3 class="tbl-h">Spalten (Zeiträume)</h3>
-            <p class="tbl-hint">Jede Spalte ist ein Zeitraum, frei benannt (z. B. "Heute", "Aug VJ", "2026") — Bezeichnung und tatsächliche Berechnung (Zeitraum-Typ/Versatz) sind getrennt. Ohne eigene Beschriftung wird der vorgeschlagene Name (grau) übernommen. Der Versatz steuert, welche Periode gemeint ist: 0 = aktuell, -1 = eine Periode zurück, -2 = zwei Perioden zurück usw. (nie positiv) — für "Vorjahresmonat" bei Zeitraum-Typ "Monat" z. B. -12, die Einheit wird direkt im Feld angezeigt. Per Ziehen lassen sich die Spalten neu anordnen.</p>
+            <p class="tbl-hint">Jede Spalte ist ein Zeitraum, frei benannt (z. B. "Heute", "Aug VJ", "2026") — Bezeichnung und tatsächliche Berechnung (Zeitraum-Typ/Versatz) sind getrennt. Ohne eigene Beschriftung wird der vorgeschlagene Name (grau) übernommen. Der Versatz steuert, welche Periode gemeint ist: 0 = aktuell, -1 = eine Periode zurück, -2 = zwei Perioden zurück usw. (nie positiv) — für "Vorjahresmonat" bei Zeitraum-Typ "Monat" z. B. -12, die Einheit wird direkt im Feld angezeigt. Per Ziehen oder über die Pfeile lassen sich die Spalten neu anordnen.</p>
             <div class="tbl-columns">
-              <template x-for="col in columns" :key="col.uid">
+              <template x-for="(col, idx) in columns" :key="col.uid">
                 <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid">
-                  <button type="button" class="tbl-col-remove" title="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
+                  <div class="tbl-col-top">
+                    <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true"></span>
+                    <span class="tbl-col-move">
+                      <button type="button" title="Spalte nach links" :disabled="idx === 0" @click="moveColumn(col.uid, -1)">←</button>
+                      <button type="button" title="Spalte nach rechts" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
+                    </span>
+                    <button type="button" class="tbl-col-remove" title="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
+                  </div>
                   <span class="tbl-field-label">Beschriftung</span>
                   <input type="text" :placeholder="suggestColumnLabel(col)" x-model="col.label">
                   <span class="tbl-field-label">Zeitraum-Typ</span>
@@ -237,10 +263,12 @@
               <strong>Entität</strong>: eine einzelne Entität. <strong>Gruppe</strong>: mehrere Entitäten zu einer Summen-Zeile zusammengefasst.
               <strong>Formel</strong>: referenziert andere Zeilen über ihr Buchstaben-Kürzel (links), z. B. <code>A / B * 100</code> — nur Zeilen OBERHALB der Formel-Zeile sind referenzierbar.
               <strong>Trennlinie</strong>: trennt zwei Bereiche rein optisch und benötigt keine Daten.
+              Per Ziehen oder über die Pfeile neu anordnen.
             </p>
-            <div class="tbl-rows">
+            <div class="tbl-rows" id="tbl-rows">
               <template x-for="(row, idx) in rows" :key="row.uid">
-                <div class="tbl-row-card">
+                <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid">
+                  <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true" style="margin-top:5px;"></span>
                   <div class="tbl-row-letter" x-text="row.row_type === 'separator' ? '—' : rowLetters[row.uid]"></div>
                   <div class="tbl-row-main">
                     <div class="tbl-row-top">
@@ -284,15 +312,17 @@
                     </div>
 
                     <template x-if="row.row_type === 'formula'">
-                      <div>
-                        <input type="text" class="tbl-formula-input" placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()">
-                        <span class="tbl-field-label">Einheit (optional)</span>
-                        <input type="text" class="tbl-formula-input" :placeholder="suggestFormulaUnit(row) || 'Automatisch übernehmen'" x-model="row.formula_unit" @change="load()">
-                        <p class="tbl-formula-hint">Verfügbar: <span x-text="rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)'"></span></p>
-                        <p class="tbl-formula-hint">Ohne eigene Einheit wird die Einheit der ersten referenzierten Ausgangszeile übernommen.</p>
+                      <div class="tbl-formula-row">
+                        <div class="tbl-formula-field">
+                          <span class="tbl-field-label">Formel — verfügbar: <span x-text="rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)'"></span></span>
+                          <input type="text" class="tbl-formula-input" placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()">
+                        </div>
+                        <div class="tbl-formula-field tbl-formula-unit-field">
+                          <span class="tbl-field-label">Einheit</span>
+                          <input type="text" class="tbl-formula-input" :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()">
+                        </div>
                       </div>
                     </template>
-                    <p class="tbl-separator-editor-hint" x-show="row.row_type === 'separator'">Durchgehende Linie über die gesamte Tabellenbreite.</p>
                   </div>
                 </div>
               </template>
@@ -321,14 +351,6 @@
                 <button type="button" :class="{active: style.density === 'compact'}" title="Schmalerer Zeilenabstand, mehr Zeilen auf einen Blick" @click="style.density = 'compact'">Kompakt</button>
               </div>
             </div>
-            <ul class="tbl-style-legend">
-              <li><strong>Zebra-Streifen:</strong> abwechselnder Zeilenhintergrund für leichteres zeilenweises Lesen.</li>
-              <li><strong>Kopfzeile hervorheben:</strong> Kopfzeile (Zeiträume) in der Akzentfarbe.</li>
-              <li><strong>Erste Spalte hervorheben:</strong> erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt, berücksichtigt ein aktives Zebra-Muster.</li>
-              <li><strong>Beschriftung fett:</strong> Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung.</li>
-              <li><strong>Rahmen:</strong> Horizontal (nur Linien zwischen Zeilen) &middot; Gitter (Linien um jede Zelle) &middot; Ohne Rahmen (keine Linien).</li>
-              <li><strong>Dichte:</strong> Komfortabel (normaler Zeilenabstand) &middot; Kompakt (schmalerer Zeilenabstand, mehr Zeilen auf einen Blick).</li>
-            </ul>
 
             <h3 class="tbl-h">Vorschau</h3>
           </div>
@@ -370,6 +392,7 @@
 
   <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
@@ -426,45 +449,137 @@
       return '';
     }
 
-    // Spalten per Drag & Drop neu anordnen — dasselbe native HTML5-DnD-Muster
-    // wie bei den Dashboard-Kacheln (dashboard-tiles.js, setupDragAndDrop()),
-    // hier per Event-Delegation auf den (statischen) .tbl-columns-Container
-    // statt pro Karte gebunden, damit neu hinzugefügte Karten (addColumn())
-    // automatisch mit erfasst werden, ohne die Listener neu anhängen zu
-    // müssen. Die Karten selbst werden von Alpines x-for gerendert — das
-    // Array (this.columns) ist die Quelle der Wahrheit, DOM-Reihenfolge
-    // während des Ziehens ist nur eine visuelle Vorschau, die am Ende des
-    // Drags ins Array zurückübertragen wird.
+    // Spalten per Drag & Drop neu anordnen. Anders als bei den Dashboard-
+    // Kacheln (dashboard-tiles.js, setupDragAndDrop() — dort reines DOM ohne
+    // konkurrierendes Framework) werden die Karten hier von Alpines x-for
+    // gerendert. Während des Ziehens per insertBefore direkt im DOM zu
+    // verschieben (die ursprüngliche Fassung) gerät mit Alpines eigener,
+    // keyed x-for-Verwaltung derselben Elemente in Konflikt: die Vorschau-
+    // Tabelle (die NIE manuell angefasst wird) aktualisiert sich sofort
+    // korrekt, aber die manuell verschobene Karte selbst hinkt hinterher und
+    // "springt" erst beim nächsten x-for-Durchlauf (z. B. der übernächste
+    // Drag) an ihre neue Position — Alpines interne Zuordnung Key→Knoten
+    // verliert durch das externe insertBefore den Bezug zur tatsächlichen
+    // DOM-Reihenfolge. Deshalb hier stattdessen: WÄHREND des Ziehens direkt
+    // das reaktive Array (this.columns) umsortieren und dem DOM die
+    // Neupositionierung vollständig überlassen — Alpine bleibt die einzige
+    // Instanz, die diese Knoten je bewegt.
     function setupColumnDrag() {
       const container = document.querySelector('.tbl-columns');
       if (!container || container.dataset.dragBound) return;
       container.dataset.dragBound = '1';
+      let draggedUid = null;
       let draggedEl = null;
+      // dragstart selbst kann nicht prüfen, ob der Griff angefasst wurde —
+      // event.target ist dort laut Spec immer das draggable-Element (die
+      // ganze Karte), nicht der tatsächlich angeklickte Kindknoten. Deshalb
+      // hier per mousedown merken, dort ist event.target noch der reale
+      // Klick-Zielknoten wie bei jedem anderen Maus-Event.
+      let handleGrabbed = false;
+      container.addEventListener('mousedown', e => {
+        handleGrabbed = !!e.target.closest('.drag-handle');
+      });
       container.addEventListener('dragstart', e => {
         const card = e.target.closest('.tbl-col-card');
         if (!card) return;
+        // Nur vom Ziehgriff aus starten — sonst interpretiert der Browser
+        // einen Drag-Start auf einem input/select als Textauswahl/Fokus
+        // statt als natives Drag (siehe Kommentar bei .drag-handle oben).
+        if (!handleGrabbed) { e.preventDefault(); return; }
         draggedEl = card;
+        draggedUid = card.dataset.colUid;
         card.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', card.dataset.colUid || '');
+        e.dataTransfer.setData('text/plain', draggedUid || '');
       });
       container.addEventListener('dragover', e => {
-        if (!draggedEl) return;
+        if (!draggedUid) return;
         e.preventDefault();
         const card = e.target.closest('.tbl-col-card');
-        if (!card || card === draggedEl) return;
+        if (!card || card.dataset.colUid === draggedUid) return;
+        const pageData = Alpine.$data(document.querySelector('.page'));
+        const fromIdx = pageData.columns.findIndex(c => c.uid === draggedUid);
+        const overIdx = pageData.columns.findIndex(c => c.uid === card.dataset.colUid);
+        if (fromIdx === -1 || overIdx === -1) return;
         const rect = card.getBoundingClientRect();
         const before = (e.clientX - rect.left) < rect.width / 2;
-        card.parentNode.insertBefore(draggedEl, before ? card : card.nextSibling);
+        let targetIdx = overIdx + (before ? 0 : 1);
+        if (targetIdx > fromIdx) targetIdx -= 1;
+        if (targetIdx === fromIdx) return;
+        const [col] = pageData.columns.splice(fromIdx, 1);
+        pageData.columns.splice(targetIdx, 0, col);
       });
       container.addEventListener('dragend', () => {
-        if (draggedEl) {
-          draggedEl.classList.remove('dragging');
-          const uids = Array.from(container.querySelectorAll('.tbl-col-card')).map(el => el.dataset.colUid);
+        if (draggedEl) draggedEl.classList.remove('dragging');
+        draggedEl = null;
+        draggedUid = null;
+      });
+    }
+
+    // Zeilen per Drag & Drop neu anordnen — dasselbe Muster wie
+    // setupColumnDrag() oben (Array live während des Ziehens umsortieren,
+    // kein manuelles insertBefore), nur vertikal (Zeilen untereinander statt
+    // Karten nebeneinander): Reihenfolge-Vergleich per rect.top/height-
+    // Mittelpunkt statt rect.left/width. Anders als bei Spalten wird beim
+    // Loslassen zusätzlich correctFormulaLetters() aufgerufen — sie
+    // korrigiert die Buchstaben-Referenzen in Formel-Zeilen anhand der beim
+    // Start des Ziehens gemerkten alten Zuordnung, genau wie moveRow() per
+    // Pfeil-Buttons — und danach neu geladen.
+    function setupRowDrag() {
+      const container = document.getElementById('tbl-rows');
+      if (!container || container.dataset.dragBound) return;
+      container.dataset.dragBound = '1';
+      let draggedUid = null;
+      let draggedEl = null;
+      let oldLetterToUid = null;
+      // Siehe Kommentar zu handleGrabbed in setupColumnDrag() oben —
+      // event.target ist bei dragstart selbst nicht der angeklickte
+      // Kindknoten, deshalb per mousedown vormerken.
+      let handleGrabbed = false;
+      container.addEventListener('mousedown', e => {
+        handleGrabbed = !!e.target.closest('.drag-handle');
+      });
+      container.addEventListener('dragstart', e => {
+        const card = e.target.closest('.tbl-row-card');
+        if (!card) return;
+        // Nur vom Ziehgriff aus starten — siehe derselbe Kommentar in
+        // setupColumnDrag() oben.
+        if (!handleGrabbed) { e.preventDefault(); return; }
+        draggedEl = card;
+        draggedUid = card.dataset.rowUid;
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', draggedUid || '');
+        const pageData = Alpine.$data(document.querySelector('.page'));
+        oldLetterToUid = pageData.snapshotRowLetters();
+      });
+      container.addEventListener('dragover', e => {
+        if (!draggedUid) return;
+        e.preventDefault();
+        const card = e.target.closest('.tbl-row-card');
+        if (!card || card.dataset.rowUid === draggedUid) return;
+        const pageData = Alpine.$data(document.querySelector('.page'));
+        const fromIdx = pageData.rows.findIndex(r => r.uid === draggedUid);
+        const overIdx = pageData.rows.findIndex(r => r.uid === card.dataset.rowUid);
+        if (fromIdx === -1 || overIdx === -1) return;
+        const rect = card.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < rect.height / 2;
+        let targetIdx = overIdx + (before ? 0 : 1);
+        if (targetIdx > fromIdx) targetIdx -= 1;
+        if (targetIdx === fromIdx) return;
+        const [row] = pageData.rows.splice(fromIdx, 1);
+        pageData.rows.splice(targetIdx, 0, row);
+      });
+      container.addEventListener('dragend', () => {
+        if (draggedEl) draggedEl.classList.remove('dragging');
+        if (draggedUid && oldLetterToUid) {
           const pageData = Alpine.$data(document.querySelector('.page'));
-          pageData.columns.sort((a, b) => uids.indexOf(a.uid) - uids.indexOf(b.uid));
+          pageData.correctFormulaLetters(oldLetterToUid);
+          pageData.load();
         }
         draggedEl = null;
+        draggedUid = null;
+        oldLetterToUid = null;
       });
     }
 
@@ -494,6 +609,18 @@
         addColumn() {
           this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false});
         },
+        // Verschiebt eine Spalte um eine Position nach links (-1) oder rechts
+        // (+1) — dieselbe Splice-Logik wie moveRow() unten, als Alternative
+        // zum Ziehen (setupColumnDrag()) für Tastatur-/Klickbedienung. Kein
+        // load() nötig — reine Anzeigereihenfolge, dieselben bereits
+        // geladenen Werte (values ist über col.uid indiziert, siehe unten).
+        moveColumn(colUid, direction) {
+          const index = this.columns.findIndex(c => c.uid === colUid);
+          const target = index + direction;
+          if (index < 0 || target < 0 || target >= this.columns.length) return;
+          const [col] = this.columns.splice(index, 1);
+          this.columns.splice(target, 0, col);
+        },
         removeColumn(colUid) {
           this.columns = this.columns.filter(c => c.uid !== colUid);
           this.load();
@@ -518,9 +645,41 @@
           const index = this.rows.findIndex(r => r.uid === rowUid);
           const target = index + direction;
           if (index < 0 || target < 0 || target >= this.rows.length) return;
+          const oldLetterToUid = this.snapshotRowLetters();
           const [row] = this.rows.splice(index, 1);
           this.rows.splice(target, 0, row);
+          this.correctFormulaLetters(oldLetterToUid);
           this.load();
+        },
+        // Buchstabe→UID-Momentaufnahme der aktuellen Reihenfolge, vor einer
+        // Umsortierung zu ziehen (von moveRow() per Pfeil-Button UND von
+        // setupRowDrag() bei dragstart genutzt) — Grundlage für
+        // correctFormulaLetters() danach.
+        snapshotRowLetters() {
+          const letterToUid = {};
+          Object.entries(this.rowLetters).forEach(([rowUid, letter]) => {
+            if (letter) letterToUid[letter] = rowUid;
+          });
+          return letterToUid;
+        },
+        // Korrigiert die Buchstaben-Referenzen (A/B/C …) in Formel-Zeilen
+        // nach einer Umsortierung von this.rows: die Buchstaben sind rein
+        // positionsabhängig (rowLetters-Getter), eine Formel wie "A/B"
+        // speichert aber nur den Buchstaben, nicht die referenzierte Zeile
+        // selbst — ohne diese Korrektur würde eine Formel nach dem
+        // Umsortieren stillschweigend eine ANDERE Zeile referenzieren als
+        // vorher gemeint. oldLetterToUid ist die vor der Umsortierung per
+        // snapshotRowLetters() gezogene Momentaufnahme.
+        correctFormulaLetters(oldLetterToUid) {
+          const newLetterOfUid = this.rowLetters;
+          this.rows.forEach(r => {
+            if (r.row_type !== 'formula' || !r.formula) return;
+            r.formula = r.formula.replace(/[A-Za-z]/g, ch => {
+              const referencedUid = oldLetterToUid[ch.toUpperCase()];
+              if (!referencedUid) return ch;
+              return newLetterOfUid[referencedUid] || ch;
+            });
+          });
         },
         removeRow(rowUid) {
           this.rows = this.rows.filter(r => r.uid !== rowUid);
@@ -649,12 +808,12 @@
 
         init() {
           this.load();
-          // .tbl-columns steckt in einem x-if="editing" — bei jedem Wechsel
-          // auf "editing" wird der Container neu erzeugt (der
+          // .tbl-columns/.tbl-rows stecken in einem x-if="editing" — bei
+          // jedem Wechsel auf "editing" wird der Container neu erzeugt (der
           // dragBound-Marker geht dabei verloren), deshalb hier neu binden,
           // nicht nur einmalig beim ersten Laden.
-          this.$watch('editing', v => { if (v) this.$nextTick(() => setupColumnDrag()); });
-          if (this.editing) this.$nextTick(() => setupColumnDrag());
+          this.$watch('editing', v => { if (v) this.$nextTick(() => { setupColumnDrag(); setupRowDrag(); }); });
+          if (this.editing) this.$nextTick(() => { setupColumnDrag(); setupRowDrag(); });
         },
       };
     }

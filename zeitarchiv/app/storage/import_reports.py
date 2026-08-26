@@ -138,6 +138,20 @@ def delete(data_dir: Path, report_id: str) -> bool:
     return True
 
 
+def delete_all(data_dir: Path) -> int:
+    """Löscht alle gültigen Import-Reports und liefert deren Anzahl zurück."""
+    reports = list_all(data_dir)
+    deleted = 0
+    for report in reports:
+        if delete(data_dir, report["id"]):
+            deleted += 1
+    try:
+        (data_dir / "reports" / "import").rmdir()
+    except OSError:
+        pass
+    return deleted
+
+
 def download_path(data_dir: Path, report_id: str) -> Path | None:
     path = _path(data_dir, report_id)
     return path if path is not None and path.is_file() else None
