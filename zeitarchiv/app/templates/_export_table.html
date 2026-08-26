@@ -34,7 +34,7 @@
       </td>
       <td class="centered"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>
       <td>{{ row.unit or "—" }}</td>
-      <td>{{ "{:,}".format(row.row_count).replace(",", ".") }}</td>
+      <td>{{ row.row_count | format_int }}</td>
       <td class="actions">
         <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" {% if row.row_count == 0 %}aria-disabled="true" style="pointer-events:none;opacity:.4;"{% endif %}>CSV herunterladen</a>
       </td>

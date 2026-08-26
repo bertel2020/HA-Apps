@@ -8,6 +8,21 @@
 <link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
 <style>
   :root{--font-scale:{{ font_scale_value }};}
+  /* "Diagnose" bewusst von Dokumentation/Changelog/Fehler melden abgesetzt
+     (eigener, sensiblerer Download statt reiner externer Links) — die
+     geteilte .settings-subsection-Trennlinie (app.css) greift sonst nur
+     zwischen zwei AUFEINANDERFOLGENDEN Subsections (+-Selektor), hier steht
+     sie aber direkt nach der reinen .actionbar-Button-Zeile. */
+  #ueber .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+  /* Log-Level-Formular UND "Nächsten Schreibvorgang aufzeichnen" sind beide
+     .settings-subsection, aber keine direkten Geschwister im DOM — der
+     htmx-Refresh-Wrapper #debug-tools (_settings_debug_tools.html) steht
+     dazwischen, wodurch der geteilte +-Selektor (app.css) nicht zwischen
+     ihnen greift. Gezielt nur auf direkte Kinder von #debug-tools statt auf
+     #protokollierung .settings-subsection insgesamt, sonst bekäme auch das
+     allererste Subsection (Log-Level-Formular, direkt unter der Überschrift)
+     fälschlich eine Trennlinie darüber. */
+  #protokollierung #debug-tools > .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
   .about-copyright{
     display:flex;align-items:center;gap:8px;margin-top:20px;padding-top:14px;
     border-top:1px solid var(--border);font-size:calc(12px * var(--font-scale,1));color:var(--ink-faint);
@@ -18,8 +33,8 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Einstellungen</p>
     <h1>Einstellungen</h1>
     <p class="sub">Globale Konfiguration &mdash; unabhängig von einzelnen Entitäten.</p>
 
@@ -125,9 +140,16 @@
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md" target="_blank" rel="noopener noreferrer">Dokumentation</a>
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/issues" target="_blank" rel="noopener noreferrer">Fehler melden</a>
-            <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
           </div>
-          <p class="hint">Der Diagnosebericht enthält Betriebs-, Speicher- und nicht geheime Konfigurationsdaten, aber keine API-Token, Messwerte oder Entitäts-IDs.</p>
+
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Diagnose</h3>
+            <div class="actionbar" style="justify-content:flex-start;">
+              <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
+            </div>
+            <p class="hint">Der Diagnosebericht enthält Betriebs-, Speicher- und nicht geheime Konfigurationsdaten, aber keine API-Token, Messwerte oder Entitäts-IDs.</p>
+          </div>
+
           <footer class="about-copyright">
             <span class="copyright-mark" aria-hidden="true">©</span>
             <span>2026 <a href="https://github.com/bertel2020" target="_blank" rel="noopener noreferrer">bertel2020</a></span>

@@ -49,6 +49,7 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
     <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / <a href="{{ base }}/entities/{{ entity_id }}">{{ friendly_name or entity_id }}</a> / Konfiguration</p>
     <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>

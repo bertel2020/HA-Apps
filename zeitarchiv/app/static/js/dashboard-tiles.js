@@ -78,10 +78,11 @@
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
+    const base = el.closest('#dashboard-grid')?.dataset.base || '.';
     const params = new URLSearchParams({entity_ids: entityIds.join(','), range, offset: '0', continuous: String(continuous)});
     let data;
     try {
-      const res = await fetch(`api/query-multi?${params}`);
+      const res = await fetch(`${base}/api/query-multi?${params}`);
       data = await res.json();
     } catch (e) {
       chartEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
@@ -248,9 +249,10 @@
     const gridRows = Math.max(1, Math.min(3, parseInt(tile.dataset.gridRows || '1', 10)));
     const visibleCols = columns.slice(0, TABLE_TILE_MAX_COLS_PER_GRID_COL * gridCols);
     const visibleRows = rows.slice(0, TABLE_TILE_MAX_ROWS_PER_GRID_ROW * gridRows);
+    const base = el.closest('#dashboard-grid')?.dataset.base || '.';
     let values;
     try {
-      values = await TableCompute.computeValues('.', columns, rows);
+      values = await TableCompute.computeValues(base, columns, rows);
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
       return;
@@ -310,6 +312,9 @@
   }
 
   function setupSizePickers() {
+    const grid = document.getElementById('dashboard-grid');
+    const base = grid?.dataset.base || '.';
+    const dashboardId = parseInt(grid?.dataset.dashboardId || '1', 10);
     document.querySelectorAll('.dtile-menu').forEach(control => {
       const tile = control.closest('.dtile[data-item-id]');
       const cells = Array.from(control.querySelectorAll('.dtile-size-cell'));
@@ -345,10 +350,11 @@
           const gridCols = parseInt(cell.dataset.cols, 10);
           const gridRows = parseInt(cell.dataset.rows, 10);
           try {
-            const response = await fetch('dashboard/size', {
+            const response = await fetch(`${base}/dashboard/size`, {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
+                dashboard_id: dashboardId,
                 item_type: tile.dataset.itemType,
                 item_id: parseInt(tile.dataset.itemId, 10),
                 grid_cols: gridCols,
@@ -431,14 +437,16 @@
   }
 
   async function persistOrder(grid) {
+    const base = grid.dataset.base || '.';
+    const dashboardId = parseInt(grid.dataset.dashboardId || '1', 10);
     const pins = Array.from(grid.querySelectorAll('.dtile[data-item-id]')).map(el => ({
       item_type: el.dataset.itemType, item_id: parseInt(el.dataset.itemId, 10),
     }));
     try {
-      await fetch('dashboard/reorder', {
+      await fetch(`${base}/dashboard/reorder`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({pins}),
+        body: JSON.stringify({dashboard_id: dashboardId, pins}),
       });
     } catch (e) {
       // Reihenfolge bleibt clientseitig wie gezogen bestehen — ein erneutes

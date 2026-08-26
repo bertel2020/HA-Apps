@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from .formatting import format_size
+from .formatting import format_int, format_size, format_value
 from .storage import import_reports
 from .storage.coordinator import StorageCoordinator
 
@@ -56,6 +56,12 @@ class ReportService:
         except (KeyError, TypeError, ValueError):
             finished_label, finished_date = "—", ""
         summary = report.get("summary", {})
+        rows_written = int(summary.get("rows_imported", 0)) + int(summary.get("rows_merged", 0))
+        rows_skipped = int(summary.get("rows_duplicate", 0)) + int(summary.get("rows_invalid", 0))
+        duration_seconds = float(report.get("duration_seconds", 0) or 0)
+        # *_label-Varianten fürs Template (NUMBER_LOCALE-Format, siehe
+        # formatting.py) — rows_written/rows_skipped selbst bleiben rohe int,
+        # weil context() sie als Sortierschlüssel braucht (sort_value()).
         return {
             **report,
             "finished_label": finished_label,
@@ -63,8 +69,29 @@ class ReportService:
             "source_label": SOURCE_LABELS.get(report.get("source_type"), "Unbekannt"),
             "status_label": STATUS_LABELS.get(report.get("status"), "Unbekannt"),
             "source_size": format_size(int(report.get("source", {}).get("size_bytes", 0) or 0)),
-            "rows_written": int(summary.get("rows_imported", 0)) + int(summary.get("rows_merged", 0)),
-            "rows_skipped": int(summary.get("rows_duplicate", 0)) + int(summary.get("rows_invalid", 0)),
+            "rows_written": rows_written,
+            "rows_skipped": rows_skipped,
+            "rows_written_label": format_int(rows_written),
+            "rows_skipped_label": format_int(rows_skipped),
+            "duration_label": format_value(duration_seconds, decimals=1),
+            "duration_label_precise": format_value(duration_seconds, decimals=3),
+            "summary_label": {
+                "targets": format_int(int(summary.get("targets", 0))),
+                "rows_imported": format_int(int(summary.get("rows_imported", 0))),
+                "rows_merged": format_int(int(summary.get("rows_merged", 0))),
+                "rows_duplicate": format_int(int(summary.get("rows_duplicate", 0))),
+                "rows_invalid": format_int(int(summary.get("rows_invalid", 0))),
+            },
+            "results": [
+                {
+                    **result,
+                    "rows_imported_label": format_int(int(result.get("rows_imported", 0))),
+                    "rows_merged_label": format_int(int(result.get("rows_merged", 0))),
+                    "duplicate_rows_label": format_int(int(result.get("duplicate_rows", 0))),
+                    "skipped_rows_label": format_int(int(result.get("skipped_rows", 0))),
+                }
+                for result in report.get("results", [])
+            ],
         }
 
     @staticmethod

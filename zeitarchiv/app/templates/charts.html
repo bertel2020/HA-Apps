@@ -14,7 +14,14 @@
   .chart-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
   .chart-card .entity-tooltip-host{min-width:0;}
   .chart-card .entity-names{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .chart-card .actions{display:flex;gap:8px;margin-top:auto;padding-top:10px;}
+  .chart-card .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px;}
+  .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:150px;border-style:dashed;text-decoration:none;}
+  .chart-grid-add-btn{
+    display:flex;align-items:center;justify-content:center;
+    width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);
+    color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));line-height:1;
+  }
+  .chart-grid-add:hover .chart-grid-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
   .fav-star{
     position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;
     font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
@@ -24,16 +31,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Charts</p>
     <h1>Charts</h1>
     <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="charts/new">+ Neuer Chart</a></p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'charts' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
-        {% if rows %}
+    <div class="settings-panel">
         <div class="chart-grid">
           {% for row in rows %}
           <div class="card chart-card">
@@ -47,15 +50,15 @@
             <div class="meta">{{ row.entity_count }} Entität{{ 'en' if row.entity_count != 1 else '' }} &middot; {{ row.range_label }}</div>
             <div class="actions">
               <a class="btn" href="charts/{{ row.id }}">Ansehen</a>
+              <a class="btn" href="charts/{{ row.id }}?edit=1">Bearbeiten</a>
               <button type="button" class="btn btn-danger" onclick="deleteChart({{ row.id }}, this)">Löschen</button>
             </div>
           </div>
           {% endfor %}
+          <a class="card chart-grid-add" href="charts/new" title="Neuer Chart">
+            <span class="chart-grid-add-btn">+</span>
+          </a>
         </div>
-        {% else %}
-        <div class="empty">Noch keine Charts abgelegt — <a href="charts/new">jetzt eins erstellen →</a></div>
-        {% endif %}
-      </div>
     </div>
   </div>
 

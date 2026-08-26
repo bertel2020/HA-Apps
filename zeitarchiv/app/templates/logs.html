@@ -22,15 +22,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Protokoll</p>
     <h1>Protokoll</h1>
     <p class="sub">Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll. &middot; <a href="settings#protokollierung">Protokollierung einstellen →</a></p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'logs' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
         <section>
           <div class="log-toolbar">
             <span class="dd-picker-wrap">
@@ -53,7 +50,6 @@
           </div>
           <pre id="log-output" tabindex="0" aria-label="Zeitarchiv-Protokoll">Protokoll wird geladen …</pre>
         </section>
-      </div>
     </div>
   </div>
 

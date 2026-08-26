@@ -106,8 +106,8 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page" x-data="entityChart()">
-    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / {{ friendly_name or entity_id }}</p>
     <div class="h1-row">
       <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
@@ -222,7 +222,6 @@
 
   </div>
 
-  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/vendor/echarts.min.js"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>

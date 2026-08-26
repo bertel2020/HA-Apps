@@ -9,17 +9,13 @@
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Backup / Restore</p>
     <h1>Backup / Restore</h1>
     <p class="sub">Kompletten Datenbestand als ZIP-Datei sichern &mdash; manuell oder nach Zeitplan.</p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'backup' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
-        {% include "_settings_backup_form.html" %}
-      </div>
+    <div class="settings-panel">
+      {% include "_settings_backup_form.html" %}
     </div>
   </div>
   <script src="static/vendor/htmx.min.js"></script>

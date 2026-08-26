@@ -83,26 +83,28 @@
      (overflow:hidden/ellipsis) auf dem Kind-Span darin — sitzen beide auf
      demselben Element, schneidet dessen eigenes overflow:hidden das eigene
      Tooltip mit ab (siehe derselbe Fix in export.html). */
-  .symcon-name-cell{display:block;min-width:0;max-width:180px;}
-  .symcon-name-wrap,.symcon-parent-wrap{display:block;max-width:180px;}
+  .symcon-name-cell{display:block;min-width:0;max-width:230px;}
+  .symcon-name-wrap,.symcon-parent-wrap{display:block;max-width:230px;}
   .symcon-name,.symcon-parent{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .symcon-name{font-weight:600;color:var(--ink);}
   .symcon-parent{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
   .symcon-name-tooltip .symcon-tooltip-parent{display:block;max-width:520px;white-space:normal;line-height:1.4;font-family:var(--font-display);font-size:calc(11px * var(--font-scale, 1));color:inherit;}
 
   /* Feste, kompakte Spalten verhindern, dass technische Kurzspalten unnötig
-     Platz verbrauchen. Die HA-Zuordnung erhält den verbleibenden Raum. */
-  table.symcon-import-table{table-layout:fixed;min-width:790px;}
+     Platz verbrauchen. Die HA-Zuordnung erhält den verbleibenden Raum. Seit
+     die Sidebar-Navigation durch die globale Menüleiste ersetzt wurde, steht
+     .settings-panel mehr Breite zur Verfügung — entsprechend etwas breiter
+     gezogen. */
+  table.symcon-import-table{table-layout:fixed;min-width:920px;}
   .symcon-col-check{width:40px;}
-  .symcon-col-id{width:82px;}
-  .symcon-col-name{width:185px;}
-  .symcon-col-period{width:190px;}
-  .symcon-col-rows{width:92px;}
+  .symcon-col-id{width:92px;}
+  .symcon-col-name{width:235px;}   /* etwas breiter, geht zulasten der flexiblen HA-Zuordnungs-Spalte (erhält den verbleibenden Raum, siehe oben) */
+  .symcon-col-period{width:206px;}
+  .symcon-col-rows{width:104px;}
+  .symcon-col-unit{width:70px;}    /* eigene Spalte statt gestapelt unter Datensätze — "kWh"/"°C" ≈ 30px + Puffer */
   .symcon-import-table th:first-child,.symcon-import-table td:first-child{padding-left:10px;padding-right:4px;text-align:center;}
   .symcon-import-table th:nth-child(2),.symcon-import-table td:nth-child(2){padding-left:8px;padding-right:8px;}
   .symcon-import-table .period-cell{font-family:var(--font-display);white-space:nowrap;}
-  .symcon-row-count,.symcon-unit{display:block;}
-  .symcon-unit{margin-top:2px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
 
   .map-picker{display:flex;align-items:center;min-width:0;}
   .map-picker .map-input{padding-right:31px;}
@@ -139,15 +141,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Import</p>
     <h1>Import</h1>
     <p class="sub">Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als CSV-Datei mit freier Spalten-/Format-Zuordnung.</p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'symcon-import' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
 
     <div class="import-tabs">
       <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">Symcon</button>
@@ -240,9 +239,9 @@
           <colgroup>
             <col class="symcon-col-check"><col class="symcon-col-id">
             {% if settings_imported %}<col class="symcon-col-name">{% endif %}
-            <col class="symcon-col-period"><col class="symcon-col-rows"><col class="symcon-col-entity">
+            <col class="symcon-col-period"><col class="symcon-col-rows"><col class="symcon-col-unit"><col class="symcon-col-entity">
           </colgroup>
-          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="Alle auf dieser Seite markieren"></th><th>Symcon-ID</th>{% if settings_imported %}<th>Symcon-Name</th>{% endif %}<th>Zeitraum</th><th>Datensätze</th><th>→ HA-Entität</th></tr>
+          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="Alle auf dieser Seite markieren"></th><th>Symcon-ID</th>{% if settings_imported %}<th>Symcon-Name</th>{% endif %}<th>Zeitraum</th><th>Datensätze</th><th>Einheit</th><th>→ HA-Entität</th></tr>
           {% for row in rows %}
           <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}" data-symcon-unit="{{ row.symcon_unit or '' }}"
               data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}">
@@ -263,17 +262,16 @@
             </td>
             {% endif %}
             <td class="period-cell">{% if row.period_start %}{{ row.period_start }} &ndash; {{ row.period_end }}{% else %}—{% endif %}</td>
-            <td{% if row.preview != "—" %} data-tooltip="Min · Max: {{ row.preview }}"{% endif %}>
-              <span class="symcon-row-count">{{ row.row_count }}</span>
-              {% if row.symcon_unit %}<span class="symcon-unit">{{ row.symcon_unit }}</span>{% endif %}
-            </td>
+            <td{% if row.preview != "—" %} data-tooltip="Min · Max: {{ row.preview }}"{% endif %}>{{ row.row_count | format_int }}</td>
+            <td>{{ row.symcon_unit or "—" }}</td>
             <td>
               {% if row.readable %}
-              <span class="map-picker">
+              <span class="map-picker entity-tooltip-host">
                 <input type="text" class="map-input" name="map_{{ row.variable_id }}" list="entity-datalist"
                        placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)"
                        oninput="updateUnitCheck(this)">
                 <button type="button" class="map-clear" title="Auswahl ändern" aria-label="Ausgewählte HA-Entität entfernen" onclick="clearMapping(this)">×</button>
+                <span class="entity-tooltip" role="tooltip"></span>
               </span>
               <div class="unit-conversion" hidden>
                 <div class="unit-warning"></div>
@@ -347,7 +345,6 @@
       {% include "_reports_panel.html" %}
     </div>
 
-      </div>
     </div>
   </div>
 
@@ -461,6 +458,26 @@
       return source[1] / target[1];
     }
 
+    // Tooltip (Friendly Name + Entitäts-ID) über der HA-Zuordnung — dieselbe
+    // .entity-tooltip-Optik wie überall sonst in der App, aber erst nach
+    // Auswahl per JS befüllt statt fix beim Rendern, weil map-input erst zur
+    // Laufzeit einen Wert bekommt. textContent statt innerHTML-Strings, damit
+    // Friendly Names mit Sonderzeichen nicht als Markup interpretiert werden;
+    // ein leer gelassener Tooltip bleibt dank .entity-tooltip:empty (app.css)
+    // unsichtbar, solange keine Entität gewählt ist.
+    function updateMapTooltip(input, option) {
+      const tooltip = input.closest('.map-picker')?.querySelector('.entity-tooltip');
+      if (!tooltip) return;
+      tooltip.innerHTML = '';
+      if (option && input.value && input.value !== '__ignore__') {
+        const strong = document.createElement('strong');
+        strong.textContent = option.textContent;
+        const code = document.createElement('code');
+        code.textContent = input.value;
+        tooltip.append(strong, code);
+      }
+    }
+
     function updateUnitCheck(input) {
       const row = input.closest('tr[data-variable-id]');
       if (!row) return;
@@ -468,6 +485,7 @@
       const factor = row.querySelector('.factor-input');
       const option = Array.from(document.querySelectorAll('#entity-datalist option'))
         .find(candidate => candidate.value === input.value);
+      updateMapTooltip(input, option);
       const sourceUnit = row.dataset.symconUnit || '';
       const targetUnit = option ? option.dataset.unit || '' : '';
       const mismatch = sourceUnit && targetUnit && normalizeUnit(sourceUnit) !== normalizeUnit(targetUnit);

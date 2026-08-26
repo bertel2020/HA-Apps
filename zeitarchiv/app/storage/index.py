@@ -80,7 +80,7 @@ def should_accept_value(
 # sind vollständige SQL-Ausdrücke (kein Freitext), deshalb auch "entity_id" hier
 # als COALESCE-Ausdruck: die Tabelle zeigt primär den Anzeigenamen an, also soll
 # die Sortierung "Entität" auch danach gehen, nicht nach der rohen entity_id.
-_DISPLAY_NAME_EXPR = "COALESCE(friendly_name, entity_id) COLLATE NOCASE"
+_DISPLAY_NAME_EXPR = "COALESCE(entities.friendly_name, entities.entity_id) COLLATE NOCASE"
 SORTABLE_COLUMNS = {
     "entity_id": _DISPLAY_NAME_EXPR,
     "friendly_name": _DISPLAY_NAME_EXPR,
@@ -88,11 +88,21 @@ SORTABLE_COLUMNS = {
     "resolution": "resolution",
     "retention": "retention",
     "unit": "unit",
-    "rows": "MAX(row_count - (SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id), 0)",
+    "rows": "MAX(row_count - COALESCE(dc.deleted_count, 0), 0)",
     "first_ts": "first_ts",
     "last_ts": "last_ts",
     "size": "size_bytes",
 }
+
+# Anzahl gelöschter Vorkommen je Entität, einmalig aggregiert statt als
+# korrelierte Subquery pro Zeile (ZP-003 in PERFORMANCE.md): eine korrelierte
+# Subquery wertet SQLite pro äußerer Zeile separat aus (O(Entities × Deletes));
+# dieser LEFT JOIN aggregiert deleted_points genau einmal.
+_DELETED_COUNT_JOIN = (
+    "LEFT JOIN ("
+    "SELECT entity_id, COUNT(*) AS deleted_count FROM deleted_points GROUP BY entity_id"
+    ") dc ON dc.entity_id = entities.entity_id"
+)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS entities (
@@ -277,14 +287,26 @@ CREATE TABLE IF NOT EXISTS saved_tables (
 -- Chart an Position 1 und einer Tabelle an Position 1 nicht eindeutig
 -- vergleichbar. item_type/item_id statt einer Fremdschlüssel-Spalte pro Typ,
 -- weil hier zwei unterschiedliche Quelltabellen gemeinsam sortiert werden.
+CREATE TABLE IF NOT EXISTS dashboards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0
+);
+
+-- dashboard_id verweist auf dashboards.id — mehrere, unabhängige Dashboards
+-- (Konzept "Dashboards"-Menüpunkt neben der festen Übersichtsseite), jedes
+-- mit eigener Kachel-Reihenfolge/-Größe. UNIQUE erlaubt dasselbe Chart/dieselbe
+-- Tabelle bewusst auf mehreren Dashboards gleichzeitig angeheftet.
 CREATE TABLE IF NOT EXISTS dashboard_pins (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dashboard_id INTEGER NOT NULL DEFAULT 1,
     item_type TEXT NOT NULL,
     item_id INTEGER NOT NULL,
     position INTEGER NOT NULL,
     grid_cols INTEGER NOT NULL DEFAULT 1,
     grid_rows INTEGER NOT NULL DEFAULT 1,
-    UNIQUE(item_type, item_id)
+    UNIQUE(dashboard_id, item_type, item_id)
 );
 
 -- Eine Spalte = ein Zeitraum ("2026", "Aug VJ", "Heute", …) — label ist frei
@@ -492,6 +514,41 @@ class Index:
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN grid_cols INTEGER NOT NULL DEFAULT 1")
         if "grid_rows" not in dashboard_columns:
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN grid_rows INTEGER NOT NULL DEFAULT 1")
+        if "dashboard_id" not in dashboard_columns:
+            # UNIQUE(item_type, item_id) muss zu UNIQUE(dashboard_id, item_type,
+            # item_id) werden (Konzept "Dashboards": dasselbe Chart darf auf
+            # mehreren Dashboards angeheftet sein) — SQLite kann eine
+            # UNIQUE-Beschränkung nicht per ALTER TABLE ändern, deshalb Tabelle
+            # neu aufbauen (wie schon bei deleted_points oben). Alle
+            # bestehenden Pins wandern dabei ins migrierte Default-Dashboard.
+            self._conn.execute("ALTER TABLE dashboard_pins RENAME TO dashboard_pins_old")
+            self._conn.execute(
+                """CREATE TABLE dashboard_pins (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dashboard_id INTEGER NOT NULL DEFAULT 1,
+                    item_type TEXT NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
+                    grid_cols INTEGER NOT NULL DEFAULT 1,
+                    grid_rows INTEGER NOT NULL DEFAULT 1,
+                    UNIQUE(dashboard_id, item_type, item_id)
+                )"""
+            )
+            self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, grid_cols, grid_rows) "
+                "SELECT 1, item_type, item_id, position, grid_cols, grid_rows FROM dashboard_pins_old"
+            )
+            self._conn.execute("DROP TABLE dashboard_pins_old")
+
+        # Einmalige Anlage des migrierten Default-Dashboards ("Übersicht", fest
+        # verankert an id=1, siehe dashboard_pins-Migration oben) — nur beim
+        # allerersten Start nach diesem Feature nötig, danach ist dashboards
+        # nie mehr leer. is_default markiert es als nicht löschbar, umbenennbar
+        # bleibt es trotzdem.
+        if self._conn.execute("SELECT COUNT(*) FROM dashboards").fetchone()[0] == 0:
+            self._conn.execute(
+                "INSERT INTO dashboards (id, name, position, is_default) VALUES (1, 'Übersicht', 0, 1)"
+            )
 
         # Einmalige Übernahme alter Dashboard-Kacheln (saved_charts.dashboard_
         # position) in die neue, typübergreifende dashboard_pins-Tabelle — nur
@@ -818,6 +875,37 @@ class Index:
                 (ts, ts, value, ts, value, ts, ts, time.time(), entity_id),
             )
 
+    @staticmethod
+    def _entity_filter_conditions(
+        search: str | None,
+        type_filter: str | list[str] | None,
+        unit_filter: str | None,
+        favorites_only: bool,
+    ) -> tuple[list[str], list[str]]:
+        if isinstance(type_filter, str):
+            type_filter = [type_filter]
+        types = [t for t in (type_filter or []) if t and t != "all"]
+
+        conditions: list[str] = []
+        params: list[str] = []
+        if search:
+            conditions.append("(entities.entity_id LIKE ? OR entities.friendly_name LIKE ?)")
+            like = f"%{search}%"
+            params += [like, like]
+        if types:
+            placeholders = ", ".join("?" for _ in types)
+            conditions.append(f"entities.aggregation_type IN ({placeholders})")
+            params += types
+        if unit_filter and unit_filter != "all":
+            if unit_filter == "__none__":
+                conditions.append("entities.unit IS NULL")
+            else:
+                conditions.append("entities.unit = ?")
+                params.append(unit_filter)
+        if favorites_only:
+            conditions.append("entities.is_favorite = 1")
+        return conditions, params
+
     def list_entities(
         self,
         search: str | None = None,
@@ -826,6 +914,8 @@ class Index:
         sort: str = "entity_id",
         direction: str = "asc",
         favorites_only: bool = False,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[sqlite3.Row]:
         """search filtert per LIKE auf entity_id/friendly_name, type_filter auf
         aggregation_type — ein einzelner Typ (Rückwärtskompatibilität), eine Liste
@@ -836,43 +926,52 @@ class Index:
         Spaltennamen lassen sich in SQLite nicht parametrisieren). Anders als bei
         Charts/Tabellen stehen Favoriten hier NICHT automatisch zuerst — die Liste
         bleibt beim gewählten sort (i. d. R. alphabetisch), favorites_only blendet
-        stattdessen den Rest ganz aus (eigene Ansicht statt Umsortierung)."""
+        stattdessen den Rest ganz aus (eigene Ansicht statt Umsortierung).
+
+        limit/offset (ZP-004 in PERFORMANCE.md) grenzen das Ergebnis bereits in
+        SQL ein, statt die komplette gefilterte Menge zu laden und erst in Python
+        zu paginieren — limit=None (Standard) liefert weiterhin alle Treffer, für
+        Aufrufer, die die volle Liste brauchen (Wartungsjobs, Exporte, interne
+        Iterationen)."""
         column = SORTABLE_COLUMNS.get(sort, "entity_id")
         direction_sql = "DESC" if direction == "desc" else "ASC"
 
-        if isinstance(type_filter, str):
-            type_filter = [type_filter]
-        types = [t for t in (type_filter or []) if t and t != "all"]
+        conditions, params = self._entity_filter_conditions(
+            search, type_filter, unit_filter, favorites_only
+        )
 
         query = (
-            "SELECT entities.*, "
-            "(SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id) AS deleted_count "
-            "FROM entities"
+            "SELECT entities.*, COALESCE(dc.deleted_count, 0) AS deleted_count "
+            "FROM entities " + _DELETED_COUNT_JOIN
         )
-        conditions: list[str] = []
-        params: list[str] = []
-        if search:
-            conditions.append("(entity_id LIKE ? OR friendly_name LIKE ?)")
-            like = f"%{search}%"
-            params += [like, like]
-        if types:
-            placeholders = ", ".join("?" for _ in types)
-            conditions.append(f"aggregation_type IN ({placeholders})")
-            params += types
-        if unit_filter and unit_filter != "all":
-            if unit_filter == "__none__":
-                conditions.append("unit IS NULL")
-            else:
-                conditions.append("unit = ?")
-                params.append(unit_filter)
-        if favorites_only:
-            conditions.append("is_favorite = 1")
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += f" ORDER BY {column} {direction_sql}, entity_id ASC"
+        query += f" ORDER BY {column} {direction_sql}, entities.entity_id ASC"
+        if limit is not None:
+            query += " LIMIT ? OFFSET ?"
+            params = [*params, limit, offset]
 
         with self._lock, self._conn:
             return self._conn.execute(query, params).fetchall()
+
+    def count_entities(
+        self,
+        search: str | None = None,
+        type_filter: str | list[str] | None = None,
+        unit_filter: str | None = None,
+        favorites_only: bool = False,
+    ) -> int:
+        """Gesamtzahl der Treffer für dieselben Filter wie list_entities() —
+        Grundlage für die Seiteninfo bei SQL-seitiger Pagination (ZP-004)."""
+        conditions, params = self._entity_filter_conditions(
+            search, type_filter, unit_filter, favorites_only
+        )
+        query = "SELECT COUNT(*) AS total FROM entities"
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        with self._lock, self._conn:
+            row = self._conn.execute(query, params).fetchone()
+            return int(row["total"])
 
     def set_entity_favorite(self, entity_id: str, favorite: bool) -> None:
         with self._lock, self._conn:
@@ -1096,58 +1195,119 @@ class Index:
             self._conn.execute("DELETE FROM saved_charts WHERE id = ?", (chart_id,))
             self._conn.execute("DELETE FROM dashboard_pins WHERE item_type = 'chart' AND item_id = ?", (chart_id,))
 
+    # -- Dashboards (Konzept "Dashboards"-Menüpunkt: mehrere, unabhängige
+    # Dashboards zusätzlich zur festen Übersichtsseite, id=1 ist das beim
+    # Feature-Rollout migrierte Default-Dashboard "Übersicht", is_default
+    # macht es umbenennbar, aber nicht löschbar). ------------------------------
+
+    def list_dashboards(self) -> list[dict]:
+        with self._lock, self._conn:
+            rows = self._conn.execute("SELECT * FROM dashboards ORDER BY position ASC, id ASC").fetchall()
+            return [dict(row) for row in rows]
+
+    def get_dashboard(self, dashboard_id: int) -> dict | None:
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT * FROM dashboards WHERE id = ?", (dashboard_id,)).fetchone()
+            return dict(row) if row else None
+
+    def create_dashboard(self, name: str) -> int:
+        with self._lock, self._conn:
+            max_pos = self._conn.execute("SELECT MAX(position) FROM dashboards").fetchone()[0]
+            cursor = self._conn.execute(
+                "INSERT INTO dashboards (name, position) VALUES (?, ?)", (name, (max_pos or 0) + 1)
+            )
+            return cursor.lastrowid
+
+    def rename_dashboard(self, dashboard_id: int, name: str) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET name = ? WHERE id = ?", (name, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
+    def delete_dashboard(self, dashboard_id: int) -> bool:
+        """False bei unbekannter id ODER beim Default-Dashboard (is_default) —
+        letzteres ist der feste Ankerpunkt für "/" und darf nicht verschwinden."""
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT is_default FROM dashboards WHERE id = ?", (dashboard_id,)
+            ).fetchone()
+            if row is None or row["is_default"]:
+                return False
+            self._conn.execute("DELETE FROM dashboards WHERE id = ?", (dashboard_id,))
+            self._conn.execute("DELETE FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,))
+            return True
+
     # -- Dashboard-Kacheln (Konzept "Offene Punkte", typübergreifend: Charts
     # UND Vergleichstabellen teilen sich dieselbe dashboard_pins-Tabelle und
-    # damit denselben Kachel-Grenzwert, siehe DASHBOARD_TILE_LIMIT). ----------
+    # damit denselben Kachel-Grenzwert, siehe DASHBOARD_TILE_LIMIT — jeweils
+    # pro Dashboard gezählt). ---------------------------------------------
 
     DASHBOARD_TILE_LIMIT = 18
 
-    def list_dashboard_pins(self) -> list[dict]:
-        """Angeheftete Kacheln in Reihenfolge — item_type ist 'chart' oder
-        'table', der Aufrufer (main.py _dashboard_tiles_context()) löst jeden
-        Eintrag dann gegen die passende Tabelle auf. Liefert auch verwaiste
-        Einträge zurück (sollte durch die Bereinigung in delete_saved_chart()/
-        delete_saved_table() praktisch nie vorkommen) — das Herausfiltern
-        macht main.py, da nur dort bekannt ist, wie ein Chart von einer
-        Tabelle unterschieden und geladen wird."""
+    def list_dashboard_pins(self, dashboard_id: int) -> list[dict]:
+        """Angeheftete Kacheln eines Dashboards in Reihenfolge — item_type ist
+        'chart' oder 'table', der Aufrufer (main.py _dashboard_tiles_context())
+        löst jeden Eintrag dann gegen die passende Tabelle auf. Liefert auch
+        verwaiste Einträge zurück (sollte durch die Bereinigung in
+        delete_saved_chart()/delete_saved_table() praktisch nie vorkommen) —
+        das Herausfiltern macht main.py, da nur dort bekannt ist, wie ein
+        Chart von einer Tabelle unterschieden und geladen wird."""
         with self._lock, self._conn:
-            rows = self._conn.execute("SELECT * FROM dashboard_pins ORDER BY position ASC").fetchall()
+            rows = self._conn.execute(
+                "SELECT * FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC", (dashboard_id,)
+            ).fetchall()
             return [dict(row) for row in rows]
 
-    def count_dashboard_pins(self) -> int:
+    def count_dashboard_pins(self, dashboard_id: int | None = None) -> int:
+        """Ohne dashboard_id: Gesamtzahl über alle Dashboards (Statistik-Seite).
+        Mit dashboard_id: Belegung des Kachel-Limits eines einzelnen Dashboards."""
         with self._lock, self._conn:
-            return self._conn.execute("SELECT COUNT(*) FROM dashboard_pins").fetchone()[0]
+            if dashboard_id is None:
+                return self._conn.execute("SELECT COUNT(*) FROM dashboard_pins").fetchone()[0]
+            return self._conn.execute(
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
 
-    def is_pinned(self, item_type: str, item_id: int) -> bool:
+    def is_pinned(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
         with self._lock, self._conn:
             row = self._conn.execute(
-                "SELECT 1 FROM dashboard_pins WHERE item_type = ? AND item_id = ?", (item_type, item_id)
+                "SELECT 1 FROM dashboard_pins WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                (dashboard_id, item_type, item_id),
             ).fetchone()
             return row is not None
 
-    def pin_item_to_dashboard(self, item_type: str, item_id: int) -> bool:
+    def pin_item_to_dashboard(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
         """Heftet ein Chart oder eine Vergleichstabelle als neue letzte Kachel
-        an — False, wenn das Limit von 18 gleichzeitigen Kacheln (Konzept
-        "Offene Punkte": Performance, viele ECharts-Instanzen/Tabellen auf der
-        meistbesuchten Seite) schon erreicht ist, dann bleibt alles
-        unverändert. UNIQUE(item_type, item_id) verhindert nebenbei ein
-        doppeltes Anheften desselben Objekts."""
+        eines Dashboards an — False, wenn das Limit von 18 gleichzeitigen
+        Kacheln (Konzept "Offene Punkte": Performance, viele ECharts-Instanzen/
+        Tabellen auf einer Seite) für DIESES Dashboard schon erreicht ist, dann
+        bleibt alles unverändert. UNIQUE(dashboard_id, item_type, item_id)
+        verhindert nebenbei ein doppeltes Anheften auf demselben Dashboard —
+        dasselbe Objekt auf einem ANDEREN Dashboard ist dagegen erlaubt."""
         with self._lock, self._conn:
-            count = self._conn.execute("SELECT COUNT(*) FROM dashboard_pins").fetchone()[0]
+            count = self._conn.execute(
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
             if count >= self.DASHBOARD_TILE_LIMIT:
                 return False
             if self._conn.execute(
-                "SELECT 1 FROM dashboard_pins WHERE item_type = ? AND item_id = ?", (item_type, item_id)
+                "SELECT 1 FROM dashboard_pins WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                (dashboard_id, item_type, item_id),
             ).fetchone():
                 return True  # schon angeheftet — kein Fehler, einfach nichts weiter tun
-            max_pos = self._conn.execute("SELECT MAX(position) FROM dashboard_pins").fetchone()[0]
+            max_pos = self._conn.execute(
+                "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
             self._conn.execute(
-                "INSERT INTO dashboard_pins (item_type, item_id, position) VALUES (?, ?, ?)",
-                (item_type, item_id, (max_pos or 0) + 1),
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position) VALUES (?, ?, ?, ?)",
+                (dashboard_id, item_type, item_id, (max_pos or 0) + 1),
             )
             return True
 
-    def set_dashboard_pin_size(self, item_type: str, item_id: int, grid_cols: int, grid_rows: int) -> bool:
+    def set_dashboard_pin_size(
+        self, dashboard_id: int, item_type: str, item_id: int, grid_cols: int, grid_rows: int
+    ) -> bool:
         """Speichert die Rastergröße einer angehefteten Dashboard-Kachel.
 
         Die Validierung lebt zusätzlich zur API auch hier, damit kein anderer
@@ -1161,32 +1321,36 @@ class Index:
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
-                "WHERE item_type = ? AND item_id = ?",
-                (int(grid_cols), int(grid_rows), item_type, item_id),
+                "WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                (int(grid_cols), int(grid_rows), dashboard_id, item_type, item_id),
             )
             return cursor.rowcount > 0
 
-    def unpin_item_from_dashboard(self, item_type: str, item_id: int) -> None:
+    def unpin_item_from_dashboard(self, dashboard_id: int, item_type: str, item_id: int) -> None:
         # Absichtlich keine Neu-Nummerierung der verbleibenden Kacheln — die
         # Reihenfolge über position bleibt stabil, eine Lücke stört dabei
         # nicht (list_dashboard_pins() sortiert nur nach dem Wert, nicht nach
         # Lückenlosigkeit).
         with self._lock, self._conn:
             self._conn.execute(
-                "DELETE FROM dashboard_pins WHERE item_type = ? AND item_id = ?", (item_type, item_id)
+                "DELETE FROM dashboard_pins WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                (dashboard_id, item_type, item_id),
             )
 
-    def reorder_dashboard_pins(self, pins: list[tuple[str, int]]) -> None:
+    def reorder_dashboard_pins(self, dashboard_id: int, pins: list[tuple[str, int]]) -> None:
         """Setzt position neu, komplett durchnummeriert nach der übergebenen
-        Reihenfolge (Drag&Drop auf der Übersichtsseite, funktioniert über
+        Reihenfolge (Drag&Drop auf einer Dashboard-Seite, funktioniert über
         Charts UND Tabellen hinweg gemischt). pins ist eine Liste aus
         (item_type, item_id) — der UPDATE trifft nur tatsächlich vorhandene
-        Pins, ein veralteter/manipulierter Eintrag fügt nie einen neuen
-        hinzu (das bleibt pin_item_to_dashboard() vorbehalten)."""
+        Pins DIESES Dashboards, ein veralteter/manipulierter Eintrag fügt nie
+        einen neuen hinzu (das bleibt pin_item_to_dashboard() vorbehalten)."""
         with self._lock, self._conn:
             self._conn.executemany(
-                "UPDATE dashboard_pins SET position = ? WHERE item_type = ? AND item_id = ?",
-                [(position, item_type, item_id) for position, (item_type, item_id) in enumerate(pins, start=1)],
+                "UPDATE dashboard_pins SET position = ? WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                [
+                    (position, dashboard_id, item_type, item_id)
+                    for position, (item_type, item_id) in enumerate(pins, start=1)
+                ],
             )
 
     # -- Vergleichstabellen (Konzept "Offene Punkte") --------------------------
@@ -1309,12 +1473,12 @@ class Index:
     def get_overview(self) -> dict:
         with self._lock, self._conn:
             row = self._conn.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS entity_count,
-                    COALESCE(SUM(MAX(row_count - (SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id), 0)), 0) AS total_rows,
+                    COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
                     COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities
+                FROM entities {_DELETED_COUNT_JOIN}
                 """
             ).fetchone()
             return dict(row)
@@ -1341,12 +1505,12 @@ class Index:
             if latest is not None and now - latest < min_interval_seconds:
                 return False
             overview = self._conn.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS entity_count,
-                    COALESCE(SUM(MAX(row_count - (SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id), 0)), 0) AS total_rows,
+                    COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
                     COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities
+                FROM entities {_DELETED_COUNT_JOIN}
                 """
             ).fetchone()
             self._conn.execute(
@@ -1363,6 +1527,37 @@ class Index:
                 (since_ts,),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    _DUPLICATE_SNAPSHOT_KEY = "duplicate_snapshot_cache"
+
+    def is_duplicate_snapshot_stale(self, min_interval_seconds: float = 3600) -> bool:
+        """Ob die im Wartungsplaner zwischengespeicherte Duplikat-Zählung der
+        Statistik-Seite (ZP-002 in PERFORMANCE.md) neu berechnet werden sollte.
+        Die eigentliche Zählung braucht den Storage-Layer (cleanup.py) und
+        bleibt deshalb Sache des Aufrufers — Index kennt nur den Cache-Stand."""
+        raw = self.get_setting(self._DUPLICATE_SNAPSHOT_KEY)
+        if raw is None:
+            return True
+        try:
+            checked_at = json.loads(raw).get("checked_at")
+        except (json.JSONDecodeError, AttributeError):
+            return True
+        return checked_at is None or time.time() - checked_at >= min_interval_seconds
+
+    def set_duplicate_snapshot(self, rows: list[dict]) -> None:
+        payload = json.dumps({"checked_at": time.time(), "rows": rows})
+        self.set_setting(self._DUPLICATE_SNAPSHOT_KEY, payload)
+
+    def get_duplicate_snapshot(self) -> dict | None:
+        """{"checked_at": ..., "rows": [...]} des letzten Wartungsplaner-Laufs,
+        oder None vor dem allerersten Lauf nach einer frischen Installation."""
+        raw = self.get_setting(self._DUPLICATE_SNAPSHOT_KEY)
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
 
     def is_memory_snapshot_due(self, min_interval_seconds: float = 3600) -> bool:
         """Ob der nächste stündliche RAM-Schnappschuss fällig ist — getrennt
@@ -1395,11 +1590,12 @@ class Index:
     def get_stats_by_type(self) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                """
+                f"""
                 SELECT aggregation_type, COUNT(*) AS entity_count,
-                       COALESCE(SUM(MAX(row_count - (SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id), 0)), 0) AS total_rows,
+                       COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
                        COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities GROUP BY aggregation_type ORDER BY total_size_bytes DESC
+                FROM entities {_DELETED_COUNT_JOIN}
+                GROUP BY aggregation_type ORDER BY total_size_bytes DESC
                 """
             ).fetchall()
             return [dict(row) for row in rows]
@@ -1407,11 +1603,12 @@ class Index:
     def get_stats_by_resolution(self) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                """
+                f"""
                 SELECT resolution, COUNT(*) AS entity_count,
-                       COALESCE(SUM(MAX(row_count - (SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id), 0)), 0) AS total_rows,
+                       COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
                        COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities GROUP BY resolution ORDER BY total_size_bytes DESC
+                FROM entities {_DELETED_COUNT_JOIN}
+                GROUP BY resolution ORDER BY total_size_bytes DESC
                 """
             ).fetchall()
             return [dict(row) for row in rows]
@@ -1419,11 +1616,12 @@ class Index:
     def get_stats_by_retention(self) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                """
+                f"""
                 SELECT retention, COUNT(*) AS entity_count,
-                       COALESCE(SUM(MAX(row_count - (SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id), 0)), 0) AS total_rows,
+                       COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
                        COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities GROUP BY retention ORDER BY total_size_bytes DESC
+                FROM entities {_DELETED_COUNT_JOIN}
+                GROUP BY retention ORDER BY total_size_bytes DESC
                 """
             ).fetchall()
             return [dict(row) for row in rows]

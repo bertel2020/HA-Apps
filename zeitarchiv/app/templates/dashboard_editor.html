@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — {{ dashboard.name if dashboard else "Neues Dashboard" }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  [x-cloak]{display:none!important;}
+  .dash-editor-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .dash-editor-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
+  .field input[type="text"]{width:100%;max-width:420px;}
+</style>
+</head>
+<body>
+  {% include "_topnav.html" %}
+  <div class="page" x-data="dashboardEditor()">
+    <h1>Dashboards</h1>
+    <p class="sub">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ base }}/dashboards">&larr; Zurück</a></p>
+
+    <div class="settings-panel">
+      <div class="dash-editor-title-row">
+        <h2>{{ "Dashboard bearbeiten" if dashboard else "Neues Dashboard" }}</h2>
+      </div>
+      <p class="sub">Name des Dashboards — weitere Einstellungen können hier später ergänzt werden.</p>
+
+      <div class="field">
+        <label for="dash-name">Name</label>
+        <input id="dash-name" type="text" x-model="name" placeholder="Name des Dashboards …" @keydown.enter="save()">
+      </div>
+
+      <div class="save-row">
+        <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
+        <a class="btn" href="{{ base }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">Abbrechen</a>
+        {% if dashboard and not dashboard.is_default %}
+        <button type="button" class="btn btn-danger" @click="deleteDashboard()">Löschen</button>
+        {% endif %}
+        <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script>
+    const BASE = {{ base | tojson }};
+    const DASHBOARD_ID = {{ dashboard.id | tojson if dashboard else 'null' }};
+
+    function dashboardEditor() {
+      return {
+        dashboardId: DASHBOARD_ID,
+        name: {{ (dashboard.name if dashboard else '') | tojson }},
+        saving: false,
+        savedMessage: '',
+
+        async save() {
+          if (!this.name.trim()) { alert('Bitte einen Namen für das Dashboard angeben.'); return; }
+          this.saving = true;
+          this.savedMessage = '';
+          try {
+            const url = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}/rename` : `${BASE}/dashboards`;
+            const res = await fetch(url, {
+              method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: this.name.trim()}),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              alert(err.detail || 'Speichern fehlgeschlagen.');
+              return;
+            }
+            const data = await res.json();
+            window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
+          } finally {
+            this.saving = false;
+          }
+        },
+
+        async deleteDashboard() {
+          if (!await appConfirm('Dieses Dashboard wirklich löschen? Alle Kacheln darauf gehen verloren.', {danger: true})) return;
+          const res = await fetch(`${BASE}/dashboards/${this.dashboardId}/delete`, {method: 'POST'});
+          if (res.ok) {
+            window.location.href = `${BASE}/dashboards`;
+          } else {
+            alert('Löschen fehlgeschlagen.');
+          }
+        },
+      };
+    }
+  </script>
+</body>
+</html>

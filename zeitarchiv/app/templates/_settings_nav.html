@@ -1,7 +1,11 @@
 {# base wird nur von tiefer verschachtelten Seiten (z. B. /charts/{id}, Tiefe 2)
    gesetzt (".."), damit die Links hier relativ korrekt bleiben — wichtig unter
    HA Ingress' dynamischem Pfad-Präfix, siehe base-Konvention in entity_detail.html.
-   Auf Tiefe-1-Seiten (Einstellungen, Statistik, ...) bleibt base leer. #}
+   Auf Tiefe-1-Seiten (Einstellungen, Statistik, ...) bleibt base leer.
+   Enthält nur noch die Settings-internen Sprungmarken — Entitäten, Charts,
+   Tabellen, Statistik, Protokoll, Import, Export und Backup stehen seit
+   _topnav.html im System-Dropdown der globalen Menüleiste und wurden hier
+   entfernt, um nicht zwei parallele Navigationsquellen zu pflegen. #}
 {% set prefix = (base ~ '/') if base else '' %}
 <nav class="settings-nav">
   <a href="{{ prefix }}settings#darstellung" {% if nav_active == 'darstellung' %}class="active"{% endif %}>Darstellung</a>
@@ -12,13 +16,4 @@
   <a href="{{ prefix }}settings#verbindung" {% if nav_active == 'verbindung' %}class="active"{% endif %}>Verbindung</a>
   <a href="{{ prefix }}settings#protokollierung" {% if nav_active == 'protokollierung' %}class="active"{% endif %}>Protokollierung</a>
   <a href="{{ prefix }}settings#ueber" {% if nav_active == 'ueber' %}class="active"{% endif %}>Über Zeitarchiv</a>
-  <div class="nav-divider"></div>
-  <a href="{{ prefix }}entities" {% if nav_active == 'entitaeten' %}class="active"{% endif %}>Entitäten <span class="tag">→</span></a>
-  <a href="{{ prefix }}charts" {% if nav_active == 'charts' %}class="active"{% endif %}>Charts <span class="tag">→</span></a>
-  <a href="{{ prefix }}tables" {% if nav_active == 'tables' %}class="active"{% endif %}>Tabellen <span class="tag">→</span></a>
-  <a href="{{ prefix }}statistik" {% if nav_active == 'statistik' %}class="active"{% endif %}>Statistik <span class="tag">→</span></a>
-  <a href="{{ prefix }}logs" {% if nav_active == 'logs' %}class="active"{% endif %}>Protokoll <span class="tag">→</span></a>
-  <a href="{{ prefix }}import" {% if nav_active == 'symcon-import' %}class="active"{% endif %}>Import <span class="tag">→</span></a>
-  <a href="{{ prefix }}export" {% if nav_active == 'export' %}class="active"{% endif %}>Export <span class="tag">→</span></a>
-  <a href="{{ prefix }}backup" {% if nav_active == 'backup' %}class="active"{% endif %}>Backup / Restore <span class="tag">→</span></a>
 </nav>

@@ -84,15 +84,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Statistik</p>
     <h1>Statistik</h1>
     <p class="sub">Archiv-weite Kennzahlen — Aufschlüsselung nach Typ, Auflösung und Aufbewahrung, Wachstum über Zeit.</p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'statistik' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
 
     <div class="stat-row">
       <div class="stat"><div class="label">Entitäten</div><div class="value">{{ entity_count }}</div></div>
@@ -257,16 +254,15 @@
         <div class="label">Tabellen</div>
         <div class="value">{{ table_count }}</div>
       </a>
-      <a class="stat" href="{{ app_root }}/">
+      <a class="stat" href="{{ app_root }}/dashboards">
         <div class="label">Dashboards</div>
-        <div class="value">1</div>
-        <div class="sub-value">{{ dashboard_pin_count }} von {{ dashboard_pin_limit }} Kacheln angepinnt</div>
+        <div class="value">{{ dashboard_count }}</div>
+        <div class="sub-value">{{ dashboard_pin_count }} Kachel{{ 'n' if dashboard_pin_count != 1 else '' }} insgesamt angepinnt</div>
       </a>
     </div>
 
     <p class="hint" style="text-align:right;margin-top:24px;">Stand: {{ generated_at }}</p>
 
-      </div>
     </div>
   </div>
 

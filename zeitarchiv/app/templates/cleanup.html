@@ -171,6 +171,7 @@
        calendar-picker.js). Kein größeres entityChart()-artiges Objekt nötig:
        die eigentliche Navigation läuft weiterhin über htmx-Formularfelder,
        nicht über Alpine-Reaktivität. -->
+  {% include "_topnav.html" %}
   <div class="page" x-data="{ range: 'day', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
     <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / <a href="{{ base }}/entities/{{ entity_id }}">{{ friendly_name or entity_id }}</a> / Bearbeitungsbereich</p>
     <div class="h1-row">
@@ -267,7 +268,6 @@
   </div>
 
   <script src="{{ base }}/static/vendor/htmx.min.js"></script>
-  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>

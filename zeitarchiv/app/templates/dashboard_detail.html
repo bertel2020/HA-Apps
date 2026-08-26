@@ -3,17 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv</title>
+<title>Zeitarchiv — {{ dashboard.name }}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
 <style>:root{--font-scale:{{ font_scale_value }};--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;}</style>
 <style>
-  /* Dashboard-Kacheln: drei Spalten als feste Desktop-Grundeinheit. Jede
-     Kachel kann davon 1–3 Spalten und 1–3 Zeilen belegen. */
+  /* Identisch zu den Dashboard-Kachel-Styles in entities.html — dieselbe
+     Kachel-Mechanik (Konzept "Offene Punkte"/"Dashboards"), nur auf einer
+     zweiten, unabhängigen Seitentiefe eingehängt. */
   [x-cloak]{display:none!important;}
-  .dashboard-section{margin-top:40px;}
-  .dashboard-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;}
-  .dashboard-head h2{margin:0;font-size:calc(17px * var(--font-scale, 1));}
   .dashboard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:var(--dashboard-row-height);gap:14px;align-items:stretch;}
   .dtile{
     position:relative;min-width:0;grid-column:span var(--tile-cols,1);grid-row:span var(--tile-rows,1);
@@ -73,11 +71,6 @@
   }
   .dtile-menu-remove:hover{background:var(--danger-soft);}
 
-  /* Vergleichstabelle als Dashboard-Kachel — Mini-Tabelle statt Mini-Chart,
-     dieselbe Höhe wie .dtile-chart, damit Chart- und Tabellen-Kacheln
-     nebeneinander gleich groß bleiben. Style-Klassen (.tbl-style-*) sind
-     dieselben wie im vollen Tabellen-Editor (table_editor.html) — eine
-     angeheftete Tabelle sieht hier identisch aus wie dort. */
   .dtile-table-preview{height:auto;min-height:160px;flex:1;overflow:auto;}
   .dtile-mini-table{width:100%;font-size:calc(11px * var(--font-scale, 1));}
   .dtile-mini-table th,.dtile-mini-table td{padding:4px 8px;white-space:nowrap;}
@@ -106,54 +99,28 @@
     .dashboard-grid{grid-template-columns:minmax(0,1fr);}
     .dtile,.dtile[data-grid-cols="2"],.dtile[data-grid-cols="3"]{grid-column:span 1;}
   }
+  .dash-title-row{display:flex;align-items:center;gap:10px;}
+  .dash-rename-btn{color:var(--ink-faint);text-decoration:none;padding:2px;}
+  .dash-rename-btn:hover{color:var(--accent-line);}
 </style>
 </head>
 <body>
   {% include "_topnav.html" %}
   <div class="page">
-    <h1>Übersicht</h1>
-
-    <div class="stat-row">
-      <a class="stat" href="entities">
-        <div class="label">Entitäten</div>
-        <div class="value">{{ entity_count }}</div>
-        {% if type_breakdown %}<div class="sub-value">{{ type_breakdown }}</div>{% endif %}
-      </a>
-      <a class="stat" href="statistik">
-        <div class="label">Datensätze gesamt</div>
-        <div class="value">{{ total_rows }}</div>
-        {% if rows_sparkline %}
-        <svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">
-          <path class="area" d="{{ rows_sparkline.area }}"/>
-          <path class="line" d="{{ rows_sparkline.line }}"/>
-        </svg>
-        {% endif %}
-      </a>
-      <a class="stat" href="statistik">
-        <div class="label">Größe</div>
-        <div class="value">{{ total_size }}</div>
-        {% if size_sparkline %}
-        <svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">
-          <path class="area" d="{{ size_sparkline.area }}"/>
-          <path class="line" d="{{ size_sparkline.line }}"/>
-        </svg>
-        {% endif %}
-      </a>
+    <div class="dash-title-row">
+      <h1>{{ dashboard.name }}</h1>
+      <a class="dash-rename-btn" href="{{ base }}/dashboards/{{ dashboard.id }}/edit" title="Bearbeiten">✎</a>
     </div>
 
     <div class="dashboard-section">
-      <div class="dashboard-head">
-        <h2>Dashboard</h2>
-      </div>
       {% include "_dashboard_tiles.html" %}
     </div>
   </div>
 
-  <script src="static/vendor/htmx.min.js"></script>
-  <script src="static/vendor/echarts.min.js"></script>
-  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="static/js/table-compute.js?v={{ js_v }}"></script>
-  <script src="static/js/dashboard-tiles.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/vendor/htmx.min.js"></script>
+  <script src="{{ base }}/static/vendor/echarts.min.js"></script>
+  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/dashboard-tiles.js?v={{ js_v }}"></script>
 </body>
 </html>

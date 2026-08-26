@@ -19,32 +19,40 @@
   }
   th a.active{color:var(--accent-line);}
   th a:hover{color:var(--accent-line);}
-  /* Feste Pixelbreiten statt Prozent — Prozent hätte sich mit dem globalen
-     table.dt{width:100%} auf jede Fensterbreite gestreckt (bei wenigen
-     sichtbaren Spalten unnötig breit, bei vielen gleichzeitig gestaucht statt
-     einfach zu scrollen). width:fit-content überschreibt das bewusst: die
-     Tabelle ist immer exakt die Summe ihrer sichtbaren Spalten breit, nie
-     mehr, nie gestaucht — width:auto hätte sich hier (Browser-Eigenheit bei
-     table-layout:fixed) trotzdem am verfügbaren Platz orientiert statt an
-     der deklarierten Spaltensumme, fit-content/min-content nicht. Reicht der
-     Platz nicht (viele Spalten gleichzeitig aktiv), greift .tbl-wrap's
-     overflow-x:auto statt umzubrechen — deshalb white-space:nowrap auf jeder
-     Zelle. Breiten aus echten Textmessungen (Header-Label und längster
-     realistischer Datenwert je Spalte) plus Zellpadding (2×14px); Entität
-     zusätzlich über max-width auf .name/.id begrenzt (siehe unten), sonst
-     bestimmt die oft sehr lange ungekürzte entity_id die Spaltenbreite statt
-     der hier deklarierten. */
-  table.entities-dt{table-layout:fixed;width:fit-content;}
+  /* width:100% statt fit-content — bewusste Kursänderung ggü. dem früheren
+     Ansatz (Tabelle immer exakt Summe der Spalten, nie gestreckt): bei wenigen
+     aktiven Spalten (z. B. nur Entität+Typ+Erster/Letzter Wert wie im
+     Standard-Zustand) blieb sichtbar ungenutzter Raum rechts stehen. Die
+     deklarierten Spaltenbreiten unten wirken bei table-layout:fixed +
+     width:100% als PROPORTIONEN, nach denen der Browser den verfügbaren Platz
+     verteilt — Entität behält dadurch weiterhin den größten Anteil. Die
+     min-width kommt NICHT von hier, sondern als Inline-Style direkt vom
+     Server (_entities_table.html) — ein einzelner fester CSS-Wert könnte bei
+     der laufzeitveränderlichen "Spalten"-Auswahl entweder unnötig Scroll
+     erzwingen (zu hoch für wenige aktive Spalten) oder Überlappung riskieren
+     (zu niedrig für viele aktive Spalten). Reicht der berechnete Platz nicht,
+     greift .tbl-wrap's overflow-x:auto statt die Spalten zu stauchen —
+     deshalb bleibt white-space:nowrap auf jeder Zelle. Breiten aus echten
+     Textmessungen (Header-Label und längster realistischer Datenwert je
+     Spalte) plus Zellpadding (2×14px); Entität zusätzlich über max-width auf
+     .name/.id begrenzt (siehe unten), sonst bestimmt die oft sehr lange
+     ungekürzte entity_id die Spaltenbreite statt der hier deklarierten. */
+  table.entities-dt{table-layout:fixed;width:100%;}
   .entities-dt th,.entities-dt td{white-space:nowrap;}
+  /* Seit die Sidebar-Navigation (_settings_nav.html) durch die globale
+     Menüleiste ersetzt wurde, steht .settings-panel die volle .page-Breite
+     zur Verfügung (statt vorher 1fr neben einer 190px-Sidebar) — die
+     Spalten sind entsprechend breiter gezogen, Entität überproportional
+     stark, da sie der einzige Frei-Text (Name + ID) ist. */
   .col-fav{width:40px;}
-  .col-entity{width:230px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + etwas mehr Puffer */
-  .col-type{width:100px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
-  .col-date{width:112px;}      /* "22.05.2014" ≈ 73px + Puffer */
-  .col-resolution{width:92px;} /* "Rohdaten" ≈ 59px + Puffer */
-  .col-retention{width:104px;} /* Header "Aufbewahrung" ≈ 82px + Puffer */
-  .col-unit{width:72px;}       /* Header "Einheit" ≈ 40px + Puffer */
-  .col-rows{width:100px;}      /* "1.857.990" ≈ 65px + Puffer */
-  .col-size{width:84px;}       /* "14.8 MB" ≈ 51px + Puffer */
+  .col-entity{width:330px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + deutlich mehr Puffer für den nun verfügbaren Platz */
+  .col-type{width:112px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
+  .col-date{width:126px;}      /* "22.05.2014" ≈ 73px + Puffer */
+  .col-resolution{width:104px;} /* "Rohdaten" ≈ 59px + Puffer */
+  .col-retention{width:118px;} /* Header "Aufbewahrung" ≈ 82px + Puffer */
+  .col-unit{width:84px;}       /* Header "Einheit" ≈ 40px + Puffer */
+  .col-rows{width:114px;}      /* "1.857.990" ≈ 65px + Puffer */
+  .col-size{width:96px;}       /* "14.8 MB" ≈ 51px + Puffer */
   /* Ausrichtung je Spalte statt Position (:not(:first-child)) — dieselbe
      Klasse steuert oben schon die Breite, für th UND td gemeinsam, damit
      Kopf- und Datenzeile nie auseinanderlaufen. Favorit + Typ zentriert;
@@ -74,18 +82,23 @@
      bewusst OBERHALB der eigenen Box positioniert. */
   td.entity a{color:inherit;text-decoration:none;display:block;}
   td.entity a:hover .name{color:var(--accent-line);}
-  /* max-width = col-entity(230px) minus Zellpadding (2×14px) — ohne das
+  /* max-width = col-entity(330px) minus Zellpadding (2×14px) — ohne das
      bestimmt bei table-layout:fixed + width:auto trotzdem der ungekürzte
      Inhalt (v. a. die oft sehr lange entity_id im Mono-Font) die tatsächlich
      gerenderte Spaltenbreite, nicht die hier deklarierte .col-entity-Breite
      (Browser fallen für "auto" auf intrinsic/Content-Sizing zurück, sobald
-     ein Kind ohne eigene Breitenbegrenzung eine große Mindestbreite meldet). */
+     ein Kind ohne eigene Breitenbegrenzung eine große Mindestbreite meldet).
+     Die Spalte selbst kann bei width:100%/proportionaler Streckung (s. o.)
+     im Ergebnis breiter sein als 330px — dann bleibt hier zusätzlicher,
+     ungenutzter Raum in der Zelle, was unkritisch ist; wichtig ist nur die
+     Untergrenze, damit Name/ID nie schmaler abgeschnitten werden als die
+     Spalte tatsächlich ist. */
   td.entity .name{
-    display:block;max-width:202px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    display:block;max-width:302px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
     overflow:hidden;text-overflow:ellipsis;
   }
   td.entity .id{
-    display:block;max-width:202px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
+    display:block;max-width:302px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
     overflow:hidden;text-overflow:ellipsis;cursor:help;
   }
   /* Favoriten-Stern — eigene, schmale Spalte ganz links (keine Sortierung,
@@ -104,15 +117,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Entitäten</p>
     <h1>Entitäten</h1>
     <p class="sub">Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.</p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'entitaeten' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">
@@ -162,7 +172,6 @@
         </div>
 
         <div id="entities-table"></div>
-      </div>
     </div>
   </div>
 

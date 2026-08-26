@@ -42,15 +42,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / Export</p>
     <h1>CSV-Export</h1>
     <p class="sub">Lädt die komplette Rohdaten-Historie einer Entität als CSV herunter &mdash; Hot Buffer und Archiv zusammengeführt, zur Löschung markierte Datensätze ausgeschlossen.</p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'export' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
 
         <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="export-table" hx-include="#controls, [name=page_size]" hx-target="#export-table" hx-swap="innerHTML">
@@ -81,7 +78,6 @@
         </div>
 
         <div id="export-table"></div>
-      </div>
     </div>
   </div>
 

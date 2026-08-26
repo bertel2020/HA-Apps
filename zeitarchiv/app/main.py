@@ -205,6 +205,7 @@ DASHBOARD_ROW_HEIGHT = {"0": 206, "1": 210, "2": 218, "3": 228, "4": 240}
 COLOR_SCHEME_LABELS = {
     "zeitarchiv": "Zeitarchiv",
     "home_assistant": "Home Assistant",
+    "modern": "Modern",
 }
 COLOR_MODE_LABELS = {
     "auto": "Automatisch",
@@ -312,6 +313,16 @@ app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="stati
 # keinen Cache-Control-Header setzt und nur Last-Modified/ETag liefert — je nach
 # Heuristik reicht das nicht für ein zuverlässiges Update. Ein an die Datei-mtime
 # gekoppelter Query-Parameter zwingt bei jeder Änderung eine frische Anfrage.
+# format_int/format_value als Jinja-Filter statt jede Stelle einzeln in Python
+# vorzuformatieren: hier gerenderte Zahlen (Import-Vorschau/-Ergebnis, siehe
+# _import_dry_run.html/_import_result.html) stecken in Dataclass-Listen aus
+# storage/symcon_import.py, für die ein eigener "_label"-Wrapper pro Feld
+# unverhältnismäßig wäre. Einzige Ausnahme von der sonstigen Konvention
+# "in Python formatieren, _label ans Template reichen" — bewusst, weil die
+# Alternative (jede Dataclass-Zahl vor jedem Render manuell in ein Dict mit
+# *_label-Kopien übersetzen) hier mehr Code für denselben Zweck wäre.
+templates.env.filters["format_int"] = format_int
+templates.env.filters["format_value"] = format_value
 templates.env.globals["css_v"] = int((APP_DIR / "static" / "css" / "app.css").stat().st_mtime)
 # Dieselbe Cache-Busting-Begründung wie oben, nur fürs JS (calendar-picker.js,
 # confirm-dialog.js, …) — ohne das blieb z. B. ein Fix in calendar-picker.js im
@@ -711,7 +722,7 @@ def entities_view(request: Request) -> HTMLResponse:
         "total_size": format_size(overview["total_size_bytes"]),
         "rows_sparkline": _sparkline_paths([s["total_rows"] for s in snapshots]),
         "size_sparkline": _sparkline_paths([s["total_size_bytes"] for s in snapshots]),
-        **_dashboard_tiles_context(),
+        **_dashboard_tiles_context(1),
     }
     return templates.TemplateResponse(request, "entities.html", context)
 
@@ -832,7 +843,7 @@ def _settings_retention_context(result: str | None = None) -> dict:
             next_expiration = "—"
         by_retention.append({
             "label": format_retention(row["retention"]),
-            "entity_count": row["entity_count"],
+            "entity_count": format_int(row["entity_count"]),
             "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
             "rows_due": format_int(rows_due),
@@ -860,9 +871,9 @@ def _settings_retention_context(result: str | None = None) -> dict:
             "trigger": "Zeitplan" if job["trigger"] == "scheduled" else "Manuell",
             "status": status_labels.get(job["status"], job["status"]),
             "status_key": job["status"],
-            "rows_deleted": job["rows_deleted"] if job["rows_deleted"] is not None else "—",
+            "rows_deleted": format_int(job["rows_deleted"]) if job["rows_deleted"] is not None else "—",
             "months_deleted": job["months_deleted"] if job["months_deleted"] is not None else "—",
-            "entities_affected": job["entities_affected"] if job["entities_affected"] is not None else "—",
+            "entities_affected": format_int(job["entities_affected"]) if job["entities_affected"] is not None else "—",
             "bytes_freed": format_size(job["bytes_freed"] or 0) if job["bytes_freed"] else "—",
             "error": job["error"],
         })
@@ -879,7 +890,7 @@ def _settings_retention_context(result: str | None = None) -> dict:
         "last_run": display_ts(last_success_raw) if last_success_raw else None,
         "retention_jobs": jobs,
         "retention_running": running,
-        "limited_retention_count": limited_count,
+        "limited_retention_count": format_int(limited_count),
         "by_retention": by_retention,
         "retention_preview_generated_at": (
             f"{format_timestamp(retention_overview['generated_at'], TZ)} "
@@ -1577,6 +1588,20 @@ def _background_storage_reconciliation() -> None:
     )
 
 
+def _refresh_duplicate_snapshot_if_stale() -> None:
+    """Berechnet die Duplikat-Zählung für /statistik höchstens einmal pro
+    Stunde im Hintergrund (ZP-002 in PERFORMANCE.md) — dieselbe teure
+    Rohdaten-Prüfung wie zuvor, aber nicht mehr bei jedem Seitenaufruf."""
+    if not index.is_duplicate_snapshot_stale():
+        return
+    rows = cleanup.count_duplicate_rows_by_entity(
+        DATA_DIR, index, TZ, max_rows_per_entity=MAX_UI_ANALYSIS_ROWS
+    )
+    index.set_duplicate_snapshot(
+        [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
+    )
+
+
 def _maintenance_scheduler_loop() -> None:
     """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
     while not _maintenance_scheduler_stop.is_set():
@@ -1585,6 +1610,7 @@ def _maintenance_scheduler_loop() -> None:
                 logger.debug("Stündlicher Statistik-Schnappschuss gespeichert")
             supervisor_stats.maybe_record_memory_snapshot(index)
             _refresh_retention_overview_if_stale()
+            _refresh_duplicate_snapshot_if_stale()
             _run_backup_schedule_if_due(datetime.now(TZ))
             _run_retention_enforcement_if_due(datetime.now(TZ))
         except Exception:
@@ -2156,7 +2182,7 @@ def statistik_view(request: Request) -> HTMLResponse:
     by_type = [
         {
             "label": format_type(row["aggregation_type"]),
-            "entity_count": row["entity_count"],
+            "entity_count": format_int(row["entity_count"]),
             "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
         }
@@ -2165,7 +2191,7 @@ def statistik_view(request: Request) -> HTMLResponse:
     by_resolution = [
         {
             "label": format_resolution(row["resolution"]),
-            "entity_count": row["entity_count"],
+            "entity_count": format_int(row["entity_count"]),
             "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
         }
@@ -2177,9 +2203,12 @@ def statistik_view(request: Request) -> HTMLResponse:
         {"ts": s["ts"], "total_rows": s["total_rows"], "total_size_bytes": s["total_size_bytes"]}
         for s in snapshots
     ]
-    duplicate_rows = cleanup.count_duplicate_rows_by_entity(
-        DATA_DIR, index, TZ, max_rows_per_entity=MAX_UI_ANALYSIS_ROWS
-    )
+    # Aus dem stündlichen Wartungsplaner-Snapshot gelesen statt live berechnet
+    # (ZP-002 in PERFORMANCE.md) — vor dem allerersten Planer-Lauf nach einer
+    # frischen Installation ist der Cache noch leer, dann zeigt die Seite
+    # übergangsweise "keine Duplikate" statt die teure Prüfung synchron
+    # nachzuholen.
+    duplicate_rows = (index.get_duplicate_snapshot() or {}).get("rows", [])
     duplicates_by_entity = [
         {
             "entity_id": row["entity_id"],
@@ -2208,6 +2237,7 @@ def statistik_view(request: Request) -> HTMLResponse:
 
     rate_per_hour = _ingestion_rate_per_second(growth_points, 24 * 3600)
     rate_per_day = _ingestion_rate_per_second(growth_points, 7 * 86400)
+    dashboard_count = len(index.list_dashboards())
     dashboard_pin_count = index.count_dashboard_pins()
 
     return templates.TemplateResponse(
@@ -2219,8 +2249,8 @@ def statistik_view(request: Request) -> HTMLResponse:
             "total_size": format_size(overview["total_size_bytes"]),
             "chart_count": index.count_saved_charts(),
             "table_count": index.count_saved_tables(),
+            "dashboard_count": dashboard_count,
             "dashboard_pin_count": dashboard_pin_count,
-            "dashboard_pin_limit": index.DASHBOARD_TILE_LIMIT,
             "events_per_hour": format_int(round(rate_per_hour * 3600)) if rate_per_hour is not None else None,
             "events_per_day": format_int(round(rate_per_day * 86400)) if rate_per_day is not None else None,
             "by_type": by_type,
@@ -2274,8 +2304,12 @@ def _export_table_response(
     page: int = 1,
     page_size: int = 50,
 ) -> HTMLResponse:
-    matched = index.list_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction)
-    page_matched, pagination = _paginate(matched, page, page_size)
+    total = index.count_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter)
+    pagination = _paginate_meta(total, page, page_size)
+    page_matched = index.list_entities(
+        search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction,
+        limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
+    )
     rows = [
         {
             "entity_id": row["entity_id"],
@@ -2419,11 +2453,15 @@ def _entities_table_response(
 ) -> HTMLResponse:
     if visible_columns is None:
         visible_columns = _entities_visible_columns()
-    matched = index.list_entities(
+    total = index.count_entities(
+        search=search or None, type_filter=type_filter, unit_filter=unit_filter, favorites_only=favorites_only,
+    )
+    pagination = _paginate_meta(total, page, page_size)
+    page_matched = index.list_entities(
         search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction,
         favorites_only=favorites_only,
+        limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
     )
-    page_matched, pagination = _paginate(matched, page, page_size)
     rows = [
         {
             "entity_id": row["entity_id"],
@@ -2866,17 +2904,21 @@ def charts_favorite_toggle(chart_id: int) -> dict:
     return {"is_favorite": new_state}
 
 
-def _dashboard_tiles_context() -> dict:
-    """Für die Dashboard-Kacheln auf der Übersichtsseite (Konzept "Offene
-    Punkte", erweitert um Vergleichstabellen) — sowohl vom initialen Laden
-    von "/" als auch von pin/unpin/reorder genutzt (alle geben dasselbe
-    Fragment zurück, damit eine Änderung nicht per Extra-Request neu geladen
-    werden muss). dashboard_pins kennt zwei item_type-Werte ('chart'/
-    'table'), hier gegen die jeweilige Tabelle aufgelöst — ein verwaister
-    Pin (Chart/Tabelle zwischenzeitlich gelöscht, sollte durch die
-    Bereinigung in delete_saved_chart()/delete_saved_table() praktisch nie
-    vorkommen) wird dabei still übersprungen statt einen Fehler zu werfen."""
-    pins = index.list_dashboard_pins()
+def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
+    """Für die Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene
+    Punkte", erweitert um Vergleichstabellen UND um mehrere unabhängige
+    Dashboards) — sowohl vom initialen Laden von "/"/"/dashboards/{id}" als
+    auch von pin/unpin/reorder genutzt (alle geben dasselbe Fragment zurück,
+    damit eine Änderung nicht per Extra-Request neu geladen werden muss).
+    dashboard_pins kennt zwei item_type-Werte ('chart'/'table'), hier gegen
+    die jeweilige Tabelle aufgelöst — ein verwaister Pin (Chart/Tabelle
+    zwischenzeitlich gelöscht, sollte durch die Bereinigung in
+    delete_saved_chart()/delete_saved_table() praktisch nie vorkommen) wird
+    dabei still übersprungen statt einen Fehler zu werfen. base ist der
+    relative Rückweg zur App-Wurzel (siehe "base"-Konvention in chart_editor()/
+    table_editor()) — "." auf "/", ".." auf "/dashboards/{id}", damit dasselbe
+    Fragment auf beiden Seitentiefen funktionierende Links erzeugt."""
+    pins = index.list_dashboard_pins(dashboard_id)
     tiles = []
     for p in pins:
         if p["item_type"] == "chart":
@@ -2903,6 +2945,8 @@ def _dashboard_tiles_context() -> dict:
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
     return {
+        "dashboard_id": dashboard_id,
+        "base": base,
         "tiles": tiles,
         "can_add_tile": len(tiles) < index.DASHBOARD_TILE_LIMIT,
         "unpinned_charts": [c for c in index.list_saved_charts() if c["id"] not in pinned_chart_ids],
@@ -2910,18 +2954,26 @@ def _dashboard_tiles_context() -> dict:
     }
 
 
+def _get_dashboard_or_404(dashboard_id: int) -> dict:
+    dashboard = index.get_dashboard(dashboard_id)
+    if dashboard is None:
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    return dashboard
+
+
 @app.post("/charts/{chart_id}/pin", response_class=HTMLResponse)
-def charts_pin(request: Request, chart_id: int) -> HTMLResponse:
+def charts_pin(request: Request, chart_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
     if index.get_saved_chart(chart_id) is None:
         raise HTTPException(status_code=404, detail="Chart nicht gefunden")
-    index.pin_item_to_dashboard("chart", chart_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context())
+    _get_dashboard_or_404(dashboard_id)
+    index.pin_item_to_dashboard(dashboard_id, "chart", chart_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
 
 @app.post("/charts/{chart_id}/unpin", response_class=HTMLResponse)
-def charts_unpin(request: Request, chart_id: int) -> HTMLResponse:
-    index.unpin_item_from_dashboard("chart", chart_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context())
+def charts_unpin(request: Request, chart_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+    index.unpin_item_from_dashboard(dashboard_id, "chart", chart_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
 
 class _DashboardPinRef(BaseModel):
@@ -2930,10 +2982,12 @@ class _DashboardPinRef(BaseModel):
 
 
 class _ReorderDashboardBody(BaseModel):
+    dashboard_id: int = 1
     pins: list[_DashboardPinRef]
 
 
 class _ResizeDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
     item_type: str
     item_id: int
     grid_cols: int = Field(ge=1, le=3)
@@ -2942,13 +2996,13 @@ class _ResizeDashboardTileBody(BaseModel):
 
 @app.post("/dashboard/reorder")
 def dashboard_reorder(body: _ReorderDashboardBody) -> dict:
-    """Persistiert die per Drag&Drop auf der Übersichtsseite geänderte
+    """Persistiert die per Drag&Drop auf einer Dashboard-Seite geänderte
     Kachel-Reihenfolge — das Frontend hat die Kacheln zu diesem Zeitpunkt
     schon live im DOM umsortiert (dashboard-tiles.js), dieser Aufruf schreibt
     das nur noch fest, ohne selbst ein neues Fragment zurückzugeben. Ein
     eigener Pfad statt "/charts/reorder"/"/tables/reorder", weil eine
     Kachel-Reihenfolge Charts UND Tabellen gemischt enthalten kann."""
-    index.reorder_dashboard_pins([(p.item_type, p.item_id) for p in body.pins])
+    index.reorder_dashboard_pins(body.dashboard_id, [(p.item_type, p.item_id) for p in body.pins])
     return {"ok": True}
 
 
@@ -2957,10 +3011,81 @@ def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     if body.item_type not in {"chart", "table"}:
         raise HTTPException(status_code=422, detail="Ungültiger Dashboard-Kacheltyp")
     if not index.set_dashboard_pin_size(
-        body.item_type, body.item_id, body.grid_cols, body.grid_rows
+        body.dashboard_id, body.item_type, body.item_id, body.grid_cols, body.grid_rows
     ):
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
+
+
+# -- Dashboards (Konzept "Dashboards"-Menüpunkt: mehrere, unabhängige
+# Dashboards zusätzlich zur festen Übersichtsseite "/", siehe dashboards-
+# Tabelle in storage/index.py). ---------------------------------------------
+
+class _DashboardCreateBody(BaseModel):
+    name: str
+
+
+class _DashboardRenameBody(BaseModel):
+    name: str
+
+
+@app.get("/dashboards", response_class=HTMLResponse)
+def dashboards_list(request: Request) -> HTMLResponse:
+    dashboards = index.list_dashboards()
+    pin_counts = {d["id"]: index.count_dashboard_pins(d["id"]) for d in dashboards}
+    return templates.TemplateResponse(
+        request, "dashboards.html", {"dashboards": dashboards, "pin_counts": pin_counts}
+    )
+
+
+@app.post("/dashboards")
+def dashboards_create(body: _DashboardCreateBody) -> dict:
+    name = body.name.strip() or "Neues Dashboard"
+    dashboard_id = index.create_dashboard(name)
+    return {"id": dashboard_id, "name": name}
+
+
+@app.get("/dashboards/new", response_class=HTMLResponse)
+def dashboards_new(request: Request) -> HTMLResponse:
+    # Muss VOR "/dashboards/{dashboard_id}" registriert sein, sonst würde
+    # dieser Pfad zuerst dort landen und an der int-Konvertierung von "new"
+    # scheitern (siehe dasselbe Muster bei /charts/new vor /charts/{chart_id}).
+    return templates.TemplateResponse(request, "dashboard_editor.html", {"dashboard": None, "base": ".."})
+
+
+@app.get("/dashboards/{dashboard_id}", response_class=HTMLResponse)
+def dashboard_detail(request: Request, dashboard_id: int) -> HTMLResponse:
+    dashboard = _get_dashboard_or_404(dashboard_id)
+    context = {
+        "dashboard": dashboard,
+        **_dashboard_tiles_context(dashboard_id, base=".."),
+    }
+    return templates.TemplateResponse(request, "dashboard_detail.html", context)
+
+
+@app.get("/dashboards/{dashboard_id}/edit", response_class=HTMLResponse)
+def dashboards_edit(request: Request, dashboard_id: int) -> HTMLResponse:
+    dashboard = _get_dashboard_or_404(dashboard_id)
+    return templates.TemplateResponse(
+        request, "dashboard_editor.html", {"dashboard": dashboard, "base": "../.."}
+    )
+
+
+@app.post("/dashboards/{dashboard_id}/rename")
+def dashboards_rename(dashboard_id: int, body: _DashboardRenameBody) -> dict:
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+    if not index.rename_dashboard(dashboard_id, name):
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    return {"ok": True, "name": name}
+
+
+@app.post("/dashboards/{dashboard_id}/delete")
+def dashboards_delete(dashboard_id: int) -> dict:
+    if not index.delete_dashboard(dashboard_id):
+        raise HTTPException(status_code=400, detail="Dashboard kann nicht gelöscht werden")
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -3130,17 +3255,18 @@ def tables_favorite_toggle(table_id: int) -> dict:
 
 
 @app.post("/tables/{table_id}/pin", response_class=HTMLResponse)
-def tables_pin(request: Request, table_id: int) -> HTMLResponse:
+def tables_pin(request: Request, table_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
     if index.get_saved_table(table_id) is None:
         raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
-    index.pin_item_to_dashboard("table", table_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context())
+    _get_dashboard_or_404(dashboard_id)
+    index.pin_item_to_dashboard(dashboard_id, "table", table_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
 
 @app.post("/tables/{table_id}/unpin", response_class=HTMLResponse)
-def tables_unpin(request: Request, table_id: int) -> HTMLResponse:
-    index.unpin_item_from_dashboard("table", table_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context())
+def tables_unpin(request: Request, table_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+    index.unpin_item_from_dashboard(dashboard_id, "table", table_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
 
 @app.get("/entities/{entity_id}", response_class=HTMLResponse)
@@ -3226,10 +3352,11 @@ def entity_data_days(entity_id: str, year: int, month: int) -> dict:
 
 def _paginate(items: list, page: int, page_size: int) -> tuple[list, dict]:
     """Teilt eine Liste in Seiten für Tabellen mit potenziell vielen Zeilen
-    (Entitäten-Übersicht und Bereinigung). Die Obergrenze 1000 verhindert eine
-    unbegrenzte Materialisierung durch alte ``page_size=0``-URLs oder manuell
-    veränderte Requests. page wird auf den gültigen Bereich begrenzt, damit ein
-    veralteter Seiten-Wert nach einem Filterwechsel nie eine leere Seite zeigt."""
+    (Bereinigung u. a.), deren Gesamtmenge bereits vollständig im Speicher
+    vorliegt. Die Obergrenze 1000 verhindert eine unbegrenzte Materialisierung
+    durch alte ``page_size=0``-URLs oder manuell veränderte Requests. page
+    wird auf den gültigen Bereich begrenzt, damit ein veralteter Seiten-Wert
+    nach einem Filterwechsel nie eine leere Seite zeigt."""
     total = len(items)
     page_size = 1000 if page_size <= 0 else min(page_size, 1000)
     total_pages = max(1, -(-total // page_size))  # ceil ohne math.ceil-Import
@@ -3240,6 +3367,15 @@ def _paginate(items: list, page: int, page_size: int) -> tuple[list, dict]:
         "page": page, "page_size": page_size, "total": total, "total_pages": total_pages,
         "start": start + 1 if total else 0, "end": end,
     }
+
+
+def _paginate_meta(total: int, page: int, page_size: int) -> dict:
+    """Berechnet dieselbe Seiteninfo wie `_paginate()`, aber für eine bereits
+    bekannte Trefferzahl statt einer im Speicher vorliegenden Liste — für
+    Aufrufer, die per SQL `LIMIT`/`OFFSET` paginieren, statt die komplette
+    Ergebnismenge zu laden (ZP-004 in PERFORMANCE.md)."""
+    _, pagination = _paginate([None] * total, page, page_size)
+    return pagination
 
 
 # Zeiträume der Bereinigungsseite — dieselben Perioden wie im Chart

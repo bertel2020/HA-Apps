@@ -1,30 +1,43 @@
-<!-- Dashboard-Kacheln auf der Übersichtsseite (Konzept "Offene Punkte", erweitert
-     um Vergleichstabellen) — eigenes Fragment statt inline in entities.html,
-     weil Pin/Unpin/Reorder (main.py charts_pin()/tables_pin()/unpin()/
+<!-- Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene Punkte", erweitert
+     um Vergleichstabellen UND um mehrere unabhängige Dashboards) — eigenes
+     Fragment statt inline in entities.html/dashboard_detail.html, weil
+     Pin/Unpin/Reorder (main.py charts_pin()/tables_pin()/unpin()/
      dashboard_reorder()) genau dieses Fragment zurückgeben und per htmx
      (hx-target="#dashboard-grid" hx-swap="outerHTML") ersetzen, ohne die
-     ganze Übersichtsseite neu zu laden.
+     ganze Seite neu zu laden.
+
+     base ist der relative Rückweg zur App-Wurzel ("." auf "/", ".." auf
+     "/dashboards/{id}", siehe main.py _dashboard_tiles_context()) — nötig,
+     weil dieses Fragment auf zwei unterschiedlich tiefen Seiten eingehängt
+     wird und htmx/relative Links sich sonst gegen den falschen Pfad
+     auflösen. dashboard_id wandert als Query-Parameter mit, damit Pin/Unpin
+     wissen, auf welchem Dashboard sie wirken sollen. Beide Werte liegen
+     zusätzlich als data-Attribute auf #dashboard-grid, damit dashboard-
+     tiles.js (Chart-/Tabellen-Fetches, Reorder, Resize) sie ebenfalls kennt.
 
      Kacheln referenzieren bestehende, unter /charts bzw. /tables gespeicherte
      Objekte statt eine zweite Möglichkeit zu bieten, sie zu definieren — die
      "+"-Kachel ist nur ein Picker über die jeweils noch nicht angehefteten
      Einträge, keine Editor-Seite. Nur EINE leere "+"-Kachel gleichzeitig
      sichtbar (progressive Anzeige statt eines sofort leeren Rasters), bis
-     zum Limit von 18 (can_add_tile, index.DASHBOARD_TILE_LIMIT). Reihenfolge
-     per Drag&Drop änderbar (dashboard-tiles.js, native HTML5-DnD statt einer
-     zusätzlichen Bibliothek), Charts und Tabellen gemischt sortierbar — die
-     "+"-Kachel bleibt dabei bewusst NICHT draggable, sie ist immer die
-     letzte. Das Raster bleibt auch ohne gespeicherte Objekte sichtbar: Die
-     leere "+"-Kachel führt dann direkt zum Anlegen des ersten Charts oder der
-     ersten Tabelle. -->
-<div id="dashboard-grid" class="dashboard-grid">
+     zum Limit von 18 (can_add_tile, index.DASHBOARD_TILE_LIMIT, pro
+     Dashboard gezählt). Reihenfolge per Drag&Drop änderbar (dashboard-
+     tiles.js, native HTML5-DnD statt einer zusätzlichen Bibliothek), Charts
+     und Tabellen gemischt sortierbar — die "+"-Kachel bleibt dabei bewusst
+     NICHT draggable, sie ist immer die letzte. Das Raster bleibt auch ohne
+     gespeicherte Objekte sichtbar: Die leere "+"-Kachel führt dann direkt
+     zum Anlegen des ersten Charts oder der ersten Tabelle. -->
+{% set base = base | default('.') %}
+{% set dashboard_id = dashboard_id | default(1) %}
+{% set href_base = '' if base == '.' else base + '/' %}
+<div id="dashboard-grid" class="dashboard-grid" data-base="{{ base }}" data-dashboard-id="{{ dashboard_id }}">
   {% for tile in tiles %}
   {% if tile.kind == 'chart' %}
   <div class="dtile" draggable="true" data-item-type="chart" data-item-id="{{ tile.id }}"
        data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
        style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}" title="Zum Umsortieren ziehen">
     {% include "_dashboard_tile_menu.html" %}
-    <a class="dtile-body" href="charts/{{ tile.id }}" draggable="false"
+    <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
        data-entity-ids='{{ tile.entity_ids | tojson }}'
        data-entity-names='{{ tile.entity_names | tojson }}'
        data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
@@ -40,7 +53,7 @@
        data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
        style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}" title="Zum Umsortieren ziehen">
     {% include "_dashboard_tile_menu.html" %}
-    <a class="dtile-body" href="tables/{{ tile.id }}" draggable="false"
+    <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}" draggable="false"
        data-columns='{{ tile.columns | tojson }}' data-rows='{{ tile.rows | tojson }}' data-style='{{ tile.style | tojson }}'>
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-table-preview"><div class="dtile-loading">&hellip;</div></div>
@@ -56,7 +69,8 @@
       <p class="dtile-picker-label">Chart anheften</p>
       {% for c in unpinned_charts %}
       <button type="button" class="dtile-picker-item"
-              hx-post="charts/{{ c.id }}/pin" hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+              hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+              hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
         {{ c.name }}
       </button>
       {% endfor %}
@@ -65,15 +79,16 @@
       <p class="dtile-picker-label">Tabelle anheften</p>
       {% for t in unpinned_tables %}
       <button type="button" class="dtile-picker-item"
-              hx-post="tables/{{ t.id }}/pin" hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+              hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+              hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
         {{ t.name }}
       </button>
       {% endfor %}
       {% endif %}
       {% if not tiles and not unpinned_charts and not unpinned_tables %}
-      <p class="dtile-picker-empty">Noch keine Charts oder Tabellen angelegt.<br><a href="charts/new">Erstes Chart anlegen</a> &middot; <a href="tables/new">erste Tabelle anlegen</a></p>
+      <p class="dtile-picker-empty">Noch keine Charts oder Tabellen angelegt.<br><a href="{{ href_base }}charts/new">Erstes Chart anlegen</a> &middot; <a href="{{ href_base }}tables/new">erste Tabelle anlegen</a></p>
       {% elif not unpinned_charts and not unpinned_tables %}
-      <p class="dtile-picker-empty">Alle abgelegten Charts/Tabellen sind schon angeheftet.<br><a href="charts/new">Neuer Chart</a> &middot; <a href="tables/new">Neue Tabelle</a></p>
+      <p class="dtile-picker-empty">Alle abgelegten Charts/Tabellen sind schon angeheftet.<br><a href="{{ href_base }}charts/new">Neuer Chart</a> &middot; <a href="{{ href_base }}tables/new">Neue Tabelle</a></p>
       {% endif %}
     </div>
   </div>

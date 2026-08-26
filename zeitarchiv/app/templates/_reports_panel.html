@@ -16,12 +16,21 @@
   .report-empty{padding:24px 0;color:var(--ink-faint)}
   /* Feste statt der Browser-Auto-Breite je Spalte — sonst brechen "Zeitpunkt"
      und "Status" bei knappem Platz mitten im Text um (z. B. "Teilweise
-     erfolgreich" zweizeilig), während die eigentlich schmalen Zahlenspalten
-     zu viel Raum bekommen. Ziele/Importiert/Übersprungen/Dauer bewusst ohne
-     feste Breite — sind schon von Natur aus kurz, brauchen keine Vorgabe. */
-  .report-table th:nth-child(1),.report-table td:nth-child(1){width:150px}
-  .report-table th:nth-child(2),.report-table td:nth-child(2){width:80px}
-  .report-table th:nth-child(3),.report-table td:nth-child(3){width:170px}
+     erfolgreich" zweizeilig), während die kurzen Zahlenspalten ungleichmäßig
+     viel/wenig Raum bekommen (Browser-Auto-Layout verteilt nach intrinsischer
+     Breite, nicht ausgewogen). Alle sieben Spalten bekommen deshalb bewusste
+     Prozentbreiten (table-layout:fixed) statt nur die ersten drei fest zu
+     setzen und den Rest dem Zufall zu überlassen — Summe = 100%, damit die
+     Tabelle wie gehabt die volle .settings-panel-Breite ausfüllt. */
+  table.report-table{table-layout:fixed;min-width:960px;}
+  .report-table th:nth-child(1),.report-table td:nth-child(1){width:18%}
+  .report-table th:nth-child(2),.report-table td:nth-child(2){width:14%}
+  .report-table th:nth-child(3),.report-table td:nth-child(3){width:23%}
+  .report-table th:nth-child(4),.report-table td:nth-child(4){width:9%}
+  .report-table th:nth-child(5),.report-table td:nth-child(5){width:13%}
+  .report-table th:nth-child(6),.report-table td:nth-child(6){width:14%}
+  .report-table th:nth-child(7),.report-table td:nth-child(7){width:9%}
+  .report-table td{white-space:nowrap;}
   .report-row{cursor:pointer}
   /* Sortierbare Spaltenköpfe — dieselbe Optik wie die Entitäten-/Export-
      Tabelle (export.html: th a{...}), damit sortierbare Tabellen app-weit
@@ -82,7 +91,7 @@
          class="{{ 'active' if col.active else '' }}">{{ col.label }}{% if col.active %} {{ col.arrow }}{% endif %}</a></th>
   {% endfor %}
 </tr>
-{% for report in reports %}<tr class="report-row" onclick="location.href='reports/{{ report.id }}'"><td class="mono nowrap">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary.targets }}</td><td>{{ report.rows_written }}</td><td>{{ report.rows_skipped }}</td><td>{{ '%.1f' | format(report.duration_seconds) }} s</td></tr>{% endfor %}
+{% for report in reports %}<tr class="report-row" onclick="location.href='reports/{{ report.id }}'"><td class="mono nowrap">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary_label.targets }}</td><td>{{ report.rows_written_label }}</td><td>{{ report.rows_skipped_label }}</td><td>{{ report.duration_label }} s</td></tr>{% endfor %}
 </table></div>
 {% else %}<p class="report-empty">Keine passenden Import-Reports vorhanden.</p>{% endif %}
 <div class="pager" style="justify-content:space-between;">

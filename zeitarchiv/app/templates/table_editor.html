@@ -87,34 +87,56 @@
   .tbl-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .tbl-row-top input[type=text]{
     font-family:inherit;font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
-    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:140px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:150px;max-width:300px;
   }
+  /* "Fett" + Auf/Ab + Löschen als EIN Wrapper mit margin-left:auto statt
+     mehrerer eigenständig rechtsbündiger Elemente — sonst würde der freie
+     Platz in der Zeile auf mehrere auto-Margins aufgeteilt und eine sichtbare
+     Lücke zwischen "Fett" und den Pfeilen reißen. Als ein Block rutscht er
+     IMMER an dieselbe rechte Kante, egal wie breit die davorstehenden Felder
+     je Zeilentyp sind (Entität/Gruppe/Formel haben unterschiedlich viele/
+     breite Picker-Felder vor "Fett") — und bleibt auch bei der Trennlinie
+     (kein "Fett", nur Auf/Ab/Löschen) rechtsbündig, weil der Wrapper selbst
+     nie versteckt wird. */
+  .tbl-row-right{display:flex;align-items:center;gap:8px;margin-left:auto;}
   .tbl-row-top label.cbx{display:flex;align-items:center;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
   .tbl-row-remove{flex:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(16px * var(--font-scale, 1));padding:0 2px;line-height:1;margin-top:4px;}
   .tbl-row-remove:hover{color:var(--danger);}
-  .tbl-row-move{display:flex;gap:2px;margin-left:auto;}
+  .tbl-row-move{display:flex;gap:2px;}
   .tbl-row-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
   .tbl-row-move button:hover{color:var(--accent-line);}
   .tbl-row-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
 
-  /* Entität-Zeilen-Picker — dieselbe .dd-picker-Optik wie überall sonst in
-     der App, aber mit Suchfeld + scrollbarer Liste wie der Gruppen-Picker
-     darunter (.tbl-group-popover, hier per Klassen-Kombination mitgenutzt
-     statt einer dritten eigenen Popover-Variante). Ersetzt das frühere
-     ungefilterte <select> — bei vielen Entitäten war darin nichts zu finden
-     außer per Scrollen/Tippen-zum-Springen. */
-  .tbl-row-top .dd-picker-wrap{max-width:320px;width:100%;}
-  .tbl-row-top .dd-picker-wrap > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* Typ-Picker (Entität/Gruppe/Formel/Trennlinie) — feste Breite statt
+     Inhaltsbreite, ein Tick großzügiger als das längste Label ("Trennlinie ▾")
+     braucht, damit er nicht bei jedem Zeilentyp minimal in der Breite springt. */
+  .tbl-row-top .tbl-type-picker{flex:none;width:130px;}
+  .tbl-row-top .tbl-type-picker > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;white-space:nowrap;box-sizing:border-box;}
+  /* Entität-/Gruppen-Zeilen-Picker — dieselbe .dd-picker-Optik wie überall
+     sonst in der App, aber mit Suchfeld + scrollbarer Liste (.tbl-group-popover,
+     hier per Klassen-Kombination mitgenutzt statt einer dritten eigenen
+     Popover-Variante). Ersetzt das frühere ungefilterte <select> — bei vielen
+     Entitäten war darin nichts zu finden außer per Scrollen/Tippen-zum-Springen.
+     Feste statt flexible Breite, seit Typ-Picker und Namensfeld in dieselbe
+     Zeile gerückt sind — sonst würde er je nach verfügbarem Platz mal breiter,
+     mal schmaler als sein Nachbar wirken. Das Formel-Feld (unten) teilt sich
+     dieselbe Breite, damit alle "Wert"-Slots über die Zeilentypen hinweg
+     gleich aussehen. */
+  .tbl-row-top .tbl-value-picker{flex:none;width:260px;}
+  .tbl-row-top .tbl-value-picker > button,.tbl-row-top .tbl-group-btn{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;}
   .tbl-formula-input{
     font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
-    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;max-width:320px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);box-sizing:border-box;
   }
-  /* Formel + Einheit nebeneinander in einer Zeile — Einheit deutlich
-     schmaler, da typische Einheiten (kWh, °C, m³ …) nur wenige Zeichen
-     brauchen, während die Formel selbst der eigentliche Eingabefokus bleibt. */
-  .tbl-formula-row{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;}
-  .tbl-formula-field{display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px;max-width:320px;}
-  .tbl-formula-unit-field{flex:0 1 110px;min-width:90px;max-width:110px;}
+  /* Formel + Einheit stehen jetzt direkt in .tbl-row-top (statt in einer
+     eigenen Zeile darunter mit Label über jedem Feld) — dieselbe Ein-Zeile-
+     Logik wie beim Entität-/Gruppen-Picker. Die "verfügbar: A, B …"-Hilfe
+     und die feste "Einheit"-Beschriftung leben deshalb nur noch als title-
+     Tooltip statt als sichtbarer Text, sonst würde die Zeile umbrechen.
+     Formel bekommt dieselbe Breite wie der Werte-Picker (s.o.), Einheit
+     bleibt schmal (typische Einheiten wie kWh/°C/m³ brauchen wenig Platz). */
+  .tbl-row-top input.tbl-formula-input-inline{flex:none;width:260px;min-width:0;max-width:none;}
+  .tbl-row-top input.tbl-formula-unit-inline{flex:none;width:90px;min-width:0;max-width:none;}
 
   /* Gruppen-Picker: Button + Popover, dasselbe Positionierungsmuster wie das
      Kalender-Widget (cal-wrap/calendar-popover) — position:relative am
@@ -229,15 +251,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page" x-data="tableEditor()">
-    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/tables">Tabellen</a> / {{ table_name or "Neue Tabelle" }}</p>
     <h1>Tabellen</h1>
-    <p class="sub">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen — Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum). &middot; <a href="{{ base }}/tables/new">+ Neue Tabelle</a> &middot; <a href="{{ base }}/tables">&larr; Zurück</a></p>
+    <p class="sub">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen — Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum). &middot; <a href="{{ base }}/tables">&larr; Zurück</a></p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'tables' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (tableId ? 'Tabelle bearbeiten' : 'Neue Tabelle') : (name || 'Neue Tabelle')"></h2>
           {% if table_id %}
@@ -304,7 +323,7 @@
                   <div class="tbl-row-letter" x-text="row.row_type === 'separator' ? '—' : rowLetters[row.uid]"></div>
                   <div class="tbl-row-main">
                     <div class="tbl-row-top">
-                      <span class="dd-picker-wrap" @click.outside="row.typePickerOpen = false">
+                      <span class="dd-picker-wrap tbl-type-picker" @click.outside="row.typePickerOpen = false">
                         <button type="button" class="btn" @click="row.typePickerOpen = !row.typePickerOpen" x-text="ROW_TYPE_LABELS[row.row_type] + ' ▾'"></button>
                         <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.typePickerOpen" x-cloak>
                           <template x-for="[value, label] in ROW_TYPE_OPTIONS" :key="value">
@@ -313,57 +332,54 @@
                           </template>
                         </div>
                       </span>
+
+                      <span class="dd-picker-wrap tbl-value-picker" x-show="row.row_type === 'entity'" @click.outside="row.entityPickerOpen = false">
+                        <button type="button" class="btn"
+                                @click="row.entityPickerOpen = !row.entityPickerOpen; row.entitySearch = ''; if (row.entityPickerOpen) $nextTick(() => $el.parentElement.querySelector('input[type=search]').focus())"
+                                x-text="row.entity_ids[0] ? (ENTITY_LABEL_BY_ID[row.entity_ids[0]] || row.entity_ids[0]) : 'Entität wählen …'"></button>
+                        <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="row.entityPickerOpen" x-cloak>
+                          <input type="search" placeholder="Suchen …" x-model="row.entitySearch">
+                          {% for opt in entity_options %}
+                          <div class="dd-picker-row" :class="{active: row.entity_ids[0] === '{{ opt.entity_id }}'}"
+                               x-show='!row.entitySearch || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.entitySearch.toLowerCase())'
+                               @click="row.entity_ids = ['{{ opt.entity_id }}']; row.entityPickerOpen = false; load()">{{ opt.label }}</div>
+                          {% endfor %}
+                        </div>
+                      </span>
+
+                      <div class="tbl-group-wrap tbl-value-picker" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
+                        <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
+                                x-text="row.entity_ids.length ? row.entity_ids.length + ' Entität' + (row.entity_ids.length !== 1 ? 'en' : '') + ' ausgewählt' : 'Entitäten wählen …'"></button>
+                        <div class="tbl-group-popover" x-show="row.pickerOpen" x-cloak>
+                          <input type="search" placeholder="Suchen …" x-model="row.search">
+                          {% for opt in entity_options %}
+                          <label class="tbl-group-row" x-show='!row.search || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.search.toLowerCase())'>
+                            <input type="checkbox" value="{{ opt.entity_id }}"
+                                   :checked="row.entity_ids.includes('{{ opt.entity_id }}')"
+                                   @change="toggleGroupEntity(row, '{{ opt.entity_id }}')">
+                            <span>{{ opt.label }}</span>
+                          </label>
+                          {% endfor %}
+                        </div>
+                      </div>
+
+                      <input type="text" class="tbl-formula-input tbl-formula-input-inline" x-show="row.row_type === 'formula'"
+                             placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
+                             :title="'Formel — verfügbar: ' + (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)')">
+                      <input type="text" class="tbl-formula-input tbl-formula-unit-inline" x-show="row.row_type === 'formula'"
+                             :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" title="Einheit">
+
                       <input type="text" x-show="row.row_type !== 'separator'" :placeholder="suggestRowLabel(row) || 'Beschriftung …'" x-model="row.label">
-                      <label class="cbx" x-show="row.row_type !== 'separator'"><input type="checkbox" x-model="row.bold"> Fett</label>
-                      <div class="tbl-row-move">
-                        <button type="button" title="Zeile nach oben" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
-                        <button type="button" title="Zeile nach unten" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
-                      </div>
-                      <button type="button" class="tbl-row-remove" title="Zeile entfernen" @click="removeRow(row.uid)">×</button>
-                    </div>
 
-                    <span class="dd-picker-wrap" x-show="row.row_type === 'entity'" @click.outside="row.entityPickerOpen = false">
-                      <button type="button" class="btn"
-                              @click="row.entityPickerOpen = !row.entityPickerOpen; row.entitySearch = ''; if (row.entityPickerOpen) $nextTick(() => $el.parentElement.querySelector('input[type=search]').focus())"
-                              x-text="row.entity_ids[0] ? (ENTITY_LABEL_BY_ID[row.entity_ids[0]] || row.entity_ids[0]) : 'Entität wählen …'"></button>
-                      <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="row.entityPickerOpen" x-cloak>
-                        <input type="search" placeholder="Suchen …" x-model="row.entitySearch">
-                        {% for opt in entity_options %}
-                        <div class="dd-picker-row" :class="{active: row.entity_ids[0] === '{{ opt.entity_id }}'}"
-                             x-show='!row.entitySearch || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.entitySearch.toLowerCase())'
-                             @click="row.entity_ids = ['{{ opt.entity_id }}']; row.entityPickerOpen = false; load()">{{ opt.label }}</div>
-                        {% endfor %}
-                      </div>
-                    </span>
-
-                    <div class="tbl-group-wrap" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
-                      <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
-                              x-text="row.entity_ids.length ? row.entity_ids.length + ' Entität' + (row.entity_ids.length !== 1 ? 'en' : '') + ' ausgewählt' : 'Entitäten wählen …'"></button>
-                      <div class="tbl-group-popover" x-show="row.pickerOpen" x-cloak>
-                        <input type="search" placeholder="Suchen …" x-model="row.search">
-                        {% for opt in entity_options %}
-                        <label class="tbl-group-row" x-show='!row.search || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.search.toLowerCase())'>
-                          <input type="checkbox" value="{{ opt.entity_id }}"
-                                 :checked="row.entity_ids.includes('{{ opt.entity_id }}')"
-                                 @change="toggleGroupEntity(row, '{{ opt.entity_id }}')">
-                          <span>{{ opt.label }}</span>
-                        </label>
-                        {% endfor %}
+                      <div class="tbl-row-right">
+                        <label class="cbx" x-show="row.row_type !== 'separator'"><input type="checkbox" x-model="row.bold"> Fett</label>
+                        <div class="tbl-row-move">
+                          <button type="button" title="Zeile nach oben" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
+                          <button type="button" title="Zeile nach unten" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
+                        </div>
+                        <button type="button" class="tbl-row-remove" title="Zeile entfernen" @click="removeRow(row.uid)">×</button>
                       </div>
                     </div>
-
-                    <template x-if="row.row_type === 'formula'">
-                      <div class="tbl-formula-row">
-                        <div class="tbl-formula-field">
-                          <span class="tbl-field-label">Formel — verfügbar: <span x-text="rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)'"></span></span>
-                          <input type="text" class="tbl-formula-input" placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()">
-                        </div>
-                        <div class="tbl-formula-field tbl-formula-unit-field">
-                          <span class="tbl-field-label">Einheit</span>
-                          <input type="text" class="tbl-formula-input" :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()">
-                        </div>
-                      </div>
-                    </template>
                   </div>
                 </div>
               </template>
@@ -444,11 +460,9 @@
           {% endif %}
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
-      </div>
     </div>
   </div>
 
-  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
@@ -659,7 +673,10 @@
       return {
         tableId: TABLE_ID,
         name: TABLE_NAME,
-        editing: !TABLE_ID,
+        // Der "Bearbeiten"-Button auf der Tabellen-Übersicht verlinkt mit
+        // ?edit=1 hierher, um direkt im Bearbeiten-Modus zu starten statt
+        // erst über "Anpassen" umschalten zu müssen.
+        editing: !TABLE_ID || new URLSearchParams(location.search).has('edit'),
         columns: INITIAL_COLUMNS.map(c => ({...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
         rows: INITIAL_ROWS.map(r => ({formula_unit: '', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, search: '', entitySearch: ''})),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},

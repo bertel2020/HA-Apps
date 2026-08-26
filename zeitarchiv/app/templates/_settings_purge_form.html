@@ -6,28 +6,28 @@
     <div class="stat-row" style="margin-bottom:14px;">
       <div class="stat">
         <div class="label">Physisch entfernbar</div>
-        <div class="value">{{ totals.removable_rows }}</div>
-        <div class="sub-value">von {{ totals.marked_rows }} markierten Datensätzen</div>
+        <div class="value">{{ totals.removable_rows | format_int }}</div>
+        <div class="sub-value">von {{ totals.marked_rows | format_int }} markierten Datensätzen</div>
       </div>
       <div class="stat">
         <div class="label">Hot Buffer</div>
-        <div class="value">{{ totals.hot_rows }}</div>
+        <div class="value">{{ totals.hot_rows | format_int }}</div>
         <div class="sub-value">Datensätze im laufenden Monat</div>
       </div>
       <div class="stat">
         <div class="label">Archiv</div>
-        <div class="value">{{ totals.archive_rows }}</div>
+        <div class="value">{{ totals.archive_rows | format_int }}</div>
         <div class="sub-value">Datensätze in {{ totals.archive_months }} Monatsdatei{% if totals.archive_months != 1 %}en{% endif %}</div>
       </div>
       <div class="stat">
         <div class="label">Betroffene Entitäten</div>
-        <div class="value">{{ totals.entities_affected }}</div>
+        <div class="value">{{ totals.entities_affected | format_int }}</div>
         <div class="sub-value">mit physisch entfernbaren Daten</div>
       </div>
     </div>
     {% if totals.not_removable_rows %}
       <p class="hint" style="margin:0 0 14px;color:var(--danger);">
-        {{ totals.not_removable_rows }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} {% if totals.not_removable_rows == 1 %}konnte{% else %}konnten{% endif %} keiner vorhandenen Rohdatenzeile zugeordnet werden und {% if totals.not_removable_rows == 1 %}würde deshalb{% else %}würden deshalb{% endif %} nicht entfernt.
+        {{ totals.not_removable_rows | format_int }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} {% if totals.not_removable_rows == 1 %}konnte{% else %}konnten{% endif %} keiner vorhandenen Rohdatenzeile zugeordnet werden und {% if totals.not_removable_rows == 1 %}würde deshalb{% else %}würden deshalb{% endif %} nicht entfernt.
       </p>
     {% endif %}
     {% if purge_preview.rows %}
@@ -38,16 +38,16 @@
           {% for row in purge_preview.rows[:50] %}
             <tr>
               <td><strong>{{ row.friendly_name or row.entity_id }}</strong>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}</td>
-              <td>{{ row.removable_rows }} / {{ row.marked_rows }}</td>
-              <td>{{ row.hot_rows }}</td>
-              <td>{{ row.archive_rows }}</td>
+              <td>{{ row.removable_rows | format_int }} / {{ row.marked_rows | format_int }}</td>
+              <td>{{ row.hot_rows | format_int }}</td>
+              <td>{{ row.archive_rows | format_int }}</td>
               <td>{{ row.archive_months }}</td>
             </tr>
           {% endfor %}
           </tbody>
         </table>
       </div>
-      {% if purge_preview.rows|length > 50 %}<p class="hint">Es werden die ersten 50 von {{ purge_preview.rows|length }} Entitäten angezeigt.</p>{% endif %}
+      {% if purge_preview.rows|length > 50 %}<p class="hint">Es werden die ersten 50 von {{ purge_preview.rows|length | format_int }} Entitäten angezeigt.</p>{% endif %}
     {% else %}
       <div class="empty">Aktuell sind keine Datensätze zur Löschung markiert.</div>
     {% endif %}

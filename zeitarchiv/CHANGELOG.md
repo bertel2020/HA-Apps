@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.30.0 - 2026-08-27
+
+### Neu
+
+- Mehrere Dashboards: Kacheln lassen sich jetzt auf beliebig viele benannte
+  Dashboards verteilen (Liste, Kachel-Ansicht, Editor) statt nur auf die
+  eine Startseite.
+- Drittes Farbschema „Modern" (Zinc/Indigo).
+
+### Geändert
+
+- Import-/Export-Icons in der Navigation getauscht, damit die Pfeilrichtung
+  zur Semantik passt.
+- Aufgeräumte Navigation: redundante „Charts →"/„Tabellen →"-Links und
+  doppelte Breadcrumbs entfernt, wo bereits eine „← Zurück"-Zeile vorhanden
+  ist.
+- Mehrere interne Performance-Optimierungen in Statistik-Seite,
+  Entitätenliste und Bereinigungs-Vorschau.
+
 ## 0.20.1 - 2026-08-26
 
 ### Neu

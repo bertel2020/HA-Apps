@@ -1,6 +1,19 @@
 <div class="tbl-wrap">
   {% if rows %}
-  <table class="dt entities-dt">
+  {# Mindestbreite = Summe der TATSÄCHLICH sichtbaren Spalten (Fav+Entität
+     immer dabei, first_ts/last_ts zählen als 2× col-date) — muss serverseitig
+     berechnet werden, weil die Spaltenauswahl per "Spalten"-Picker zur
+     Laufzeit variiert und ein einzelner fester CSS-min-width entweder bei
+     wenigen Spalten unnötig Scroll erzwingt (zu hoch) oder bei vielen
+     Spalten Überlappung riskiert (zu niedrig, siehe .col-*-Breiten in
+     entities_list.html). Passt sich dadurch bei jedem htmx-Reload dieses
+     Fragments automatisch der jeweils aktiven Auswahl an. #}
+  {% set _col_widths = {'type': 112, 'first_ts': 126, 'last_ts': 126, 'resolution': 104, 'retention': 118, 'unit': 84, 'rows': 114, 'size': 96} %}
+  {% set ns = namespace(min_width = 40 + 330) %}
+  {% for col, px in _col_widths.items() %}
+    {% if col in visible_columns %}{% set ns.min_width = ns.min_width + px %}{% endif %}
+  {% endfor %}
+  <table class="dt entities-dt" style="min-width:{{ ns.min_width }}px;">
     <colgroup>
       <col class="col-fav">
       <col class="col-entity">
@@ -48,7 +61,7 @@
       {% if 'resolution' in visible_columns %}<td class="va-mid col-resolution">{{ row.resolution_label }}</td>{% endif %}
       {% if 'retention' in visible_columns %}<td class="va-mid col-retention">{{ row.retention_label }}</td>{% endif %}
       {% if 'unit' in visible_columns %}<td class="va-mid col-unit">{{ row.unit or "—" }}</td>{% endif %}
-      {% if 'rows' in visible_columns %}<td class="va-mid col-rows">{{ "{:,}".format(row.row_count).replace(",", ".") }}</td>{% endif %}
+      {% if 'rows' in visible_columns %}<td class="va-mid col-rows">{{ row.row_count | format_int }}</td>{% endif %}
       {% if 'size' in visible_columns %}<td class="va-mid col-size">{{ row.size }}</td>{% endif %}
     </tr>
     {% endfor %}

@@ -10,7 +10,7 @@
   <h3 class="eyebrow" style="margin-bottom:10px;">Schritt 2/2 &middot; Import läuft&hellip;</h3>
   <p style="margin:0 0 8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
     {% if current_variable %}Symcon-ID <strong style="color:var(--ink);font-family:var(--font-mono);">{{ current_variable }}</strong> &middot; {% endif %}
-    <strong style="color:var(--ink);">{{ done_months }}</strong> von <strong style="color:var(--ink);">{{ total_months }}</strong> Monaten &middot; <strong style="color:var(--ink);">{{ rows_imported }}</strong> Datensätze geschrieben
+    <strong style="color:var(--ink);">{{ done_months }}</strong> von <strong style="color:var(--ink);">{{ total_months }}</strong> Monaten &middot; <strong style="color:var(--ink);">{{ rows_imported | format_int }}</strong> Datensätze geschrieben
   </p>
   {% endif %}
   <div style="height:8px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--border);overflow:hidden;">

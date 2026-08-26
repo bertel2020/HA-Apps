@@ -1,0 +1,137 @@
+{# Globale Menüleiste — wird direkt nach <body> in jede Top-Level-Seite
+   eingebunden (entities.html, charts.html, tables.html, settings.html,
+   statistik.html, import.html, export.html, backup.html, logs.html).
+   Der aktive Menüpunkt wird rein aus dem aktuellen Pfad abgeleitet (kein
+   zusätzlicher nav_active-Parameter je Route nötig) und funktioniert dadurch
+   unverändert auch auf tiefer verschachtelten Detailseiten wie
+   /entities/<id> oder /charts/<id>. app_root berücksichtigt automatisch
+   Home Assistants Ingress-Pfadpräfix (siehe _app_root_context in main.py). #}
+{# Alpine.js zentral hier laden statt in jeder Seite einzeln — vor _topnav.html
+   brauchten nur entities.html/entity_detail.html/cleanup.html/chart_editor.html/
+   table_editor.html überhaupt Alpine, alle anderen Seiten hatten das Script-Tag
+   nie und ihr System-Dropdown blieb deshalb tot. app_root funktioniert
+   unabhängig von der Verschachtelungstiefe (siehe oben), im Gegensatz zum
+   uneinheitlichen base/relative-Pfad-Mix, den die einzelnen Seiten bisher
+   für ihre Script-Tags nutzten. #}
+<script src="{{ app_root }}/static/vendor/alpine.min.js" defer></script>
+{% set _path = request.url.path %}
+{% set _rel = _path[(app_root|length):] if app_root and _path.startswith(app_root) else _path %}
+{% set nav_home = _rel in ('/', '') %}
+{% set nav_dashboards = _rel.startswith('/dashboards') %}
+{% set nav_entities = _rel.startswith('/entities') %}
+{% set nav_charts = _rel.startswith('/charts') %}
+{% set nav_tables = _rel.startswith('/tables') %}
+{% set nav_statistik = _rel.startswith('/statistik') %}
+{% set nav_import = _rel.startswith('/import') %}
+{% set nav_export = _rel.startswith('/export') %}
+{% set nav_backup = _rel.startswith('/backup') %}
+{% set nav_logs = _rel.startswith('/logs') %}
+{% set nav_settings = _rel.startswith('/settings') %}
+{% set nav_system = nav_statistik or nav_import or nav_export or nav_backup or nav_logs or nav_settings %}
+
+{% macro nav_icon(name) -%}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="topnav-icon" aria-hidden="true">{%- if name == 'home' -%}
+<path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h5v-6h2v6h5v-9"/>
+{%- elif name == 'dashboards' -%}
+<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/>
+{%- elif name == 'entities' -%}
+<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+{%- elif name == 'charts' -%}
+<polyline points="3,17 9,10 13,14 21,5"/>
+{%- elif name == 'tables' -%}
+<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="10" x2="9" y2="20"/>
+{%- elif name == 'system' -%}
+<line x1="6" y1="5" x2="6" y2="19"/><circle cx="6" cy="9" r="2"/><line x1="12" y1="5" x2="12" y2="19"/><circle cx="12" cy="15" r="2"/><line x1="18" y1="5" x2="18" y2="19"/><circle cx="18" cy="8" r="2"/>
+{%- elif name == 'statistik' -%}
+<line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/>
+{%- elif name == 'import' -%}
+<polyline points="7,11 12,16 17,11"/><line x1="12" y1="4" x2="12" y2="16"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>
+{%- elif name == 'export' -%}
+<polyline points="7,9 12,4 17,9"/><line x1="12" y1="4" x2="12" y2="15"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>
+{%- elif name == 'backup' -%}
+<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>
+{%- elif name == 'logs' -%}
+<path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="16" y2="16"/>
+{%- elif name == 'settings' -%}
+<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>
+{%- elif name == 'menu' -%}
+<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
+{%- elif name == 'x' -%}
+<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+{%- endif %}</svg>
+{%- endmacro %}
+{% macro nav_chevron() -%}
+<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
+{%- endmacro %}
+
+<div class="topnav" x-data="{ systemOpen: false, drawerOpen: false, drawerSystemOpen: {{ 'true' if nav_system else 'false' }} }">
+  <div class="topnav-bar">
+    <a class="topnav-brand" href="{{ app_root }}/">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
+        <rect width="64" height="64" rx="14" fill="#13211C"/>
+        <rect x="13" y="44" width="6" height="7" rx="1.5" fill="#E79A5B"/>
+        <rect x="23.8" y="35.87" width="6" height="15.13" rx="1.5" fill="#E79A5B"/>
+        <rect x="34.6" y="27.73" width="6" height="23.27" rx="1.5" fill="#E79A5B"/>
+        <polyline points="16,40 26.8,31.87 37.6,23.73 48.4,15.6" fill="none" stroke="#57C9BB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="16" cy="40" r="1.4" fill="#57C9BB"/>
+        <circle cx="26.8" cy="31.87" r="1.4" fill="#57C9BB"/>
+        <circle cx="37.6" cy="23.73" r="1.4" fill="#57C9BB"/>
+        <circle cx="48.4" cy="15.6" r="2.6" fill="#57C9BB"/>
+      </svg>
+      <span>Zeitarchiv</span>
+    </a>
+
+    <nav class="topnav-links">
+      <a class="topnav-link{{ ' is-active' if nav_home }}" href="{{ app_root }}/">{{ nav_icon('home') }}Übersicht</a>
+      <a class="topnav-link{{ ' is-active' if nav_dashboards }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Dashboards</a>
+      <a class="topnav-link{{ ' is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}Entitäten</a>
+      <a class="topnav-link{{ ' is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}Charts</a>
+      <a class="topnav-link{{ ' is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}Tabellen</a>
+      <div class="topnav-system{{ ' is-active' if nav_system }}" @click.outside="systemOpen = false">
+        <button type="button" class="topnav-system-btn" @click="systemOpen = !systemOpen" :aria-expanded="systemOpen.toString()">
+          {{ nav_icon('system') }}System{{ nav_chevron() }}
+        </button>
+        <div class="topnav-menu" x-show="systemOpen" x-cloak @click="systemOpen = false">
+          <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ nav_icon('statistik') }}Statistik</a>
+          <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ nav_icon('import') }}Import</a>
+          <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ nav_icon('export') }}Export</a>
+          <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ nav_icon('backup') }}Backup / Restore</a>
+          <a class="{{ 'is-active' if nav_logs }}" href="{{ app_root }}/logs">{{ nav_icon('logs') }}Protokoll</a>
+          <div class="topnav-menu-divider"></div>
+          <a class="{{ 'is-active' if nav_settings }}" href="{{ app_root }}/settings">{{ nav_icon('settings') }}Einstellungen</a>
+        </div>
+      </div>
+    </nav>
+
+    <button type="button" class="topnav-burger" @click="drawerOpen = true" aria-label="Menü öffnen">
+      {{ nav_icon('menu') }}
+    </button>
+  </div>
+
+  <div class="topnav-drawer-backdrop" :class="{ 'is-open': drawerOpen }" @click="drawerOpen = false" x-cloak></div>
+  <div class="topnav-drawer" :class="{ 'is-open': drawerOpen }" x-cloak>
+    <div class="topnav-drawer-head">
+      <span>Zeitarchiv</span>
+      <button type="button" class="topnav-drawer-close" @click="drawerOpen = false" aria-label="Menü schließen">{{ nav_icon('x') }}</button>
+    </div>
+    <nav>
+      <a class="{{ 'is-active' if nav_home }}" href="{{ app_root }}/">{{ nav_icon('home') }}Übersicht</a>
+      <a class="{{ 'is-active' if nav_dashboards }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Dashboards</a>
+      <a class="{{ 'is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}Entitäten</a>
+      <a class="{{ 'is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}Charts</a>
+      <a class="{{ 'is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}Tabellen</a>
+      <button type="button" class="topnav-drawer-system-btn{{ ' is-active' if nav_system }}" @click="drawerSystemOpen = !drawerSystemOpen" :aria-expanded="drawerSystemOpen.toString()">
+        <span class="topnav-drawer-system-label">{{ nav_icon('system') }}System</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" :class="{ 'is-open': drawerSystemOpen }" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
+      </button>
+      <div class="topnav-drawer-sub" x-show="drawerSystemOpen">
+        <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">Statistik</a>
+        <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">Import</a>
+        <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">Export</a>
+        <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">Backup / Restore</a>
+        <a class="{{ 'is-active' if nav_logs }}" href="{{ app_root }}/logs">Protokoll</a>
+        <a class="{{ 'is-active' if nav_settings }}" href="{{ app_root }}/settings">Einstellungen</a>
+      </div>
+    </nav>
+  </div>
+</div>

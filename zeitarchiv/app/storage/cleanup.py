@@ -593,6 +593,18 @@ def preview_purge(
         archive_dir = entity_dir(data_dir, "archive", entity_id)
         if archive_dir.exists():
             for path in sorted(archive_dir.glob("*.parquet")):
+                # Nur Monate öffnen, die überhaupt eine markierte Zeile
+                # enthalten können (wie purge_archived_months()) — sonst
+                # würde jede Vorschau alle Archiv-Monate der Entität
+                # vollständig lesen, auch wenn nur ein einzelner Monat
+                # betroffen ist (ZP-005 in PERFORMANCE.md).
+                year_str, month_str = path.stem.split("-")
+                year, month = int(year_str), int(month_str)
+                month_start = datetime(year, month, 1, tzinfo=tz).timestamp()
+                days_in_month = calendar.monthrange(year, month)[1]
+                month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=tz).timestamp() + 1
+                if not any(month_start <= ts < month_end for ts in remaining):
+                    continue
                 table = pq.read_table(path, columns=["ts"])
                 removed = consume(table.column("ts").to_pylist(), remaining)
                 if removed:

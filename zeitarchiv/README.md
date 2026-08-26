@@ -15,11 +15,9 @@ Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
 visualisiert sie.
 
-Version 0.20.1 zeigt den aktuellen RAM-Verbrauch unter „Über Zeitarchiv",
-erleichtert die Seitennavigation um eine direkte Seitenwahl sowie Erste-/
-Letzte-Seite-Sprung und behebt einen Fehler, durch den der Zeitraum „Jahr"
-im Bearbeitungsbereich bei sehr datenreichen Entitäten ohne Rückmeldung
-hängen blieb.
+Version 0.30.0 bringt mehrere Dashboards: Kacheln lassen sich jetzt auf
+beliebig viele benannte Dashboards verteilen statt nur auf die eine
+Startseite. Dazu ein drittes Farbschema „Modern" (Zinc/Indigo).
 
 ## Auf einen Blick
 
@@ -91,13 +89,15 @@ wartet die App auf Daten, archiviert aber nichts.
 
 ## Die Oberfläche
 
-### Dashboard
+### Dashboards
 
-Die Startseite zeigt Archivkennzahlen und bis zu 18 frei angeordnete Kacheln.
-Charts und Tabellen lassen sich mischen, per Drag-and-drop sortieren und in
-Größen von 1×1 bis 3×3 darstellen. Die Ein-/Ausblend-Animation der
-Kachel-Charts gilt zentral für alle Kacheln und lässt sich unter
-**Einstellungen → Darstellung** deaktivieren.
+Kacheln lassen sich auf beliebig viele benannte Dashboards verteilen statt
+nur auf eine Startseite. Der Menüpunkt **Dashboards** bietet eine
+Kartenübersicht aller Dashboards, pro Dashboard eine Kachel-Ansicht (bis zu
+18 frei angeordnete Kacheln, Charts und Tabellen gemischt, Drag-and-drop,
+Größen 1×1 bis 3×3) sowie einen Editor zum Anlegen/Umbenennen/Löschen. Die
+Ein-/Ausblend-Animation der Kachel-Charts gilt weiterhin zentral für alle
+Kacheln und lässt sich unter **Einstellungen → Darstellung** deaktivieren.
 
 ### Entitäten und Verläufe
 

@@ -20,7 +20,7 @@
     <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
     <div class="dtile-menu-divider"></div>
     <button type="button" class="dtile-menu-remove" role="menuitem" draggable="false"
-            hx-post="{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin"
+            hx-post="{{ href_base }}{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
             hx-target="#dashboard-grid" hx-swap="outerHTML"
             hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?"
             @click="menuOpen = false">Vom Dashboard entfernen</button>

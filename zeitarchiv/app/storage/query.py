@@ -171,6 +171,43 @@ def _read_hot_rows_filtered(
     return filter_deleted_occurrences(in_range, deleted_counts)
 
 
+def _last_value_before(path: Path, before_ts: float) -> float | None:
+    """Letzter Wert einer einzelnen Archiv-Monatsdatei mit ``ts < before_ts``.
+
+    Liest pro Row-Group zuerst nur die Parquet-Statistik (min/max von ``ts``,
+    ohne die eigentlichen Datenseiten zu laden) — eine Row-Group, die
+    komplett auf oder nach ``before_ts`` liegt, wird so übersprungen, ohne
+    ihre Werte einzulesen (ZP-001 in PERFORMANCE.md). Row-Groups ohne
+    verwertbare Statistik (z. B. sehr alte/fremde Parquet-Dateien) werden wie
+    bisher vollständig gelesen. Anders als zuvor wird nicht mehr die
+    komplette Tabelle sortiert, bevor gefiltert wird — nur die tatsächlich
+    infrage kommenden Kandidaten."""
+    parquet_file = pq.ParquetFile(path)
+    metadata = parquet_file.metadata
+    ts_index = parquet_file.schema_arrow.get_field_index("ts")
+    for group_index in range(metadata.num_row_groups - 1, -1, -1):
+        row_group = metadata.row_group(group_index)
+        stats = row_group.column(ts_index).statistics if ts_index >= 0 else None
+        if stats is not None and stats.has_min_max and stats.min >= before_ts:
+            continue
+        table = parquet_file.read_row_group(group_index, columns=["ts", "value"])
+        candidates = [
+            (ts, value)
+            for ts, value in zip(
+                table.column("ts").to_pylist(), table.column("value").to_pylist()
+            )
+            if ts < before_ts
+        ]
+        if candidates:
+            # Stabil nur nach ts sortieren (wie zuvor table.sort_by("ts")) —
+            # bei doppelten Zeitstempeln bleibt so dieselbe Reihenfolge wie
+            # in der Originaldatei maßgeblich für die Auswahl des letzten
+            # Kandidaten.
+            candidates.sort(key=lambda candidate: candidate[0])
+            return candidates[-1][1]
+    return None
+
+
 def _boundary_value(data_dir: Path, entity_id: str, before_ts: float, tz: ZoneInfo) -> float | None:
     """Letzter Rohwert vor ``before_ts`` aus Hot Buffer oder Monatsarchiv."""
     before_local = datetime.fromtimestamp(before_ts, tz)
@@ -189,16 +226,9 @@ def _boundary_value(data_dir: Path, entity_id: str, before_ts: float, tz: ZoneIn
     for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
         if path.stem > current_month:
             continue
-        table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
-        candidates = [
-            (ts, value)
-            for ts, value in zip(
-                table.column("ts").to_pylist(), table.column("value").to_pylist()
-            )
-            if ts < before_ts
-        ]
-        if candidates:
-            return candidates[-1][1]
+        value = _last_value_before(path, before_ts)
+        if value is not None:
+            return value
     return None
 
 

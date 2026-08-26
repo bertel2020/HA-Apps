@@ -97,15 +97,12 @@
 </style>
 </head>
 <body>
+  {% include "_topnav.html" %}
   <div class="page" x-data="chartEditor()">
-    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/charts">Charts</a> / {{ chart_name or "Neuer Chart" }}</p>
     <h1>Charts</h1>
-    <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ base }}/charts/new">+ Neuer Chart</a> &middot; <a href="{{ base }}/charts">&larr; Zurück</a></p>
+    <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ base }}/charts">&larr; Zurück</a></p>
 
-    <div class="settings-layout">
-      {% set nav_active = 'charts' %}
-      {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+    <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (chartId ? 'Chart bearbeiten' : 'Neuer Chart') : (name || 'Neuer Chart')"></h2>
           {% if chart_id %}
@@ -267,11 +264,9 @@
           {% endif %}
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
-      </div>
     </div>
   </div>
 
-  <script src="{{ base }}/static/vendor/alpine.min.js" defer></script>
   <script src="{{ base }}/static/vendor/echarts.min.js"></script>
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
@@ -560,8 +555,11 @@
         // (nur Chart + Zeitraum/Vergleich) — der "Anpassen"-Button schaltet
         // erst dann Entitäts-Auswahl und Speichern/Löschen sichtbar. Ein noch
         // ungespeichertes neues Chart hat nichts anzuzeigen, startet also
-        // direkt im Bearbeiten-Modus.
-        editing: !CHART_ID,
+        // direkt im Bearbeiten-Modus. Der "Bearbeiten"-Button auf der
+        // Charts-Übersicht verlinkt mit ?edit=1 hierher, um direkt im
+        // Bearbeiten-Modus zu starten statt erst über "Anpassen" umschalten
+        // zu müssen.
+        editing: !CHART_ID || new URLSearchParams(location.search).has('edit'),
         loading: false,
         saving: false,
         savedMessage: '',
