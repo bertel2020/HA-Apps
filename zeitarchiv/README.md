@@ -342,6 +342,14 @@ python3 scripts/sync_versions.py --check
 - Manuelle Lösch- und Retention-Aktionen können endgültig sein. Vor größeren
   Eingriffen sollte ein geprüftes Backup erstellt werden.
 
+## Lizenz
+
+Dieses Projekt steht unter der [Apache License 2.0](LICENSE).
+Copyright 2026 Roberto / bertel2020.
+
+Die verwendeten Drittanbieter-Komponenten und deren Lizenzen sind in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) aufgeführt.
+
 ---
 
 <p align="center">
