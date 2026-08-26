@@ -138,6 +138,16 @@ def configure_logging(level: str, access_mode: str) -> None:
     access_logger.propagate = False
     access_logger.disabled = access_mode == "off"
 
+    # Gezieltes Entity-Tracing (Konzept "Debugging"): bleibt IMMER auf DEBUG,
+    # unabhängig vom konfigurierten Loglevel oben — eine bewusst gestartete,
+    # zeitlich begrenzte Aufzeichnung soll sichtbar sein, ohne dass man dafür
+    # zusätzlich den globalen Loglevel umstellen (und wieder zurückstellen)
+    # muss.
+    trace_logger = logging.getLogger("zeitarchiv.trace")
+    trace_logger.handlers = [_CONSOLE_HANDLER, _RING_HANDLER]
+    trace_logger.setLevel(logging.DEBUG)
+    trace_logger.propagate = False
+
     # Uvicorns Standard-Accesslog würde jeden Messwert-POST zusätzlich loggen.
     # Zeitarchiv übernimmt das differenziert im eigenen HTTP-Middleware.
     logging.getLogger("uvicorn.access").disabled = True

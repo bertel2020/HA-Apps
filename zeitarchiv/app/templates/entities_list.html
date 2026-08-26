@@ -99,19 +99,8 @@
   .fav-star.active{color:#D9A22B;opacity:1;}
   .fav-star:hover{color:#D9A22B;opacity:1;}
 
-  /* Spalten-Auswahl — Button + Popover, dasselbe Positionierungsmuster wie
-     der Gruppen-Picker in table_editor.html (position:relative am Anker,
-     position:absolute am Popover), hier nur in reinem JS statt Alpine (diese
-     Seite lädt kein Alpine). */
-  .col-picker-wrap{position:relative;display:inline-block;}
-  .col-picker-popover{
-    position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;
-    background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
-    display:none;
-  }
-  .col-picker-popover.open{display:block;}
-  .col-picker-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
-  .col-picker-row:hover{background:var(--surface-alt);}
+  /* Spalten-Auswahl und Typ-Filter nutzen beide das gemeinsame Dropdown-
+     Picker-Muster (.dd-picker-*, app.css) statt eigener Optik hier. */
 </style>
 </head>
 <body>
@@ -126,29 +115,28 @@
       <div class="settings-panel">
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
-             hx-get="entities-table" hx-include="#controls" hx-target="#entities-table" hx-swap="innerHTML">
+             hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">
           <input type="search" name="search" placeholder="Entität oder Name suchen …" onchange="resetEntitiesPage()">
-          <span id="type-filter-wrap" style="display:{{ 'inline' if 'type' in visible_columns else 'none' }};">
-            <label class="filter-chip"><input type="checkbox" name="type" value="all" checked onchange="onTypeAllChange(this); resetEntitiesPage()"><span>Alle</span></label>
-            <label class="filter-chip"><input type="checkbox" name="type" value="standard" onchange="onTypeSpecificChange(this); resetEntitiesPage()"><span>Standard</span></label>
-            <label class="filter-chip"><input type="checkbox" name="type" value="counter" onchange="onTypeSpecificChange(this); resetEntitiesPage()"><span>Zähler</span></label>
-            <label class="filter-chip"><input type="checkbox" name="type" value="switch" onchange="onTypeSpecificChange(this); resetEntitiesPage()"><span>Schalter</span></label>
-          </span>
           <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>★ Nur Favoriten</span></label>
-          <select name="unit" id="unit-filter-select" onchange="resetEntitiesPage()" title="Nach Einheit filtern"
-                  style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">
-            <option value="all">Alle Einheiten</option>
-            {% for opt in unit_options %}
-            <option value="{{ opt.value }}">{{ opt.label }}</option>
-            {% endfor %}
-          </select>
-          <select name="page_size" onchange="resetEntitiesPage()" title="Zeilen pro Seite">
-            <option value="10">10 / Seite</option>
-            <option value="50" selected>50 / Seite</option>
-            <option value="100">100 / Seite</option>
-            <option value="500">500 / Seite</option>
-            <option value="1000">1000 / Seite</option>
-          </select>
+          <span id="type-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'type' in visible_columns else 'none' }};">
+            <button type="button" class="btn" id="type-filter-btn" onclick="toggleDDPicker('type-filter')">Typ: Alle ▾</button>
+            <div class="dd-picker-popover" id="type-filter-popover">
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="all" checked onchange="onTypeAllChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Alle</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Standard</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Zähler</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Schalter</span></label>
+            </div>
+          </span>
+          <span id="unit-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">
+            <button type="button" class="btn" id="unit-filter-btn" onclick="toggleDDPicker('unit-filter')">Einheit: Alle ▾</button>
+            <input type="hidden" name="unit" id="unit-filter-input" value="all">
+            <div class="dd-picker-popover" id="unit-filter-popover">
+              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', 'Alle'); resetEntitiesPage();">Alle Einheiten</div>
+              {% for opt in unit_options %}
+              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetEntitiesPage();">{{ opt.label }}</div>
+              {% endfor %}
+            </div>
+          </span>
           <!-- page ist hier die einzige Quelle der Wahrheit für die Seiten-Navigation
                (analog zum offset-field-Muster bei Bereinigung, Abschnitt 04) — der Pager
                im entities-table-Fragment schreibt nur hierhin. -->
@@ -159,11 +147,11 @@
                gespeicherte Auswahl versehentlich auf "keine Spalte sichtbar"
                zurücksetzen, siehe Kommentar bei der Route in main.py. -->
           <input type="hidden" name="columns_submitted" value="1">
-          <div class="col-picker-wrap">
-            <button type="button" class="btn" onclick="toggleColumnPicker()">Spalten ▾</button>
-            <div class="col-picker-popover" id="col-picker-popover">
+          <div class="dd-picker-wrap">
+            <button type="button" class="btn" onclick="toggleDDPicker('col-picker')">Spalten ▾</button>
+            <div class="dd-picker-popover" id="col-picker-popover">
               {% for key, label in column_options %}
-              <label class="col-picker-row">
+              <label class="dd-picker-row">
                 <input type="checkbox" name="columns" value="{{ key }}" {% if key in visible_columns %}checked{% endif %}
                        onchange="onColumnToggle('{{ key }}', this.checked); resetEntitiesPage()">
                 <span>{{ label }}</span>
@@ -181,6 +169,7 @@
   <script src="static/vendor/htmx.min.js"></script>
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script>
     // Die Liste bleibt beim gewählten sort (kein automatisches Nach-oben-
     // Sortieren von Favoriten, siehe list_entities()) — ein Umschalten ändert
@@ -230,18 +219,25 @@
     }
   </script>
   <script>
-    // Spalten-Popover — reines Vanilla-JS (diese Seite lädt kein Alpine),
-    // dasselbe Öffnen/Schließen-Muster wie der Gruppen-Picker in
-    // table_editor.html, nur ohne dessen reaktiven @click.outside.
-    function toggleColumnPicker() {
-      document.getElementById('col-picker-popover').classList.toggle('open');
-    }
-    document.addEventListener('click', (e) => {
-      const wrap = document.querySelector('.col-picker-wrap');
-      if (wrap && !wrap.contains(e.target)) {
-        document.getElementById('col-picker-popover').classList.remove('open');
+    // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Spalten, Einheit)
+    // kommt aus dem gemeinsamen static/js/dd-picker.js (toggleDDPicker/
+    // selectDDOption). Der Typ-Filter ist Mehrfachauswahl über Checkboxen
+    // und bleibt deshalb eigene Logik — nutzt von dort nur toggleDDPicker()
+    // fürs Öffnen/Schließen des Popovers.
+
+    // Button-Beschriftung spiegelt die aktuelle Typ-Auswahl, damit sie ohne
+    // geöffnetes Popover erkennbar bleibt (analog zu "Vergleichen"-Button in
+    // chart_editor.html, der ebenfalls den aktiven Modus im Label zeigt).
+    const TYPE_LABELS = {standard: 'Standard', counter: 'Zähler', switch: 'Schalter'};
+    function updateTypeFilterLabel() {
+      const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
+      const btn = document.getElementById('type-filter-btn');
+      if (!checked.length || checked.some(cb => cb.value === 'all')) {
+        btn.textContent = 'Typ: Alle ▾';
+        return;
       }
-    });
+      btn.textContent = 'Typ: ' + checked.map(cb => TYPE_LABELS[cb.value]).join(', ') + ' ▾';
+    }
 
     // Filter, die zu einer gerade ausgeblendeten Spalte gehören (aktuell nur
     // Typ und Einheit), sofort mitausblenden UND zurücksetzen — ein aktiver,
@@ -252,15 +248,18 @@
     // in #controls selbst, wird also nicht neu vom Server gerendert).
     function onColumnToggle(key, visible) {
       if (key === 'type') {
-        document.getElementById('type-filter-wrap').style.display = visible ? 'inline' : 'none';
+        document.getElementById('type-filter-wrap').style.display = visible ? 'inline-block' : 'none';
         if (!visible) {
           document.querySelectorAll('input[name=type]').forEach(cb => cb.checked = cb.value === 'all');
+          updateTypeFilterLabel();
         }
       }
       if (key === 'unit') {
-        const select = document.getElementById('unit-filter-select');
-        select.style.display = visible ? 'inline-block' : 'none';
-        if (!visible) select.value = 'all';
+        document.getElementById('unit-filter-wrap').style.display = visible ? 'inline-block' : 'none';
+        if (!visible) {
+          document.getElementById('unit-filter-input').value = 'all';
+          document.getElementById('unit-filter-btn').textContent = 'Einheit: Alle ▾';
+        }
       }
     }
   </script>

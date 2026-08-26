@@ -9,7 +9,6 @@
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
   .log-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
-  .log-toolbar select{min-height:38px;}
   .log-toolbar input[type="search"]{flex:1;min-width:190px;}
   .log-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0;color:var(--ink-faint);font-size:calc(12px * var(--font-scale,1));}
   #log-output{box-sizing:border-box;width:100%;height:560px;overflow:auto;margin:0;padding:16px;
@@ -34,9 +33,15 @@
       <div class="settings-panel">
         <section>
           <div class="log-toolbar">
-            <select id="log-filter" aria-label="Loglevel filtern">
-              {% for key, label in log_filter_options %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
-            </select>
+            <span class="dd-picker-wrap">
+              <button type="button" class="btn" id="log-filter-btn" onclick="toggleDDPicker('log-filter')" aria-label="Loglevel filtern">Level: {{ log_filter_options[0][1] }} ▾</button>
+              <input type="hidden" id="log-filter-input" value="{{ log_filter_options[0][0] }}">
+              <div class="dd-picker-popover" id="log-filter-popover">
+                {% for key, label in log_filter_options %}
+                <div class="dd-picker-row" onclick="selectDDOption('log-filter', '{{ key }}', '{{ label }}')">{{ label }}</div>
+                {% endfor %}
+              </div>
+            </span>
             <input id="log-search" class="search" type="search" placeholder="Protokoll durchsuchen …" aria-label="Protokoll durchsuchen">
             <button type="button" class="btn" id="log-refresh">Jetzt aktualisieren</button>
             <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> Automatisch</label>
@@ -52,12 +57,13 @@
     </div>
   </div>
 
+  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script>
     (() => {
       const output = document.getElementById('log-output');
       const source = document.getElementById('log-source');
       const status = document.getElementById('log-status');
-      const level = document.getElementById('log-filter');
+      const level = document.getElementById('log-filter-input');
       const search = document.getElementById('log-search');
       const auto = document.getElementById('log-auto');
       const download = document.getElementById('log-download');

@@ -27,14 +27,40 @@
   <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
     <div class="field" style="margin:0;">
       <label>Automatische Anwendung</label>
-      <select name="retention_enforcement">
-        <option value="off" {% if not retention_enforcement_enabled %}selected{% endif %}>Aus</option>
-        <option value="on" {% if retention_enforcement_enabled %}selected{% endif %}>An &mdash; täglich</option>
-      </select>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="retention-enforcement-btn" onclick="toggleDDPicker('retention-enforcement')">{{ 'An — täglich' if retention_enforcement_enabled else 'Aus' }} ▾</button>
+        <input type="hidden" name="retention_enforcement" id="retention-enforcement-input" value="{{ 'on' if retention_enforcement_enabled else 'off' }}">
+        <div class="dd-picker-popover" id="retention-enforcement-popover">
+          <div class="dd-picker-row" onclick="selectDDOption('retention-enforcement', 'off', 'Aus')">Aus</div>
+          <div class="dd-picker-row" onclick="selectDDOption('retention-enforcement', 'on', 'An — täglich')">An &mdash; täglich</div>
+        </div>
+      </span>
     </div>
     <div class="field" style="margin:0;">
       <label>Uhrzeit ({{ retention_timezone }})</label>
-      <input type="time" name="retention_enforcement_time" value="{{ retention_enforcement_time }}" required>
+      {% set current_hour = retention_enforcement_time.split(':')[0] %}
+      {% set current_minute = retention_enforcement_time.split(':')[1] %}
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn dd-time-btn" id="retention-time-btn" onclick="toggleDDPicker('retention-time')">{{ retention_enforcement_time }}</button>
+        <div class="dd-picker-popover dd-time-popover" id="retention-time-popover">
+          <div class="dd-time-spin">
+            <div class="dd-time-spin-box">
+              <button type="button" class="dd-time-spin-arrow" aria-label="Stunde eins hoch" onclick="stepDDTime('retention-time', 'hour', 1)">▲</button>
+              <input type="text" inputmode="numeric" maxlength="2" class="dd-time-spin-input" id="retention-time-hour-field"
+                     value="{{ current_hour }}" onfocus="this.select()" onchange="commitDDTimeField('retention-time', 'hour', this)">
+              <button type="button" class="dd-time-spin-arrow" aria-label="Stunde eins runter" onclick="stepDDTime('retention-time', 'hour', -1)">▼</button>
+            </div>
+            <span class="dd-time-spin-sep">:</span>
+            <div class="dd-time-spin-box">
+              <button type="button" class="dd-time-spin-arrow" aria-label="Minute eins hoch" onclick="stepDDTime('retention-time', 'minute', 1)">▲</button>
+              <input type="text" inputmode="numeric" maxlength="2" class="dd-time-spin-input" id="retention-time-minute-field"
+                     value="{{ current_minute }}" onfocus="this.select()" onchange="commitDDTimeField('retention-time', 'minute', this)">
+              <button type="button" class="dd-time-spin-arrow" aria-label="Minute eins runter" onclick="stepDDTime('retention-time', 'minute', -1)">▼</button>
+            </div>
+          </div>
+        </div>
+        <input type="hidden" name="retention_enforcement_time" id="retention-time-input" value="{{ retention_enforcement_time }}">
+      </span>
     </div>
   </div>
 </form>

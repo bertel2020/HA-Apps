@@ -100,6 +100,30 @@
       <div class="stat"><div class="label">Größe</div><div class="value">{{ total_size }}</div></div>
     </div>
 
+    <h2>Ereignisrate</h2>
+    <div class="stat-row">
+      <div class="stat">
+        <div class="label">Ø Ereignisse/Stunde</div>
+        {% if events_per_hour is not none %}
+        <div class="value">{{ events_per_hour }}</div>
+        <div class="sub-value">letzte 24 Stunden</div>
+        {% else %}
+        <div class="value">&mdash;</div>
+        <div class="sub-value">Noch nicht genug Verlaufsdaten</div>
+        {% endif %}
+      </div>
+      <div class="stat">
+        <div class="label">Ø Ereignisse/Tag</div>
+        {% if events_per_day is not none %}
+        <div class="value">{{ events_per_day }}</div>
+        <div class="sub-value">letzte 7 Tage</div>
+        {% else %}
+        <div class="value">&mdash;</div>
+        <div class="sub-value">Noch nicht genug Verlaufsdaten</div>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="section-header">
       <h2>Wachstum über Zeit</h2>
       {% if has_growth_history %}
@@ -222,6 +246,23 @@
     {% if duplicates_by_entity %}
     <p class="hint" style="margin-top:14px;">{{ duplicates_total }} doppelte Zeitstempel insgesamt in den letzten 30 Tagen &mdash; entfernbar über "Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite.</p>
     {% endif %}
+
+    <h2>Inhalte</h2>
+    <div class="stat-row">
+      <a class="stat" href="charts">
+        <div class="label">Charts</div>
+        <div class="value">{{ chart_count }}</div>
+      </a>
+      <a class="stat" href="tables">
+        <div class="label">Tabellen</div>
+        <div class="value">{{ table_count }}</div>
+      </a>
+      <a class="stat" href="{{ app_root }}/">
+        <div class="label">Dashboards</div>
+        <div class="value">1</div>
+        <div class="sub-value">{{ dashboard_pin_count }} von {{ dashboard_pin_limit }} Kacheln angepinnt</div>
+      </a>
+    </div>
 
     <p class="hint" style="text-align:right;margin-top:24px;">Stand: {{ generated_at }}</p>
 

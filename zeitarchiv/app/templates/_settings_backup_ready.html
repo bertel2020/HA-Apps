@@ -29,43 +29,7 @@
   <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML">
     Backup jetzt erstellen
   </button>
-  {% if backups %}
-  <div class="tbl-wrap" style="margin-top:14px;">
-    <table class="dt">
-      <tr><th>Erstellt</th><th>Größe</th><th></th></tr>
-      {% for b in backups %}
-      <tr>
-        <td>{{ b.created_at }}</td>
-        <td>{{ b.size }}</td>
-        <td style="text-align:right;">
-          <span style="display:inline-flex;align-items:center;gap:10px;">
-            <button type="button" class="btn"
-                    hx-post="backup/verify/{{ b.filename }}"
-                    hx-target="#backup-status" hx-swap="outerHTML">
-              Prüfen
-            </button>
-            <button type="button" class="btn btn-danger"
-                    hx-post="backup/restore/{{ b.filename }}"
-                    hx-target="#backup-status" hx-swap="outerHTML"
-                    hx-confirm="Backup {{ b.created_at }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.">
-              Wiederherstellen
-            </button>
-            <a class="btn" href="backup/download/{{ b.filename }}">Herunterladen</a>
-            <button type="button" class="btn btn-danger"
-                    hx-post="backup/delete/{{ b.filename }}"
-                    hx-target="#backup-status" hx-swap="outerHTML"
-                    hx-confirm="Backup {{ b.created_at }} endgültig löschen?">
-              Löschen
-            </button>
-          </span>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% else %}
-  <p class="hint" style="margin-top:10px;">Noch kein Backup erstellt.</p>
-  {% endif %}
+  {% include "_backup_table.html" %}
   {% if backup_jobs %}
   <h3 style="margin:24px 0 10px;">Ausführungsverlauf</h3>
   <div class="tbl-wrap">

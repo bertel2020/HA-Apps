@@ -22,43 +22,81 @@
   <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
     Automatisch erstellen
-    <select name="backup_schedule">
-      {% for value, label in backup_schedule_options %}
-      <option value="{{ value }}" {% if value == backup_schedule %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="backup-schedule-btn" onclick="toggleDDPicker('backup-schedule')">{% for v, l in backup_schedule_options %}{% if v == backup_schedule %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="backup_schedule" id="backup-schedule-input" value="{{ backup_schedule }}">
+      <div class="dd-picker-popover" id="backup-schedule-popover">
+        {% for value, label in backup_schedule_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('backup-schedule', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
   </label>
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
     Uhrzeit ({{ backup_timezone|default('lokal') }})
-    <input type="time" name="backup_schedule_time" value="{{ backup_schedule_time }}" required>
+    {% set current_hour = backup_schedule_time.split(':')[0] %}
+    {% set current_minute = backup_schedule_time.split(':')[1] %}
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn dd-time-btn" id="backup-time-btn" onclick="toggleDDPicker('backup-time')">{{ backup_schedule_time }}</button>
+      <div class="dd-picker-popover dd-time-popover" id="backup-time-popover">
+        <div class="dd-time-spin">
+          <div class="dd-time-spin-box">
+            <button type="button" class="dd-time-spin-arrow" aria-label="Stunde eins hoch" onclick="stepDDTime('backup-time', 'hour', 1)">▲</button>
+            <input type="text" inputmode="numeric" maxlength="2" class="dd-time-spin-input" id="backup-time-hour-field"
+                   value="{{ current_hour }}" onfocus="this.select()" onchange="commitDDTimeField('backup-time', 'hour', this)">
+            <button type="button" class="dd-time-spin-arrow" aria-label="Stunde eins runter" onclick="stepDDTime('backup-time', 'hour', -1)">▼</button>
+          </div>
+          <span class="dd-time-spin-sep">:</span>
+          <div class="dd-time-spin-box">
+            <button type="button" class="dd-time-spin-arrow" aria-label="Minute eins hoch" onclick="stepDDTime('backup-time', 'minute', 1)">▲</button>
+            <input type="text" inputmode="numeric" maxlength="2" class="dd-time-spin-input" id="backup-time-minute-field"
+                   value="{{ current_minute }}" onfocus="this.select()" onchange="commitDDTimeField('backup-time', 'minute', this)">
+            <button type="button" class="dd-time-spin-arrow" aria-label="Minute eins runter" onclick="stepDDTime('backup-time', 'minute', -1)">▼</button>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" name="backup_schedule_time" id="backup-time-input" value="{{ backup_schedule_time }}">
+    </span>
   </label>
   {% if backup_schedule == 'weekly' %}
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
     Wochentag
-    <select name="backup_schedule_weekday">
-      {% for value, label in backup_weekday_options %}
-      <option value="{{ value }}" {% if value == backup_schedule_weekday %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="backup-schedule-weekday-btn" onclick="toggleDDPicker('backup-schedule-weekday')">{% for v, l in backup_weekday_options %}{% if v == backup_schedule_weekday %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="backup_schedule_weekday" id="backup-schedule-weekday-input" value="{{ backup_schedule_weekday }}">
+      <div class="dd-picker-popover" id="backup-schedule-weekday-popover">
+        {% for value, label in backup_weekday_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('backup-schedule-weekday', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
   </label>
   {% else %}
   <input type="hidden" name="backup_schedule_weekday" value="{{ backup_schedule_weekday }}">
   {% endif %}
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
     Anzahl behalten
-    <select name="backup_keep_count">
-      {% for value, label in backup_keep_count_options %}
-      <option value="{{ value }}" {% if value == backup_keep_count %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="backup-keep-count-btn" onclick="toggleDDPicker('backup-keep-count')">{% for v, l in backup_keep_count_options %}{% if v == backup_keep_count %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="backup_keep_count" id="backup-keep-count-input" value="{{ backup_keep_count }}">
+      <div class="dd-picker-popover" id="backup-keep-count-popover">
+        {% for value, label in backup_keep_count_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('backup-keep-count', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
   </label>
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
     Max. Alter
-    <select name="backup_keep_days">
-      {% for value, label in backup_keep_days_options %}
-      <option value="{{ value }}" {% if value == backup_keep_days %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="backup-keep-days-btn" onclick="toggleDDPicker('backup-keep-days')">{% for v, l in backup_keep_days_options %}{% if v == backup_keep_days %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="backup_keep_days" id="backup-keep-days-input" value="{{ backup_keep_days }}">
+      <div class="dd-picker-popover" id="backup-keep-days-popover">
+        {% for value, label in backup_keep_days_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('backup-keep-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
   </label>
   </div>
   <p class="hint" style="margin:12px 0 0;">

@@ -141,6 +141,59 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 .filter-chip input:checked + span,.chip.active{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
 .chip:disabled{opacity:.35;cursor:default;}
 
+/* Dropdown-Picker — Button + Popover mit Checkbox-Zeilen (Mehrfachauswahl-
+   Filter wie Typ, oder Spalten-Auswahl), statt mehrerer Pillen quer über die
+   Toolbar. Dasselbe Positionierungsmuster wie der Gruppen-Picker in
+   table_editor.html: position:relative am Anker, position:absolute am
+   Popover. Öffnen/Schließen ist reines Vanilla-JS je Seite (kein Alpine auf
+   diesen Seiten), diese Regeln sind nur die gemeinsame Optik. */
+.dd-picker-wrap{position:relative;display:inline-block;}
+/* Der Auslöser-Button bekommt dieselbe weiße Optik wie Suche/Select/Chip
+   daneben (statt des grauen .btn-Standardfülls) — er ist hier ein
+   Toolbar-Filter, kein Aktions-Button. */
+.dd-picker-wrap > .btn{background:var(--surface);}
+.dd-picker-wrap > .btn:hover:not(:disabled){background:var(--surface-alt);}
+.dd-picker-popover{
+  position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
+  display:none;
+}
+.dd-picker-popover.open{display:block;}
+.dd-picker-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
+.dd-picker-row:hover{background:var(--surface-alt);}
+/* Markiert die aktuell gewählte Zeile in Picker-Popovern, die (anders als
+   die meisten Filter-Dropdowns) eine dauerhafte Auswahl statt einer
+   Aktionsliste darstellen — z. B. die Zeilentyp-/Rahmen-/Zeilenabstand-
+   Picker in table_editor.html. Dieselbe Hervorhebung wie eine aktive
+   .menu-row. */
+.dd-picker-row.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+.dd-picker-row.active:hover{background:var(--accent-line);}
+
+/* Uhrzeit-Eingabe — Ersatz für das native <input type="time"> (dessen
+   Auswahl-Popup sich in keinem Browser stylen lässt) UND für einen zuvor
+   erprobten Listen-Picker, der sich als unhandlich erwies. Zwei editierbare
+   Zahlenfelder mit ▲/▼-Tasten statt Dropdown/Popover — direktes Tippen
+   (Feld selektiert beim Fokussieren seinen ganzen Inhalt) oder Klick auf
+   die Pfeile, mit Umlauf an den Grenzen. */
+.dd-time-spin{display:flex;align-items:center;gap:6px;}
+.dd-time-spin-box{display:flex;flex-direction:column;align-items:center;}
+.dd-time-spin-arrow{
+  width:44px;padding:0;border:none;background:none;color:var(--ink-faint);cursor:pointer;
+  line-height:1.3;font-size:calc(11px * var(--font-scale, 1));
+}
+.dd-time-spin-arrow:hover{color:var(--accent-line);}
+.dd-time-spin-input{
+  width:44px;padding:5px 0;text-align:center;font-family:var(--font-mono);font-size:calc(15px * var(--font-scale, 1));
+  font-weight:600;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);
+}
+.dd-time-spin-input:focus{outline:none;border-color:var(--accent-line);background:var(--accent-line-soft);}
+.dd-time-spin-sep{color:var(--ink-faint);font-family:var(--font-mono);font-weight:600;}
+/* Auslöser-Button ("04:30") + Popover, das die Zahlenfelder oben enthält —
+   dasselbe Öffnen/Schließen wie jeder andere .dd-picker (Klick außerhalb
+   schließt), nur mit den Stepper-Feldern statt einer Auswahlliste drin. */
+.dd-time-btn{font-family:var(--font-mono);min-width:56px;text-align:center;}
+.dd-time-popover{width:auto;}
+
 /* Optionen-Menü — Dropdown für seltener geänderte Chart-Einstellungen
    (Auflösung, Punkte, Kontinuierlich, Rohwerte, Y-Achse, Statistik in
    Legende/Linie-Balken), damit die Haupt-Toolbar auf Zeitraum + Vergleichen
@@ -156,8 +209,8 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 .menu-btn.active .chevron{transform:rotate(180deg);}
 .menu-popover{
   position:absolute;top:calc(100% + 8px);left:0;z-index:30;min-width:260px;
-  background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);
-  padding:8px;display:flex;flex-direction:column;gap:1px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
+  padding:10px;display:flex;flex-direction:column;gap:1px;
 }
 .menu-section-label{
   font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;
@@ -220,6 +273,8 @@ table.dt th{
   text-align:left;padding:8px 14px;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
   border-bottom:1.5px solid var(--border-strong);white-space:nowrap;
 }
+table.dt th a{display:block;text-decoration:none;color:inherit;}
+table.dt th a:hover,table.dt th a.active{color:var(--accent-line);}
 table.dt td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--ink-muted);vertical-align:top;font-variant-numeric:tabular-nums;}
 table.dt tr:last-child td{border-bottom:none;}
 table.dt tbody tr:hover td{background:var(--surface-alt);}
@@ -301,6 +356,17 @@ td.mono{font-family:var(--font-mono);}
 .pager{display:flex;align-items:center;gap:10px;margin-top:10px;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
 .pager-page{white-space:nowrap;}
 .pager-range{color:var(--ink-faint);}
+/* Zeilen/Seite-Auswahl direkt im Pager statt oben im Toolbar (Konzept-
+   Erweiterung: räumliche Nähe zu "Seite X / Y") — bewusst deutlich kleiner/
+   stiller als die übrigen Formularelemente der Seite (dort füllt derselbe
+   select die generische Toolbar-Regel, hier soll er sich wie ein weiteres
+   Pager-Detail lesen, nicht wie ein eigenständiges Steuerelement). */
+.pager select{
+  font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);
+  padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  min-height:0;box-sizing:border-box;cursor:pointer;
+}
+.pager select:hover{border-color:var(--accent-line);color:var(--ink);}
 
 /* Aktionsleiste unter Tabellen */
 .actionbar{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);flex-wrap:wrap;}
@@ -353,6 +419,11 @@ td.mono{font-family:var(--font-mono);}
 .field label{display:block;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:600;margin-bottom:8px;}
 .field select{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);min-width:200px;cursor:pointer;}
 .field select:hover{border-color:var(--accent-line);}
+.field input[type="text"]{
+  font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface);color:var(--ink);box-sizing:border-box;
+}
+.field input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
 .hint{margin:8px 0 0;font-size:calc(12.5px * var(--font-scale, 1));line-height:1.55;color:var(--ink-faint);}
 .save-status{margin:10px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);font-weight:600;}
 .config-card,.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;}

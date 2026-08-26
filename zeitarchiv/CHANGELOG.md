@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.12.0 - 2026-08-26
+
+### Neu
+
+- Verlaufsansichten von Schalter-Entitäten (binary_sensor/switch/
+  input_boolean) bieten zusätzlich zu Linie und Balken einen Zeitstrahl, der
+  die AN-Intervalle als durchgehendes Band zeichnet.
+- Statistik-Seite mit Kacheln zur Anzahl gespeicherter Charts, Tabellen und
+  Dashboards sowie der Event-Rate pro Stunde/Tag.
+- Zwei neue Werkzeuge zur Fehlersuche unter Einstellungen → Protokoll: eine
+  einmalige Aufzeichnung des nächsten von Home Assistant gesendeten
+  Schreib-Requests sowie eine zeitlich begrenzte Verfolgung einzelner
+  Entitäten über 15 Minuten — beides unabhängig vom eingestellten Loglevel
+  und ohne dauerhaften Mehraufwand.
+- Schalter-Entitäten mit Dauer-Anzeigemodus zeigen Bucket-Werte in Charts als
+  Zeitdauer (Stunden/Minuten) statt als Rohsekunden.
+- Backup-Seite: Tabelle sortierbar, mit Seitennavigation sowie einer
+  bestätigten Aktion zum Löschen aller Backups.
+
+### Geändert
+
+- Sämtliche native Auswahlfelder der Oberfläche (u. a. Einstellungen,
+  Tabellen-Editor, Symcon-Import) verwenden jetzt ein einheitliches,
+  durchsuchbares Auswahlmenü statt des Browser-Standard-Dropdowns.
+- Die Uhrzeit-Auswahl ist ein Popup mit zwei numerischen Feldern samt
+  Auf/Ab-Pfeilen statt einer Liste.
+- Die Auswahl der Zeilenanzahl pro Seite sitzt jetzt einheitlich unten neben
+  der Seitennavigation (Entitäten, Export, Bereinigung, Reports, Symcon-Import,
+  Backup); der Export- und der Backup-Seite fehlte diese Navigation bisher
+  teilweise.
+
 ## 0.11.0 - 2026-08-26
 
 ### Neu

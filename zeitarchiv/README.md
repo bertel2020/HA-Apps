@@ -98,7 +98,8 @@ Kachel-Charts gilt zentral für alle Kacheln und lässt sich unter
 Die Entitätenliste ist durchsuchbar, filterbar und konfigurierbar. Jede
 Entität besitzt eine eigene Verlaufsansicht mit:
 
-- Linie oder Balken;
+- Linie oder Balken, bei Schalter-Entitäten zusätzlich als Zeitstrahl mit den
+  AN-Intervallen;
 - geglättete Linien oder Balken;
 - Navigation von Stunde bis Dekade;
 - laufendem oder rollierendem Zeitfenster;

@@ -1,24 +1,32 @@
 <form id="logging-form">
   <div style="display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;">
     <div class="field" style="margin:0;">
-      <label for="log-level">Anwendungs-Loglevel</label>
-      <select id="log-level" name="log_level"
-              hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
-              hx-target="#logging-form" hx-swap="outerHTML">
-        {% for key, label in log_level_options %}
-        <option value="{{ key }}" {% if key == log_level %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <label>Anwendungs-Loglevel</label>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="log-level-btn" onclick="toggleDDPicker('log-level')">{% for k, l in log_level_options %}{% if k == log_level %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" id="log-level-input" name="log_level" value="{{ log_level }}"
+               hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
+               hx-target="#logging-form" hx-swap="outerHTML">
+        <div class="dd-picker-popover" id="log-level-popover">
+          {% for key, label in log_level_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('log-level', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
     </div>
     <div class="field" style="margin:0;">
-      <label for="access-log-mode">HTTP-Anfragen protokollieren</label>
-      <select id="access-log-mode" name="access_log_mode"
-              hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
-              hx-target="#logging-form" hx-swap="outerHTML">
-        {% for key, label in access_log_options %}
-        <option value="{{ key }}" {% if key == access_log_mode %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <label>HTTP-Anfragen protokollieren</label>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="access-log-mode-btn" onclick="toggleDDPicker('access-log-mode')">{% for k, l in access_log_options %}{% if k == access_log_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" id="access-log-mode-input" name="access_log_mode" value="{{ access_log_mode }}"
+               hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
+               hx-target="#logging-form" hx-swap="outerHTML">
+        <div class="dd-picker-popover" id="access-log-mode-popover">
+          {% for key, label in access_log_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('access-log-mode', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
     </div>
   </div>
   <p class="hint">
@@ -29,3 +37,5 @@
   <p style="margin:10px 0 0;"><a href="logs">Protokoll öffnen →</a></p>
   {% if logging_saved %}<p class="save-status">✓ Gespeichert und aktiviert</p>{% endif %}
 </form>
+
+{% include "_settings_debug_tools.html" %}

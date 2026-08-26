@@ -1,0 +1,75 @@
+<div id="backup-table-wrap">
+  {% if backups %}
+  <div class="tbl-wrap" style="margin-top:14px;">
+    <table class="dt">
+      <tr>
+        {% for col in backup_columns %}
+        <th>
+          <a href="backup/list?sort={{ col.key }}&dir={{ col.next_dir }}&page=1&page_size={{ backup_pagination.page_size }}"
+             class="{{ 'active' if col.active else '' }}"
+             hx-get="backup/list?sort={{ col.key }}&dir={{ col.next_dir }}&page=1&page_size={{ backup_pagination.page_size }}"
+             hx-target="#backup-table-wrap" hx-swap="outerHTML">
+            {{ col.label }}{% if col.active %} {{ col.arrow }}{% endif %}
+          </a>
+        </th>
+        {% endfor %}
+        <th></th>
+      </tr>
+      {% for b in backups %}
+      <tr>
+        <td>{{ b.created_at }}</td>
+        <td>{{ b.size }}</td>
+        <td style="text-align:right;">
+          <span style="display:inline-flex;align-items:center;gap:10px;">
+            <button type="button" class="btn"
+                    hx-post="backup/verify/{{ b.filename }}"
+                    hx-target="#backup-status" hx-swap="outerHTML">
+              Prüfen
+            </button>
+            <button type="button" class="btn btn-danger"
+                    hx-post="backup/restore/{{ b.filename }}"
+                    hx-target="#backup-status" hx-swap="outerHTML"
+                    hx-confirm="Backup {{ b.created_at }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.">
+              Wiederherstellen
+            </button>
+            <a class="btn" href="backup/download/{{ b.filename }}">Herunterladen</a>
+            <button type="button" class="btn btn-danger"
+                    hx-post="backup/delete/{{ b.filename }}"
+                    hx-target="#backup-status" hx-swap="outerHTML"
+                    hx-confirm="Backup {{ b.created_at }} endgültig löschen?">
+              Löschen
+            </button>
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  <div class="pager" style="justify-content:space-between;margin-top:10px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="pager-range">{{ backup_pagination.start }}&ndash;{{ backup_pagination.end }} von {{ backup_pagination.total }}</span>
+      <button class="btn navbtn"
+              hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.page - 1 }}&page_size={{ backup_pagination.page_size }}"
+              hx-target="#backup-table-wrap" hx-swap="outerHTML"
+              {% if backup_pagination.page <= 1 %}disabled{% endif %}>‹</button>
+      <span class="pager-page">Seite {{ backup_pagination.page }} / {{ backup_pagination.total_pages }}</span>
+      <button class="btn navbtn"
+              hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.page + 1 }}&page_size={{ backup_pagination.page_size }}"
+              hx-target="#backup-table-wrap" hx-swap="outerHTML"
+              {% if backup_pagination.page >= backup_pagination.total_pages %}disabled{% endif %}>›</button>
+    </div>
+    <select onchange="htmx.ajax('GET', 'backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=1&page_size=' + this.value, {target: '#backup-table-wrap', swap: 'outerHTML'})" title="Zeilen pro Seite">
+      {% for size in [10, 20, 50, 100] %}
+      <option value="{{ size }}" {% if backup_pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="button" class="btn btn-danger" style="margin-top:14px;"
+          hx-post="backup/delete-all" hx-target="#backup-status" hx-swap="outerHTML"
+          hx-confirm="Alle {{ backup_total }} Backups endgültig löschen?">
+    Alle Backups löschen
+  </button>
+  {% else %}
+  <p class="hint" style="margin-top:10px;">Noch kein Backup erstellt.</p>
+  {% endif %}
+</div>

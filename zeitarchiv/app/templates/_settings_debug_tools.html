@@ -1,0 +1,48 @@
+<div id="debug-tools" {% if capture_armed or trace_entity_id %}hx-get="settings/logging/debug" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+
+  <div class="settings-subsection">
+    <h3 class="settings-subsection-title">Nächsten Schreibvorgang aufzeichnen</h3>
+    <p class="hint">
+      Zeichnet einmalig den nächsten von Home Assistant gesendeten Schreib-Request vollständig auf
+      (Rohwerte und Entity-IDs, niemals den API-Token) — läuft nicht dauerhaft mit, sondern
+      deaktiviert sich nach genau einem Treffer wieder selbst.
+    </p>
+    {% if capture_armed %}
+    <p class="save-status">⏳ Wartet auf den nächsten Schreibvorgang …</p>
+    <button type="button" class="btn btn-danger" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Abbrechen</button>
+    {% elif capture_payload_json %}
+    <p class="hint" style="margin:0 0 10px;">Aufgezeichnet um {{ capture_captured_at }} &middot; {{ capture_event_count }} Event(s)</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <a class="btn" href="settings/logging/capture-write/download">Herunterladen</a>
+      <button type="button" class="btn" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Löschen</button>
+    </div>
+    <details>
+      <summary class="hint" style="cursor:pointer;display:inline;">Vorschau anzeigen</summary>
+      <pre style="margin-top:8px;max-height:280px;overflow:auto;background:var(--surface-alt);border:1px solid var(--border);padding:12px;border-radius:8px;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));white-space:pre-wrap;word-break:break-word;">{{ capture_payload_json }}</pre>
+    </details>
+    {% else %}
+    <button type="button" class="btn" hx-post="settings/logging/capture-write/arm" hx-target="#debug-tools" hx-swap="outerHTML">Nächsten Schreibvorgang aufzeichnen</button>
+    {% endif %}
+  </div>
+
+  <div class="settings-subsection">
+    <h3 class="settings-subsection-title">Entität verfolgen</h3>
+    <p class="hint">
+      Protokolliert 15 Minuten lang jeden übertragenen Wert einer einzelnen Entität — unabhängig
+      vom oben gewählten Loglevel, danach automatisch wieder aus.
+    </p>
+    {% if trace_entity_id %}
+    <p class="save-status">🔴 Verfolgt <code>{{ trace_entity_id }}</code> &middot; noch {{ trace_expires_in_minutes }} Minute(n)</p>
+    <button type="button" class="btn btn-danger" hx-post="settings/logging/trace/stop" hx-target="#debug-tools" hx-swap="outerHTML">Trace beenden</button>
+    {% else %}
+    <form hx-post="settings/logging/trace/start" hx-target="#debug-tools" hx-swap="outerHTML" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+      <div class="field" style="margin:0;">
+        <label>Entity-ID</label>
+        <input type="text" name="entity_id" placeholder="sensor.beispiel" required style="min-width:260px;">
+      </div>
+      <button type="submit" class="btn">Verfolgen starten (15 Min.)</button>
+    </form>
+    {% endif %}
+  </div>
+
+</div>

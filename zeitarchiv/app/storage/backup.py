@@ -69,6 +69,17 @@ def delete_backup(backups_dir: Path, filename: str) -> bool:
     return True
 
 
+def delete_all_backups(backups_dir: Path) -> int:
+    """Löscht alle vorhandenen Backup-ZIPs (nicht Rollbacks/Ausführungsverlauf,
+    siehe delete_restore_rollback()); gibt die Anzahl gelöschter Dateien zurück."""
+    if not backups_dir.exists():
+        return 0
+    files = [p for p in backups_dir.glob("zeitarchiv-backup-*.zip") if p.is_file()]
+    for path in files:
+        path.unlink()
+    return len(files)
+
+
 def _iter_backup_files(data_dir: Path) -> list[Path]:
     files: list[Path] = []
     for name in BACKUP_ENTRIES:

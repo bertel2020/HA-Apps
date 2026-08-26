@@ -28,11 +28,16 @@
   <div class="csv-config">
     <div class="field">
       <label>Trennzeichen</label>
-      <select name="delimiter" hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
-        {% for value, label in delimiter_options %}
-        <option value="{{ value }}" {% if value == delimiter %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="delimiter-btn" onclick="toggleDDPicker('delimiter')">{% for v, l in delimiter_options %}{% if v == delimiter %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="delimiter" id="delimiter-input" value="{{ delimiter }}"
+               hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
+        <div class="dd-picker-popover" id="delimiter-popover">
+          {% for value, label in delimiter_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('delimiter', '{{ value }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
     </div>
     <div class="field">
       <label class="checkbox-label">
@@ -57,27 +62,39 @@
   <div class="csv-config">
     <div class="field">
       <label>Zeitstempel-Spalte</label>
-      <select name="ts_col">
-        {% for col in columns %}
-        <option value="{{ loop.index0 }}" {% if loop.index0 == ts_col %}selected{% endif %}>{{ col }}</option>
-        {% endfor %}
-      </select>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="ts-col-btn" onclick="toggleDDPicker('ts-col')">{% for col in columns %}{% if loop.index0 == ts_col %}{{ col }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="ts_col" id="ts-col-input" value="{{ ts_col }}">
+        <div class="dd-picker-popover" id="ts-col-popover">
+          {% for col in columns %}
+          <div class="dd-picker-row" onclick="selectDDOption('ts-col', '{{ loop.index0 }}', '{{ col }}')">{{ col }}</div>
+          {% endfor %}
+        </div>
+      </span>
     </div>
     <div class="field">
       <label>Wert-Spalte</label>
-      <select name="value_col">
-        {% for col in columns %}
-        <option value="{{ loop.index0 }}" {% if loop.index0 == value_col %}selected{% endif %}>{{ col }}</option>
-        {% endfor %}
-      </select>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="value-col-btn" onclick="toggleDDPicker('value-col')">{% for col in columns %}{% if loop.index0 == value_col %}{{ col }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="value_col" id="value-col-input" value="{{ value_col }}">
+        <div class="dd-picker-popover" id="value-col-popover">
+          {% for col in columns %}
+          <div class="dd-picker-row" onclick="selectDDOption('value-col', '{{ loop.index0 }}', '{{ col }}')">{{ col }}</div>
+          {% endfor %}
+        </div>
+      </span>
     </div>
     <div class="field">
       <label>Zeitstempel-Format</label>
-      <select name="ts_format" onchange="toggleCustomTsPattern(this.value)">
-        {% for value, label in ts_format_options %}
-        <option value="{{ value }}" {% if value == ts_format %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="ts-format-btn" onclick="toggleDDPicker('ts-format')">{% for v, l in ts_format_options %}{% if v == ts_format %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="ts_format" id="ts-format-input" value="{{ ts_format }}">
+        <div class="dd-picker-popover" id="ts-format-popover">
+          {% for value, label in ts_format_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('ts-format', '{{ value }}', '{{ label }}'); toggleCustomTsPattern('{{ value }}');">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
     </div>
     <div class="field" id="custom-ts-pattern-field" style="{{ '' if ts_format == 'custom' else 'display:none;' }}">
       <label>Eigenes Format (strptime, z. B. %d.%m.%Y %H:%M:%S)</label>

@@ -67,5 +67,15 @@
     <button class="btn navbtn" onclick="stepEntitiesPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
     {% endif %}
   </div>
-  <span class="pager-stand">Stand: {{ generated_at }}</span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    {% if pagination.page_size %}
+    <select name="page_size" title="Zeilen pro Seite"
+            hx-get="entities-table" hx-include="#controls" hx-target="#entities-table" hx-swap="innerHTML"
+            onchange="resetEntitiesPage()">
+      {% for size in [10, 50, 100, 500, 1000] %}
+      <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </div>
 </div>

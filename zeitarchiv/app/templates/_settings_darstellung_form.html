@@ -1,44 +1,57 @@
 <div class="field">
   <label>Farbschema</label>
-  <select name="color_scheme" hx-post="settings/darstellung" hx-trigger="change"
-          hx-target="#darstellung-form" hx-swap="innerHTML"
-          onchange="document.documentElement.dataset.colorScheme = this.value">
-    {% for key, label in color_scheme_options %}
-    <option value="{{ key }}" {% if key == color_scheme %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="color-scheme-btn" onclick="toggleDDPicker('color-scheme')">{% for k, l in color_scheme_options %}{% if k == color_scheme %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="color_scheme" id="color-scheme-input" value="{{ color_scheme }}"
+           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="color-scheme-popover">
+      {% for key, label in color_scheme_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('color-scheme', '{{ key }}', '{{ label }}'); document.documentElement.dataset.colorScheme = '{{ key }}';">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
   <p class="hint">„Zeitarchiv“ nutzt das bisherige Petrol-/Kupfer-Schema. „Home Assistant“ verwendet neutrale Flächen und das originale HA-Blau.</p>
 </div>
 <div class="field">
   <label>Darstellungsmodus</label>
-  <select name="color_mode" hx-post="settings/darstellung" hx-trigger="change"
-          hx-target="#darstellung-form" hx-swap="innerHTML"
-          onchange="document.documentElement.dataset.colorMode = this.value">
-    {% for key, label in color_mode_options %}
-    <option value="{{ key }}" {% if key == color_mode %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="color-mode-btn" onclick="toggleDDPicker('color-mode')">{% for k, l in color_mode_options %}{% if k == color_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="color_mode" id="color-mode-input" value="{{ color_mode }}"
+           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="color-mode-popover">
+      {% for key, label in color_mode_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('color-mode', '{{ key }}', '{{ label }}'); document.documentElement.dataset.colorMode = '{{ key }}';">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
   <p class="hint">„Automatisch“ folgt dem System. „Hell“ und „Dunkel“ übersteuern die automatische Auswahl dauerhaft.</p>
 </div>
 <div class="field">
   <label>Schriftgröße</label>
-  <select name="font_scale" hx-post="settings/darstellung" hx-trigger="change"
-          hx-target="#darstellung-form" hx-swap="innerHTML"
-          onchange="document.documentElement.style.setProperty('--font-scale', this.selectedOptions[0].dataset.scale)">
-    {% for key, label in font_scale_options %}
-    <option value="{{ key }}" data-scale="{{ font_scale_values[key] }}" {% if key == font_scale %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="font-scale-btn" onclick="toggleDDPicker('font-scale')">{% for k, l in font_scale_options %}{% if k == font_scale %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="font_scale" id="font-scale-input" value="{{ font_scale }}"
+           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="font-scale-popover">
+      {% for key, label in font_scale_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('font-scale', '{{ key }}', '{{ label }}'); document.documentElement.style.setProperty('--font-scale', '{{ font_scale_values[key] }}');">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
   <p class="hint">Gilt für die gesamte Oberfläche &mdash; wirkt sofort auf dieser Seite, andere bereits geöffnete Seiten übernehmen die neue Größe beim nächsten Laden.</p>
 </div>
 <div class="field">
   <label>Dashboard-Animation</label>
-  <select name="dashboard_animation" hx-post="settings/darstellung" hx-trigger="change"
-          hx-target="#darstellung-form" hx-swap="innerHTML">
-    {% for key, label in dashboard_animation_options %}
-    <option value="{{ key }}" {% if key == dashboard_animation %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="dashboard-animation-btn" onclick="toggleDDPicker('dashboard-animation')">{% for k, l in dashboard_animation_options %}{% if k == dashboard_animation %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="dashboard_animation" id="dashboard-animation-input" value="{{ dashboard_animation }}"
+           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="dashboard-animation-popover">
+      {% for key, label in dashboard_animation_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('dashboard-animation', '{{ key }}', '{{ label }}')">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
   <p class="hint">Ein-/Ausblend-Animation der Charts auf angehefteten Dashboard-Kacheln. Gilt für alle Kacheln gemeinsam.</p>
 </div>
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

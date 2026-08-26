@@ -17,14 +17,6 @@
   }
   [x-cloak]{display:none!important;}
 
-  .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:none;}
-  .seg button{
-    flex:none;padding:6px 10px;font-size:calc(12px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
-    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
-  }
-  .seg button:last-child{border-right:none;}
-  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
-
   h3.tbl-h{font-size:calc(14px * var(--font-scale, 1));font-weight:700;margin:22px 0 4px;}
   p.tbl-hint{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin:0 0 12px;max-width:100%;}
 
@@ -41,11 +33,15 @@
     padding:10px 12px;display:flex;flex-direction:column;gap:7px;
   }
   .tbl-col-card.dragging{opacity:.4;}
-  .tbl-col-card input[type=text],.tbl-col-card select,.tbl-col-card input[type=number]{
+  .tbl-col-card input[type=text],.tbl-col-card input[type=number]{
     font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 8px;border-radius:6px;
     border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;
   }
   .tbl-col-card label.cbx{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  /* Zeitraum-Typ-Picker füllt wie die Textfelder daneben die volle Kartenbreite,
+     statt sich am Label-Text ("Monat ▾") auszurichten. */
+  .tbl-col-card .dd-picker-wrap{width:100%;}
+  .tbl-col-card .dd-picker-wrap > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 8px;}
   .tbl-field-label{
     display:block;font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.04em;
     color:var(--ink-faint);margin-bottom:-3px;
@@ -101,10 +97,14 @@
   .tbl-row-move button:hover{color:var(--accent-line);}
   .tbl-row-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
 
-  .tbl-entity-select{
-    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
-    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);max-width:320px;width:100%;
-  }
+  /* Entität-Zeilen-Picker — dieselbe .dd-picker-Optik wie überall sonst in
+     der App, aber mit Suchfeld + scrollbarer Liste wie der Gruppen-Picker
+     darunter (.tbl-group-popover, hier per Klassen-Kombination mitgenutzt
+     statt einer dritten eigenen Popover-Variante). Ersetzt das frühere
+     ungefilterte <select> — bei vielen Entitäten war darin nichts zu finden
+     außer per Scrollen/Tippen-zum-Springen. */
+  .tbl-row-top .dd-picker-wrap{max-width:320px;width:100%;}
+  .tbl-row-top .dd-picker-wrap > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .tbl-formula-input{
     font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
     border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);width:100%;max-width:320px;
@@ -136,6 +136,17 @@
   .tbl-group-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
   .tbl-group-row:hover{background:var(--surface-alt);}
   .tbl-group-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* Die geteilten .dd-picker-popover-Regeln (app.css) starten mit display:none
+     und einer .open-Klasse, die static/js/dd-picker.js umschaltet — hier
+     steuert stattdessen Alpines x-show direkt die inline display-Eigenschaft
+     (nötig, weil der Zeilentyp-Picker pro Zeile existiert, siehe Kommentar bei
+     ROW_TYPE_OPTIONS weiter unten). Ohne diese Override-Regel bliebe das
+     Popover trotz x-show="...true" unsichtbar, weil die Klassen-Regel
+     display:none zieht und x-show nur die INLINE-Eigenschaft leert statt
+     .open zu setzen. x-cloak (siehe oben) verhindert weiterhin das kurze
+     Aufblitzen vor Alpines Initialisierung. */
+  .dd-picker-popover-alpine{display:block;}
 
   .tbl-add-row-bar{display:flex;gap:8px;margin-top:10px;}
 
@@ -172,6 +183,13 @@
      — dieselben Klassennamen wie auf der Dashboard-Kachel (entities.html),
      damit eine angeheftete Tabelle dort identisch aussieht. */
   .tbl-style-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  /* Rahmen/Zeilenabstand sind eine feste Auswahl (nicht An/Aus wie die Chips
+     darüber) und bekommen deshalb eine eigene Zeile mit Beschriftung —
+     dasselbe .field-Muster wie Quelle/Status im Reports-Filter
+     (_reports_panel.html), statt unbeschriftet zwischen den Chips zu
+     schweben. */
+  .tbl-style-selects{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;}
+  .tbl-style-selects .field{margin:0;}
   .tbl-style-zebra tr:nth-child(even) td{background:var(--surface-alt);}
   .tbl-style-zebra.tbl-style-header-accent tr:nth-child(even) td{background:var(--surface-alt);}
   .tbl-style-border-grid td,.tbl-style-border-grid th{border:1px solid var(--border);}
@@ -246,11 +264,25 @@
                   <span class="tbl-field-label">Beschriftung</span>
                   <input type="text" :placeholder="suggestColumnLabel(col)" x-model="col.label">
                   <span class="tbl-field-label">Zeitraum-Typ</span>
-                  <select x-model="col.range_key" @change="load()">
-                    {% for key, label in range_options %}
-                    <option value="{{ key }}">{{ label }}</option>
-                    {% endfor %}
-                  </select>
+                  <!-- x-data lokal statt col.xxx: .tbl-columns scrollt horizontal
+                       (overflow-x:auto), was rechnerisch auch overflow-y:auto
+                       erzwingt (CSS-Spec) — ein normal positioniertes Popover
+                       würde unten aus dem sichtbaren Kartenbereich abgeschnitten.
+                       position:fixed mit beim Öffnen berechneter Position
+                       (aus der Button-Position) umgeht diese Klemmung, siehe
+                       dieselbe Grund-Idee wie calendar-picker.js' reposition(). -->
+                  <span class="dd-picker-wrap" x-data="{ open: false, top: 0, left: 0 }" @click.outside="open = false">
+                    <button type="button" class="btn"
+                            @click="open = !open; if (open) { const r = $el.getBoundingClientRect(); top = r.bottom + 6; left = r.left; }"
+                            x-text="RANGE_LABELS[col.range_key] + ' ▾'"></button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak
+                         :style="`position:fixed;top:${top}px;left:${left}px;`">
+                      <template x-for="[value, label] in Object.entries(RANGE_LABELS)" :key="value">
+                        <div class="dd-picker-row" :class="{active: col.range_key === value}"
+                             @click="col.range_key = value; open = false; load()" x-text="label"></div>
+                      </template>
+                    </div>
+                  </span>
                   <span class="tbl-field-label" x-text="`Versatz (${versatzUnit(col)})`"></span>
                   <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
                 </div>
@@ -272,12 +304,15 @@
                   <div class="tbl-row-letter" x-text="row.row_type === 'separator' ? '—' : rowLetters[row.uid]"></div>
                   <div class="tbl-row-main">
                     <div class="tbl-row-top">
-                      <div class="seg">
-                        <button type="button" :class="{active: row.row_type === 'entity'}" @click="setRowType(row, 'entity')">Entität</button>
-                        <button type="button" :class="{active: row.row_type === 'group'}" @click="setRowType(row, 'group')">Gruppe</button>
-                        <button type="button" :class="{active: row.row_type === 'formula'}" @click="setRowType(row, 'formula')">Formel</button>
-                        <button type="button" :class="{active: row.row_type === 'separator'}" @click="setRowType(row, 'separator')">Trennlinie</button>
-                      </div>
+                      <span class="dd-picker-wrap" @click.outside="row.typePickerOpen = false">
+                        <button type="button" class="btn" @click="row.typePickerOpen = !row.typePickerOpen" x-text="ROW_TYPE_LABELS[row.row_type] + ' ▾'"></button>
+                        <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.typePickerOpen" x-cloak>
+                          <template x-for="[value, label] in ROW_TYPE_OPTIONS" :key="value">
+                            <div class="dd-picker-row" :class="{active: row.row_type === value}"
+                                 @click="setRowType(row, value); row.typePickerOpen = false" x-text="label"></div>
+                          </template>
+                        </div>
+                      </span>
                       <input type="text" x-show="row.row_type !== 'separator'" :placeholder="suggestRowLabel(row) || 'Beschriftung …'" x-model="row.label">
                       <label class="cbx" x-show="row.row_type !== 'separator'"><input type="checkbox" x-model="row.bold"> Fett</label>
                       <div class="tbl-row-move">
@@ -287,13 +322,19 @@
                       <button type="button" class="tbl-row-remove" title="Zeile entfernen" @click="removeRow(row.uid)">×</button>
                     </div>
 
-                    <select class="tbl-entity-select" x-show="row.row_type === 'entity'"
-                            @change="row.entity_ids = $event.target.value ? [$event.target.value] : []; load()">
-                      <option value="">Entität wählen …</option>
-                      {% for opt in entity_options %}
-                      <option value="{{ opt.entity_id }}" :selected="row.entity_ids[0] === '{{ opt.entity_id }}'">{{ opt.label }}</option>
-                      {% endfor %}
-                    </select>
+                    <span class="dd-picker-wrap" x-show="row.row_type === 'entity'" @click.outside="row.entityPickerOpen = false">
+                      <button type="button" class="btn"
+                              @click="row.entityPickerOpen = !row.entityPickerOpen; row.entitySearch = ''; if (row.entityPickerOpen) $nextTick(() => $el.parentElement.querySelector('input[type=search]').focus())"
+                              x-text="row.entity_ids[0] ? (ENTITY_LABEL_BY_ID[row.entity_ids[0]] || row.entity_ids[0]) : 'Entität wählen …'"></button>
+                      <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="row.entityPickerOpen" x-cloak>
+                        <input type="search" placeholder="Suchen …" x-model="row.entitySearch">
+                        {% for opt in entity_options %}
+                        <div class="dd-picker-row" :class="{active: row.entity_ids[0] === '{{ opt.entity_id }}'}"
+                             x-show='!row.entitySearch || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.entitySearch.toLowerCase())'
+                             @click="row.entity_ids = ['{{ opt.entity_id }}']; row.entityPickerOpen = false; load()">{{ opt.label }}</div>
+                        {% endfor %}
+                      </div>
+                    </span>
 
                     <div class="tbl-group-wrap" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
                       <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
@@ -341,14 +382,31 @@
               <button type="button" class="chip" :class="{active: style.header_accent}" title="Kopfzeile (Zeiträume) in der Akzentfarbe" @click="style.header_accent = !style.header_accent">Kopfzeile hervorheben</button>
               <button type="button" class="chip" :class="{active: style.first_col_accent}" title="Erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt — berücksichtigt aktives Zebra-Muster" @click="style.first_col_accent = !style.first_col_accent">Erste Spalte hervorheben</button>
               <button type="button" class="chip" :class="{active: style.first_col_bold}" title="Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung" @click="style.first_col_bold = !style.first_col_bold">Beschriftung fett</button>
-              <div class="seg">
-                <button type="button" :class="{active: style.borders === 'horizontal'}" title="Nur waagerechte Linien zwischen den Zeilen" @click="style.borders = 'horizontal'">Horizontal</button>
-                <button type="button" :class="{active: style.borders === 'grid'}" title="Linien um jede einzelne Zelle" @click="style.borders = 'grid'">Gitter</button>
-                <button type="button" :class="{active: style.borders === 'none'}" title="Keine Linien zwischen den Zeilen" @click="style.borders = 'none'">Ohne Rahmen</button>
+            </div>
+            <div class="tbl-style-selects">
+              <div class="field">
+                <label>Rahmen</label>
+                <span class="dd-picker-wrap" @click.outside="bordersPickerOpen = false">
+                  <button type="button" class="btn" @click="bordersPickerOpen = !bordersPickerOpen" x-text="BORDER_LABELS[style.borders] + ' ▾'"></button>
+                  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="bordersPickerOpen" x-cloak>
+                    <template x-for="[value, label] in BORDER_OPTIONS" :key="value">
+                      <div class="dd-picker-row" :class="{active: style.borders === value}"
+                           @click="style.borders = value; bordersPickerOpen = false" x-text="label"></div>
+                    </template>
+                  </div>
+                </span>
               </div>
-              <div class="seg">
-                <button type="button" :class="{active: style.density === 'comfortable'}" title="Normaler Zeilenabstand" @click="style.density = 'comfortable'">Komfortabel</button>
-                <button type="button" :class="{active: style.density === 'compact'}" title="Schmalerer Zeilenabstand, mehr Zeilen auf einen Blick" @click="style.density = 'compact'">Kompakt</button>
+              <div class="field">
+                <label>Zeilenabstand</label>
+                <span class="dd-picker-wrap" @click.outside="densityPickerOpen = false">
+                  <button type="button" class="btn" @click="densityPickerOpen = !densityPickerOpen" x-text="DENSITY_LABELS[style.density] + ' ▾'"></button>
+                  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="densityPickerOpen" x-cloak>
+                    <template x-for="[value, label] in DENSITY_OPTIONS" :key="value">
+                      <div class="dd-picker-row" :class="{active: style.density === value}"
+                           @click="style.density = value; densityPickerOpen = false" x-text="label"></div>
+                    </template>
+                  </div>
+                </span>
               </div>
             </div>
 
@@ -583,19 +641,35 @@
       });
     }
 
+    // Options-Listen für die drei Dropdown-Picker unten (Zeilentyp, Rahmen,
+    // Zeilenabstand) — dasselbe .dd-picker-Muster wie im Rest der App, hier
+    // aber Alpine-gebunden statt static/js/dd-picker.js: der Zeilentyp-Picker
+    // existiert pro Zeile (x-for), ein modulweites Öffnen/Schließen über
+    // IDs wie bei dd-picker.js würde bei mehreren gleichzeitig gerenderten
+    // Zeilen kollidieren. row.typePickerOpen (analog zu row.pickerOpen beim
+    // bestehenden Gruppen-Picker) hält den Zustand deshalb pro Zeile.
+    const ROW_TYPE_OPTIONS = [['entity', 'Entität'], ['group', 'Gruppe'], ['formula', 'Formel'], ['separator', 'Trennlinie']];
+    const ROW_TYPE_LABELS = Object.fromEntries(ROW_TYPE_OPTIONS);
+    const BORDER_OPTIONS = [['horizontal', 'Horizontal'], ['grid', 'Gitter'], ['none', 'Ohne Rahmen']];
+    const BORDER_LABELS = Object.fromEntries(BORDER_OPTIONS);
+    const DENSITY_OPTIONS = [['comfortable', 'Komfortabel'], ['compact', 'Kompakt']];
+    const DENSITY_LABELS = Object.fromEntries(DENSITY_OPTIONS);
+
     function tableEditor() {
       return {
         tableId: TABLE_ID,
         name: TABLE_NAME,
         editing: !TABLE_ID,
         columns: INITIAL_COLUMNS.map(c => ({...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
-        rows: INITIAL_ROWS.map(r => ({formula_unit: '', ...r, uid: uid(), pickerOpen: false, search: ''})),
+        rows: INITIAL_ROWS.map(r => ({formula_unit: '', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, search: '', entitySearch: ''})),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
         loading: false,
         saving: false,
         savedMessage: '',
         _loadSeq: 0,
+        bordersPickerOpen: false,
+        densityPickerOpen: false,
 
         get rowLetters() {
           const m = {};
@@ -626,7 +700,7 @@
           this.load();
         },
         addRow(type) {
-          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', bold: false, pickerOpen: false, search: ''});
+          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', bold: false, pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, search: '', entitySearch: ''});
           this.load();
         },
         setRowType(row, type) {

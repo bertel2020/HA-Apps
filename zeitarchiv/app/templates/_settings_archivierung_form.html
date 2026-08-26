@@ -1,21 +1,29 @@
 <div class="field">
   <label>Standard-Auflösung</label>
-  <select name="default_resolution" hx-post="settings/archivierung" hx-trigger="change"
-          hx-target="#archivierung-form" hx-swap="innerHTML">
-    {% for key, label in resolution_options %}
-    <option value="{{ key }}" {% if key == default_resolution %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="default-resolution-btn" onclick="toggleDDPicker('default-resolution')">{% for k, l in resolution_options %}{% if k == default_resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="default_resolution" id="default-resolution-input" value="{{ default_resolution }}"
+           hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="default-resolution-popover">
+      {% for key, label in resolution_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('default-resolution', '{{ key }}', '{{ label }}')">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
   <p class="hint">Gilt nur für Entitäten, die ab jetzt zum ersten Mal einen Wert senden — bereits archivierte Entitäten behalten ihre eigene Einstellung aus der jeweiligen Konfigurationsseite.</p>
 </div>
 <div class="field">
   <label>Standard-Aufbewahrung</label>
-  <select name="default_retention" hx-post="settings/archivierung" hx-trigger="change"
-          hx-target="#archivierung-form" hx-swap="innerHTML">
-    {% for key, label in retention_options %}
-    <option value="{{ key }}" {% if key == default_retention %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="default-retention-btn" onclick="toggleDDPicker('default-retention')">{% for k, l in retention_options %}{% if k == default_retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="default_retention" id="default-retention-input" value="{{ default_retention }}"
+           hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="default-retention-popover">
+      {% for key, label in retention_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('default-retention', '{{ key }}', '{{ label }}')">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
   <p class="hint">Gilt als Standard für neu erkannte Entitäten. Die automatische Durchsetzung lässt sich unten im Bereich „Aufbewahrung“ konfigurieren.</p>
 </div>
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

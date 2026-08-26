@@ -232,13 +232,6 @@
                 title="Nicht lesbare Zeilen ein-/ausblenden">{{ unreadable_count }} nicht lesbar</button>
         {% endif %}
         <span class="count-chip" id="marked-count">0 markiert</span>
-        <select id="import-page-size" onchange="setImportPageSize(this.value)" title="Zeilen pro Seite">
-          <option value="10">10 / Seite</option>
-          <option value="50" selected>50 / Seite</option>
-          <option value="100">100 / Seite</option>
-          <option value="500">500 / Seite</option>
-          <option value="1000">1000 / Seite</option>
-        </select>
       </div>
 
       {% if rows %}
@@ -304,11 +297,20 @@
            Zuordnungs-Felder bleiben dauerhaft im Formular — sonst gingen bereits
            gesetzte Zuordnungen auf ausgeblendeten "Seiten" beim Absenden verloren.
            Paging blendet Zeilen nur sichtbar/unsichtbar. -->
-      <div class="pager">
-        <span class="pager-range" id="import-pager-range"></span>
-        <button type="button" class="btn navbtn" id="import-pager-prev" onclick="stepImportPage(-1)">‹</button>
-        <span class="pager-page" id="import-pager-page"></span>
-        <button type="button" class="btn navbtn" id="import-pager-next" onclick="stepImportPage(1)">›</button>
+      <div class="pager" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pager-range" id="import-pager-range"></span>
+          <button type="button" class="btn navbtn" id="import-pager-prev" onclick="stepImportPage(-1)">‹</button>
+          <span class="pager-page" id="import-pager-page"></span>
+          <button type="button" class="btn navbtn" id="import-pager-next" onclick="stepImportPage(1)">›</button>
+        </div>
+        <select id="import-page-size" onchange="setImportPageSize(this.value)" title="Zeilen pro Seite">
+          <option value="10">10 / Seite</option>
+          <option value="50" selected>50 / Seite</option>
+          <option value="100">100 / Seite</option>
+          <option value="500">500 / Seite</option>
+          <option value="1000">1000 / Seite</option>
+        </select>
       </div>
 
       <!-- entity-datalist wird auf Seitenebene gerendert (siehe oben) — hier nur
@@ -353,6 +355,7 @@
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script>
     function showImportTab(name) {
       const url = new URL(window.location.href);
@@ -387,6 +390,10 @@
       page.value = 1;
       form.submit();
     }
+
+    // Quelle-/Status-Dropdowns nutzen das gemeinsame static/js/dd-picker.js
+    // (toggleDDPicker/selectDDOption) — hier nur noch resetReportsPage() als
+    // zusätzlicher Effekt bei der Auswahl, siehe onclick in _reports_panel.html.
 
     async function confirmReportsDelete(event, form) {
       event.preventDefault();

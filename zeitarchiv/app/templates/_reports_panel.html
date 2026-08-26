@@ -45,11 +45,31 @@
   <form class="report-filter" id="report-filter" method="get" action="import">
     <input type="hidden" name="tab" value="reports">
     <input type="hidden" name="page" id="report-page" value="1">
-    <div class="field"><label for="report-source">Quelle</label><select id="report-source" name="source" onchange="resetReportsPage()"><option value="all">Alle Quellen</option><option value="symcon" {% if source == 'symcon' %}selected{% endif %}>Symcon</option><option value="csv" {% if source == 'csv' %}selected{% endif %}>CSV</option></select></div>
-    <div class="field"><label for="report-status">Status</label><select id="report-status" name="status" onchange="resetReportsPage()"><option value="all">Alle Status</option>{% for value,label in status_options.items() %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-    <select name="page_size" onchange="resetReportsPage()" title="Zeilen pro Seite">
-      {% for size in [10, 50, 100, 500, 1000] %}<option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>{% endfor %}
-    </select>
+    <div class="field">
+      <label>Quelle</label>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': 'Alle Quellen', 'symcon': 'Symcon', 'csv': 'CSV'}[source] }} ▾</button>
+        <input type="hidden" name="source" form="report-filter" id="report-source-input" value="{{ source }}">
+        <div class="dd-picker-popover" id="report-source-popover">
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'all', 'Alle Quellen'); resetReportsPage();">Alle Quellen</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'symcon', 'Symcon'); resetReportsPage();">Symcon</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'csv', 'CSV'); resetReportsPage();">CSV</div>
+        </div>
+      </span>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="report-status-btn" onclick="toggleDDPicker('report-status')">{{ 'Alle Status' if status == 'all' else status_options.get(status, 'Alle Status') }} ▾</button>
+        <input type="hidden" name="status" form="report-filter" id="report-status-input" value="{{ status }}">
+        <div class="dd-picker-popover" id="report-status-popover">
+          <div class="dd-picker-row" onclick="selectDDOption('report-status', 'all', 'Alle Status'); resetReportsPage();">Alle Status</div>
+          {% for value, label in status_options.items() %}
+          <div class="dd-picker-row" onclick="selectDDOption('report-status', '{{ value }}', '{{ label }}'); resetReportsPage();">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
   </form>
   <form class="report-delete-form" method="post" action="reports/delete-all" onsubmit="confirmReportsDelete(event, this)">
     <button class="btn btn-danger" type="submit" {% if not total_reports %}disabled{% endif %}>Alle Reports löschen</button>
@@ -65,9 +85,14 @@
 {% for report in reports %}<tr class="report-row" onclick="location.href='reports/{{ report.id }}'"><td class="mono nowrap">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary.targets }}</td><td>{{ report.rows_written }}</td><td>{{ report.rows_skipped }}</td><td>{{ '%.1f' | format(report.duration_seconds) }} s</td></tr>{% endfor %}
 </table></div>
 {% else %}<p class="report-empty">Keine passenden Import-Reports vorhanden.</p>{% endif %}
-<div class="pager">
-  <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
-  <button type="button" class="btn navbtn" onclick="stepReportsPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-  <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
-  <button type="button" class="btn navbtn" onclick="stepReportsPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+<div class="pager" style="justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+    <button type="button" class="btn navbtn" onclick="stepReportsPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
+    <span class="pager-page">Seite {{ pagination.page }} / {{ pagination.total_pages }}</span>
+    <button type="button" class="btn navbtn" onclick="stepReportsPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+  </div>
+  <select name="page_size" form="report-filter" onchange="resetReportsPage()" title="Zeilen pro Seite">
+    {% for size in [10, 50, 100, 500, 1000] %}<option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>{% endfor %}
+  </select>
 </div>

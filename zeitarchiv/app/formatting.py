@@ -172,6 +172,10 @@ GAP_THRESHOLD_LABELS = {
     "1440": "1 Tag",
     "off": "Aus",
 }
+DISPLAY_MODE_LABELS = {
+    "onoff": "AN/AUS (Rohwert)",
+    "time": "Zeit (Dauer)",
+}
 OUTLIER_THRESHOLD_LABELS = {
     "5": "5 %",
     "10": "10 %",

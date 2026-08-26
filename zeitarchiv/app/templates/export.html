@@ -53,18 +53,31 @@
       <div class="settings-panel">
 
         <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
-             hx-get="export-table" hx-include="#controls" hx-target="#export-table" hx-swap="innerHTML">
-          <input type="search" name="search" placeholder="Entität oder Name suchen …">
-          <label class="filter-chip"><input type="checkbox" name="type" value="all" checked onchange="onExportTypeAllChange(this)"><span>Alle</span></label>
-          <label class="filter-chip"><input type="checkbox" name="type" value="standard" onchange="onExportTypeSpecificChange(this)"><span>Standard</span></label>
-          <label class="filter-chip"><input type="checkbox" name="type" value="counter" onchange="onExportTypeSpecificChange(this)"><span>Zähler</span></label>
-          <label class="filter-chip"><input type="checkbox" name="type" value="switch" onchange="onExportTypeSpecificChange(this)"><span>Schalter</span></label>
-          <select name="unit" title="Nach Einheit filtern">
-            <option value="all">Alle Einheiten</option>
-            {% for opt in unit_options %}
-            <option value="{{ opt.value }}">{{ opt.label }}</option>
-            {% endfor %}
-          </select>
+             hx-get="export-table" hx-include="#controls, [name=page_size]" hx-target="#export-table" hx-swap="innerHTML">
+          <input type="search" name="search" placeholder="Entität oder Name suchen …" onchange="resetExportPage()">
+          <span class="dd-picker-wrap">
+            <button type="button" class="btn" id="export-type-filter-btn" onclick="toggleDDPicker('export-type-filter')">Typ: Alle ▾</button>
+            <div class="dd-picker-popover" id="export-type-filter-popover">
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="all" checked onchange="onExportTypeAllChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Alle</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Standard</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Zähler</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Schalter</span></label>
+            </div>
+          </span>
+          <span class="dd-picker-wrap">
+            <button type="button" class="btn" id="export-unit-filter-btn" onclick="toggleDDPicker('export-unit-filter')">Einheit: Alle ▾</button>
+            <input type="hidden" name="unit" id="export-unit-filter-input" value="all">
+            <div class="dd-picker-popover" id="export-unit-filter-popover">
+              <div class="dd-picker-row" onclick="selectDDOption('export-unit-filter', 'all', 'Alle'); resetExportPage();">Alle Einheiten</div>
+              {% for opt in unit_options %}
+              <div class="dd-picker-row" onclick="selectDDOption('export-unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetExportPage();">{{ opt.label }}</div>
+              {% endfor %}
+            </div>
+          </span>
+          <!-- page ist hier die einzige Quelle der Wahrheit für die Seiten-Navigation
+               (analog zum page-field-Muster bei Entitäten/Bereinigung) — der Pager
+               im export-table-Fragment schreibt nur hierhin. -->
+          <input type="hidden" name="page" id="export-page-field" value="1">
         </div>
 
         <div id="export-table"></div>
@@ -74,6 +87,7 @@
 
   <script src="static/vendor/htmx.min.js"></script>
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script>
     function onExportTypeAllChange(checkbox) {
       if (checkbox.checked) {
@@ -86,6 +100,35 @@
       document.querySelector('input[name=type][value=all]').checked = false;
       const anyChecked = Array.from(document.querySelectorAll('input[name=type]:not([value=all])')).some(cb => cb.checked);
       if (!anyChecked) document.querySelector('input[name=type][value=all]').checked = true;
+    }
+
+    // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Typ, Einheit)
+    // kommt aus dem gemeinsamen static/js/dd-picker.js.
+    const EXPORT_TYPE_LABELS = {standard: 'Standard', counter: 'Zähler', switch: 'Schalter'};
+    function updateExportTypeFilterLabel() {
+      const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
+      const btn = document.getElementById('export-type-filter-btn');
+      if (!checked.length || checked.some(cb => cb.value === 'all')) {
+        btn.textContent = 'Typ: Alle ▾';
+        return;
+      }
+      btn.textContent = 'Typ: ' + checked.map(cb => EXPORT_TYPE_LABELS[cb.value]).join(', ') + ' ▾';
+    }
+
+    // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —
+    // jeder Control, der die zugrunde liegende Trefferliste ändert (Suche, Typ-/
+    // Einheit-Filter, Zeilen/Seite), setzt page zurück auf 1.
+    function resetExportPage() {
+      document.getElementById('export-page-field').value = '1';
+    }
+    function setExportPage(v) {
+      const field = document.getElementById('export-page-field');
+      field.value = Math.max(1, v);
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    function stepExportPage(delta) {
+      const current = parseInt(document.getElementById('export-page-field').value || '1', 10);
+      setExportPage(current + delta);
     }
   </script>
 </body>

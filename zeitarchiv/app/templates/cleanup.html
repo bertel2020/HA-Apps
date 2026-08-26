@@ -124,7 +124,7 @@
        aussieht. */
     position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
     background:var(--surface);border:1px solid var(--border);border-radius:12px;
-    box-shadow:var(--shadow);padding:12px;
+    box-shadow:var(--shadow);padding:10px;
   }
   .calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
   .calendar-header .navbtn{flex:none;}
@@ -209,7 +209,7 @@
 
     <div x-show="tab === 'cleanup' || tab === 'correct'" x-cloak>
     <div id="controls" hx-trigger="load, change" hx-get="{{ base }}/entities/{{ entity_id }}/rows"
-         hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+         hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML">
       <div class="toolbar">
         <div class="seg" id="range-seg">
           <button type="button" data-range="hour" onclick="setRange('hour')">Stunde</button>
@@ -244,13 +244,6 @@
         {% if counter_decrease_enabled %}
         <label class="filter-chip"><input type="radio" name="filter" value="counter_decreases" onchange="resetPage()"><span>Zählerrückgänge</span></label>
         {% endif %}
-        <select name="page_size" onchange="resetPage()" title="Zeilen pro Seite">
-          <option value="10">10 / Seite</option>
-          <option value="50" selected>50 / Seite</option>
-          <option value="100">100 / Seite</option>
-          <option value="500">500 / Seite</option>
-          <option value="1000">1000 / Seite</option>
-        </select>
       </div>
       <!-- range/offset/page sind hier die einzige Quelle der Wahrheit — sowohl die
            Zeitraum-Chips als auch die ‹/›/Jetzt-Buttons/der Kalender-Sprung/Pager im

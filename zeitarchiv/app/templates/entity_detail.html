@@ -59,7 +59,7 @@
        abgeschnitten aussieht. */
     position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
     background:var(--surface);border:1px solid var(--border);border-radius:12px;
-    box-shadow:var(--shadow);padding:12px;text-align:left;
+    box-shadow:var(--shadow);padding:10px;text-align:left;
   }
   .calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
   .calendar-header .navbtn{flex:none;}
@@ -181,8 +181,17 @@
             <div class="menu-row">
               <span class="menu-row-label">Diagrammtyp</span>
               <div class="seg">
-                <button :class="{active: chartType === 'line'}" :disabled="raw" @click="chartType='line'; load()">Linie</button>
-                <button :class="{active: chartType === 'bar'}" :disabled="raw" @click="chartType='bar'; load()">Balken</button>
+                <button :class="{active: chartType === 'line'}" @click="setChartType('line')">Linie</button>
+                <button :class="{active: chartType === 'bar'}" @click="setChartType('bar')">Balken</button>
+                <!-- Serverseitig statt x-show: bei ausgeblendetem Button würde
+                     .seg button:last-child (Rahmen-Regel) sonst weiter auf diesem
+                     unsichtbaren letzten Button statt auf "Balken" greifen, sichtbar
+                     als überzähliger Trennstrich hinter Balken. Nur bei Schalter-
+                     Entitäten (binary_sensor/switch/input_boolean) — ein Zeitstrahl
+                     aus 0/1-Werten ergäbe bei anderen Typen keinen Sinn. -->
+                {% if aggregation_type == 'switch' %}
+                <button :class="{active: chartType === 'timeline'}" @click="setChartType('timeline')">Zeitstrahl</button>
+                {% endif %}
               </div>
             </div>
             <label class="menu-row">
@@ -203,7 +212,7 @@
     </div>
 
     <div class="card">
-      <div id="chart" x-show="points.length"></div>
+      <div id="chart" x-show="points.length" :style="chartType === 'timeline' ? 'height:150px;' : ''"></div>
       <div class="empty" x-show="!points.length" x-text="loading ? 'Lädt …' : 'Keine Daten für diesen Zeitraum.'"></div>
       <div class="stat-line" x-show="points.length">
         <span>Punkte: <strong x-text="points.length"></strong></span>
@@ -249,6 +258,11 @@
     // pro Entität im Konfigurationsbereich einstellbar.
     const DECIMALS = {{ decimals | tojson }};
     const DEFAULT_CHART_TYPE = {{ ('bar' if aggregation_type in ('counter', 'switch') else 'line') | tojson }};
+    // Nur bei Schalter-Entitäten (binary_sensor/switch/input_boolean) im
+    // Konfigurationsbereich umschaltbar (Konzept: Anzeigemodus) — steuert, ob
+    // die Bucket-Werte (on_seconds) als Dauer (h/m) statt als Rohsekunden
+    // erscheinen, z. B. für einen Anwesenheitssensor.
+    const DURATION_DISPLAY = {{ (aggregation_type == 'switch' and display_mode == 'time') | tojson }};
 
     // Rohwerte kommen als JS-Floats mit Rauschen im letzten Bit (z. B. 0.0003999999998995918
     // statt 0.0004) — bei DECIMALS=null (Automatisch) auf 4 signifikante Stellen runden statt
@@ -259,6 +273,7 @@
     // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe
     // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
     function fmtValue(v) {
+      if (DURATION_DISPLAY) return NumberFormat.fmtDuration(v);
       return NumberFormat.fmt(v, DECIMALS);
     }
 
@@ -452,6 +467,25 @@
           this.load();
         },
 
+        // Diagrammtyp-Wahl (Linie/Balken/Zeitstrahl) — eigene Methode statt
+        // wie bisher direkt im Klick-Handler, weil "Zeitstrahl" zusätzlich
+        // Rohwerte erzwingt (er zeichnet AN/AUS-Übergänge, keine Buckets) und
+        // "Balken" Rohwerte ausschließt (Bucket-Summen ergeben nur gebuckelt
+        // Sinn) — die drei Buttons bleiben dadurch IMMER klickbar (kein
+        // :disabled="raw" mehr nötig, das Zeitstrahl↔Linie/Balken sonst
+        // gegenseitig blockiert hätte), jeder Klick stellt raw/compare
+        // selbst passend ein.
+        setChartType(type) {
+          this.chartType = type;
+          if (type === 'timeline') {
+            this.raw = true;
+            this.compare = false;
+          } else if (type === 'bar') {
+            this.raw = false;
+          }
+          this.load();
+        },
+
         async load() {
           // Schutz gegen Race-Bedingungen: wenn schnell zwischen Zeiträumen geklickt
           // wird, kann eine ältere Anfrage nach einer neueren zurückkommen — ohne
@@ -462,7 +496,12 @@
           const params = new URLSearchParams({
             entity_id: ENTITY_ID, range: this.range, offset: String(this.offset),
             continuous: String(this.continuous), compare: String(this.compare),
-            compare_mode: this.compareMode, raw: String(this.raw), chart_type: this.chartType,
+            // /api/query kennt nur "line"/"bar" (siehe api_query in main.py) — im
+            // Zeitstrahl-Modus wird ohnehin immer raw=true gesendet, wofür der
+            // Server chart_type unbeachtet lässt, daher hier "line" als gültiger
+            // Platzhalter statt des ungültigen Werts "timeline".
+            compare_mode: this.compareMode, raw: String(this.raw),
+            chart_type: this.chartType === 'timeline' ? 'line' : this.chartType,
           });
           const res = await fetch(`${BASE}/api/query?${params}`);
           const data = await res.json();
@@ -498,6 +537,12 @@
             }
             return d.toLocaleDateString('de-DE', {month: 'short', year: 'numeric'});
           };
+
+          if (this.chartType === 'timeline') {
+            this.renderTimeline(fmt);
+            return;
+          }
+
           // Drittes Element je Datenpunkt: die TATSÄCHLICHE Zeit (unverschoben) —
           // bei der Hauptreihe identisch zum x-Wert, bei der Vorperiode weiter unten
           // nicht (die wird zeitlich verschoben, um sie optisch zu überlagern). Das
@@ -592,7 +637,7 @@
             // Werten (z. B. "0.0347 kWh" bei kleinen Zähler-Deltas) nicht immer aus
             // und schnitt die führende Ziffer links ab, was wie eine falsche/
             // unplausible Skala aussah, obwohl nur die Beschriftung geclippt war.
-            grid: {left: 10, right: 20, top: UNIT ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
+            grid: {left: 10, right: 20, top: (UNIT || DURATION_DISPLAY) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -617,7 +662,7 @@
             },
             yAxis: {
               type: 'value',
-              name: UNIT || undefined,
+              name: DURATION_DISPLAY ? 'Dauer' : (UNIT || undefined),
               nameLocation: 'end',
               nameTextStyle: {align: 'left'},
               axisLabel: {formatter: v => UNIT ? `${fmtValue(v)} ${UNIT}` : fmtValue(v)},
@@ -655,6 +700,80 @@
           // die Legende fehlt, sondern serverseitig auch das komplette Tooltip nie
           // rendert (der Fehler reißt den ganzen Render-Zyklus ab).
           if (this.compare) option.legend = {bottom: 0};
+          chartInstance.setOption(option, true);
+          chartInstance.resize();
+        },
+
+        // Zeitstrahl: statt Bucket-Summen (Balken) oder einer geglätteten 0/1-Linie
+        // ein durchgehendes Band mit genau den AN-Intervallen — aus den Rohpunkten
+        // (this.points, hier per raw=true immer Einzelmesswerte) durch Paarung
+        // aufeinanderfolgender Zeitstempel gebildet: Punkt i beginnt ein Intervall,
+        // das beim nächsten Punkt endet (oder am Fensterende, falls i der letzte
+        // Punkt ist) — dieselbe Paarungslogik, mit der rollup.py schon heute
+        // on_seconds je Bucket berechnet, hier nur zum Zeichnen statt Aufsummieren.
+        // AUS-Abschnitte werden bewusst NICHT gezeichnet (Lücke im Band) statt als
+        // eigene, andersfarbige Segmente — reduziert auf die eigentliche Frage
+        // "wann AN", ohne dass ein zusätzlicher Rahmen um den ganzen Zeitraum nötig
+        // wäre, um "kein Wert" von "AUS" zu unterscheiden.
+        renderTimeline(fmt) {
+          const intervals = [];
+          for (let i = 0; i < this.points.length; i++) {
+            const start = this.points[i].ts;
+            const end = i + 1 < this.points.length ? this.points[i + 1].ts : (this.windowEnd ?? start);
+            if (this.points[i].value >= 0.5 && end > start) {
+              intervals.push([0, start * 1000, end * 1000]);
+            }
+          }
+          const accent = getComputedStyle(document.body).getPropertyValue('--chart-bar');
+          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+          const option = {
+            textStyle: {
+              fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              fontSize: Math.round(12 * uiFontScale * 10) / 10,
+            },
+            grid: {left: 10, right: 20, top: 16, bottom: 40, containLabel: true},
+            xAxis: {
+              type: 'time',
+              min: this.windowStart != null ? this.windowStart * 1000 : undefined,
+              max: this.periodEnd != null ? this.periodEnd * 1000 : undefined,
+              boundaryGap: [0, 0],
+              axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
+            },
+            // Eine einzelne Kategorie = eine Zeile — bewusst ohne Achsenlinie/
+            // -beschriftung, das Band selbst macht klar, worum es geht (Legende/
+            // Name steht bereits als Seitentitel über dem Chart).
+            yAxis: {type: 'category', data: [''], axisLine: {show: false}, axisTick: {show: false}, splitLine: {show: false}},
+            tooltip: {
+              trigger: 'item',
+              formatter: p => {
+                const [, startMs, endMs] = p.value;
+                const pad = n => String(n).padStart(2, '0');
+                const fmtTime = ms => {
+                  const d = new Date(ms);
+                  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                };
+                return `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+              },
+              appendToBody: true,
+            },
+            series: [{
+              type: 'custom',
+              renderItem: (params, api) => {
+                const categoryIndex = api.value(0);
+                const start = api.coord([api.value(1), categoryIndex]);
+                const end = api.coord([api.value(2), categoryIndex]);
+                const height = api.size([0, 1])[1] * 0.6;
+                const rectShape = echarts.graphic.clipRectByRect(
+                  {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+                  {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+                );
+                return rectShape && {type: 'rect', shape: rectShape, style: {fill: accent}};
+              },
+              encode: {x: [1, 2], y: 0},
+              data: intervals,
+            }],
+          };
           chartInstance.setOption(option, true);
           chartInstance.resize();
         },

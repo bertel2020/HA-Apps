@@ -601,8 +601,9 @@
             const values = s.points.map(p => p.value).filter(Number.isFinite);
             const minima = s.points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
             const maxima = s.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
+            const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
             const unit = s.unit ? ` ${s.unit}` : '';
-            const formatted = value => `${fmtNum(value, s.decimals)}${unit}`;
+            const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, s.decimals)}${unit}`;
             return {
               entityId: s.entity_id,
               name: this.entityNames[s.entity_id] || s.friendly_name,
@@ -736,7 +737,14 @@
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
           // wechselseitig links/rechts, weitere Achsen pro Seite nach außen versetzt.
-          const units = [...new Set(this.series.map(s => s.unit))];
+          // Schalter-Entitäten im Anzeigemodus "Zeit" (Dauer statt Rohsekunden)
+          // bekommen dafür einen eigenen synthetischen Achsen-Schlüssel statt
+          // ihrer echten (meist leeren) unit — sonst würden sie sich fälschlich
+          // eine Achse mit unitlosen Standard-Entitäten teilen und in Rohsekunden
+          // statt als Dauer beschriftet.
+          const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+          const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
+          const units = [...new Set(this.series.map(axisKey))];
           // Eine Achse kann mehrere Entitäten mit gleicher Einheit aber
           // unterschiedlicher Nachkommastellen-Einstellung bündeln — dann gilt
           // die "strengste" (kleinste) Rundung aller beteiligten Entitäten, damit
@@ -744,15 +752,16 @@
           const unitDecimals = new Map();
           this.series.forEach(s => {
             if (s.decimals == null) return;
-            const current = unitDecimals.get(s.unit);
-            if (current == null || s.decimals < current) unitDecimals.set(s.unit, s.decimals);
+            const current = unitDecimals.get(axisKey(s));
+            if (current == null || s.decimals < current) unitDecimals.set(axisKey(s), s.decimals);
           });
           const dynamicYAxis = this.dynamicYAxis;
           const yAxis = units.map((u, i) => {
             const decimals = unitDecimals.get(u);
+            const isDuration = u === ' duration';
             return {
               type: 'value',
-              name: u || undefined,
+              name: isDuration ? 'Dauer' : (u || undefined),
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
@@ -763,7 +772,7 @@
               // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
               // also keine sichtbare Wirkung gegenüber der festen Variante.
               scale: dynamicYAxis,
-              axisLabel: {formatter: v => u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)},
+              axisLabel: {formatter: v => isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals))},
             };
           });
           // Feste Farbe je Entität (statt ECharts' Auto-Zuordnung) — nur so lässt
@@ -795,16 +804,16 @@
               s.points, this.range, this.resolutionPreset,
               s.aggregation_type, this.windowStart
             );
-            const mainData = mainPoints.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals]);
+            const mainData = mainPoints.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
             if (chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
-              mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4]]);
+              mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
             }
             const main = {
               name: displayName,
               type: chartType,
-              yAxisIndex: units.indexOf(s.unit),
+              yAxisIndex: units.indexOf(axisKey(s)),
               data: mainData,
               lineStyle: {width: 1.5, color},
               itemStyle: {color},
@@ -841,16 +850,16 @@
                 s.compare_points, this.range, this.resolutionPreset,
                 s.aggregation_type, s.compare_window_start
               );
-              const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit, s.decimals]);
+              const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
               if (chartType === 'line' && compareData.length && this.windowEnd != null
                   && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
                 const last = compareData[compareData.length - 1];
-                compareData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4]]);
+                compareData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
               }
               const cmp = {
                 name: `${displayName} (${seriesLabel}${compareLabel ? ', ' + compareLabel : ''})`,
                 type: chartType,
-                yAxisIndex: units.indexOf(s.unit),
+                yAxisIndex: units.indexOf(axisKey(s)),
                 data: compareData,
                 lineStyle: {width: 1.5, color, type: 'dashed', opacity: 0.5},
                 itemStyle: {color, opacity: 0.5},
@@ -917,7 +926,8 @@
                 const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
                 const unit = p.data[3];
                 const decimals = p.data[4];
-                const val = unit ? `${fmtNum(p.value[1], decimals)} ${unit}` : fmtNum(p.value[1], decimals);
+                const isDuration = p.data[5];
+                const val = isDuration ? NumberFormat.fmtDuration(p.value[1]) : (unit ? `${fmtNum(p.value[1], decimals)} ${unit}` : fmtNum(p.value[1], decimals));
                 return `<div style="display:flex;justify-content:space-between;gap:18px;">`
                      + `<span>${p.marker}${p.seriesName}</span>`
                      + `<strong style="margin-left:8px;">${val}</strong></div>`

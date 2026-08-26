@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS entities (
     row_count INTEGER NOT NULL DEFAULT 0,
     size_bytes INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
+    display_mode TEXT NOT NULL DEFAULT 'onoff',
     updated_at REAL NOT NULL
 );
 
@@ -346,6 +347,12 @@ class Index:
             # Favoriten (Konzept-Erweiterung) — Entitäten lassen sich markieren,
             # um sie in der Übersicht/Liste immer oben zu finden.
             self._conn.execute("ALTER TABLE entities ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
+        if "display_mode" not in columns:
+            # Nur für aggregation_type "switch" relevant (binary_sensor/switch/
+            # input_boolean): steuert, ob Charts die Bucket-Werte (on_seconds)
+            # als Dauer (h/m) oder als Rohwert/AN-Anteil anzeigen. 'onoff' erhält
+            # das bisherige Verhalten für alle bestehenden Entitäten bei.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'onoff'")
 
         dp_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(deleted_points)")}
         if "id" not in dp_columns:
@@ -622,6 +629,7 @@ class Index:
         value_filter: str | None = None,
         gap_threshold: str | None = None,
         outlier_threshold: str | None = None,
+        display_mode: str | None = None,
     ) -> None:
         """Ändert Auflösung, Aufbewahrung, Nachkommastellen und/oder die Lücken-/
         Ausreißer-Schwellwerte einer Entität (Konzept Abschnitt 03/04). Alle
@@ -648,6 +656,9 @@ class Index:
         if outlier_threshold is not None:
             updates.append("outlier_threshold = ?")
             params.append(outlier_threshold)
+        if display_mode is not None:
+            updates.append("display_mode = ?")
+            params.append(display_mode)
         if not updates:
             return
         updates.append("updated_at = ?")
@@ -980,6 +991,10 @@ class Index:
             rows = self._conn.execute("SELECT * FROM saved_charts ORDER BY is_favorite DESC, created_at DESC").fetchall()
             return [self._row_to_saved_chart(row) for row in rows]
 
+    def count_saved_charts(self) -> int:
+        with self._lock, self._conn:
+            return self._conn.execute("SELECT COUNT(*) FROM saved_charts").fetchone()[0]
+
     def get_saved_chart(self, chart_id: int) -> dict | None:
         with self._lock, self._conn:
             row = self._conn.execute("SELECT * FROM saved_charts WHERE id = ?", (chart_id,)).fetchone()
@@ -1014,6 +1029,10 @@ class Index:
         with self._lock, self._conn:
             rows = self._conn.execute("SELECT * FROM dashboard_pins ORDER BY position ASC").fetchall()
             return [dict(row) for row in rows]
+
+    def count_dashboard_pins(self) -> int:
+        with self._lock, self._conn:
+            return self._conn.execute("SELECT COUNT(*) FROM dashboard_pins").fetchone()[0]
 
     def is_pinned(self, item_type: str, item_id: int) -> bool:
         with self._lock, self._conn:
@@ -1153,6 +1172,10 @@ class Index:
                    FROM saved_tables t ORDER BY t.is_favorite DESC, t.created_at DESC"""
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def count_saved_tables(self) -> int:
+        with self._lock, self._conn:
+            return self._conn.execute("SELECT COUNT(*) FROM saved_tables").fetchone()[0]
 
     def set_table_favorite(self, table_id: int, favorite: bool) -> None:
         with self._lock, self._conn:

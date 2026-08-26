@@ -50,6 +50,7 @@ from .formatting import (
     BACKUP_KEEP_COUNT_LABELS,
     BACKUP_SCHEDULE_LABELS,
     DECIMALS_LABELS,
+    DISPLAY_MODE_LABELS,
     FONT_SCALE_LABELS,
     GAP_THRESHOLD_LABELS,
     OUTLIER_THRESHOLD_LABELS,
@@ -111,6 +112,7 @@ from .timezone_config import load_timezone
 from .version import APP_VERSION
 
 logger = logging.getLogger(__name__)
+trace_logger = logging.getLogger("zeitarchiv.trace")
 
 EntityId = Annotated[
     str,
@@ -601,6 +603,22 @@ _CONNECTION_STATS = {
     "last_auth_failure_ts": None,
 }
 
+# Einmalige Aufzeichnung des nächsten /api/write-Requests (Konzept
+# "Debugging: nächsten Schreibvorgang aufzeichnen") — bewusst kein
+# Dauer-Logging der übertragenen Werte (siehe zeitarchiv.trace unten): scharf
+# geschaltet über die Protokollierung-Einstellungen, deaktiviert sich nach
+# genau einem Treffer selbst wieder. Prozess-lokal wie _CONNECTION_STATS,
+# kein Neustart-übergreifender Zustand nötig.
+_write_capture_lock = threading.Lock()
+_write_capture: dict = {"armed": False, "captured_at": None, "payload": None}
+
+# Zeitlich begrenztes Tracing einer einzelnen Entität (Konzept "Debugging:
+# Entity-Trace") — loggt Rohwerte (Zeitstempel + Wert) nur für die
+# eingetragene entity_id und nur bis expires_at, dann automatisch wieder aus.
+_entity_trace_lock = threading.Lock()
+_entity_trace: dict = {"entity_id": None, "started_at": None, "expires_at": None}
+_ENTITY_TRACE_DURATION_SECONDS = 15 * 60
+
 
 class EventIn(BaseModel):
     event_id: Optional[str] = Field(
@@ -707,6 +725,29 @@ def health(authorization: str | None = Header(default=None)) -> dict:
 def write(payload: WriteRequest, authorization: str | None = Header(default=None)) -> dict:
     _check_auth(authorization)
     _CONNECTION_STATS["write_requests_ok"] += 1
+
+    # Einmalige Aufzeichnung (siehe _write_capture oben): scharf geschaltet
+    # über settings/logging/capture-write, deaktiviert sich hier sofort
+    # wieder selbst — trifft absichtlich GENAU diesen einen Request, nicht
+    # nur "den nächsten nach dem Scharfschalten sichtbaren" (kein Fenster,
+    # in dem ein zweiter Request unbemerkt durchrutschen könnte).
+    with _write_capture_lock:
+        if _write_capture["armed"]:
+            _write_capture["armed"] = False
+            _write_capture["captured_at"] = time.time()
+            _write_capture["payload"] = payload.model_dump()
+
+    now = time.time()
+    with _entity_trace_lock:
+        trace_entity = _entity_trace["entity_id"]
+        trace_active = bool(trace_entity) and (_entity_trace["expires_at"] or 0) > now
+    if trace_active:
+        for event in payload.events:
+            if event.entity_id == trace_entity:
+                trace_logger.debug(
+                    "Trace %s · ts=%s · value=%s · unit=%s · domain=%s",
+                    event.entity_id, event.ts, event.value, event.unit or "—", event.domain,
+                )
 
     counts = {"written": 0, "skipped": 0, "filtered": 0, "duplicate": 0, "recovered": 0}
     for event in payload.events:
@@ -852,6 +893,7 @@ def api_query_multi(
             "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
             "unit": (entity["unit"] if entity else None) or "",
             "decimals": decimals_to_int(entity["decimals"]) if entity else None,
+            "display_mode": (entity["display_mode"] if entity else None) or "onoff",
             "aggregation_type": result["aggregation_type"],
             "chart_type": result["chart_type"],
             "points": result["points"],
@@ -1326,6 +1368,36 @@ def _settings_verbindung_context(saved: bool = False) -> dict:
     }
 
 
+def _debug_tools_context() -> dict:
+    """Zustand der beiden Debugging-Werkzeuge (Konzept "Debugging: nächsten
+    Schreibvorgang aufzeichnen" / "Entity-Trace") — eigene Funktion statt Teil
+    von _settings_logging_context(), damit das per htmx per Polling
+    nachgeladene Fragment (settings/logging/debug) nur diesen kleinen
+    Ausschnitt neu rendert, nicht die ganze Protokollierung-Sektion."""
+    with _write_capture_lock:
+        capture_armed = _write_capture["armed"]
+        captured_at = _write_capture["captured_at"]
+        payload = _write_capture["payload"]
+    with _entity_trace_lock:
+        trace_entity_id = _entity_trace["entity_id"]
+        trace_expires_at = _entity_trace["expires_at"]
+
+    now = time.time()
+    trace_active = bool(trace_entity_id) and (trace_expires_at or 0) > now
+    return {
+        "capture_armed": capture_armed,
+        "capture_captured_at": (
+            f"{format_timestamp(captured_at, TZ)} {format_time(captured_at, TZ)}" if captured_at else None
+        ),
+        "capture_event_count": len(payload["events"]) if payload else None,
+        "capture_payload_json": json.dumps(payload, indent=2, ensure_ascii=False) if payload else None,
+        "trace_entity_id": trace_entity_id if trace_active else None,
+        "trace_expires_in_minutes": (
+            max(1, round((trace_expires_at - now) / 60)) if trace_active else None
+        ),
+    }
+
+
 def _settings_logging_context(saved: bool = False) -> dict:
     return {
         "log_level": index.get_setting("log_level", DEFAULT_LOG_LEVEL),
@@ -1333,6 +1405,7 @@ def _settings_logging_context(saved: bool = False) -> dict:
         "access_log_mode": index.get_setting("access_log_mode", DEFAULT_ACCESS_LOG_MODE),
         "access_log_options": list(ACCESS_LOG_LABELS.items()),
         "logging_saved": saved,
+        **_debug_tools_context(),
     }
 
 
@@ -1476,6 +1549,84 @@ async def settings_logging(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "_settings_logging_form.html", _settings_logging_context(saved=True)
     )
+
+
+@app.get("/settings/logging/debug", response_class=HTMLResponse)
+def settings_logging_debug(request: Request) -> HTMLResponse:
+    """Nur der Debug-Werkzeuge-Ausschnitt — per htmx-Polling nachgeladen,
+    solange eine Aufzeichnung scharf ist oder ein Trace läuft (siehe
+    _debug_tools_context())."""
+    return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
+
+
+@app.post("/settings/logging/capture-write/arm", response_class=HTMLResponse)
+def settings_capture_write_arm(request: Request) -> HTMLResponse:
+    """Zeichnet GENAU den nächsten eingehenden /api/write-Request auf (Rohdaten
+    inkl. Werten/Entity-IDs, aber ohne Authorization-Header) — kein Dauer-
+    Logging, siehe Kommentar bei _write_capture oben."""
+    with _write_capture_lock:
+        _write_capture["armed"] = True
+        _write_capture["captured_at"] = None
+        _write_capture["payload"] = None
+    return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
+
+
+@app.post("/settings/logging/capture-write/clear", response_class=HTMLResponse)
+def settings_capture_write_clear(request: Request) -> HTMLResponse:
+    with _write_capture_lock:
+        _write_capture["armed"] = False
+        _write_capture["captured_at"] = None
+        _write_capture["payload"] = None
+    return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
+
+
+@app.get("/settings/logging/capture-write/download")
+def settings_capture_write_download() -> Response:
+    with _write_capture_lock:
+        payload = _write_capture["payload"]
+        captured_at = _write_capture["captured_at"]
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Keine Aufzeichnung vorhanden")
+    filename = f"zeitarchiv-write-capture-{datetime.fromtimestamp(captured_at, TZ).strftime('%Y%m%d-%H%M%S')}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/settings/logging/trace/start", response_class=HTMLResponse)
+async def settings_trace_start(request: Request) -> HTMLResponse:
+    """Startet ein zeitlich begrenztes Trace einer einzelnen Entität (Konzept
+    "Debugging: Entity-Trace") — protokolliert deren Rohwerte über
+    zeitarchiv.trace, unabhängig vom allgemeinen Loglevel, für
+    _ENTITY_TRACE_DURATION_SECONDS, dann automatisch wieder aus."""
+    form = await request.form()
+    entity_id = str(form.get("entity_id", "")).strip()
+    if not entity_id:
+        raise HTTPException(status_code=400, detail="Entity-ID fehlt")
+    try:
+        validate_entity_id(entity_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    with _entity_trace_lock:
+        _entity_trace["entity_id"] = entity_id
+        _entity_trace["started_at"] = time.time()
+        _entity_trace["expires_at"] = time.time() + _ENTITY_TRACE_DURATION_SECONDS
+    trace_logger.debug("Trace gestartet für %s · %d Minuten", entity_id, _ENTITY_TRACE_DURATION_SECONDS // 60)
+    return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
+
+
+@app.post("/settings/logging/trace/stop", response_class=HTMLResponse)
+def settings_trace_stop(request: Request) -> HTMLResponse:
+    with _entity_trace_lock:
+        entity_id = _entity_trace["entity_id"]
+        _entity_trace["entity_id"] = None
+        _entity_trace["started_at"] = None
+        _entity_trace["expires_at"] = None
+    if entity_id:
+        trace_logger.debug("Trace beendet für %s", entity_id)
+    return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
 
 
 @app.post("/settings/archivierung", response_class=HTMLResponse)
@@ -1832,21 +1983,65 @@ def _stop_maintenance_scheduler() -> None:
         _maintenance_scheduler_thread.join(timeout=5)
 
 
-def _backup_context(*, message: str | None = None) -> dict:
-    with _backup_progress.lock:
-        running = _backup_progress.running
-        done = _backup_progress.done
-        total = _backup_progress.total
-        current_error = _backup_progress.error
-    percent = int(done / total * 100) if total else 0
+_BACKUP_SORT_COLUMNS = [("created_at", "Erstellt"), ("size_bytes", "Größe")]
+
+
+def _backup_list_context(sort: str = "created_at", direction: str = "desc", page: int = 1, page_size: int = 10) -> dict:
+    """Sortierte/paginierte Backup-Liste (Konzept-Erweiterung: sortierbare
+    Spalten + Paging, analog zur Entitäten-Übersicht/_entities_table_response)
+    — eigene Funktion statt Teil von _backup_context(), damit das per htmx
+    nachladbare Tabellen-Fragment (_backup_table.html, Route /backup/list)
+    dieselbe Sortier-/Paging-Logik nutzt, ohne den kompletten Backup-Status-
+    Kontext (Fortschritt, Jobs, Rollbacks, Warnungen) mit aufzubauen."""
+    if sort not in dict(_BACKUP_SORT_COLUMNS):
+        sort = "created_at"
+    if direction not in ("asc", "desc"):
+        direction = "desc"
+    raw = backup.list_backups(BACKUPS_DIR)
+    raw.sort(key=lambda b: b[sort], reverse=(direction == "desc"))
+    page_raw, pagination = _paginate(raw, page, page_size)
     backups = [
         {
             "filename": b["filename"],
             "size": format_size(b["size_bytes"]),
             "created_at": f"{format_timestamp(b['created_at'], TZ)} {format_time(b['created_at'], TZ)}",
         }
-        for b in backup.list_backups(BACKUPS_DIR)
+        for b in page_raw
     ]
+
+    def _next_dir(column: str) -> str:
+        return "asc" if sort == column and direction == "desc" else "desc"
+
+    columns = [
+        {
+            "key": key,
+            "label": label,
+            "next_dir": _next_dir(key),
+            "active": sort == key,
+            "arrow": ("↓" if direction == "desc" else "↑") if sort == key else "",
+        }
+        for key, label in _BACKUP_SORT_COLUMNS
+    ]
+    return {
+        "backups": backups,
+        "backup_columns": columns,
+        "backup_sort": sort,
+        "backup_dir": direction,
+        "backup_pagination": pagination,
+        "backup_total": pagination["total"],
+    }
+
+
+def _backup_context(
+    *, message: str | None = None,
+    sort: str = "created_at", direction: str = "desc", page: int = 1, page_size: int = 10,
+) -> dict:
+    with _backup_progress.lock:
+        running = _backup_progress.running
+        done = _backup_progress.done
+        total = _backup_progress.total
+        current_error = _backup_progress.error
+    percent = int(done / total * 100) if total else 0
     jobs = []
     status_labels = {
         "queued": "Geplant", "running": "Läuft", "success": "Erfolgreich",
@@ -1917,7 +2112,7 @@ def _backup_context(*, message: str | None = None) -> dict:
         "backup_message": message,
         "backup_error": current_error,
         "backup_warnings": warnings,
-        "backups": backups,
+        **_backup_list_context(sort, direction, page, page_size),
         "backup_jobs": jobs,
         "backup_rollbacks": backup.list_restore_rollbacks(DATA_DIR),
         "backup_schedule": schedule_value,
@@ -2136,6 +2331,34 @@ def backup_delete(request: Request, filename: str) -> HTMLResponse:
     return _backup_status_response(request)
 
 
+@app.post("/backup/delete-all", response_class=HTMLResponse)
+def backup_delete_all(request: Request) -> HTMLResponse:
+    """Löscht alle vorhandenen Backup-ZIPs nach UI-Bestätigung (nicht den
+    Ausführungsverlauf oder Restore-Rollbacks, die bleiben eigenständig über
+    ihre jeweiligen Löschaktionen steuerbar)."""
+    with storage_coordinator.exclusive():
+        count = backup.delete_all_backups(BACKUPS_DIR)
+    message = f"{count} Backup(s) gelöscht." if count else "Keine Backups zum Löschen vorhanden."
+    return templates.TemplateResponse(request, "_settings_backup_ready.html", _backup_context(message=message))
+
+
+@app.get("/backup/list", response_class=HTMLResponse)
+def backup_list(
+    request: Request,
+    sort: str = "created_at",
+    dir: str = "desc",
+    page: int = 1,
+    page_size: int = 10,
+) -> HTMLResponse:
+    """Nur das Backup-Tabellen-Fragment (Sortier-/Seiten-Wechsel) — dasselbe
+    Prinzip wie /entities-table, aber auf #backup-table-wrap statt des
+    gesamten #backup-status begrenzt, damit Import-Dropzone/Ausführungs-
+    verlauf/Rollbacks beim reinen Umsortieren nicht mit neu gerendert werden."""
+    return templates.TemplateResponse(
+        request, "_backup_table.html", _backup_list_context(sort, dir, page, page_size)
+    )
+
+
 _GROWTH_RANGE_SINCE_SECONDS = {"day": 86400, "month": 30 * 86400, "year": 365 * 86400, "all": None}
 _GROWTH_RANGE_OPTIONS = [("day", "Tag"), ("month", "Monat"), ("year", "Jahr"), ("all", "Gesamt")]
 
@@ -2252,6 +2475,29 @@ def settings_diagnostics_download() -> Response:
     )
 
 
+def _ingestion_rate_per_second(snapshots: list[dict], window_seconds: float) -> float | None:
+    """Ø Netto-Zeilenzuwachs pro Sekunde über die letzten window_seconds,
+    aus den stündlichen stats_snapshots abgeleitet (siehe
+    Index.get_stats_snapshots) — kein eigener Ereignis-Log nötig, da die
+    Snapshots ohnehin unabhängig von Seitenaufrufen stündlich geschrieben
+    werden. None, wenn vor dem Fenster noch kein Snapshot liegt (zu wenig
+    Verlauf) oder gar keine zwei Snapshots vorhanden sind."""
+    if len(snapshots) < 2:
+        return None
+    latest = snapshots[-1]
+    cutoff = latest["ts"] - window_seconds
+    baseline = next((s for s in reversed(snapshots[:-1]) if s["ts"] <= cutoff), None)
+    if baseline is None:
+        return None
+    elapsed = latest["ts"] - baseline["ts"]
+    if elapsed <= 0:
+        return None
+    # Retention-Läufe können total_rows zwischen zwei Snapshots senken (endgültig
+    # gelöschte Zeilen) — als Ingest-Rate auf 0 statt negativ anzeigen, da eine
+    # negative "Eventrate" hier verwirrender wäre als informativ.
+    return max(0.0, (latest["total_rows"] - baseline["total_rows"]) / elapsed)
+
+
 @app.get("/statistik", response_class=HTMLResponse)
 @_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
 def statistik_view(request: Request) -> HTMLResponse:
@@ -2313,6 +2559,10 @@ def statistik_view(request: Request) -> HTMLResponse:
     retention_history_30d = index.get_retention_job_totals(now.timestamp() - 30 * 86400)
     retention_history_all = index.get_retention_job_totals(0.0)
 
+    rate_per_hour = _ingestion_rate_per_second(growth_points, 24 * 3600)
+    rate_per_day = _ingestion_rate_per_second(growth_points, 7 * 86400)
+    dashboard_pin_count = index.count_dashboard_pins()
+
     return templates.TemplateResponse(
         request,
         "statistik.html",
@@ -2320,6 +2570,12 @@ def statistik_view(request: Request) -> HTMLResponse:
             "entity_count": overview["entity_count"],
             "total_rows": format_int(overview['total_rows']),
             "total_size": format_size(overview["total_size_bytes"]),
+            "chart_count": index.count_saved_charts(),
+            "table_count": index.count_saved_tables(),
+            "dashboard_pin_count": dashboard_pin_count,
+            "dashboard_pin_limit": index.DASHBOARD_TILE_LIMIT,
+            "events_per_hour": format_int(round(rate_per_hour * 3600)) if rate_per_hour is not None else None,
+            "events_per_day": format_int(round(rate_per_day * 86400)) if rate_per_day is not None else None,
             "by_type": by_type,
             "by_resolution": by_resolution,
             "retention_due_rows": format_int(int(retention_totals.get('rows_deleted', 0) or 0)),
@@ -2368,8 +2624,11 @@ def _export_table_response(
     unit_filter: str,
     sort: str,
     direction: str,
+    page: int = 1,
+    page_size: int = 50,
 ) -> HTMLResponse:
     matched = index.list_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction)
+    page_matched, pagination = _paginate(matched, page, page_size)
     rows = [
         {
             "entity_id": row["entity_id"],
@@ -2379,7 +2638,7 @@ def _export_table_response(
             "unit": row["unit"],
             "row_count": _visible_row_count(row),
         }
-        for row in matched
+        for row in page_matched
     ]
 
     def _next_dir(column: str) -> str:
@@ -2411,6 +2670,7 @@ def _export_table_response(
             "type": type_filter,
             "unit": unit_filter,
             "columns": header_links,
+            "pagination": pagination,
         },
     )
 
@@ -2423,8 +2683,10 @@ def export_table(
     unit: str = "all",
     sort: str = "entity_id",
     dir: str = "asc",
+    page: int = 1,
+    page_size: int = 50,
 ) -> HTMLResponse:
-    return _export_table_response(request, search, type, unit, sort, dir)
+    return _export_table_response(request, search, type, unit, sort, dir, page, page_size)
 
 
 @app.get("/export/download")
@@ -2583,7 +2845,6 @@ def _entities_table_response(
             "columns": header_links,
             "visible_columns": visible_columns,
             "pagination": pagination,
-            "generated_at": f"{format_timestamp(time.time(), TZ)} {format_time(time.time(), TZ)}",
         },
     )
 
@@ -2642,6 +2903,7 @@ def _entity_config_context(entity) -> dict:
     return {
         "entity_id": entity_id,
         "friendly_name": entity["friendly_name"],
+        "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
         "unit": entity["unit"] or "—",
         "row_count": format_int(_visible_row_count(entity)),
@@ -2656,12 +2918,14 @@ def _entity_config_context(entity) -> dict:
         "value_filter": entity["value_filter"],
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
+        "display_mode": entity["display_mode"],
         "resolution_options": list(RESOLUTION_LABELS.items()),
         "retention_options": list(RETENTION_LABELS.items()),
         "decimals_options": list(DECIMALS_LABELS.items()),
         "value_filter_options": list(VALUE_FILTER_LABELS.items()),
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
+        "display_mode_options": list(DISPLAY_MODE_LABELS.items()),
         "preview_rows": preview_rows,
         "base": "../..",
     }
@@ -2690,6 +2954,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     value_filter = form.get("value_filter")
     gap_threshold = form.get("gap_threshold")
     outlier_threshold = form.get("outlier_threshold")
+    display_mode = form.get("display_mode")
     if resolution is not None and resolution not in RESOLUTION_LABELS:
         raise HTTPException(status_code=400, detail="Ungültige Auflösung")
     if retention is not None and retention not in RETENTION_LABELS:
@@ -2702,6 +2967,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail="Ungültiger Lücken-Schwellwert")
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Ausreißer-Schwellwert")
+    if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültiger Anzeigemodus")
     def update_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
             index.set_config(
@@ -2712,6 +2979,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 value_filter=str(value_filter) if value_filter is not None else None,
                 gap_threshold=str(gap_threshold) if gap_threshold is not None else None,
                 outlier_threshold=str(outlier_threshold) if outlier_threshold is not None else None,
+                display_mode=str(display_mode) if display_mode is not None else None,
             )
             if retention is not None:
                 _invalidate_retention_overview()
@@ -3250,6 +3518,7 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
             "type_label": format_type(entity["aggregation_type"]),
             "unit": entity["unit"],
             "decimals": decimals_to_int(entity["decimals"]),
+            "display_mode": entity["display_mode"],
             "base": "..",
             "first_date": first_date,
             "last_date": last_date,
