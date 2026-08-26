@@ -4,6 +4,9 @@
 
 ### Neu
 
+- Globale Menüleiste ersetzt die bisherige Seitenleiste auf allen Seiten
+  (Übersicht/Entitäten/Charts/Tabellen/Dashboards + System-Dropdown, inkl.
+  mobilem Menü).
 - Mehrere Dashboards: Kacheln lassen sich jetzt auf beliebig viele benannte
   Dashboards verteilen (Liste, Kachel-Ansicht, Editor) statt nur auf die
   eine Startseite.
@@ -16,8 +19,26 @@
 - Aufgeräumte Navigation: redundante „Charts →"/„Tabellen →"-Links und
   doppelte Breadcrumbs entfernt, wo bereits eine „← Zurück"-Zeile vorhanden
   ist.
+- Tabellen (Entitäten, Symcon-Import, Reports, Formel-Tabellen) nutzen die
+  durch den Wegfall der Seitenleiste gewonnene Breite; Entitäten-Tabelle
+  berechnet ihre Mindestbreite jetzt serverseitig.
+- Tabellen-Editor: Zeilentyp-, Entität-/Gruppen-Auswahl und Formel/Einheit
+  kompakter in einer Zeile, Aktionen rechtsbündig.
+- Deutsche Zahlenformatierung an mehreren bisher übersehenen Stellen ergänzt
+  (Import-Vorschau/-Ergebnis, Bereinigungsvorschau, Aufbewahrungs-Übersicht
+  u. a.).
+- Diverse Oberflächenpolitur: „+"-Kachel und Bearbeiten-Button auf
+  Charts-/Tabellen-Übersicht, „Über Zeitarchiv"/„Protokollierung" klarer
+  strukturiert, größeres Logo, Tooltip für die HA-Entität-Zuordnung im
+  Import.
 - Mehrere interne Performance-Optimierungen in Statistik-Seite,
   Entitätenliste und Bereinigungs-Vorschau.
+
+### Behoben
+
+- Dropdown-Menüs funktionierten wegen fehlendem Alpine.js auf den meisten
+  Seiten nicht, nur auf der Übersicht.
+- NUL-Bytes im Chart-Editor-Template entfernt.
 
 ## 0.20.1 - 2026-08-26
 
