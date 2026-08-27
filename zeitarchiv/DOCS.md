@@ -36,4 +36,6 @@ protokolliert. Dort lassen sich Ergebnisse filtern, im Detail prüfen und als
 JSON herunterladen. Importvorschauen erzeugen keinen Report.
 
 Ausführliche Funktions- und Grenzwerthinweise stehen in der mitgelieferten
-`README.md`.
+`README.md`. Ein aufgabenorientiertes Benutzerhandbuch (Einrichtung, jede
+Seite im Detail, Einstellungen-Referenz) steht in
+[docs/user-guide.md](docs/user-guide.md).
