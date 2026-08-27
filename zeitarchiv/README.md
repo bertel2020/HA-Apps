@@ -15,6 +15,10 @@ Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
 visualisiert sie.
 
+Ausführliches, aufgabenorientiertes Benutzerhandbuch:
+[docs/user-guide.md](docs/user-guide.md). Technische Dokumentation für
+Entwickler: [docs/](docs/README.md).
+
 ## Auf einen Blick
 
 | | |
