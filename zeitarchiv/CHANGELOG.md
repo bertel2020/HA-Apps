@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.0 - 2026-08-27
+
+### Neu
+
+- Home-Assistant-Import: markierte Zeilen werden jetzt wie beim
+  Symcon-Import farblich hervorgehoben und an den Tabellenanfang verschoben
+  — bleibt eine aktive Spaltensortierung dabei erhalten, gilt sie nur noch
+  innerhalb der markierten bzw. unmarkierten Gruppe.
+
 ## 0.55.2 - 2026-08-27
 
 ### Verbesserung

@@ -75,6 +75,7 @@
       </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
+          class="{{ 'marked' if entity.entity_id in ha_selected_ids }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}"
           data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
           data-sort-unit="{{ entity.unit or '' }}"
@@ -191,7 +192,9 @@
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = count + ' markiert'; }
     }
     function onHaMarkChange(checkbox) {
+      checkbox.closest('tr').classList.toggle('marked', checkbox.checked);
       refreshHaMarkedCount();
+      applyHaPaging();  // Markieren ändert die Zeilenreihenfolge -> sichtbaren Bereich neu berechnen
     }
     function toggleAllHaRows(headerCheckbox) {
       document.querySelectorAll('#ha-import-table tr[data-entity-id]').forEach((row) => {
@@ -199,8 +202,10 @@
         const cb = row.querySelector('.ha-mark-checkbox');
         if (!cb) return;
         cb.checked = headerCheckbox.checked;
+        row.classList.toggle('marked', headerCheckbox.checked);
       });
       refreshHaMarkedCount();
+      applyHaPaging();
     }
     function toggleHaCustomRange(value) {
       const field = document.getElementById('ha-custom-range-fields');
@@ -225,21 +230,30 @@
       if (!table) return;
       let rows = Array.from(table.querySelectorAll('tr[data-entity-id]'));
 
-      if (haSortKey) {
-        const attr = 'sort' + haSortKey.charAt(0).toUpperCase() + haSortKey.slice(1);
-        rows.sort((a, b) => {
-          const av = a.dataset[attr] ?? '';
-          const bv = b.dataset[attr] ?? '';
-          if (av === '' && bv === '') return 0;
-          if (av === '') return 1;   // Werte ohne Verfügbarkeitsprüfung/Einheit
-          if (bv === '') return -1;  // immer ans Ende, unabhängig von der Richtung.
-          const an = parseFloat(av);
-          const bn = parseFloat(bv);
-          const cmp = (!Number.isNaN(an) && !Number.isNaN(bn)) ? an - bn : av.localeCompare(bv, 'de');
-          return haSortDir === 'asc' ? cmp : -cmp;
-        });
-        rows.forEach((row) => table.appendChild(row));
-      }
+      // Markierte Zeilen immer zuerst (wie beim Symcon-Import oben) — die
+      // gewählte Spaltensortierung (haSortKey/haSortDir, falls gesetzt) gilt
+      // nur noch INNERHALB der beiden Gruppen (markiert/unmarkiert), nicht
+      // mehr über die ganze Tabelle. Ohne aktive Spaltensortierung bleibt
+      // die bisherige Reihenfolge je Gruppe erhalten (Array.prototype.sort
+      // ist stabil) — reines Markieren verschiebt dann nur die Gruppe, sonst
+      // nichts.
+      const attr = haSortKey ? 'sort' + haSortKey.charAt(0).toUpperCase() + haSortKey.slice(1) : null;
+      rows.sort((a, b) => {
+        const aMarked = a.classList.contains('marked');
+        const bMarked = b.classList.contains('marked');
+        if (aMarked !== bMarked) return aMarked ? -1 : 1;
+        if (!attr) return 0;
+        const av = a.dataset[attr] ?? '';
+        const bv = b.dataset[attr] ?? '';
+        if (av === '' && bv === '') return 0;
+        if (av === '') return 1;   // Werte ohne Verfügbarkeitsprüfung/Einheit
+        if (bv === '') return -1;  // immer ans Ende, unabhängig von der Richtung.
+        const an = parseFloat(av);
+        const bn = parseFloat(bv);
+        const cmp = (!Number.isNaN(an) && !Number.isNaN(bn)) ? an - bn : av.localeCompare(bv, 'de');
+        return haSortDir === 'asc' ? cmp : -cmp;
+      });
+      rows.forEach((row) => table.appendChild(row));
 
       const isFilteredOut = (row) => haSearch && !(row.dataset.search || '').includes(haSearch);
       rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
