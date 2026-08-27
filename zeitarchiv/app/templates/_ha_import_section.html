@@ -6,37 +6,72 @@
   Supervisor.
 </div>
 {% endif %}
+{% if ha_availability_error %}
+<div class="callout" style="border-left-color:var(--danger);">
+  Verfügbarkeit konnte nicht geprüft werden: {{ ha_availability_error }}
+</div>
+{% endif %}
 {% if not ha_entities %}
 <div class="empty">Noch keine Entität in Zeitarchiv bekannt — die HA-Integration muss mindestens einen Live-Wert übertragen haben, bevor ein Import für diese Entität möglich ist.</div>
 {% else %}
 <form id="ha-form" method="post" action="import/ha/dry-run">
   <div class="toolbar import-filter-toolbar">
-    <input type="search" class="search" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:160px;">
+    <input type="search" class="search" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:160px;max-width:320px;">
     <span class="count-chip">{{ ha_entities | length }} bekannte Entitäten</span>
     <span class="count-chip" id="ha-marked-count">0 markiert</span>
   </div>
 
-  <div class="csv-config" style="margin-bottom:14px;">
+  <div class="csv-config" style="margin-bottom:14px;align-items:flex-end;">
     <div class="field">
-      <label>Von</label>
-      <input type="date" name="date_from" value="{{ ha_date_from }}">
+      <label>Zeitraum</label>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn" id="ha-range-btn" onclick="toggleDDPicker('ha-range')">{% for value, label in ha_range_options %}{% if value == ha_range_preset %}{{ label }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="range_preset" id="ha-range-input" value="{{ ha_range_preset }}">
+        <div class="dd-picker-popover" id="ha-range-popover">
+          {% for value, label in ha_range_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('ha-range', '{{ value }}', '{{ label }}'); toggleHaCustomRange('{{ value }}');">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="field" id="ha-custom-range-fields" style="display:flex;gap:12px;{{ '' if ha_range_preset == 'custom' else 'display:none;' }}">
+      <div><label>Von</label><input type="date" name="date_from" value="{{ ha_date_from }}"></div>
+      <div><label>Bis</label><input type="date" name="date_to" value="{{ ha_date_to }}"></div>
     </div>
     <div class="field">
-      <label>Bis</label>
-      <input type="date" name="date_to" value="{{ ha_date_to }}">
+      <button type="button" class="btn" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
+        {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
+        <span class="htmx-indicator"> &middot; prüft …</span>
+      </button>
     </div>
   </div>
 
   <div class="tbl-wrap">
     <table id="ha-import-table" class="dt symcon-import-table">
-      <tr><th style="width:40px;"><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle markieren"></th><th>Entität</th><th>Einheit</th><th>Art</th></tr>
+      <tr>
+        <th style="width:40px;"><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle markieren"></th>
+        <th>Entität</th><th>Einheit</th><th>Typ</th><th>Art</th><th>Verfügbar</th>
+      </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}">
-        <td><input type="checkbox" class="ha-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onHaMarkChange(this)" {% if entity.entity_id in ha_selected_ids %}checked{% endif %}></td>
+        <td>
+          <input type="hidden" name="check_entity_ids" value="{{ entity.entity_id }}">
+          <input type="checkbox" class="ha-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onHaMarkChange(this)" {% if entity.entity_id in ha_selected_ids %}checked{% endif %}>
+        </td>
         <td><span class="ent-name" style="font-weight:600;">{{ entity.friendly_name or entity.entity_id }}</span><span class="ent-id mono" style="display:block;color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));">{{ entity.entity_id }}</span></td>
         <td>{{ entity.unit or "—" }}</td>
-        <td>{% if entity.state_class %}<span class="source-badge">{{ entity.state_class }}</span>{% else %}Rohhistorie{% endif %}</td>
+        <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
+        <td>
+          {% if entity.has_data is none %}
+          <span class="ha-art-badge unknown" title="Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken">–</span>
+          {% elif entity.has_data %}
+          <span class="ha-art-badge has-data">Rohhistorie</span>
+          {% else %}
+          <span class="ha-art-badge no-data">Keine Rohhistorie</span>
+          {% endif %}
+        </td>
+        <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">{{ entity.available_label or "—" }}</td>
       </tr>
       {% endfor %}
     </table>
@@ -78,9 +113,14 @@
       });
       refreshHaMarkedCount();
     }
+    function toggleHaCustomRange(value) {
+      const field = document.getElementById('ha-custom-range-fields');
+      if (field) field.style.display = value === 'custom' ? 'flex' : 'none';
+    }
     window.onHaSearch = onHaSearch;
     window.onHaMarkChange = onHaMarkChange;
     window.toggleAllHaRows = toggleAllHaRows;
+    window.toggleHaCustomRange = toggleHaCustomRange;
     refreshHaMarkedCount();
   })();
 </script>

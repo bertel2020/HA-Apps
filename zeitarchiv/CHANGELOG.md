@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.51.0 - 2026-08-27
+
+### Neu
+
+- Home-Assistant-Import: Zeitraum-Auswahl als Dropdown („Verfügbare Historie
+  (max.)“ / „Letzte 10 Tage“ / „Letzte 30 Tage“ / „Eigener Zeitraum …“) statt
+  zweier freier Datumsfelder — bei „Eigener Zeitraum“ erscheinen weiterhin
+  Von/Bis-Felder.
+- Neuer Button „Verfügbarkeit prüfen“: zeigt für alle gelisteten Entitäten,
+  ob und in welchem Zeitraum Home Assistant tatsächlich Rohhistorie liefert
+  (Spalten „Art“ und „Verfügbar“, z. B. „12.08.2025 – 29.08.2025 · 1.245
+  Punkte“) — bewusst ein expliziter Klick statt automatischer Prüfung beim
+  Öffnen des Reiters, dafür aber ein einziger gebündelter Abruf für alle
+  Entitäten gleichzeitig (Home Assistants `filter_entity_id` akzeptiert eine
+  kommagetrennte Liste), nicht ein Request pro Zeile.
+- Die bisherige Spalte „Art“ (Standard/Zähler/Schalter) heißt jetzt „Typ“ —
+  die neue Spalte „Art“ beschreibt stattdessen, ob Home Assistant Rohhistorie
+  oder keine Daten liefert.
+- Vorschau und Ergebnis des Home-Assistant-Imports zeigen jetzt zusätzlich
+  den in Home Assistant tatsächlich gefundenen Zeitraum je Entität, in einer
+  eigenen, für diesen Import passenderen Darstellung.
+- „Bereinigen“/„Korrigieren“/„Hinzufügen“-Reiter auf der Bearbeitungsseite
+  einer Entität optisch an die Import-Reiter angeglichen (gleiche Schrift,
+  Größe, Gewichtung).
+
+### Intern
+
+- Der komplette Symcon-/CSV-/Home-Assistant-Import-Bereich wurde aus
+  `main.py` in ein eigenes Modul (`import_routes.py`) ausgelagert, nach
+  demselben Muster wie zuvor schon `api_routes.py`/`report_routes.py` —
+  `main.py` schrumpft dadurch von 5.427 auf rund 4.070 Zeilen.
+
 ## 0.50.0 - 2026-08-27
 
 ### Neu

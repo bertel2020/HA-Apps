@@ -1,0 +1,1516 @@
+"""Symcon-/CSV-/Home-Assistant-Import: Upload, Scan, Dry-Run/Start und der
+Reports-Tab-Kontext für /import — ausgelagert aus main.py (Konzept
+"main.py-Zeilenbudget", siehe test_route_modules.py), demselben Muster wie
+report_routes.py/api_routes.py: ein *Dependencies-Frozen-Dataclass wird von
+main.py befüllt, ein *Service kapselt sowohl privaten Zustand (Scan-Cache,
+Hintergrund-Fortschritt, Quellordner-Sperren) als auch die Routen selbst
+(router(), als verschachtelte Closures registriert statt gebundener
+Methoden — dieselbe Technik wie ReportService.router())."""
+
+from __future__ import annotations
+
+import dataclasses
+import json
+import logging
+import math
+import shutil
+import threading
+import zipfile
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from .formatting import format_int, format_size, format_timestamp, format_type, format_value, parse_localized_number
+from .limits import (
+    MAX_CSV_UPLOAD_BYTES,
+    MAX_IMPORT_ROWS_PER_ENTITY,
+    MAX_SETTINGS_UPLOAD_BYTES,
+    MAX_ZIP_UPLOAD_BYTES,
+)
+from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size
+from .storage import csv_import, ha_import, import_reports, symcon_import
+from .storage.coordinator import StorageCoordinator
+from .storage.index import Index
+
+logger = logging.getLogger(__name__)
+
+
+# Zeitraum-Voreinstellungen für den Home-Assistant-Import-Reiter (dd-picker,
+# siehe _ha_import_section.html) — "max" ist bewusst auf HA_MAX_RANGE_DAYS
+# begrenzt statt wirklich unbegrenzt: HA hält Rohhistorie standardmäßig nur
+# ~10 Tage vor, aber bei individuell verlängerter Recorder-Aufbewahrung
+# (purge_keep_days) könnte ein echtes "seit Anbeginn" sonst über Jahre in
+# HISTORY_CHUNK-Fenstern abgefragt werden — ein einzelner Klick sollte nicht
+# hunderte Requests gegen die laufende HA-Instanz auslösen können.
+HA_RANGE_PRESETS = {
+    "max": "Verfügbare Historie (max.)",
+    "10d": "Letzte 10 Tage",
+    "30d": "Letzte 30 Tage",
+    "custom": "Eigener Zeitraum …",
+}
+HA_RANGE_PRESET_DAYS = {"10d": 10, "30d": 30}
+HA_MAX_RANGE_DAYS = 365
+
+
+class _ScanCache:
+    """Cache für das Ergebnis von scan_source() (Konzept Abschnitt 04) — ohne
+    das würde JEDER Seitenaufruf von /import (und jeder Dry-Run-/Import-Klick)
+    den kompletten Symcon-Ordner neu einlesen und jede Rohdatenzeile neu parsen.
+    Bei einem echten Export mit zehntausenden Dateien dauert das lange genug,
+    dass die Seite ohne Cache bei jedem Reload minutenlang blockiert bzw. im
+    Browser wie ein Hänger aussieht — genau das Problem, das die Fortschritts-
+    anzeige beim Upload eigentlich schon lösen sollte, aber ohne Cache nur beim
+    allerersten Scan half."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.variables: list[symcon_import.SymconVariable] | None = None
+
+
+class _UploadProgress:
+    """Geteilter Fortschritts-Status für Entpacken + Scannen nach einem ZIP-
+    Upload (Konzept Abschnitt 04) — beides passiert in einem Hintergrund-Thread,
+    /import/upload-progress wird von der hand geschriebenen Upload-JS in
+    import.html gepollt (JSON statt htmx-Fragment, weil das reine Byte-Upload
+    schon eigenes XHR braucht und beides in einem Ablauf zusammengehört).
+    Derselbe Zustand trägt auch den Nur-Scan-Fall (siehe _run_scan_background),
+    wenn /import auf einen bereits entpackten, aber noch nicht gescannten
+    Ordner trifft — z. B. nach einem Server-Neustart, der den Cache geleert hat."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.running = False
+        self.phase = ""  # "extracting" | "scanning" | "done" | "error"
+        self.done = 0
+        self.total = 0
+        self.error = ""
+
+
+class _ImportProgress:
+    """Geteilter Fortschritts-Status für den im Hintergrund-Thread laufenden
+    Import (Konzept Abschnitt 04) — /import/progress pollt das per htmx, damit
+    der Import-Assistent nicht auf einen einzigen, potenziell lange blockierenden
+    Request warten muss (z. B. hunderte Monate, Millionen Zeilen). Zwei Phasen,
+    beide sichtbar: "planning" (plan_import() je Variable, liest dafür schon
+    alle Rohdaten — bei vielen Variablen selbst nicht mehr trivial schnell) und
+    "importing" (der eigentliche Schreibvorgang)."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.started = False
+        self.running = False
+        self.phase = ""  # "planning" | "importing"
+        self.total_variables = 0
+        self.planned_variables = 0
+        self.total_months = 0
+        self.done_months = 0
+        self.rows_imported = 0
+        self.current_variable = ""
+        self.results: list[symcon_import.ImportResult] = []
+        self.errors: list[str] = []
+
+
+@dataclass(frozen=True)
+class ImportDependencies:
+    data_dir: Path
+    tz: ZoneInfo
+    index: Index
+    coordinator: StorageCoordinator
+    templates: Jinja2Templates
+    app_root_context: Callable[[Request], dict]
+    reports_context: Callable[..., dict]
+    run_storage_reconciliation: Callable[..., dict]
+    symcon_import_dir: Path
+    csv_import_dir: Path
+    symcon_names_path: Path
+    symcon_source_meta_path: Path
+    symcon_scan_cache_path: Path
+
+
+class ImportService:
+    def __init__(self, deps: ImportDependencies) -> None:
+        self.deps = deps
+        self._scan_cache = _ScanCache()
+        # ZIP-Extraktion, Scan, Löschen und Import dürfen denselben Symcon-Quellordner
+        # nicht gleichzeitig lesen bzw. ersetzen. Diese Sperre ist absichtlich von den
+        # Archiv-Sperren getrennt; die feste Reihenfolge lautet immer Quelle, danach
+        # (falls nötig) StorageCoordinator, damit kein Lock-Zyklus entstehen kann.
+        self._import_source_lock = threading.Lock()
+        self._import_admission_lock = threading.Lock()
+        self._upload_progress = _UploadProgress()
+        self._import_progress = _ImportProgress()
+
+
+    def _load_symcon_names(self) -> dict[str, dict[str, str | None]]:
+        """Lädt die zuletzt hochgeladene ID→{name, parent, unit}-Zuordnung (siehe
+        self.deps.symcon_names_path) — leeres dict, falls noch keine settings.json importiert
+        wurde oder die Datei nicht lesbar ist (z. B. manuell gelöscht). Normalisiert
+        nebenbei eine ältere, noch flache {id: name}-Datei (vor der Parent-
+        Auflösung geschrieben) auf dieselbe Form wie eine frische — ein einmal
+        hochgeladener Stand soll nicht durch ein Code-Update ungültig werden."""
+        if not self.deps.symcon_names_path.exists():
+            return {}
+        try:
+            with self.deps.symcon_names_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        result: dict[str, dict[str, str | None]] = {}
+        for key, value in data.items():
+            if isinstance(value, dict):
+                result[key] = {
+                    "name": value.get("name"),
+                    "parent": value.get("parent"),
+                    "unit": value.get("unit"),
+                }
+            elif isinstance(value, str):
+                result[key] = {"name": value, "parent": None, "unit": None}
+        return result
+
+
+
+    def _symcon_import_rows(self, 
+        variables: list[symcon_import.SymconVariable], names: dict[str, dict[str, str | None]]
+    ) -> list[dict]:
+        rows = []
+        for v in variables:
+            if v.first_ts and v.last_ts:
+                period_start = datetime.fromtimestamp(v.first_ts, self.deps.tz).strftime("%d.%m.%Y")
+                period_end = datetime.fromtimestamp(v.last_ts, self.deps.tz).strftime("%d.%m.%Y")
+            else:
+                period_start = period_end = None
+            preview = (
+                f"{format_value(v.min_value)} · {format_value(v.max_value)}"
+                if v.min_value is not None and v.max_value is not None
+                else "—"
+            )
+            info = names.get(v.variable_id, {})
+            rows.append(
+                {
+                    "variable_id": v.variable_id,
+                    "symcon_name": info.get("name"),
+                    "symcon_parent": info.get("parent"),
+                    "symcon_unit": info.get("unit"),
+                    "readable": v.readable,
+                    "error": v.error,
+                    # Als Zahl an Jinja weitergeben: import.html formatiert den
+                    # Wert zentral über den format_int-Filter. Vorformatierte
+                    # Strings wie "53.663" würden dort beim zweiten int()-Aufruf
+                    # einen ValueError und damit HTTP 500 auslösen.
+                    "row_count": v.row_count,
+                    "period_start": period_start,
+                    "period_end": period_end,
+                    "preview": preview,
+                }
+            )
+        return rows
+
+
+
+    def _save_scan_cache(self, variables: list[symcon_import.SymconVariable]) -> None:
+        """Schreibt das Scan-Ergebnis nach self.deps.symcon_scan_cache_path — Path-Objekte
+        sind nicht direkt JSON-fähig, deshalb je Variable auf Strings abgebildet."""
+        data = {
+            "import_row_limit": MAX_IMPORT_ROWS_PER_ENTITY,
+            "variables": [
+                {
+                    "variable_id": v.variable_id,
+                    "files": [str(p) for p in v.files],
+                    "row_count": v.row_count,
+                    "skipped_rows": v.skipped_rows,
+                    "first_ts": v.first_ts,
+                    "last_ts": v.last_ts,
+                    "min_value": v.min_value,
+                    "max_value": v.max_value,
+                    "readable": v.readable,
+                    "error": v.error,
+                }
+                for v in variables
+            ],
+        }
+        with self.deps.symcon_scan_cache_path.open("w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+
+
+    def _load_scan_cache(self) -> list[symcon_import.SymconVariable] | None:
+        """Gegenstück zu self._save_scan_cache() — None, wenn keine (oder eine defekte)
+        Cache-Datei vorliegt, dann greift der reguläre Hintergrund-Scan als
+        Fallback (siehe import_page())."""
+        if not self.deps.symcon_scan_cache_path.exists():
+            return None
+        try:
+            data = json.loads(self.deps.symcon_scan_cache_path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict) or data.get("import_row_limit") != MAX_IMPORT_ROWS_PER_ENTITY:
+                return None
+            return [
+                symcon_import.SymconVariable(
+                    variable_id=d["variable_id"],
+                    files=[Path(p) for p in d["files"]],
+                    row_count=d["row_count"],
+                    skipped_rows=d.get("skipped_rows", 0),
+                    first_ts=d["first_ts"],
+                    last_ts=d["last_ts"],
+                    min_value=d["min_value"],
+                    max_value=d["max_value"],
+                    readable=d["readable"],
+                    error=d.get("error"),
+                )
+                for d in data["variables"]
+            ]
+        except (json.JSONDecodeError, OSError, KeyError, TypeError):
+            return None
+
+
+
+    def _import_page_context(self) -> dict:
+        with self._scan_cache.lock:
+            variables = self._scan_cache.variables or []
+        entity_options = [
+            (row["entity_id"], row["friendly_name"] or row["entity_id"], row["unit"] or "")
+            for row in self.deps.index.list_entities()
+        ]
+        names = self._load_symcon_names()
+        return {
+            "source_exists": self.deps.symcon_import_dir.exists() and any(self.deps.symcon_import_dir.iterdir()),
+            "rows": self._symcon_import_rows(variables, names),
+            "entity_options": entity_options,
+            "settings_imported": bool(names),
+        }
+
+
+
+    def _cached_variables(self) -> list[symcon_import.SymconVariable]:
+        """Für /import/dry-run und /import/start: nutzt denselben Cache wie die
+        Seite selbst statt erneut zu scannen. Der Fallback (synchroner Scan) greift
+        nur, wenn beide Endpunkte ohne vorherigen Seitenaufruf angesprochen würden —
+        im normalen Ablauf ist der Cache über GET /import längst warm."""
+        with self._scan_cache.lock:
+            if self._scan_cache.variables is not None:
+                return self._scan_cache.variables
+        variables = symcon_import.scan_source(self.deps.symcon_import_dir)
+        with self._scan_cache.lock:
+            self._scan_cache.variables = variables
+        self._save_scan_cache(variables)
+        return variables
+
+
+
+    def _run_scan_background(self) -> None:
+        """Scannt self.deps.symcon_import_dir im Hintergrund und füllt den Cache — der
+        "scanning"-Teil von self._run_upload_background(), auch einzeln nutzbar, wenn
+        schon entpackte Daten vorliegen, aber (noch) kein Cache existiert."""
+        with self._upload_progress.lock:
+            self._upload_progress.running = True
+            self._upload_progress.phase = "scanning"
+            self._upload_progress.done = 0
+            self._upload_progress.total = 0
+            self._upload_progress.error = ""
+
+        def on_scan_progress(done: int, total: int) -> None:
+            with self._upload_progress.lock:
+                self._upload_progress.done = done
+                self._upload_progress.total = total
+
+        def worker() -> None:
+            try:
+                with self._import_source_lock:
+                    variables = symcon_import.scan_source(self.deps.symcon_import_dir, on_progress=on_scan_progress)
+                    with self._scan_cache.lock:
+                        self._scan_cache.variables = variables
+                    self._save_scan_cache(variables)
+                with self._upload_progress.lock:
+                    self._upload_progress.phase = "done"
+            except (OSError, ValueError) as exc:
+                with self._upload_progress.lock:
+                    self._upload_progress.phase = "error"
+                    self._upload_progress.error = f"Quelldaten konnten nicht gescannt werden: {exc}"
+            finally:
+                with self._upload_progress.lock:
+                    self._upload_progress.running = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+
+
+    def _run_upload_background(self, tmp_zip: Path, source_meta: dict) -> None:
+        with self._upload_progress.lock:
+            self._upload_progress.running = True
+            self._upload_progress.phase = "extracting"
+            self._upload_progress.done = 0
+            self._upload_progress.total = 0
+            self._upload_progress.error = ""
+
+        def on_extract_progress(done: int, total: int) -> None:
+            with self._upload_progress.lock:
+                self._upload_progress.done = done
+                self._upload_progress.total = total
+
+        def on_scan_progress(done: int, total: int) -> None:
+            with self._upload_progress.lock:
+                self._upload_progress.done = done
+                self._upload_progress.total = total
+
+        def worker() -> None:
+            try:
+                with self._import_source_lock:
+                    symcon_import.extract_zip(tmp_zip, self.deps.symcon_import_dir, on_progress=on_extract_progress)
+                    with self._upload_progress.lock:
+                        self._upload_progress.phase = "scanning"
+                        self._upload_progress.done = 0
+                        self._upload_progress.total = 0
+                    variables = symcon_import.scan_source(self.deps.symcon_import_dir, on_progress=on_scan_progress)
+                    with self._scan_cache.lock:
+                        self._scan_cache.variables = variables
+                    self._save_scan_cache(variables)
+                    temporary_meta = self.deps.symcon_source_meta_path.with_suffix(".json.part")
+                    try:
+                        temporary_meta.write_text(
+                            json.dumps(source_meta, ensure_ascii=False), encoding="utf-8"
+                        )
+                        temporary_meta.replace(self.deps.symcon_source_meta_path)
+                    finally:
+                        temporary_meta.unlink(missing_ok=True)
+                with self._upload_progress.lock:
+                    self._upload_progress.phase = "done"
+            except (zipfile.BadZipFile, ValueError) as exc:
+                with self._upload_progress.lock:
+                    self._upload_progress.phase = "error"
+                    self._upload_progress.error = f"ZIP konnte nicht verarbeitet werden: {exc}"
+            finally:
+                tmp_zip.unlink(missing_ok=True)
+                with self._upload_progress.lock:
+                    self._upload_progress.running = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _ha_import_context(self,
+        selected_ids: set[str] | None = None,
+        range_preset: str = "max",
+        date_from: str = "",
+        date_to: str = "",
+        availability: dict[str, ha_import.EntityAvailability] | None = None,
+        availability_error: str | None = None,
+        availability_checked: bool = False,
+    ) -> dict:
+        """Auswahlliste für den Home-Assistant-Import-Reiter — bewusst NICHT über
+        die HA-API entdeckt (/api/states), sondern self.deps.index.list_entities(): nur
+        Entitäten, die die HA-Integration bereits konfiguriert/gefiltert und
+        mindestens einmal live nach Zeitarchiv übertragen hat, stehen zur Wahl.
+        Eine zweite, unabhängige Entdeckung über die Core-API würde diese
+        Filterung umgehen und Entitäten anbieten, die der Nutzer in der
+        Integration bewusst ausgeschlossen hat. type_label/aggregation_type
+        kommen aus demselben Formatter wie die Entitäten-Übersicht
+        (_entities_table.html) — die Spalte "Typ" zeigt hier also Zeitarchivs
+        eigene Aggregationsklasse (Standard/Zähler/Schalter), nicht HAs
+        state_class. Die separate Spalte "Art"/"Verfügbar" (Rohhistorie vs.
+        keine Daten, Zeitraum, Punktanzahl) wird bewusst NICHT hier eager für
+        alle Zeilen mitgeladen, sondern erst durch den expliziten "Verfügbarkeit
+        prüfen"-Button (siehe /import/ha/availability) — sonst würde jeder
+        Aufruf dieser Seite automatisch N HA-Requests auslösen.
+        ha_available=False (rein lokale Prüfung, kein Netzwerk-Roundtrip) erlaubt
+        der Vorlage, vorab auf eine fehlende Supervisor-Umgebung hinzuweisen —
+        die Liste selbst bleibt trotzdem sichtbar, da sie keine HA-Verbindung
+        braucht."""
+        now = datetime.now(timezone.utc)
+        default_from = (now - timedelta(days=10)).strftime("%Y-%m-%d")
+        default_to = now.strftime("%Y-%m-%d")
+        ha_available = ha_import.token_available()
+        availability = availability or {}
+        entities = []
+        for row in self.deps.index.list_entities():
+            entity_id = row["entity_id"]
+            avail = availability.get(entity_id)
+            entities.append({
+                "entity_id": entity_id,
+                "friendly_name": row["friendly_name"] or entity_id,
+                "unit": row["unit"],
+                "aggregation_type": row["aggregation_type"],
+                "type_label": format_type(row["aggregation_type"]),
+                "has_data": avail.has_data if avail is not None else None,
+                "art_label": ("Rohhistorie" if avail.has_data else "Keine Rohhistorie") if avail is not None else None,
+                "available_label": self._ha_availability_label(avail) if avail is not None else None,
+            })
+        return {
+            "ha_available": ha_available,
+            "ha_error": None if ha_available else "Supervisor ist in dieser Umgebung nicht verfügbar",
+            "ha_entities": entities,
+            "ha_selected_ids": selected_ids or set(),
+            "ha_availability_checked": availability_checked,
+            "ha_availability_error": availability_error,
+            "ha_range_options": list(HA_RANGE_PRESETS.items()),
+            "ha_range_preset": range_preset if range_preset in HA_RANGE_PRESETS else "max",
+            "ha_date_from": date_from or default_from,
+            "ha_date_to": date_to or default_to,
+        }
+
+
+
+    def _run_import_background(self, 
+        mapped: list[tuple[symcon_import.SymconVariable, str, float]]
+    ) -> None:
+        """Startet Planung und Schreibvorgang komplett im Hintergrund-Thread, damit
+        /import/start sofort zurückkehrt — schon plan_import() liest für jede
+        Variable alle Rohdaten neu ein und kann bei vielen zugeordneten Variablen
+        spürbar dauern; würde das synchron vor der Antwort laufen, sähe der Import
+        bei genug Variablen ohne jede Rückmeldung erst nach einer Weile "fertig" aus."""
+        started_at = datetime.now(timezone.utc)
+        names = self._load_symcon_names()
+        try:
+            source_meta = json.loads(self.deps.symcon_source_meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            source_meta = {"filename": "Symcon-db-ZIP", "size_bytes": dir_size(self.deps.symcon_import_dir)}
+        target_units = {}
+        for _, target, _ in mapped:
+            entity = self.deps.index.get_entity(target)
+            target_units[target] = entity["unit"] if entity is not None else None
+        configuration = {
+            "settings_imported": bool(names),
+            "mappings": [
+                {
+                    "variable_id": variable.variable_id,
+                    "symcon_name": names.get(variable.variable_id, {}).get("name"),
+                    "symcon_parent": names.get(variable.variable_id, {}).get("parent"),
+                    "symcon_unit": names.get(variable.variable_id, {}).get("unit"),
+                    "entity_id": target,
+                    "target_unit": target_units[target],
+                    "factor": factor,
+                }
+                for variable, target, factor in mapped
+            ],
+        }
+
+        # Erst nach erfolgreicher Vorbereitung als laufend markieren. Schlägt z. B.
+        # das Auflösen einer Zielentität fehl, darf kein Phantom-Import im Status
+        # hängen bleiben, der alle weiteren Startversuche bis zum Neustart blockiert.
+        with self._import_progress.lock:
+            self._import_progress.started = True
+            self._import_progress.running = True
+            self._import_progress.phase = "planning"
+            self._import_progress.total_variables = len(mapped)
+            self._import_progress.planned_variables = 0
+            self._import_progress.total_months = 0
+            self._import_progress.done_months = 0
+            self._import_progress.rows_imported = 0
+            self._import_progress.current_variable = ""
+            self._import_progress.results = []
+            self._import_progress.errors = []
+
+        def worker() -> dict | None:
+            plans: list[tuple[symcon_import.SymconVariable, str, float]] = []
+            total_months = 0
+            for variable, target_entity_id, factor in mapped:
+                with self._import_progress.lock:
+                    self._import_progress.current_variable = variable.variable_id
+                try:
+                    plan = symcon_import.plan_import(
+                        self.deps.data_dir, self.deps.index, variable, target_entity_id, self.deps.tz, factor=factor
+                    )
+                    total_months += len(plan.months_to_import) + len(plan.months_to_merge)
+                except ValueError:
+                    pass  # scheitert gleich nochmal in der Import-Phase, landet dann in errors
+                plans.append((variable, target_entity_id, factor))
+                with self._import_progress.lock:
+                    self._import_progress.planned_variables += 1
+                    self._import_progress.total_months = total_months
+
+            with self._import_progress.lock:
+                self._import_progress.phase = "importing"
+                self._import_progress.current_variable = ""
+
+            for variable, target_entity_id, factor in plans:
+                with self._import_progress.lock:
+                    self._import_progress.current_variable = variable.variable_id
+
+                def on_month_done(label: str, row_count: int) -> None:
+                    with self._import_progress.lock:
+                        self._import_progress.done_months += 1
+                        self._import_progress.rows_imported += row_count
+
+                try:
+                    result = symcon_import.import_variable(
+                        self.deps.data_dir,
+                        self.deps.index,
+                        variable,
+                        target_entity_id,
+                        self.deps.tz,
+                        on_month_done=on_month_done,
+                        factor=factor,
+                    )
+                    with self._import_progress.lock:
+                        self._import_progress.results.append(result)
+                except ValueError:
+                    with self._import_progress.lock:
+                        self._import_progress.errors.append(
+                            f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden"
+                        )
+            return None
+
+        def coordinated_import_worker() -> None:
+            reconciliation_report = None
+            try:
+                with self._import_source_lock:
+                    with self.deps.coordinator.exclusive():
+                        worker()
+                        reconciliation_report = self.deps.run_storage_reconciliation(
+                            entity_ids=sorted({target for _, target, _ in mapped}), repair=True
+                        )
+            except Exception as exc:
+                logger.exception("Symcon-Import unerwartet fehlgeschlagen")
+                with self._import_progress.lock:
+                    self._import_progress.errors.append(f"Import abgebrochen: {exc}")
+            finally:
+                with self._import_progress.lock:
+                    results = [dataclasses.asdict(result) for result in self._import_progress.results]
+                    errors = list(self._import_progress.errors)
+                try:
+                    with self.deps.coordinator.exclusive():
+                        import_reports.create(
+                            self.deps.data_dir,
+                            source_type="symcon",
+                            started_at=started_at,
+                            source=source_meta,
+                            configuration=configuration,
+                            results=results,
+                            errors=errors,
+                            reconciliation=reconciliation_report,
+                        )
+                except Exception:
+                    logger.exception("Symcon-Importreport konnte nicht gespeichert werden")
+                finally:
+                    with self._import_progress.lock:
+                        self._import_progress.running = False
+
+        threading.Thread(target=coordinated_import_worker, daemon=True).start()
+
+
+
+    def _import_progress_context(self) -> dict:
+        with self._import_progress.lock:
+            phase = self._import_progress.phase
+            total_vars = self._import_progress.total_variables
+            planned_vars = self._import_progress.planned_variables
+            total_months = self._import_progress.total_months
+            done_months = self._import_progress.done_months
+            if phase == "planning":
+                percent = int(planned_vars / total_vars * 100) if total_vars else 0
+            else:
+                percent = int(done_months / total_months * 100) if total_months else 100
+            return {
+                "running": self._import_progress.running,
+                "phase": phase,
+                "total_variables": total_vars,
+                "planned_variables": planned_vars,
+                "total_months": total_months,
+                "done_months": done_months,
+                "percent": percent,
+                "rows_imported": format_int(self._import_progress.rows_imported),
+                "current_variable": self._import_progress.current_variable,
+                "results": list(self._import_progress.results),
+                "errors": list(self._import_progress.errors),
+            }
+
+
+
+    def _mapped_variables(self, form) -> list[tuple[symcon_import.SymconVariable, str, float]]:
+        """Liest die map_<id>-Felder aus dem Formular und löst sie gegen die aktuell
+        gescannten Variablen auf — "" und "__ignore__" heißen beide "überspringen".
+        Nutzt den Scan-Cache (siehe _import_page_context) statt bei jedem Dry-Run-/
+        Import-Klick neu zu scannen."""
+        variables = {v.variable_id: v for v in self._cached_variables()}
+        mapped = []
+        for key, value in form.multi_items():
+            if not key.startswith("map_"):
+                continue
+            target_entity_id = str(value).strip()
+            if not target_entity_id or target_entity_id == "__ignore__":
+                continue
+            variable_id = key[len("map_") :]
+            variable = variables.get(variable_id)
+            if variable is None or not variable.readable:
+                continue
+            raw_factor = str(form.get(f"factor_{variable_id}", "1"))
+            try:
+                factor = parse_localized_number(raw_factor)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"
+                ) from exc
+            if not math.isfinite(factor) or factor == 0 or abs(factor) > 1_000_000_000_000:
+                raise HTTPException(
+                    status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"
+                )
+            mapped.append((variable, target_entity_id, factor))
+        return mapped
+
+
+
+    def _csv_uploaded_path(self) -> Path | None:
+        if not self.deps.csv_import_dir.exists():
+            return None
+        files = sorted(p for p in self.deps.csv_import_dir.iterdir() if p.is_file())
+        return files[0] if files else None
+
+
+
+    def _csv_import_context(self, 
+        delimiter: str | None = None,
+        has_header: bool | None = None,
+        ts_col: int | None = None,
+        value_col: int | None = None,
+        ts_format: str = "unix_s",
+        custom_pattern: str = "",
+        entity_id: str = "",
+    ) -> dict:
+        entity_options = [
+            (row["entity_id"], row["friendly_name"] or row["entity_id"], row["unit"] or "")
+            for row in self.deps.index.list_entities()
+        ]
+        base = {
+            "entity_options": entity_options,
+            "delimiter_options": list(csv_import.DELIMITERS.items()),
+            "ts_format_options": list(csv_import.TIMESTAMP_FORMATS.items()),
+        }
+        path = self._csv_uploaded_path()
+        if path is None:
+            return {**base, "csv_uploaded": False}
+
+        # Nur beim allerersten Aufruf nach einem Upload wird geraten (delimiter/
+        # has_header noch None) — sobald die Vorschau-Form einmal abgeschickt wurde,
+        # gilt immer der explizit übergebene Wert, nie wieder die Schätzung.
+        resolved_delimiter = delimiter if delimiter else csv_import.sniff_delimiter(path)
+        resolved_has_header = (
+            csv_import.sniff_has_header(path, resolved_delimiter) if has_header is None else has_header
+        )
+        prev = csv_import.preview(path, resolved_delimiter, resolved_has_header)
+        default_value_col = 1 if len(prev.columns) > 1 else 0
+        return {
+            **base,
+            "csv_uploaded": True,
+            "csv_filename": path.name,
+            "delimiter": resolved_delimiter,
+            "has_header": resolved_has_header,
+            "columns": prev.columns,
+            "sample_rows": prev.sample_rows,
+            "total_lines": prev.total_lines,
+            "ts_col": ts_col if ts_col is not None else 0,
+            "value_col": value_col if value_col is not None else default_value_col,
+            "ts_format": ts_format,
+            "custom_pattern": custom_pattern,
+            "entity_id": entity_id,
+        }
+
+
+
+    def _csv_form_params(self, form) -> tuple[str, bool, int, int, str, str, str]:
+        delimiter = str(form.get("delimiter") or ",")
+        has_header = form.get("has_header") == "on"
+        try:
+            ts_col = int(form.get("ts_col", 0))
+        except (TypeError, ValueError):
+            ts_col = 0
+        try:
+            value_col = int(form.get("value_col", 0))
+        except (TypeError, ValueError):
+            value_col = 0
+        ts_format = str(form.get("ts_format") or "unix_s")
+        custom_pattern = str(form.get("custom_pattern") or "")
+        entity_id = str(form.get("entity_id") or "").strip()
+        return delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id
+
+
+
+    def _ha_form_params(self, form) -> tuple[list[str], str, str, str]:
+        entity_ids = [str(v).strip() for v in form.getlist("entity_ids") if str(v).strip()]
+        range_preset = str(form.get("range_preset") or "max")
+        if range_preset not in HA_RANGE_PRESETS:
+            range_preset = "max"
+        date_from = str(form.get("date_from") or "")
+        date_to = str(form.get("date_to") or "")
+        return entity_ids, range_preset, date_from, date_to
+
+
+
+    def _known_ha_entity_ids(self, entity_ids: list[str]) -> tuple[list[str], list[str]]:
+        """Nur Entitäten, die bereits in Zeitarchiv bekannt sind (siehe Modul-
+        Docstring oben) — trennt bewusst zwischen bekannt/unbekannt, statt eine
+        unbekannte ID erst beim Planen/Schreiben generisch scheitern zu lassen."""
+        known, unknown = [], []
+        for entity_id in entity_ids:
+            (known if self.deps.index.get_entity(entity_id) is not None else unknown).append(entity_id)
+        return known, unknown
+
+
+
+    def _ha_date_range(self, range_preset: str, date_from: str, date_to: str) -> tuple[datetime, datetime]:
+        """Löst die gewählte Zeitraum-Voreinstellung (HA_RANGE_PRESETS) in ein
+        UTC-Zeitfenster auf. Nur "custom" liest date_from/date_to aus dem
+        Formular — date_to ist dabei inklusiv gemeint, deshalb +1 Tag als
+        Fensterende; nie über "jetzt" hinaus."""
+        now = datetime.now(timezone.utc)
+        if range_preset == "max":
+            return now - timedelta(days=HA_MAX_RANGE_DAYS), now
+        if range_preset in HA_RANGE_PRESET_DAYS:
+            return now - timedelta(days=HA_RANGE_PRESET_DAYS[range_preset]), now
+        try:
+            start = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            start = now - timedelta(days=10)
+        try:
+            end = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+        except ValueError:
+            end = now
+        end = min(end, now)
+        if end <= start:
+            end = start + timedelta(days=1)
+        return start, end
+
+
+
+    def _ha_available_label(self, history: ha_import.HistoryFetchResult) -> str:
+        """Beschreibt, was tatsächlich in HA gefunden wurde — rows ist nach
+        fetch_history_rows() aufsteigend sortiert, der erste/letzte Eintrag ist
+        also der älteste/neueste tatsächlich abgerufene Messpunkt (nicht der
+        angefragte Zeitraum, der ja über das hinausgehen kann, was HA noch
+        vorhält)."""
+        if not history.rows:
+            return "Keine Rohhistorie im gewählten Zeitraum gefunden"
+        first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
+        return (
+            f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
+            f"{format_int(len(history.rows))} Punkte"
+        )
+
+
+
+    def _ha_availability_label(self, avail: ha_import.EntityAvailability) -> str:
+        """Kurzform für die Auswahltabelle — Pendant zu _ha_available_label()
+        oben, nur auf Basis der gebündelten Verfügbarkeitsprüfung
+        (EntityAvailability: first_ts/last_ts/count) statt bereits
+        eingelesener Zeilen."""
+        if not avail.has_data:
+            return "Keine Rohhistorie im gewählten Zeitraum"
+        return (
+            f"{format_timestamp(avail.first_ts, self.deps.tz)} – {format_timestamp(avail.last_ts, self.deps.tz)} · "
+            f"{format_int(avail.count)} Punkte"
+        )
+
+
+    def _fetch_ha_history(self,
+        entity_ids: list[str], start: datetime, end: datetime
+    ) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
+        """Netzwerkteil komplett außerhalb jeder Datei-/Indexsperre (Konzept
+        "Offene Punkte" zu HA-Import: Sperren dürfen nicht unter einem
+        HTTP-Roundtrip zur HA-Instanz stehen) — wird per run_in_threadpool
+        aufgerufen, danach folgt die eigentliche Planung/Schreibphase gesperrt.
+        Domain kommt aus der Entitäts-ID selbst (Konvention wie überall sonst im
+        Addon, z. B. ingestion.py) — kein zusätzlicher /api/states-Aufruf nötig,
+        da nur bereits bekannte Zeitarchiv-Entitäten hier ankommen."""
+        fetched: dict[str, ha_import.HistoryFetchResult] = {}
+        errors: list[str] = []
+        for entity_id in entity_ids:
+            domain = entity_id.split(".", 1)[0]
+            try:
+                fetched[entity_id] = ha_import.fetch_history_rows(entity_id, domain, start, end)
+            except (ha_import.HaApiError, ValueError) as exc:
+                errors.append(f"{entity_id}: {exc}")
+        return fetched, errors
+
+
+    def _fetch_ha_availability(
+        self, entity_ids: list[str], start: datetime, end: datetime
+    ) -> tuple[dict[str, ha_import.EntityAvailability], str | None]:
+        """Wie _fetch_ha_history(), aber für die gebündelte Verfügbarkeits-
+        Vorschau (EIN bis wenige Requests für ALLE übergebenen Entitäten
+        zusammen, siehe ha_import.fetch_availability) statt Rohdaten für den
+        tatsächlichen Import. Ein einzelner HaApiError betrifft hier immer
+        den gesamten Batch (nicht pro Entität wie bei _fetch_ha_history), da
+        mehrere Entitäten dieselbe HTTP-Anfrage teilen."""
+        domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
+        try:
+            return ha_import.fetch_availability(domains, start, end), None
+        except ha_import.HaApiError as exc:
+            return {}, str(exc)
+
+
+
+
+    def router(self) -> APIRouter:
+        router = APIRouter()
+
+        @router.get("/import", response_class=HTMLResponse)
+        def import_page(
+            request: Request,
+            tab: str = "symcon",
+            source: str = "all",
+            status: str = "all",
+            search: str = "",
+            date_from: str = "",
+            date_to: str = "",
+            sort: str = "finished_at",
+            dir: str = "desc",
+            page: int = 1,
+            page_size: int = 50,
+        ) -> HTMLResponse:
+            """Symcon-Import-Assistent (Konzept Abschnitt 03) — der db-Ordner kommt als
+            ZIP-Upload über die Oberfläche (kein Bind-Mount mehr nötig), entpackt unter
+            self.deps.symcon_import_dir und bleibt dort liegen, bis er explizit über /import/delete
+            entfernt wird. Keine Klarnamen im Ordner, deshalb Werte-Vorschau statt
+            Namensvorschlägen; Zuordnung per Dropdown.
+
+            Trifft der Aufruf auf bereits entpackte Daten, für die der In-Memory-Cache
+            (noch) leer ist — z. B. direkt nach einem Server-Neustart, der ihn immer
+            leert —, wird zuerst der auf Platte gesicherte Scan aus einem früheren
+            Lauf geladen (schnell, synchron, kein erneutes Einlesen des ganzen
+            Symcon-Ordners nötig). Nur wenn auch keine Cache-Datei vorliegt (z. B.
+            wirklich der erste Scan), läuft der eigentliche Scan im Hintergrund und
+            die Seite zeigt bis dahin dieselbe Fortschrittsanzeige wie nach einem
+            Upload — synchron würde das bei einem großen Export die Seite für die
+            volle Scan-Dauer blockieren."""
+            active_tab = tab if tab in {"symcon", "csv", "ha", "reports"} else "symcon"
+            common_context = {
+                "active_import_tab": active_tab,
+                **self.deps.reports_context(source, status, search, date_from, date_to, sort, dir, page, page_size),
+                # Wie _csv_import_context() bei jedem /import-Aufruf geladen — die
+                # Auswahlliste kommt aus index.list_entities() (reiner DB-Read),
+                # keine HA-API-Anfrage nötig (siehe _ha_import_context()).
+                **self._ha_import_context(),
+            }
+            source_exists = self.deps.symcon_import_dir.exists() and any(self.deps.symcon_import_dir.iterdir())
+            if source_exists:
+                with self._scan_cache.lock:
+                    cached = self._scan_cache.variables is not None
+                if not cached:
+                    from_disk = self._load_scan_cache()
+                    if from_disk is not None:
+                        with self._scan_cache.lock:
+                            self._scan_cache.variables = from_disk
+                        cached = True
+                if not cached:
+                    with self._upload_progress.lock:
+                        already_running = self._upload_progress.running
+                    if not already_running:
+                        self._run_scan_background()
+                    return self.deps.templates.TemplateResponse(
+                        request,
+                        "import.html",
+                        {
+                            "scanning": True,
+                            "source_exists": True,
+                            "rows": [],
+                            "entity_options": [],
+                            "settings_imported": bool(self._load_symcon_names()),
+                            **self._csv_import_context(),
+                            **common_context,
+                        },
+                    )
+            return self.deps.templates.TemplateResponse(
+                request,
+                "import.html",
+                {**self._import_page_context(), **self._csv_import_context(), **common_context},
+            )
+
+
+
+        @router.post("/import/upload")
+        async def import_upload(file: UploadFile = File(...)) -> dict:
+            """Nimmt das hochgeladene ZIP entgegen (der Byte-Transfer selbst zeigt über
+            XHR-Upload-Events schon Fortschritt in import.html) und startet Entpacken +
+            Scannen im Hintergrund — /import/upload-progress liefert von dort an den
+            Fortschritt, damit ein ZIP mit tausenden Dateien nicht wie ein Hänger
+            aussieht, während der Server noch beschäftigt ist."""
+            if not file.filename or not file.filename.lower().endswith(".zip"):
+                raise HTTPException(status_code=400, detail="Bitte eine ZIP-Datei hochladen")
+            with self._import_admission_lock:
+                with self._upload_progress.lock:
+                    upload_running = self._upload_progress.running
+                with self._import_progress.lock:
+                    import_running = self._import_progress.running
+                if upload_running or import_running:
+                    raise HTTPException(status_code=409, detail="Ein Upload, Scan oder Import läuft bereits")
+                with self._upload_progress.lock:
+                    self._upload_progress.running = True
+                    self._upload_progress.phase = "receiving"
+            tmp_zip = self.deps.data_dir / "_symcon_upload.zip"
+            try:
+                await run_in_threadpool(
+                    copy_upload_limited, file.file, tmp_zip, MAX_ZIP_UPLOAD_BYTES
+                )
+            except UploadLimitExceeded as exc:
+                with self._upload_progress.lock:
+                    self._upload_progress.running = False
+                    self._upload_progress.phase = "error"
+                    self._upload_progress.error = str(exc)
+                raise HTTPException(status_code=413, detail=str(exc)) from exc
+            except Exception:
+                with self._upload_progress.lock:
+                    self._upload_progress.running = False
+                    self._upload_progress.phase = "error"
+                raise
+            with self._scan_cache.lock:
+                self._scan_cache.variables = None  # Ein neuer Upload macht den bisherigen Cache ungültig.
+            logger.info("Symcon-ZIP empfangen · Größe=%s", format_size(tmp_zip.stat().st_size))
+            self._run_upload_background(
+                tmp_zip,
+                {"filename": Path(file.filename).name, "size_bytes": tmp_zip.stat().st_size},
+            )
+            return {"ok": True}
+
+
+
+        @router.get("/import/upload-progress")
+        def import_upload_progress() -> dict:
+            """Wird per fetch()-Polling aus import.html aufgerufen, solange Entpacken/
+            Scannen im Hintergrund läuft (Konzept Abschnitt 04)."""
+            with self._upload_progress.lock:
+                return {
+                    "running": self._upload_progress.running,
+                    "phase": self._upload_progress.phase,
+                    "done": self._upload_progress.done,
+                    "total": self._upload_progress.total,
+                    "error": self._upload_progress.error,
+                }
+
+
+
+        @router.post("/import/settings-upload")
+        async def import_settings_upload(file: UploadFile = File(...)) -> dict:
+            """Optionaler Zusatz-Upload zum db-ZIP: Symcons settings.json (Objektbaum-
+            Export) liefert Klarnamen je Variablen-ID (Konzept "Offene Punkte") — rein
+            informativ für die Namensspalte im Import-Assistenten, ändert an Zuordnung/
+            Import selbst nichts. Anders als der ZIP-Upload synchron: settings.json ist
+            reiner JSON-Text, das Parsen dauert auch bei großen Symcon-Installationen
+            nur Millisekunden, eine Fortschrittsanzeige wäre hier unnötige Komplexität."""
+            if not file.filename or not file.filename.lower().endswith(".json"):
+                raise HTTPException(status_code=400, detail="Bitte eine JSON-Datei hochladen")
+            tmp_json = self.deps.data_dir / "_symcon_settings_upload.json"
+            try:
+                await run_in_threadpool(
+                    copy_upload_limited,
+                    file.file,
+                    tmp_json,
+                    MAX_SETTINGS_UPLOAD_BYTES,
+                )
+                raw = await run_in_threadpool(tmp_json.read_bytes)
+            except UploadLimitExceeded as exc:
+                raise HTTPException(status_code=413, detail=str(exc)) from exc
+            finally:
+                tmp_json.unlink(missing_ok=True)
+            try:
+                names = symcon_import.extract_variable_names(raw)
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=400, detail=f"Ungültiges JSON: {exc}") from exc
+            if not names:
+                raise HTTPException(
+                    status_code=400, detail="Keine Variablen-Namen gefunden — ist das wirklich die settings.json?"
+                )
+            def store_names() -> None:
+                with self._import_source_lock:
+                    with self.deps.coordinator.exclusive():
+                        self.deps.data_dir.mkdir(parents=True, exist_ok=True)
+                        tmp_names = self.deps.symcon_names_path.with_suffix(".json.part")
+                        try:
+                            with tmp_names.open("w", encoding="utf-8") as f:
+                                json.dump(names, f)
+                            tmp_names.replace(self.deps.symcon_names_path)
+                        finally:
+                            tmp_names.unlink(missing_ok=True)
+
+            await run_in_threadpool(store_names)
+            return {"ok": True, "count": len(names)}
+
+
+
+        @router.post("/import/delete", response_class=RedirectResponse)
+        def import_delete(request: Request) -> RedirectResponse:
+            """Entfernt die entpackten Symcon-Daten wieder (Konzept Abschnitt 03: bleiben
+            sonst erhalten, damit Zuordnung/Dry Run beliebig oft wiederholbar sind, ohne
+            jedes Mal neu hochladen zu müssen) — inklusive der aus einer settings.json
+            abgeleiteten Namens-Zuordnung (Konzept "Offene Punkte"), falls eine
+            importiert wurde: "Daten löschen" ist der bewusste, komplette Reset für
+            diese Import-Sitzung, nicht nur für den db-Ordner."""
+            with self._import_source_lock:
+                with self.deps.coordinator.exclusive():
+                    symcon_import.delete_source(self.deps.symcon_import_dir)
+                    self.deps.symcon_names_path.unlink(missing_ok=True)
+                    self.deps.symcon_source_meta_path.unlink(missing_ok=True)
+                    self.deps.symcon_scan_cache_path.unlink(missing_ok=True)
+                    with self._scan_cache.lock:
+                        self._scan_cache.variables = None
+            # Post/Redirect/Get: Die vollständige Importseite darf nicht direkt unter
+            # /import/delete gerendert werden. Ihre relativen CSS-/JS-Pfade würden dort
+            # zu /import/static/... aufgelöst und ein Reload würde den Lösch-POST erneut
+            # absenden. app_root berücksichtigt dabei Home Assistants Ingress-Präfix.
+            app_root = self.deps.app_root_context(request)["app_root"]
+            return RedirectResponse(url=f"{app_root}/import", status_code=303)
+
+
+
+        @router.post("/import/dry-run", response_class=HTMLResponse)
+        async def import_dry_run(request: Request) -> HTMLResponse:
+            """Vorschau ohne Schreibvorgang (Konzept Abschnitt 03) — beliebig oft
+            wiederholbar, z. B. nach einer geänderten Zuordnung."""
+            form = await request.form()
+            def plan_locked():
+                with self._import_source_lock:
+                    mapped = self._mapped_variables(form)
+                    with self.deps.coordinator.entities([target for _, target, _ in mapped]):
+                        plans = []
+                        errors = []
+                        for variable, target_entity_id, factor in mapped:
+                            try:
+                                plans.append(
+                                    symcon_import.plan_import(
+                                        self.deps.data_dir,
+                                        self.deps.index,
+                                        variable,
+                                        target_entity_id,
+                                        self.deps.tz,
+                                        factor=factor,
+                                    )
+                                )
+                            except ValueError:
+                                errors.append(f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden")
+                        return plans, errors
+
+            plans, errors = await run_in_threadpool(plan_locked)
+            return self.deps.templates.TemplateResponse(
+                request, "_import_dry_run.html", {"plans": plans, "errors": errors}
+            )
+
+
+
+        @router.post("/import/start", response_class=HTMLResponse)
+        async def import_start(request: Request) -> HTMLResponse:
+            """Startet den Import der zugeordneten Variablen im Hintergrund (Konzept
+            Abschnitt 04) und liefert sofort die Fortschrittsanzeige zurück, statt auf
+            den kompletten Schreibvorgang zu warten — bei hunderten Monaten und
+            Millionen Zeilen kann das sonst minutenlang blockieren. Nie destruktiv:
+            import_variable() überspringt jeden Monat, der mit bereits vorhandenen
+            Zeitarchiv-Daten überlappt oder für den schon eine Archivdatei existiert,
+            statt sie zu überschreiben. Dieselbe Klassifizierung wie /import/dry-run,
+            damit Vorschau und Ergebnis nie auseinanderlaufen."""
+            form = await request.form()
+            def admit_import() -> None:
+                with self._import_admission_lock:
+                    with self._upload_progress.lock:
+                        upload_running = self._upload_progress.running
+                    with self._import_progress.lock:
+                        already_running = self._import_progress.running
+                    if upload_running:
+                        raise HTTPException(status_code=409, detail="Ein Upload oder Scan läuft bereits")
+                    if not already_running:
+                        with self._import_source_lock:
+                            self._run_import_background(self._mapped_variables(form))
+
+            await run_in_threadpool(admit_import)
+            return self.deps.templates.TemplateResponse(request, "self._import_progress.html", self._import_progress_context())
+
+
+
+        @router.get("/import/progress", response_class=HTMLResponse)
+        def import_progress(request: Request) -> HTMLResponse:
+            """Wird per htmx-Polling alle 500ms aufgerufen, solange der Hintergrund-
+            Import läuft (Konzept Abschnitt 04) — liefert entweder die Fortschritts-
+            anzeige (löst weiteres Polling aus) oder, sobald fertig, das Endergebnis
+            ohne hx-trigger, was das Polling automatisch stoppt."""
+            with self._import_progress.lock:
+                started = self._import_progress.started
+            ctx = self._import_progress_context()
+            if not started:
+                return HTMLResponse("")
+            if ctx["running"]:
+                return self.deps.templates.TemplateResponse(request, "self._import_progress.html", ctx)
+            return self.deps.templates.TemplateResponse(request, "_import_result.html", ctx)
+
+
+        # ---------------------------------------------------------------------------
+        # Eigener CSV-Import (Konzept "Offene Punkte") — bewusst als eigener, klar
+        # abgetrennter Abschnitt: eine Datei, freie Spalten-/Format-Zuordnung, ein
+        # Ziel-Entität, ganz anders im Ablauf als der Symcon-Assistent oben, auch wenn
+        # beide dieselbe nie-destruktive Monats-Klassifizierung teilen
+        # (symcon_import.plan_import_rows()/import_rows()).
+        # ---------------------------------------------------------------------------
+
+
+
+        @router.post("/import/csv/upload", response_class=HTMLResponse)
+        async def import_csv_upload(request: Request, file: UploadFile = File(...)) -> HTMLResponse:
+            """Reiner Byte-Upload, keine Hintergrund-Verarbeitung nötig (anders als der
+            Symcon-ZIP): eine einzelne CSV-Datei ist klein genug, dass Speichern +
+            Trennzeichen-/Kopfzeilen-Schätzung synchron passieren können, ohne wie ein
+            Hänger zu wirken — läuft deshalb direkt als htmx-Multipart-Post, keine
+            eigene XHR-Fortschrittsanzeige wie beim (potenziell riesigen) Symcon-ZIP."""
+            if not file.filename or not file.filename.lower().endswith(".csv"):
+                raise HTTPException(status_code=400, detail="Bitte eine CSV-Datei hochladen")
+            staging = self.deps.data_dir / "_csv_upload"
+            try:
+                await run_in_threadpool(
+                    copy_upload_limited, file.file, staging, MAX_CSV_UPLOAD_BYTES
+                )
+            except UploadLimitExceeded as exc:
+                raise HTTPException(status_code=413, detail=str(exc)) from exc
+            def install_staging() -> None:
+                with self.deps.coordinator.exclusive():
+                    if self.deps.csv_import_dir.exists():
+                        shutil.rmtree(self.deps.csv_import_dir)
+                    self.deps.csv_import_dir.mkdir(parents=True, exist_ok=True)
+                    # .name statt des rohen Dateinamens: derselbe Zip-Slip-Vorsichtsgedanke
+                    # wie bei extract_zip() — Upload-Dateinamen sind nicht vertrauenswürdig.
+                    dest = self.deps.csv_import_dir / Path(file.filename).name
+                    staging.replace(dest)
+
+            try:
+                await run_in_threadpool(install_staging)
+            finally:
+                staging.unlink(missing_ok=True)
+            installed_csv = next(self.deps.csv_import_dir.iterdir(), None)
+            logger.info(
+                "CSV-Datei empfangen · Größe=%s",
+                format_size(installed_csv.stat().st_size) if installed_csv and installed_csv.is_file() else "—",
+            )
+            return self.deps.templates.TemplateResponse(request, "_csv_import_section.html", self._csv_import_context())
+
+
+
+        @router.post("/import/csv/delete", response_class=HTMLResponse)
+        def import_csv_delete(request: Request) -> HTMLResponse:
+            with self.deps.coordinator.exclusive():
+                if self.deps.csv_import_dir.exists():
+                    shutil.rmtree(self.deps.csv_import_dir)
+            return self.deps.templates.TemplateResponse(request, "_csv_import_section.html", self._csv_import_context())
+
+
+
+        @router.post("/import/csv/preview", response_class=HTMLResponse)
+        async def import_csv_preview(request: Request) -> HTMLResponse:
+            """Aktualisiert Spalten-Vorschau + Auswahlfelder live, wenn Trennzeichen/
+            Kopfzeile/Format geändert werden — vor dem eigentlichen Dry Run/Import,
+            damit die Spaltenzuordnung sichtbar richtig sitzt, bevor irgendetwas
+            gelesen/geschrieben wird."""
+            form = await request.form()
+            delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
+            def preview_locked() -> dict:
+                with self.deps.coordinator.exclusive():
+                    return self._csv_import_context(
+                        delimiter=delimiter,
+                        has_header=has_header,
+                        ts_col=ts_col,
+                        value_col=value_col,
+                        ts_format=ts_format,
+                        custom_pattern=custom_pattern,
+                        entity_id=entity_id,
+                    )
+
+            ctx = await run_in_threadpool(preview_locked)
+            return self.deps.templates.TemplateResponse(request, "_csv_import_section.html", ctx)
+
+
+
+        @router.post("/import/csv/dry-run", response_class=HTMLResponse)
+        async def import_csv_dry_run(request: Request) -> HTMLResponse:
+            """Vorschau ohne Schreibvorgang — reicht dieselbe ImportPlan-Vorlage wie
+            der Symcon-Import (_import_dry_run.html), da plan_import_rows() dieselbe
+            generische ImportPlan-Struktur zurückgibt."""
+            form = await request.form()
+            delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
+            plans: list[symcon_import.ImportPlan] = []
+            errors: list[str] = []
+            if not entity_id:
+                errors.append("Bitte eine Ziel-Entität auswählen.")
+            else:
+                def plan_csv_locked():
+                    with self.deps.coordinator.entity(entity_id):
+                        path = self._csv_uploaded_path()
+                        if path is None:
+                            return None
+                        parsed = csv_import.parse_rows(
+                            path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz
+                        )
+                        return symcon_import.plan_import_rows(
+                            self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
+                            source_label=path.name, skipped_rows=parsed.skipped
+                        )
+
+                try:
+                    plan = await run_in_threadpool(plan_csv_locked)
+                    if plan is None:
+                        errors.append("Keine CSV-Datei hochgeladen.")
+                    else:
+                        plans.append(plan)
+                except ValueError as exc:
+                    errors.append(str(exc))
+            return self.deps.templates.TemplateResponse(request, "_import_dry_run.html", {"plans": plans, "errors": errors})
+
+
+
+        @router.post("/import/csv/start", response_class=HTMLResponse)
+        async def import_csv_start(request: Request) -> HTMLResponse:
+            """Schreibt synchron (anders als der Symcon-Import kein Hintergrund-Thread
+            nötig): eine einzelne Datei/Entität ist vom Umfang her vergleichbar mit
+            EINER Symcon-Variable, für die der Symcon-Import ebenfalls ohne spürbare
+            Verzögerung durchläuft. Nie destruktiv — dieselbe Monats-Klassifizierung
+            (import_rows()) wie beim Symcon-Import, derselbe Dry-Run vorher möglich."""
+            started_at = datetime.now(timezone.utc)
+            form = await request.form()
+            delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
+            results: list[symcon_import.ImportResult] = []
+            errors: list[str] = []
+            reconciliation_report = None
+            source_path = self._csv_uploaded_path()
+            if not entity_id:
+                errors.append("Bitte eine Ziel-Entität auswählen.")
+            else:
+                def execute_csv_import():
+                    with self.deps.coordinator.exclusive():
+                        path = self._csv_uploaded_path()
+                        if path is None:
+                            raise ValueError("Keine CSV-Datei hochgeladen.")
+                        parsed = csv_import.parse_rows(
+                            path,
+                            delimiter,
+                            has_header,
+                            ts_col,
+                            value_col,
+                            ts_format,
+                            custom_pattern,
+                            self.deps.tz,
+                        )
+                        result = symcon_import.import_rows(
+                            self.deps.data_dir,
+                            self.deps.index,
+                            parsed.rows,
+                            entity_id,
+                            self.deps.tz,
+                            source_label=path.name,
+                            skipped_rows=parsed.skipped,
+                        )
+                        reconciliation = self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)
+                        return result, reconciliation
+
+                try:
+                    result, reconciliation_report = await run_in_threadpool(execute_csv_import)
+                    results.append(result)
+                except ValueError as exc:
+                    errors.append(str(exc))
+                except Exception as exc:
+                    logger.exception("CSV-Import unerwartet fehlgeschlagen")
+                    errors.append(f"Import abgebrochen: {exc}")
+            try:
+                with self.deps.coordinator.exclusive():
+                    import_reports.create(
+                        self.deps.data_dir,
+                        source_type="csv",
+                        started_at=started_at,
+                        source={
+                            "filename": source_path.name if source_path else None,
+                            "size_bytes": source_path.stat().st_size if source_path and source_path.is_file() else 0,
+                        },
+                        configuration={
+                            "delimiter": delimiter,
+                            "has_header": has_header,
+                            "timestamp_column": ts_col,
+                            "value_column": value_col,
+                            "timestamp_format": ts_format,
+                            "custom_pattern": custom_pattern if ts_format == "custom" else "",
+                            "entity_id": entity_id,
+                        },
+                        results=[dataclasses.asdict(result) for result in results],
+                        errors=errors,
+                        reconciliation=reconciliation_report,
+                    )
+            except Exception:
+                logger.exception("CSV-Importreport konnte nicht gespeichert werden")
+            return self.deps.templates.TemplateResponse(request, "_import_result.html", {"results": results, "errors": errors})
+
+
+        # ---------------------------------------------------------------------------
+        # Home-Assistant-Import (Rohhistorie direkt über die HA-Core-API, siehe
+        # storage/ha_import.py) — kein Datei-Upload, Quelle und Ziel sind dieselbe
+        # Entitäts-ID. Teilt sich wie der CSV-Import die generische Monats-
+        # Klassifizierung mit dem Symcon-Import (plan_import_rows()/import_rows()).
+        # Anders als bei Symcon/CSV muss die Ziel-Entität hier NICHT frei wählbar
+        # sein: zur Auswahl stehen ausschließlich bereits in Zeitarchiv bekannte
+        # Entitäten (index.list_entities(), siehe _ha_import_context()) — die HA-
+        # Integration hat sie bereits konfiguriert/gefiltert, ein eigener
+        # Entdeckungs-/Anlage-Mechanismus über die Core-API würde diese Filterung
+        # umgehen. Ein trotzdem übermittelter unbekannter entity_id-Wert wird
+        # verworfen, statt eine neue Entität anzulegen.
+        # ---------------------------------------------------------------------------
+
+
+
+        @router.post("/import/ha/availability", response_class=HTMLResponse)
+        async def import_ha_availability(request: Request) -> HTMLResponse:
+            """Gebündelte Verfügbarkeits-Vorschau für die Auswahltabelle
+            ("Art"/"Verfügbar"-Spalten) — bewusst ein eigener, expliziter
+            Button-Klick statt eines automatischen Ladens beim Öffnen des
+            Reiters oder bei jedem Zeitraum-Wechsel: sonst würde jeder
+            Seitenaufruf automatisch HA-Requests auslösen (siehe
+            _ha_import_context()-Docstring). check_entity_ids kommt aus
+            versteckten, IMMER mitgesendeten Feldern je Zeile (anders als
+            entity_ids, das nur die angehakten Checkboxen enthält) — geprüft
+            wird also die komplette sichtbare Liste, unabhängig von der
+            aktuellen Auswahl. Rendert dieselbe _ha_import_section.html neu
+            (komplettes outerHTML-Swap, wie auch die CSV-Sektion bei
+            Steuerungsänderungen) und reicht die aktuell angehakten
+            entity_ids als ha_selected_ids durch, damit die Auswahl beim
+            Neuzeichnen erhalten bleibt."""
+            form = await request.form()
+            check_entity_ids = [str(v).strip() for v in form.getlist("check_entity_ids") if str(v).strip()]
+            selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            known_ids, _unknown_ids = self._known_ha_entity_ids(check_entity_ids)
+            availability: dict[str, ha_import.EntityAvailability] = {}
+            availability_error: str | None = None
+            if known_ids:
+                start, end = self._ha_date_range(range_preset, date_from, date_to)
+                availability, availability_error = await run_in_threadpool(
+                    self._fetch_ha_availability, known_ids, start, end
+                )
+            return self.deps.templates.TemplateResponse(
+                request, "_ha_import_section.html",
+                self._ha_import_context(
+                    selected_ids=set(selected_ids), range_preset=range_preset,
+                    date_from=date_from, date_to=date_to,
+                    availability=availability, availability_error=availability_error,
+                    availability_checked=True,
+                ),
+            )
+
+
+        @router.post("/import/ha/dry-run", response_class=HTMLResponse)
+        async def import_ha_dry_run(request: Request) -> HTMLResponse:
+            """Vorschau ohne Schreibvorgang — eigene Vorlage (_ha_import_dry_run.html)
+            statt der mit Symcon/CSV geteilten _import_dry_run.html: zeigt zusätzlich
+            den tatsächlich in HA gefundenen Zeitraum/Punkteanzahl je Entität, was nur
+            beim HA-Import überhaupt einen Sinn ergibt (Symcon/CSV kennen ihre Quelle
+            vollständig, ohne HAs begrenzte Recorder-Aufbewahrung)."""
+            form = await request.form()
+            raw_entity_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
+            items: list[dict] = []
+            errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            if not entity_ids:
+                if not unknown_ids:
+                    errors.append("Bitte mindestens eine Entität auswählen.")
+                return self.deps.templates.TemplateResponse(request, "_ha_import_dry_run.html", {"items": items, "errors": errors})
+
+            start, end = self._ha_date_range(range_preset, date_from, date_to)
+            fetched, fetch_errors = await run_in_threadpool(self._fetch_ha_history, entity_ids, start, end)
+            errors.extend(fetch_errors)
+
+            def plan_locked() -> list[dict]:
+                with self.deps.coordinator.entities(list(fetched.keys())):
+                    result = []
+                    for entity_id, history in fetched.items():
+                        entity = self.deps.index.get_entity(entity_id)
+                        try:
+                            plan = symcon_import.plan_import_rows(
+                                self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
+                                source_label=entity_id, skipped_rows=history.skipped,
+                            )
+                        except ValueError as exc:
+                            errors.append(f"{entity_id}: {exc}")
+                            continue
+                        result.append({
+                            "entity_id": entity_id,
+                            "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                            "available_label": self._ha_available_label(history),
+                            "plan": plan,
+                        })
+                    return result
+
+            if fetched:
+                items = await run_in_threadpool(plan_locked)
+            return self.deps.templates.TemplateResponse(request, "_ha_import_dry_run.html", {"items": items, "errors": errors})
+
+
+
+        @router.post("/import/ha/start", response_class=HTMLResponse)
+        async def import_ha_start(request: Request) -> HTMLResponse:
+            """Schreibt synchron, wie der CSV-Import — der Netzwerk-Fetch (potenziell
+            der langsamste Teil) läuft vorher außerhalb jeder Sperre; exclusive() hält
+            danach nur noch den eigentlichen Schreib- und Indexabgleich-Teil. Eigene
+            Vorlage (_ha_import_result.html) wie beim Dry Run, aus demselben Grund."""
+            started_at = datetime.now(timezone.utc)
+            form = await request.form()
+            raw_entity_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
+            items: list[dict] = []
+            results: list[symcon_import.ImportResult] = []
+            errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            reconciliation_report = None
+            start, end = (None, None)
+            if not entity_ids:
+                if not unknown_ids:
+                    errors.append("Bitte mindestens eine Entität auswählen.")
+            else:
+                start, end = self._ha_date_range(range_preset, date_from, date_to)
+                fetched, fetch_errors = await run_in_threadpool(self._fetch_ha_history, entity_ids, start, end)
+                errors.extend(fetch_errors)
+
+                def execute_ha_import() -> tuple[list[dict], dict]:
+                    with self.deps.coordinator.exclusive():
+                        run_items = []
+                        for entity_id, history in fetched.items():
+                            entity = self.deps.index.get_entity(entity_id)
+                            try:
+                                result = symcon_import.import_rows(
+                                    self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
+                                    source_label=entity_id, skipped_rows=history.skipped,
+                                )
+                            except ValueError as exc:
+                                errors.append(f"{entity_id}: {exc}")
+                                continue
+                            run_items.append({
+                                "entity_id": entity_id,
+                                "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                                "available_label": self._ha_available_label(history),
+                                "result": result,
+                            })
+                        reconciliation = self.deps.run_storage_reconciliation(
+                            entity_ids=sorted(fetched.keys()), repair=True
+                        ) if fetched else None
+                        return run_items, reconciliation
+
+                if fetched:
+                    try:
+                        items, reconciliation_report = await run_in_threadpool(execute_ha_import)
+                        results = [item["result"] for item in items]
+                    except Exception as exc:
+                        logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
+                        errors.append(f"Import abgebrochen: {exc}")
+            try:
+                with self.deps.coordinator.exclusive():
+                    import_reports.create(
+                        self.deps.data_dir,
+                        source_type="ha",
+                        started_at=started_at,
+                        source={"filename": "Home Assistant", "size_bytes": 0},
+                        configuration={
+                            "entity_ids": raw_entity_ids,
+                            "range_preset": range_preset,
+                            "date_from": date_from,
+                            "date_to": date_to,
+                        },
+                        results=[dataclasses.asdict(result) for result in results],
+                        errors=errors,
+                        reconciliation=reconciliation_report,
+                    )
+            except Exception:
+                logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")
+            return self.deps.templates.TemplateResponse(request, "_ha_import_result.html", {"items": items, "errors": errors})
+
+
+        return router
+

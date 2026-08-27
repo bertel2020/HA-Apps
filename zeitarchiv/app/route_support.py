@@ -5,8 +5,47 @@ from __future__ import annotations
 import functools
 import inspect
 from collections.abc import Callable, Iterable
+from pathlib import Path
 
 from .storage.coordinator import StorageCoordinator
+
+
+class UploadLimitExceeded(ValueError):
+    """Ein Upload überschreitet sein festgelegtes Größenlimit."""
+
+
+def format_upload_limit(max_bytes: int) -> str:
+    gib = 1024 * 1024 * 1024
+    mib = 1024 * 1024
+    if max_bytes % gib == 0:
+        return f"{max_bytes // gib} GiB"
+    return f"{max_bytes // mib} MiB"
+
+
+def copy_upload_limited(source, destination: Path, max_bytes: int) -> int:
+    """Kopiert einen Upload atomar und bricht oberhalb von max_bytes ab."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    part_path = destination.with_suffix(destination.suffix + ".part")
+    written = 0
+    try:
+        with part_path.open("wb") as handle:
+            while chunk := source.read(1024 * 1024):
+                written += len(chunk)
+                if written > max_bytes:
+                    raise UploadLimitExceeded(
+                        f"Upload ist größer als {format_upload_limit(max_bytes)}"
+                    )
+                handle.write(chunk)
+        part_path.replace(destination)
+        return written
+    finally:
+        part_path.unlink(missing_ok=True)
+
+
+def dir_size(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
 
 
 def storage_locked(

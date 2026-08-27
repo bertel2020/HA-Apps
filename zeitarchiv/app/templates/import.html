@@ -37,6 +37,15 @@
   .upload-error{margin-top:12px;border:1px solid var(--danger);background:var(--danger-soft);border-radius:10px;padding:12px 16px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
 
   .source-badge{font-family:var(--font-mono);padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);}
+
+  /* Wie .badge (app.css), aber für die HA-Verfügbarkeitsprüfung: kein
+     Zeitarchiv-Aggregationstyp, sondern ob HA für die Entität aktuell
+     Rohhistorie liefert. "unknown" (noch nicht geprüft) bewusst blass statt
+     wie ein Fehler/eine Warnung, da das der Ausgangszustand jeder Zeile ist. */
+  .ha-art-badge{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border);}
+  .ha-art-badge.has-data{color:var(--accent-line);border-color:var(--accent-line);}
+  .ha-art-badge.no-data{color:var(--ink-faint);}
+  .ha-art-badge.unknown{color:var(--ink-faint);border-style:dashed;cursor:help;}
   .import-delete-row{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
   .import-delete-row .btn-danger{font-weight:600;}
   .import-delete-button{min-width:154px;}

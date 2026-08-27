@@ -40,16 +40,17 @@ Kein Browser-/E2E-Test (kein Playwright/Selenium) — Alpine.js-/htmx-
 Interaktionen werden manuell im Browser verifiziert. Template-Tests prüfen
 gerenderten HTML-Output, nicht clientseitiges Verhalten.
 
-## Bekannter, offener Befund: `main.py`-Zeilenbudget
+## `main.py`-Zeilenbudget
 
 `test_route_modules.py::test_main_keeps_external_api_and_report_routes_out_of_the_monolith`
 erzwingt `len(main.py.splitlines()) < 4_800` als Architektur-Wächter gegen
-unkontrolliertes Wachstum des Monolithen. Stand 0.40.0: **5.140 Zeilen** —
-der Test schlägt bewusst weiterhin fehl, statt das Limit stillschweigend
-hochzusetzen (das würde den Zweck der Prüfung aushebeln). `api_routes.py`
-und `report_routes.py` (die vom selben Test geprüften Auslagerungen) sind
-weiterhin sauber getrennt; es fehlt eine weitere, noch nicht vorgenommene
-Extraktion (Kandidaten: Bereinigungs- oder Einstellungen-Routen) aus
-`main.py`, um wieder unter das Budget zu kommen. Bis dahin bleibt dieser eine
-Test rot — kein Grund zur Beunruhigung bei neuen `pytest`-Läufen, aber auch
-keiner, ihn zu ignorieren.
+unkontrolliertes Wachstum des Monolithen. `/api/*` (`api_routes.py`),
+Import-Reports (`report_routes.py`) und seit 0.51.0 auch der komplette
+Symcon-/CSV-/Home-Assistant-Import (`import_routes.py`) sind dafür
+ausgelagert — jeweils ein `*Dependencies`-Frozen-Dataclass plus ein
+`*Service` mit `.router()`, der die Routen als verschachtelte Closures
+registriert (siehe `ReportService`/`ImportService` als Vorlage für weitere
+Extraktionen). Stand 0.51.0: **rund 4.070 Zeilen**, Test grün. Wächst
+`main.py` wieder über das Budget, ist eine weitere Extraktion nach demselben
+Muster der richtige nächste Schritt (Kandidaten: Bereinigungs- oder
+Einstellungen-Routen) — nicht, das Limit stillschweigend hochzusetzen.

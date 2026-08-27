@@ -68,10 +68,11 @@
      "Hinzufügen" ist ein eigenständiges, schlankes Formular ohne Tabelle. */
   .edit-tabs{display:flex;gap:8px;margin:18px 0 4px;border-bottom:1px solid var(--border);}
   .edit-tabs button{
-    background:none;border:none;border-bottom:2px solid transparent;padding:9px 4px;margin-bottom:-1px;
-    font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;
+    font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
+    background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;margin-bottom:-1px;
+    cursor:pointer;
   }
-  .edit-tabs button.active{color:var(--accent-line);border-bottom-color:var(--accent-line);font-weight:600;}
+  .edit-tabs button.active{color:var(--accent-line);border-bottom-color:var(--accent-line);}
   .edit-tabs button:hover:not(.active){color:var(--ink);}
 
   .add-value-card{max-width:480px;margin-top:16px;}

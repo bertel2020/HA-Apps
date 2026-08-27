@@ -47,6 +47,11 @@ CORE_API_BASE = "http://supervisor/core/api"
 # eine einzelne, potenziell sehr große Antwort.
 HISTORY_CHUNK = timedelta(days=7)
 REQUEST_TIMEOUT = 20
+# /api/history/period akzeptiert eine kommagetrennte filter_entity_id-Liste —
+# fetch_availability() nutzt das, um die Verfügbarkeits-Vorschau für viele
+# Zeilen der Auswahltabelle mit wenigen Requests statt einem pro Entität zu
+# holen. Batchgröße begrenzt trotzdem die einzelne Anfrage/URL-Länge.
+ENTITY_BATCH_SIZE = 40
 
 
 class HaApiError(RuntimeError):
@@ -163,4 +168,83 @@ def fetch_history_rows(
                     f"HA-Historie enthält mehr als {max_rows:,} Datenpunkte".replace(",", ".")
                 )
         window_start = window_end
+    return result
+
+
+@dataclass
+class EntityAvailability:
+    entity_id: str
+    first_ts: float | None = None
+    last_ts: float | None = None
+    count: int = 0
+
+    @property
+    def has_data(self) -> bool:
+        return self.count > 0
+
+
+def fetch_availability(
+    entity_domains: dict[str, str], start: datetime, end: datetime
+) -> dict[str, EntityAvailability]:
+    """Verfügbarkeits-Vorschau für die Auswahltabelle: EIN gebündelter
+    History-Abruf für beliebig viele Entitäten gleichzeitig (HA erlaubt eine
+    kommagetrennte filter_entity_id-Liste), statt eines Requests je Zeile —
+    macht eine Live-Vorschau erst praktikabel, ohne die HA-Instanz mit N
+    Einzelabfragen zu belasten (Batchgröße siehe ENTITY_BATCH_SIZE). Zählt nur
+    tatsächlich importierbare Punkte (dieselbe Wertnormalisierung wie
+    fetch_history_rows), prüft aber NICHT auf Langzeitstatistik — die
+    unterstützt dieser Import bewusst (noch) nicht, siehe Moduldocstring.
+
+    Mit minimal_response=true liefert HA nur beim jeweils ersten (und
+    letzten) Punkt je Entität das volle Objekt inkl. entity_id, dazwischen
+    nur state/last_changed — deshalb wird die Entität pro zurückgegebenem
+    Array über dessen ERSTEN Eintrag identifiziert statt über die
+    Listenposition, die bei mehreren angefragten Entitäten nicht als stabil
+    garantiert ist."""
+    result = {eid: EntityAvailability(eid) for eid in entity_domains}
+    last_ts_by_entity: dict[str, float] = {}
+    entity_ids = list(entity_domains)
+    for batch_start in range(0, len(entity_ids), ENTITY_BATCH_SIZE):
+        batch = entity_ids[batch_start : batch_start + ENTITY_BATCH_SIZE]
+        window_start = start
+        while window_start < end:
+            window_end = min(window_start + HISTORY_CHUNK, end)
+            payload = _get(
+                f"/history/period/{urllib.parse.quote(_iso(window_start), safe='')}",
+                {
+                    "filter_entity_id": ",".join(batch),
+                    "end_time": _iso(window_end),
+                    "minimal_response": "true",
+                    "no_attributes": "true",
+                },
+            )
+            for entries in payload if isinstance(payload, list) else []:
+                if not entries or not isinstance(entries, list) or not isinstance(entries[0], dict):
+                    continue
+                entity_id = entries[0].get("entity_id")
+                domain = entity_domains.get(entity_id)
+                if domain is None:
+                    continue
+                avail = result[entity_id]
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    changed = entry.get("last_changed") or entry.get("last_updated")
+                    if not changed:
+                        continue
+                    try:
+                        ts = datetime.fromisoformat(str(changed).replace("Z", "+00:00")).timestamp()
+                    except ValueError:
+                        continue
+                    if _parse_state(str(entry.get("state")), domain) is None:
+                        continue
+                    prev = last_ts_by_entity.get(entity_id)
+                    if prev is not None and ts <= prev:
+                        continue
+                    last_ts_by_entity[entity_id] = ts
+                    if avail.first_ts is None:
+                        avail.first_ts = ts
+                    avail.last_ts = ts
+                    avail.count += 1
+            window_start = window_end
     return result

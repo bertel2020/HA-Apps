@@ -158,7 +158,19 @@ wo diese ebenfalls Platz belegen.
   angeben.
 - **CSV:** Trennzeichen sowie Zeit-, Wert- und Zielspalte frei zuordnen,
   Ergebnis vor dem eigentlichen Import prüfen.
-- **Reports** (dritter Reiter): jeder tatsächlich ausgeführte Import bleibt
+- **Home Assistant:** bestehende Recorder-Rohhistorie direkt aus der
+  laufenden Home-Assistant-Instanz übernehmen, ohne Symcon oder eine
+  hochgeladene Datei. Zur Auswahl stehen nur Entitäten, die bereits in
+  Zeitarchiv bekannt sind (also von der Home-Assistant-Integration
+  konfiguriert wurden und mindestens einen Live-Wert übertragen haben).
+  Zeitraum wählen (voreingestellt „Verfügbare Historie (max.)“, alternativ
+  feste Zeiträume oder ein eigener), optional „Verfügbarkeit prüfen“ für
+  eine Vorschau, welche Entitäten in Home Assistant tatsächlich Rohhistorie
+  haben und für welchen Zeitraum — Home Assistant hält Rohhistorie
+  standardmäßig nur einige Tage vor. Benötigt die Add-on-Berechtigung
+  `homeassistant_api` sowie eine Home-Assistant-Installation mit Supervisor
+  (nicht bei Home Assistant Container).
+- **Reports** (vierter Reiter): jeder tatsächlich ausgeführte Import bleibt
   mit Quelle, Zuordnung, importierten/übersprungenen Datensätzen und
   eventuellen Fehlern nachvollziehbar, filterbar nach Quelle/Status,
   sortierbar, mit JSON-Download je Eintrag. Reine Vorschauen erzeugen keinen
@@ -221,3 +233,7 @@ verändern."** → Dashboard öffnen → Editor → "Fixiert" aktivieren.
 verdoppeln."** → **Import → Symcon** → ZIP hochladen → Zuordnung prüfen →
 Import starten. Bereits vorhandene Zeitstempel werden automatisch
 übersprungen, unabhängig von der Quelle.
+
+**"Ich nutze kein Symcon und möchte trotzdem die bisherige HA-Historie
+übernehmen."** → **Import → Home Assistant** → Entitäten auswählen,
+optional „Verfügbarkeit prüfen“ → Vorschau (Dry Run) → Import starten.
