@@ -34,7 +34,7 @@
         {% for d in dashboards %}
         <div class="card dash-card" id="dash-card-{{ d.id }}">
           <h3><a href="dashboards/{{ d.id }}">{{ d.name }}</a></h3>
-          <div class="meta">{{ pin_counts.get(d.id, 0) }} Kachel{{ 'n' if pin_counts.get(d.id, 0) != 1 else '' }}{{ ' · Standard' if d.is_default else '' }}</div>
+          <div class="meta">{{ pin_counts.get(d.id, 0) }} Kachel{{ 'n' if pin_counts.get(d.id, 0) != 1 else '' }}{{ ' · Standard' if d.is_default else '' }}{{ ' · 🔒 Fixiert' if d.locked else '' }}</div>
           <div class="actions">
             <a class="btn" href="dashboards/{{ d.id }}">Öffnen</a>
             <a class="btn" href="dashboards/{{ d.id }}/edit">Bearbeiten</a>
@@ -54,7 +54,7 @@
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script>
     async function deleteDashboard(id, btn) {
-      if (!await appConfirm('Dieses Dashboard wirklich löschen? Alle Kacheln darauf gehen verloren.', {danger: true})) return;
+      if (!await appConfirm('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.', {danger: true})) return;
       btn.disabled = true;
       fetch(`dashboards/${id}/delete`, {method: 'POST'}).then(r => {
         if (r.ok) {

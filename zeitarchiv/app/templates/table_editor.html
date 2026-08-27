@@ -124,6 +124,14 @@
      gleich aussehen. */
   .tbl-row-top .tbl-value-picker{flex:none;width:260px;}
   .tbl-row-top .tbl-value-picker > button,.tbl-row-top .tbl-group-btn{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;}
+  /* Aggregation (Entität/Gruppe) — sitzt an derselben Stelle in der Zeile wie
+     die Einheit bei Formel-Zeilen (direkt vor der Beschriftung), etwas
+     breiter als deren 90px, da "Auto ▾" sonst zu knapp würde. Kurze
+     Button-Labels (Auto/Ø/Min/Max/Σ) statt ausgeschriebener Wörter, damit
+     die Zeile nicht umbricht — volle Bezeichnung im Popover und als
+     title-Tooltip auf dem Button selbst. */
+  .tbl-row-top .tbl-agg-picker{flex:none;width:100px;}
+  .tbl-row-top .tbl-agg-picker > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;white-space:nowrap;box-sizing:border-box;}
   .tbl-formula-input{
     font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
     border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);box-sizing:border-box;
@@ -172,34 +180,49 @@
 
   .tbl-add-row-bar{display:flex;gap:8px;margin-top:10px;}
 
-  /* Live-Vorschau — Buchstaben-Kürzel (A/B/C, dasselbe Rund-Badge wie
-     .tbl-row-letter bei den Zeilen-Kärtchen oben) als ECHTE, zusätzliche
-     erste Tabellenspalte (nicht als separate Nebenstruktur) — dadurch immer
-     exakt auf Höhe der jeweiligen Zeile, unabhängig von Dichte/Zebra/
-     Schriftgröße, ganz ohne Pixel-Werte raten zu müssen. Nur beim
-     Bearbeiten sichtbar (x-show="editing" je Zelle), nicht Teil des
-     eigentlichen Ergebnisses/der angehefteten Dashboard-Kachel. Weil diese
-     Spalte strukturell IMMER die erste ist (x-show blendet nur aus, ändert
-     aber nichts an der DOM-Position), können sich Beschriftungs-Spalte
-     (sticky/Hervorhebung) und die rechtsbündigen Werte-Spalten nicht mehr
-     auf :first-child verlassen — deshalb die explizite .tbl-label-col-
-     Klasse auf der eigentlichen Beschriftungs-Spalte statt :first-child. */
+  /* Live-Vorschau — Beschriftungs-Spalte ist strukturell IMMER die erste
+     (Buchstaben-Kürzel leben NICHT in dieser Tabelle, siehe
+     .tbl-letters-gutter weiter unten) — deshalb die explizite
+     .tbl-label-col-Klasse statt :first-child, für den Fall, dass hier
+     künftig doch einmal wieder eine Spalte davorstehen sollte. */
   .tbl-preview{overflow-x:auto;}
   .tbl-preview td,.tbl-preview th{white-space:nowrap;}
-  .tbl-preview th:not(.tbl-preview-letter-col):not(.tbl-label-col){text-align:right;}
+  .tbl-preview th:not(.tbl-label-col){text-align:right;}
   .tbl-preview td.tbl-num{text-align:right;font-variant-numeric:tabular-nums;}
   .tbl-preview tr.tbl-bold td{font-weight:700;color:var(--ink);}
   .tbl-preview td.tbl-error{color:var(--danger);}
   .tbl-preview td.tbl-label-col,.tbl-preview th.tbl-label-col{
     position:sticky;left:0;background:var(--surface);z-index:1;
   }
-  table.dt.compact th.tbl-preview-letter-col,table.dt.compact td.tbl-preview-letter-col{
-    padding:2px 6px;text-align:center;width:1%;
-  }
   table.dt.compact tr.tbl-separator-row td{
     padding:10px 12px;border:0;background:transparent !important;box-shadow:none !important;
   }
   .tbl-separator-line{display:block;width:100%;height:2px;border-radius:999px;background:var(--border-strong, var(--border));}
+
+  /* Buchstaben-Kürzel (A/B/C, dasselbe Rund-Badge wie .tbl-row-letter bei den
+     Zeilen-Kärtchen oben) — bewusst AUSSERHALB von .tbl-wrap (eigenes
+     Flex-Geschwister mit Lücke, keine gemeinsame Umrandung/Ecken/Hintergrund),
+     damit die Vorschau beim Bearbeiten nicht wie eine zusätzliche Spalte DER
+     Tabelle aussieht (die es im fertigen Ergebnis nie gibt) — genau das war
+     mit zwei früheren Ansätzen (echte erste Tabellenspalte; separate
+     Nebentabelle mit per CSS nachgebauten Zeilenhöhen) nicht zuverlässig
+     hinzubekommen: entweder sah es wie Teil der Tabelle aus, oder die
+     Zeilenhöhen liefen bei Dichte-/Rahmen-Kombinationen leicht auseinander.
+     Deshalb hier die dritte, robuste Variante: EIN Ursprung der Wahrheit
+     (die echte Tabelle), ihre tatsächlichen, gerenderten Zeilen-Positionen
+     werden per JS gemessen (syncLetterPositions(), ausgelöst von einem
+     ResizeObserver auf der Tabelle) und 1:1 auf die Badges hier übertragen
+     (:style in der Vorlage) — kein Nachbauen von Padding/Rahmen/Schriftgröße
+     nötig, funktioniert dadurch unter jeder Dichte-/Rahmen-/Zebra-Kombination
+     und jeder Schriftgrößen-Skalierung gleichermaßen exakt. */
+  .tbl-preview-row{display:flex;align-items:flex-start;gap:14px;}
+  .tbl-letters-gutter{position:relative;flex:none;width:26px;}
+  .tbl-letter-slot{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;}
+  /* Kleineres Badge bei "Kompakt" — reine Optik (die Ausrichtung selbst hängt
+     nicht von dieser Größe ab, siehe Kommentar oben), verhindert nur, dass
+     das 24px-Standard-Badge einen deutlich niedrigeren Kompakt-Zeilenschlitz
+     optisch sprengt. */
+  .tbl-row-letter-sm{width:18px !important;height:18px !important;margin-top:0 !important;font-size:calc(10.5px * var(--font-scale, 1)) !important;}
 
   /* Darstellungs-Optionen (Konzept-Erweiterung "professionelles UI-Design")
      — dieselben Klassennamen wie auf der Dashboard-Kachel (entities.html),
@@ -222,23 +245,26 @@
      "table.dt.compact.tbl-style-*" hier zu wiederholen, hätten "Ohne
      Rahmen" und "Kompakt" schlicht keine sichtbare Wirkung. */
   table.dt.compact.tbl-style-border-none td,table.dt.compact.tbl-style-border-none th{border-bottom:none;}
-  table.dt.compact.tbl-style-compact td,table.dt.compact.tbl-style-compact th{padding:2px 8px;}
+  /* padding:0 (statt 2px) vertikal — table.dt.compact hat bereits von Haus
+     aus knappen vertikalen Abstand (siehe Kommentar oben), "Kompakt" muss
+     also spürbar UNTER dieses Grundmaß gehen, sonst unterscheidet sich die
+     Option optisch kaum von "Komfortabel" (genau das war die Rückmeldung). */
+  table.dt.compact.tbl-style-compact td,table.dt.compact.tbl-style-compact th{padding:0 8px;}
+  table.dt.compact.tbl-style-compact tr.tbl-separator-row td{padding:4px 8px;}
   .tbl-style-header-accent tr:first-child th{background:var(--accent-line);color:var(--accent-contrast);}
   /* Dezent statt vollflächig satt: sanft eingefärbte Fläche (color-mix aus
      Akzentfarbe + Oberfläche, funktioniert automatisch hell/dunkel, da
-     beide Zutaten Theme-Variablen sind) plus schmaler Akzentstreifen links
-     — liest sich als "markierte Spalte", nicht als Button. !important, weil
-     Zebra/Kopfzeile-Kombinationen (Zeile drüber) sonst je nach Kombination
-     höhere Selektor-Spezifität haben als eine einfache "erste Spalte"-Regel
-     je erreichen könnte. Kein font-weight hier — das ist eine eigene,
-     unabhängige Option (.tbl-style-first-col-bold). Nur td, nicht th: die
-     Kopfzeile bleibt unverändert (eigene Option "Kopfzeile hervorheben"),
-     die Eck-Zelle soll nicht in einer davon unabhängigen dritten Farbe
-     erscheinen. */
+     beide Zutaten Theme-Variablen sind) — liest sich als "markierte Spalte",
+     nicht als Button. !important, weil Zebra/Kopfzeile-Kombinationen (Zeile
+     drüber) sonst je nach Kombination höhere Selektor-Spezifität haben als
+     eine einfache "erste Spalte"-Regel je erreichen könnte. Kein font-weight
+     hier — das ist eine eigene, unabhängige Option (.tbl-style-first-col-
+     bold). Nur td, nicht th: die Kopfzeile bleibt unverändert (eigene Option
+     "Kopfzeile hervorheben"), die Eck-Zelle soll nicht in einer davon
+     unabhängigen dritten Farbe erscheinen. */
   .tbl-style-first-col-accent td.tbl-label-col{
     background:color-mix(in srgb, var(--accent-line) 13%, var(--surface)) !important;
     color:var(--accent-line) !important;
-    box-shadow:inset 3px 0 0 var(--accent-line);
   }
   /* Bei aktivem Zebra-Muster übernimmt die erste Spalte dessen Streifung
      statt einer durchgängig gleichen Fläche — dieselbe tr:nth-child(even)-
@@ -304,6 +330,22 @@
                   </span>
                   <span class="tbl-field-label" x-text="`Versatz (${versatzUnit(col)})`"></span>
                   <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
+                  <span class="tbl-field-label">Nachkommastellen</span>
+                  <!-- position:fixed aus demselben Grund wie beim Zeitraum-Typ-
+                       Picker oben (.tbl-columns scrollt horizontal, ein normal
+                       positioniertes Popover würde unten abgeschnitten). -->
+                  <span class="dd-picker-wrap" x-data="{ open: false, top: 0, left: 0 }" @click.outside="open = false">
+                    <button type="button" class="btn"
+                            @click="open = !open; if (open) { const r = $el.getBoundingClientRect(); top = r.bottom + 6; left = r.left; }"
+                            x-text="DECIMALS_LABELS[col.decimals] + ' ▾'"></button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak
+                         :style="`position:fixed;top:${top}px;left:${left}px;`">
+                      <template x-for="[value, label] in Object.entries(DECIMALS_LABELS)" :key="value">
+                        <div class="dd-picker-row" :class="{active: col.decimals === value}"
+                             @click="col.decimals = value; open = false" x-text="label"></div>
+                      </template>
+                    </div>
+                  </span>
                 </div>
               </template>
               <button type="button" class="tbl-col-add" @click="addColumn()" title="Spalte hinzufügen">+</button>
@@ -362,6 +404,17 @@
                           {% endfor %}
                         </div>
                       </div>
+
+                      <span class="dd-picker-wrap tbl-agg-picker" x-show="row.row_type === 'entity' || row.row_type === 'group'" @click.outside="row.aggPickerOpen = false">
+                        <button type="button" class="btn" @click="row.aggPickerOpen = !row.aggPickerOpen"
+                                :title="AGG_TITLES[row.aggregation]" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
+                        <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.aggPickerOpen" x-cloak>
+                          <template x-for="[value, label] in AGG_OPTIONS" :key="value">
+                            <div class="dd-picker-row" :class="{active: row.aggregation === value}"
+                                 @click="row.aggregation = value; row.aggPickerOpen = false; load()" x-text="label"></div>
+                          </template>
+                        </div>
+                      </span>
 
                       <input type="text" class="tbl-formula-input tbl-formula-input-inline" x-show="row.row_type === 'formula'"
                              placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
@@ -430,25 +483,37 @@
           </div>
         </template>
 
-        <div class="tbl-wrap tbl-preview">
-          <table class="dt compact" :class="TableCompute.styleClasses(style)">
-            <tr>
-              <th x-show="editing" class="tbl-preview-letter-col"></th>
-              <th class="tbl-label-col">&nbsp;</th>
-              <template x-for="col in columns" :key="col.uid"><th x-text="col.label.trim() || suggestColumnLabel(col)"></th></template>
-            </tr>
+        <div class="tbl-preview-row">
+          <!-- Nur beim Bearbeiten sichtbar, bewusst außerhalb von .tbl-wrap
+               — siehe Kommentar bei .tbl-letters-gutter oben im CSS. Position
+               (top/height) je Badge kommt aus den tatsächlich gerenderten
+               Zeilen der Tabelle daneben (letterPositions, siehe
+               syncLetterPositions()), nicht aus nachgebautem CSS. -->
+          <div class="tbl-letters-gutter" x-show="editing" x-cloak :style="`height:${gutterHeight}px`">
             <template x-for="(row, idx) in rows" :key="row.uid">
-              <tr :class="{'tbl-bold': row.bold && row.row_type !== 'separator', 'tbl-separator-row': row.row_type === 'separator'}">
-                <td x-show="editing && row.row_type !== 'separator'" class="tbl-preview-letter-col"><div class="tbl-row-letter" x-text="rowLetters[row.uid]"></div></td>
-                <td x-show="row.row_type !== 'separator'" class="tbl-label-col" x-text="resolvedRowLabel(row)"></td>
-                <template x-for="col in columns" :key="col.uid">
-                  <td x-show="row.row_type !== 'separator'" class="tbl-num" :class="{'tbl-error': cellError(row, col)}" x-text="cellText(row, col)"></td>
-                </template>
-                <td x-show="row.row_type === 'separator'" :colspan="columns.length + (editing ? 2 : 1)"><span class="tbl-separator-line" aria-hidden="true"></span></td>
-              </tr>
+              <div class="tbl-letter-slot" x-show="row.row_type !== 'separator'" :style="letterSlotStyle(row.uid)">
+                <div class="tbl-row-letter" :class="{'tbl-row-letter-sm': style.density === 'compact'}" x-text="rowLetters[row.uid]"></div>
+              </div>
             </template>
-            <tr x-show="!rows.length || !columns.length"><td :colspan="columns.length + (editing ? 2 : 1)" style="text-align:center;color:var(--ink-faint);">Bitte mindestens eine Spalte und eine Zeile anlegen.</td></tr>
-          </table>
+          </div>
+          <div class="tbl-wrap tbl-preview">
+            <table class="dt compact" :class="TableCompute.styleClasses(style)" x-ref="previewTable">
+              <tr>
+                <th class="tbl-label-col">&nbsp;</th>
+                <template x-for="col in columns" :key="col.uid"><th x-text="col.label.trim() || suggestColumnLabel(col)"></th></template>
+              </tr>
+              <template x-for="(row, idx) in rows" :key="row.uid">
+                <tr :data-row-uid="row.uid" :class="{'tbl-bold': row.bold && row.row_type !== 'separator', 'tbl-separator-row': row.row_type === 'separator'}">
+                  <td x-show="row.row_type !== 'separator'" class="tbl-label-col" x-text="resolvedRowLabel(row)"></td>
+                  <template x-for="col in columns" :key="col.uid">
+                    <td x-show="row.row_type !== 'separator'" class="tbl-num" :class="{'tbl-error': cellError(row, col)}" x-text="cellText(row, col)"></td>
+                  </template>
+                  <td x-show="row.row_type === 'separator'" :colspan="columns.length + 1"><span class="tbl-separator-line" aria-hidden="true"></span></td>
+                </tr>
+              </template>
+              <tr x-show="!rows.length || !columns.length"><td :colspan="columns.length + 1" style="text-align:center;color:var(--ink-faint);">Bitte mindestens eine Spalte und eine Zeile anlegen.</td></tr>
+            </table>
+          </div>
         </div>
         <p class="tbl-hint" x-show="loading" style="margin-top:8px;">Lädt …</p>
 
@@ -486,6 +551,12 @@
     // statt als Button-Beschriftung. Werden nur verwendet, wenn die Spalte
     // keine eigene Beschriftung hat (Platzhalter im Feld UND Fallback beim
     // Speichern).
+    // Dieselben Bezeichnungen wie das entity-eigene "Nachkommastellen"-Feld
+    // (formatting.DECIMALS_LABELS, siehe _entity_config_form.html) — hier nur
+    // als JS-Konstante dupliziert, weil die Optionsliste (5 feste Werte) sich
+    // praktisch nie ändert und die anderen Picker in dieser Datei (BORDER_
+    // OPTIONS, DENSITY_OPTIONS, …) genauso lokal statt aus Jinja befüllt sind.
+    const DECIMALS_LABELS = {auto: 'Automatisch', '0': '0 Nachkommastellen', '1': '1 Nachkommastelle', '2': '2 Nachkommastellen', '3': '3 Nachkommastellen'};
     const RANGE_LABELS = {hour: 'Stunde', day: 'Tag', week: 'Woche', month: 'Monat', year: 'Jahr', decade: 'Dekade'};
     const PREVIOUS_LABELS = {hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche', month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade'};
     const PLURAL_UNITS = {hour: 'Stunden', day: 'Tagen', week: 'Wochen', month: 'Monaten', year: 'Jahren', decade: 'Dekaden'};
@@ -664,6 +735,17 @@
     // bestehenden Gruppen-Picker) hält den Zustand deshalb pro Zeile.
     const ROW_TYPE_OPTIONS = [['entity', 'Entität'], ['group', 'Gruppe'], ['formula', 'Formel'], ['separator', 'Trennlinie']];
     const ROW_TYPE_LABELS = Object.fromEntries(ROW_TYPE_OPTIONS);
+    // Aggregation je Entität/Gruppen-Zeile — "auto" ist das bisherige,
+    // implizite Verhalten (Zähler/Schalter -> Summe, sonst Durchschnitt),
+    // siehe TableCompute.computeValues()/memberValueFor(). Kurze
+    // Button-Labels (siehe .tbl-agg-picker-Kommentar oben im CSS), volle
+    // Bezeichnung im Popover UND als title-Tooltip auf dem Button.
+    const AGG_OPTIONS = [['auto', 'Automatisch'], ['avg', 'Ø Durchschnitt'], ['min', 'Min'], ['max', 'Max'], ['sum', 'Σ Summe']];
+    const AGG_SHORT_LABELS = {auto: 'Auto', avg: 'Ø', min: 'Min', max: 'Max', sum: 'Σ'};
+    const AGG_TITLES = {
+      auto: 'Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)',
+      avg: 'Durchschnitt', min: 'Minimum', max: 'Maximum', sum: 'Summe',
+    };
     const BORDER_OPTIONS = [['horizontal', 'Horizontal'], ['grid', 'Gitter'], ['none', 'Ohne Rahmen']];
     const BORDER_LABELS = Object.fromEntries(BORDER_OPTIONS);
     const DENSITY_OPTIONS = [['comfortable', 'Komfortabel'], ['compact', 'Kompakt']];
@@ -677,8 +759,8 @@
         // ?edit=1 hierher, um direkt im Bearbeiten-Modus zu starten statt
         // erst über "Anpassen" umschalten zu müssen.
         editing: !TABLE_ID || new URLSearchParams(location.search).has('edit'),
-        columns: INITIAL_COLUMNS.map(c => ({...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
-        rows: INITIAL_ROWS.map(r => ({formula_unit: '', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, search: '', entitySearch: ''})),
+        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
+        rows: INITIAL_ROWS.map(r => ({formula_unit: '', aggregation: 'auto', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, aggPickerOpen: false, search: '', entitySearch: ''})),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
         loading: false,
@@ -687,6 +769,8 @@
         _loadSeq: 0,
         bordersPickerOpen: false,
         densityPickerOpen: false,
+        letterPositions: {},  // row.uid -> {top, height} in px, aus der echten Tabelle gemessen
+        gutterHeight: 0,
 
         get rowLetters() {
           const m = {};
@@ -698,7 +782,7 @@
         },
 
         addColumn() {
-          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false});
+          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false, decimals: 'auto'});
         },
         // Verschiebt eine Spalte um eine Position nach links (-1) oder rechts
         // (+1) — dieselbe Splice-Logik wie moveRow() unten, als Alternative
@@ -717,7 +801,7 @@
           this.load();
         },
         addRow(type) {
-          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', bold: false, pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, search: '', entitySearch: ''});
+          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', aggregation: 'auto', bold: false, pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, aggPickerOpen: false, search: '', entitySearch: ''});
           this.load();
         },
         setRowType(row, type) {
@@ -804,7 +888,7 @@
 
         cellText(row, col) {
           const cell = this.values[col.uid] && this.values[col.uid][row.uid];
-          return TableCompute.cellText(cell);
+          return TableCompute.cellText(cell, col.decimals);
         },
         cellError(row, col) {
           const cell = this.values[col.uid] && this.values[col.uid][row.uid];
@@ -824,7 +908,7 @@
           const plainColumns = this.columns.map(c => ({range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year}));
           const plainRows = this.rows.map(r => ({
             row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
-            formula_unit: r.formula_unit || '',
+            formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
           }));
           const computed = await TableCompute.computeValues(BASE, plainColumns, plainRows);
           if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
@@ -857,13 +941,14 @@
             name: this.name.trim(),
             columns: this.columns.map(c => ({
               label: c.label.trim() || suggestColumnLabel(c), range_key: c.range_key, offset: c.offset || 0,
-              year_over_year: !!c.year_over_year,
+              year_over_year: !!c.year_over_year, decimals: c.decimals || 'auto',
             })),
             rows: this.rows.map(r => ({
               label: this.resolvedRowLabel(r), row_type: r.row_type,
               entity_ids: r.row_type === 'separator' ? [] : r.entity_ids,
               formula: r.row_type === 'separator' ? '' : r.formula,
               formula_unit: r.row_type === 'formula' ? (r.formula_unit || '').trim() : '',
+              aggregation: (r.row_type === 'entity' || r.row_type === 'group') ? (r.aggregation || 'auto') : 'auto',
               bold: r.row_type === 'separator' ? false : !!r.bold,
             })),
             style: this.style,
@@ -897,14 +982,58 @@
           window.location.href = `${BASE}/tables`;
         },
 
+        // Position/Höhe EINES Buchstaben-Badges in .tbl-letters-gutter — aus
+        // letterPositions (von syncLetterPositions() gemessen), nicht
+        // errechnet. Ohne Eintrag (z. B. bevor die erste Messung lief) bleibt
+        // der Slot unsichtbar statt bei 0/0 zu "kleben".
+        letterSlotStyle(rowUid) {
+          const p = this.letterPositions[rowUid];
+          if (!p) return 'display:none;';
+          return `top:${p.top}px;height:${p.height}px;`;
+        },
+        // Liest die TATSÄCHLICH gerenderten Zeilen-Positionen der echten
+        // Tabelle (x-ref="previewTable") aus und überträgt sie unverändert
+        // auf die Badges nebenan — siehe ausführlichen Kommentar bei
+        // .tbl-letters-gutter im CSS oben, warum eine Messung statt eines
+        // per CSS nachgebauten Zwillings die robuste Wahl ist. Läuft über
+        // getBoundingClientRect()-Differenzen (nicht offsetTop), weil
+        // offsetTop vom nächsten POSITIONIERTEN Vorfahren abhängt, der hier
+        // nicht zuverlässig die Tabelle selbst ist.
+        syncLetterPositions() {
+          const table = this.$refs.previewTable;
+          if (!table || !table.isConnected) return;
+          const tableRect = table.getBoundingClientRect();
+          const positions = {};
+          table.querySelectorAll('tr[data-row-uid]').forEach(tr => {
+            const r = tr.getBoundingClientRect();
+            positions[tr.dataset.rowUid] = {top: r.top - tableRect.top, height: r.height};
+          });
+          this.letterPositions = positions;
+          this.gutterHeight = tableRect.height;
+        },
+
         init() {
           this.load();
           // .tbl-columns/.tbl-rows stecken in einem x-if="editing" — bei
           // jedem Wechsel auf "editing" wird der Container neu erzeugt (der
           // dragBound-Marker geht dabei verloren), deshalb hier neu binden,
           // nicht nur einmalig beim ersten Laden.
-          this.$watch('editing', v => { if (v) this.$nextTick(() => { setupColumnDrag(); setupRowDrag(); }); });
+          this.$watch('editing', v => { if (v) this.$nextTick(() => { setupColumnDrag(); setupRowDrag(); this.syncLetterPositions(); }); });
           if (this.editing) this.$nextTick(() => { setupColumnDrag(); setupRowDrag(); });
+          // ResizeObserver statt einzelner Watcher auf rows/columns/style —
+          // jede Änderung, die die Zeilenhöhen der echten Tabelle beeinflussen
+          // könnte (Zeile hinzugefügt/entfernt, Dichte/Rahmen umgeschaltet,
+          // geladene Werte ändern die Zellenbreite/Umbruch, Schriftgrößen-
+          // Skalierung), ändert zwangsläufig auch deren Gesamthöhe — genau
+          // das beobachtet der ResizeObserver, ganz ohne jede einzelne
+          // mögliche Ursache selbst auflisten zu müssen.
+          this.$nextTick(() => {
+            const table = this.$refs.previewTable;
+            if (table && window.ResizeObserver) {
+              new ResizeObserver(() => this.syncLetterPositions()).observe(table);
+            }
+            this.syncLetterPositions();
+          });
         },
       };
     }

@@ -12,6 +12,15 @@
   .dash-editor-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
   .dash-editor-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
   .field input[type="text"]{width:100%;max-width:420px;}
+  .field-switch-row{display:flex;align-items:center;gap:10px;}
+  .switch{position:relative;display:inline-block;width:40px;height:22px;flex:none;}
+  .switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;}
+  .switch-track{position:absolute;inset:0;background:var(--border);border-radius:999px;transition:background .15s;pointer-events:none;}
+  .switch-thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:var(--surface);border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s;}
+  .switch input:checked + .switch-track{background:var(--accent-line);}
+  .switch input:checked + .switch-track .switch-thumb{transform:translateX(18px);}
+  .switch input:focus-visible + .switch-track{outline:2px solid var(--accent-line);outline-offset:2px;}
+  .switch input:disabled{cursor:default;}
 </style>
 </head>
 <body>
@@ -24,12 +33,25 @@
       <div class="dash-editor-title-row">
         <h2>{{ "Dashboard bearbeiten" if dashboard else "Neues Dashboard" }}</h2>
       </div>
-      <p class="sub">Name des Dashboards — weitere Einstellungen können hier später ergänzt werden.</p>
+      <p class="sub">Name und Fixierung dieses Dashboards.</p>
 
       <div class="field">
         <label for="dash-name">Name</label>
         <input id="dash-name" type="text" x-model="name" placeholder="Name des Dashboards …" @keydown.enter="save()">
       </div>
+
+      {% if dashboard %}
+      <div class="field">
+        <div class="field-switch-row">
+          <label class="switch">
+            <input type="checkbox" id="dash-locked" x-model="locked">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+          <label for="dash-locked">Fixiert</label>
+        </div>
+        <p class="sub" style="margin-top:6px;">Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.</p>
+      </div>
+      {% endif %}
 
       <div class="save-row">
         <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
@@ -51,6 +73,7 @@
       return {
         dashboardId: DASHBOARD_ID,
         name: {{ (dashboard.name if dashboard else '') | tojson }},
+        locked: {{ 'true' if dashboard and dashboard.locked else 'false' }},
         saving: false,
         savedMessage: '',
 
@@ -69,6 +92,12 @@
               return;
             }
             const data = await res.json();
+            if (this.dashboardId) {
+              const lockRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/lock`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({locked: this.locked}),
+              });
+              if (!lockRes.ok) { alert('Speichern der Fixierung fehlgeschlagen.'); return; }
+            }
             window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
           } finally {
             this.saving = false;
@@ -76,7 +105,7 @@
         },
 
         async deleteDashboard() {
-          if (!await appConfirm('Dieses Dashboard wirklich löschen? Alle Kacheln darauf gehen verloren.', {danger: true})) return;
+          if (!await appConfirm('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.', {danger: true})) return;
           const res = await fetch(`${BASE}/dashboards/${this.dashboardId}/delete`, {method: 'POST'});
           if (res.ok) {
             window.location.href = `${BASE}/dashboards`;

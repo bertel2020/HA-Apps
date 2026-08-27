@@ -42,9 +42,11 @@
   .dtile-picker-item{
     display:block;width:100%;text-align:left;padding:8px 10px;border-radius:7px;border:none;background:none;
     color:var(--ink);font-size:calc(13px * var(--font-scale, 1));cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    text-decoration:none;box-sizing:border-box;
   }
   .dtile-picker-item:hover{background:var(--surface-alt);}
-  .dtile-picker-empty{margin:6px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .dtile-picker-new{color:var(--accent-line);font-weight:600;margin-bottom:4px;}
+  .dtile-picker-label + .dtile-picker-new{margin-top:-2px;}
 
   .dtile-menu{position:absolute;top:6px;right:6px;z-index:4;}
   .dtile-menu-btn{
@@ -83,11 +85,15 @@
   .tbl-style-zebra tr:nth-child(even) td{background:var(--surface-alt);}
   .tbl-style-border-grid td,.tbl-style-border-grid th{border:1px solid var(--border);}
   .tbl-style-border-none td,.tbl-style-border-none th{border-bottom:none;}
-  .tbl-style-compact td,.tbl-style-compact th{padding:2px 6px;}
+  /* padding:0 (statt 2px) vertikal — spürbar unter dem Komfortabel-Grundmaß
+     (.dtile-mini-table th/td oben: 4px 8px), sonst kaum sichtbarer
+     Unterschied zwischen den beiden Dichte-Optionen. */
+  .tbl-style-compact td,.tbl-style-compact th{padding:0 6px;}
+  .tbl-style-compact tr.tbl-separator-row td{padding:3px 6px;}
   .tbl-style-header-accent tr:first-child th{background:var(--accent-line);color:var(--accent-contrast);}
   .tbl-style-first-col-accent td:first-child{
     background:color-mix(in srgb, var(--accent-line) 13%, var(--surface)) !important;
-    color:var(--accent-line) !important;box-shadow:inset 3px 0 0 var(--accent-line);
+    color:var(--accent-line) !important;
   }
   .tbl-style-first-col-accent.tbl-style-zebra tr:nth-child(even) td:first-child{background:color-mix(in srgb, var(--accent-line) 24%, var(--surface)) !important;}
   .tbl-style-first-col-bold td:first-child{font-weight:700;}
@@ -102,6 +108,7 @@
   .dash-title-row{display:flex;align-items:center;gap:10px;}
   .dash-rename-btn{color:var(--ink-faint);text-decoration:none;padding:2px;}
   .dash-rename-btn:hover{color:var(--accent-line);}
+  .dash-locked-badge{font-size:calc(16px * var(--font-scale, 1));cursor:default;opacity:.75;}
 </style>
 </head>
 <body>
@@ -109,7 +116,11 @@
   <div class="page">
     <div class="dash-title-row">
       <h1>{{ dashboard.name }}</h1>
+      {% if dashboard.locked %}
+      <span class="dash-locked-badge" title="Fixiert">🔒</span>
+      {% else %}
       <a class="dash-rename-btn" href="{{ base }}/dashboards/{{ dashboard.id }}/edit" title="Bearbeiten">✎</a>
+      {% endif %}
     </div>
 
     <div class="dashboard-section">

@@ -19,7 +19,7 @@
   {% endif %}
 
   <div class="actionbar" style="margin-top:14px;">
-    <button class="btn primary"
+    <button class="btn btn-danger"
             hx-post="{{ base }}/entities/{{ entity_id }}/rows/repetitions-delete"
             hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
       Ja, {{ total_to_delete }} Zeile(n) entfernen

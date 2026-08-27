@@ -40,6 +40,27 @@ def format_time(ts: float | None, tz: ZoneInfo) -> str:
     return datetime.fromtimestamp(ts, tz).strftime("%H:%M:%S")
 
 
+def format_uptime(seconds: float) -> str:
+    """Kompakte Laufzeit-Anzeige ("3 Tage 4 Std.", "45 Min.", "12 Sek.") für
+    die Prozess-Laufzeit in "Über Zeitarchiv" — höchstens zwei Einheiten,
+    dieselbe Kompakt-Idee wie NumberFormat.fmtDuration() auf der JS-Seite
+    (static/js/number-format.js, dort für Schalter-Einschaltdauer), hier
+    zusätzlich mit einer Tage-Stufe für mehrtägige Laufzeiten."""
+    total = max(0, round(seconds))
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    if days:
+        suffix = f" {hours} Std." if hours else ""
+        return f"{days} Tag{'e' if days != 1 else ''}{suffix}"
+    if hours:
+        suffix = f" {minutes} Min." if minutes else ""
+        return f"{hours} Std.{suffix}"
+    if minutes:
+        return f"{minutes} Min."
+    return f"{secs} Sek."
+
+
 # Zentrale Stelle für das Zahlenformat der Oberfläche — aktuell nur Deutsch
 # (Komma als Dezimal-, Punkt als Tausendertrennzeichen). Eine künftige
 # Sprachumschaltung (z. B. Englisch, NUMBER_LOCALE="en-US") ändert nur diese

@@ -31,9 +31,7 @@
       </div>
     </div>
     <p class="hint">
-      Wirkt sofort und bleibt nach Neustarts erhalten. „Alle Anfragen“ umfasst auch die häufigen
-      Schreibzugriffe der Home-Assistant-Integration und sollte nur zur Fehlersuche aktiviert werden.
-      Token, Passwörter und Authorization-Header werden unabhängig vom Loglevel maskiert.
+      Wirkt sofort. „Alle Anfragen“ nur zur Fehlersuche &mdash; Zugangsdaten werden immer maskiert.
     </p>
     <div class="actionbar" style="justify-content:flex-start;">
       <a class="btn" href="logs">Protokoll öffnen →</a>
@@ -41,5 +39,3 @@
     {% if logging_saved %}<p class="save-status">✓ Gespeichert und aktiviert</p>{% endif %}
   </form>
 </div>
-
-{% include "_settings_debug_tools.html" %}

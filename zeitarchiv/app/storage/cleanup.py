@@ -11,7 +11,6 @@ physisch.
 
 from __future__ import annotations
 
-import calendar
 import statistics
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
@@ -22,11 +21,20 @@ from zoneinfo import ZoneInfo
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ..formatting import decimals_to_int, format_value
 from . import rollup
 from .hotbuffer import append as hot_append
-from .hotbuffer import hot_path, read_rows
+from .hotbuffer import hot_path, month_key, read_rows
 from .index import Index, filter_deleted_occurrences, should_accept_value
 from .paths import entity_dir
+
+
+def _format_val(value: float, decimals: str) -> str:
+    return format_value(value, decimals_to_int(decimals))
+
+
+def _format_ts(ts: float, tz: ZoneInfo) -> str:
+    return datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y %H:%M:%S")
 
 
 def _months_between(start_ts: float, end_ts: float, tz: ZoneInfo) -> list[tuple[int, int]]:
@@ -74,6 +82,7 @@ def analyze_raw_rows_page(
     page_size: int,
     gap_threshold_minutes: float | None,
     outlier_threshold_percent: float | None,
+    tz: ZoneInfo,
     decimals: str = "auto",
     counter_decrease_enabled: bool = False,
 ) -> dict:
@@ -127,15 +136,18 @@ def analyze_raw_rows_page(
         nonlocal total_matches, group_rows
         if not group_rows:
             return
-        duplicate_reason = (
-            f"{len(group_rows)}× derselbe Zeitstempel" if len(group_rows) > 1 else None
-        )
+        duplicate_reason = None
+        if len(group_rows) > 1:
+            formatted_values = " / ".join(
+                _format_val(row["value"], decimals) for row in group_rows
+            )
+            duplicate_reason = f"{len(group_rows)}× derselbe Zeitstempel — Werte: {formatted_values}"
         if group_outlier is not None:
             counts["outliers"] += 1
         if group_gap is not None:
             counts["gaps"] += 1
         if duplicate_reason is not None:
-            counts["duplicates"] += 1
+            counts["duplicates"] += len(group_rows)
 
         for row in group_rows:
             repetition_reason = row.pop("repetition_reason")
@@ -183,6 +195,7 @@ def analyze_raw_rows_page(
             if delta > gap_seconds:
                 group_gap = (
                     f"{_format_duration(delta)} seit vorherigem Wert "
+                    f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)} "
                     f"(Schwellwert: {_format_duration(gap_seconds)})"
                 )
         if (
@@ -194,7 +207,7 @@ def analyze_raw_rows_page(
             if jump_percent > outlier_threshold_percent:
                 group_outlier = (
                     f"{jump_percent:.0f} % Sprung gegenüber Vorwert "
-                    f"({previous_value:.3g})"
+                    f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)}"
                 )
 
         if should_accept_value(
@@ -203,7 +216,7 @@ def analyze_raw_rows_page(
             last_kept_ts, last_kept_value = ts, value
             repetition_reason = None
         else:
-            repetition_reason = _repetition_reason(decimals)
+            repetition_reason = _repetition_reason(decimals, last_kept_ts, last_kept_value, tz)
 
         counter_decrease_reason = None
         if counter_decrease_enabled:
@@ -346,19 +359,34 @@ def _format_duration(seconds: float) -> str:
     return f"{days} Tage {hours} Std." if hours else f"{days} Tage"
 
 
-def detect_duplicates(rows: list[tuple[float, float]]) -> dict[float, str]:
+def detect_duplicates(
+    rows: list[tuple[float, float]], decimals: str = "auto"
+) -> dict[float, str]:
     """Gibt je doppelt vorkommendem Zeitstempel eine Begründung zurück (Anzahl der
-    Vorkommen) — die Rückgabe verhält sich wie ein Set (Mitgliedschaft/Iteration
-    über die Keys), liefert für die Anzeige aber zusätzlich den Grund."""
-    seen: dict[float, int] = {}
-    for ts, _ in rows:
-        seen[ts] = seen.get(ts, 0) + 1
-    return {ts: f"{count}× derselbe Zeitstempel" for ts, count in seen.items() if count > 1}
+    Vorkommen plus alle betroffenen Werte) — die Rückgabe verhält sich wie ein Set
+    (Mitgliedschaft/Iteration über die Keys), liefert für die Anzeige aber
+    zusätzlich den Grund."""
+    values_by_ts: dict[float, list[float]] = {}
+    for ts, value in rows:
+        values_by_ts.setdefault(ts, []).append(value)
+    return {
+        ts: (
+            f"{len(values)}× derselbe Zeitstempel — Werte: "
+            + " / ".join(_format_val(v, decimals) for v in values)
+        )
+        for ts, values in values_by_ts.items()
+        if len(values) > 1
+    }
 
 
-def _repetition_reason(decimals: str) -> str:
+def _repetition_reason(
+    decimals: str, last_kept_ts: float, last_kept_value: float, tz: ZoneInfo
+) -> str:
     precision = "3 (Automatisch)" if decimals == "auto" else decimals
-    return f"Gleicher gerundeter Folgewert bei {precision} Nachkommastellen"
+    return (
+        f"Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — "
+        f"wie Vorwert {_format_val(last_kept_value, decimals)} um {_format_ts(last_kept_ts, tz)}"
+    )
 
 
 def iter_repeated_rows(
@@ -389,11 +417,21 @@ def repeated_rows_to_delete(
 
 
 def detect_repetitions(
-    rows: list[tuple[float, float]], decimals: str
+    rows: list[tuple[float, float]], decimals: str, tz: ZoneInfo
 ) -> dict[float, str]:
-    """Markiert die von ``repeated_rows_to_delete`` erkannten Zeilen."""
-    reason = _repetition_reason(decimals)
-    return {ts: reason for ts, _value in repeated_rows_to_delete(rows, decimals)}
+    """Markiert die von ``repeated_rows_to_delete`` erkannten Zeilen, inkl. Bezug
+    auf den beibehaltenen Vorwert, gegen den gerundet verglichen wurde."""
+    reasons: dict[float, str] = {}
+    last_kept_ts: float | None = None
+    last_kept_value: float | None = None
+    for ts, value in rows:
+        if should_accept_value(
+            "decimals", decimals, last_kept_value, last_kept_ts, value, ts
+        ):
+            last_kept_ts, last_kept_value = ts, value
+        else:
+            reasons[ts] = _repetition_reason(decimals, last_kept_ts, last_kept_value, tz)
+    return reasons
 
 
 def _counter_decrease_reason(previous_value: float, value: float) -> str:
@@ -433,21 +471,30 @@ def detect_counter_decreases(
     return decreases
 
 
-def duplicate_rows_to_delete(rows: list[tuple[float, float]]) -> list[tuple[float, float]]:
+def iter_duplicate_rows_to_delete(
+    rows: Iterable[tuple[float, float]],
+) -> Iterator[tuple[float, float]]:
+    """Streaming-Variante von duplicate_rows_to_delete() mit konstantem statt mit
+    der Zeilenzahl wachsendem Speicherbedarf: da rows nach Zeitstempel sortiert
+    sind (list_raw_rows/iter_raw_rows), liegen alle Vorkommen desselben
+    Zeitstempels direkt hintereinander — ein Vergleich mit nur dem Vorwert
+    genügt, statt sich alle bisher gesehenen Zeitstempel in einem Set zu merken."""
+    previous_ts: float | None = None
+    for ts, value in rows:
+        if ts == previous_ts:
+            yield ts, value
+        else:
+            previous_ts = ts
+
+
+def duplicate_rows_to_delete(rows: Iterable[tuple[float, float]]) -> list[tuple[float, float]]:
     """Für "Duplikate automatisch entfernen" (Konzept Abschnitt 04): bei jedem
     mehrfach vorkommenden Zeitstempel bleibt genau EIN Vorkommen erhalten (das
     zeitlich erste in rows), alle weiteren werden zum Löschen vorgeschlagen.
     rows muss dieselbe stabile Reihenfolge haben wie beim tatsächlichen Löschen
     (list_raw_rows liefert bereits sortiert), sonst könnte hier ein anderes
     Vorkommen ausgewählt werden als später tatsächlich entfernt wird."""
-    seen: set[float] = set()
-    to_delete: list[tuple[float, float]] = []
-    for ts, value in rows:
-        if ts in seen:
-            to_delete.append((ts, value))
-        else:
-            seen.add(ts)
-    return to_delete
+    return list(iter_duplicate_rows_to_delete(rows))
 
 
 def count_duplicate_rows_by_entity(
@@ -484,7 +531,12 @@ def count_duplicate_rows_by_entity(
     return results
 
 
-def detect_gaps(rows: list[tuple[float, float]], threshold_minutes: float | None) -> dict[float, str]:
+def detect_gaps(
+    rows: list[tuple[float, float]],
+    threshold_minutes: float | None,
+    decimals: str,
+    tz: ZoneInfo,
+) -> dict[float, str]:
     """Markiert den Zeitstempel NACH einer Lücke, die den je Entität konfigurierten
     Minuten-Schwellwert überschreitet (Konfigurationsseite der Entität) — bewusst
     ein fester, vom Nutzer gewählter Schwellwert statt einer automatisch aus dem
@@ -497,15 +549,23 @@ def detect_gaps(rows: list[tuple[float, float]], threshold_minutes: float | None
     threshold_seconds = threshold_minutes * 60
     flagged: dict[float, str] = {}
     for i in range(len(rows) - 1):
-        delta = rows[i + 1][0] - rows[i][0]
+        prev_ts, prev_value = rows[i]
+        delta = rows[i + 1][0] - prev_ts
         if delta > threshold_seconds:
             flagged[rows[i + 1][0]] = (
-                f"{_format_duration(delta)} seit vorherigem Wert (Schwellwert: {_format_duration(threshold_seconds)})"
+                f"{_format_duration(delta)} seit vorherigem Wert "
+                f"{_format_val(prev_value, decimals)} um {_format_ts(prev_ts, tz)} "
+                f"(Schwellwert: {_format_duration(threshold_seconds)})"
             )
     return flagged
 
 
-def detect_outliers(rows: list[tuple[float, float]], threshold_percent: float | None) -> dict[float, str]:
+def detect_outliers(
+    rows: list[tuple[float, float]],
+    threshold_percent: float | None,
+    decimals: str,
+    tz: ZoneInfo,
+) -> dict[float, str]:
     """Markiert Werte, die um mehr als den je Entität konfigurierten Prozentsatz
     gegenüber dem UNMITTELBAR VORHERGEHENDEN Wert springen (Konfigurationsseite
     der Entität) — bewusst ein Sprung gegenüber dem Vorwert statt einer
@@ -530,10 +590,13 @@ def detect_outliers(rows: list[tuple[float, float]], threshold_percent: float | 
     flagged: dict[float, str] = {}
     for i in range(1, len(rows)):
         ts, value = rows[i]
-        prev_value = rows[i - 1][1]
+        prev_ts, prev_value = rows[i - 1]
         jump_percent = abs(value - prev_value) / baseline * 100
         if jump_percent > threshold_percent:
-            flagged[ts] = f"{jump_percent:.0f} % Sprung gegenüber Vorwert ({prev_value:.3g})"
+            flagged[ts] = (
+                f"{jump_percent:.0f} % Sprung gegenüber Vorwert "
+                f"{_format_val(prev_value, decimals)} um {_format_ts(prev_ts, tz)}"
+            )
     return flagged
 
 
@@ -545,6 +608,21 @@ def undo_last_delete(index: Index, entity_id: str) -> int:
     """Macht die zuletzt gelöschte Charge rückgängig (ein Klick = ein 'Löschen'-Vorgang
     rückgängig, wie im Konzept-Mockup "Rückgängig" beschrieben)."""
     return index.undo_last_deleted_batch(entity_id)
+
+
+def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict[float, int]]:
+    """Gruppiert EINMAL nach Kalendermonat (dieselbe "YYYY-MM"-Zuordnung wie
+    hotbuffer.month_key()/die Archiv-Dateinamen "YYYY-MM.parquet") — Grundlage
+    für einen O(1)-Nachschlag je Archiv-Monat (path.stem direkt als Schlüssel)
+    statt eines erneuten linearen Scans über ALLE markierten Zeitstempel für
+    JEDEN einzelnen Archiv-Monat. Bei einer Entität mit sehr vielen markierten
+    Löschungen UND vielen Archiv-Monaten (z. B. 620.000 Zeilen × 151 Monate)
+    summierte sich das bisher zu zig Millionen Vergleichen und machte allein
+    die (rein lesende!) Einstellungen-Vorschau mehrere Sekunden langsam."""
+    by_month: dict[str, dict[float, int]] = {}
+    for ts, count in ts_counts.items():
+        by_month.setdefault(month_key(ts, tz), {})[ts] = count
+    return by_month
 
 
 def preview_purge(
@@ -592,18 +670,15 @@ def preview_purge(
 
         archive_dir = entity_dir(data_dir, "archive", entity_id)
         if archive_dir.exists():
+            # Nur Monate öffnen, die überhaupt eine markierte Zeile enthalten
+            # können (wie purge_archived_months()) — sonst würde jede
+            # Vorschau alle Archiv-Monate der Entität vollständig lesen, auch
+            # wenn nur ein einzelner Monat betroffen ist (ZP-005 in
+            # PERFORMANCE.md). Einmal gruppiert statt pro Monat neu gescannt,
+            # siehe _group_by_month().
+            remaining_by_month = _group_by_month(remaining, tz)
             for path in sorted(archive_dir.glob("*.parquet")):
-                # Nur Monate öffnen, die überhaupt eine markierte Zeile
-                # enthalten können (wie purge_archived_months()) — sonst
-                # würde jede Vorschau alle Archiv-Monate der Entität
-                # vollständig lesen, auch wenn nur ein einzelner Monat
-                # betroffen ist (ZP-005 in PERFORMANCE.md).
-                year_str, month_str = path.stem.split("-")
-                year, month = int(year_str), int(month_str)
-                month_start = datetime(year, month, 1, tzinfo=tz).timestamp()
-                days_in_month = calendar.monthrange(year, month)[1]
-                month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=tz).timestamp() + 1
-                if not any(month_start <= ts < month_end for ts in remaining):
+                if path.stem not in remaining_by_month:
                     continue
                 table = pq.read_table(path, columns=["ts"])
                 removed = consume(table.column("ts").to_pylist(), remaining)
@@ -724,15 +799,16 @@ def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
         if not archive_dir.exists():
             continue
         entity_had_emptied_month = False
+        # Einmal gruppiert statt für jeden Archiv-Monat erneut über ALLE
+        # markierten Zeitstempel dieser Entität zu scannen, siehe
+        # _group_by_month().
+        deleted_by_month = _group_by_month(deleted, tz)
         for path in sorted(archive_dir.glob("*.parquet")):
-            year_str, month_str = path.stem.split("-")
-            year, month = int(year_str), int(month_str)
-            month_start = datetime(year, month, 1, tzinfo=tz).timestamp()
-            days_in_month = calendar.monthrange(year, month)[1]
-            month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=tz).timestamp() + 1
-            relevant = {ts: count for ts, count in deleted.items() if month_start <= ts < month_end}
+            relevant = deleted_by_month.get(path.stem)
             if not relevant:
                 continue
+            year_str, month_str = path.stem.split("-")
+            year, month = int(year_str), int(month_str)
 
             table = pq.read_table(path)
             rows = sorted(zip(table.column("ts").to_pylist(), table.column("value").to_pylist()))

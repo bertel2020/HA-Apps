@@ -115,3 +115,33 @@ def find_stale_hot_files(data_dir: Path, entity_id: str, current_ts: float, tz: 
         if file_month < current_month:
             stale.append(path)
     return stale
+
+
+def find_entities_with_stale_hot_files(
+    data_dir: Path, entity_ids: set[str], current_ts: float, tz: ZoneInfo
+) -> set[str]:
+    """Wie find_stale_hot_files(), aber für ALLE Entitäten auf einmal, mit
+    EINEM Verzeichnis-Listing statt eines glob() je Entität. Für die
+    Einstellungen-Seite (Rotation-Zähler) rief find_stale_hot_files() bisher
+    pro Entität separat glob(f"{entity_id}-*.csv") auf — jeder dieser Aufrufe
+    durchsucht erneut das komplette hot_dir, macht die Gesamtkosten also
+    proportional zu Entitätenzahl MAL Dateizahl im hot_dir statt nur zur
+    Dateizahl. Bei vielen Entitäten (jede mit eigener Hot-Datei) summierte
+    sich das zu einer spürbaren Verzögerung beim Laden von /settings, die bei
+    jedem Aufruf neu anfiel (kein Zwischenspeicher). Dateiname ist immer
+    "{entity_id}-{YYYY-MM}.csv" — der Monats-Suffix hat fest 7 Zeichen, daher
+    robust von HINTEN abgeschnitten statt nach einem Trennzeichen zu suchen
+    (ein entity_id mit Bindestrich würde sonst falsch aufgeteilt)."""
+    hot_dir = storage_area_dir(data_dir, "hot")
+    if not hot_dir.exists():
+        return set()
+    current_month = month_key(current_ts, tz)
+    stale_entities: set[str] = set()
+    for path in hot_dir.glob("*.csv"):
+        stem = path.stem
+        if len(stem) < 9 or stem[-8] != "-":
+            continue
+        entity_id, file_month = stem[:-8], stem[-7:]
+        if file_month < current_month and entity_id in entity_ids:
+            stale_entities.add(entity_id)
+    return stale_entities

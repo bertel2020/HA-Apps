@@ -272,7 +272,7 @@
       html += `<tr${row.bold ? ' class="tbl-bold"' : ''}><td>${escapeHtml(row.label)}</td>`;
       visibleCols.forEach((col, ci) => {
         const cell = values[ci] && values[ci][ri];
-        html += `<td class="tbl-num">${escapeHtml(TableCompute.cellText(cell))}</td>`;
+        html += `<td class="tbl-num">${escapeHtml(TableCompute.cellText(cell, col.decimals))}</td>`;
       });
       if (columns.length > visibleCols.length) html += '<td>…</td>';
       html += '</tr>';

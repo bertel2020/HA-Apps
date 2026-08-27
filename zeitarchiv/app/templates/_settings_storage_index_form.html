@@ -1,7 +1,6 @@
 <h3 class="settings-subsection-title">Indexkonsistenz</h3>
 <p class="hint" style="margin:0 0 14px;">
-  Vergleicht den schnellen SQLite-Index mit Parquet-Archiv und Hot Buffer. Die Prüfung liest nur;
-  eine Reparatur ersetzt ausschließlich abgeleitete Zähler, Größen und Zeitgrenzen.
+  Vergleicht Index mit den gespeicherten Rohdaten. Prüfung liest nur, Reparatur korrigiert nur abgeleitete Werte.
 </p>
 {% if storage_audit %}
 <div class="status-grid">

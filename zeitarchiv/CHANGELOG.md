@@ -1,5 +1,76 @@
 # Changelog
 
+## 0.40.0 - 2026-08-27
+
+### Neu
+
+- Dashboards aufklappbar in der Navigation: „Dashboards" im Hauptmenü zeigt
+  beim Klick eine Liste aller vorhandenen Dashboards (Desktop-Dropdown und
+  mobiles Menü), statt direkt zur Übersichtsliste zu verlinken.
+- Dashboard fixieren: ein Schalter im Editor sperrt Umsortieren,
+  Größenändern und Entfernen von Kacheln auf der Ansicht — serverseitig
+  durchgesetzt, nicht nur optisch versteckt. Umbenennen/Löschen bleiben im
+  Editor weiterhin möglich.
+- „Gesamter Zeitraum"-Kennzahlen auf der Bereinigungsseite: zusätzlich zur
+  gewählten Periode eine dauerhafte Zeile mit Ausreißern/Lücken/Duplikaten/
+  Wiederholungen über die komplette Historie (gecacht, 15 Min.).
+- Neuer Chart/Neue Tabelle direkt im Anheften-Menü eines Dashboards, auch
+  wenn bereits Kacheln vorhanden sind.
+- Einheit beim Wert: die Rohwert-Tabelle (Bereinigen/Korrigieren) zeigt die
+  Einheit der Entität jetzt direkt neben jedem Wert.
+- Vergleichstabellen: Aggregation je Zeile wählbar (Automatisch/Ø/Min/Max/
+  Summe) statt der bisher festen Zähler-Summe/Durchschnitt-Regel.
+- Vergleichstabellen: Nachkommastellen je Spalte einstellbar (Automatisch
+  oder 0–3).
+- Einstellungen → Diagnose → Prozess zeigt Startzeitpunkt und Laufzeit der
+  App.
+
+### Geändert
+
+- Reichhaltigere Begründungstexte bei Ausreißer/Lücke/Duplikat/Wiederholung
+  (Vorwert samt Zeitstempel bzw. alle betroffenen Werte statt nur einer
+  Kurzformel); zugehörige Tooltips überlappen nicht mehr die scrollbare
+  Tabelle.
+- Zeitstempel zeigen durchgängig das Jahr.
+- Reihenfolge der Bereinigungs-Tabs: Bereinigen / Korrigieren / Hinzufügen.
+- Spaltenbreiten der Rohwert-Tabelle neu austariert, Zeilenhöhe zwischen
+  Bereinigen- und Korrigieren-Modus vereinheitlicht.
+- Wert-Eingabefeld unter „Hinzufügen" nutzt durchgängig deutsches
+  Zahlenformat (Komma).
+- Löschen-Button auf der Bereinigungsseite in den App-Standardfarben/
+  -Bestätigungsdialog statt nativem Browser-Popup.
+- Redundante Breadcrumb auf Bereinigungs- und Konfigurationsseite entfernt.
+- Übersichtsseite zeigt statt eines festen „Übersicht"-Titels den
+  tatsächlichen Namen des Standard-Dashboards.
+- Löschen-Bestätigung für Dashboards klargestellt: nur die Kachel-Anordnung
+  geht verloren, zugrunde liegende Charts/Tabellen bleiben erhalten.
+- Tabellen-Editor-Vorschau: Buchstaben-Kürzel (A/B/C …) sitzen jetzt sichtbar
+  abgesetzt neben statt innerhalb der Tabelle, per Messung pixelgenau
+  ausgerichtet.
+- „Erste Spalte hervorheben" ohne den bisherigen Farbbalken am Rand.
+- Zeilenabstand „Kompakt" in Vergleichstabellen spürbar enger.
+- Einstellungen-Menü bleibt auf dem Smartphone beim Scrollen sichtbar
+  (sticky, unterhalb der Kopfzeile) und folgt horizontal dem aktuell
+  hervorgehobenen Abschnitt.
+- Diagnose-Werkzeuge (Schreibvorgang aufzeichnen, Entität verfolgen,
+  Diagnosebericht) in einem eigenen Abschnitt „Diagnose" zusammengefasst
+  statt auf „Protokollierung"/„Über Zeitarchiv" verteilt.
+- „Über Zeitarchiv" mit Logo, Versions-Badge und kompakterer
+  Kachel-Darstellung neu gestaltet.
+- Zahlreiche Hinweistexte in den Einstellungen gekürzt.
+
+### Behoben
+
+- Duplikate-Zähler in der Bereinigungsleiste zeigte die Anzahl
+  Duplikat-Gruppen statt der tatsächlich gelisteten Zeilen.
+- „Duplikate automatisch entfernen" schlug bei Entitäten mit mehr als
+  500.000 Rohwerten im gewählten Zeitraum mit einem stillen 413-Fehler fehl.
+- Einstellungen-Seite lud bei vielen Entitäten bzw. vielen markierten
+  Löschungen spürbar langsam — der Rotation-Zähler durchsuchte den Hot
+  Buffer je Entität einzeln, die Bereinigungsvorschau las bei jedem Aufruf
+  erneut alle betroffenen Archiv-Monate. Beides jetzt einmalig berechnet
+  bzw. gecacht.
+
 ## 0.30.1 - 2026-08-27
 
 ### Behoben
@@ -40,7 +111,7 @@
   strukturiert, größeres Logo, Tooltip für die HA-Entität-Zuordnung im
   Import.
 - Mehrere interne Performance-Optimierungen in Statistik-Seite,
-  Entitätenliste und Bereinigungs-Vorschau.
+  Entitätenliste und Bereinigungs-Vorschau (siehe `PERFORMANCE.md`).
 
 ### Behoben
 

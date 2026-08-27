@@ -27,19 +27,33 @@
   </script>
 </div>
 
-<div class="entity-stats" id="rows-summary" hx-swap-oob="true" aria-live="polite">
-  <div class="entity-stat"><strong>{{ total_row_count_label }}</strong><span>insgesamt</span></div>
-  <div class="entity-stat"><strong>{{ range_row_count_label }}</strong><span>im Zeitraum</span></div>
-  {% if outlier_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.outliers else '' }}"><strong>{{ counts.outliers }}</strong><span>Ausreißer</span></div>{% endif %}
-  {% if gap_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.gaps else '' }}"><strong>{{ counts.gaps }}</strong><span>Lücken</span></div>{% endif %}
-  <div class="entity-stat {{ 'has-issues' if counts.duplicates else '' }}"><strong>{{ counts.duplicates }}</strong><span>Duplikate</span></div>
-  <div class="entity-stat {{ 'has-issues' if counts.repetitions else '' }}"><strong>{{ counts.repetitions }}</strong><span>Wiederholungen</span></div>
-  {% if counter_decrease_enabled %}<div class="entity-stat {{ 'has-issues' if counts.counter_decreases else '' }}"><strong>{{ counts.counter_decreases }}</strong><span>Zählerrückgänge</span></div>{% endif %}
+<div class="entity-stats-groups" id="rows-summary" hx-swap-oob="true" aria-live="polite">
+  <div class="entity-stats">
+    <span class="entity-stats-tag" title="Gesamter Zeitraum">Gesamter Zeitraum</span>
+    <div class="entity-stat"><strong>{{ total_row_count_label }}</strong><span>Werte</span></div>
+    {% if outlier_detection_enabled %}<div class="entity-stat {{ 'has-issues' if alltime_counts.outliers else '' }}"><strong>{{ alltime_counts.outliers }}</strong><span>Ausreißer</span></div>{% endif %}
+    {% if gap_detection_enabled %}<div class="entity-stat {{ 'has-issues' if alltime_counts.gaps else '' }}"><strong>{{ alltime_counts.gaps }}</strong><span>Lücken</span></div>{% endif %}
+    <div class="entity-stat {{ 'has-issues' if alltime_counts.duplicates else '' }}"><strong>{{ alltime_counts.duplicates }}</strong><span>Duplikate</span></div>
+    <div class="entity-stat {{ 'has-issues' if alltime_counts.repetitions else '' }}"><strong>{{ alltime_counts.repetitions }}</strong><span>Wiederholungen</span></div>
+    {% if counter_decrease_enabled %}<div class="entity-stat {{ 'has-issues' if alltime_counts.counter_decreases else '' }}"><strong>{{ alltime_counts.counter_decreases }}</strong><span>Zählerrückgänge</span></div>{% endif %}
+  </div>
+  <div class="entity-stats">
+    <span class="entity-stats-tag" title="{{ period_label }}">{{ period_label }}</span>
+    <div class="entity-stat"><strong>{{ range_row_count_label }}</strong><span>Werte</span></div>
+    {% if outlier_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.outliers else '' }}"><strong>{{ counts.outliers }}</strong><span>Ausreißer</span></div>{% endif %}
+    {% if gap_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.gaps else '' }}"><strong>{{ counts.gaps }}</strong><span>Lücken</span></div>{% endif %}
+    <div class="entity-stat {{ 'has-issues' if counts.duplicates else '' }}"><strong>{{ counts.duplicates }}</strong><span>Duplikate</span></div>
+    <div class="entity-stat {{ 'has-issues' if counts.repetitions else '' }}"><strong>{{ counts.repetitions }}</strong><span>Wiederholungen</span></div>
+    {% if counter_decrease_enabled %}<div class="entity-stat {{ 'has-issues' if counts.counter_decreases else '' }}"><strong>{{ counts.counter_decreases }}</strong><span>Zählerrückgänge</span></div>{% endif %}
+  </div>
 </div>
 
 {% if rows %}
 <div class="tbl-wrap">
-  <table class="dt compact">
+  <table class="dt compact" style="table-layout:fixed;">
+    <colgroup>
+      <col style="width:13%"><col style="width:20%"><col style="width:21%"><col style="width:46%">
+    </colgroup>
     <tr>
       {% if mode == 'correct' %}
       <th></th>
@@ -57,9 +71,9 @@
       {% endif %}
       <td>{{ row.formatted_ts }}</td>
       {% if mode == 'correct' %}
-      <td class="correct-value-cell" data-ts="{{ row.ts }}" data-old-value="{{ row.value }}">{{ row.formatted_value }}</td>
+      <td class="correct-value-cell" data-ts="{{ row.ts }}" data-old-value="{{ row.value }}">{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% else %}
-      <td>{{ row.formatted_value }}</td>
+      <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
         {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}</span>{% endfor %}
@@ -98,7 +112,7 @@
   <span style="color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));">✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.</span>
   {% else %}
   <strong><span id="selected-count">0</span> ausgewählt</strong>
-  <button class="btn primary needs-selection" disabled
+  <button class="btn btn-danger needs-selection" disabled
           hx-post="{{ base }}/entities/{{ entity_id }}/rows/delete"
           hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
           hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">

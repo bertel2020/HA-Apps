@@ -291,7 +291,8 @@ CREATE TABLE IF NOT EXISTS dashboards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     position INTEGER NOT NULL,
-    is_default INTEGER NOT NULL DEFAULT 0
+    is_default INTEGER NOT NULL DEFAULT 0,
+    locked INTEGER NOT NULL DEFAULT 0
 );
 
 -- dashboard_id verweist auf dashboards.id — mehrere, unabhängige Dashboards
@@ -321,7 +322,8 @@ CREATE TABLE IF NOT EXISTS table_columns (
     label TEXT NOT NULL,
     range_key TEXT NOT NULL DEFAULT 'month',
     offset INTEGER NOT NULL DEFAULT 0,
-    year_over_year INTEGER NOT NULL DEFAULT 0
+    year_over_year INTEGER NOT NULL DEFAULT 0,
+    decimals TEXT NOT NULL DEFAULT 'auto'
 );
 
 -- Eine Zeile ist eine von drei Arten (Konzept: v1 entity, v2 group, v3
@@ -345,7 +347,8 @@ CREATE TABLE IF NOT EXISTS table_rows (
     entity_ids TEXT NOT NULL DEFAULT '[]',
     formula TEXT NOT NULL DEFAULT '',
     formula_unit TEXT NOT NULL DEFAULT '',
-    bold INTEGER NOT NULL DEFAULT 0
+    bold INTEGER NOT NULL DEFAULT 0,
+    aggregation TEXT NOT NULL DEFAULT 'auto'
 );
 """
 
@@ -508,6 +511,17 @@ class Index:
         table_row_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(table_rows)")}
         if "formula_unit" not in table_row_columns:
             self._conn.execute("ALTER TABLE table_rows ADD COLUMN formula_unit TEXT NOT NULL DEFAULT ''")
+        if "aggregation" not in table_row_columns:
+            # Aggregation je Entität/Gruppen-Zeile (Ø/Min/Max/Summe) — "auto"
+            # ist das bisherige, implizite Verhalten (Zähler/Schalter -> Summe,
+            # sonst Durchschnitt), siehe TableCompute.computeValues().
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN aggregation TEXT NOT NULL DEFAULT 'auto'")
+
+        table_column_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(table_columns)")}
+        if "decimals" not in table_column_columns:
+            # Dieselbe Konvention wie das entity-eigene "Nachkommastellen"-Feld
+            # (formatting.DECIMALS_LABELS) — rein für die Anzeige dieser Spalte.
+            self._conn.execute("ALTER TABLE table_columns ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
 
         dashboard_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboard_pins)")}
         if "grid_cols" not in dashboard_columns:
@@ -539,6 +553,15 @@ class Index:
                 "SELECT 1, item_type, item_id, position, grid_cols, grid_rows FROM dashboard_pins_old"
             )
             self._conn.execute("DROP TABLE dashboard_pins_old")
+
+        dashboards_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboards)")}
+        if "locked" not in dashboards_columns:
+            # Fixieren (Konzept "Dashboard sperren"): verhindert versehentliche
+            # Layout-Änderungen (Kachelgröße, Entfernen, Umsortieren) beim
+            # normalen Ansehen — Umbenennen/Löschen bleiben im Dashboard-Editor
+            # unabhängig vom Sperrstatus möglich, betrifft also nur die
+            # Kachel-Aktionen auf der Dashboard-Ansichtsseite selbst.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")
 
         # Einmalige Anlage des migrierten Default-Dashboards ("Übersicht", fest
         # verankert an id=1, siehe dashboard_pins-Migration oben) — nur beim
@@ -1225,6 +1248,13 @@ class Index:
             )
             return cursor.rowcount > 0
 
+    def set_dashboard_locked(self, dashboard_id: int, locked: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET locked = ? WHERE id = ?", (1 if locked else 0, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
     def delete_dashboard(self, dashboard_id: int) -> bool:
         """False bei unbekannter id ODER beim Default-Dashboard (is_default) —
         letzteres ist der feste Ankerpunkt für "/" und darf nicht verschwinden."""
@@ -1361,22 +1391,26 @@ class Index:
         # den Lock bereits halten (threading.Lock ist nicht reentrant, ein
         # zweites with self._lock hier würde deadlocken).
         self._conn.executemany(
-            "INSERT INTO table_columns (table_id, position, label, range_key, offset, year_over_year) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO table_columns (table_id, position, label, range_key, offset, year_over_year, decimals) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
             [
-                (table_id, i, c["label"], c["range_key"], c["offset"], int(c["year_over_year"]))
+                (
+                    table_id, i, c["label"], c["range_key"], c["offset"], int(c["year_over_year"]),
+                    c.get("decimals", "auto"),
+                )
                 for i, c in enumerate(columns)
             ],
         )
 
     def _write_table_rows(self, table_id: int, rows: list[dict]) -> None:
         self._conn.executemany(
-            "INSERT INTO table_rows (table_id, position, label, row_type, entity_ids, formula, formula_unit, bold) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO table_rows "
+            "(table_id, position, label, row_type, entity_ids, formula, formula_unit, bold, aggregation) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, r["label"], r["row_type"], json.dumps(r["entity_ids"]),
-                    r["formula"], r.get("formula_unit", ""), int(r["bold"]),
+                    r["formula"], r.get("formula_unit", ""), int(r["bold"]), r.get("aggregation", "auto"),
                 )
                 for i, r in enumerate(rows)
             ],
@@ -1449,7 +1483,7 @@ class Index:
             result["columns"] = [
                 {
                     "label": c["label"], "range_key": c["range_key"], "offset": c["offset"],
-                    "year_over_year": bool(c["year_over_year"]),
+                    "year_over_year": bool(c["year_over_year"]), "decimals": c["decimals"],
                 }
                 for c in column_rows
             ]
@@ -1458,6 +1492,7 @@ class Index:
                     "label": r["label"], "row_type": r["row_type"],
                     "entity_ids": json.loads(r["entity_ids"]), "formula": r["formula"],
                     "formula_unit": r["formula_unit"], "bold": bool(r["bold"]),
+                    "aggregation": r["aggregation"],
                 }
                 for r in row_rows
             ]
@@ -1552,6 +1587,40 @@ class Index:
         """{"checked_at": ..., "rows": [...]} des letzten Wartungsplaner-Laufs,
         oder None vor dem allerersten Lauf nach einer frischen Installation."""
         raw = self.get_setting(self._DUPLICATE_SNAPSHOT_KEY)
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+
+    _CLEANUP_ALLTIME_STATS_PREFIX = "cleanup_alltime_stats:"
+
+    def is_cleanup_alltime_stats_stale(self, entity_id: str, min_interval_seconds: float = 900) -> bool:
+        """Ob die je Entität gecachten Ausreißer/Lücken/Duplikate/Wiederholungen-
+        Zählungen über die GESAMTE Historie (Bereinigungsseite, "Gesamter
+        Zeitraum") neu berechnet werden sollten — ein Vollscan wäre bei
+        Entitäten mit Millionen Rohwerten sonst bei jedem Seitenaufruf teuer.
+        Anders als der globale Duplikat-Snapshot (ein Wartungsplaner-Lauf für
+        alle Entitäten) wird hier bewusst nur je aufgerufener Entität und on
+        demand neu gerechnet, statt im Hintergrund für jede Entität im Archiv."""
+        raw = self.get_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id)
+        if raw is None:
+            return True
+        try:
+            computed_at = json.loads(raw).get("computed_at")
+        except (json.JSONDecodeError, AttributeError):
+            return True
+        return computed_at is None or time.time() - computed_at >= min_interval_seconds
+
+    def set_cleanup_alltime_stats(self, entity_id: str, counts: dict) -> None:
+        payload = json.dumps({"computed_at": time.time(), "counts": counts})
+        self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, payload)
+
+    def get_cleanup_alltime_stats(self, entity_id: str) -> dict | None:
+        """{"computed_at": ..., "counts": {...}} oder None vor der ersten
+        Berechnung für diese Entität."""
+        raw = self.get_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id)
         if raw is None:
             return None
         try:

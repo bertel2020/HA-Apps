@@ -64,7 +64,7 @@
 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
 {%- endmacro %}
 
-<div class="topnav" x-data="{ systemOpen: false, drawerOpen: false, drawerSystemOpen: {{ 'true' if nav_system else 'false' }} }">
+<div class="topnav" x-data="{ systemOpen: false, dashboardsOpen: false, drawerOpen: false, drawerSystemOpen: {{ 'true' if nav_system else 'false' }}, drawerDashboardsOpen: {{ 'true' if nav_dashboards else 'false' }} }">
   <div class="topnav-bar">
     <a class="topnav-brand" href="{{ app_root }}/">
       <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
@@ -83,7 +83,21 @@
 
     <nav class="topnav-links">
       <a class="topnav-link{{ ' is-active' if nav_home }}" href="{{ app_root }}/">{{ nav_icon('home') }}Übersicht</a>
-      <a class="topnav-link{{ ' is-active' if nav_dashboards }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Dashboards</a>
+      <div class="topnav-system{{ ' is-active' if nav_dashboards }}" @click.outside="dashboardsOpen = false">
+        <button type="button" class="topnav-system-btn" @click="dashboardsOpen = !dashboardsOpen" :aria-expanded="dashboardsOpen.toString()">
+          {{ nav_icon('dashboards') }}Dashboards{{ nav_chevron() }}
+        </button>
+        <div class="topnav-menu topnav-menu-dashboards" x-show="dashboardsOpen" x-cloak @click="dashboardsOpen = false">
+          <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Alle Dashboards</a>
+          {% if nav_dashboards_list %}
+          <div class="topnav-menu-divider"></div>
+          {% for d in nav_dashboards_list %}
+          {% set d_path = '/dashboards/' ~ d.id|string %}
+          <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ d.name }}</a>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
       <a class="topnav-link{{ ' is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}Entitäten</a>
       <a class="topnav-link{{ ' is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}Charts</a>
       <a class="topnav-link{{ ' is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}Tabellen</a>
@@ -116,7 +130,17 @@
     </div>
     <nav>
       <a class="{{ 'is-active' if nav_home }}" href="{{ app_root }}/">{{ nav_icon('home') }}Übersicht</a>
-      <a class="{{ 'is-active' if nav_dashboards }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Dashboards</a>
+      <button type="button" class="topnav-drawer-system-btn{{ ' is-active' if nav_dashboards }}" @click="drawerDashboardsOpen = !drawerDashboardsOpen" :aria-expanded="drawerDashboardsOpen.toString()">
+        <span class="topnav-drawer-system-label">{{ nav_icon('dashboards') }}Dashboards</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" :class="{ 'is-open': drawerDashboardsOpen }" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
+      </button>
+      <div class="topnav-drawer-sub" x-show="drawerDashboardsOpen">
+        <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">Alle Dashboards</a>
+        {% for d in nav_dashboards_list %}
+        {% set d_path = '/dashboards/' ~ d.id|string %}
+        <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ d.name }}</a>
+        {% endfor %}
+      </div>
       <a class="{{ 'is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}Entitäten</a>
       <a class="{{ 'is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}Charts</a>
       <a class="{{ 'is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}Tabellen</a>

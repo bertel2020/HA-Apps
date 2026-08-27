@@ -1,4 +1,4 @@
-<p class="hint" style="margin:0 0 14px;">Entfernt zur Löschung markierte Datensätze (Bereinigungs-Werkzeug) physisch und gibt den Speicherplatz frei &mdash; im laufenden Monat (Hot Buffer) ebenso wie in bereits archivierten Monaten (Parquet-Archiv). Für archivierte Monate werden dabei automatisch auch die zugehörigen Rollup-Dateien (Stunde/Tag bis Jahr) neu berechnet, damit Rohdaten und Diagramme konsistent bleiben.</p>
+<p class="hint" style="margin:0 0 14px;">Entfernt markierte Datensätze endgültig und gibt Speicherplatz frei. Rollups werden automatisch neu berechnet.</p>
 {% set totals = purge_preview.totals %}
 <div class="settings-minor-section">
     <h4 class="settings-minor-title">Vorschau der Bereinigung</h4>

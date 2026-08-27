@@ -18,16 +18,37 @@
   .fav-star.active{color:#D9A22B;opacity:1;}
   .fav-star:hover{color:#D9A22B;opacity:1;}
 
-  /* Kompakte Entitäts-Kennzahlen zwischen Kopf und Werkzeug-Tabs. Das Element
-     wird bei jedem Tabellen-Request per htmx OOB aktualisiert, bleibt optisch
-     aber ein stabiler Teil des Seitenkopfs. */
+  /* Kompakte Entitäts-Kennzahlen zwischen Kopf und Werkzeug-Tabs, als ZWEI
+     getrennte Zeilen: "Gesamter Zeitraum" (komplette Historie, ändert sich
+     nicht mit dem Zeitraum-Chip) und der gerade gewählte Zeitraum darunter —
+     vorher beides in einer Zeile vermischt, wodurch unklar war, was "insgesamt"
+     eigentlich bedeutet. Das äußere Element wird bei jedem Tabellen-Request
+     per htmx OOB komplett ersetzt, bleibt optisch aber ein stabiler Teil des
+     Seitenkopfs. */
+  .entity-stats-groups{display:flex;flex-direction:column;gap:8px;margin:14px 0 2px;}
   .entity-stats{
-    display:flex;align-items:stretch;flex-wrap:wrap;margin:14px 0 2px;
+    display:flex;align-items:stretch;flex-wrap:wrap;
     border:1px solid var(--border);border-left:3px solid var(--accent-line);
     border-radius:9px;background:var(--surface-alt);overflow:hidden;
     color:var(--ink-muted);font-family:var(--font-mono);
   }
-  .entity-stat{display:flex;align-items:baseline;gap:6px;padding:9px 13px;white-space:nowrap;}
+  /* Feste statt dynamisch gemessene Breite: 270px passt beim
+     Basis-Font-Scale (1) auch das längste vorkommende Label
+     "Gesamter Zeitraum (seit DD.MM.YYYY)" (231px Text + Innenabstand)
+     bequem — die Breite bleibt so über beide Zeilen hinweg stabil,
+     ohne dass JS bei jedem htmx-Swap nachmessen muss. */
+  .entity-stats-tag{
+    display:flex;align-items:center;padding:9px 13px;white-space:nowrap;
+    flex:none;box-sizing:border-box;width:calc(270px * var(--font-scale, 1));
+    overflow:hidden;text-overflow:ellipsis;
+    font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;letter-spacing:.03em;
+    text-transform:uppercase;color:var(--ink-faint);background:var(--surface);
+    border-right:1px solid var(--border);
+  }
+  @media (max-width:720px){
+    .entity-stats-tag{width:calc(150px * var(--font-scale, 1));}
+  }
+  .entity-stat{display:flex;align-items:baseline;gap:6px;padding:9px 13px;white-space:nowrap;flex:none;box-sizing:border-box;}
   .entity-stat + .entity-stat{border-left:1px solid var(--border);}
   .entity-stat strong{color:var(--ink);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;}
   .entity-stat span{font-size:calc(11.5px * var(--font-scale, 1));}
@@ -65,9 +86,36 @@
   .add-value-status.err{color:var(--danger);}
 
   /* Korrigieren-Modus: Stift-Button statt Checkbox, Wert-Zelle wird per Klick
-     zu einem Inline-Formular (Zahl-Feld + ✓/✗) — siehe startCorrect() unten. */
-  .correct-edit-btn{background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:calc(14px * var(--font-scale, 1));padding:2px 4px;}
+     zu einem Inline-Formular (Zahl-Feld + ✓/✗) — siehe startCorrect() unten.
+     Die native Checkbox im Bereinigen-Modus und dieser Button hatten trotz
+     gleich großer eigener Box (18px) noch minimal unterschiedliche Zeilenhöhen
+     zur Folge (Browser-Zeilenbox-Berechnung reagiert nicht bei beiden Element-
+     Typen identisch) — deshalb zusätzlich eine EXPLIZITE, für #rows-table fest
+     vorgegebene Zeilenhöhe weiter unten, die für beide Modi gleichermaßen gilt
+     und Restunterschiede eliminiert statt sie nur anzunähern. */
+  .correct-edit-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:calc(18px * var(--font-scale, 1));height:calc(18px * var(--font-scale, 1));
+    background:none;border:none;cursor:pointer;color:var(--ink-faint);
+    font-size:calc(12.5px * var(--font-scale, 1));padding:0;
+  }
   .correct-edit-btn:hover{color:var(--accent-line);}
+  table.dt.compact td input[type="checkbox"]{
+    width:calc(14px * var(--font-scale, 1));height:calc(14px * var(--font-scale, 1));
+    margin:calc(2px * var(--font-scale, 1));vertical-align:middle;
+  }
+  /* Feste Zeilenhöhe für #rows-table (Bereinigen UND Korrigieren teilen sich
+     dieselbe _rows_table.html, siehe dortiger Kommentar) statt sie aus dem
+     jeweils höchsten Kind ableiten zu lassen — macht die Höhe unabhängig
+     davon, ob die erste Spalte eine Checkbox oder den Korrigieren-Button
+     enthält, und ist damit robuster als nur beide Kontrollelemente gleich
+     groß zu machen. 30px liegt bewusst über dem, was Text/Checkbox/Button je
+     für sich bräuchten (~24–28px) — sonst bliebe height nur ein wirkungsloser
+     Mindestwert (CSS-Tabellenzellen wachsen bei Bedarf immer über eine zu
+     knapp bemessene height hinaus), und beide Modi würden wieder mit ihrer je
+     eigenen, leicht unterschiedlichen Inhaltsgröße rendern. */
+  #rows-table table.dt.compact td{height:calc(30px * var(--font-scale, 1));vertical-align:middle;}
+  .value-unit{color:var(--ink-faint);font-size:calc(11.5px * var(--font-scale, 1));}
   .correct-inline{display:flex;align-items:center;gap:6px;}
   .correct-inline input{
     width:110px;font-family:inherit;font-size:inherit;padding:4px 6px;border-radius:6px;
@@ -160,6 +208,25 @@
   .calendar-day:disabled{cursor:default;}
   .calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
   .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+
+  /* Status-Badge-Tooltips (Ausreißer/Lücke/Duplikat/Wiederholung) brauchen
+     eigenes JS statt der generischen [data-tooltip]::after-Regel (app.css):
+     die Badges sitzen in der scrollbaren Rohwert-Tabelle (.tbl-wrap,
+     overflow-x:auto), die jeden absolut positionierten Nachfahren an ihrer
+     eigenen Box kappt statt ihn umbrechen zu lassen, sobald er über den
+     sichtbaren Ausschnitt hinausragt — sichtbar als mittendrin abgeschnittener
+     Text. Ein an <body> gehängtes, per JS positioniertes .js-tooltip-Element
+     (position:fixed) entkommt dieser Klemme vollständig. */
+  .flag-badge[data-tooltip]:hover::after{content:none;}
+  .js-tooltip{
+    position:fixed;z-index:50;display:none;
+    background:var(--ink);color:var(--bg);padding:6px 10px;border-radius:6px;
+    font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;
+    white-space:normal;width:max-content;max-width:min(420px,calc(100vw - 24px));
+    overflow-wrap:anywhere;line-height:1.4;pointer-events:none;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);
+  }
+  .js-tooltip.open{display:block;}
 </style>
 </head>
 <body>
@@ -173,7 +240,6 @@
        nicht über Alpine-Reaktivität. -->
   {% include "_topnav.html" %}
   <div class="page" x-data="{ range: 'day', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
-    <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / <a href="{{ base }}/entities">Entitäten</a> / <a href="{{ base }}/entities/{{ entity_id }}">{{ friendly_name or entity_id }}</a> / Bearbeitungsbereich</p>
     <div class="h1-row">
       <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
@@ -184,14 +250,14 @@
       <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
 
-    <div class="entity-stats" id="rows-summary" aria-live="polite">
+    <div class="entity-stats-groups" id="rows-summary" aria-live="polite">
       <span class="entity-stats-loading">Kennzahlen werden geladen …</span>
     </div>
 
     <div class="edit-tabs">
       <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">Bereinigen</button>
-      <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">Hinzufügen</button>
       <button type="button" :class="{active: tab === 'correct'}" @click="setTab('correct')">Korrigieren</button>
+      <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">Hinzufügen</button>
     </div>
 
     <div x-show="tab === 'add'" x-cloak class="add-value-card">
@@ -201,7 +267,7 @@
           <input type="datetime-local" id="add-datetime" step="1">
         </label>
         <label>Wert
-          <input type="number" step="any" id="add-value" placeholder="0.0">
+          <input type="text" inputmode="decimal" id="add-value" placeholder="0,0">
         </label>
         <button type="button" class="btn primary" onclick="submitAddValue()">Hinzufügen</button>
       </div>
@@ -268,6 +334,8 @@
   </div>
 
   <script src="{{ base }}/static/vendor/htmx.min.js"></script>
+  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
@@ -305,7 +373,7 @@
         return;
       }
       const ts = new Date(dtStr).getTime() / 1000;
-      const value = parseFloat(valueStr);
+      const value = NumberFormat.parse(valueStr);
       if (Number.isNaN(value)) {
         statusEl.className = 'add-value-status err';
         statusEl.textContent = 'Ungültiger Wert.';
@@ -496,6 +564,74 @@
     }
     document.body.addEventListener('change', e => { if (e.target.name === 'ts') updateSelectedCount(); });
     document.body.addEventListener('htmx:afterSwap', updateSelectedCount);
+
+    // Die Kennzahl-Spalten (je Kennzahl, NICHT das Tag-Feld — das hat eine
+    // feste CSS-Breite, siehe .entity-stats-tag) sollen zwischen "Gesamter
+    // Zeitraum" und der ausgewählten Periode exakt fluchten, obwohl beide
+    // Zeilen eigene, unabhängig breite Boxen sind (kein <table>, das Spalten
+    // automatisch über Zeilen hinweg ausrichten würde). Deshalb hier per JS:
+    // Inline-Breiten zurücksetzen, dann je Spaltenindex die breitere der
+    // beiden Zellen messen und beiden dieselbe Breite geben.
+    function alignEntityStatsColumns() {
+      const container = document.getElementById('rows-summary');
+      if (!container) return;
+      const rows = Array.from(container.children).filter(el => el.classList.contains('entity-stats'));
+      if (rows.length < 2) return;
+      // erstes Kind je Zeile ist .entity-stats-tag (feste Breite) — ab Index 1.
+      const cellRows = rows.map(row => Array.from(row.children).slice(1));
+      const colCount = Math.min(...cellRows.map(cells => cells.length));
+      cellRows.forEach(cells => cells.forEach(cell => { cell.style.width = ''; }));
+      for (let i = 0; i < colCount; i++) {
+        const widest = Math.max(...cellRows.map(cells => cells[i].getBoundingClientRect().width));
+        cellRows.forEach(cells => { cells[i].style.width = Math.ceil(widest) + 'px'; });
+      }
+    }
+    document.body.addEventListener('htmx:afterSwap', alignEntityStatsColumns);
+
+    // Status-Badge-Tooltips: siehe Kommentar bei .js-tooltip oben — ein an
+    // <body> gehängtes fixed-Element statt des CSS-::after, damit lange
+    // Begründungstexte (Vorwert, betroffene Werte) nicht von der scrollbaren
+    // Rohwert-Tabelle abgeschnitten werden. Event-Delegation auf document,
+    // weil #rows-table bei jeder Filter-/Seiten-Änderung per htmx neu
+    // eingesetzt wird.
+    (function () {
+      let tip = null;
+      function ensureTip() {
+        if (!tip) {
+          tip = document.createElement('div');
+          tip.className = 'js-tooltip';
+          document.body.appendChild(tip);
+        }
+        return tip;
+      }
+      function showTip(badge) {
+        const text = badge.getAttribute('data-tooltip');
+        if (!text) return;
+        const el = ensureTip();
+        el.textContent = text;
+        el.classList.add('open');
+        const anchor = badge.getBoundingClientRect();
+        const box = el.getBoundingClientRect();
+        let left = Math.min(anchor.left, window.innerWidth - box.width - 8);
+        left = Math.max(8, left);
+        let top = anchor.top - box.height - 6;
+        if (top < 8) top = anchor.bottom + 6;
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+      }
+      function hideTip() {
+        if (tip) tip.classList.remove('open');
+      }
+      document.addEventListener('mouseover', e => {
+        const badge = e.target.closest('.flag-badge[data-tooltip]');
+        if (badge) showTip(badge);
+      });
+      document.addEventListener('mouseout', e => {
+        const badge = e.target.closest('.flag-badge[data-tooltip]');
+        if (badge) hideTip();
+      });
+      document.addEventListener('scroll', hideTip, true);
+    })();
   </script>
 </body>
 </html>

@@ -8,21 +8,17 @@
 <link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
 <style>
   :root{--font-scale:{{ font_scale_value }};}
-  /* "Diagnose" bewusst von Dokumentation/Changelog/Fehler melden abgesetzt
-     (eigener, sensiblerer Download statt reiner externer Links) — die
-     geteilte .settings-subsection-Trennlinie (app.css) greift sonst nur
-     zwischen zwei AUFEINANDERFOLGENDEN Subsections (+-Selektor), hier steht
-     sie aber direkt nach der reinen .actionbar-Button-Zeile. */
-  #ueber .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
-  /* Log-Level-Formular UND "Nächsten Schreibvorgang aufzeichnen" sind beide
-     .settings-subsection, aber keine direkten Geschwister im DOM — der
-     htmx-Refresh-Wrapper #debug-tools (_settings_debug_tools.html) steht
-     dazwischen, wodurch der geteilte +-Selektor (app.css) nicht zwischen
-     ihnen greift. Gezielt nur auf direkte Kinder von #debug-tools statt auf
-     #protokollierung .settings-subsection insgesamt, sonst bekäme auch das
-     allererste Subsection (Log-Level-Formular, direkt unter der Überschrift)
-     fälschlich eine Trennlinie darüber. */
-  #protokollierung #debug-tools > .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+  /* "Diagnosebericht" (Diagnosedaten herunterladen) folgt im DOM direkt auf
+     #debug-tools (_settings_debug_tools.html, htmx-Refresh-Wrapper um die
+     beiden Werkzeug-Subsections "Nächsten Schreibvorgang aufzeichnen"/
+     "Entität verfolgen"), NICHT direkt auf eine .settings-subsection — die
+     geteilte Trennlinie (app.css, +-Selektor zwischen aufeinanderfolgenden
+     Subsections) greift deshalb hier nicht von selbst. Gezielt nur auf
+     DIREKTE Kinder von #diagnose (":>"), sonst bekämen auch die beiden
+     Werkzeug-Subsections INNERHALB von #debug-tools zusätzlich diese Regel —
+     deren Trennlinie zwischen sich regelt bereits ganz normal der geteilte
+     +-Selektor, da sie direkte Geschwister voneinander sind. */
+  #diagnose > .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
   .about-copyright{
     display:flex;align-items:center;gap:8px;margin-top:20px;padding-top:14px;
     border-top:1px solid var(--border);font-size:calc(12px * var(--font-scale,1));color:var(--ink-faint);
@@ -30,6 +26,38 @@
   .about-copyright .copyright-mark{font-family:var(--font-mono);color:var(--ink-muted);}
   .about-copyright a{color:var(--ink-muted);font-weight:600;text-decoration:none;}
   .about-copyright a:hover,.about-copyright a:focus-visible{color:var(--accent-line);text-decoration:underline;}
+
+  /* "Über Zeitarchiv" — Hero-Karte mit Logo statt der bisherigen reinen
+     Label/Wert-Kästchen-Liste (Konzept: modernerer, ruhigerer erster
+     Eindruck). Das Logo trägt bewusst FESTE Markenfarben (identisch zum
+     .topnav-brand-SVG oben in der Navigation) statt Theme-Variablen — die
+     Wortmarke soll unabhängig vom gewählten Farbschema/Hell-Dunkel-Modus
+     immer gleich aussehen, genau wie in der Kopfzeile. */
+  .about-card{
+    display:flex;gap:18px;align-items:center;background:var(--surface-alt);
+    border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin:18px 0 20px;
+  }
+  .about-logo{width:52px;height:52px;flex:none;border-radius:12px;box-shadow:var(--shadow);}
+  .about-card-heading{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+  .about-app-name{font-family:var(--font-display);font-size:calc(20px * var(--font-scale,1));font-weight:700;color:var(--ink);}
+  .about-version-badge{
+    font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale,1));font-weight:600;
+    color:var(--accent-line);background:var(--accent-line-soft);padding:2px 9px;border-radius:999px;
+  }
+  .about-tagline{margin:0;color:var(--ink-muted);font-size:calc(13.5px * var(--font-scale,1));line-height:1.55;max-width:640px;}
+  /* auto-fit statt einer festen Spaltenzahl — bleibt bei nur zwei Einträgen
+     (Zeitzone/Datenverzeichnis) zweispaltig auf breiten Bildschirmen und
+     fällt auf schmalen von selbst einspaltig, ohne eigene @media-Regel. */
+  .about-meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:22px;}
+  .about-meta-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;min-width:0;}
+  .about-meta-label{
+    display:block;font-family:var(--font-mono);font-size:calc(10px * var(--font-scale,1));text-transform:uppercase;
+    letter-spacing:.04em;color:var(--ink-faint);margin-bottom:4px;
+  }
+  .about-meta-value{display:block;font-family:var(--font-mono);font-size:calc(13px * var(--font-scale,1));color:var(--ink);word-break:break-all;}
+  @media (max-width:520px){
+    .about-card{flex-direction:column;align-items:flex-start;text-align:left;}
+  }
 </style>
 </head>
 <body>
@@ -51,7 +79,7 @@
 
         <section id="archivierung" class="settings-section">
           <h2 class="settings-section-title">Archivierung</h2>
-          <p>Standard-Auflösung und -Aufbewahrung für neu erkannte Entitäten. Wirkt nur beim erstmaligen Erkennen &mdash; bereits archivierte Entitäten behalten ihre individuelle Einstellung aus der jeweiligen Konfigurationsseite.</p>
+          <p>Standardwerte für neu erkannte Entitäten. Bestehende bleiben unverändert.</p>
           <div id="archivierung-form">
             {% include "_settings_archivierung_form.html" %}
           </div>
@@ -117,37 +145,72 @@
           </div>
         </section>
 
+        <section id="diagnose" class="settings-section">
+          <h2 class="settings-section-title">Diagnose</h2>
+          {% include "_settings_debug_tools.html" %}
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Diagnosebericht</h3>
+            <div class="actionbar" style="justify-content:flex-start;">
+              <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
+            </div>
+            <p class="hint">Enthält Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.</p>
+          </div>
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Prozess</h3>
+            <div class="field" id="settings-ram" hx-get="settings/ram" hx-trigger="load" hx-swap="outerHTML">
+              <label>RAM-Verbrauch</label>
+              <div class="val mono">wird geladen …</div>
+            </div>
+            <div class="field">
+              <label>Startzeitpunkt</label>
+              <div class="val mono">{{ server_started_at }}</div>
+            </div>
+            <div class="field">
+              <label>Laufzeit</label>
+              <div class="val mono">{{ uptime }}</div>
+            </div>
+          </div>
+        </section>
+
         <section id="ueber" class="settings-section">
           <h2 class="settings-section-title">Über Zeitarchiv</h2>
-          <p>Home-Assistant-App zur langfristigen Archivierung und Auswertung von Entitäts-Zeitreihen &mdash; platzsparende Parquet+zstd-Speicherung, Charts, Tabellen, Import/Export und sichere Datenpflege.</p>
-          <div class="field">
-            <label>Version</label>
-            <div class="val mono">{{ app_version }}</div>
+
+          <div class="about-card">
+            <svg class="about-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
+              <rect width="64" height="64" rx="14" fill="#13211C"/>
+              <rect x="13" y="44" width="6" height="7" rx="1.5" fill="#E79A5B"/>
+              <rect x="23.8" y="35.87" width="6" height="15.13" rx="1.5" fill="#E79A5B"/>
+              <rect x="34.6" y="27.73" width="6" height="23.27" rx="1.5" fill="#E79A5B"/>
+              <polyline points="16,40 26.8,31.87 37.6,23.73 48.4,15.6" fill="none" stroke="#57C9BB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="16" cy="40" r="1.4" fill="#57C9BB"/>
+              <circle cx="26.8" cy="31.87" r="1.4" fill="#57C9BB"/>
+              <circle cx="37.6" cy="23.73" r="1.4" fill="#57C9BB"/>
+              <circle cx="48.4" cy="15.6" r="2.6" fill="#57C9BB"/>
+            </svg>
+            <div class="about-card-body">
+              <div class="about-card-heading">
+                <span class="about-app-name">Zeitarchiv</span>
+                <span class="about-version-badge">v{{ app_version }}</span>
+              </div>
+              <p class="about-tagline">Home-Assistant-App zur langfristigen Archivierung und Auswertung von Entitäts-Zeitreihen &mdash; platzsparende Parquet+zstd-Speicherung, Charts, Tabellen, Import/Export und sichere Datenpflege.</p>
+            </div>
           </div>
-          <div class="field">
-            <label>Zeitzone</label>
-            <div class="val mono">{{ timezone }}</div>
+
+          <div class="about-meta-grid">
+            <div class="about-meta-item">
+              <span class="about-meta-label">Zeitzone</span>
+              <span class="about-meta-value">{{ timezone }}</span>
+            </div>
+            <div class="about-meta-item">
+              <span class="about-meta-label">Datenverzeichnis</span>
+              <span class="about-meta-value">{{ data_dir }}</span>
+            </div>
           </div>
-          <div class="field">
-            <label>Datenverzeichnis</label>
-            <div class="val mono">{{ data_dir }}</div>
-          </div>
-          <div class="field" id="settings-ram" hx-get="settings/ram" hx-trigger="load" hx-swap="outerHTML">
-            <label>RAM-Verbrauch</label>
-            <div class="val mono">wird geladen …</div>
-          </div>
+
           <div class="actionbar" style="justify-content:flex-start;">
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md" target="_blank" rel="noopener noreferrer">Dokumentation</a>
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/issues" target="_blank" rel="noopener noreferrer">Fehler melden</a>
-          </div>
-
-          <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Diagnose</h3>
-            <div class="actionbar" style="justify-content:flex-start;">
-              <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
-            </div>
-            <p class="hint">Der Diagnosebericht enthält Betriebs-, Speicher- und nicht geheime Konfigurationsdaten, aber keine API-Token, Messwerte oder Entitäts-IDs.</p>
           </div>
 
           <footer class="about-copyright">
@@ -220,10 +283,27 @@
         .filter(Boolean);
       if (!sections.length) return;
 
+      // Mobil ist .settings-nav eine horizontal scrollbare Einzeile (siehe
+      // app.css) — ohne diesen Abgleich bliebe der Scroll-Streifen an seiner
+      // ursprünglichen Position stehen, während sich die Hervorhebung beim
+      // Scrollen durch die Seite weiterbewegt, sodass der aktive Punkt
+      // irgendwann außerhalb des sichtbaren Streifens verschwindet. Nur bei
+      // TATSÄCHLICHEM Wechsel scrollen (currentId-Vergleich), sonst würde
+      // jeder scroll-Event (auch ohne Abschnittswechsel) erneut
+      // scrollIntoView auslösen und mit dem Scrollen der Seite selbst
+      // konkurrieren. Auf Desktop (vertikale Liste, komplett sichtbar) ist
+      // der Aufruf ein No-op, da bereits alles im Bild ist.
+      let currentId = null;
       function setActive(id) {
+        if (id === currentId) return;
+        currentId = id;
+        let activeLink = null;
         navLinks.forEach(a => {
-          a.classList.toggle('active', a.getAttribute('href').split('#')[1] === id);
+          const isActive = a.getAttribute('href').split('#')[1] === id;
+          a.classList.toggle('active', isActive);
+          if (isActive) activeLink = a;
         });
+        if (activeLink) activeLink.scrollIntoView({behavior: 'smooth', inline: 'center', block: 'nearest'});
       }
 
       // "Aktuell" ist der Abschnitt, von dem GERADE DER GRÖSSTE ANTEIL seiner

@@ -76,11 +76,17 @@ window.TableCompute = (() => {
   // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
   const fmtNum = (window.NumberFormat && window.NumberFormat.fmt) || (v => String(v));
 
-  function cellText(cell) {
+  // decimals: der Spalten-eigene "Nachkommastellen"-String ("auto"/"0"/"1"/…,
+  // dieselbe Konvention wie das entity-eigene Feld, siehe _TableColumnBody in
+  // main.py) — rein optisch, fließt nirgends in eine Berechnung ein. Ohne
+  // Angabe (ältere, vor dieser Funktion gespeicherte Tabellen) unverändert
+  // NumberFormat.fmt()s Default (bis zu 4 signifikante Stellen).
+  function cellText(cell, decimals) {
     if (!cell) return '–';
     if (cell.error) return 'Fehler';
     if (cell.value == null) return '–';
-    return fmtNum(cell.value) + (cell.unit ? ' ' + cell.unit : '');
+    const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10) : null;
+    return fmtNum(cell.value, decimalsInt) + (cell.unit ? ' ' + cell.unit : '');
   }
 
   // Buchstaben-Kürzel je Datenzeile (A, B, C, … Z, dann wieder von vorn) —
@@ -105,6 +111,34 @@ window.TableCompute = (() => {
       if (unitScope[letter]) return unitScope[letter];
     }
     return '';
+  }
+
+  // Aggregiert die Buckets EINER Entität innerhalb einer Spalte (Zeitraum) zu
+  // einem Zahlenwert, je nach gewählter Zeilen-Aggregation. "auto" ist das
+  // historische Verhalten (Zähler/Schalter -> Summe, sonst Durchschnitt der
+  // Bucket-Werte) und bleibt für bestehende Tabellen unverändert. min/max
+  // nutzen das echte Bucket-Minimum/-Maximum (server-seitig aus den
+  // Rohwerten berechnet, siehe storage/query.py `min_value`/`max_value`),
+  // NICHT das Minimum/Maximum der Bucket-DURCHSCHNITTE — sonst würde z. B.
+  // eine kurze Temperaturspitze innerhalb eines Stunden-Buckets im
+  // Tages-/Monats-Maximum verschwinden. Kein Datenpunkt im Zeitraum: bei
+  // avg/sum/auto weiterhin 0 (bisheriges Verhalten, wichtig für Gruppen-
+  // Summen aus mehreren Mitgliedern), bei min/max stattdessen null — 0 wäre
+  // dort kein neutrales Element, sondern ein plausibler, aber falscher Wert.
+  function memberValueFor(series, aggregation) {
+    const pts = series.points || [];
+    if (aggregation === 'min' || aggregation === 'max') {
+      if (!pts.length) return null;
+      const key = aggregation === 'min' ? 'min' : 'max';
+      const vals = pts.map(p => (p[key] != null ? p[key] : p.value)).filter(v => v != null);
+      return vals.length ? Math[aggregation](...vals) : null;
+    }
+    if (!pts.length) return 0;
+    const total = pts.reduce((a, p) => a + (p.value || 0), 0);
+    if (aggregation === 'sum') return total;
+    if (aggregation === 'avg') return total / pts.length;
+    const isSum = series.aggregation_type === 'counter' || series.aggregation_type === 'switch';
+    return isSum ? total : total / pts.length;
   }
 
   // Berechnet values[colIndex][rowIndex] = {value, unit} | {error:true} | null
@@ -138,18 +172,22 @@ window.TableCompute = (() => {
         if (row.row_type === 'formula' || row.row_type === 'separator') return;
         const members = row.entity_ids.map(id => byEntity[id]).filter(Boolean);
         if (!members.length) { values[ci][ri] = null; return; }
-        // Je Mitglied: Summe bei Zähler/Schalter, Durchschnitt der Buckets bei
-        // Standard-Entitäten (dieselbe Regel wie die "Summe"-Zeile auf der
-        // Entität-eigenen Chart-Seite) — eine Gruppen-Zeile summiert diese
-        // Mitglieder-Werte zusätzlich noch einmal auf.
-        const memberValues = members.map(s => {
-          const pts = s.points || [];
-          if (!pts.length) return 0;
-          const total = pts.reduce((a, p) => a + (p.value || 0), 0);
-          const isSum = s.aggregation_type === 'counter' || s.aggregation_type === 'switch';
-          return isSum ? total : total / pts.length;
-        });
-        const value = memberValues.reduce((a, v) => a + v, 0);
+        const aggregation = row.aggregation || 'auto';
+        const memberValues = members.map(s => memberValueFor(s, aggregation));
+        let value;
+        if (aggregation === 'min' || aggregation === 'max') {
+          // Ein Mitglied ganz ohne Datenpunkte fließt hier NICHT als 0 ein
+          // (anders als bei avg/sum/auto unten) — sonst würde eine Entität
+          // ohne Daten im Zeitraum fälschlich zum globalen Minimum. Sind ALLE
+          // Mitglieder ohne Daten, bleibt die Zelle leer statt 0.
+          const valid = memberValues.filter(v => v != null);
+          if (!valid.length) { values[ci][ri] = null; return; }
+          value = aggregation === 'min' ? Math.min(...valid) : Math.max(...valid);
+        } else {
+          // Wie bisher: eine Gruppen-Zeile summiert die (je nach Modus schon
+          // aggregierten) Mitglieder-Werte zusätzlich noch einmal auf.
+          value = memberValues.reduce((a, v) => a + (v || 0), 0);
+        }
         const memberUnits = [...new Set(members.map(member => member.unit || ''))];
         values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : ''};
       });

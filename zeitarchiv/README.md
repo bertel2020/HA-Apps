@@ -92,12 +92,16 @@ wartet die App auf Daten, archiviert aber nichts.
 ### Dashboards
 
 Kacheln lassen sich auf beliebig viele benannte Dashboards verteilen statt
-nur auf eine Startseite. Der Menüpunkt **Dashboards** bietet eine
-Kartenübersicht aller Dashboards, pro Dashboard eine Kachel-Ansicht (bis zu
+nur auf eine Startseite. Der Menüpunkt **Dashboards** klappt eine Liste
+aller vorhandenen Dashboards auf, pro Dashboard eine Kachel-Ansicht (bis zu
 18 frei angeordnete Kacheln, Charts und Tabellen gemischt, Drag-and-drop,
-Größen 1×1 bis 3×3) sowie einen Editor zum Anlegen/Umbenennen/Löschen. Die
-Ein-/Ausblend-Animation der Kachel-Charts gilt weiterhin zentral für alle
-Kacheln und lässt sich unter **Einstellungen → Darstellung** deaktivieren.
+Größen 1×1 bis 3×3, Direktlink zum Anlegen eines neuen Charts/einer neuen
+Tabelle im Anheften-Menü) sowie einen Editor zum Anlegen/Umbenennen/Löschen.
+Ein Dashboard lässt sich dort zusätzlich fixieren — verhindert versehentliches
+Umsortieren, Größenändern oder Entfernen von Kacheln auf der Ansicht, ohne
+Umbenennen/Löschen im Editor einzuschränken. Die Ein-/Ausblend-Animation der
+Kachel-Charts gilt weiterhin zentral für alle Kacheln und lässt sich unter
+**Einstellungen → Darstellung** deaktivieren.
 
 ### Entitäten und Verläufe
 
@@ -137,28 +141,35 @@ Ziehen als auch über Pfeil-Buttons neu anordnen — das bestimmt Legenden-,
 Statistik- und Farbreihenfolge.
 
 Vergleichstabellen unterstützen einzelne Entitäten, Summengruppen, Formeln,
-Trennzeilen und frei gewählte Zeitspalten. Eine Trennzeile zieht eine
-durchgehende Linie über die gesamte Tabellenbreite, rein optisch zur
-Gliederung, ohne eigene Daten. Spalten und Zeilen lassen sich
-per Ziehen oder über Pfeil-Buttons neu anordnen; beim Umsortieren von Zeilen
-werden die Buchstaben-Referenzen (A/B/C …) in Formel-Zeilen automatisch
-korrigiert, sodass eine Formel weiterhin dieselbe Zeile referenziert wie vor
-dem Verschieben. Eine Formel-Zeile übernimmt ohne eigene Angabe die Einheit
-der ersten referenzierten Zeile. Die Darstellung (Zebra-Streifen, Kopfzeile/
+Trennzeilen und frei gewählte Zeitspalten. Jede Entitäts-/Gruppen-Zeile
+wählt ihre Aggregation selbst (Automatisch, Ø Durchschnitt, Min, Max, Σ
+Summe), jede Spalte ihre Nachkommastellen (Automatisch oder 0–3). Eine
+Trennzeile zieht eine durchgehende Linie über die gesamte Tabellenbreite,
+rein optisch zur Gliederung, ohne eigene Daten. Spalten und Zeilen lassen
+sich per Ziehen oder über Pfeil-Buttons neu anordnen; beim Umsortieren von
+Zeilen werden die Buchstaben-Referenzen (A/B/C …) in Formel-Zeilen
+automatisch korrigiert, sodass eine Formel weiterhin dieselbe Zeile
+referenziert wie vor dem Verschieben. Eine Formel-Zeile übernimmt ohne
+eigene Angabe die Einheit der ersten referenzierten Zeile. Die Darstellung
+(Zebra-Streifen, Kopfzeile/
 erste Spalte hervorheben, Beschriftung fett, Rahmen horizontal/Gitter/ohne,
 Dichte komfortabel/kompakt) ist rein optisch und wirkt sich nie auf die
 berechneten Werte aus.
 
 ### Bereinigung
 
-Der Bearbeitungsbereich einer Entität erkennt konfigurierbare Ausreißer,
-Lücken, doppelte Zeitstempel und gerundet gleiche Folgewerte. Wiederholungen
+Der Bearbeitungsbereich einer Entität (Tabs **Bereinigen**/**Korrigieren**/
+**Hinzufügen**) erkennt konfigurierbare Ausreißer, Lücken, doppelte
+Zeitstempel und gerundet gleiche Folgewerte; jeder Fund zeigt eine
+Begründung mit Vorwert/Zeitstempel bzw. den betroffenen Werten. Wiederholungen
 lassen sich mit derselben Sechs-Stunden-Lebenszeichenregel auch nachträglich
 verdichten. Bei steigenden Zählern (`total_increasing`) werden niedrigere
 Folgewerte als mögliche Zähler-Resets protokolliert und unter
-„Zählerrückgänge“ markiert; sie bleiben standardmäßig gespeichert.
-Die Kopfzeile zeigt sowohl die Datensatzanzahl im gewählten Zeitraum als auch
-den sichtbaren Gesamtbestand der Entität.
+„Zählerrückgänge“ markiert; sie bleiben standardmäßig gespeichert. Die
+Rohwert-Tabelle zeigt die Einheit direkt neben jedem Wert.
+Die Kopfzeile zeigt Datensatzanzahl im gewählten Zeitraum, sichtbaren
+Gesamtbestand sowie Ausreißer/Lücken/Duplikate/Wiederholungen über die
+komplette Historie der Entität.
 Markierungen sind zunächst weich und können rückgängig gemacht
 werden. Erst **Einstellungen → Speicherplatz** entfernt markierte Werte
 physisch und berechnet betroffene Rollups neu.
@@ -279,6 +290,7 @@ und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
 | Sicherung | Portable Backups, Zeitplan, Prüfung und Restore |
 | Verbindung | API-Token und aktueller Schreibstatus |
 | Protokollierung | Loglevel und HTTP-Protokollierung |
+| Diagnose | Schreibvorgang aufzeichnen, Entität verfolgen, Diagnosebericht, Prozess-Laufzeit |
 | Über Zeitarchiv | Version, Zeitzone und Datenverzeichnis |
 
 Die einzige Supervisor-Option ist `timezone`; erwartet wird eine IANA-Zeitzone

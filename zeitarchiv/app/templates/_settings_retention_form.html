@@ -1,4 +1,4 @@
-<p class="hint" style="margin:0 0 14px;">Löscht Werte, die älter als die je Entität konfigurierte Aufbewahrungsfrist sind (Standardwert im Bereich "Archivierung" oben, Override je Entität auf deren Konfigurationsseite) &mdash; <strong>endgültig, nicht rückgängig zu machen</strong>. Entitäten mit "Unbegrenzt" bleiben davon immer unangetastet.</p>
+<p class="hint" style="margin:0 0 14px;">Löscht Werte nach Ablauf ihrer Aufbewahrungsfrist &mdash; <strong>endgültig</strong>. "Unbegrenzt"-Entitäten sind ausgenommen.</p>
 
 <div class="settings-subsection">
 <h3 class="settings-subsection-title">Automatische Durchsetzung</h3>
@@ -65,7 +65,7 @@
   </div>
 </form>
 
-<p class="hint">Der Planer läuft unabhängig von Seitenaufrufen. Nach einer Downtime wird höchstens ein verpasster Lauf nachgeholt. Backup, Import, Rotation und Retention greifen niemals gleichzeitig auf den Datenbestand zu.</p>
+<p class="hint">Läuft im Hintergrund, verpasste Läufe werden nachgeholt.</p>
 
 <div style="display:flex;gap:10px;flex-wrap:wrap;">
   <button type="button" class="btn"

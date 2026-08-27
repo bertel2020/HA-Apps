@@ -178,6 +178,7 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 .topnav-menu a.is-active{background:var(--accent-line-soft);color:var(--accent-line);font-weight:600;}
 .topnav-menu a.is-active .topnav-icon{color:var(--accent-line);}
 .topnav-menu-divider{height:1px;background:var(--border);margin:6px 4px;}
+.topnav-menu-dashboards{left:0;right:auto;max-height:min(70vh,480px);overflow-y:auto;}
 .topnav-burger{display:none;margin-left:auto;background:none;border:0;color:var(--ink);cursor:pointer;padding:6px;}
 .topnav-burger .topnav-icon{width:20px;height:20px;}
 .topnav-drawer-backdrop{display:none;}
@@ -531,7 +532,25 @@ td.mono{font-family:var(--font-mono);}
 .settings-panel .disabled-note{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-style:italic;}
 @media (max-width:640px){
   .settings-layout{grid-template-columns:1fr;}
-  .settings-nav{flex-direction:row;flex-wrap:wrap;top:12px;}
+  /* Eine Zeile mit horizontalem Scrollen (dasselbe Muster wie .tbl-columns)
+     statt mehrzeiligem Umbruch — als sticky-Leiste MIT Umbruch blieb dieses
+     Menü über mehrere Zeilen hinweg oben kleben und legte sich über den
+     Inhalt darunter. Als schmale Einzeile ist sticky dagegen unproblematisch
+     (siehe top/z-index unten) und zeigt wie auf "normalen" Webseiten immer,
+     wo man gerade ist. top:57px = Höhe der global-sticky .topnav (56px
+     .topnav-bar + 1px Rahmen) — die Leiste klebt DARUNTER, nicht darüber
+     (z-index 10 < .topnav' 15, falls beide sich je um 1px überlappen sollten). */
+  .settings-nav{
+    position:sticky;top:57px;z-index:10;
+    flex-direction:row;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  }
+  .settings-nav a{white-space:nowrap;}
+  /* Ohne diese Anhebung würde ein Klick auf einen Menüpunkt den Ziel-
+     Abschnitt exakt unter die beiden jetzt übereinander klebenden Leisten
+     (.topnav + .settings-nav, zusammen ca. 115px) scrollen und dessen
+     Überschrift bliebe verdeckt — 24px (Basiswert oben) reicht dafür auf dem
+     schmalen Viewport nicht mehr aus. */
+  .settings-section{scroll-margin-top:132px;}
 }
 
 /* Konfigurations-Formular (entity_config.html) */

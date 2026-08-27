@@ -62,6 +62,7 @@ from .formatting import (
     format_time,
     format_timestamp,
     format_type,
+    format_uptime,
     format_value,
     parse_localized_number,
 )
@@ -244,6 +245,16 @@ def _font_scale_context(request: Request) -> dict:
     }
 
 
+def _nav_dashboards_context(request: Request) -> dict:
+    """Für das aufklappbare "Dashboards"-Menü in _topnav.html — läuft wie
+    _font_scale_context automatisch für JEDE TemplateResponse mit, statt dass
+    jede der ~10 Seiten, die _topnav.html einbinden, die Dashboard-Liste
+    selbst in ihren Kontext aufnehmen müsste. list_dashboards() ist eine
+    einfache, indexierte SELECT-Abfrage ohne Joins — auch bei vielen
+    Dashboards auf jeder Seite unproblematisch."""
+    return {"nav_dashboards_list": index.list_dashboards()}
+
+
 def _app_root_context(request: Request) -> dict:
     """Ingress-Präfix für absolute Links; lokal bleibt die App bei ``/``."""
     ingress_path = request.headers.get("x-ingress-path", "").rstrip("/")
@@ -262,7 +273,7 @@ def _app_root_context(request: Request) -> dict:
 app = FastAPI(title="Zeitarchiv")
 templates = Jinja2Templates(
     directory=str(APP_DIR / "templates"),
-    context_processors=[_font_scale_context, _app_root_context],
+    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context],
 )
 
 
@@ -759,28 +770,95 @@ def _settings_archivierung_context(saved: bool = False) -> dict:
 def _count_stale_entities() -> int:
     """Für die Rotation-Sektion: Anzahl Entitäten mit mindestens einer noch
     nicht rotierten Hot-Datei aus einem vergangenen Monat — reines Zählen,
-    ohne tatsächlich zu rotieren (das macht erst der Button-Klick)."""
+    ohne tatsächlich zu rotieren (das macht erst der Button-Klick).
+    find_entities_with_stale_hot_files() statt find_stale_hot_files() je
+    Entität in einer Schleife — EIN Verzeichnis-Listing statt N glob()-
+    Aufrufen, die sonst bei jedem Laden von /settings erneut das komplette
+    hot_dir je Entität durchsuchen (siehe Kommentar dort)."""
     now_ts = datetime.now(TZ).timestamp()
-    entities = index.list_entities()
-    with storage_coordinator.entities([entity["entity_id"] for entity in entities]):
-        return sum(
-            1
-            for entity in entities
-            if hotbuffer.find_stale_hot_files(DATA_DIR, entity["entity_id"], now_ts, TZ)
-        )
+    entity_ids = [entity["entity_id"] for entity in index.list_entities()]
+    with storage_coordinator.entities(entity_ids):
+        return len(hotbuffer.find_entities_with_stale_hot_files(DATA_DIR, set(entity_ids), now_ts, TZ))
 
 
 def _settings_rotation_context(result: str | None = None) -> dict:
     return {"stale_count": _count_stale_entities(), "result": result}
 
 
-def _settings_purge_context(result: str | None = None) -> dict:
-    """Liefert die stets sichtbare, rein lesende Bereinigungsvorschau."""
-    affected = index.get_deleted_points_by_entity()
-    entity_ids = [row["entity_id"] for row in affected]
+_PURGE_PREVIEW_SETTING = "purge_preview_snapshot"
+_PURGE_PREVIEW_MAX_AGE_SECONDS = 3600
+
+
+def _empty_purge_preview() -> dict:
+    return {
+        "generated_at": None,
+        "totals": {
+            "marked_rows": 0,
+            "removable_rows": 0,
+            "hot_rows": 0,
+            "archive_rows": 0,
+            "archive_months": 0,
+            "entities_affected": 0,
+            "not_removable_rows": 0,
+        },
+        "rows": [],
+    }
+
+
+def _load_purge_preview() -> dict:
+    raw = index.get_setting(_PURGE_PREVIEW_SETTING, "")
+    if not raw:
+        return _empty_purge_preview()
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _empty_purge_preview()
+    if not isinstance(value, dict) or not isinstance(value.get("rows"), list):
+        return _empty_purge_preview()
+    return value
+
+
+def _refresh_purge_preview_if_stale(*, force: bool = False) -> dict:
+    """Aktualisiert die teure Bereinigungsvorschau (liest für jede Entität mit
+    markierten Löschungen die betroffenen Archiv-Parquet-Dateien) höchstens
+    einmal pro Stunde — dieselbe Zwischenspeicher-Konvention wie
+    _refresh_retention_overview_if_stale(). Ohne diesen Cache lief
+    preview_purge() bei JEDEM Aufruf von /settings neu; bei einer Entität mit
+    sehr vielen markierten Zeilen und vielen Archiv-Monaten machte allein das
+    die Einstellungen-Seite spürbar langsam (mehrere Sekunden)."""
+    current = _load_purge_preview()
+    generated_at = current.get("generated_at")
+    now_ts = time.time()
+    if (
+        not force
+        and isinstance(generated_at, (int, float))
+        and now_ts - generated_at < _PURGE_PREVIEW_MAX_AGE_SECONDS
+    ):
+        return current
+    entity_ids = [row["entity_id"] for row in index.get_deleted_points_by_entity()]
     with storage_coordinator.entities(entity_ids):
         preview = cleanup.preview_purge(DATA_DIR, index, TZ)
-    return {"result": result, "purge_preview": preview}
+    preview["generated_at"] = now_ts
+    index.set_setting(
+        _PURGE_PREVIEW_SETTING,
+        json.dumps(preview, ensure_ascii=False, separators=(",", ":")),
+    )
+    logger.debug(
+        "Bereinigungsvorschau aktualisiert · entfernbare Zeilen=%d · Entitäten=%d",
+        preview["totals"]["removable_rows"],
+        preview["totals"]["entities_affected"],
+    )
+    return preview
+
+
+def _settings_purge_context(result: str | None = None) -> dict:
+    """Liefert die stets sichtbare, rein lesende Bereinigungsvorschau — aus
+    dem Zwischenspeicher (siehe _refresh_purge_preview_if_stale()), NICHT bei
+    jedem Aufruf neu berechnet. Die Aktualisierung übernimmt der
+    Wartungsplaner (_maintenance_scheduler_loop()) im Hintergrund; nach einem
+    tatsächlichen Purge-Klick erzwingt settings_purge() zusätzlich eine
+    sofortige Aktualisierung, damit das Ergebnis nicht die alten Zahlen zeigt."""
+    return {"result": result, "purge_preview": _load_purge_preview()}
 
 
 def _settings_storage_index_context(report: dict | None = None) -> dict:
@@ -998,6 +1076,7 @@ def settings_view(request: Request) -> HTMLResponse:
             "app_version": APP_VERSION,
             "timezone": str(TZ),
             "data_dir": str(DATA_DIR),
+            "uptime": format_uptime(time.time() - _SERVER_STARTED_AT),
             **_settings_verbindung_context(),
             **_settings_darstellung_context(),
             **_settings_archivierung_context(),
@@ -1298,6 +1377,7 @@ def settings_purge(request: Request) -> HTMLResponse:
             f"davon {months} bereits archivierte{'r' if months == 1 else ''} Monat{'e' if months != 1 else ''} neu berechnet."
         )
     logger.info("Manuelle Bereinigung abgeschlossen · Zeilen=%d · Monate=%d", total_rows, months)
+    _refresh_purge_preview_if_stale(force=True)
     return templates.TemplateResponse(
         request, "_settings_purge_form.html", _settings_purge_context(result=result)
     )
@@ -1610,6 +1690,7 @@ def _maintenance_scheduler_loop() -> None:
                 logger.debug("Stündlicher Statistik-Schnappschuss gespeichert")
             supervisor_stats.maybe_record_memory_snapshot(index)
             _refresh_retention_overview_if_stale()
+            _refresh_purge_preview_if_stale()
             _refresh_duplicate_snapshot_if_stale()
             _run_backup_schedule_if_due(datetime.now(TZ))
             _run_retention_enforcement_if_due(datetime.now(TZ))
@@ -2944,14 +3025,33 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
             })
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
+    dashboard = index.get_dashboard(dashboard_id)
+    dashboard_locked = bool(dashboard["locked"]) if dashboard else False
     return {
         "dashboard_id": dashboard_id,
+        "dashboard_name": dashboard["name"] if dashboard else "Dashboard",
+        "dashboard_locked": dashboard_locked,
         "base": base,
         "tiles": tiles,
-        "can_add_tile": len(tiles) < index.DASHBOARD_TILE_LIMIT,
+        # Fixiertes Dashboard: keine neuen Kacheln anheften, siehe dashboard_locked
+        # in _dashboard_tiles.html/_dashboard_tile_menu.html für die restlichen
+        # Layout-Aktionen (Größe/Entfernen/Umsortieren).
+        "can_add_tile": len(tiles) < index.DASHBOARD_TILE_LIMIT and not dashboard_locked,
         "unpinned_charts": [c for c in index.list_saved_charts() if c["id"] not in pinned_chart_ids],
         "unpinned_tables": [t for t in index.list_saved_tables() if t["id"] not in pinned_table_ids],
     }
+
+
+def _require_dashboard_unlocked(dashboard_id: int) -> None:
+    """Lehnt Layout-ändernde Aktionen (Pin/Unpin/Resize/Reorder) auf einem
+    fixierten Dashboard serverseitig ab — nicht nur die Bedienelemente
+    ausblenden, sonst könnte ein offener alter Tab oder ein direkter
+    API-Aufruf die Sperre umgehen. 423 (Locked) statt 403/409, weil das
+    genau diesen Fall beschreibt: die Ressource existiert und der Aufrufer
+    ist berechtigt, ist aber aktiv gesperrt."""
+    dashboard = index.get_dashboard(dashboard_id)
+    if dashboard is not None and dashboard["locked"]:
+        raise HTTPException(status_code=423, detail="Dashboard ist fixiert — Layout-Änderungen sind gesperrt")
 
 
 def _get_dashboard_or_404(dashboard_id: int) -> dict:
@@ -2966,12 +3066,14 @@ def charts_pin(request: Request, chart_id: int, dashboard_id: int = 1, base: str
     if index.get_saved_chart(chart_id) is None:
         raise HTTPException(status_code=404, detail="Chart nicht gefunden")
     _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "chart", chart_id)
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
 
 @app.post("/charts/{chart_id}/unpin", response_class=HTMLResponse)
 def charts_unpin(request: Request, chart_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+    _require_dashboard_unlocked(dashboard_id)
     index.unpin_item_from_dashboard(dashboard_id, "chart", chart_id)
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
@@ -3002,6 +3104,7 @@ def dashboard_reorder(body: _ReorderDashboardBody) -> dict:
     das nur noch fest, ohne selbst ein neues Fragment zurückzugeben. Ein
     eigener Pfad statt "/charts/reorder"/"/tables/reorder", weil eine
     Kachel-Reihenfolge Charts UND Tabellen gemischt enthalten kann."""
+    _require_dashboard_unlocked(body.dashboard_id)
     index.reorder_dashboard_pins(body.dashboard_id, [(p.item_type, p.item_id) for p in body.pins])
     return {"ok": True}
 
@@ -3010,6 +3113,7 @@ def dashboard_reorder(body: _ReorderDashboardBody) -> dict:
 def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     if body.item_type not in {"chart", "table"}:
         raise HTTPException(status_code=422, detail="Ungültiger Dashboard-Kacheltyp")
+    _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_pin_size(
         body.dashboard_id, body.item_type, body.item_id, body.grid_cols, body.grid_rows
     ):
@@ -3081,6 +3185,21 @@ def dashboards_rename(dashboard_id: int, body: _DashboardRenameBody) -> dict:
     return {"ok": True, "name": name}
 
 
+class _DashboardLockBody(BaseModel):
+    locked: bool
+
+
+@app.post("/dashboards/{dashboard_id}/lock")
+def dashboards_lock(dashboard_id: int, body: _DashboardLockBody) -> dict:
+    """Fixieren/Entfixieren bleibt unabhängig vom Sperrstatus selbst immer
+    möglich (sonst gäbe es kein Zurück aus einem fixierten Dashboard) — nur
+    Kachel-Layout-Aktionen (Pin/Unpin/Resize/Reorder) werden durch
+    _require_dashboard_unlocked() blockiert, nicht diese Route hier."""
+    if not index.set_dashboard_locked(dashboard_id, body.locked):
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    return {"ok": True, "locked": body.locked}
+
+
 @app.post("/dashboards/{dashboard_id}/delete")
 def dashboards_delete(dashboard_id: int) -> dict:
     if not index.delete_dashboard(dashboard_id):
@@ -3113,6 +3232,13 @@ class _TableColumnBody(BaseModel):
     range_key: str
     offset: int = 0
     year_over_year: bool = False
+    # Dieselbe Konvention wie das entity-eigene "Nachkommastellen"-Feld
+    # (formatting.DECIMALS_LABELS, siehe _entity_config_form.html): "auto"
+    # oder eine Ziffer als String, rein für die Anzeige in dieser Spalte.
+    decimals: str = "auto"
+
+
+_TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum")
 
 
 class _TableRowBody(BaseModel):
@@ -3122,6 +3248,9 @@ class _TableRowBody(BaseModel):
     formula: str = ""
     formula_unit: str = ""
     bold: bool = False
+    # Nur für row_type "entity"/"group" relevant — "auto" ist das bisherige,
+    # implizite Verhalten (Zähler/Schalter -> Summe, sonst Durchschnitt).
+    aggregation: str = "auto"
 
 
 class _TableStyleBody(BaseModel):
@@ -3187,6 +3316,8 @@ def _validate_table_body(body: _SaveTableBody) -> None:
     for c in body.columns:
         if c.range_key not in dict(_CHART_RANGE_OPTIONS):
             raise HTTPException(status_code=400, detail="Ungültiger Zeitraum in einer Spalte")
+        if c.decimals not in DECIMALS_LABELS:
+            raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Option in einer Spalte")
     for r in body.rows:
         if r.row_type not in ("entity", "group", "formula", "separator"):
             raise HTTPException(status_code=400, detail="Ungültiger Zeilentyp")
@@ -3194,6 +3325,8 @@ def _validate_table_body(body: _SaveTableBody) -> None:
             raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht mindestens eine Entität')
         if r.row_type == "formula" and not r.formula.strip():
             raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht eine Formel')
+        if r.aggregation not in _TABLE_ROW_AGGREGATIONS:
+            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" hat eine ungültige Aggregation')
     if body.style.borders not in _TABLE_BORDER_OPTIONS:
         raise HTTPException(status_code=400, detail="Ungültige Rahmen-Option")
     if body.style.density not in _TABLE_DENSITY_OPTIONS:
@@ -3259,12 +3392,14 @@ def tables_pin(request: Request, table_id: int, dashboard_id: int = 1, base: str
     if index.get_saved_table(table_id) is None:
         raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
     _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "table", table_id)
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
 
 @app.post("/tables/{table_id}/unpin", response_class=HTMLResponse)
 def tables_unpin(request: Request, table_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+    _require_dashboard_unlocked(dashboard_id)
     index.unpin_item_from_dashboard(dashboard_id, "table", table_id)
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
 
@@ -3409,6 +3544,51 @@ def _rows_window(range_key: str, offset: int, now: datetime, first_ts: float | N
     return start, end
 
 
+_CLEANUP_ALLTIME_STATS_MAX_AGE_SECONDS = 15 * 60
+
+
+def _cleanup_alltime_counts(entity, now: datetime) -> dict:
+    """Ausreißer/Lücken/Duplikate/Wiederholungen/Zählerrückgänge über die
+    KOMPLETTE Historie der Entität, nicht nur den gerade gewählten Zeitraum
+    (Bereinigungsseite, Kachel-Zeile "Gesamter Zeitraum") — gecacht für
+    15 Minuten (index.is_cleanup_alltime_stats_stale), weil ein Vollscan bei
+    Entitäten mit Millionen Rohwerten sonst bei jedem Seitenaufruf bzw. jedem
+    Filterklick teuer wäre. Nutzt denselben speicherbegrenzten Streaming-Pfad
+    wie der Zeitraum "Gesamt" im Chip (analyze_raw_rows_page, zwei Durchläufe
+    ohne Materialisierung aller Zeilen), page_size=1 weil hier nur die
+    counts gebraucht werden, keine Zeilenliste."""
+    entity_id = entity["entity_id"]
+    if not index.is_cleanup_alltime_stats_stale(entity_id, _CLEANUP_ALLTIME_STATS_MAX_AGE_SECONDS):
+        cached = index.get_cleanup_alltime_stats(entity_id)
+        if cached is not None:
+            return cached["counts"]
+
+    window_start, window_end = _rows_window("all", 0, now, entity["first_ts"])
+    gap_threshold = entity["gap_threshold"]
+    outlier_threshold = entity["outlier_threshold"]
+
+    def rows_factory():
+        return cleanup.iter_raw_rows(
+            DATA_DIR, index, entity_id,
+            window_start.timestamp(), window_end.timestamp(), TZ, now=now,
+        )
+
+    analysis = cleanup.analyze_raw_rows_page(
+        rows_factory,
+        filter_="all",
+        page=1,
+        page_size=1,
+        gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
+        outlier_threshold_percent=None if outlier_threshold == "off" else float(outlier_threshold),
+        tz=TZ,
+        decimals=entity["decimals"],
+        counter_decrease_enabled=entity["state_class"] == "total_increasing",
+    )
+    counts = analysis["counts"]
+    index.set_cleanup_alltime_stats(entity_id, counts)
+    return counts
+
+
 def _rows_period_label(range_key: str, offset: int, window_start: datetime, window_end: datetime, now: datetime) -> str:
     """Deutsches Zeitraum-Label für die Navigationsleiste — inhaltlich identisch
     zu formatPeriodLabel() in entity_detail.html, hier aber serverseitig, weil
@@ -3475,6 +3655,7 @@ def _rows_fragment(
             outlier_threshold_percent=(
                 None if outlier_threshold == "off" else float(outlier_threshold)
             ),
+            tz=TZ,
             decimals=entity["decimals"],
             counter_decrease_enabled=entity["state_class"] == "total_increasing",
         )
@@ -3485,7 +3666,7 @@ def _rows_fragment(
                 **row,
                 "formatted_value": format_value(row["value"], decimals_int),
                 "formatted_ts": datetime.fromtimestamp(row["ts"], TZ).strftime(
-                    "%d.%m. %H:%M:%S"
+                    "%d.%m.%Y %H:%M:%S"
                 ),
             }
             for row in analysis["rows"]
@@ -3502,13 +3683,15 @@ def _rows_fragment(
             max_rows=MAX_UI_ANALYSIS_ROWS,
         )
         outliers = cleanup.detect_outliers(
-            rows, None if outlier_threshold == "off" else float(outlier_threshold)
+            rows, None if outlier_threshold == "off" else float(outlier_threshold),
+            entity["decimals"], TZ,
         )
         gaps = cleanup.detect_gaps(
-            rows, None if gap_threshold == "off" else float(gap_threshold)
+            rows, None if gap_threshold == "off" else float(gap_threshold),
+            entity["decimals"], TZ,
         )
-        duplicates = cleanup.detect_duplicates(rows)
-        repetitions = cleanup.detect_repetitions(rows, entity["decimals"])
+        duplicates = cleanup.detect_duplicates(rows, entity["decimals"])
+        repetitions = cleanup.detect_repetitions(rows, entity["decimals"], TZ)
         counter_decreases = (
             cleanup.detect_counter_decreases(rows)
             if entity["state_class"] == "total_increasing"
@@ -3541,7 +3724,7 @@ def _rows_fragment(
                 "value": value,
                 "formatted_value": format_value(value, decimals_int),
                 "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime(
-                    "%d.%m. %H:%M:%S"
+                    "%d.%m.%Y %H:%M:%S"
                 ),
                 "flags": [
                     {"label": label, "reason": reasons[ts]}
@@ -3564,6 +3747,16 @@ def _rows_fragment(
     first_date = datetime.fromtimestamp(entity["first_ts"], TZ).strftime("%Y-%m-%d") if entity["first_ts"] else None
     last_date = datetime.fromtimestamp(entity["last_ts"], TZ).strftime("%Y-%m-%d") if entity["last_ts"] else None
 
+    if range_key == "all":
+        # Zeitraum "Gesamt" deckt exakt dasselbe Fenster ab wie die Gesamt-
+        # Zeitraum-Kachel — ein zweiter Vollscan wäre hier reine Verschwendung,
+        # der Cache bleibt aber trotzdem aufgefrischt (nächster Aufruf mit
+        # engerem Zeitraum-Chip muss dann nicht sofort neu scannen).
+        alltime_counts = counts
+        index.set_cleanup_alltime_stats(entity_id, counts)
+    else:
+        alltime_counts = _cleanup_alltime_counts(entity, now)
+
     return templates.TemplateResponse(
         request,
         "_rows_table.html",
@@ -3574,11 +3767,13 @@ def _rows_fragment(
             "mode": mode,
             "range": range_key,
             "offset": offset,
+            "unit": entity["unit"] or "",
             "period_label": period_label,
             "window_start_ts": window_start.timestamp(),
             "window_end_ts": window_end.timestamp(),
             "is_current": offset == 0,
             "counts": counts,
+            "alltime_counts": alltime_counts,
             "range_row_count_label": format_int(counts['all']),
             "total_row_count_label": format_int(_visible_row_count(entity)),
             "pagination": pagination,
@@ -3718,7 +3913,7 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m. %H:%M:%S"),
+            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
         }
         for ts, value in list(reversed(values))[:_UNDO_PREVIEW_LIMIT]
     ]
@@ -3761,25 +3956,31 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
 
-    def load_rows() -> list[tuple[float, float]]:
+    def load_to_delete() -> list[tuple[float, float]]:
         with storage_coordinator.entity(entity_id):
-            return cleanup.list_raw_rows(
+            # iter_raw_rows() statt list_raw_rows(max_rows=...): Duplikate müssen
+            # über den ganzen gewählten Zeitraum gesucht werden, auch wenn der weit
+            # über MAX_UI_ANALYSIS_ROWS liegt (z. B. "Gesamt" bei Millionen Rohwerten)
+            # — das Cap gilt nur für Pfade, die wirklich alle Zeilen materialisieren
+            # müssten. Hier hält iter_duplicate_rows_to_delete() den Speicherbedarf
+            # konstant, da Duplikate dank Sortierung immer direkt aufeinanderfolgen.
+            rows = cleanup.iter_raw_rows(
                 DATA_DIR, index, entity_id, window_start.timestamp(), window_end.timestamp(), TZ,
-                now=now, max_rows=MAX_UI_ANALYSIS_ROWS
+                now=now
             )
+            return cleanup.duplicate_rows_to_delete(rows)
 
-    rows = await run_in_threadpool(load_rows)
     # duplicate_rows_to_delete() braucht rows weiterhin chronologisch aufsteigend,
     # um korrekt das JEWEILS ÄLTESTE Vorkommen je Zeitstempel zu behalten — erst
     # für die Anzeige unten drehen wir auf neueste-zuerst um (Konzept: Listen mit
     # Werten generell neueste oben), all_timestamps bleibt davon unberührt (die
     # Reihenfolge der versteckten Formularfelder ist für den Löschvorgang egal).
-    to_delete = cleanup.duplicate_rows_to_delete(rows)
+    to_delete = await run_in_threadpool(load_to_delete)
     preview_rows = [
         {
             "ts": ts,
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m. %H:%M:%S"),
+            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
         }
         for ts, value in list(reversed(to_delete))[:_DUPLICATES_PREVIEW_LIMIT]
     ]
@@ -3834,7 +4035,7 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m. %H:%M:%S"),
+            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
         }
         for ts, value in newest_rows
     ]

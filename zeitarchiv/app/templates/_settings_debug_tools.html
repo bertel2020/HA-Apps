@@ -3,9 +3,7 @@
   <div class="settings-subsection">
     <h3 class="settings-subsection-title">Nächsten Schreibvorgang aufzeichnen</h3>
     <p class="hint">
-      Zeichnet einmalig den nächsten von Home Assistant gesendeten Schreib-Request vollständig auf
-      (Rohwerte und Entity-IDs, niemals den API-Token) — läuft nicht dauerhaft mit, sondern
-      deaktiviert sich nach genau einem Treffer wieder selbst.
+      Zeichnet einmalig den nächsten Schreib-Request auf (ohne API-Token), dann automatisch aus.
     </p>
     {% if capture_armed %}
     <p class="save-status">⏳ Wartet auf den nächsten Schreibvorgang …</p>
@@ -28,8 +26,7 @@
   <div class="settings-subsection">
     <h3 class="settings-subsection-title">Entität verfolgen</h3>
     <p class="hint">
-      Protokolliert 15 Minuten lang jeden übertragenen Wert einer einzelnen Entität — unabhängig
-      vom oben gewählten Loglevel, danach automatisch wieder aus.
+      Protokolliert 15 Minuten lang alle Werte einer Entität, dann automatisch aus.
     </p>
     {% if trace_entity_id %}
     <p class="save-status">🔴 Verfolgt <code>{{ trace_entity_id }}</code> &middot; noch {{ trace_expires_in_minutes }} Minute(n)</p>
