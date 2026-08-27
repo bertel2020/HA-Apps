@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.53.0 - 2026-08-27
+
+### Neu
+
+- Home-Assistant-Import: Spalte „Entität" schmaler, Spalten „Art" und
+  „Verfügbar" entsprechend breiter (mehr Platz für deren i. d. R. längeren
+  Inhalt).
+
+### Intern
+
+- Deutlich mehr Protokollierung für die Fehlersuche, insbesondere beim
+  Home-Assistant-Import:
+  - **DEBUG:** jede einzelne HTTP-Anfrage an die Home-Assistant-API
+    (Pfad, Anzahl gefilterter Entitäten, Zeitfenster) sowie deren Antwort
+    (Anzahl Arrays/Einträge) — vorher auch mit aktiviertem Debug-Loglevel
+    nicht sichtbar. Zusammenfassung jedes Home-Assistant-Dry-Runs (geplante
+    Entitäten/Zeilen).
+  - **WARNING:** ein Abruf, bei dem ein großer Anteil der Punkte als nicht
+    importierbar übersprungen wird (Home-Assistant- und CSV-Import); ein
+    abgeschlossener Home-Assistant-Import ohne Fehler, der aber 0 Zeilen
+    geschrieben hat; eine Symcon-Variable, deren Ziel-Entität beim Import
+    nicht gefunden wurde (bisher nur im UI-Report sichtbar, nie im
+    Add-on-Log).
+
 ## 0.52.0 - 2026-08-27
 
 ### Neu

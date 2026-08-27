@@ -118,14 +118,18 @@
 
   /* HA-Import-Tabelle: eigene Spaltenbreiten (anderes Spaltenset als Symcon),
      teilt sich aber table-layout:fixed über dieselbe .symcon-import-table.
-     Entität bekommt keine eigene width -> verbleibender Raum, wie bei Symcons
-     HA-Zuordnungs-Spalte. Derselbe Tooltip-Host-Trick wie .symcon-name-cell
-     oben (Kürzung auf dem Kind-Span, nicht auf dem Host selbst — sonst
-     schneidet dessen overflow:hidden den eigenen Tooltip mit ab). */
+     Entität bewusst schmal und fest (statt wie Symcons HA-Zuordnungs-Spalte
+     den verbleibenden Raum zu bekommen) — Art/Verfügbar brauchen den Platz
+     für ihren i. d. R. längeren Inhalt ("Keine Rohhistorie",
+     "12.08.2025 – 29.08.2025 · 1.245 Punkte"). Derselbe Tooltip-Host-Trick
+     wie .symcon-name-cell oben (Kürzung auf dem Kind-Span, nicht auf dem
+     Host selbst — sonst schneidet dessen overflow:hidden den eigenen
+     Tooltip mit ab) federt die schmalere Entität-Spalte dafür ab. */
+  .ha-col-entity{width:190px;}
   .ha-col-unit{width:56px;}
   .ha-col-type{width:96px;}
-  .ha-col-art{width:130px;}
-  .ha-col-available{width:200px;}
+  .ha-col-art{width:150px;}
+  .ha-col-available{width:260px;}
   /* <col>-Klassen setzen nur die Breite (das Einzige, was <col> an die
      Zellen durchreicht) — Textausrichtung muss wie bei .symcon-import-table
      oben per :nth-child() auf den tatsächlichen th/td sitzen. Typ = Spalte 4,

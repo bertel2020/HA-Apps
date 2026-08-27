@@ -26,6 +26,7 @@ denselben Wert ergeben."""
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.parse
@@ -34,6 +35,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from ..limits import MAX_IMPORT_ROWS_PER_ENTITY
+
+# Abweichend von der sonstigen storage/*.py-Konvention (dort loggt nie das
+# Modul selbst, nur der aufrufende Routen-Handler, siehe import_routes.py):
+# dieses Modul spricht als einziges storage/*-Modul ein externes, unter
+# eigener Kontrolle des Nutzers stehendes System über das Netzwerk an. Ein
+# Fehlschlag kann mitten in mehreren Zeitfenstern/Batches auftreten — der
+# Aufrufer sieht dann nur noch die eine, zusammengefasste Ausnahme, nicht
+# mehr, welche der vorherigen Anfragen bereits erfolgreich waren. Nur DEBUG,
+# nie WARNING/höher: das bleibt Aufgabe der aufrufenden Route.
+logger = logging.getLogger(__name__)
 
 # Dieselben Domain-/Zustands-Regeln wie custom_components/zeitarchiv/const.py
 # — von dort nicht importierbar, weil das Addon in einem eigenen Python-Prozess
@@ -85,9 +96,19 @@ def _get(path: str, params: dict | None = None) -> object:
             "User-Agent": "Zeitarchiv/HaImport",
         },
     )
+    # Nie den Authorization-Header/Token loggen — nur Pfad und die für die
+    # Fehlersuche relevanten Parameter (Zeitfenster, Anzahl gefilterter
+    # Entitäten statt der vollen, potenziell langen ID-Liste).
+    entity_count = len((params or {}).get("filter_entity_id", "").split(",")) if params and params.get("filter_entity_id") else 0
+    logger.debug(
+        "HA-API-Anfrage · %s · Entitäten=%d · bis=%s", path, entity_count, (params or {}).get("end_time")
+    )
     try:
         with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-            return json.loads(response.read())
+            payload = json.loads(response.read())
+            entries = sum(len(e) for e in payload if isinstance(e, list)) if isinstance(payload, list) else 0
+            logger.debug("HA-API-Antwort · %s · Arrays=%d · Einträge=%d", path, len(payload) if isinstance(payload, list) else 0, entries)
+            return payload
     except urllib.error.HTTPError as exc:
         # HTTPError ist eine Unterklasse von URLError — MUSS deshalb vor dessen
         # except-Zweig geprüft werden, sonst verschluckt der generische Zweig

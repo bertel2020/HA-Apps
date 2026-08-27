@@ -555,6 +555,10 @@ class ImportService:
                     with self._import_progress.lock:
                         self._import_progress.results.append(result)
                 except ValueError:
+                    logger.warning(
+                        "Symcon-Import: Ziel-Entität nicht gefunden · Variable=%s · Ziel=%s",
+                        variable.variable_id, target_entity_id,
+                    )
                     with self._import_progress.lock:
                         self._import_progress.errors.append(
                             f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden"
@@ -834,7 +838,7 @@ class ImportService:
         for entity_id in entity_ids:
             domain = entity_id.split(".", 1)[0]
             try:
-                fetched[entity_id] = ha_import.fetch_history_rows(entity_id, domain, start, end)
+                history = ha_import.fetch_history_rows(entity_id, domain, start, end)
             except (ha_import.HaApiError, ValueError) as exc:
                 # WARNING statt nur in errors sammeln: das ist bisher die
                 # einzige Stelle, an der ein Fehlschlag beim HA-Historienabruf
@@ -843,6 +847,20 @@ class ImportService:
                 # `docker logs`/das Add-on-Protokoll nachvollziehbar.
                 logger.warning("HA-Historie für %s nicht abrufbar · %s", entity_id, exc)
                 errors.append(f"{entity_id}: {exc}")
+                continue
+            fetched[entity_id] = history
+            # Ein nennenswerter Anteil übersprungener Punkte (nicht
+            # numerisch/kein bekannter Schalter-Zustand) ist kein Fehler,
+            # aber ein Symptom für eine Domain-/Datenqualitäts-Inkonsistenz
+            # — z. B. eine Entität, deren Zustände HA zwischenzeitlich als
+            # Text statt Zahl liefert. Ohne diese WARNING wäre "warum
+            # kommen nur halb so viele Punkte an wie erwartet" nur über den
+            # Importreport nachvollziehbar, nie im laufenden Log sichtbar.
+            if history.skipped > 0 and history.skipped >= len(history.rows):
+                logger.warning(
+                    "HA-Historie für %s: %d von %d Punkten übersprungen (nicht numerisch/kein bekannter Zustand)",
+                    entity_id, history.skipped, history.skipped + len(history.rows),
+                )
         return fetched, errors
 
 
@@ -1329,6 +1347,14 @@ class ImportService:
                         "CSV-Import abgeschlossen · Ziel=%s · Zeilen importiert=%d · Zeilen zusammengeführt=%d",
                         entity_id, result.rows_imported, result.rows_merged,
                     )
+                    # Wie bei HA (siehe _fetch_ha_history): eine hohe
+                    # Übersprungen-Quote deutet eher auf falsch gewählte
+                    # Spalten/Format als auf normale Datenlücken hin.
+                    if result.skipped_rows > 0 and result.skipped_rows >= result.rows_imported + result.rows_merged:
+                        logger.warning(
+                            "CSV-Import: %d Zeile(n) übersprungen (nicht als Zeitstempel/Wert lesbar) · Ziel=%s",
+                            result.skipped_rows, entity_id,
+                        )
                 except ValueError as exc:
                     errors.append(str(exc))
                 except Exception as exc:
@@ -1473,6 +1499,16 @@ class ImportService:
 
             if fetched:
                 items = await run_in_threadpool(plan_locked)
+            # DEBUG statt INFO: Vorschauen ändern nichts (dieselbe Zurückhaltung
+            # wie beim Symcon-/CSV-Dry-Run, die ebenfalls nicht loggen) — aber
+            # anders als dort macht dieser Dry-Run einen echten HA-API-Aufruf,
+            # dessen Planungsergebnis bei der Fehlersuche wertvoll sein kann.
+            logger.debug(
+                "HA-Dry-Run · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
+                len(items),
+                sum(item["plan"].rows_to_import + item["plan"].rows_to_merge for item in items),
+                len(errors),
+            )
             return self.deps.templates.TemplateResponse(request, "_ha_import_dry_run.html", {"items": items, "errors": errors})
 
 
@@ -1531,14 +1567,24 @@ class ImportService:
                     try:
                         items, reconciliation_report = await run_in_threadpool(execute_ha_import)
                         results = [item["result"] for item in items]
+                        rows_imported = sum(r.rows_imported for r in results)
+                        rows_merged = sum(r.rows_merged for r in results)
                         logger.info(
                             "Home-Assistant-Import abgeschlossen · Entitäten=%d · Zeilen importiert=%d · "
                             "Zeilen zusammengeführt=%d · Fehler=%d",
-                            len(results),
-                            sum(r.rows_imported for r in results),
-                            sum(r.rows_merged for r in results),
-                            len(errors),
+                            len(results), rows_imported, rows_merged, len(errors),
                         )
+                        if results and not errors and rows_imported + rows_merged == 0:
+                            # Kein Fehler, aber auch keine einzige neue Zeile
+                            # geschrieben, obwohl Entitäten ausgewählt waren und
+                            # HA tatsächlich geantwortet hat — unterscheidet den
+                            # unauffälligen Fall "nichts Neues seit letztem
+                            # Import" von einem stillen Fehlschlag, der in der
+                            # Oberfläche wie ein normaler Erfolg aussieht.
+                            logger.warning(
+                                "Home-Assistant-Import ohne Fehler abgeschlossen, aber 0 Zeilen geschrieben · Entitäten=%d",
+                                len(results),
+                            )
                     except Exception as exc:
                         logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
                         errors.append(f"Import abgebrochen: {exc}")
