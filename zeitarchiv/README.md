@@ -11,13 +11,9 @@
 
 Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
 Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
-[Zeitarchiv-Integration](../custom_components/zeitarchiv/README.md) sammelt
+[Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv) sammelt
 die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
 visualisiert sie.
-
-Seit Version 0.30.0 gibt es mehrere Dashboards: Kacheln lassen sich jetzt auf
-beliebig viele benannte Dashboards verteilen statt nur auf die eine
-Startseite. Dazu ein drittes Farbschema „Modern" (Zinc/Indigo).
 
 ## Auf einen Blick
 
@@ -60,10 +56,14 @@ Die Verantwortlichkeiten bleiben bewusst getrennt:
 
 ### 1. App installieren
 
-Für eine lokale Installation den Inhalt dieses Verzeichnisses als
-`/addons/zeitarchiv` auf den Home-Assistant-Host kopieren. Danach den App-Store
-neu laden, **Zeitarchiv** installieren und starten. Unterstützt werden
-`amd64` und `aarch64`.
+**Über den Add-on-Store:** In Home Assistant **Einstellungen → Add-ons →
+Add-on-Store → ⋮ → Repositories** öffnen, `https://github.com/bertel2020/HA-Apps`
+eintragen und hinzufügen. **Zeitarchiv** erscheint danach im Store; installieren
+und starten. Unterstützt werden `amd64` und `aarch64`.
+
+**Manuell:** Alternativ den Inhalt dieses Verzeichnisses als
+`/addons/zeitarchiv` auf den Home-Assistant-Host kopieren und den Store neu
+laden.
 
 Nach dem Start erscheint Zeitarchiv in der Home-Assistant-Seitenleiste. Die
 vollständige Oberfläche läuft über den authentifizierten Supervisor-Ingress;
@@ -76,10 +76,10 @@ erzeugten API-Token kopieren. Der Token kann dort später neu generiert werden.
 
 ### 3. Integration verbinden
 
-Die [Custom Integration](../custom_components/zeitarchiv/README.md)
-installieren und in Home Assistant über **Einstellungen → Geräte & Dienste →
-Integration hinzufügen → Zeitarchiv** einrichten. Benötigt werden Host, Port
-`8127` und der API-Token.
+Die [Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv)
+installieren (über HACS oder manuell, siehe deren README) und in Home
+Assistant über **Einstellungen → Geräte & Dienste → Integration hinzufügen →
+Zeitarchiv** einrichten. Benötigt werden Host, Port `8127` und der API-Token.
 
 ### 4. Archivfilter festlegen
 
@@ -237,7 +237,7 @@ Rotation** manuell nachgezogen werden.
 
 ## Backup und Wiederherstellung
 
-Unter **Einstellungen → Sicherung** lassen sich vollständige, portable
+Unter **System → Backup / Restore** lassen sich vollständige, portable
 ZIP-Backups erstellen, planen, prüfen, herunterladen und wiederherstellen.
 Enthalten sind Index, Hot Buffer, Monatsarchive und Rollups.
 
@@ -287,7 +287,6 @@ und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
 | Rotation | Ausstehende Monatsrotationen prüfen und ausführen |
 | Speicherplatz | Speicherindex prüfen/reparieren sowie Löschmarkierungen endgültig anwenden |
 | Aufbewahrung | Vorschau, täglicher Zeitplan und Laufhistorie |
-| Sicherung | Portable Backups, Zeitplan, Prüfung und Restore |
 | Verbindung | API-Token und aktueller Schreibstatus |
 | Protokollierung | Loglevel und HTTP-Protokollierung |
 | Diagnose | Schreibvorgang aufzeichnen, Entität verfolgen, Diagnosebericht, Prozess-Laufzeit |
@@ -323,7 +322,7 @@ Die verwendeten Drittanbieter-Komponenten und deren Lizenzen sind in
 ---
 
 <p align="center">
-  <a href="../custom_components/zeitarchiv/README.md">Integration einrichten</a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv">Integration einrichten</a>
   ·
   <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md">Changelog</a>
   ·
