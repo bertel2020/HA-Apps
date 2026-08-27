@@ -1,8 +1,7 @@
 # Zeitarchiv — Dokumentation
 
 Für einen kurzen Überblick (Installation, Funktionsliste) siehe die
-[App-README](../README.md); für Entwicklungs-Setup siehe
-[DEVELOPMENT.md](../DEVELOPMENT.md) (lokal, nicht Teil des öffentlichen Repos).
+[App-README](../README.md).
 
 **Zwei getrennte Produkte, ein Datenfluss.** Diese Dokumente beschreiben
 ausschließlich die **App** (`addon/`, hier im Repo als `app/`). Den
@@ -33,6 +32,7 @@ Release-Reihenfolge): [operations.md](operations.md).
 | [operations.md](operations.md) | Backup/Restore, Retention, Wartungsplaner, Versionierung/Release |
 | [security.md](security.md) | Auth-Modell, Netzwerktrennung, Pfad-/Zip-Validierung, Ressourcenlimits |
 | [testing.md](testing.md) | Testsuite-Überblick, Ausführung |
+| [development.md](development.md) | Lokales Setup (Docker Compose oder venv), Testlauf, Versionssync |
 
 ## Grober Aufbau
 

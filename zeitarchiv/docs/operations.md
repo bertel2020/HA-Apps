@@ -80,15 +80,16 @@ Produkte, siehe unten).
 Änderungen entstehen in `addon/` bzw. `custom_components/zeitarchiv/` und
 müssen **manuell** (`rsync`, siehe unten) in die jeweilige Git-Arbeitskopie
 übertragen werden, bevor sie committet/gepusht werden können — es gibt
-keinen automatischen Sync. `addon/CODE_REVIEW.md`, `addon/PERFORMANCE.md` und
-`addon/DEVELOPMENT.md` sind bewusst rein lokal und werden **nie** mit
-übertragen.
+keinen automatischen Sync. `addon/CODE_REVIEW.md` und `addon/PERFORMANCE.md`
+sind bewusst rein lokal und werden **nie** mit übertragen (Setup für lokale
+Entwicklung ist dagegen bewusst öffentlich, siehe
+[development.md](development.md)).
 
 ```bash
 rsync -av \
   --exclude='.venv' --exclude='data' --exclude='__pycache__' \
   --exclude='.DS_Store' --exclude='.claude' --exclude='.git' \
-  --exclude='CODE_REVIEW.md' --exclude='PERFORMANCE.md' --exclude='DEVELOPMENT.md' \
+  --exclude='CODE_REVIEW.md' --exclude='PERFORMANCE.md' \
   --exclude='*.pyc' \
   addon/ HA-Apps/zeitarchiv/
 ```
