@@ -177,10 +177,14 @@ wo diese ebenfalls Platz belegen.
   sich je nach Quelle — bei Langzeitstatistik z. B. auch „Letztes Jahr“),
   optional „Verfügbarkeit prüfen“ für eine Vorschau, welche Entitäten in
   Home Assistant tatsächlich Daten der gewählten Quelle haben und für
-  welchen Zeitraum. Ein Wechsel der Quelle setzt eine zuvor geprüfte
-  Verfügbarkeit zurück (sie gehörte zur alten Quelle). Benötigt die Add-on-
-  Berechtigung `homeassistant_api` sowie eine Home-Assistant-Installation
-  mit Supervisor (nicht bei Home Assistant Container).
+  welchen Zeitraum. Das Ergebnis bleibt je Quelle/Auflösung erhalten — auch
+  nach einem Seitenwechsel oder einem Wechsel zwischen Rohhistorie und
+  Langzeitstatistik (bis zum nächsten Neustart des Add-ons) —, der
+  Spaltenkopf „Verfügbar“ zeigt dazu den Zeitpunkt der letzten Prüfung; ab
+  15 Minuten erscheint ein Hinweis, dass der Stand veraltet sein könnte.
+  Benötigt die Add-on-Berechtigung `homeassistant_api` sowie eine
+  Home-Assistant-Installation mit Supervisor (nicht bei Home Assistant
+  Container).
 - **Reports** (vierter Reiter): jeder tatsächlich ausgeführte Import bleibt
   mit Quelle, Zuordnung, importierten/übersprungenen Datensätzen und
   eventuellen Fehlern nachvollziehbar, filterbar nach Quelle/Status,

@@ -58,6 +58,12 @@
   .ha-art-badge.has-data{color:var(--accent-line);border-color:var(--accent-line);}
   .ha-art-badge.no-data{color:var(--ink-faint);}
   .ha-art-badge.unknown{color:var(--ink-faint);border-style:dashed;cursor:help;}
+  /* Zeitpunkt der letzten Verfügbarkeitsprüfung im Spaltenkopf "Verfügbar"
+     (siehe _HaAvailabilityCache) — bewusst kein eigener Link/keine eigene
+     Zeile, damit die Sortierbarkeit der Spalte (siehe .sort-arrow) optisch
+     eindeutig beim "Verfügbar"-Text selbst bleibt. */
+  .ha-checked-at{font-weight:400;font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;margin-left:4px;}
+  .ha-stale-badge{display:inline-block;font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--danger);color:var(--danger);background:var(--danger-soft);cursor:help;white-space:nowrap;margin-left:6px;}
   .import-delete-row{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
   .import-delete-row .btn-danger{font-weight:600;}
   .import-delete-button{min-width:154px;}

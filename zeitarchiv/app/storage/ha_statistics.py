@@ -111,6 +111,12 @@ def _ws_call(commands: list[dict]) -> list[dict]:
     Zeitfenster/Batch darf nicht die übrigen ungültig machen."""
     if not commands:
         return []
+    # _token() VOR connect(): ohne SUPERVISOR_TOKEN (z. B. lokale Entwicklung
+    # ohne Supervisor) sonst ein sinnloser Verbindungsversuch gegen den
+    # ws://supervisor-Hostnamen, der bis zu REQUEST_TIMEOUT Sekunden hängt,
+    # bevor derselbe Fehler doch nur "Supervisor nicht verfügbar" wäre —
+    # ha_import.py._get() prüft das aus demselben Grund vor jedem urlopen().
+    token = _token()
     logger.debug("HA-WS-Anfrage · Befehle=%d", len(commands))
     try:
         with connect(
@@ -123,7 +129,7 @@ def _ws_call(commands: list[dict]) -> list[dict]:
             auth_msg = json.loads(ws.recv(timeout=REQUEST_TIMEOUT))
             if auth_msg.get("type") != "auth_required":
                 raise HaApiError("Home-Assistant-WebSocket-API antwortete unerwartet")
-            ws.send(json.dumps({"type": "auth", "access_token": _token()}))
+            ws.send(json.dumps({"type": "auth", "access_token": token}))
             auth_result = json.loads(ws.recv(timeout=REQUEST_TIMEOUT))
             if auth_result.get("type") != "auth_ok":
                 raise HaApiError("Home-Assistant-WebSocket-API: Authentifizierung fehlgeschlagen")

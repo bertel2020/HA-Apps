@@ -28,7 +28,15 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from .formatting import format_int, format_size, format_timestamp, format_type, format_value, parse_localized_number
+from .formatting import (
+    format_int,
+    format_size,
+    format_time,
+    format_timestamp,
+    format_type,
+    format_value,
+    parse_localized_number,
+)
 from .limits import (
     MAX_CSV_UPLOAD_BYTES,
     MAX_IMPORT_ROWS_PER_ENTITY,
@@ -71,6 +79,12 @@ HA_RANGE_PRESETS_STATS = {
 }
 HA_RANGE_PRESET_DAYS_STATS = {"30d": 30, "90d": 90, "365d": 365}
 HA_MAX_RANGE_DAYS_STATS = 3650
+
+# Ab wann eine gecachte Verfügbarkeitsprüfung (siehe _HaAvailabilityCache) als
+# veraltet gilt und die Tabelle warnt — HA-Zustände ändern sich laufend, eine
+# Stunden alte Prüfung könnte längst nicht mehr stimmen, ohne dass die
+# Tabelle das erkennen lässt.
+HA_AVAILABILITY_STALE_SECONDS = 15 * 60
 
 
 class _ScanCache:
@@ -131,6 +145,23 @@ class _ImportProgress:
         self.errors: list[str] = []
 
 
+class _HaAvailabilityCache:
+    """Cache der zuletzt geprüften HA-Verfügbarkeit je Quelle/Auflösung
+    (history_source + period, siehe _ha_cache_key()) — ohne das ginge eine
+    bereits geprüfte Verfügbarkeit bei jedem GET /import (Seitenwechsel,
+    Neuladen) verloren: _ha_import_context() kannte sie bisher nur für die
+    Dauer der jeweiligen POST-Antwort, die dieselbe Vorlage neu rendert.
+    Wie _ScanCache rein im Prozessspeicher — geht bei einem Server-Neustart
+    verloren, für eine reine Anzeige-Vorschau (kein Importzustand, jederzeit
+    per Klick neu abrufbar) ausreichend."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        # key: _ha_cache_key(history_source, period) -> {"checked_at": float,
+        # "availability": dict[str, EntityAvailability], "error": str | None}
+        self.entries: dict[str, dict] = {}
+
+
 @dataclass(frozen=True)
 class ImportDependencies:
     data_dir: Path
@@ -160,6 +191,30 @@ class ImportService:
         self._import_admission_lock = threading.Lock()
         self._upload_progress = _UploadProgress()
         self._import_progress = _ImportProgress()
+        self._ha_availability_cache = _HaAvailabilityCache()
+
+
+    @staticmethod
+    def _ha_cache_key(history_source: str, period: str) -> str:
+        return f"stats:{period}" if history_source == "stats" else "raw"
+
+
+    def _ha_cache_lookup(self, history_source: str, period: str) -> dict | None:
+        with self._ha_availability_cache.lock:
+            return self._ha_availability_cache.entries.get(self._ha_cache_key(history_source, period))
+
+
+    def _ha_cache_store(
+        self, history_source: str, period: str,
+        availability: dict[str, ha_import.EntityAvailability], error: str | None,
+    ) -> None:
+        entry = {
+            "checked_at": datetime.now(timezone.utc).timestamp(),
+            "availability": availability,
+            "error": error,
+        }
+        with self._ha_availability_cache.lock:
+            self._ha_availability_cache.entries[self._ha_cache_key(history_source, period)] = entry
 
 
     def _load_symcon_names(self) -> dict[str, dict[str, str | None]]:
@@ -414,9 +469,6 @@ class ImportService:
         date_to: str = "",
         history_source: str = "raw",
         period: str = ha_statistics.DEFAULT_PERIOD,
-        availability: dict[str, ha_import.EntityAvailability] | None = None,
-        availability_error: str | None = None,
-        availability_checked: bool = False,
     ) -> dict:
         """Auswahlliste für den Home-Assistant-Import-Reiter — bewusst NICHT über
         die HA-API entdeckt (/api/states), sondern self.deps.index.list_entities(): nur
@@ -432,21 +484,26 @@ class ImportService:
         keine Daten, Zeitraum, Punktanzahl) wird bewusst NICHT hier eager für
         alle Zeilen mitgeladen, sondern erst durch den expliziten "Verfügbarkeit
         prüfen"-Button (siehe /import/ha/availability) — sonst würde jeder
-        Aufruf dieser Seite automatisch N HA-Requests auslösen.
+        Aufruf dieser Seite automatisch N HA-Requests auslösen. Einmal geprüft,
+        kommt das Ergebnis IMMER aus self._ha_availability_cache (siehe dort) —
+        ein einzelner Aufrufer übergibt kein frisches Ergebnis mehr direkt,
+        das erspart eine zweite Quelle der Wahrheit: /import/ha/availability
+        schreibt in den Cache, jeder Aufruf hier (auch GET /import, auch der
+        reine Quellen-/Perioden-Wechsel über /import/ha/source) liest daraus.
         ha_available=False (rein lokale Prüfung, kein Netzwerk-Roundtrip) erlaubt
         der Vorlage, vorab auf eine fehlende Supervisor-Umgebung hinzuweisen —
         die Liste selbst bleibt trotzdem sichtbar, da sie keine HA-Verbindung
-        braucht.
-        history_source ("raw"/"stats") entscheidet nur, WELCHE Vorlagen-Texte/
-        Zeitraum-Voreinstellungen angezeigt werden — availability muss vom
-        Aufrufer bereits zur passenden Quelle gehören (siehe _fetch_ha_availability()),
-        hier wird nicht erneut zwischen den Quellen unterschieden."""
+        braucht."""
         now = datetime.now(timezone.utc)
         default_from = (now - timedelta(days=10)).strftime("%Y-%m-%d")
         default_to = now.strftime("%Y-%m-%d")
         ha_available = ha_import.token_available()
-        availability = availability or {}
         range_options = HA_RANGE_PRESETS_STATS if history_source == "stats" else HA_RANGE_PRESETS_RAW
+        cache_entry = self._ha_cache_lookup(history_source, period)
+        availability: dict[str, ha_import.EntityAvailability] = cache_entry["availability"] if cache_entry else {}
+        availability_error = cache_entry["error"] if cache_entry else None
+        checked_at = cache_entry["checked_at"] if cache_entry else None
+        stale = checked_at is not None and (now.timestamp() - checked_at) > HA_AVAILABILITY_STALE_SECONDS
         entities = []
         for row in self.deps.index.list_entities():
             entity_id = row["entity_id"]
@@ -474,8 +531,13 @@ class ImportService:
             "ha_error": None if ha_available else "Supervisor ist in dieser Umgebung nicht verfügbar",
             "ha_entities": entities,
             "ha_selected_ids": selected_ids or set(),
-            "ha_availability_checked": availability_checked,
+            "ha_availability_checked": cache_entry is not None,
             "ha_availability_error": availability_error,
+            "ha_availability_checked_at_label": (
+                f"{format_timestamp(checked_at, self.deps.tz)} {format_time(checked_at, self.deps.tz)}"
+                if checked_at is not None else None
+            ),
+            "ha_availability_stale": stale,
             "ha_history_source": history_source if history_source in ("raw", "stats") else "raw",
             "ha_period": period if period in ha_statistics.PERIODS else ha_statistics.DEFAULT_PERIOD,
             "ha_period_options": list(ha_statistics.PERIODS.items()),
@@ -1495,13 +1557,16 @@ class ImportService:
                 logger.warning(
                     "HA-Verfügbarkeitsprüfung: unbekannte Entitäts-IDs verworfen · %s", unknown_ids
                 )
-            availability: dict[str, ha_import.EntityAvailability] = {}
-            availability_error: str | None = None
             if known_ids:
                 start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
                 availability, availability_error = await run_in_threadpool(
                     self._fetch_ha_availability, known_ids, start, end, history_source, period
                 )
+                # Auch ein Fehlschlag wird gecacht (leeres availability-Dict) —
+                # sonst würde ein Seitenwechsel nach einem Fehlschlag wieder
+                # kommentarlos auf "noch nie geprüft" zurückfallen, statt den
+                # zuletzt aufgetretenen Fehler weiter anzuzeigen.
+                self._ha_cache_store(history_source, period, availability, availability_error)
                 if availability_error is None:
                     with_data = sum(1 for a in availability.values() if a.has_data)
                     logger.info(
@@ -1514,8 +1579,6 @@ class ImportService:
                     selected_ids=set(selected_ids), range_preset=range_preset,
                     date_from=date_from, date_to=date_to,
                     history_source=history_source, period=period,
-                    availability=availability, availability_error=availability_error,
-                    availability_checked=True,
                 ),
             )
 
@@ -1524,16 +1587,16 @@ class ImportService:
         async def import_ha_source(request: Request) -> HTMLResponse:
             """Wechselt die Quelle (Rohhistorie/Langzeitstatistik) bzw. die
             Perioden-Auflösung — reiner Neuaufbau der Auswahltabelle OHNE
-            HA-API-/WS-Aufruf: eine zuvor geprüfte Verfügbarkeit gehört zur
-            bisherigen Quelle/Periode und würde unter der neuen falsch
-            angezeigt (z. B. Rohhistorie-Punktzahlen unter der Beschriftung
-            "Langzeitstatistik"), deshalb wird sie hier verworfen statt
-            beibehalten — der Nutzer muss "Verfügbarkeit prüfen" für die neue
-            Quelle explizit erneut klicken. Wie /import/ha/availability
-            bleiben aktuell angehakte entity_ids sowie die Zeitraum-Auswahl
-            erhalten (range_preset wird dabei ggf. auf "max" zurückgesetzt,
-            falls er für die neue Quelle nicht existiert, siehe
-            _ha_import_context())."""
+            HA-API-/WS-Aufruf: _ha_import_context() liest die zur neuen
+            Quelle/Periode gehörende Verfügbarkeit automatisch aus
+            self._ha_availability_cache (je Kombination separat gepflegt,
+            siehe dort) und zeigt sie inkl. Zeitstempel/Veraltet-Warnung an,
+            statt sie zu verwerfen — wurde diese Quelle/Periode noch nie
+            geprüft, bleibt die Spalte "Verfügbar" schlicht leer. Wie
+            /import/ha/availability bleiben aktuell angehakte entity_ids
+            sowie die Zeitraum-Auswahl erhalten (range_preset wird dabei ggf.
+            auf "max" zurückgesetzt, falls er für die neue Quelle nicht
+            existiert, siehe _ha_import_context())."""
             form = await request.form()
             selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)

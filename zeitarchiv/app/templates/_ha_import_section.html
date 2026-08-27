@@ -65,7 +65,15 @@
         <th><a href="#" onclick="sortHaTable('type');return false;">Typ<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('art');return false;">Art<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a></th>
+        <th>
+          <a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a>
+          {% if ha_availability_checked_at_label %}
+          <span class="ha-checked-at" title="Zeitpunkt der letzten Verfügbarkeitsprüfung für diese Quelle">({{ ha_availability_checked_at_label }})</span>
+          {% endif %}
+          {% if ha_availability_stale %}
+          <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben. Für einen aktuellen Stand oben auf „Verfügbarkeit erneut prüfen“ klicken.">⏳ Nicht mehr taufrisch</span>
+          {% endif %}
+        </th>
       </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
@@ -197,10 +205,10 @@
     function onHaSourceChange(value) {
       const input = document.getElementById('ha-source-input');
       if (input) input.value = value;
-      // Server-Neuaufbau statt reiner Client-Umschaltung: eine zuvor
-      // geprüfte Verfügbarkeit gehört zur bisherigen Quelle und würde unter
-      // der neuen Beschriftung ("Langzeitstatistik" vs. "Rohhistorie")
-      // falsche Zahlen zeigen — siehe /import/ha/source-Docstring.
+      // Server-Neuaufbau statt reiner Client-Umschaltung: die Verfügbarkeits-
+      // Anzeige gehört zu einer bestimmten Quelle/Periode (serverseitiger
+      // Cache je Kombination, siehe /import/ha/source-Docstring) — nur ein
+      // Neuaufbau zeigt zuverlässig deren eigenen zuletzt geprüften Stand.
       htmx.ajax('POST', 'import/ha/source', { source: '#ha-form', target: '#ha-section', swap: 'outerHTML' });
     }
     function onHaPeriodChange(value) {

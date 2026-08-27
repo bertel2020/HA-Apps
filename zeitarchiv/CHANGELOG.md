@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.55.0 - 2026-08-27
+
+### Neu
+
+- Home-Assistant-Import: eine geprüfte Verfügbarkeit übersteht jetzt einen
+  Seitenwechsel/Neuladen sowie einen Wechsel zwischen Rohhistorie und
+  Langzeitstatistik (je Quelle/Auflösung getrennt gemerkt, bis zum nächsten
+  Add-on-Neustart). Der Spaltenkopf „Verfügbar“ zeigt dazu den Zeitpunkt der
+  letzten Prüfung; ist dieser älter als 15 Minuten, erscheint der Hinweis
+  „⏳ Nicht mehr taufrisch“.
+
 ## 0.54.0 - 2026-08-27
 
 ### Neu
