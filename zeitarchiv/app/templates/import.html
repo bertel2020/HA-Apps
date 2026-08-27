@@ -39,6 +39,17 @@
   .source-badge{font-family:var(--font-mono);padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);}
   .btn-sm{font-size:calc(12px * var(--font-scale, 1));padding:6px 11px;}
 
+  /* Segmentierter Umschalter (Rohhistorie/Langzeitstatistik im HA-Import) —
+     dieselbe Randfarbe/-stärke wie .btn, aber als zusammenhängende Gruppe
+     statt einzelner Buttons, damit die aktive Wahl auf einen Blick als
+     EINE Auswahl zu erkennen ist, nicht als zwei unabhängige Knöpfe. */
+  .seg-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .seg-toggle button{font-size:calc(12px * var(--font-scale, 1));padding:6px 11px;border:none;background:var(--surface-alt);color:var(--ink);cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .seg-toggle button+button{border-left:1px solid var(--border);}
+  .seg-toggle button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  .seg-toggle button:hover:not(.active){background:var(--surface);}
+  #ha-period-select{font-size:calc(12px * var(--font-scale, 1));padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);}
+
   /* Wie .badge (app.css), aber für die HA-Verfügbarkeitsprüfung: kein
      Zeitarchiv-Aggregationstyp, sondern ob HA für die Entität aktuell
      Rohhistorie liefert. "unknown" (noch nicht geprüft) bewusst blass statt
@@ -125,16 +136,16 @@
      wie .symcon-name-cell oben (Kürzung auf dem Kind-Span, nicht auf dem
      Host selbst — sonst schneidet dessen overflow:hidden den eigenen
      Tooltip mit ab) federt die schmalere Entität-Spalte dafür ab. */
-  .ha-col-entity{width:190px;}
-  .ha-col-unit{width:56px;}
-  .ha-col-type{width:96px;}
+  .ha-col-entity{width:260px;}
+  .ha-col-unit{width:72px;}
+  .ha-col-type{width:118px;}
   .ha-col-art{width:150px;}
-  .ha-col-available{width:260px;}
+  .ha-col-available{width:320px;}
   /* <col>-Klassen setzen nur die Breite (das Einzige, was <col> an die
      Zellen durchreicht) — Textausrichtung muss wie bei .symcon-import-table
-     oben per :nth-child() auf den tatsächlichen th/td sitzen. Typ = Spalte 4,
-     Art = Spalte 5 (1 Checkbox, 2 Entität, 3 Einheit). */
-  .ha-import-table th:nth-child(4),.ha-import-table td:nth-child(4),
+     oben per :nth-child() auf den tatsächlichen th/td sitzen. Typ = Spalte 3,
+     Art = Spalte 5 (1 Checkbox, 2 Entität, 4 Einheit, 6 Verfügbar). */
+  .ha-import-table th:nth-child(3),.ha-import-table td:nth-child(3),
   .ha-import-table th:nth-child(5),.ha-import-table td:nth-child(5){text-align:center;}
   .ha-entity-cell{display:block;min-width:0;}
   .ha-entity-cell .ent-name,.ha-entity-cell .ent-id{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

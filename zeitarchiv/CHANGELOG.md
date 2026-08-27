@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.54.0 - 2026-08-27
+
+### Neu
+
+- Home-Assistant-Import: neue Quelle „Langzeitstatistik" neben der
+  bisherigen Rohhistorie. Home Assistant bewahrt Langzeitstatistik
+  (Stunden-/Tagesaggregate, Mittelwert bzw. fortlaufende Summe je nach
+  Entität) im Gegensatz zur Rohhistorie standardmäßig dauerhaft auf — damit
+  lassen sich jetzt auch deutlich ältere Zeiträume importieren, für die HA
+  keine Einzelmesswerte mehr vorhält. Umschalter „Rohhistorie“/
+  „Langzeitstatistik“ oberhalb der Auswahltabelle, dazu eine Auflösung
+  (Stunden-/Tageswerte) und eigene Zeitraum-Voreinstellungen (u. a.
+  „Letztes Jahr“). Entitäten ohne Home-Assistant-`state_class` (i. d. R.
+  außerhalb von `sensor.*`) führen keine Langzeitstatistik — als „Nicht
+  unterstützt“ in der Spalte „Art“ erkennbar. Nutzt dafür erstmals die
+  Home-Assistant-WebSocket- statt der REST-API
+  (`recorder/statistics_during_period`).
+
 ## 0.53.0 - 2026-08-27
 
 ### Neu

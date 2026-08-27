@@ -17,6 +17,18 @@
 <form id="ha-form" method="post" action="import/ha/dry-run">
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
     <input type="search" class="search btn-sm" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:140px;max-width:240px;">
+
+    <input type="hidden" name="history_source" id="ha-source-input" value="{{ ha_history_source }}">
+    <span class="seg-toggle" role="group" aria-label="Quelle">
+      <button type="button" class="{{ 'active' if ha_history_source == 'raw' }}" onclick="onHaSourceChange('raw')">Rohhistorie</button>
+      <button type="button" class="{{ 'active' if ha_history_source == 'stats' }}" onclick="onHaSourceChange('stats')">Langzeitstatistik</button>
+    </span>
+    <select id="ha-period-select" name="period" onchange="onHaPeriodChange(this.value)" title="Auflösung" style="{{ '' if ha_history_source == 'stats' else 'display:none;' }}">
+      {% for value, label in ha_period_options %}
+      <option value="{{ value }}" {% if value == ha_period %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
     <button type="button" class="btn btn-sm" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
       {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
       <span class="htmx-indicator"> &middot; prüft …</span>
@@ -45,13 +57,13 @@
       <colgroup>
         <col class="symcon-col-check">
         <col class="ha-col-entity">
-        <col class="ha-col-unit"><col class="ha-col-type"><col class="ha-col-art"><col class="ha-col-available">
+        <col class="ha-col-type"><col class="ha-col-unit"><col class="ha-col-art"><col class="ha-col-available">
       </colgroup>
       <tr>
         <th><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle auf dieser Seite markieren"></th>
         <th><a href="#" onclick="sortHaTable('entity');return false;">Entität<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('type');return false;">Typ<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('art');return false;">Art<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a></th>
       </tr>
@@ -61,7 +73,7 @@
           data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
           data-sort-unit="{{ entity.unit or '' }}"
           data-sort-type="{{ entity.type_label }}"
-          data-sort-art="{{ '1' if entity.has_data else ('0' if entity.has_data is not none else '') }}"
+          data-sort-art="{{ '' if entity.has_data is none else ('0' if entity.supported == false else ('2' if entity.has_data else '1')) }}"
           data-sort-available="{{ entity.available_first_ts if entity.available_first_ts is not none else '' }}">
         <td>
           <input type="hidden" name="check_entity_ids" value="{{ entity.entity_id }}">
@@ -77,15 +89,17 @@
             </span>
           </span>
         </td>
-        <td>{{ entity.unit or "—" }}</td>
         <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
+        <td>{{ entity.unit or "—" }}</td>
         <td>
           {% if entity.has_data is none %}
           <span class="ha-art-badge unknown" title="Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken">–</span>
+          {% elif entity.supported == false %}
+          <span class="ha-art-badge unknown" title="Diese Entität führt keine Langzeitstatistik, i. d. R. ohne HA-state_class (z. B. Schalter/Text)">Nicht unterstützt</span>
           {% elif entity.has_data %}
-          <span class="ha-art-badge has-data">Rohhistorie</span>
+          <span class="ha-art-badge has-data">{{ "Langzeitstatistik" if ha_history_source == "stats" else "Rohhistorie" }}</span>
           {% else %}
-          <span class="ha-art-badge no-data">Keine Rohhistorie</span>
+          <span class="ha-art-badge no-data">{{ "Keine Langzeitstatistik" if ha_history_source == "stats" else "Keine Rohhistorie" }}</span>
           {% endif %}
         </td>
         <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">{{ entity.available_label or "—" }}</td>
@@ -112,7 +126,11 @@
   <div class="actionbar">
     <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
     <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Import starten</button>
-    <span class="hint">Home Assistant hält Rohhistorie meist nur einige Tage vor — ältere Werte werden übersprungen.</span>
+    {% if ha_history_source == "stats" %}
+    <span class="hint">Langzeitstatistik liefert Stunden-/Tagesmittelwerte (bzw. Zählerstände) statt Rohmesswerte — für Zeiträume, für die HA keine Rohhistorie mehr vorhält. Werden für denselben laufenden Monat beide Quellen importiert, stehen Roh- und Aggregatwerte nebeneinander im selben Verlauf.</span>
+    {% else %}
+    <span class="hint">Home Assistant hält Rohhistorie meist nur einige Tage vor — ältere Werte werden übersprungen. Für weiter zurückliegende Zeiträume: Langzeitstatistik oben auswählen.</span>
+    {% endif %}
   </div>
   <div id="ha-import-output"></div>
 </form>
@@ -176,6 +194,19 @@
       if (field) field.style.display = value === 'custom' ? 'flex' : 'none';
     }
 
+    function onHaSourceChange(value) {
+      const input = document.getElementById('ha-source-input');
+      if (input) input.value = value;
+      // Server-Neuaufbau statt reiner Client-Umschaltung: eine zuvor
+      // geprüfte Verfügbarkeit gehört zur bisherigen Quelle und würde unter
+      // der neuen Beschriftung ("Langzeitstatistik" vs. "Rohhistorie")
+      // falsche Zahlen zeigen — siehe /import/ha/source-Docstring.
+      htmx.ajax('POST', 'import/ha/source', { source: '#ha-form', target: '#ha-section', swap: 'outerHTML' });
+    }
+    function onHaPeriodChange(value) {
+      htmx.ajax('POST', 'import/ha/source', { source: '#ha-form', target: '#ha-section', swap: 'outerHTML' });
+    }
+
     function applyHaPaging() {
       const table = document.getElementById('ha-import-table');
       if (!table) return;
@@ -234,6 +265,8 @@
     window.onHaMarkChange = onHaMarkChange;
     window.toggleAllHaRows = toggleAllHaRows;
     window.toggleHaCustomRange = toggleHaCustomRange;
+    window.onHaSourceChange = onHaSourceChange;
+    window.onHaPeriodChange = onHaPeriodChange;
     window.setHaPageSize = setHaPageSize;
     window.stepHaPage = stepHaPage;
     refreshHaMarkedCount();

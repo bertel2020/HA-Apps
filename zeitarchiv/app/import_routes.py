@@ -36,7 +36,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size
-from .storage import csv_import, ha_import, import_reports, symcon_import
+from .storage import csv_import, ha_import, ha_statistics, import_reports, symcon_import
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
 
@@ -44,20 +44,33 @@ logger = logging.getLogger(__name__)
 
 
 # Zeitraum-Voreinstellungen für den Home-Assistant-Import-Reiter (dd-picker,
-# siehe _ha_import_section.html) — "max" ist bewusst auf HA_MAX_RANGE_DAYS
-# begrenzt statt wirklich unbegrenzt: HA hält Rohhistorie standardmäßig nur
-# ~10 Tage vor, aber bei individuell verlängerter Recorder-Aufbewahrung
-# (purge_keep_days) könnte ein echtes "seit Anbeginn" sonst über Jahre in
-# HISTORY_CHUNK-Fenstern abgefragt werden — ein einzelner Klick sollte nicht
-# hunderte Requests gegen die laufende HA-Instanz auslösen können.
-HA_RANGE_PRESETS = {
+# siehe _ha_import_section.html) — getrennt nach Quelle (history_source),
+# weil sich die sinnvolle Obergrenze stark unterscheidet: Rohhistorie hält
+# HA standardmäßig nur ~10 Tage vor (bei individuell verlängerter Recorder-
+# Aufbewahrung, purge_keep_days, potenziell mehr, aber "max" bleibt trotzdem
+# begrenzt — sonst könnte ein einzelner Klick über Jahre in HISTORY_CHUNK-
+# Fenstern hunderte Requests auslösen). Langzeitstatistik dagegen wird von
+# HA per Voreinstellung NIE automatisch bereinigt, "max" ist hier also
+# bewusst großzügiger (siehe ha_statistics.py-Moduldocstring), aber ebenso
+# aus Sicherheitsgründen nicht wirklich unbegrenzt.
+HA_RANGE_PRESETS_RAW = {
     "max": "Verfügbare Historie (max.)",
     "10d": "Letzte 10 Tage",
     "30d": "Letzte 30 Tage",
     "custom": "Eigener Zeitraum …",
 }
-HA_RANGE_PRESET_DAYS = {"10d": 10, "30d": 30}
-HA_MAX_RANGE_DAYS = 365
+HA_RANGE_PRESET_DAYS_RAW = {"10d": 10, "30d": 30}
+HA_MAX_RANGE_DAYS_RAW = 365
+
+HA_RANGE_PRESETS_STATS = {
+    "max": "Verfügbare Statistik (max.)",
+    "30d": "Letzte 30 Tage",
+    "90d": "Letzte 90 Tage",
+    "365d": "Letztes Jahr",
+    "custom": "Eigener Zeitraum …",
+}
+HA_RANGE_PRESET_DAYS_STATS = {"30d": 30, "90d": 90, "365d": 365}
+HA_MAX_RANGE_DAYS_STATS = 3650
 
 
 class _ScanCache:
@@ -399,6 +412,8 @@ class ImportService:
         range_preset: str = "max",
         date_from: str = "",
         date_to: str = "",
+        history_source: str = "raw",
+        period: str = ha_statistics.DEFAULT_PERIOD,
         availability: dict[str, ha_import.EntityAvailability] | None = None,
         availability_error: str | None = None,
         availability_checked: bool = False,
@@ -421,16 +436,22 @@ class ImportService:
         ha_available=False (rein lokale Prüfung, kein Netzwerk-Roundtrip) erlaubt
         der Vorlage, vorab auf eine fehlende Supervisor-Umgebung hinzuweisen —
         die Liste selbst bleibt trotzdem sichtbar, da sie keine HA-Verbindung
-        braucht."""
+        braucht.
+        history_source ("raw"/"stats") entscheidet nur, WELCHE Vorlagen-Texte/
+        Zeitraum-Voreinstellungen angezeigt werden — availability muss vom
+        Aufrufer bereits zur passenden Quelle gehören (siehe _fetch_ha_availability()),
+        hier wird nicht erneut zwischen den Quellen unterschieden."""
         now = datetime.now(timezone.utc)
         default_from = (now - timedelta(days=10)).strftime("%Y-%m-%d")
         default_to = now.strftime("%Y-%m-%d")
         ha_available = ha_import.token_available()
         availability = availability or {}
+        range_options = HA_RANGE_PRESETS_STATS if history_source == "stats" else HA_RANGE_PRESETS_RAW
         entities = []
         for row in self.deps.index.list_entities():
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
+            not_supported = avail is not None and not avail.supported
             entities.append({
                 "entity_id": entity_id,
                 "friendly_name": row["friendly_name"] or entity_id,
@@ -438,8 +459,11 @@ class ImportService:
                 "aggregation_type": row["aggregation_type"],
                 "type_label": format_type(row["aggregation_type"]),
                 "has_data": avail.has_data if avail is not None else None,
-                "art_label": ("Rohhistorie" if avail.has_data else "Keine Rohhistorie") if avail is not None else None,
-                "available_label": self._ha_availability_label(avail) if avail is not None else None,
+                "supported": avail.supported if avail is not None else None,
+                "available_label": (
+                    "Führt keine Langzeitstatistik" if not_supported
+                    else self._ha_availability_label(avail, history_source)
+                ) if avail is not None else None,
                 # Für die client-seitige Sortierung der Verfügbar-Spalte: ein
                 # roher Unix-Zeitstempel statt des formatierten Labels, damit
                 # "12.08.2025" nicht lexikografisch vor "9.08.2025" sortiert.
@@ -452,8 +476,11 @@ class ImportService:
             "ha_selected_ids": selected_ids or set(),
             "ha_availability_checked": availability_checked,
             "ha_availability_error": availability_error,
-            "ha_range_options": list(HA_RANGE_PRESETS.items()),
-            "ha_range_preset": range_preset if range_preset in HA_RANGE_PRESETS else "max",
+            "ha_history_source": history_source if history_source in ("raw", "stats") else "raw",
+            "ha_period": period if period in ha_statistics.PERIODS else ha_statistics.DEFAULT_PERIOD,
+            "ha_period_options": list(ha_statistics.PERIODS.items()),
+            "ha_range_options": list(range_options.items()),
+            "ha_range_preset": range_preset if range_preset in range_options else "max",
             "ha_date_from": date_from or default_from,
             "ha_date_to": date_to or default_to,
         }
@@ -748,13 +775,28 @@ class ImportService:
 
 
     def _ha_form_params(self, form) -> tuple[list[str], str, str, str]:
+        # range_preset wird bewusst NICHT hier gegen HA_RANGE_PRESETS_RAW/
+        # _STATS validiert — welches der beiden Presets-Sets gilt, hängt von
+        # history_source ab (siehe _ha_source_params()), das an dieser Stelle
+        # noch nicht ausgewertet ist. Die endgültige Validierung übernimmt
+        # _ha_import_context() (fällt bei einem für die aktuelle Quelle
+        # ungültigen Wert auf "max" zurück).
         entity_ids = [str(v).strip() for v in form.getlist("entity_ids") if str(v).strip()]
         range_preset = str(form.get("range_preset") or "max")
-        if range_preset not in HA_RANGE_PRESETS:
-            range_preset = "max"
         date_from = str(form.get("date_from") or "")
         date_to = str(form.get("date_to") or "")
         return entity_ids, range_preset, date_from, date_to
+
+
+
+    def _ha_source_params(self, form) -> tuple[str, str]:
+        history_source = str(form.get("history_source") or "raw")
+        if history_source not in ("raw", "stats"):
+            history_source = "raw"
+        period = str(form.get("period") or ha_statistics.DEFAULT_PERIOD)
+        if period not in ha_statistics.PERIODS:
+            period = ha_statistics.DEFAULT_PERIOD
+        return history_source, period
 
 
 
@@ -769,16 +811,21 @@ class ImportService:
 
 
 
-    def _ha_date_range(self, range_preset: str, date_from: str, date_to: str) -> tuple[datetime, datetime]:
-        """Löst die gewählte Zeitraum-Voreinstellung (HA_RANGE_PRESETS) in ein
-        UTC-Zeitfenster auf. Nur "custom" liest date_from/date_to aus dem
-        Formular — date_to ist dabei inklusiv gemeint, deshalb +1 Tag als
-        Fensterende; nie über "jetzt" hinaus."""
+    def _ha_date_range(
+        self, range_preset: str, date_from: str, date_to: str, history_source: str = "raw"
+    ) -> tuple[datetime, datetime]:
+        """Löst die gewählte Zeitraum-Voreinstellung (HA_RANGE_PRESETS_RAW/
+        _STATS je nach history_source) in ein UTC-Zeitfenster auf. Nur
+        "custom" liest date_from/date_to aus dem Formular — date_to ist dabei
+        inklusiv gemeint, deshalb +1 Tag als Fensterende; nie über "jetzt"
+        hinaus."""
         now = datetime.now(timezone.utc)
+        max_days = HA_MAX_RANGE_DAYS_STATS if history_source == "stats" else HA_MAX_RANGE_DAYS_RAW
+        preset_days = HA_RANGE_PRESET_DAYS_STATS if history_source == "stats" else HA_RANGE_PRESET_DAYS_RAW
         if range_preset == "max":
-            return now - timedelta(days=HA_MAX_RANGE_DAYS), now
-        if range_preset in HA_RANGE_PRESET_DAYS:
-            return now - timedelta(days=HA_RANGE_PRESET_DAYS[range_preset]), now
+            return now - timedelta(days=max_days), now
+        if range_preset in preset_days:
+            return now - timedelta(days=preset_days[range_preset]), now
         try:
             start = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         except ValueError:
@@ -794,90 +841,106 @@ class ImportService:
 
 
 
-    def _ha_available_label(self, history: ha_import.HistoryFetchResult) -> str:
+    def _ha_available_label(self, history: ha_import.HistoryFetchResult, history_source: str = "raw") -> str:
         """Beschreibt, was tatsächlich in HA gefunden wurde — rows ist nach
-        fetch_history_rows() aufsteigend sortiert, der erste/letzte Eintrag ist
-        also der älteste/neueste tatsächlich abgerufene Messpunkt (nicht der
-        angefragte Zeitraum, der ja über das hinausgehen kann, was HA noch
-        vorhält)."""
+        fetch_history_rows()/fetch_statistics_rows() aufsteigend sortiert, der
+        erste/letzte Eintrag ist also der älteste/neueste tatsächlich
+        abgerufene Messpunkt (nicht der angefragte Zeitraum, der ja über das
+        hinausgehen kann, was HA noch vorhält)."""
+        noun = "Statistik-Punkte" if history_source == "stats" else "Punkte"
         if not history.rows:
-            return "Keine Rohhistorie im gewählten Zeitraum gefunden"
+            return f"Keine {'Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie'} im gewählten Zeitraum gefunden"
         first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
         return (
             f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
-            f"{format_int(len(history.rows))} Punkte"
+            f"{format_int(len(history.rows))} {noun}"
         )
 
 
 
-    def _ha_availability_label(self, avail: ha_import.EntityAvailability) -> str:
+    def _ha_availability_label(self, avail: ha_import.EntityAvailability, history_source: str = "raw") -> str:
         """Kurzform für die Auswahltabelle — Pendant zu _ha_available_label()
         oben, nur auf Basis der gebündelten Verfügbarkeitsprüfung
         (EntityAvailability: first_ts/last_ts/count) statt bereits
-        eingelesener Zeilen."""
+        eingelesener Zeilen. Der Aufrufer (_ha_import_context()) behandelt
+        avail.supported == False separat, hier wird das nicht mehr geprüft."""
+        noun = "Statistik-Punkte" if history_source == "stats" else "Punkte"
         if not avail.has_data:
-            return "Keine Rohhistorie im gewählten Zeitraum"
+            return f"Keine {'Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie'} im gewählten Zeitraum"
         return (
             f"{format_timestamp(avail.first_ts, self.deps.tz)} – {format_timestamp(avail.last_ts, self.deps.tz)} · "
-            f"{format_int(avail.count)} Punkte"
+            f"{format_int(avail.count)} {noun}"
         )
 
 
     def _fetch_ha_history(self,
-        entity_ids: list[str], start: datetime, end: datetime
+        entity_ids: list[str], start: datetime, end: datetime,
+        history_source: str = "raw", period: str = ha_statistics.DEFAULT_PERIOD,
     ) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
         """Netzwerkteil komplett außerhalb jeder Datei-/Indexsperre (Konzept
         "Offene Punkte" zu HA-Import: Sperren dürfen nicht unter einem
-        HTTP-Roundtrip zur HA-Instanz stehen) — wird per run_in_threadpool
+        HTTP-/WS-Roundtrip zur HA-Instanz stehen) — wird per run_in_threadpool
         aufgerufen, danach folgt die eigentliche Planung/Schreibphase gesperrt.
         Domain kommt aus der Entitäts-ID selbst (Konvention wie überall sonst im
         Addon, z. B. ingestion.py) — kein zusätzlicher /api/states-Aufruf nötig,
-        da nur bereits bekannte Zeitarchiv-Entitäten hier ankommen."""
+        da nur bereits bekannte Zeitarchiv-Entitäten hier ankommen.
+        history_source == "stats" holt stattdessen Langzeitstatistik über
+        ha_statistics.py (WebSocket-API) statt Rohhistorie über ha_import.py
+        (REST-API) — dieselbe Fehlerbehandlung/Logging-Struktur für beide."""
+        label = "Langzeitstatistik" if history_source == "stats" else "HA-Historie"
         fetched: dict[str, ha_import.HistoryFetchResult] = {}
         errors: list[str] = []
         for entity_id in entity_ids:
-            domain = entity_id.split(".", 1)[0]
             try:
-                history = ha_import.fetch_history_rows(entity_id, domain, start, end)
+                if history_source == "stats":
+                    history = ha_statistics.fetch_statistics_rows(entity_id, start, end, period)
+                else:
+                    domain = entity_id.split(".", 1)[0]
+                    history = ha_import.fetch_history_rows(entity_id, domain, start, end)
             except (ha_import.HaApiError, ValueError) as exc:
                 # WARNING statt nur in errors sammeln: das ist bisher die
-                # einzige Stelle, an der ein Fehlschlag beim HA-Historienabruf
+                # einzige Stelle, an der ein Fehlschlag beim HA-Abruf
                 # überhaupt im Container-Log auftaucht — ohne sie war ein
                 # solcher Fehlschlag nur über die UI sichtbar, nie über
                 # `docker logs`/das Add-on-Protokoll nachvollziehbar.
-                logger.warning("HA-Historie für %s nicht abrufbar · %s", entity_id, exc)
+                logger.warning("%s für %s nicht abrufbar · %s", label, entity_id, exc)
                 errors.append(f"{entity_id}: {exc}")
                 continue
             fetched[entity_id] = history
             # Ein nennenswerter Anteil übersprungener Punkte (nicht
-            # numerisch/kein bekannter Schalter-Zustand) ist kein Fehler,
-            # aber ein Symptom für eine Domain-/Datenqualitäts-Inkonsistenz
-            # — z. B. eine Entität, deren Zustände HA zwischenzeitlich als
-            # Text statt Zahl liefert. Ohne diese WARNING wäre "warum
-            # kommen nur halb so viele Punkte an wie erwartet" nur über den
-            # Importreport nachvollziehbar, nie im laufenden Log sichtbar.
+            # numerisch/kein bekannter Schalter-Zustand bzw. kein mean/sum im
+            # Statistik-Fenster) ist kein Fehler, aber ein Symptom für eine
+            # Domain-/Datenqualitäts-Inkonsistenz — z. B. eine Entität, deren
+            # Zustände HA zwischenzeitlich als Text statt Zahl liefert. Ohne
+            # diese WARNING wäre "warum kommen nur halb so viele Punkte an
+            # wie erwartet" nur über den Importreport nachvollziehbar, nie im
+            # laufenden Log sichtbar.
             if history.skipped > 0 and history.skipped >= len(history.rows):
                 logger.warning(
-                    "HA-Historie für %s: %d von %d Punkten übersprungen (nicht numerisch/kein bekannter Zustand)",
-                    entity_id, history.skipped, history.skipped + len(history.rows),
+                    "%s für %s: %d von %d Punkten übersprungen (nicht numerisch/kein bekannter Zustand)",
+                    label, entity_id, history.skipped, history.skipped + len(history.rows),
                 )
         return fetched, errors
 
 
     def _fetch_ha_availability(
-        self, entity_ids: list[str], start: datetime, end: datetime
+        self, entity_ids: list[str], start: datetime, end: datetime,
+        history_source: str = "raw", period: str = ha_statistics.DEFAULT_PERIOD,
     ) -> tuple[dict[str, ha_import.EntityAvailability], str | None]:
         """Wie _fetch_ha_history(), aber für die gebündelte Verfügbarkeits-
         Vorschau (EIN bis wenige Requests für ALLE übergebenen Entitäten
-        zusammen, siehe ha_import.fetch_availability) statt Rohdaten für den
-        tatsächlichen Import. Ein einzelner HaApiError betrifft hier immer
-        den gesamten Batch (nicht pro Entität wie bei _fetch_ha_history), da
-        mehrere Entitäten dieselbe HTTP-Anfrage teilen."""
-        domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
+        zusammen) statt Rohdaten für den tatsächlichen Import. Ein einzelner
+        HaApiError betrifft hier immer den gesamten Batch (nicht pro Entität
+        wie bei _fetch_ha_history), da mehrere Entitäten denselben Request
+        teilen."""
+        label = "HA-Statistik-Verfügbarkeitsprüfung" if history_source == "stats" else "HA-Verfügbarkeitsprüfung"
         try:
+            if history_source == "stats":
+                return ha_statistics.fetch_statistics_availability(entity_ids, start, end, period), None
+            domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
             return ha_import.fetch_availability(domains, start, end), None
         except ha_import.HaApiError as exc:
-            logger.warning("HA-Verfügbarkeitsprüfung fehlgeschlagen · Entitäten=%d · %s", len(entity_ids), exc)
+            logger.warning("%s fehlgeschlagen · Entitäten=%d · %s", label, len(entity_ids), exc)
             return {}, str(exc)
 
 
@@ -1423,6 +1486,7 @@ class ImportService:
             form = await request.form()
             check_entity_ids = [str(v).strip() for v in form.getlist("check_entity_ids") if str(v).strip()]
             selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            history_source, period = self._ha_source_params(form)
             known_ids, unknown_ids = self._known_ha_entity_ids(check_entity_ids)
             if unknown_ids:
                 # Kommt normalerweise nicht vor (die Zeilen kommen alle aus
@@ -1434,23 +1498,51 @@ class ImportService:
             availability: dict[str, ha_import.EntityAvailability] = {}
             availability_error: str | None = None
             if known_ids:
-                start, end = self._ha_date_range(range_preset, date_from, date_to)
+                start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
                 availability, availability_error = await run_in_threadpool(
-                    self._fetch_ha_availability, known_ids, start, end
+                    self._fetch_ha_availability, known_ids, start, end, history_source, period
                 )
                 if availability_error is None:
                     with_data = sum(1 for a in availability.values() if a.has_data)
                     logger.info(
-                        "HA-Verfügbarkeit geprüft · Entitäten=%d · mit Rohhistorie=%d · Zeitraum=%s",
-                        len(known_ids), with_data, range_preset,
+                        "HA-Verfügbarkeit geprüft · Quelle=%s · Entitäten=%d · mit Daten=%d · Zeitraum=%s",
+                        history_source, len(known_ids), with_data, range_preset,
                     )
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_section.html",
                 self._ha_import_context(
                     selected_ids=set(selected_ids), range_preset=range_preset,
                     date_from=date_from, date_to=date_to,
+                    history_source=history_source, period=period,
                     availability=availability, availability_error=availability_error,
                     availability_checked=True,
+                ),
+            )
+
+
+        @router.post("/import/ha/source", response_class=HTMLResponse)
+        async def import_ha_source(request: Request) -> HTMLResponse:
+            """Wechselt die Quelle (Rohhistorie/Langzeitstatistik) bzw. die
+            Perioden-Auflösung — reiner Neuaufbau der Auswahltabelle OHNE
+            HA-API-/WS-Aufruf: eine zuvor geprüfte Verfügbarkeit gehört zur
+            bisherigen Quelle/Periode und würde unter der neuen falsch
+            angezeigt (z. B. Rohhistorie-Punktzahlen unter der Beschriftung
+            "Langzeitstatistik"), deshalb wird sie hier verworfen statt
+            beibehalten — der Nutzer muss "Verfügbarkeit prüfen" für die neue
+            Quelle explizit erneut klicken. Wie /import/ha/availability
+            bleiben aktuell angehakte entity_ids sowie die Zeitraum-Auswahl
+            erhalten (range_preset wird dabei ggf. auf "max" zurückgesetzt,
+            falls er für die neue Quelle nicht existiert, siehe
+            _ha_import_context())."""
+            form = await request.form()
+            selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            history_source, period = self._ha_source_params(form)
+            return self.deps.templates.TemplateResponse(
+                request, "_ha_import_section.html",
+                self._ha_import_context(
+                    selected_ids=set(selected_ids), range_preset=range_preset,
+                    date_from=date_from, date_to=date_to,
+                    history_source=history_source, period=period,
                 ),
             )
 
@@ -1464,16 +1556,22 @@ class ImportService:
             vollständig, ohne HAs begrenzte Recorder-Aufbewahrung)."""
             form = await request.form()
             raw_entity_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
             errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            context = {"history_source": history_source, "period": period}
             if not entity_ids:
                 if not unknown_ids:
                     errors.append("Bitte mindestens eine Entität auswählen.")
-                return self.deps.templates.TemplateResponse(request, "_ha_import_dry_run.html", {"items": items, "errors": errors})
+                return self.deps.templates.TemplateResponse(
+                    request, "_ha_import_dry_run.html", {**context, "items": items, "errors": errors}
+                )
 
-            start, end = self._ha_date_range(range_preset, date_from, date_to)
-            fetched, fetch_errors = await run_in_threadpool(self._fetch_ha_history, entity_ids, start, end)
+            start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
+            fetched, fetch_errors = await run_in_threadpool(
+                self._fetch_ha_history, entity_ids, start, end, history_source, period
+            )
             errors.extend(fetch_errors)
 
             def plan_locked() -> list[dict]:
@@ -1492,7 +1590,7 @@ class ImportService:
                         result.append({
                             "entity_id": entity_id,
                             "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
-                            "available_label": self._ha_available_label(history),
+                            "available_label": self._ha_available_label(history, history_source),
                             "plan": plan,
                         })
                     return result
@@ -1501,15 +1599,18 @@ class ImportService:
                 items = await run_in_threadpool(plan_locked)
             # DEBUG statt INFO: Vorschauen ändern nichts (dieselbe Zurückhaltung
             # wie beim Symcon-/CSV-Dry-Run, die ebenfalls nicht loggen) — aber
-            # anders als dort macht dieser Dry-Run einen echten HA-API-Aufruf,
+            # anders als dort macht dieser Dry-Run einen echten HA-API-/WS-Aufruf,
             # dessen Planungsergebnis bei der Fehlersuche wertvoll sein kann.
             logger.debug(
-                "HA-Dry-Run · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
+                "HA-Dry-Run · Quelle=%s · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
+                history_source,
                 len(items),
                 sum(item["plan"].rows_to_import + item["plan"].rows_to_merge for item in items),
                 len(errors),
             )
-            return self.deps.templates.TemplateResponse(request, "_ha_import_dry_run.html", {"items": items, "errors": errors})
+            return self.deps.templates.TemplateResponse(
+                request, "_ha_import_dry_run.html", {**context, "items": items, "errors": errors}
+            )
 
 
 
@@ -1522,6 +1623,7 @@ class ImportService:
             started_at = datetime.now(timezone.utc)
             form = await request.form()
             raw_entity_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
             results: list[symcon_import.ImportResult] = []
@@ -1533,10 +1635,13 @@ class ImportService:
                     errors.append("Bitte mindestens eine Entität auswählen.")
             else:
                 logger.info(
-                    "Home-Assistant-Import gestartet · Entitäten=%d · Zeitraum=%s", len(entity_ids), range_preset
+                    "Home-Assistant-Import gestartet · Quelle=%s · Entitäten=%d · Zeitraum=%s",
+                    history_source, len(entity_ids), range_preset,
                 )
-                start, end = self._ha_date_range(range_preset, date_from, date_to)
-                fetched, fetch_errors = await run_in_threadpool(self._fetch_ha_history, entity_ids, start, end)
+                start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
+                fetched, fetch_errors = await run_in_threadpool(
+                    self._fetch_ha_history, entity_ids, start, end, history_source, period
+                )
                 errors.extend(fetch_errors)
 
                 def execute_ha_import() -> tuple[list[dict], dict]:
@@ -1555,7 +1660,7 @@ class ImportService:
                             run_items.append({
                                 "entity_id": entity_id,
                                 "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
-                                "available_label": self._ha_available_label(history),
+                                "available_label": self._ha_available_label(history, history_source),
                                 "result": result,
                             })
                         reconciliation = self.deps.run_storage_reconciliation(
@@ -1570,9 +1675,9 @@ class ImportService:
                         rows_imported = sum(r.rows_imported for r in results)
                         rows_merged = sum(r.rows_merged for r in results)
                         logger.info(
-                            "Home-Assistant-Import abgeschlossen · Entitäten=%d · Zeilen importiert=%d · "
+                            "Home-Assistant-Import abgeschlossen · Quelle=%s · Entitäten=%d · Zeilen importiert=%d · "
                             "Zeilen zusammengeführt=%d · Fehler=%d",
-                            len(results), rows_imported, rows_merged, len(errors),
+                            history_source, len(results), rows_imported, rows_merged, len(errors),
                         )
                         if results and not errors and rows_imported + rows_merged == 0:
                             # Kein Fehler, aber auch keine einzige neue Zeile
@@ -1600,6 +1705,8 @@ class ImportService:
                             "range_preset": range_preset,
                             "date_from": date_from,
                             "date_to": date_to,
+                            "history_source": history_source,
+                            "period": period if history_source == "stats" else None,
                         },
                         results=[dataclasses.asdict(result) for result in results],
                         errors=errors,
@@ -1607,7 +1714,10 @@ class ImportService:
                     )
             except Exception:
                 logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")
-            return self.deps.templates.TemplateResponse(request, "_ha_import_result.html", {"items": items, "errors": errors})
+            return self.deps.templates.TemplateResponse(
+                request, "_ha_import_result.html",
+                {"history_source": history_source, "period": period, "items": items, "errors": errors},
+            )
 
 
         return router

@@ -158,18 +158,29 @@ wo diese ebenfalls Platz belegen.
   angeben.
 - **CSV:** Trennzeichen sowie Zeit-, Wert- und Zielspalte frei zuordnen,
   Ergebnis vor dem eigentlichen Import prüfen.
-- **Home Assistant:** bestehende Recorder-Rohhistorie direkt aus der
-  laufenden Home-Assistant-Instanz übernehmen, ohne Symcon oder eine
-  hochgeladene Datei. Zur Auswahl stehen nur Entitäten, die bereits in
-  Zeitarchiv bekannt sind (also von der Home-Assistant-Integration
-  konfiguriert wurden und mindestens einen Live-Wert übertragen haben).
-  Zeitraum wählen (voreingestellt „Verfügbare Historie (max.)“, alternativ
-  feste Zeiträume oder ein eigener), optional „Verfügbarkeit prüfen“ für
-  eine Vorschau, welche Entitäten in Home Assistant tatsächlich Rohhistorie
-  haben und für welchen Zeitraum — Home Assistant hält Rohhistorie
-  standardmäßig nur einige Tage vor. Benötigt die Add-on-Berechtigung
-  `homeassistant_api` sowie eine Home-Assistant-Installation mit Supervisor
-  (nicht bei Home Assistant Container).
+- **Home Assistant:** bestehende Recorder-Daten direkt aus der laufenden
+  Home-Assistant-Instanz übernehmen, ohne Symcon oder eine hochgeladene
+  Datei. Zur Auswahl stehen nur Entitäten, die bereits in Zeitarchiv bekannt
+  sind (also von der Home-Assistant-Integration konfiguriert wurden und
+  mindestens einen Live-Wert übertragen haben). Zwei Quellen zur Wahl:
+  - **Rohhistorie:** Einzelmesswerte über die Home-Assistant-REST-API — Home
+    Assistant hält sie standardmäßig aber nur einige Tage vor.
+  - **Langzeitstatistik:** von Home Assistant per Voreinstellung dauerhaft
+    aufbewahrte Stunden-/Tagesaggregate (Mittelwert bzw. fortlaufende Summe,
+    je nachdem was die Entität führt) über die Home-Assistant-WebSocket-API
+    — deckt damit auch deutlich ältere Zeiträume ab, dafür nur als Aggregat
+    statt als Einzelmesswert. Steht nur für Entitäten mit Home-Assistant-
+    `state_class` zur Verfügung (i. d. R. `sensor.*`), erkennbar an der
+    Markierung „Nicht unterstützt“ in der Spalte „Art“.
+
+  Zeitraum wählen (Voreinstellung/verfügbare Voreinstellungen unterscheiden
+  sich je nach Quelle — bei Langzeitstatistik z. B. auch „Letztes Jahr“),
+  optional „Verfügbarkeit prüfen“ für eine Vorschau, welche Entitäten in
+  Home Assistant tatsächlich Daten der gewählten Quelle haben und für
+  welchen Zeitraum. Ein Wechsel der Quelle setzt eine zuvor geprüfte
+  Verfügbarkeit zurück (sie gehörte zur alten Quelle). Benötigt die Add-on-
+  Berechtigung `homeassistant_api` sowie eine Home-Assistant-Installation
+  mit Supervisor (nicht bei Home Assistant Container).
 - **Reports** (vierter Reiter): jeder tatsächlich ausgeführte Import bleibt
   mit Quelle, Zuordnung, importierten/übersprungenen Datensätzen und
   eventuellen Fehlern nachvollziehbar, filterbar nach Quelle/Status,

@@ -1,5 +1,5 @@
 <div style="border-top:1px solid var(--border);padding-top:16px;">
-  <h3 class="eyebrow">Import abgeschlossen</h3>
+  <h3 class="eyebrow">Import abgeschlossen &middot; {{ "Langzeitstatistik" if history_source == "stats" else "Rohhistorie" }}{% if history_source == "stats" and period %} ({{ "Stundenwerte" if period == "hour" else "Tageswerte" }}){% endif %}</h3>
 
   {% for item in items %}
   <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px;">

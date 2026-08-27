@@ -241,6 +241,11 @@ class EntityAvailability:
     first_ts: float | None = None
     last_ts: float | None = None
     count: int = 0
+    # Nur von ha_statistics.fetch_statistics_availability() gesetzt (dort
+    # kann eine Entität grundsätzlich keine Langzeitstatistik führen, z. B.
+    # ohne state_class) — bei der Rohhistorie hier immer True, jede Domain
+    # kann grundsätzlich Zustände haben.
+    supported: bool = True
 
     @property
     def has_data(self) -> bool:
