@@ -6,6 +6,9 @@ Zeitarchiv-Integration sendet die Zustandsänderungen an die App; Ingress
 stellt Archiv, Charts, Tabellen, Import/Export, Bereinigung, Aufbewahrung und
 Backup / Restore in der Home-Assistant-Oberfläche bereit.
 
+**[Benutzerhandbuch](docs/user-guide.md)** — Einrichtung, jede Seite im
+Detail, Einstellungen-Referenz, typische Aufgaben.
+
 ## Einrichtung
 
 1. App installieren und starten.
@@ -36,6 +39,4 @@ protokolliert. Dort lassen sich Ergebnisse filtern, im Detail prüfen und als
 JSON herunterladen. Importvorschauen erzeugen keinen Report.
 
 Ausführliche Funktions- und Grenzwerthinweise stehen in der mitgelieferten
-`README.md`. Ein aufgabenorientiertes Benutzerhandbuch (Einrichtung, jede
-Seite im Detail, Einstellungen-Referenz) steht in
-[docs/user-guide.md](docs/user-guide.md).
+[README.md](README.md).
