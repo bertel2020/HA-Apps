@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.55.2 - 2026-08-27
+
+### Verbesserung
+
+- Home-Assistant-Import, Spalte „Verfügbar“: Zeitpunkt der letzten Prüfung
+  steht jetzt als eigener, farblich hervorgehobener Chip in Klammern direkt
+  hinter dem Spaltentitel (vorher brach er wegen `th a{display:block}` auf
+  eine eigene Zeile um). Das Prüfergebnis je Zeile steht jetzt auf zwei
+  Zeilen (Zeitraum, dann Anzahl) statt einem zusammengesetzten Text; „…
+  Punkte“ heißt jetzt „… Werte“.
+
 ## 0.55.1 - 2026-08-27
 
 ### Fehlerbehebung

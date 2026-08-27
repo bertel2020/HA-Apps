@@ -59,11 +59,16 @@
   .ha-art-badge.no-data{color:var(--ink-faint);}
   .ha-art-badge.unknown{color:var(--ink-faint);border-style:dashed;cursor:help;}
   /* Zeitpunkt der letzten Verfügbarkeitsprüfung im Spaltenkopf "Verfügbar"
-     (siehe _HaAvailabilityCache) — bewusst kein eigener Link/keine eigene
-     Zeile, damit die Sortierbarkeit der Spalte (siehe .sort-arrow) optisch
-     eindeutig beim "Verfügbar"-Text selbst bleibt. */
-  .ha-checked-at{font-weight:400;font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;margin-left:4px;}
-  .ha-stale-badge{display:inline-block;font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--danger);color:var(--danger);background:var(--danger-soft);cursor:help;white-space:nowrap;margin-left:6px;}
+     (siehe _HaAvailabilityCache) — bewusst als kleiner Chip statt reinem
+     Text, damit er sich vom Spaltentitel klar absetzt; liegt INNERHALB des
+     <a> (siehe Vorlage), damit table.dt th a{display:block} (app.css) ihn
+     nicht auf eine eigene Zeile umbricht. */
+  .ha-checked-at{display:inline-block;font-weight:600;font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--accent-line);background:var(--accent-line-soft);border-radius:999px;padding:1px 8px;white-space:nowrap;margin-left:5px;vertical-align:middle;}
+  .ha-stale-badge{display:inline-block;font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--danger);color:var(--danger);background:var(--danger-soft);cursor:help;white-space:nowrap;margin-left:6px;vertical-align:middle;}
+  /* Verfügbar-Spalte: Zeitraum/Anzahl als zwei Zeilen (siehe Vorlage) statt
+     einem zusammengesetzten Text — die zweite Zeile (Anzahl) bewusst
+     leiser, sie ist die Detailinformation zur Zeitraum-Zeile darüber. */
+  .ha-available-count{color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));}
   .import-delete-row{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
   .import-delete-row .btn-danger{font-weight:600;}
   .import-delete-button{min-width:154px;}

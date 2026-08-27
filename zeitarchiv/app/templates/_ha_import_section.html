@@ -66,13 +66,11 @@
         <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('art');return false;">Art<span class="sort-arrow"></span></a></th>
         <th>
-          <a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a>
-          {% if ha_availability_checked_at_label %}
-          <span class="ha-checked-at" title="Zeitpunkt der letzten Verfügbarkeitsprüfung für diese Quelle">({{ ha_availability_checked_at_label }})</span>
-          {% endif %}
-          {% if ha_availability_stale %}
-          <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben. Für einen aktuellen Stand oben auf „Verfügbarkeit erneut prüfen“ klicken.">⏳ Nicht mehr taufrisch</span>
-          {% endif %}
+          {# checked_at/stale-Badge bewusst INNERHALB des <a> (nicht als
+             Geschwister-Element): table.dt th a{display:block} (app.css)
+             würde ein Geschwisterelement sonst auf eine eigene Zeile
+             umbrechen, statt in derselben Zeile wie "Verfügbar" zu bleiben. #}
+          <a href="#" onclick="sortHaTable('available');return false;">Verfügbar{% if ha_availability_checked_at_label %} <span class="ha-checked-at" title="Zeitpunkt der letzten Verfügbarkeitsprüfung für diese Quelle">({{ ha_availability_checked_at_label }})</span>{% endif %}{% if ha_availability_stale %} <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben. Für einen aktuellen Stand oben auf „Verfügbarkeit erneut prüfen“ klicken.">⏳ Nicht mehr taufrisch</span>{% endif %}<span class="sort-arrow"></span></a>
         </th>
       </tr>
       {% for entity in ha_entities %}
@@ -110,7 +108,14 @@
           <span class="ha-art-badge no-data">{{ "Keine Langzeitstatistik" if ha_history_source == "stats" else "Keine Rohhistorie" }}</span>
           {% endif %}
         </td>
-        <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">{{ entity.available_label or "—" }}</td>
+        <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
+          {% if entity.available_range %}
+          <div>{{ entity.available_range }}</div>
+          <div class="ha-available-count">{{ entity.available_count }}</div>
+          {% else %}
+          {{ entity.available_label or "—" }}
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </table>

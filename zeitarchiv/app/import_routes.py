@@ -509,6 +509,20 @@ class ImportService:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
             not_supported = avail is not None and not avail.supported
+            # Die Verfügbar-Spalte zeigt Zeitraum und Anzahl als zwei
+            # getrennte Zeilen (available_range/available_count) statt einem
+            # zusammengesetzten Text — available_label bleibt der Ein-Zeilen-
+            # Fallback für die Fälle ohne Zeitraum/Anzahl (noch nicht
+            # geprüft, nicht unterstützt, keine Daten gefunden).
+            available_range = available_count = available_label = None
+            if avail is not None:
+                if not_supported:
+                    available_label = "Führt keine Langzeitstatistik"
+                elif avail.has_data:
+                    available_range, available_count = self._ha_availability_range_and_count(avail, history_source)
+                else:
+                    kind = "Statistik" if history_source == "stats" else "Rohhistorie"
+                    available_label = f"Keine {kind} im gewählten Zeitraum"
             entities.append({
                 "entity_id": entity_id,
                 "friendly_name": row["friendly_name"] or entity_id,
@@ -517,10 +531,9 @@ class ImportService:
                 "type_label": format_type(row["aggregation_type"]),
                 "has_data": avail.has_data if avail is not None else None,
                 "supported": avail.supported if avail is not None else None,
-                "available_label": (
-                    "Führt keine Langzeitstatistik" if not_supported
-                    else self._ha_availability_label(avail, history_source)
-                ) if avail is not None else None,
+                "available_label": available_label,
+                "available_range": available_range,
+                "available_count": available_count,
                 # Für die client-seitige Sortierung der Verfügbar-Spalte: ein
                 # roher Unix-Zeitstempel statt des formatierten Labels, damit
                 # "12.08.2025" nicht lexikografisch vor "9.08.2025" sortiert.
@@ -909,7 +922,7 @@ class ImportService:
         erste/letzte Eintrag ist also der älteste/neueste tatsächlich
         abgerufene Messpunkt (nicht der angefragte Zeitraum, der ja über das
         hinausgehen kann, was HA noch vorhält)."""
-        noun = "Statistik-Punkte" if history_source == "stats" else "Punkte"
+        noun = "Statistik-Werte" if history_source == "stats" else "Werte"
         if not history.rows:
             return f"Keine {'Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie'} im gewählten Zeitraum gefunden"
         first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
@@ -920,19 +933,21 @@ class ImportService:
 
 
 
-    def _ha_availability_label(self, avail: ha_import.EntityAvailability, history_source: str = "raw") -> str:
+    def _ha_availability_range_and_count(
+        self, avail: ha_import.EntityAvailability, history_source: str = "raw"
+    ) -> tuple[str, str]:
         """Kurzform für die Auswahltabelle — Pendant zu _ha_available_label()
         oben, nur auf Basis der gebündelten Verfügbarkeitsprüfung
         (EntityAvailability: first_ts/last_ts/count) statt bereits
-        eingelesener Zeilen. Der Aufrufer (_ha_import_context()) behandelt
-        avail.supported == False separat, hier wird das nicht mehr geprüft."""
-        noun = "Statistik-Punkte" if history_source == "stats" else "Punkte"
-        if not avail.has_data:
-            return f"Keine {'Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie'} im gewählten Zeitraum"
-        return (
-            f"{format_timestamp(avail.first_ts, self.deps.tz)} – {format_timestamp(avail.last_ts, self.deps.tz)} · "
-            f"{format_int(avail.count)} {noun}"
-        )
+        eingelesener Zeilen. Liefert Zeitraum und Anzahl getrennt (statt als
+        ein zusammengesetzter String), weil die Tabelle sie auf zwei Zeilen
+        darstellt — nur für avail.has_data == True aufgerufen, den Fall
+        "keine Daten"/"nicht unterstützt" behandelt der Aufrufer
+        (_ha_import_context()) bereits vorher separat."""
+        noun = "Statistik-Werte" if history_source == "stats" else "Werte"
+        range_label = f"{format_timestamp(avail.first_ts, self.deps.tz)} – {format_timestamp(avail.last_ts, self.deps.tz)}"
+        count_label = f"{format_int(avail.count)} {noun}"
+        return range_label, count_label
 
 
     def _fetch_ha_history(self,
