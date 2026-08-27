@@ -1,0 +1,86 @@
+<div id="ha-section">
+{% if not ha_available %}
+<div class="callout" style="border-left-color:var(--danger);">
+  Home-Assistant-API nicht erreichbar{% if ha_error %}: {{ ha_error }}{% endif %}. Die Auswahl unten
+  bleibt sichtbar, ein Dry Run/Import würde aber fehlschlagen — z. B. bei lokaler Entwicklung ohne
+  Supervisor.
+</div>
+{% endif %}
+{% if not ha_entities %}
+<div class="empty">Noch keine Entität in Zeitarchiv bekannt — die HA-Integration muss mindestens einen Live-Wert übertragen haben, bevor ein Import für diese Entität möglich ist.</div>
+{% else %}
+<form id="ha-form" method="post" action="import/ha/dry-run">
+  <div class="toolbar import-filter-toolbar">
+    <input type="search" class="search" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:160px;">
+    <span class="count-chip">{{ ha_entities | length }} bekannte Entitäten</span>
+    <span class="count-chip" id="ha-marked-count">0 markiert</span>
+  </div>
+
+  <div class="csv-config" style="margin-bottom:14px;">
+    <div class="field">
+      <label>Von</label>
+      <input type="date" name="date_from" value="{{ ha_date_from }}">
+    </div>
+    <div class="field">
+      <label>Bis</label>
+      <input type="date" name="date_to" value="{{ ha_date_to }}">
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table id="ha-import-table" class="dt symcon-import-table">
+      <tr><th style="width:40px;"><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle markieren"></th><th>Entität</th><th>Einheit</th><th>Art</th></tr>
+      {% for entity in ha_entities %}
+      <tr data-entity-id="{{ entity.entity_id }}"
+          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}">
+        <td><input type="checkbox" class="ha-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onHaMarkChange(this)" {% if entity.entity_id in ha_selected_ids %}checked{% endif %}></td>
+        <td><span class="ent-name" style="font-weight:600;">{{ entity.friendly_name or entity.entity_id }}</span><span class="ent-id mono" style="display:block;color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));">{{ entity.entity_id }}</span></td>
+        <td>{{ entity.unit or "—" }}</td>
+        <td>{% if entity.state_class %}<span class="source-badge">{{ entity.state_class }}</span>{% else %}Rohhistorie{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="actionbar">
+    <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
+    <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Import starten</button>
+    <span class="hint">Home Assistant hält Rohhistorie meist nur einige Tage vor — ältere Werte werden übersprungen.</span>
+  </div>
+  <div id="ha-import-output"></div>
+</form>
+{% endif %}
+</div>
+<script>
+  (function () {
+    function onHaSearch(value) {
+      const search = value.trim().toLowerCase();
+      document.querySelectorAll('#ha-import-table tr[data-entity-id]').forEach((row) => {
+        row.style.display = !search || (row.dataset.search || '').includes(search) ? '' : 'none';
+      });
+    }
+    function refreshHaMarkedCount() {
+      const count = document.querySelectorAll('.ha-mark-checkbox:checked').length;
+      const chip = document.getElementById('ha-marked-count');
+      if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = count + ' markiert'; }
+    }
+    function onHaMarkChange(checkbox) {
+      checkbox.closest('tr').classList.toggle('marked', checkbox.checked);
+      refreshHaMarkedCount();
+    }
+    function toggleAllHaRows(headerCheckbox) {
+      document.querySelectorAll('#ha-import-table tr[data-entity-id]').forEach((row) => {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('.ha-mark-checkbox');
+        if (!cb) return;
+        cb.checked = headerCheckbox.checked;
+        row.classList.toggle('marked', headerCheckbox.checked);
+      });
+      refreshHaMarkedCount();
+    }
+    window.onHaSearch = onHaSearch;
+    window.onHaMarkChange = onHaMarkChange;
+    window.toggleAllHaRows = toggleAllHaRows;
+    refreshHaMarkedCount();
+  })();
+</script>

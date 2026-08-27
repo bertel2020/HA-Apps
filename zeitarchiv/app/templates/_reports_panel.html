@@ -57,12 +57,13 @@
     <div class="field">
       <label>Quelle</label>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': 'Alle Quellen', 'symcon': 'Symcon', 'csv': 'CSV'}[source] }} ▾</button>
+        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': 'Alle Quellen', 'symcon': 'Symcon', 'csv': 'CSV', 'ha': 'Home Assistant'}[source] }} ▾</button>
         <input type="hidden" name="source" form="report-filter" id="report-source-input" value="{{ source }}">
         <div class="dd-picker-popover" id="report-source-popover">
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'all', 'Alle Quellen'); resetReportsPage();">Alle Quellen</div>
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'symcon', 'Symcon'); resetReportsPage();">Symcon</div>
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'csv', 'CSV'); resetReportsPage();">CSV</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'ha', 'Home Assistant'); resetReportsPage();">Home Assistant</div>
         </div>
       </span>
     </div>

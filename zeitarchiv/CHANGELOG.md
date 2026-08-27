@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.50.0 - 2026-08-27
+
+### Neu
+
+- Import-Reiter „Home Assistant": bestehende Recorder-Rohhistorie direkt aus
+  der laufenden Home-Assistant-Instanz importieren, ohne Symcon oder eine
+  hochgeladene Datei — Entitäten und Zeitraum wählen, Vorschau prüfen, Import
+  starten. Zur Auswahl stehen ausschließlich Entitäten, die bereits in
+  Zeitarchiv bekannt sind (also über die Home-Assistant-Integration
+  konfiguriert wurden und mindestens einen Live-Wert übertragen haben) —
+  es werden keine neuen Entitäten automatisch angelegt.
+  Benötigt die neue Add-on-Berechtigung `homeassistant_api` (Zugriff auf die
+  Home-Assistant-Core-API über den Supervisor-Proxy).
+
+  Mindestanforderung: Home Assistant mit Supervisor (Home Assistant OS oder
+  Supervised) sowie die REST-History-API mit den Parametern
+  `minimal_response`/`no_attributes`. Beides ist seit sehr vielen Jahren
+  fester, stabiler Bestandteil von Home Assistant — eine exakte
+  Mindestversion war nicht mit Sicherheit zu ermitteln, in der Praxis
+  funktioniert aber jede aktuell noch unterstützte/aktualisierte
+  Home-Assistant-Installation. Nicht unterstützt: Core-only-Installationen
+  ohne Supervisor (z. B. Home Assistant Container) — dort fehlt der
+  `http://supervisor/core/api/`-Proxy, über den dieser Import läuft.
+
 ## 0.40.0 - 2026-08-27
 
 ### Neu

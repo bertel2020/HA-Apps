@@ -151,6 +151,7 @@
     <div class="import-tabs">
       <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">Symcon</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">CSV-Datei</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'ha' %} active{% endif %}" id="tab-btn-ha" onclick="showImportTab('ha')">Home Assistant</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">Reports</button>
     </div>
 
@@ -341,6 +342,20 @@
     {% include "_csv_import_section.html" %}
     </div>
 
+    <div id="tab-ha" class="import-tab"{% if active_import_tab != 'ha' %} style="display:none;"{% endif %}>
+    <div class="callout">
+      <strong>So funktioniert der Import aus Home Assistant:</strong>
+      <ol class="import-steps">
+        <li>Zur Auswahl stehen nur Entitäten, die bereits in Zeitarchiv bekannt sind — also von der Home-Assistant-Integration konfiguriert wurden und mindestens einen Live-Wert übertragen haben.</li>
+        <li>Entitäten auswählen und einen Zeitraum festlegen — Zeitarchiv liest die vorhandene Recorder-Historie direkt über die Home-Assistant-API.</li>
+        <li>Home Assistant hält Rohhistorie standardmäßig nur wenige Tage vor; ältere Werte sind dort nicht mehr abrufbar. Vorschau prüfen und Import starten.</li>
+      </ol>
+      <p class="symcon-import-note">Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import nur noch nicht vorhandene Zeitstempel.</p>
+      <p class="symcon-import-note">Home Assistant kann am Anfang eines abgefragten Zeitfensters einen künstlichen &bdquo;Zustand zu diesem Zeitpunkt&ldquo; melden &mdash; dieser wird beim Zusammenfügen mehrerer Zeitfenster automatisch als Duplikat erkannt und nicht doppelt übernommen.</p>
+    </div>
+    {% include "_ha_import_section.html" %}
+    </div>
+
     <div id="tab-reports" class="import-tab"{% if active_import_tab != 'reports' %} style="display:none;"{% endif %}>
       {% include "_reports_panel.html" %}
     </div>
@@ -356,6 +371,10 @@
   <script>
     function showImportTab(name) {
       const url = new URL(window.location.href);
+      // "reports" lädt serverseitig gefiltert/paginiert — braucht deshalb
+      // einen vollen Reload statt des rein clientseitigen Umschaltens wie bei
+      // Symcon/CSV/Home Assistant (deren Inhalt schon beim ersten Laden der
+      // Seite mitgerendert wird).
       if (name === 'reports' && url.searchParams.get('tab') !== 'reports') {
         url.searchParams.set('tab', 'reports');
         window.location.href = url;
@@ -363,9 +382,11 @@
       }
       document.getElementById('tab-symcon').style.display = name === 'symcon' ? '' : 'none';
       document.getElementById('tab-csv').style.display = name === 'csv' ? '' : 'none';
+      document.getElementById('tab-ha').style.display = name === 'ha' ? '' : 'none';
       document.getElementById('tab-reports').style.display = name === 'reports' ? '' : 'none';
       document.getElementById('tab-btn-symcon').classList.toggle('active', name === 'symcon');
       document.getElementById('tab-btn-csv').classList.toggle('active', name === 'csv');
+      document.getElementById('tab-btn-ha').classList.toggle('active', name === 'ha');
       document.getElementById('tab-btn-reports').classList.toggle('active', name === 'reports');
       if (name === 'symcon') url.searchParams.delete('tab');
       else url.searchParams.set('tab', name);

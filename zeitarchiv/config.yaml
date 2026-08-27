@@ -1,5 +1,5 @@
 name: "Zeitarchiv"
-version: "0.40.0"
+version: "0.50.0"
 slug: "zeitarchiv"
 description: "Kompaktes Zeitreihen-Archiv für Home Assistant"
 arch:
@@ -10,6 +10,7 @@ startup: application
 boot: auto
 stage: stable
 hassio_api: true
+homeassistant_api: true
 ingress: true
 ingress_port: 8099
 ingress_stream: true

@@ -11,7 +11,7 @@ from pathlib import Path
 
 FORMAT = "zeitarchiv-import-report"
 FORMAT_VERSION = 1
-_REPORT_ID_RE = re.compile(r"^\d{8}T\d{6}Z-(?:symcon|csv)-[0-9a-f]{12}$")
+_REPORT_ID_RE = re.compile(r"^\d{8}T\d{6}Z-(?:symcon|csv|ha)-[0-9a-f]{12}$")
 
 
 def create(
@@ -26,7 +26,7 @@ def create(
     reconciliation: dict | None = None,
 ) -> dict:
     """Schreibt einen abgeschlossenen Report atomar unter reports/import/Jahr."""
-    if source_type not in {"symcon", "csv"}:
+    if source_type not in {"symcon", "csv", "ha"}:
         raise ValueError("Unbekannter Importtyp")
     finished_at = datetime.now(timezone.utc)
     started_utc = started_at.astimezone(timezone.utc)

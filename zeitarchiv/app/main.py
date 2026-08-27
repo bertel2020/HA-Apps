@@ -93,6 +93,7 @@ from .storage import (
     csv_import,
     cleanup,
     entity_removal,
+    ha_import,
     hotbuffer,
     import_reports,
     retention as retention_mod,
@@ -4375,6 +4376,35 @@ def _run_upload_background(tmp_zip: Path, source_meta: dict) -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
+def _ha_import_context(
+    selected_ids: set[str] | None = None, date_from: str = "", date_to: str = ""
+) -> dict:
+    """Auswahlliste für den Home-Assistant-Import-Reiter — bewusst NICHT über
+    die HA-API entdeckt (/api/states), sondern index.list_entities(): nur
+    Entitäten, die die HA-Integration bereits konfiguriert/gefiltert und
+    mindestens einmal live nach Zeitarchiv übertragen hat, stehen zur Wahl.
+    Eine zweite, unabhängige Entdeckung über die Core-API würde diese
+    Filterung umgehen und Entitäten anbieten, die der Nutzer in der
+    Integration bewusst ausgeschlossen hat. Home Assistant hält Rohhistorie
+    standardmäßig nur wenige Tage vor (Recorder-Dokumentation), deshalb ein
+    kurzer Standardzeitraum. ha_available=False (rein lokale Prüfung, kein
+    Netzwerk-Roundtrip) erlaubt der Vorlage, vorab auf eine fehlende
+    Supervisor-Umgebung hinzuweisen — die Liste selbst bleibt trotzdem
+    sichtbar, da sie keine HA-Verbindung braucht."""
+    now = datetime.now(timezone.utc)
+    default_from = (now - timedelta(days=10)).strftime("%Y-%m-%d")
+    default_to = now.strftime("%Y-%m-%d")
+    ha_available = ha_import.token_available()
+    return {
+        "ha_available": ha_available,
+        "ha_error": None if ha_available else "Supervisor ist in dieser Umgebung nicht verfügbar",
+        "ha_entities": index.list_entities(),
+        "ha_selected_ids": selected_ids or set(),
+        "ha_date_from": date_from or default_from,
+        "ha_date_to": date_to or default_to,
+    }
+
+
 @app.get("/import", response_class=HTMLResponse)
 def import_page(
     request: Request,
@@ -4404,10 +4434,14 @@ def import_page(
     die Seite zeigt bis dahin dieselbe Fortschrittsanzeige wie nach einem
     Upload — synchron würde das bei einem großen Export die Seite für die
     volle Scan-Dauer blockieren."""
-    active_tab = tab if tab in {"symcon", "csv", "reports"} else "symcon"
+    active_tab = tab if tab in {"symcon", "csv", "ha", "reports"} else "symcon"
     common_context = {
         "active_import_tab": active_tab,
         **_reports_context(source, status, search, date_from, date_to, sort, dir, page, page_size),
+        # Wie _csv_import_context() bei jedem /import-Aufruf geladen — die
+        # Auswahlliste kommt aus index.list_entities() (reiner DB-Read),
+        # keine HA-API-Anfrage nötig (siehe _ha_import_context()).
+        **_ha_import_context(),
     }
     source_exists = SYMCON_IMPORT_DIR.exists() and any(SYMCON_IMPORT_DIR.iterdir())
     if source_exists:
@@ -5137,4 +5171,180 @@ async def import_csv_start(request: Request) -> HTMLResponse:
             )
     except Exception:
         logger.exception("CSV-Importreport konnte nicht gespeichert werden")
+    return templates.TemplateResponse(request, "_import_result.html", {"results": results, "errors": errors})
+
+
+# ---------------------------------------------------------------------------
+# Home-Assistant-Import (Rohhistorie direkt über die HA-Core-API, siehe
+# storage/ha_import.py) — kein Datei-Upload, Quelle und Ziel sind dieselbe
+# Entitäts-ID. Teilt sich wie der CSV-Import die generische Monats-
+# Klassifizierung mit dem Symcon-Import (plan_import_rows()/import_rows()).
+# Anders als bei Symcon/CSV muss die Ziel-Entität hier NICHT frei wählbar
+# sein: zur Auswahl stehen ausschließlich bereits in Zeitarchiv bekannte
+# Entitäten (index.list_entities(), siehe _ha_import_context()) — die HA-
+# Integration hat sie bereits konfiguriert/gefiltert, ein eigener
+# Entdeckungs-/Anlage-Mechanismus über die Core-API würde diese Filterung
+# umgehen. Ein trotzdem übermittelter unbekannter entity_id-Wert wird
+# verworfen, statt eine neue Entität anzulegen.
+# ---------------------------------------------------------------------------
+
+
+def _ha_form_params(form) -> tuple[list[str], str, str]:
+    entity_ids = [str(v).strip() for v in form.getlist("entity_ids") if str(v).strip()]
+    date_from = str(form.get("date_from") or "")
+    date_to = str(form.get("date_to") or "")
+    return entity_ids, date_from, date_to
+
+
+def _known_ha_entity_ids(entity_ids: list[str]) -> tuple[list[str], list[str]]:
+    """Nur Entitäten, die bereits in Zeitarchiv bekannt sind (siehe Modul-
+    Docstring oben) — trennt bewusst zwischen bekannt/unbekannt, statt eine
+    unbekannte ID erst beim Planen/Schreiben generisch scheitern zu lassen."""
+    known, unknown = [], []
+    for entity_id in entity_ids:
+        (known if index.get_entity(entity_id) is not None else unknown).append(entity_id)
+    return known, unknown
+
+
+def _ha_date_range(date_from: str, date_to: str) -> tuple[datetime, datetime]:
+    """Tagesgenaue Formularwahl in ein UTC-Zeitfenster übersetzt — date_to ist
+    inklusiv gemeint, deshalb +1 Tag als Fensterende; nie über "jetzt" hinaus."""
+    now = datetime.now(timezone.utc)
+    try:
+        start = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        start = now - timedelta(days=10)
+    try:
+        end = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+    except ValueError:
+        end = now
+    end = min(end, now)
+    if end <= start:
+        end = start + timedelta(days=1)
+    return start, end
+
+
+def _fetch_ha_history(
+    entity_ids: list[str], start: datetime, end: datetime
+) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
+    """Netzwerkteil komplett außerhalb jeder Datei-/Indexsperre (Konzept
+    "Offene Punkte" zu HA-Import: Sperren dürfen nicht unter einem
+    HTTP-Roundtrip zur HA-Instanz stehen) — wird per run_in_threadpool
+    aufgerufen, danach folgt die eigentliche Planung/Schreibphase gesperrt.
+    Domain kommt aus der Entitäts-ID selbst (Konvention wie überall sonst im
+    Addon, z. B. ingestion.py) — kein zusätzlicher /api/states-Aufruf nötig,
+    da nur bereits bekannte Zeitarchiv-Entitäten hier ankommen."""
+    fetched: dict[str, ha_import.HistoryFetchResult] = {}
+    errors: list[str] = []
+    for entity_id in entity_ids:
+        domain = entity_id.split(".", 1)[0]
+        try:
+            fetched[entity_id] = ha_import.fetch_history_rows(entity_id, domain, start, end)
+        except (ha_import.HaApiError, ValueError) as exc:
+            errors.append(f"{entity_id}: {exc}")
+    return fetched, errors
+
+
+@app.post("/import/ha/dry-run", response_class=HTMLResponse)
+async def import_ha_dry_run(request: Request) -> HTMLResponse:
+    """Vorschau ohne Schreibvorgang — dieselbe generische ImportPlan-Vorlage
+    wie Symcon/CSV (_import_dry_run.html), da plan_import_rows() unabhängig
+    von der Datenherkunft ist."""
+    form = await request.form()
+    raw_entity_ids, date_from, date_to = _ha_form_params(form)
+    entity_ids, unknown_ids = _known_ha_entity_ids(raw_entity_ids)
+    plans: list[symcon_import.ImportPlan] = []
+    errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+    if not entity_ids:
+        if not unknown_ids:
+            errors.append("Bitte mindestens eine Entität auswählen.")
+        return templates.TemplateResponse(request, "_import_dry_run.html", {"plans": plans, "errors": errors})
+
+    start, end = _ha_date_range(date_from, date_to)
+    fetched, fetch_errors = await run_in_threadpool(_fetch_ha_history, entity_ids, start, end)
+    errors.extend(fetch_errors)
+
+    def plan_locked() -> list[symcon_import.ImportPlan]:
+        with storage_coordinator.entities(list(fetched.keys())):
+            result = []
+            for entity_id, history in fetched.items():
+                try:
+                    result.append(
+                        symcon_import.plan_import_rows(
+                            DATA_DIR, index, history.rows, entity_id, TZ,
+                            source_label=entity_id, skipped_rows=history.skipped,
+                        )
+                    )
+                except ValueError as exc:
+                    errors.append(f"{entity_id}: {exc}")
+            return result
+
+    if fetched:
+        plans = await run_in_threadpool(plan_locked)
+    return templates.TemplateResponse(request, "_import_dry_run.html", {"plans": plans, "errors": errors})
+
+
+@app.post("/import/ha/start", response_class=HTMLResponse)
+async def import_ha_start(request: Request) -> HTMLResponse:
+    """Schreibt synchron, wie der CSV-Import — der Netzwerk-Fetch (potenziell
+    der langsamste Teil) läuft vorher außerhalb jeder Sperre; exclusive() hält
+    danach nur noch den eigentlichen Schreib- und Indexabgleich-Teil."""
+    started_at = datetime.now(timezone.utc)
+    form = await request.form()
+    raw_entity_ids, date_from, date_to = _ha_form_params(form)
+    entity_ids, unknown_ids = _known_ha_entity_ids(raw_entity_ids)
+    results: list[symcon_import.ImportResult] = []
+    errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+    reconciliation_report = None
+    start, end = (None, None)
+    if not entity_ids:
+        if not unknown_ids:
+            errors.append("Bitte mindestens eine Entität auswählen.")
+    else:
+        start, end = _ha_date_range(date_from, date_to)
+        fetched, fetch_errors = await run_in_threadpool(_fetch_ha_history, entity_ids, start, end)
+        errors.extend(fetch_errors)
+
+        def execute_ha_import() -> tuple[list[symcon_import.ImportResult], dict]:
+            with storage_coordinator.exclusive():
+                run_results = []
+                for entity_id, history in fetched.items():
+                    try:
+                        run_results.append(
+                            symcon_import.import_rows(
+                                DATA_DIR, index, history.rows, entity_id, TZ,
+                                source_label=entity_id, skipped_rows=history.skipped,
+                            )
+                        )
+                    except ValueError as exc:
+                        errors.append(f"{entity_id}: {exc}")
+                reconciliation = _run_storage_reconciliation(
+                    entity_ids=sorted(fetched.keys()), repair=True
+                ) if fetched else None
+                return run_results, reconciliation
+
+        if fetched:
+            try:
+                results, reconciliation_report = await run_in_threadpool(execute_ha_import)
+            except Exception as exc:
+                logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
+                errors.append(f"Import abgebrochen: {exc}")
+    try:
+        with storage_coordinator.exclusive():
+            import_reports.create(
+                DATA_DIR,
+                source_type="ha",
+                started_at=started_at,
+                source={"filename": "Home Assistant", "size_bytes": 0},
+                configuration={
+                    "entity_ids": raw_entity_ids,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                },
+                results=[dataclasses.asdict(result) for result in results],
+                errors=errors,
+                reconciliation=reconciliation_report,
+            )
+    except Exception:
+        logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")
     return templates.TemplateResponse(request, "_import_result.html", {"results": results, "errors": errors})
