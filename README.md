@@ -8,7 +8,7 @@ werden.
 
 | App | Version | Beschreibung | Dokumentation |
 | --- | --- | --- | --- |
-| Zeitarchiv | 0.55.0 | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Charts, direktem Home-Assistant-Import und Backup. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
+| Zeitarchiv | 0.55.1 | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Charts, direktem Home-Assistant-Import und Backup. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
 
 Weitere Apps können später als zusätzlicher Ordner im Repository-Stamm ergänzt
 und in dieser Tabelle eingetragen werden.

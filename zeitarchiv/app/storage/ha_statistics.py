@@ -149,10 +149,22 @@ def _ws_call(commands: list[dict]) -> list[dict]:
                 if resp_id in pending:
                     results[resp_id] = response
                     pending.discard(resp_id)
-            entries = sum(
-                len(v) for r in results.values() if r.get("success")
-                for v in (r.get("result") or {}).values() if isinstance(v, list)
-            )
+            # Nur fürs DEBUG-Log gezählt — die "result"-Form unterscheidet
+            # sich je Befehlstyp: recorder/statistics_during_period liefert
+            # ein dict {statistic_id: [Punkte]}, recorder/list_statistic_ids
+            # dagegen direkt eine Liste. Beide Formen robust behandeln statt
+            # eine davon anzunehmen, sonst crasht ausgerechnet das Logging
+            # selbst (AttributeError: 'list' object has no attribute
+            # 'values') statt nur eine ungenaue Zahl zu liefern.
+            entries = 0
+            for r in results.values():
+                if not r.get("success"):
+                    continue
+                result = r.get("result")
+                if isinstance(result, dict):
+                    entries += sum(len(v) for v in result.values() if isinstance(v, list))
+                elif isinstance(result, list):
+                    entries += len(result)
             logger.debug("HA-WS-Antwort · Befehle=%d · Einträge=%d", len(commands), entries)
             return [results[i] for i in range(1, len(commands) + 1)]
     except HaApiError:

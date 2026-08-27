@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.55.1 - 2026-08-27
+
+### Fehlerbehebung
+
+- Home-Assistant-Import: „Verfügbarkeit prüfen“ für Langzeitstatistik brach
+  mit HTTP 500 ab (`AttributeError: 'list' object has no attribute
+  'values'`). Ursache: die reine Debug-Protokollierung in
+  `ha_statistics._ws_call()` nahm für jede WebSocket-Antwort dieselbe
+  `result`-Form an (dict) — `recorder/list_statistic_ids` liefert sie aber
+  als Liste. Live auf einer echten Home-Assistant-Instanz gefunden.
+
 ## 0.55.0 - 2026-08-27
 
 ### Neu
