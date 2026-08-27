@@ -88,8 +88,51 @@ def _get(path: str, params: dict | None = None) -> object:
     try:
         with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
             return json.loads(response.read())
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-        raise HaApiError("Home-Assistant-API nicht erreichbar") from exc
+    except urllib.error.HTTPError as exc:
+        # HTTPError ist eine Unterklasse von URLError — MUSS deshalb vor dessen
+        # except-Zweig geprüft werden, sonst verschluckt der generische Zweig
+        # unten jeden HTTP-Fehlerstatus (401/403/400/404/…) ununterscheidbar
+        # von einer echten Netzwerk-Nichterreichbarkeit. Gerade 401/403 sind
+        # der wahrscheinlichste reale Fehlerfall: die Supervisor-Berechtigung
+        # `homeassistant_api` wirkt erst nach einem Add-on-Update/Rebuild
+        # (siehe CHANGELOG) — ein bloßer Prozess-Neustart mit unveränderter
+        # Version reicht nicht, das SUPERVISOR_TOKEN bleibt dann ohne
+        # Core-API-Berechtigung.
+        detail = _http_error_detail(exc)
+        # HAs "message"-Feld enthält den Statuscode meist schon als Text
+        # (z. B. "401: Unauthorized") — dann nicht zusätzlich davorsetzen,
+        # sonst steht der Code doppelt in der Meldung. Andernfalls (kein
+        # JSON-Body, z. B. eine HTML-Fehlerseite eines vorgeschalteten
+        # Proxys) bleibt der Code die einzige verlässliche Angabe.
+        stripped = detail.lstrip(": ")
+        message = stripped if stripped.startswith(str(exc.code)) else f"Fehler {exc.code}{detail}"
+        raise HaApiError(f"Home-Assistant-API antwortete mit {message}") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise HaApiError(f"Home-Assistant-API nicht erreichbar: {exc.reason if isinstance(exc, urllib.error.URLError) else exc}") from exc
+    except ValueError as exc:
+        raise HaApiError("Home-Assistant-API lieferte keine gültige JSON-Antwort") from exc
+
+
+def _http_error_detail(exc: "urllib.error.HTTPError") -> str:
+    """Home Assistants Fehlerantworten sind i. d. R. JSON mit einem
+    "message"-Feld (z. B. {"message": "401: Unauthorized"}) — wird die
+    Antwort mitgeliefert, ist sie für die Fehlersuche wertvoller als der
+    reine Statuscode (unterscheidet z. B. "ungültiger Token" von "Endpunkt
+    kennt diesen Parameter nicht"). Kein harter Fehlschlag, falls die
+    Fehlerantwort aus irgendeinem Grund nicht lesbar/kein JSON ist — dann
+    bleibt wenigstens der Statuscode aus dem Aufrufer."""
+    try:
+        body = exc.read()
+    except OSError:
+        return ""
+    try:
+        data = json.loads(body)
+    except ValueError:
+        text = body.decode("utf-8", errors="replace").strip()
+        return f": {text[:200]}" if text else ""
+    if isinstance(data, dict) and data.get("message"):
+        return f": {data['message']}"
+    return ""
 
 
 def _parse_state(state: str, domain: str) -> float | None:

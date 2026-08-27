@@ -440,6 +440,10 @@ class ImportService:
                 "has_data": avail.has_data if avail is not None else None,
                 "art_label": ("Rohhistorie" if avail.has_data else "Keine Rohhistorie") if avail is not None else None,
                 "available_label": self._ha_availability_label(avail) if avail is not None else None,
+                # Für die client-seitige Sortierung der Verfügbar-Spalte: ein
+                # roher Unix-Zeitstempel statt des formatierten Labels, damit
+                # "12.08.2025" nicht lexikografisch vor "9.08.2025" sortiert.
+                "available_first_ts": avail.first_ts if avail is not None else None,
             })
         return {
             "ha_available": ha_available,
@@ -465,6 +469,7 @@ class ImportService:
         spürbar dauern; würde das synchron vor der Antwort laufen, sähe der Import
         bei genug Variablen ohne jede Rückmeldung erst nach einer Weile "fertig" aus."""
         started_at = datetime.now(timezone.utc)
+        logger.info("Symcon-Import gestartet · Variablen=%d", len(mapped))
         names = self._load_symcon_names()
         try:
             source_meta = json.loads(self.deps.symcon_source_meta_path.read_text(encoding="utf-8"))
@@ -573,6 +578,14 @@ class ImportService:
                 with self._import_progress.lock:
                     results = [dataclasses.asdict(result) for result in self._import_progress.results]
                     errors = list(self._import_progress.errors)
+                logger.info(
+                    "Symcon-Import abgeschlossen · Variablen=%d · Zeilen importiert=%d · "
+                    "Zeilen zusammengeführt=%d · Fehler=%d",
+                    len(results),
+                    sum(r["rows_imported"] for r in results),
+                    sum(r["rows_merged"] for r in results),
+                    len(errors),
+                )
                 try:
                     with self.deps.coordinator.exclusive():
                         import_reports.create(
@@ -823,6 +836,12 @@ class ImportService:
             try:
                 fetched[entity_id] = ha_import.fetch_history_rows(entity_id, domain, start, end)
             except (ha_import.HaApiError, ValueError) as exc:
+                # WARNING statt nur in errors sammeln: das ist bisher die
+                # einzige Stelle, an der ein Fehlschlag beim HA-Historienabruf
+                # überhaupt im Container-Log auftaucht — ohne sie war ein
+                # solcher Fehlschlag nur über die UI sichtbar, nie über
+                # `docker logs`/das Add-on-Protokoll nachvollziehbar.
+                logger.warning("HA-Historie für %s nicht abrufbar · %s", entity_id, exc)
                 errors.append(f"{entity_id}: {exc}")
         return fetched, errors
 
@@ -840,6 +859,7 @@ class ImportService:
         try:
             return ha_import.fetch_availability(domains, start, end), None
         except ha_import.HaApiError as exc:
+            logger.warning("HA-Verfügbarkeitsprüfung fehlgeschlagen · Entitäten=%d · %s", len(entity_ids), exc)
             return {}, str(exc)
 
 
@@ -1047,6 +1067,7 @@ class ImportService:
                     self.deps.symcon_scan_cache_path.unlink(missing_ok=True)
                     with self._scan_cache.lock:
                         self._scan_cache.variables = None
+            logger.info("Symcon-Quelldaten gelöscht")
             # Post/Redirect/Get: Die vollständige Importseite darf nicht direkt unter
             # /import/delete gerendert werden. Ihre relativen CSS-/JS-Pfade würden dort
             # zu /import/static/... aufgelöst und ein Reload würde den Lösch-POST erneut
@@ -1188,6 +1209,7 @@ class ImportService:
             with self.deps.coordinator.exclusive():
                 if self.deps.csv_import_dir.exists():
                     shutil.rmtree(self.deps.csv_import_dir)
+            logger.info("CSV-Quelldaten gelöscht")
             return self.deps.templates.TemplateResponse(request, "_csv_import_section.html", self._csv_import_context())
 
 
@@ -1271,6 +1293,8 @@ class ImportService:
             if not entity_id:
                 errors.append("Bitte eine Ziel-Entität auswählen.")
             else:
+                logger.info("CSV-Import gestartet · Ziel=%s", entity_id)
+
                 def execute_csv_import():
                     with self.deps.coordinator.exclusive():
                         path = self._csv_uploaded_path()
@@ -1301,6 +1325,10 @@ class ImportService:
                 try:
                     result, reconciliation_report = await run_in_threadpool(execute_csv_import)
                     results.append(result)
+                    logger.info(
+                        "CSV-Import abgeschlossen · Ziel=%s · Zeilen importiert=%d · Zeilen zusammengeführt=%d",
+                        entity_id, result.rows_imported, result.rows_merged,
+                    )
                 except ValueError as exc:
                     errors.append(str(exc))
                 except Exception as exc:
@@ -1369,7 +1397,14 @@ class ImportService:
             form = await request.form()
             check_entity_ids = [str(v).strip() for v in form.getlist("check_entity_ids") if str(v).strip()]
             selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
-            known_ids, _unknown_ids = self._known_ha_entity_ids(check_entity_ids)
+            known_ids, unknown_ids = self._known_ha_entity_ids(check_entity_ids)
+            if unknown_ids:
+                # Kommt normalerweise nicht vor (die Zeilen kommen alle aus
+                # index.list_entities()) — deutet auf ein manipuliertes/
+                # veraltetes Formular hin, deshalb WARNING statt DEBUG.
+                logger.warning(
+                    "HA-Verfügbarkeitsprüfung: unbekannte Entitäts-IDs verworfen · %s", unknown_ids
+                )
             availability: dict[str, ha_import.EntityAvailability] = {}
             availability_error: str | None = None
             if known_ids:
@@ -1377,6 +1412,12 @@ class ImportService:
                 availability, availability_error = await run_in_threadpool(
                     self._fetch_ha_availability, known_ids, start, end
                 )
+                if availability_error is None:
+                    with_data = sum(1 for a in availability.values() if a.has_data)
+                    logger.info(
+                        "HA-Verfügbarkeit geprüft · Entitäten=%d · mit Rohhistorie=%d · Zeitraum=%s",
+                        len(known_ids), with_data, range_preset,
+                    )
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_section.html",
                 self._ha_import_context(
@@ -1455,6 +1496,9 @@ class ImportService:
                 if not unknown_ids:
                     errors.append("Bitte mindestens eine Entität auswählen.")
             else:
+                logger.info(
+                    "Home-Assistant-Import gestartet · Entitäten=%d · Zeitraum=%s", len(entity_ids), range_preset
+                )
                 start, end = self._ha_date_range(range_preset, date_from, date_to)
                 fetched, fetch_errors = await run_in_threadpool(self._fetch_ha_history, entity_ids, start, end)
                 errors.extend(fetch_errors)
@@ -1487,6 +1531,14 @@ class ImportService:
                     try:
                         items, reconciliation_report = await run_in_threadpool(execute_ha_import)
                         results = [item["result"] for item in items]
+                        logger.info(
+                            "Home-Assistant-Import abgeschlossen · Entitäten=%d · Zeilen importiert=%d · "
+                            "Zeilen zusammengeführt=%d · Fehler=%d",
+                            len(results),
+                            sum(r.rows_imported for r in results),
+                            sum(r.rows_merged for r in results),
+                            len(errors),
+                        )
                     except Exception as exc:
                         logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
                         errors.append(f"Import abgebrochen: {exc}")

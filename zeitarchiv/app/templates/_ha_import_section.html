@@ -15,51 +15,68 @@
 <div class="empty">Noch keine Entität in Zeitarchiv bekannt — die HA-Integration muss mindestens einen Live-Wert übertragen haben, bevor ein Import für diese Entität möglich ist.</div>
 {% else %}
 <form id="ha-form" method="post" action="import/ha/dry-run">
-  <div class="toolbar import-filter-toolbar">
-    <input type="search" class="search" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:160px;max-width:320px;">
-    <span class="count-chip">{{ ha_entities | length }} bekannte Entitäten</span>
+  <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
+    <input type="search" class="search btn-sm" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:140px;max-width:240px;">
+    <button type="button" class="btn btn-sm" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
+      {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
+      <span class="htmx-indicator"> &middot; prüft …</span>
+    </button>
     <span class="count-chip" id="ha-marked-count">0 markiert</span>
-  </div>
 
-  <div class="csv-config" style="margin-bottom:14px;align-items:flex-end;">
-    <div class="field">
-      <label>Zeitraum</label>
-      <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="ha-range-btn" onclick="toggleDDPicker('ha-range')">{% for value, label in ha_range_options %}{% if value == ha_range_preset %}{{ label }}{% endif %}{% endfor %} ▾</button>
-        <input type="hidden" name="range_preset" id="ha-range-input" value="{{ ha_range_preset }}">
-        <div class="dd-picker-popover" id="ha-range-popover">
-          {% for value, label in ha_range_options %}
-          <div class="dd-picker-row" onclick="selectDDOption('ha-range', '{{ value }}', '{{ label }}'); toggleHaCustomRange('{{ value }}');">{{ label }}</div>
-          {% endfor %}
-        </div>
-      </span>
-    </div>
-    <div class="field" id="ha-custom-range-fields" style="display:flex;gap:12px;{{ '' if ha_range_preset == 'custom' else 'display:none;' }}">
-      <div><label>Von</label><input type="date" name="date_from" value="{{ ha_date_from }}"></div>
-      <div><label>Bis</label><input type="date" name="date_to" value="{{ ha_date_to }}"></div>
-    </div>
-    <div class="field">
-      <button type="button" class="btn" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
-        {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
-        <span class="htmx-indicator"> &middot; prüft …</span>
-      </button>
-    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="ha-range-btn" onclick="toggleDDPicker('ha-range')" title="Zeitraum">{% for value, label in ha_range_options %}{% if value == ha_range_preset %}{{ label }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="range_preset" id="ha-range-input" value="{{ ha_range_preset }}">
+      <div class="dd-picker-popover" id="ha-range-popover">
+        {% for value, label in ha_range_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('ha-range', '{{ value }}', '{{ label }}'); toggleHaCustomRange('{{ value }}');">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+    <span id="ha-custom-range-fields" style="display:inline-flex;gap:8px;align-items:center;{{ '' if ha_range_preset == 'custom' else 'display:none;' }}">
+      <label for="ha-date-from" style="font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);">Von</label>
+      <input type="date" id="ha-date-from" name="date_from" value="{{ ha_date_from }}">
+      <label for="ha-date-to" style="font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);">Bis</label>
+      <input type="date" id="ha-date-to" name="date_to" value="{{ ha_date_to }}">
+    </span>
   </div>
 
   <div class="tbl-wrap">
-    <table id="ha-import-table" class="dt symcon-import-table">
+    <table id="ha-import-table" class="dt symcon-import-table ha-import-table">
+      <colgroup>
+        <col class="symcon-col-check">
+        <col>
+        <col class="ha-col-unit"><col class="ha-col-type"><col class="ha-col-art"><col class="ha-col-available">
+      </colgroup>
       <tr>
-        <th style="width:40px;"><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle markieren"></th>
-        <th>Entität</th><th>Einheit</th><th>Typ</th><th>Art</th><th>Verfügbar</th>
+        <th><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle auf dieser Seite markieren"></th>
+        <th><a href="#" onclick="sortHaTable('entity');return false;">Entität<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('type');return false;">Typ<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('art');return false;">Art<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
-          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}">
+          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}"
+          data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
+          data-sort-unit="{{ entity.unit or '' }}"
+          data-sort-type="{{ entity.type_label }}"
+          data-sort-art="{{ '1' if entity.has_data else ('0' if entity.has_data is not none else '') }}"
+          data-sort-available="{{ entity.available_first_ts if entity.available_first_ts is not none else '' }}">
         <td>
           <input type="hidden" name="check_entity_ids" value="{{ entity.entity_id }}">
           <input type="checkbox" class="ha-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onHaMarkChange(this)" {% if entity.entity_id in ha_selected_ids %}checked{% endif %}>
         </td>
-        <td><span class="ent-name" style="font-weight:600;">{{ entity.friendly_name or entity.entity_id }}</span><span class="ent-id mono" style="display:block;color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));">{{ entity.entity_id }}</span></td>
+        <td>
+          <span class="ha-entity-cell entity-tooltip-host" tabindex="0">
+            <span class="ent-name" style="font-weight:600;">{{ entity.friendly_name or entity.entity_id }}</span>
+            <span class="ent-id mono" style="color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));">{{ entity.entity_id }}</span>
+            <span class="entity-tooltip ha-entity-tooltip" role="tooltip">
+              <strong>{{ entity.friendly_name or entity.entity_id }}</strong>
+              <code>{{ entity.entity_id }}</code>
+            </span>
+          </span>
+        </td>
         <td>{{ entity.unit or "—" }}</td>
         <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
         <td>
@@ -77,6 +94,21 @@
     </table>
   </div>
 
+  <div class="pager" style="justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="pager-range" id="ha-pager-range"></span>
+      <button type="button" class="btn navbtn" id="ha-pager-prev" onclick="stepHaPage(-1)">‹</button>
+      <span class="pager-page" id="ha-pager-page"></span>
+      <button type="button" class="btn navbtn" id="ha-pager-next" onclick="stepHaPage(1)">›</button>
+    </div>
+    <select id="ha-page-size" onchange="setHaPageSize(this.value)" title="Zeilen pro Seite">
+      <option value="20" selected>20 / Seite</option>
+      <option value="50">50 / Seite</option>
+      <option value="100">100 / Seite</option>
+      <option value="500">500 / Seite</option>
+    </select>
+  </div>
+
   <div class="actionbar">
     <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
     <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Import starten</button>
@@ -88,19 +120,46 @@
 </div>
 <script>
   (function () {
+    // Client-seitige Sortierung/Paginierung wie beim Symcon-Import oben
+    // (applyImportPaging()): alle Zeilen inkl. Checkbox-Zustand bleiben
+    // dauerhaft im Formular, Paging/Sortierung blendet nur sichtbar/
+    // unsichtbar bzw. ändert die DOM-Reihenfolge — sonst gingen bereits
+    // angehakte Entitäten auf ausgeblendeten "Seiten" beim Absenden verloren.
+    let haPageSize = 20;
+    let haPage = 1;
+    let haSearch = '';
+    let haSortKey = null;
+    let haSortDir = 'asc';
+
     function onHaSearch(value) {
-      const search = value.trim().toLowerCase();
-      document.querySelectorAll('#ha-import-table tr[data-entity-id]').forEach((row) => {
-        row.style.display = !search || (row.dataset.search || '').includes(search) ? '' : 'none';
-      });
+      haSearch = value.trim().toLowerCase();
+      haPage = 1;
+      applyHaPaging();
     }
+
+    function sortHaTable(key) {
+      if (haSortKey === key) {
+        haSortDir = haSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        haSortKey = key;
+        haSortDir = 'asc';
+      }
+      haPage = 1;
+      document.querySelectorAll('#ha-import-table th a').forEach((a) => {
+        const active = a.textContent.trim().toLowerCase().startsWith(key === 'available' ? 'verfügbar' : key === 'entity' ? 'entität' : key === 'unit' ? 'einheit' : key === 'type' ? 'typ' : 'art');
+        a.classList.toggle('active', active);
+        const arrow = a.querySelector('.sort-arrow');
+        if (arrow) arrow.textContent = active ? (haSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+      });
+      applyHaPaging();
+    }
+
     function refreshHaMarkedCount() {
       const count = document.querySelectorAll('.ha-mark-checkbox:checked').length;
       const chip = document.getElementById('ha-marked-count');
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = count + ' markiert'; }
     }
     function onHaMarkChange(checkbox) {
-      checkbox.closest('tr').classList.toggle('marked', checkbox.checked);
       refreshHaMarkedCount();
     }
     function toggleAllHaRows(headerCheckbox) {
@@ -109,7 +168,6 @@
         const cb = row.querySelector('.ha-mark-checkbox');
         if (!cb) return;
         cb.checked = headerCheckbox.checked;
-        row.classList.toggle('marked', headerCheckbox.checked);
       });
       refreshHaMarkedCount();
     }
@@ -117,10 +175,68 @@
       const field = document.getElementById('ha-custom-range-fields');
       if (field) field.style.display = value === 'custom' ? 'flex' : 'none';
     }
+
+    function applyHaPaging() {
+      const table = document.getElementById('ha-import-table');
+      if (!table) return;
+      let rows = Array.from(table.querySelectorAll('tr[data-entity-id]'));
+
+      if (haSortKey) {
+        const attr = 'sort' + haSortKey.charAt(0).toUpperCase() + haSortKey.slice(1);
+        rows.sort((a, b) => {
+          const av = a.dataset[attr] ?? '';
+          const bv = b.dataset[attr] ?? '';
+          if (av === '' && bv === '') return 0;
+          if (av === '') return 1;   // Werte ohne Verfügbarkeitsprüfung/Einheit
+          if (bv === '') return -1;  // immer ans Ende, unabhängig von der Richtung.
+          const an = parseFloat(av);
+          const bn = parseFloat(bv);
+          const cmp = (!Number.isNaN(an) && !Number.isNaN(bn)) ? an - bn : av.localeCompare(bv, 'de');
+          return haSortDir === 'asc' ? cmp : -cmp;
+        });
+        rows.forEach((row) => table.appendChild(row));
+      }
+
+      const isFilteredOut = (row) => haSearch && !(row.dataset.search || '').includes(haSearch);
+      rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
+      const visible = rows.filter((row) => !isFilteredOut(row));
+
+      const total = visible.length;
+      const size = haPageSize;
+      const totalPages = Math.max(1, Math.ceil(total / size));
+      haPage = Math.max(1, Math.min(haPage, totalPages));
+      const start = (haPage - 1) * size;
+      const end = Math.min(start + size, total);
+      visible.forEach((row, i) => { row.style.display = (i >= start && i < end) ? '' : 'none'; });
+
+      const range = document.getElementById('ha-pager-range');
+      if (range) range.textContent = total ? `${start + 1}–${end} von ${total}` : '0 von 0';
+      const pageLabel = document.getElementById('ha-pager-page');
+      if (pageLabel) pageLabel.textContent = `Seite ${haPage} / ${totalPages}`;
+      const prevBtn = document.getElementById('ha-pager-prev');
+      if (prevBtn) prevBtn.disabled = haPage <= 1;
+      const nextBtn = document.getElementById('ha-pager-next');
+      if (nextBtn) nextBtn.disabled = haPage >= totalPages;
+    }
+    function setHaPageSize(value) {
+      const parsed = parseInt(value, 10);
+      haPageSize = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 1000) : 20;
+      haPage = 1;
+      applyHaPaging();
+    }
+    function stepHaPage(delta) {
+      haPage += delta;
+      applyHaPaging();
+    }
+
     window.onHaSearch = onHaSearch;
+    window.sortHaTable = sortHaTable;
     window.onHaMarkChange = onHaMarkChange;
     window.toggleAllHaRows = toggleAllHaRows;
     window.toggleHaCustomRange = toggleHaCustomRange;
+    window.setHaPageSize = setHaPageSize;
+    window.stepHaPage = stepHaPage;
     refreshHaMarkedCount();
+    applyHaPaging();
   })();
 </script>

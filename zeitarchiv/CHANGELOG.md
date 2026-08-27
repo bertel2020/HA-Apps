@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.52.0 - 2026-08-27
+
+### Neu
+
+- Home-Assistant-Import: Auswahltabelle überarbeitet — Entität kürzt lange
+  Namen/IDs jetzt mit Tooltip statt in die Nachbarspalte zu ragen, Spalte
+  „Typ“ (Standard/Zähler/Schalter) schmaler und zentriert wie in der
+  Entitätenübersicht, Tabelle sortierbar (Spaltenköpfe anklickbar),
+  Spaltenbreiten per Ziehen anpassbar, Seitenweise mit 20 Zeilen pro Seite
+  (beides bereits bestehende, app-weite Mechanismen, hier erstmals auf diese
+  Tabelle angewendet). Werkzeugleiste in eine Zeile zusammengefasst,
+  Suchfeld/„Verfügbarkeit prüfen“-Button kompakter, Button direkt neben dem
+  Suchfeld, der reine Zähler-Chip „N bekannte Entitäten“ entfernt.
+- Fehlermeldungen bei einer nicht erreichbaren oder fehlschlagenden
+  Home-Assistant-API sind jetzt aussagekräftig (z. B. „antwortete mit 401:
+  Unauthorized“ statt einer nichtssagenden Pauschalmeldung) — wichtig u. a.
+  um eine fehlende `homeassistant_api`-Berechtigung (siehe 0.51.0, wirkt erst
+  nach einem Add-on-Update/Rebuild) von einer echten Nichterreichbarkeit zu
+  unterscheiden.
+
+### Intern
+
+- Deutlich mehr Protokollierung im Add-on-Log für alle drei Import-Wege
+  (Symcon/CSV/Home Assistant): Start und Abschluss mit Kennzahlen
+  (Entitäten/Zeilen importiert/zusammengeführt/Fehler) auf INFO-Ebene,
+  fehlgeschlagene Einzelabrufe/Verfügbarkeitsprüfungen gegen Home Assistant
+  auf WARNING-Ebene (bisher nur in der Oberfläche sichtbar, nie im Log),
+  Löschen hochgeladener Quelldaten auf INFO-Ebene.
+
 ## 0.51.0 - 2026-08-27
 
 ### Neu
