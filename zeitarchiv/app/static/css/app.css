@@ -327,16 +327,21 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 .menu-btn .chevron{font-size:.7em;opacity:.6;transition:transform .15s ease;}
 .menu-btn.active .chevron{transform:rotate(180deg);}
 .menu-popover{
-  position:absolute;top:calc(100% + 8px);left:0;z-index:30;min-width:260px;
+  position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:290px;
   background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
-  padding:10px;display:flex;flex-direction:column;gap:1px;
+  padding:8px;display:flex;flex-direction:column;gap:1px;
 }
+/* Schmalere Variante für Menüs mit nur kurzen Ein-Wort-Auswahlzeilen (z. B.
+   "Vergleichen": Aus/Vortag/Vorjahrestag) — die 290px des Optionen-Menüs
+   (dort durch "Legenden-Stil" + Chips/Tabelle nötig) wären hier unnötig
+   breit. */
+.menu-popover-narrow{width:190px;}
 .menu-section-label{
   font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);padding:8px 10px 4px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);padding:6px 10px 3px;
 }
 .menu-row{
-  display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 10px;border-radius:9px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 10px;border-radius:9px;
   font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;transition:background .1s ease;
 }
 .menu-row:hover{background:var(--surface-alt);}
@@ -349,14 +354,14 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
    ändert sich die Form des Menüs sichtbar, sobald eine kürzere/längere
    Option gewählt wird ("Automatisch" vs. "1 Stunde" vs. "30 Minuten"). */
 .menu-row select{font-family:var(--font-mono);width:150px;flex:none;}
-.menu-row-label{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
+.menu-row-label{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;white-space:nowrap;}
 /* Menü-Zeilen können auch reine Navigations-Links sein (a.menu-row) statt
    Einstellungen — Browser-Standard für Links zurückgesetzt, damit sie sich
    optisch nicht von den Toggle-/Auswahl-Zeilen im selben Menü unterscheiden. */
 a.menu-row{text-decoration:none;}
 .menu-row-arrow{color:var(--ink-faint);flex:none;}
 .menu-note{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
-.menu-divider{height:1px;background:var(--border);margin:5px 6px;}
+.menu-divider{height:1px;background:var(--border);margin:4px 6px;}
 /* Sanftes Einblenden des Popovers (x-transition:enter in den Templates) —
    nur enter, kein leave, ein Zuklappen darf ruhig sofort verschwinden. */
 .menu-pop-enter{transition:opacity .12s ease-out,transform .12s ease-out;}
@@ -384,7 +389,7 @@ a.menu-row{text-decoration:none;}
 /* Welche Kennzahlen "Statistik in Legende" anzeigt (Min/Max/Ø/Summe) —
    eingerückte Checkbox-Reihe direkt unter dem Toggle, nur sichtbar solange
    dieser aktiv ist (x-show="chartStats" im Template). */
-.legend-metrics-row{padding:2px 10px 8px 10px;display:flex;flex-wrap:wrap;justify-content:flex-start;gap:10px;cursor:default;}
+.legend-metrics-row{padding:2px 10px 6px 10px;display:flex;flex-wrap:wrap;justify-content:center;gap:10px;cursor:default;}
 .legend-metric-check{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;}
 .legend-metric-check input{margin:0;cursor:pointer;}
 
@@ -497,24 +502,35 @@ td.mono{font-family:var(--font-mono);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
 [data-tooltip]{cursor:help;position:relative;}
-[data-tooltip]:hover::after{
+[data-tooltip]::after{
   content:attr(data-tooltip);position:absolute;left:0;bottom:calc(100% + 6px);
   background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;
   font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);white-space:normal;width:max-content;max-width:min(520px,calc(100vw - 48px));overflow-wrap:anywhere;z-index:30;
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;
+  opacity:0;visibility:hidden;transition:visibility 0s;
 }
+/* Verzögerung wie beim JS-Timer-Tooltip (~450ms, siehe entity-picker.js) —
+   nur beim Erscheinen; das Verschwinden bleibt instant (transition-delay
+   wird nur in der :hover-Regel gesetzt, nicht in der Basisregel). */
+[data-tooltip]:hover::after{opacity:1;visibility:visible;transition-delay:.45s;}
 /* Entitäten-Tooltips brauchen echtes Markup statt content:attr(...), damit
    Friendly Name und Entity-ID unterschiedlich formatiert, aber immer als zwei
    getrennte Zeilen erscheinen. max-content richtet die Box an der längeren
    Zeile aus; die Viewport-Grenze verhindert unnötiges Überlaufen. */
 .entity-tooltip-host{position:relative;cursor:help;}
 .entity-tooltip{
-  display:none;position:absolute;left:0;bottom:calc(100% + 6px);z-index:40;
+  position:absolute;left:0;bottom:calc(100% + 6px);z-index:40;
   width:max-content;max-width:min(720px,calc(100vw - 48px));box-sizing:border-box;
   padding:7px 10px;border-radius:7px;background:var(--ink);color:var(--bg);
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;text-align:left;
+  visibility:hidden;transition:visibility 0s;
 }
-.entity-tooltip-host:hover>.entity-tooltip,.entity-tooltip-host:focus-within>.entity-tooltip{display:block;}
+/* Verzögerung wie beim JS-Timer-Tooltip (~450ms, siehe entity-picker.js) —
+   nur beim Erscheinen; transition-delay steht bewusst nur in dieser Regel,
+   nicht in der Basisregel, damit das Verschwinden instant bleibt. */
+.entity-tooltip-host:hover>.entity-tooltip,.entity-tooltip-host:focus-within>.entity-tooltip{
+  visibility:visible;transition-delay:.45s;
+}
 /* Hosts mit dynamisch befülltem Tooltip (z. B. die HA-Entität-Zuordnung im
    Symcon-Import, deren Inhalt erst nach Auswahl per JS gesetzt wird) sollen
    vor der ersten Auswahl keine leere Sprechblase zeigen. */
@@ -529,7 +545,13 @@ td.mono{font-family:var(--font-mono);}
    seitlich ab, sobald es über den schmalen Zeilenrahmen hinausragt. Per
    Alpine x-teleport aus dem Container gehoben und stattdessen per
    Inline-Style (JS, siehe Template) exakt an der Zeile positioniert. */
-.entity-tooltip.entity-tooltip-floating{position:fixed;left:auto;bottom:auto;}
+/* Per JS geteleportet (body-Kind, kein .entity-tooltip-host-Vorfahre) —
+   die :hover-Sichtbarkeitsregel oben greift hier nie. Sichtbarkeit kommt
+   stattdessen ausschließlich vom eigenen 450ms-JS-Timer (entity-picker.js/
+   map-entity-picker.js), der display:block/none direkt per Inline-Style
+   setzt; visibility hier fest auf "visible", damit dieser display-Wert
+   überhaupt etwas bewirkt. */
+.entity-tooltip.entity-tooltip-floating{position:fixed;left:auto;bottom:auto;visibility:visible;}
 .entity-tooltip strong,.entity-tooltip code{display:block;white-space:nowrap;line-height:1.4;}
 .entity-tooltip strong{font-family:var(--font-display);font-size:calc(11.5px * var(--font-scale, 1));font-weight:700;}
 .entity-tooltip code{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:inherit;}

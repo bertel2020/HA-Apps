@@ -62,6 +62,10 @@
   }
   .seg button:last-child{border-right:none;}
   .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  /* Kleinere Variante innerhalb des Optionen-Menüs (Legenden-Stil) — sonst
+     ragt diese Zeile wegen der .seg-Innenabstände höher auf als die
+     Toggle-Zeilen daneben (siehe dieselbe Regel in entity_detail.html). */
+  .menu-row .seg button{padding:4px 9px;font-size:calc(11.5px * var(--font-scale, 1));}
 
   .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0;}
   .period-label{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);display:block;margin-bottom:14px;}
@@ -144,7 +148,7 @@
             <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
               <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
             </button>
-            <div class="menu-popover" x-show="compareMenuOpen" x-cloak
+            <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
                  x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
               <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
               <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>

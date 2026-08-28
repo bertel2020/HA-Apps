@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.60.0 - 2026-08-28
+
+### Verbesserung
+
+- Tooltips zeigen jetzt überall einheitlich mit kurzer Verzögerung statt
+  teils sofort.
+- Optionen-Menüs (Entität, Chart) kompakter; Vergleichen-Menü schmaler.
+- Dashboards-Übersicht: 3 statt 4 Kacheln pro Zeile.
+- README und Benutzerhandbuch überarbeitet.
+
 ## 0.59.0 - 2026-08-28
 
 ### Neu

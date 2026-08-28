@@ -38,6 +38,15 @@
   .seg button:last-child{border-right:none;}
   .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
   .seg button:disabled{opacity:.35;cursor:default;}
+  /* Kleinere Variante innerhalb des Optionen-Menüs (Diagrammtyp,
+     Legenden-Stil) — sonst ragen diese Zeilen wegen der .seg-Innenabstände
+     spürbar höher auf als die Toggle-Zeilen daneben. */
+  .menu-row .seg button{padding:4px 9px;font-size:calc(11.5px * var(--font-scale, 1));}
+  /* Dezent hervorgehoben statt wie eine gewöhnliche Aktion, damit sie als
+     Sonderfall auffällt (setzt alle Optionen dieser Entität zurück), aber
+     nicht wie eine destruktive/gefährliche Aktion wirkt (kein --danger). */
+  .menu-row-reset{color:var(--accent-bar);}
+  .menu-row-reset:hover{background:var(--accent-bar-soft);}
   .nav{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
   .period-label{
     min-width:130px;text-align:center;white-space:nowrap;
@@ -146,7 +155,7 @@
           <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
             <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
           </button>
-          <div class="menu-popover" x-show="compareMenuOpen" x-cloak
+          <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
                x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
             <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
             <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
@@ -240,7 +249,7 @@
             <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
             <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
             <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
-            <button type="button" class="menu-row" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
+            <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
           </div>
         </div>
       </div>
