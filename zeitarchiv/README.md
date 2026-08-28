@@ -218,6 +218,15 @@ Inkonsistenzen früh sichtbar zu machen.
 - Manuelle Lösch- und Retention-Aktionen können endgültig sein. Vor größeren
   Eingriffen sollte ein geprüftes Backup erstellt werden.
 
+## Haftungsausschluss
+
+Zeitarchiv ist ein privat entwickeltes, kostenloses Open-Source-Projekt und
+wird ohne Gewährleistung oder Garantie bereitgestellt. Die Nutzung erfolgt
+auf eigene Verantwortung; insbesondere kann keine Garantie für einen
+fehlerfreien Betrieb sowie für die Richtigkeit, Vollständigkeit,
+Verfügbarkeit oder den dauerhaften Erhalt gespeicherter Daten übernommen
+werden. Erstelle daher regelmäßig unabhängige Backups deiner Daten.
+
 ## Lizenz
 
 Dieses Projekt steht unter der [Apache License 2.0](LICENSE).
