@@ -48,13 +48,19 @@ die nginx-Allowlist blockiert — ABER ein Refactoring, das `/api/health` oder
   Platte vorhandenen bösartigen Symlink ab, nicht nur `../`-Sequenzen im
   Eingabestring.
 
-## Import-Härtung (ZIP/CSV)
+## Ressourcenlimits
 
-`app/limits.py` definiert harte Obergrenzen, geprüft **vor** vollständigem
-Entpacken/Einlesen:
+`app/limits.py` definiert harte Obergrenzen für Schreib-, Abfrage-, Export-
+und Import-Operationen, jeweils geprüft **vor** der eigentlichen
+Verarbeitung:
 
 | Grenze | Wert |
-| --- | --- |
+| --- | ---: |
+| Events je Schreibbatch | 1.000 |
+| Entitäten je Multi-Abfrage | 25 |
+| Punkte je Rohwertabfrage | 100.000 |
+| Zeilen je CSV-Export | 5.000.000 |
+| Importzeilen je Entität | 10.000.000 |
 | ZIP-Upload | 2 GiB |
 | CSV-Upload | 256 MiB |
 | `settings.json` (Symcon) | 16 MiB |
@@ -62,9 +68,13 @@ Entpacken/Einlesen:
 | ZIP-Mitglieder | 500.000.000 |
 | Kompressionsverhältnis | 200:1 |
 
-Das Kompressionsverhältnis-Limit ist die eigentliche Zip-Bomb-Verteidigung:
-ein Archiv, das behauptet, weit mehr als das 200-fache seiner komprimierten
-Größe zu enthalten, wird abgelehnt, bevor es entpackt wird.
+## Import-Härtung (ZIP/CSV)
+
+Die ZIP-/CSV-/`settings.json`-Grenzen oben werden **vor** vollständigem
+Entpacken/Einlesen geprüft. Das Kompressionsverhältnis-Limit ist die
+eigentliche Zip-Bomb-Verteidigung: ein Archiv, das behauptet, weit mehr als
+das 200-fache seiner komprimierten Größe zu enthalten, wird abgelehnt, bevor
+es entpackt wird.
 
 ## Sicherheitsheader und Antwortverhalten
 

@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.61.0 - 2026-08-29
+
+### Neu
+
+- Zeitstrahl (An/Aus-Verlauf als durchgehende Balken statt einzelner Punkte)
+  jetzt auch im Chart-Editor für mehrere Schalter-Entitäten gleichzeitig
+  nutzbar, mit korrekt als Dauer (statt Rohsekunden) ausgewiesener
+  Einschaltdauer-Summe.
+- Neue Auflösung "Tag" für Zeitraum "Tag": fasst den ganzen Tag zu einem
+  einzigen Balken je Entität zusammen — praktisch, um z. B. Tages-Einspeisung
+  und -Bezug direkt nebeneinander zu vergleichen.
+- Farbschema "Modern" überarbeitet: bessere Kontraste, klarere Chart-Farbpalette.
+
+### Verbesserung
+
+- Diagramm-Achsen zeigen durchgängig die korrekte Anzahl an Einteilungen
+  (kein zusätzlicher Phantom-Tick mehr bei Woche/Monat); Balken am Rand
+  werden nicht mehr abgeschnitten.
+- Dashboard-Kacheln übernehmen jetzt zuverlässig den gespeicherten
+  Diagrammtyp (z. B. Zeitstrahl statt fälschlich Balken).
+
+### Fehlerbehebung
+
+- Zeitstrahl-Auswahl im Chart-Editor ging beim Speichern verloren.
+- Die Auflösungs-Auswahl im Chart-Editor zeigte beim erneuten Öffnen zum
+  Bearbeiten teils "Automatisch" statt der tatsächlich gespeicherten
+  Auflösung an, obwohl der Chart selbst korrekt gerendert wurde.
+- Vereinzelte, sich über die Zeit ansammelnde Tooltip-Reste auf
+  Dashboard-Kacheln nach mehrfachem Anheften/Umsortieren.
+
 ## 0.60.0 - 2026-08-28
 
 ### Verbesserung

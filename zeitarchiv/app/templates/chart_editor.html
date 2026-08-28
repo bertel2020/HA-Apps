@@ -145,7 +145,7 @@
             {% endfor %}
           </div>
           <div class="menu-wrap" @click.outside="compareMenuOpen = false">
-            <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
+            <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full'" @click="compareMenuOpen = !compareMenuOpen">
               <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
             </button>
             <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
@@ -164,30 +164,59 @@
               <div class="menu-section-label">Daten</div>
               <div class="menu-row">
                 <span class="menu-row-label">Auflösung
-                  <span class="menu-note" x-show="resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
+                  <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
                 </span>
-                <select x-model="resolutionPreset" @change="render()">
+                <!-- query_raw_series() (server) kennt gar kein resolution_preset
+                     — im Rohwerte-/Zeitstrahl-Modus (raw immer true, siehe
+                     toggleTimeline()/load()) hat diese Auswahl keinerlei
+                     Wirkung, deshalb deaktiviert statt eine wirkungslose
+                     Einstellung bedienbar zu lassen. -->
+                <!-- :selected zusätzlich zu x-model nötig: die <option>s
+                     entstehen erst per x-for, NACHDEM Alpine den
+                     x-model-Anfangswert bereits auf das (zu dem Zeitpunkt
+                     noch optionslose) <select> angewendet hat — der Browser
+                     wählt dann automatisch die erste Option ("Automatisch")
+                     statt des tatsächlichen Modell-Werts, ohne dass Alpine
+                     das danach korrigiert. Sichtbar z. B. beim Öffnen von
+                     "Anpassen" für ein mit Auflösung "Tag" gespeichertes
+                     Chart — der Chart selbst rendert korrekt (resolutionPreset
+                     stimmt), nur die Anzeige im Dropdown nicht. -->
+                <select x-model="resolutionPreset" :disabled="raw" @change="onResolutionChange()">
                   <template x-for="option in resolutionOptions" :key="option.value">
-                    <option :value="option.value" x-text="option.label"></option>
+                    <option :value="option.value" :selected="option.value === resolutionPreset" x-text="option.label"></option>
                   </template>
                 </select>
               </div>
               <label class="menu-row">
                 <span class="menu-row-label">Kontinuierlich</span>
                 <span class="menu-toggle">
-                  <input type="checkbox" :checked="continuous" @change="toggleContinuous()">
+                  <!-- Bei Auflösung "Tag" (singleBucket, s. render()) ohne
+                       Wirkung auf die Balken selbst, macht das Umschalten
+                       aber trotzdem sichtbar (Perioden-Label, ob "heute"
+                       oder ein rollierendes 24h-Fenster gemeint ist) —
+                       deaktiviert, damit für den Summen-Vergleich immer der
+                       eindeutige Kalendertag gilt statt eines je nach
+                       Tageszeit wechselnden rollierenden Fensters. -->
+                  <input type="checkbox" :checked="continuous" :disabled="resolutionPreset === 'full'" @change="toggleContinuous()">
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
               <label class="menu-row">
                 <span class="menu-row-label">Rohwerte</span>
                 <span class="menu-toggle">
-                  <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                  <input type="checkbox" :checked="raw" :disabled="timeline || !['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
               <div class="menu-divider"></div>
               <div class="menu-section-label">Darstellung</div>
+              <label class="menu-row" x-show="allSwitch">
+                <span class="menu-row-label">Zeitstrahl</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="timeline" @change="toggleTimeline()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
               <label class="menu-row" x-show="hasLineSeries">
                 <span class="menu-row-label">Punkte</span>
                 <span class="menu-toggle">
@@ -198,14 +227,20 @@
               <label class="menu-row">
                 <span class="menu-row-label">Werte anzeigen</span>
                 <span class="menu-toggle">
-                  <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
+                  <input type="checkbox" :checked="showValues" :disabled="timeline" @change="showValues = !showValues; render()">
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
               <label class="menu-row">
                 <span class="menu-row-label">Dynamische Y-Achse</span>
                 <span class="menu-toggle">
-                  <input type="checkbox" :checked="dynamicYAxis" @change="dynamicYAxis = !dynamicYAxis; render()">
+                  <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
+                       und irreführend: die wenigen Balken sollen als
+                       Summen-Vergleich lesbar bleiben, eine nicht bei 0
+                       startende Y-Achse würde die Höhenverhältnisse
+                       verzerren — deshalb hier deaktiviert statt nur optisch
+                       ignoriert. -->
+                  <input type="checkbox" :checked="dynamicYAxis" :disabled="resolutionPreset === 'full'" @change="dynamicYAxis = !dynamicYAxis; render()">
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
@@ -340,6 +375,7 @@
     const CHART_STATS = {{ chart_stats | tojson }};
     const LEGEND_METRICS = {{ legend_metrics | tojson }};
     const LEGEND_STYLE = {{ legend_style | tojson }};
+    const CHART_TYPE = {{ chart_type | tojson }};
     // Reihenfolge bestimmt sowohl die Checkbox-Liste im Optionen-Menü als auch
     // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
     const LEGEND_METRIC_OPTIONS = [
@@ -416,7 +452,11 @@
 
     const RESOLUTION_SECONDS = {
       hour: {medium: 5 * 60, coarse: 15 * 60},
-      day: {medium: 30 * 60, coarse: 60 * 60},
+      // full: die komplette Periode als EIN Balken — z. B. "Tag" bei
+      // Zeitraum "Tag", um zwei Entitäten (etwa Bezug/Einspeisung) als
+      // jeweils einen einzigen Tagesgesamtwert nebeneinander zu vergleichen,
+      // statt als 24-/48-teilige Reihe.
+      day: {medium: 30 * 60, coarse: 60 * 60, full: 24 * 60 * 60},
       week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60},
       month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60},
       year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60},
@@ -424,7 +464,7 @@
     };
     const RESOLUTION_LABELS = {
       hour: {medium: '5 Minuten', coarse: '15 Minuten'},
-      day: {medium: '30 Minuten', coarse: '1 Stunde'},
+      day: {medium: '30 Minuten', coarse: '1 Stunde', full: 'Tag'},
       week: {medium: '6 Stunden', coarse: '1 Tag'},
       month: {medium: '1 Tag', coarse: '1 Woche'},
       year: {medium: '1 Monat', coarse: '3 Monate'},
@@ -450,6 +490,22 @@
       if (!gaps.length) return null;
       gaps.sort((a, b) => a - b);
       return gaps[Math.floor(gaps.length / 2)];
+    }
+
+    // Gesamt-Einschaltdauer aus rohen AN/AUS-Zeitstempeln — dieselbe Paar-
+    // bildung (jeder Punkt gilt bis zum nächsten, letzter bis windowEnd) wie
+    // renderTimelineMulti() beim Zeichnen der Zeitstrahl-Balken, hier nur für
+    // die Summe statt fürs Rendering. Im Rohwerte-/Zeitstrahl-Modus sind die
+    // Punktwerte selbst nur 0/1-Zustände — deren Summe wäre bedeutungslos,
+    // die tatsächliche Dauer ergibt sich erst aus den Intervalllängen.
+    function switchOnDuration(points, windowEnd) {
+      let total = 0;
+      for (let i = 0; i < points.length; i++) {
+        const start = points[i].ts;
+        const end = i + 1 < points.length ? points[i + 1].ts : (windowEnd ?? start);
+        if (points[i].value >= 0.5 && end > start) total += end - start;
+      }
+      return total;
     }
 
     const DURATION_UNITS = [
@@ -629,6 +685,15 @@
         showPoints: false,
         showValues: false,
         raw: false,
+        // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
+        // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
+        // geladenen Serien Schalter sind (siehe allSwitch-Getter); bei
+        // gemischten Charts bliebe unklar, was eine gemeinsame Zeitstrahl-
+        // Achse für eine Standard-/Zähler-Serie bedeuten sollte. Aus
+        // CHART_TYPE vorbelegt (persistiert über save(), siehe dort) statt
+        // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
+        // Chart gespeicherte Wahl verwerfen.
+        timeline: CHART_TYPE === 'timeline',
         resolutionPreset: RESOLUTION_PRESET,
         dynamicYAxis: DYNAMIC_Y_AXIS,
         // Min/Max/Ø in der Legende statt einer separaten Kachel-Reihe (siehe
@@ -671,13 +736,22 @@
         // render()) ohne jede Wirkung, deshalb nur sichtbar, wenn mindestens
         // eine der aktuell geladenen Serien tatsächlich als Linie gerendert wird.
         get hasLineSeries() { return this.series.some(s => s.chart_type === 'line'); },
+        // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
+        // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
+        // timeline-Kommentar oben.
+        get allSwitch() { return this.series.length > 0 && this.series.every(s => s.aggregation_type === 'switch'); },
         get resolutionOptions() {
           const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
-          return [
+          const options = [
             {value: 'auto', label: 'Automatisch'},
             {value: 'medium', label: labels.medium},
             {value: 'coarse', label: labels.coarse},
           ];
+          // Optionale dritte, noch gröbere Stufe je Zeitraum (aktuell nur
+          // "Tag" bei Zeitraum "Tag", siehe RESOLUTION_SECONDS/-LABELS oben)
+          // — nur angeboten, wenn für den aktuellen Zeitraum definiert.
+          if (labels.full) options.push({value: 'full', label: labels.full});
+          return options;
         },
         // Ermittelt, welche Auflösung "Automatisch" gerade tatsächlich bedeutet
         // (siehe detectResolutionSeconds oben) — aus der ersten Serie mit genug
@@ -700,12 +774,25 @@
             const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
             const unit = s.unit ? ` ${s.unit}` : '';
             const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, s.decimals)}${unit}`;
-            // Summe nur bei Zählern sinnvoll — Bucket-Werte sind dort bereits
+            // Summe bei Zählern sinnvoll — Bucket-Werte sind dort bereits
             // Deltas je Zeitfenster (siehe query.py), deren Summe den
-            // Gesamtverbrauch im Zeitraum ergibt. Bei Standard-Entitäten (Momentan-
-            // messwerte) oder im Rohwerte-Modus (Einzelmesswerte statt Deltas)
-            // wäre eine Summe dagegen bedeutungslos.
-            const hasSum = s.aggregation_type === 'counter' && !this.raw;
+            // Gesamtverbrauch im Zeitraum ergibt — UND bei Schaltern, deren
+            // Bucket-Werte bereits Einschaltsekunden sind (z. B. Summe =
+            // gesamte Anwesenheitsdauer im Zeitraum). Bei Zählern nicht im
+            // Rohwerte-Modus (Einzelmesswerte statt Deltas); bei Schaltern
+            // dagegen AUCH im Rohwerte-/Zeitstrahl-Modus möglich — dort kommt
+            // die Summe nicht aus den (nur 0/1-wertigen) Punktwerten, sondern
+            // aus switchOnDuration() oben.
+            const isSwitch = s.aggregation_type === 'switch';
+            const hasSum = (s.aggregation_type === 'counter' && !this.raw) || isSwitch;
+            const sumValue = this.raw && isSwitch ? switchOnDuration(s.points, this.windowEnd) : values.reduce((sum, v) => sum + v, 0);
+            // Summe bei Schaltern ist immer eine Dauer in Sekunden — anders
+            // als "last"/"min"/"max"/"average" (die bei Rohwert-Anzeigemodus
+            // echte 0/1-Zustände sind) unabhängig vom Anzeigemodus
+            // (display_mode) immer als h/m/s formatiert statt über
+            // fmtNum()s generische 4-signifikante-Stellen-Rundung, die bei
+            // größeren Sekundenwerten sichtbar ungenau wird.
+            const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
             return {
               entityId: s.entity_id,
               name: this.entityNames[s.entity_id] || s.friendly_name,
@@ -714,7 +801,7 @@
               min: minima.length ? formatted(Math.min(...minima)) : '—',
               max: maxima.length ? formatted(Math.max(...maxima)) : '—',
               average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
-              sum: hasSum ? (values.length ? formatted(values.reduce((sum, v) => sum + v, 0)) : '—') : null,
+              sum: hasSum ? (values.length ? sumFormatted : '—') : null,
             };
           });
         },
@@ -756,11 +843,38 @@
           // Wechsel z. B. zu "Jahr" unsichtbar aktiv (Chip ausgegraut/disabled,
           // aber der Zustand dahinter noch true) und load() würde weiter raw=true
           // an einen Zeitraum senden, für den die Umschaltfläche gar nicht mehr
-          // erreichbar ist.
-          if (!['hour', 'day', 'week'].includes(key)) this.raw = false;
+          // erreichbar ist. Zeitstrahl ist die eine Ausnahme: der erzwingt raw
+          // IMMER, unabhängig vom Zeitraum (siehe toggleTimeline()) — sonst
+          // würde z. B. "Monat" hier still auf Bucket-Werte zurückfallen, die
+          // renderTimelineMulti() fälschlich als durchgehende AN-Intervalle
+          // statt als echte Rohübergänge zeichnet.
+          if (!this.timeline && !['hour', 'day', 'week'].includes(key)) this.raw = false;
+          // "Tag"-Auflösung (RESOLUTION_LABELS.full) gibt es aktuell nur bei
+          // Zeitraum "Tag" — ohne diesen Reset bliebe resolutionPreset beim
+          // Wechsel z. B. zu "Woche" auf einem Wert stehen, den die dortige
+          // Auswahlliste gar nicht mehr anbietet.
+          if (this.resolutionPreset === 'full' && !(RESOLUTION_LABELS[key] || {}).full) this.resolutionPreset = 'auto';
           this.load();
         },
         toggleContinuous() { this.continuous = !this.continuous; this.load(); },
+        // "Tag"-Auflösung (ein Balken je Entität, s. render()/singleBucket)
+        // und Periodenvergleich (zeitversetzte Zweitserie) schließen sich
+        // aus derselben Begründung wie raw+compare aus (siehe toggleRaw()) —
+        // ein Vergleich zweier Einzelwerte auf einer Kategorie-Achse ergäbe
+        // keinen sinnvoll darstellbaren zweiten Zeitpunkt.
+        onResolutionChange() {
+          if (this.resolutionPreset === 'full') {
+            this.compare = false;
+            this.dynamicYAxis = false;
+            // continuous ist (anders als compare/dynamicYAxis) ein
+            // Server-Query-Parameter (verschiebt windowStart/windowEnd) —
+            // ein bloßes render() würde den Chart weiter mit dem zuvor
+            // geladenen rollierenden Fenster zeigen, deshalb load() statt
+            // render(), wenn sich der Wert dadurch tatsächlich ändert.
+            if (this.continuous) { this.continuous = false; this.load(); return; }
+          }
+          this.render();
+        },
         setCompareMode(mode) {
           this.compare = true;
           this.compareMode = mode;
@@ -793,6 +907,21 @@
           if (this.raw) this.compare = false;
           this.load();
         },
+        // Zeitstrahl erzwingt Rohwerte (er zeichnet AN/AUS-Übergänge, keine
+        // Bucket-Summen) und schließt Vergleich aus — dieselbe Logik wie
+        // setChartType('timeline') auf der Entität-eigenen Chart-Seite. Beim
+        // Ausschalten wird raw wieder zurückgesetzt: anders als ein manuell
+        // gesetztes "Rohwerte" darf es hier nicht stehen bleiben, sonst
+        // liefert der Server laut query_raw_series() weiterhin chart_type
+        // "line" für JEDE Entität (Balken ergäben bei vielen Rohpunkten nur
+        // eine Fläche) — sichtbar als plötzliche Linie statt der eigentlich
+        // erwarteten automatischen Balken für Zähler/Schalter.
+        toggleTimeline() {
+          this.timeline = !this.timeline;
+          if (this.timeline) { this.raw = true; this.compare = false; }
+          else { this.raw = false; }
+          this.load();
+        },
 
         async load() {
           if (this.selectedEntityIds.length === 0) {
@@ -801,6 +930,12 @@
             this.$nextTick(() => this.render());
             return;
           }
+          // Zweite, robustere Absicherung neben setRange()/toggleTimeline():
+          // Zeitstrahl braucht IMMER echte Rohübergänge, nie Bucket-Werte,
+          // unabhängig davon, über welchen Code-Pfad load() gerade ausgelöst
+          // wurde — Bucket-Werte würde renderTimelineMulti() sonst fälschlich
+          // als durchgehende AN-Intervalle statt echter Übergänge zeichnen.
+          if (this.timeline) this.raw = true;
           const requestId = ++this._requestId;
           this.loading = true;
           const params = new URLSearchParams({
@@ -813,6 +948,11 @@
           const data = await res.json();
           if (requestId !== this._requestId) return;
           this.series = data.series || [];
+          // Entitäten-Auswahl kann sich geändert haben, seit "Zeitstrahl"
+          // aktiviert wurde (z. B. eine Nicht-Schalter-Entität ergänzt) —
+          // dann fällt die Ansicht automatisch auf Linie/Balken zurück statt
+          // einen inzwischen unpassenden Zeitstrahl weiterzuzeigen.
+          if (this.timeline && !this.allSwitch) this.timeline = false;
           this.autoResolutionLabel = this.computeAutoResolutionLabel();
           this.windowStart = data.window_start ?? null;
           this.windowEnd = data.window_end ?? null;
@@ -857,6 +997,27 @@
             }
             return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
           };
+
+          if (this.timeline) {
+            this.renderTimelineMulti(fmt);
+            return;
+          }
+
+          // "Tag"-Auflösung bucketet den kompletten Zeitraum zu genau EINEM
+          // Wert je Entität (siehe RESOLUTION_SECONDS.day.full) — auf der
+          // sonst üblichen Zeit-Achse säße dieser eine Balken exakt auf
+          // windowStart (also am linken Rand) und bliebe trotz barMaxWidth-
+          // Deckelung winzig, während der Rest der auf den ganzen Tag
+          // gespreizten Achse leer bliebe. Eine Kategorie-Achse mit genau
+          // einer Kategorie lässt ECharts die Balken mehrerer Entitäten
+          // stattdessen automatisch nebeneinander und gut sichtbar anordnen
+          // — exakt der Vergleichs-Anwendungsfall, für den diese Auflösung
+          // gedacht ist (z. B. Tages-Einspeisung vs. -Bezug).
+          const singleBucket = this.resolutionPreset === 'full';
+          const singleBucketLabel = this.windowStart != null
+            ? new Date(this.windowStart * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'})
+            : '';
+
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
           // wechselseitig links/rechts, weitere Achsen pro Seite nach außen versetzt.
@@ -878,7 +1039,13 @@
             const current = unitDecimals.get(axisKey(s));
             if (current == null || s.decimals < current) unitDecimals.set(axisKey(s), s.decimals);
           });
-          const dynamicYAxis = this.dynamicYAxis;
+          // singleBucket erzwingt eine bei 0 startende Y-Achse, unabhängig
+          // vom gespeicherten Schalter-Zustand — bei einem bereits vor
+          // diesem Fix gespeicherten Chart könnte sonst weiterhin
+          // dynamic_y_axis:true UND resolution_preset:"full" gemeinsam
+          // vorliegen (siehe onResolutionChange()/Optionen-Menü, die das nur
+          // clientseitig ab jetzt verhindern).
+          const dynamicYAxis = this.dynamicYAxis && !singleBucket;
           const yAxis = units.map((u, i) => {
             const decimals = unitDecimals.get(u);
             const isDuration = u === ' duration';
@@ -930,8 +1097,12 @@
             if (tooltipBucketSeconds == null) {
               tooltipBucketSeconds = detectResolutionSeconds(mainPoints);
             }
-            const mainData = mainPoints.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
-            if (chartType === 'line' && mainData.length && this.windowEnd != null
+            // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position immer
+            // Kategorie 0 statt eines Zeitstempels — der Halte-Punkt bis
+            // windowEnd (nächster Block) ergibt auf einer Achse mit nur einer
+            // Kategorie ohnehin keinen Sinn und entfällt deshalb hier.
+            const mainData = mainPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
+            if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
               mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
@@ -960,8 +1131,20 @@
               // Bezugspunkt für eine sinnvolle Auto-Breite, wodurch der Balken
               // einen Großteil der (bewusst bis zum Fensterende reichenden)
               // Achse einnehmen kann. Bei vielen Balken liegt die Auto-Breite
-              // ohnehin längst unter dem Limit.
-              barMaxWidth: 48,
+              // ohnehin längst unter dem Limit. Bei singleBucket (Kategorie-
+              // Achse mit genau einer Kategorie) ist genau dieses großzügige
+              // Auto-Breite-Verhalten dagegen erwünscht — ECharts verteilt die
+              // Balken mehrerer Entitäten dort von selbst sinnvoll, deshalb
+              // keine Deckelung.
+              barMaxWidth: singleBucket ? undefined : 48,
+              // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. o.)
+              // sitzt mit seiner Mitte GENAU auf dem Bucket-Zeitstempel —
+              // beim ersten/letzten Bucket liegt die Hälfte der Balkenbreite
+              // dadurch zwangsläufig knapp jenseits von min/max und würde
+              // ohne dies hart am Diagrammrand abgeschnitten wirken. Bei
+              // singleBucket (Kategorie-Achse mit eigener Bandbreite je
+              // Kategorie) besteht dieses Problem nicht.
+              clip: singleBucket ? undefined : chartType !== 'bar',
             };
             if (chartType === 'line') {
               main.smooth = true;
@@ -1001,6 +1184,7 @@
                 lineStyle: {width: 1.5, color, type: 'dashed', opacity: 0.5},
                 itemStyle: {color, opacity: 0.5},
                 barMaxWidth: 48,
+                clip: chartType !== 'bar',
               };
               if (chartType === 'line') {
                 cmp.smooth = true;
@@ -1025,7 +1209,23 @@
             // letzten tatsächlichen Wert auf, z. B. bei einer Entität, die seit
             // Stunden nichts mehr gemeldet hat, statt konsistent bis zum
             // Fensterende (bei "Heute" also bis zur aktuellen Uhrzeit) zu reichen.
-            xAxis: {
+            xAxis: singleBucket ? {
+              // Genau eine Kategorie statt einer auf den ganzen Tag
+              // gespreizten Zeit-Achse — "Tag"-Auflösung liefert je Entität
+              // nur einen einzigen Wert, ein Achsen-"Zeitpunkt" ist hier
+              // also tatsächlich korrekt (siehe singleBucket oben).
+              type: 'category',
+              data: [singleBucketLabel],
+              axisTick: {show: false},
+              // Ohne dies versucht ECharts (Default: onZero:true), die Achsen-
+              // Linie an der Y-Position von y=0 auszurichten — bei aktiver
+              // "Dynamischer Y-Achse" (Y-Achse startet dann NICHT bei 0,
+              // sondern knapp unter dem kleinsten Wert) landet diese
+              // Ausrichtung mitten in den Balken statt am unteren Rand, sie
+              // wirken dadurch "versenkt". false verankert die Achse immer
+              // am unteren Diagrammrand, unabhängig vom Y-Achsen-Minimum.
+              axisLine: {onZero: false},
+            } : {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
               // periodEnd statt windowEnd: eine laufende Periode (z. B. Woche)
@@ -1041,6 +1241,16 @@
               // einem Bucket) — boundaryGap:[0,0] unterbindet dieses Auto-Polster,
               // min/max bleiben dadurch die tatsächlichen Achsengrenzen.
               boundaryGap: [0, 0],
+              // Woche/Monat bucketen tagesweise (siehe fmt() oben, "dd.mm."-
+              // Beschriftung) — mit fest erzwungenem Tages-Interval statt
+              // ECharts' automatischer "nice tick"-Berechnung, die trotz
+              // explizitem max (s. o.) gelegentlich einen zusätzlichen Tick
+              // GITTERNETZ (nicht nur Label) jenseits der Periodengrenze
+              // erzeugt — sichtbar als 8. statt 7. Einteilung bei "Woche".
+              // Nicht für Jahr/Dekade erzwungen: Monate/Jahre sind
+              // unterschiedlich lang, ein fester Millisekunden-Interval
+              // würde dort falsch ausgerichtete Ticks erzeugen.
+              interval: ['week', 'month'].includes(this.range) ? 24 * 60 * 60 * 1000 : undefined,
               axisLabel: {
                 // ECharts' "nice tick"-Berechnung polstert die Achse intern
                 // minimal über max hinaus (trotz explizitem max oben) — ohne
@@ -1100,6 +1310,92 @@
           chartInstance.resize();
         },
 
+        // Mehrspuriger Zeitstrahl — eine Kategorie-Zeile je Entität, sonst
+        // dieselbe Balken-Technik wie renderTimeline() auf der Entität-
+        // eigenen Chart-Seite (entity_detail.html), hier nur auf N Zeilen
+        // statt einer verallgemeinert. Nutzt bewusst die rohen, nicht
+        // resampelten Punkte jeder Serie — Zeitstrahl zeigt AN/AUS-
+        // Übergänge, kein gebuckeltes Resampling ergäbe hier Sinn.
+        renderTimelineMulti(fmt) {
+          const categories = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
+          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+          const data = [];
+          this.series.forEach((s, catIndex) => {
+            const color = PALETTE[catIndex % PALETTE.length];
+            const points = s.points;
+            for (let i = 0; i < points.length; i++) {
+              const start = points[i].ts;
+              const end = i + 1 < points.length ? points[i + 1].ts : (this.windowEnd ?? start);
+              if (points[i].value >= 0.5 && end > start) {
+                data.push([catIndex, start * 1000, end * 1000, color]);
+              }
+            }
+          });
+          const option = {
+            textStyle: {
+              fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              fontSize: Math.round(12 * uiFontScale * 10) / 10,
+            },
+            grid: {left: 10, right: 20, top: 16, bottom: 40, containLabel: true},
+            xAxis: {
+              type: 'time',
+              min: this.windowStart != null ? this.windowStart * 1000 : undefined,
+              max: this.periodEnd != null ? this.periodEnd * 1000 - 1000 : undefined,
+              boundaryGap: [0, 0],
+              // Siehe Kommentar bei der Linien-/Balken-Chart-Achse in render()
+              // oben (dort auch die Begründung für den erzwungenen Tages-
+              // Interval bei Woche/Monat).
+              interval: ['week', 'month'].includes(this.range) ? 24 * 60 * 60 * 1000 : undefined,
+              axisLabel: {
+                formatter: v => (this.periodEnd != null && v >= this.periodEnd * 1000) ? '' : fmt(v / 1000),
+                hideOverlap: true,
+              },
+            },
+            // Ohne Beschriftung — der Name steht bereits in der Legende
+            // darunter und im Tooltip beim Hovern (siehe categories-Lookup
+            // dort); ein zusätzliches Label je Zeile wäre nur Redundanz und
+            // kostet bei langen Namen unnötig Platz.
+            yAxis: {
+              type: 'category', data: categories.map(() => ''), inverse: true,
+              axisLine: {show: false}, axisTick: {show: false}, splitLine: {show: false},
+            },
+            tooltip: {
+              trigger: 'item',
+              formatter: p => {
+                const [catIndex, startMs, endMs] = p.value;
+                const pad = n => String(n).padStart(2, '0');
+                const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+                return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+              },
+              appendToBody: true,
+            },
+            series: [{
+              type: 'custom',
+              renderItem: (params, api) => {
+                const categoryIndex = api.value(0);
+                const start = api.coord([api.value(1), categoryIndex]);
+                const end = api.coord([api.value(2), categoryIndex]);
+                const height = api.size([0, 1])[1] * 0.6;
+                const rectShape = echarts.graphic.clipRectByRect(
+                  {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+                  {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+                );
+                // Farbe als eigenes Datenfeld statt itemStyle je Datenpunkt —
+                // api.style() im renderItem einer Custom-Serie liest nur die
+                // serienweite itemStyle-Option, nicht das itemStyle jedes
+                // einzelnen Datenpunkts, deshalb hier stattdessen ein
+                // zusätzlicher Wert je Intervall (siehe data-Aufbau oben).
+                return rectShape && {type: 'rect', shape: rectShape, style: {fill: api.value(3)}};
+              },
+              encode: {x: [1, 2], y: 0},
+              data,
+            }],
+          };
+          chartInstance.setOption(option, true);
+          chartInstance.resize();
+        },
+
         async save() {
           if (!this.name.trim()) { alert('Bitte einen Namen für das Chart angeben.'); return; }
           if (this.selectedEntityIds.length === 0) { alert('Bitte mindestens eine Entität auswählen.'); return; }
@@ -1123,6 +1419,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
+            chart_type: this.timeline ? 'timeline' : 'auto',
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;
@@ -1154,6 +1451,12 @@
         },
 
         init() {
+          // Ein vor diesem Fix gespeichertes Chart könnte noch
+          // resolution_preset:"full" UND continuous:true gemeinsam tragen
+          // (siehe onResolutionChange()/Optionen-Menü, die das ab jetzt nur
+          // clientseitig verhindern) — hier einmalig vor dem ersten load()
+          // bereinigen, statt das bei jedem Rendern erneut zu maskieren.
+          if (this.resolutionPreset === 'full' && this.continuous) this.continuous = false;
           this.load();
           window.addEventListener('resize', () => chartInstance && chartInstance.resize());
           new ResizeObserver(() => chartInstance && chartInstance.resize()).observe(document.getElementById('chart'));

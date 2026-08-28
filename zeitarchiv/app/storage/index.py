@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS saved_charts (
     chart_stats INTEGER NOT NULL DEFAULT 1,
     legend_metrics TEXT NOT NULL DEFAULT '["sum"]',
     legend_style TEXT NOT NULL DEFAULT 'chips',
+    chart_type TEXT NOT NULL DEFAULT 'auto',
     is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
@@ -523,6 +524,16 @@ class Index:
             # legend_metrics oben, dieselbe Konfigurierbarkeit pro Chart.
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN legend_style TEXT NOT NULL DEFAULT 'chips'"
+            )
+        if "chart_type" not in sc_columns:
+            # "auto" (Linie/Balken je Serie automatisch, siehe query.py) oder
+            # "timeline" (AN-Intervalle, nur wählbar wenn alle Serien Schalter
+            # sind) — dieselbe Konvention wie entities.chart_options auf der
+            # Entität-eigenen Chart-Seite (dort zusätzlich "line"/"bar" als
+            # explizite Wahl, hier nicht nötig, da Linie/Balken pro Serie
+            # ohnehin automatisch feststehen).
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN chart_type TEXT NOT NULL DEFAULT 'auto'"
             )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
@@ -1186,6 +1197,7 @@ class Index:
         chart_stats: bool = True,
         legend_metrics: list[str] | None = None,
         legend_style: str = "chips",
+        chart_type: str = "auto",
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1193,14 +1205,14 @@ class Index:
                 "INSERT INTO saved_charts "
                 "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, now, now,
+                    legend_style, chart_type, now, now,
                 ),
             )
             return cur.lastrowid
@@ -1219,18 +1231,19 @@ class Index:
         chart_stats: bool = True,
         legend_metrics: list[str] | None = None,
         legend_style: str = "chips",
+        chart_type: str = "auto",
     ) -> None:
         with self._lock, self._conn:
             self._conn.execute(
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
                 "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
-                "chart_stats = ?, legend_metrics = ?, legend_style = ?, updated_at = ? WHERE id = ?",
+                "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, time.time(), chart_id,
+                    legend_style, chart_type, time.time(), chart_id,
                 ),
             )
 
@@ -1243,6 +1256,7 @@ class Index:
         d["chart_stats"] = bool(d.get("chart_stats", 1))
         d["legend_metrics"] = json.loads(d["legend_metrics"]) if d.get("legend_metrics") else ["sum"]
         d["legend_style"] = d.get("legend_style") or "chips"
+        d["chart_type"] = d.get("chart_type") or "auto"
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["is_favorite"] = bool(d["is_favorite"])
         return d

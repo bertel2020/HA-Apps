@@ -97,6 +97,20 @@
     return gaps[Math.floor(gaps.length / 2)];
   }
 
+  // Gesamt-Einschaltdauer aus rohen AN/AUS-Zeitstempeln — dieselbe Paar-
+  // bildung wie renderTileTimeline() beim Zeichnen der Zeitstrahl-Balken,
+  // hier nur für die Legenden-Summe statt fürs Rendering. Identisch zu
+  // switchOnDuration() in chart_editor.html/entity_detail.html.
+  function switchOnDuration(points, windowEnd) {
+    let total = 0;
+    for (let i = 0; i < points.length; i++) {
+      const start = points[i].ts;
+      const end = i + 1 < points.length ? points[i + 1].ts : (windowEnd ?? start);
+      if (points[i].value >= 0.5 && end > start) total += end - start;
+    }
+    return total;
+  }
+
   // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
   // Daten, nicht nach dem Zeitraum-Namen — die Uhrzeit ist bei Tages-Buckets
   // oder gröber ohnehin immer Mitternacht, also reine Information ohne Wert.
@@ -244,13 +258,26 @@
     const range = el.dataset.range || 'day';
     const continuous = el.dataset.continuous === 'true';
     const resolutionPreset = el.dataset.resolutionPreset || 'auto';
-    const dynamicYAxis = el.dataset.dynamicYAxis === 'true';
+    // Siehe chart_editor.html (render(), dynamicYAxis-Konstante): bei
+    // Auflösung "Tag" (singleBucket weiter unten) erzwungen aus, unabhängig
+    // vom gespeicherten Chart-Zustand — eine nicht bei 0 startende Y-Achse
+    // würde den Summen-Vergleich der wenigen Balken verzerren.
+    const dynamicYAxis = el.dataset.dynamicYAxis === 'true' && resolutionPreset !== 'full';
     const animation = el.dataset.animation !== 'false';
+    // Wie chart_editor.html: Zeitstrahl braucht immer echte Rohübergänge,
+    // nie Bucket-Werte (siehe dortiger Kommentar bei setRange()/load() —
+    // Bucket-Werte würden als fälschlich durchgehende AN-Intervalle statt
+    // echter Übergänge gezeichnet).
+    const chartType = el.dataset.chartType || 'auto';
+    const timeline = chartType === 'timeline';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
     const base = el.closest('#dashboard-grid')?.dataset.base || '.';
-    const params = new URLSearchParams({entity_ids: entityIds.join(','), range, offset: '0', continuous: String(continuous)});
+    const params = new URLSearchParams({
+      entity_ids: entityIds.join(','), range, offset: '0', continuous: String(continuous),
+      raw: String(timeline),
+    });
     let data;
     try {
       const res = await fetch(`${base}/api/query-multi?${params}`);
@@ -278,9 +305,20 @@
       const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
       const unit = s.unit ? ` ${s.unit}` : '';
       const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtCompactNumber(value, s.decimals)}${unit}`;
-      // Summe nur bei Zählern sinnvoll — siehe derselbe Kommentar in
-      // chart_editor.html (seriesStats()).
-      const hasSum = s.aggregation_type === 'counter';
+      // Summe bei Zählern UND bei Schaltern sinnvoll (Bucket-Werte sind dort
+      // bereits Einschaltsekunden) — siehe derselbe Kommentar in
+      // chart_editor.html (seriesStats()). Im Zeitstrahl-/Rohwerte-Modus
+      // (raw=true, s. o.) kommt die Summe stattdessen aus switchOnDuration()
+      // unten, da die Punktwerte dann nur noch 0/1-Zustände sind.
+      const isSwitch = s.aggregation_type === 'switch';
+      const hasSum = s.aggregation_type === 'counter' || isSwitch;
+      const sumValue = timeline && isSwitch ? switchOnDuration(s.points, data.window_end) : values.reduce((sum, v) => sum + v, 0);
+      // Summe bei Schaltern ist immer eine Dauer in Sekunden — unabhängig
+      // vom Anzeigemodus immer als h/m/s formatiert statt über
+      // fmtCompactNumber()s generische 4-signifikante-Stellen-Rundung, die
+      // bei größeren Sekundenwerten sichtbar ungenau wird (siehe
+      // chart_editor.html/entity_detail.html, derselbe Fix).
+      const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
       return {
         name: entityNames[s.entity_id] || s.friendly_name,
         color: PALETTE[i % PALETTE.length],
@@ -288,7 +326,7 @@
         min: minima.length ? formatted(Math.min(...minima)) : '—',
         max: maxima.length ? formatted(Math.max(...maxima)) : '—',
         average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
-        sum: hasSum ? (values.length ? formatted(values.reduce((sum, v) => sum + v, 0)) : '—') : null,
+        sum: hasSum ? (values.length ? sumFormatted : '—') : null,
       };
     });
     const legendMetrics = JSON.parse(el.dataset.legendMetrics || '["sum"]');
@@ -304,6 +342,18 @@
 
     chartEl.innerHTML = '';
     let chart = instances.get(chartId);
+    // Ein htmx-Swap von #dashboard-grid (Pin/Unpin/Reorder) ersetzt chartEl
+    // durch einen KOMPLETT NEUEN DOM-Knoten, während instances noch die alte
+    // ECharts-Instanz unter derselben chartId hält — die zeigt dann auf ein
+    // bereits entferntes Canvas. Ohne dispose() hier bliebe diese alte
+    // Instanz (inkl. ihres via appendToBody an document.body gehängten
+    // Tooltip-Elements, siehe tooltip weiter unten) unsichtbar für immer
+    // bestehen, statt neu an den aktuellen Container gebunden zu werden —
+    // sichtbar als sich über die Zeit ansammelnde verwaiste Tooltips.
+    if (chart && chart.getDom() !== chartEl) {
+      chart.dispose();
+      chart = null;
+    }
     if (!chart) {
       chart = echarts.init(chartEl);
       instances.set(chartId, chart);
@@ -318,6 +368,15 @@
     const inkFaint = style.getPropertyValue('--ink-faint').trim();
     const inkMuted = style.getPropertyValue('--ink-muted').trim();
     const surface = style.getPropertyValue('--surface').trim();
+
+    // Zeitstrahl statt Linie/Balken — eigener, kompakter Renderpfad (analog
+    // renderTimelineMulti() in chart_editor.html), springt hier komplett aus
+    // der Linie-/Balken-Aufbereitung unten heraus, die bei AN/AUS-Intervallen
+    // ohnehin keinen Sinn ergäbe.
+    if (timeline) {
+      renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface);
+      return;
+    }
 
     // Eine Y-Achse je unterschiedlicher Einheit (genau wie auf der vollen
     // Chart-Seite, chart_editor.html) — ohne das teilen sich z. B. Watt- und
@@ -363,6 +422,18 @@
     // vor), hier nur deklariert.
     let tooltipBucketSeconds = null;
 
+    // Siehe chart_editor.html (render(), gleicher Name/Kommentar): "Tag"-
+    // Auflösung bucketet auf genau EINEN Wert je Entität — auf der sonst
+    // üblichen Zeit-Achse säße dieser eine Balken winzig am linken Rand
+    // (windowStart), der Rest der auf den ganzen Tag gespreizten Achse
+    // bliebe leer. Eine Kategorie-Achse mit einer Kategorie lässt ECharts
+    // die Balken mehrerer Entitäten stattdessen automatisch und gut
+    // sichtbar nebeneinander anordnen.
+    const singleBucket = resolutionPreset === 'full';
+    const singleBucketLabel = data.window_start != null
+      ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'})
+      : '';
+
     const echartsSeries = series.map((s, i) => {
       const color = PALETTE[i % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
@@ -372,8 +443,8 @@
       if (tooltipBucketSeconds == null) {
         tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
       }
-      const lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, s.decimals]);
-      if (s.chart_type === 'line' && lineData.length && data.window_end != null
+      const lineData = displayPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, s.unit, s.decimals]);
+      if (!singleBucket && s.chart_type === 'line' && lineData.length && data.window_end != null
           && lineData[lineData.length - 1][0] < data.window_end * 1000) {
         const last = lineData[lineData.length - 1];
         lineData.push([data.window_end * 1000, last[1], last[2], last[3]]);
@@ -388,7 +459,14 @@
         data: lineData,
         lineStyle: {width: 2, color},
         itemStyle: {color},
-        barMaxWidth: 28,
+        barMaxWidth: singleBucket ? undefined : 28,
+        // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. u.) sitzt mit
+        // seiner Mitte GENAU auf dem Bucket-Zeitstempel — beim ersten/letzten
+        // Bucket liegt die Hälfte der Balkenbreite dadurch zwangsläufig knapp
+        // jenseits von min/max und würde ohne dies hart am Kachelrand
+        // abgeschnitten wirken. Bei singleBucket (Kategorie-Achse) entfällt
+        // dieses Problem.
+        clip: singleBucket ? undefined : s.chart_type !== 'bar',
       };
       if (s.chart_type === 'line') {
         cfg.smooth = true;
@@ -417,7 +495,16 @@
       textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
       color: PALETTE,
       grid: {left: 6, right: 6, top: 10, bottom: 20, containLabel: true},
-      xAxis: {
+      xAxis: singleBucket ? {
+        // Genau eine Kategorie statt einer auf den ganzen Tag gespreizten
+        // Zeit-Achse — siehe singleBucket oben.
+        type: 'category',
+        data: [singleBucketLabel],
+        axisLabel: {fontSize: scaledFont(10), color: inkFaint},
+        axisLine: {lineStyle: {color: borderColor}},
+        axisTick: {show: false},
+        splitLine: {show: false},
+      } : {
         type: 'time',
         min: data.window_start != null ? data.window_start * 1000 : undefined,
         // period_end statt window_end: eine laufende Periode (z. B. Woche)
@@ -429,6 +516,14 @@
         // Achsen-Tick "01.09." für einen Monat, der am 31.08. endet).
         max: (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 - 1000 : undefined,
         boundaryGap: [0, 0],
+        // Woche/Monat bucketen tagesweise (siehe fmtAxis()) — mit fest
+        // erzwungenem Tages-Interval statt ECharts' automatischer "nice
+        // tick"-Berechnung, die trotz explizitem max (s. o.) gelegentlich
+        // einen zusätzlichen Tick (Gitternetz, nicht nur Label) jenseits der
+        // Periodengrenze erzeugt. Nicht für Jahr/Dekade erzwungen: Monate/
+        // Jahre sind unterschiedlich lang, ein fester Millisekunden-Interval
+        // würde dort falsch ausgerichtete Ticks erzeugen.
+        interval: ['week', 'month'].includes(range) ? 24 * 60 * 60 * 1000 : undefined,
         axisLabel: {
           // ECharts' eigene "nice tick"-Berechnung polstert eine Zeit-Achse
           // intern minimal über min/max hinaus (auch mit explizit gesetztem
@@ -456,7 +551,10 @@
         textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: (params) => {
           if (!params.length) return '';
-          const header = fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
+          // Bei singleBucket ist axisValue die Kategorie-Beschriftung (bereits
+          // ein fertiges Datum), kein Millisekunden-Zeitstempel — fmtTooltip-
+          // Timestamp() erwartet Millisekunden, deshalb hier direkt verwendet.
+          const header = singleBucket ? singleBucketLabel : fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
           const rows = params.map(p => {
             const unit = p.data[2] || '';
             const decimals = p.data[3];
@@ -475,7 +573,91 @@
       },
       legend: {show: false, data: echartsSeries.map(s => s.name), selected: legendSelected},
       series: echartsSeries,
+      // notMerge: ohne dies mergt ECharts neue Optionen standardmäßig nur in
+      // den bestehenden State statt ihn zu ersetzen — bei jeder erneuten
+      // renderTile()-Ausführung derselben Kachel (Resize, Größenwechsel,
+      // Legenden-Umschalter) könnten so Reste vorheriger Aufrufe bestehen
+      // bleiben. chart_editor.html nutzt aus demselben Grund ebenfalls
+      // setOption(..., true).
+    }, true);
+  }
+
+  // Kompakter Zeitstrahl für eine Kachel — eine Kategorie-Zeile je Entität,
+  // dieselbe Balken-Technik wie renderTimelineMulti() in chart_editor.html,
+  // hier nur mit den kleineren Kachel-Schriftgrößen/Abständen. Ohne
+  // Zeilen-Beschriftung (der Name steht schon in der Kachel-Legende, siehe
+  // renderTile()) — bei mehreren Zeilen in einer kleinen Kachel wäre dafür
+  // ohnehin kaum Platz.
+  function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface) {
+    const categories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
+    const items = [];
+    series.forEach((s, catIndex) => {
+      const color = PALETTE[catIndex % PALETTE.length];
+      const points = s.points || [];
+      for (let i = 0; i < points.length; i++) {
+        const start = points[i].ts;
+        const end = i + 1 < points.length ? points[i + 1].ts : (data.window_end ?? start);
+        if (points[i].value >= 0.5 && end > start) {
+          items.push([catIndex, start * 1000, end * 1000, color]);
+        }
+      }
     });
+    chart.setOption({
+      animation,
+      textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
+      grid: {left: 4, right: 6, top: 10, bottom: 20, containLabel: true},
+      xAxis: {
+        type: 'time',
+        min: data.window_start != null ? data.window_start * 1000 : undefined,
+        max: (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 - 1000 : undefined,
+        boundaryGap: [0, 0],
+        interval: ['week', 'month'].includes(range) ? 24 * 60 * 60 * 1000 : undefined,
+        axisLabel: {
+          formatter: v => {
+            const rawPeriodEndMs = (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 : null;
+            if (rawPeriodEndMs != null && v >= rawPeriodEndMs) return '';
+            return fmtAxis(range, v / 1000);
+          },
+          fontSize: scaledFont(10), color: inkFaint, hideOverlap: true,
+        },
+        axisLine: {lineStyle: {color: borderColor}},
+        axisTick: {show: false},
+        splitLine: {show: false},
+      },
+      yAxis: {
+        type: 'category', data: categories.map(() => ''), inverse: true,
+        axisLine: {show: false}, axisTick: {show: false}, splitLine: {show: false},
+      },
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: surface,
+        borderColor,
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
+        formatter: p => {
+          const [catIndex, startMs, endMs] = p.value;
+          const pad = n => String(n).padStart(2, '0');
+          const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+          return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+        },
+        appendToBody: true,
+      },
+      series: [{
+        type: 'custom',
+        renderItem: (params, api) => {
+          const categoryIndex = api.value(0);
+          const start = api.coord([api.value(1), categoryIndex]);
+          const end = api.coord([api.value(2), categoryIndex]);
+          const height = api.size([0, 1])[1] * 0.6;
+          const rectShape = echarts.graphic.clipRectByRect(
+            {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+            {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+          );
+          return rectShape && {type: 'rect', shape: rectShape, style: {fill: api.value(3)}};
+        },
+        encode: {x: [1, 2], y: 0},
+        data: items,
+      }],
+    }, true);
   }
 
   // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe

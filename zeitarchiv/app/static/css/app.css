@@ -63,16 +63,32 @@
   --shadow:0 1px 2px rgba(0,0,0,.4);
 }
 
-/* Modernes, cleanes Schema: neutrales Zinc-Grau mit Indigo/Sky-Akzent,
-   ohne warme/organische Note — bewusst abgesetzt von den anderen Schemata. */
+/* Modernes, cleanes Schema: neutrales Zinc-Grau mit Indigo/Teal-Akzent,
+   ohne warme/organische Note bei den beiden Haupt-Akzenten — bewusst
+   abgesetzt von den anderen Schemata.
+
+   Zweite Überarbeitung (nach einer reinen Kontrast-Korrektur) — diesmal
+   auf gestalterisches Feedback statt nur Zahlen: die helle Variante wirkte
+   als große Flächenfarbe (z. B. `.tbl-style-header-accent`, eine volle
+   Tabellen-Kopfzeile) zu grell, UND Primär-/Sekundärfarbe lagen mit Indigo
+   und (dem zuvor kontrast-korrigierten, aber weiterhin blauen) Sky zu nah
+   beieinander, um in Charts als zwei klar unterscheidbare Serien zu lesen.
+   Zwei Korrekturen: 1) Indigo eine Tailwind-Stufe dunkler/entsättigter
+   (600→700) — bleibt eindeutig Indigo, wirkt aber als Vollfläche ruhiger.
+   2) Sekundärfarbe von Sky (Hue ~200°, zu nah an Indigos ~245°) auf Teal
+   (Hue ~175°) gewechselt — deutlich größerer Hue-Abstand bei weiterhin
+   kühlem, "unorganischem" Charakter. Die komplette Chart-1..8-Palette
+   wurde danach neu über den Farbkreis verteilt statt einzelner Tailwind-
+   "500"-Swatches, jede Farbe einzeln auf ≥3:1 (Chart-1/2 zusätzlich ≥4.5:1,
+   da zugleich Text-/Badge-Farbe) gegen Weiß geprüft. */
 :root[data-color-scheme="modern"]{
   --bg:#FAFAFA; --surface:#FFFFFF; --surface-alt:#F4F4F5; --border:#E4E4E7; --border-strong:#D4D4D8;
-  --ink:#18181B; --ink-muted:#71717A; --ink-faint:#A1A1AA;
-  --accent-line:#4F46E5; --accent-bar:#0EA5E9; --accent-line-soft:#EEF2FF; --accent-bar-soft:#E0F2FE;
+  --ink:#18181B; --ink-muted:#71717A; --ink-faint:#86868E;
+  --accent-line:#4338CA; --accent-bar:#0F766E; --accent-line-soft:#EEF2FF; --accent-bar-soft:#F0FDFA;
   --accent-contrast:#FFFFFF; --danger:#DC2626; --danger-soft:#FEE2E2; --danger-contrast:#FFFFFF;
-  --chart-line:#4F46E5; --chart-bar:#0EA5E9;
-  --chart-1:#4F46E5; --chart-2:#0EA5E9; --chart-3:#10B981; --chart-4:#F59E0B;
-  --chart-5:#EC4899; --chart-6:#8B5CF6; --chart-7:#EF4444; --chart-8:#71717A;
+  --chart-line:#4338CA; --chart-bar:#0F766E;
+  --chart-1:#4338CA; --chart-2:#0F766E; --chart-3:#B45309; --chart-4:#B91C1C;
+  --chart-5:#7E22CE; --chart-6:#15803D; --chart-7:#BE185D; --chart-8:#64748B;
   --shadow:0 1px 2px rgba(24,24,27,.06),0 1px 1px rgba(24,24,27,.04);
 }
 @media (prefers-color-scheme: dark){
@@ -80,22 +96,22 @@
   :root[data-color-scheme="modern"][data-color-mode="auto"]{
     --bg:#09090B; --surface:#18181B; --surface-alt:#27272A; --border:#3F3F46; --border-strong:#52525B;
     --ink:#FAFAFA; --ink-muted:#A1A1AA; --ink-faint:#71717A;
-    --accent-line:#818CF8; --accent-bar:#38BDF8; --accent-line-soft:#1E1B4B; --accent-bar-soft:#0C2A3D;
+    --accent-line:#818CF8; --accent-bar:#2DD4BF; --accent-line-soft:#1E1B4B; --accent-bar-soft:#0F2C29;
     --accent-contrast:#09090B; --danger:#F87171; --danger-soft:#3F1D1D; --danger-contrast:#09090B;
-    --chart-line:#818CF8; --chart-bar:#38BDF8;
-    --chart-1:#818CF8; --chart-2:#38BDF8; --chart-3:#34D399; --chart-4:#FBBF24;
-    --chart-5:#F472B6; --chart-6:#A78BFA; --chart-7:#F87171; --chart-8:#A1A1AA;
+    --chart-line:#818CF8; --chart-bar:#2DD4BF;
+    --chart-1:#818CF8; --chart-2:#2DD4BF; --chart-3:#FBBF24; --chart-4:#F87171;
+    --chart-5:#C084FC; --chart-6:#4ADE80; --chart-7:#F472B6; --chart-8:#94A3B8;
     --shadow:0 1px 2px rgba(0,0,0,.4);
   }
 }
 :root[data-color-scheme="modern"][data-color-mode="dark"]{
   --bg:#09090B; --surface:#18181B; --surface-alt:#27272A; --border:#3F3F46; --border-strong:#52525B;
   --ink:#FAFAFA; --ink-muted:#A1A1AA; --ink-faint:#71717A;
-  --accent-line:#818CF8; --accent-bar:#38BDF8; --accent-line-soft:#1E1B4B; --accent-bar-soft:#0C2A3D;
+  --accent-line:#818CF8; --accent-bar:#2DD4BF; --accent-line-soft:#1E1B4B; --accent-bar-soft:#0F2C29;
   --accent-contrast:#09090B; --danger:#F87171; --danger-soft:#3F1D1D; --danger-contrast:#09090B;
-  --chart-line:#818CF8; --chart-bar:#38BDF8;
-  --chart-1:#818CF8; --chart-2:#38BDF8; --chart-3:#34D399; --chart-4:#FBBF24;
-  --chart-5:#F472B6; --chart-6:#A78BFA; --chart-7:#F87171; --chart-8:#A1A1AA;
+  --chart-line:#818CF8; --chart-bar:#2DD4BF;
+  --chart-1:#818CF8; --chart-2:#2DD4BF; --chart-3:#FBBF24; --chart-4:#F87171;
+  --chart-5:#C084FC; --chart-6:#4ADE80; --chart-7:#F472B6; --chart-8:#94A3B8;
   --shadow:0 1px 2px rgba(0,0,0,.4);
 }
 

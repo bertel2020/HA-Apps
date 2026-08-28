@@ -33,6 +33,7 @@ Release-Reihenfolge): [operations.md](operations.md).
 | [security.md](security.md) | Auth-Modell, Netzwerktrennung, Pfad-/Zip-Validierung, Ressourcenlimits |
 | [testing.md](testing.md) | Testsuite-Überblick, Ausführung |
 | [development.md](development.md) | Lokales Setup (Docker Compose oder venv), Testlauf, Versionssync |
+| [demo-data.md](demo-data.md) | Synthetische Demo-Daten erzeugen und einbinden (`scripts/generate_demo_data.py`) |
 
 ## Grober Aufbau
 

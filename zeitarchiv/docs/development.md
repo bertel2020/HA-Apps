@@ -44,3 +44,8 @@ Driftprüfung (Details: [operations.md](operations.md)):
 python3 scripts/sync_versions.py
 python3 scripts/sync_versions.py --check
 ```
+
+## Demo-Daten
+
+Für ein Datenverzeichnis mit realistisch aussehenden Beispieldaten (ohne
+echte Home-Assistant-Anbindung) siehe [demo-data.md](demo-data.md).

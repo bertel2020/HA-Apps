@@ -42,13 +42,13 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 
 | | |
 | --- | --- |
-| **Kompaktes Archiv** | Abgeschlossene Monate als Parquet mit zstd-Kompression, unabhängig von der Recorder-Aufbewahrung |
-| **Schnelle Langzeitansichten** | Vorbereitete Rollups von Stunde bis Jahr statt teurer Live-Aggregation |
-| **Eigene Dashboards** | Frei kombinierbare Charts und Vergleichstabellen auf beliebig vielen Dashboards |
+| **Speichert dauerhaft** | Verlaufsdaten bleiben erhalten, unabhängig davon, wie lange Home Assistants eigene Aufbewahrung läuft |
+| **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
+| **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
 | **Datenpflege** | Ausreißer, Lücken und Duplikate erkennen, korrigieren oder bereinigen |
 | **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Wiederherstellung und Zeitplan |
-| **Sicherheit** | Ingress-Authentifizierung, tokenpflichtige API, strikt getrennter Schreibzugang |
+| **Abgesichert** | Läuft hinter Home Assistants eigenem Login, Schreibzugriff strikt vom Rest der Oberfläche getrennt |
 
 ## Zusammenspiel
 
@@ -181,20 +181,6 @@ Beide API-Endpunkte auf Port `8127` benötigen einen Bearer-Token. Oberfläche,
 Abfragen, Exporte, Backups, Importe und Verwaltungsrouten antworten dort mit
 HTTP 404. Importpfade werden normalisiert, Archive auf Zip-Bomb-Muster geprüft
 und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
-
-### Ressourcenlimits
-
-| Operation | Grenze |
-| --- | ---: |
-| Events je Schreibbatch | 1.000 |
-| Entitäten je Multi-Abfrage | 25 |
-| Punkte je Rohwertabfrage | 100.000 |
-| Zeilen je CSV-Export | 5.000.000 |
-| Importzeilen je Entität | 10.000.000 |
-| ZIP-Upload | 2 GiB |
-| CSV-Upload | 256 MiB |
-| `settings.json` | 16 MiB |
-| Entpackte ZIP-Daten | 5 GiB |
 
 ## Einstellungen und Konfiguration
 

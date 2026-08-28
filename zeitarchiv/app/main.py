@@ -2885,16 +2885,21 @@ _CHART_RANGE_OPTIONS = [
     ("hour", "Stunde"), ("day", "Tag"), ("week", "Woche"),
     ("month", "Monat"), ("year", "Jahr"), ("decade", "Dekade"),
 ]
-_CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse"}
+_CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse", "full"}
 _CHART_LEGEND_METRICS = {"last", "min", "max", "average", "sum"}
 _CHART_LEGEND_STYLES = {"chips", "table"}
+# "timeline" nur clientseitig erzwingbar, wenn tatsächlich alle Serien
+# Schalter sind (siehe allSwitch-Getter in chart_editor.html) — hier nur
+# generell als gültiger Wert zugelassen, dieselbe Konvention wie
+# _ENTITY_CHART_TYPES oben.
+_CHART_EDITOR_CHART_TYPES = {"auto", "timeline"}
 
 # Optionen-Menü der Entität-eigenen Chart-Seite (entity_detail.html) — im
 # Gegensatz zum Chart-Editor (saved_charts, ein Feld pro Chart) hier zweistufig:
 # ein globaler Default (Setting "entity_chart_defaults", Einstellungen →
 # Darstellung) plus eine optionale, vollständige Übersteuerung pro Entität
 # (entities.chart_options), siehe _resolve_entity_chart_options() unten.
-_ENTITY_CHART_TYPES = {"auto", "line", "bar"}
+_ENTITY_CHART_TYPES = {"auto", "line", "bar", "timeline"}
 _ENTITY_CHART_OPTION_DEFAULTS = {
     "continuous": False,
     "raw": False,
@@ -2999,6 +3004,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_stats": chart["chart_stats"] if chart else True,
         "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
         "legend_style": chart["legend_style"] if chart else "chips",
+        "chart_type": chart["chart_type"] if chart else "auto",
         "entity_names": chart["entity_names"] if chart else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
@@ -3053,6 +3059,7 @@ class _SaveChartBody(BaseModel):
     chart_stats: bool = True
     legend_metrics: list[str] = ["sum"]
     legend_style: str = "chips"
+    chart_type: str = "auto"
 
 
 @app.post("/charts")
@@ -3069,12 +3076,14 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
     if body.legend_style not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+    if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
+        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
         entity_names, body.resolution_preset, body.dynamic_y_axis,
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
-        legend_style=body.legend_style,
+        legend_style=body.legend_style, chart_type=body.chart_type,
     )
     return {"id": chart_id}
 
@@ -3103,12 +3112,14 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
     if body.legend_style not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+    if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
+        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
         body.continuous, entity_names, body.resolution_preset,
         body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
-        legend_style=body.legend_style,
+        legend_style=body.legend_style, chart_type=body.chart_type,
     )
     return {"id": chart_id}
 
@@ -3164,7 +3175,7 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
                 # gezeigt werden, und Chips vs. Tabelle sind dort konfiguriert,
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
-                "legend_style": c["legend_style"],
+                "legend_style": c["legend_style"], "chart_type": c["chart_type"],
             })
         elif p["item_type"] == "table":
             t = index.get_saved_table(p["item_id"])

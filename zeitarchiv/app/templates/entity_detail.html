@@ -384,6 +384,22 @@
       return NumberFormat.fmt(v, DECIMALS);
     }
 
+    // Gesamt-Einschaltdauer aus rohen AN/AUS-Zeitstempeln — dieselbe Paar-
+    // bildung (jeder Punkt gilt bis zum nächsten, letzter bis windowEnd) wie
+    // renderTimeline() beim Zeichnen der Zeitstrahl-Balken, hier nur für die
+    // Summe statt fürs Rendering. Im Rohwerte-/Zeitstrahl-Modus sind die
+    // Punktwerte selbst nur 0/1-Zustände — deren Summe wäre bedeutungslos,
+    // die tatsächliche Dauer ergibt sich erst aus den Intervalllängen.
+    function switchOnDuration(points, windowEnd) {
+      let total = 0;
+      for (let i = 0; i < points.length; i++) {
+        const start = points[i].ts;
+        const end = i + 1 < points.length ? points[i + 1].ts : (windowEnd ?? start);
+        if (points[i].value >= 0.5 && end > start) total += end - start;
+      }
+      return total;
+    }
+
     // Eigenständige Funktion statt Alpine-Getter, damit sie sowohl für die
     // aktuelle Periode (Toolbar-Label) als auch für die Vorperiode (Legenden-
     // Beschriftung des Vergleichs-Serie in render()) genutzt werden kann.
@@ -545,21 +561,35 @@
         get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
         // Min/Max/Ø/Summe für den Legenden-Chip (siehe Template) — dieselbe
         // Berechnung wie seriesStats() in chart_editor.html, hier nur für die
-        // eine Serie dieser Seite statt für eine Liste. Summe nur bei Zählern
-        // sinnvoll (Bucket-Werte sind dort bereits Deltas je Zeitfenster) und
-        // nicht im Rohwerte-Modus (Einzelmesswerte statt Deltas).
+        // eine Serie dieser Seite statt für eine Liste. Summe bei Zählern
+        // (Bucket-Werte sind dort bereits Deltas je Zeitfenster) UND bei
+        // Schaltern sinnvoll — z. B. Summe = gesamte Anwesenheitsdauer im
+        // Zeitraum. Bei Zählern nicht im Rohwerte-Modus (Einzelmesswerte
+        // statt Deltas); bei Schaltern dagegen AUCH im Rohwerte-/Zeitstrahl-
+        // Modus möglich — dort kommt die Summe nicht aus den Punktwerten
+        // (die sind nur 0/1), sondern aus switchOnDuration() weiter oben.
         get entityStat() {
           const values = this.points.map(p => p.value).filter(Number.isFinite);
           const minima = this.points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
           const maxima = this.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
-          const hasSum = this.aggregationType === 'counter' && !this.raw;
+          const isSwitch = this.aggregationType === 'switch';
+          const hasSum = (this.aggregationType === 'counter' && !this.raw) || isSwitch;
           const formatted = value => fmtValue(value) + (UNIT ? ' ' + UNIT : '');
+          const sumValue = this.raw && isSwitch ? switchOnDuration(this.points, this.windowEnd) : this.total;
+          // Summe bei Schaltern ist immer eine Dauer in Sekunden (Bucket-
+          // Summe der on_seconds bzw. switchOnDuration()) — unabhängig vom
+          // Anzeigemodus (DURATION_DISPLAY/fmtValue greift nur, wenn die
+          // Entität selbst auf "Zeit" steht) immer als h/m/s formatiert statt
+          // über die generische 4-signifikante-Stellen-Rundung von
+          // NumberFormat.fmt(), die bei größeren Sekundenwerten sichtbar
+          // ungenau wird (z. B. 53624 → "53.620").
+          const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
           return {
             last: values.length ? formatted(values[values.length - 1]) : '—',
             min: minima.length ? formatted(Math.min(...minima)) : '—',
             max: maxima.length ? formatted(Math.max(...maxima)) : '—',
             average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
-            sum: hasSum ? (values.length ? formatted(this.total) : '—') : null,
+            sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },
         get canGoForward() { return this.offset < 0; },
@@ -812,6 +842,12 @@
             // greift nur in diesem Sparse-Fall, bei vielen Balken ist die
             // Auto-Breite ohnehin längst kleiner als das Limit.
             barMaxWidth: 48,
+            // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. o.) sitzt
+            // mit seiner Mitte GENAU auf dem Bucket-Zeitstempel — beim
+            // ersten/letzten Bucket liegt die Hälfte der Balkenbreite dadurch
+            // zwangsläufig knapp jenseits von min/max und würde ohne dies
+            // hart am Diagrammrand abgeschnitten wirken.
+            clip: this.chartType !== 'bar',
           }];
           // symbol nie explizit auf undefined setzen (nur weglassen oder auf 'none') —
           // ECharts' interne Options-Normalisierung stürzt bei einem explizit
@@ -859,6 +895,7 @@
               itemStyle: {opacity: 0.45, color: getComputedStyle(document.body).getPropertyValue('--chart-bar')},
               lineStyle: {width: 1.5},
               barMaxWidth: 48,
+              clip: this.chartType !== 'bar',
             };
             if (this.chartType === 'line' && !this.showPoints) {
               compareSeries.symbol = 'none';
@@ -901,6 +938,16 @@
               // hinaus) — boundaryGap:[0,0] unterbindet dieses Auto-Polster, min/max
               // bleiben dadurch die tatsächlichen Achsengrenzen.
               boundaryGap: [0, 0],
+              // Woche/Monat bucketen tagesweise (siehe fmt() oben, "dd.mm."-
+              // Beschriftung) — mit fest erzwungenem Tages-Interval statt
+              // ECharts' automatischer "nice tick"-Berechnung, die trotz
+              // explizitem max (s. o.) gelegentlich einen zusätzlichen Tick
+              // (Gitternetz, nicht nur Label) jenseits der Periodengrenze
+              // erzeugt — sichtbar als 8. statt 7. Einteilung bei "Woche".
+              // Nicht für Jahr/Dekade erzwungen: Monate/Jahre sind
+              // unterschiedlich lang, ein fester Millisekunden-Interval
+              // würde dort falsch ausgerichtete Ticks erzeugen.
+              interval: ['week', 'month'].includes(this.range) ? 24 * 60 * 60 * 1000 : undefined,
               axisLabel: {
                 // ECharts' "nice tick"-Berechnung polstert die Achse intern
                 // minimal über max hinaus (trotz explizitem max oben) — ohne
@@ -1010,6 +1057,9 @@
               // Chart-Achse oben (periodEnd ist exklusiv).
               max: this.periodEnd != null ? this.periodEnd * 1000 - 1000 : undefined,
               boundaryGap: [0, 0],
+              // Siehe Kommentar bei der Linien-/Balken-Chart-Achse oben (dort
+              // auch die Begründung für den erzwungenen Tages-Interval).
+              interval: ['week', 'month'].includes(this.range) ? 24 * 60 * 60 * 1000 : undefined,
               // Siehe Kommentar bei der Linien-/Balken-Chart-Achse oben — ECharts
               // polstert die Achse trotz max intern minimal weiter, deshalb
               // zusätzlich die Beschriftung ab periodEnd unterdrücken.

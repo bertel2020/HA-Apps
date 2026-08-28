@@ -48,6 +48,7 @@
        data-chart-stats="{{ 'true' if tile.chart_stats else 'false' }}"
        data-legend-metrics='{{ tile.legend_metrics | tojson }}'
        data-legend-style="{{ tile.legend_style }}"
+       data-chart-type="{{ tile.chart_type }}"
        data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>

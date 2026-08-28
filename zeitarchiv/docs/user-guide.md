@@ -265,10 +265,20 @@ eines bestehenden:
   in einem Chart sinnvoll lesbar bleiben.
 - **Auflösung** wählbar, inklusive "Automatisch" — dabei zeigt ein kleiner
   Hinweis direkt an, welche Auflösung das für den aktuell gewählten
-  Zeitraum tatsächlich bedeutet (z. B. "≈ 1 Stunde").
+  Zeitraum tatsächlich bedeutet (z. B. "≈ 1 Stunde"). Bei Zeitraum "Tag"
+  steht zusätzlich die Auflösung "Tag" zur Verfügung: sie fasst den ganzen
+  Tag zu einem einzigen Balken je Entität zusammen — praktisch, um z. B.
+  Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt
+  zu vergleichen. Vergleichen, Kontinuierlich und Dynamische Y-Achse sind
+  bei dieser Auflösung deaktiviert, da sie für einen einzelnen
+  Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
 - Punkte an/aus, Rohwerte, dynamische Y-Achse, Legenden-Statistik — dieselben
   Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
   Chart konfiguriert statt je Entität.
+- Bei ausschließlich Schalter-Entitäten (`switch`, `binary_sensor` u. Ä.)
+  steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
+  als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
+  AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
 - Mehrere Entitäten lassen sich per Ziehen oder über Pfeil-Buttons neu
   anordnen — das bestimmt die Reihenfolge in Legende, Statistik-Anzeige und
   Farbzuordnung.
