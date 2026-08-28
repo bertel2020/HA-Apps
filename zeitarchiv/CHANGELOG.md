@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.59.0 - 2026-08-28
+
+### Neu
+
+- Automatische Aufbewahrungs-Durchsetzung kann jetzt auch wöchentlich
+  statt nur täglich laufen (mit Wochentag-Auswahl).
+- Mehrere Tabellen in den Einstellungen und der Statistik (Bereinigungs-
+  Vorschau, Indexkonsistenz, Ausführungsverläufe, Duplikate je Entität,
+  Symcon-Zuordnungsbericht) sind jetzt sortierbar und blättern bei vielen
+  Zeilen automatisch um.
+
+### Verbesserung
+
+- Allgemeine Überarbeitung der Einstellungen-Seite: klarere optische
+  Trennung der Bereiche, einheitlichere Auswahl-Listen und Suchfelder,
+  aufgeräumtere Diagnose- und Verbindungs-Ansicht.
+- Durchsuchbares Entitäten-Dropdown (aus „Entität verfolgen“) jetzt auch
+  im Tabellen-Editor nutzbar; Symcon-Import zeigt bei der HA-Zuordnung
+  eine durchsuchbare, scrollbare Liste statt der nativen Browser-Vorschläge.
+- Charts- und Tabellen-Übersicht: kompakteres Kachel-Raster, Chart-Kacheln
+  zeigen keine rohen Entitäts-IDs mehr.
+
+### Fehlerbehebung
+
+- Einstellungen-Seite ließ sich unter bestimmten Bedingungen nicht mehr
+  scrollen.
+- Tabellen-Editor zeigte die Formel-Buchstaben-Spalte teils auch außerhalb
+  des Bearbeiten-Modus an.
+
 ## 0.58.0 - 2026-08-28
 
 ### Verbesserung

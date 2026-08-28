@@ -215,14 +215,15 @@
     <h2>Erkannte Duplikate (letzte 30 Tage)</h2>
     <div class="tbl-wrap">
       {% if duplicates_by_entity %}
-      <table class="dt stats-dt">
+      <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
         <colgroup>
           <col class="stats-col-entity"><col class="stats-col-value">
         </colgroup>
-        <tr><th>Entität</th><th>Duplikate</th></tr>
+        <thead><tr><th>Entität</th><th>Duplikate</th></tr></thead>
+        <tbody>
         {% for row in duplicates_by_entity %}
         <tr>
-          <td class="entity">
+          <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
             <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
               {% if row.friendly_name %}
               <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
@@ -235,6 +236,7 @@
           <td>{{ row.count }}</td>
         </tr>
         {% endfor %}
+        </tbody>
       </table>
       {% else %}
       <div class="empty">Keine Duplikate in den letzten 30 Tagen gefunden.</div>
@@ -269,6 +271,7 @@
   <script src="static/vendor/echarts.min.js"></script>
   <script src="static/js/number-format.js?v={{ js_v }}"></script>
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="static/js/sortable-table.js?v={{ js_v }}"></script>
   <script>
     const GROWTH_POINTS = {{ growth_points | tojson }};
     const STORAGE_BREAKDOWN = {{ storage_breakdown | tojson }};

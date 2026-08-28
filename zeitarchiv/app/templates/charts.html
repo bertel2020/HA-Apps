@@ -8,12 +8,10 @@
 <link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
-  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:20px;}
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:20px;}
   .chart-card{display:flex;flex-direction:column;gap:8px;position:relative;}
   .chart-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:22px;}
   .chart-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .chart-card .entity-tooltip-host{min-width:0;}
-  .chart-card .entity-names{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .chart-card .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px;}
   .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:150px;border-style:dashed;text-decoration:none;}
   .chart-grid-add-btn{
@@ -43,10 +41,6 @@
             <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
                     title="Favorit" onclick="toggleFavorite('charts/{{ row.id }}/favorite', this)">★</button>
             <h3><a href="charts/{{ row.id }}">{{ row.name }}</a></h3>
-            <div class="entity-tooltip-host" tabindex="0">
-              <div class="entity-names">{{ row.entity_names }}</div>
-              <span class="entity-tooltip" role="tooltip"><strong>{{ row.entity_tooltip_names }}</strong><code>{{ row.entity_tooltip_ids }}</code></span>
-            </div>
             <div class="meta">{{ row.entity_count }} Entität{{ 'en' if row.entity_count != 1 else '' }} &middot; {{ row.range_label }}</div>
             <div class="actions">
               <a class="btn" href="charts/{{ row.id }}">Ansehen</a>

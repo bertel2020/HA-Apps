@@ -126,7 +126,7 @@
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">
-          <input type="search" name="search" placeholder="Entität oder Name suchen …" onchange="resetEntitiesPage()">
+          <input type="search" name="search" placeholder="Entität suchen …" onchange="resetEntitiesPage()">
           <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>★ Nur Favoriten</span></label>
           <span id="type-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'type' in visible_columns else 'none' }};">
             <button type="button" class="btn" id="type-filter-btn" onclick="toggleDDPicker('type-filter')">Typ: Alle ▾</button>

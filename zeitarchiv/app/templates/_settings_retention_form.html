@@ -31,18 +31,41 @@
         <div class="settings-compact-hint">Löscht abgelaufene Werte automatisch nach Zeitplan</div>
       </div>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn btn-sm" id="retention-enforcement-btn" onclick="toggleDDPicker('retention-enforcement')">{{ 'An — täglich' if retention_enforcement_enabled else 'Aus' }} ▾</button>
-        <input type="hidden" name="retention_enforcement" id="retention-enforcement-input" value="{{ 'on' if retention_enforcement_enabled else 'off' }}">
+        <button type="button" class="btn btn-sm" id="retention-enforcement-btn" onclick="toggleDDPicker('retention-enforcement')">{% for v, l in retention_enforcement_options %}{% if v == retention_enforcement_schedule %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="retention_enforcement" id="retention-enforcement-input" value="{{ retention_enforcement_schedule }}">
         <div class="dd-picker-popover" id="retention-enforcement-popover">
-          <div class="dd-picker-row" onclick="selectDDOption('retention-enforcement', 'off', 'Aus')">Aus</div>
-          <div class="dd-picker-row" onclick="selectDDOption('retention-enforcement', 'on', 'An — täglich')">An &mdash; täglich</div>
+          {% for value, label in retention_enforcement_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('retention-enforcement', '{{ value }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
         </div>
       </span>
     </div>
+    {% if retention_enforcement_schedule == 'weekly' %}
+    <div class="settings-compact-row">
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Wochentag</div>
+        <div class="settings-compact-hint">Tag der Woche für den automatischen Lauf</div>
+      </div>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="retention-weekday-btn" onclick="toggleDDPicker('retention-weekday')">{% for v, l in retention_weekday_options %}{% if v == retention_enforcement_weekday %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="retention_enforcement_weekday" id="retention-weekday-input" value="{{ retention_enforcement_weekday }}">
+        <div class="dd-picker-popover" id="retention-weekday-popover">
+          {% for value, label in retention_weekday_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('retention-weekday', '{{ value }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    {% else %}
+    <input type="hidden" name="retention_enforcement_weekday" value="{{ retention_enforcement_weekday }}">
+    {% endif %}
+    {% if retention_enforcement_schedule != 'off' %}
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
         <div class="settings-compact-label">Uhrzeit ({{ retention_timezone }})</div>
-        <div class="settings-compact-hint">Tageszeit für den automatischen Lauf</div>
+        <div class="settings-compact-hint">
+          {% if retention_enforcement_schedule == 'weekly' %}Uhrzeit am gewählten Wochentag{% else %}Tageszeit für den automatischen Lauf{% endif %}
+        </div>
       </div>
       {% set current_hour = retention_enforcement_time.split(':')[0] %}
       {% set current_minute = retention_enforcement_time.split(':')[1] %}
@@ -68,12 +91,16 @@
         <input type="hidden" name="retention_enforcement_time" id="retention-time-input" value="{{ retention_enforcement_time }}">
       </span>
     </div>
+    {% else %}
+    <input type="hidden" name="retention_enforcement_time" value="{{ retention_enforcement_time }}">
+    {% endif %}
   </div>
 </form>
+{% if retention_enforcement_schedule != 'off' %}
+<p class="hint" style="margin-top:8px;">Läuft im Hintergrund, verpasste Läufe werden nachgeholt.</p>
+{% endif %}
 
-<p class="hint">Läuft im Hintergrund, verpasste Läufe werden nachgeholt.</p>
-
-<div style="display:flex;gap:10px;flex-wrap:wrap;">
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px;">
   <button type="button" class="btn"
           hx-post="settings/retention-enforcement/preview" hx-target="#retention-form" hx-swap="innerHTML">
     Vorschau
@@ -113,11 +140,12 @@
 <div class="settings-subsection">
 <h3 class="settings-subsection-title">Ausführungsverlauf</h3>
 <div class="tbl-wrap">
-  <table class="dt">
-    <tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Entitäten</th><th>Zeilen</th><th>Monate</th><th>Freigegeben</th></tr>
+  <table class="dt" data-sortable data-paginate data-page-size="10">
+    <thead><tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Entitäten</th><th>Zeilen</th><th>Monate</th><th>Freigegeben</th></tr></thead>
+    <tbody>
     {% for job in retention_jobs %}
     <tr title="{{ job.error or '' }}">
-      <td>{{ job.created_at }}</td>
+      <td data-sort="{{ job.created_at_ts }}">{{ job.created_at }}</td>
       <td>{{ job.trigger }}</td>
       <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>
       <td>{{ job.entities_affected }}</td>
@@ -126,6 +154,7 @@
       <td>{{ job.bytes_freed }}</td>
     </tr>
     {% endfor %}
+    </tbody>
   </table>
 </div>
 </div>

@@ -234,7 +234,7 @@ a.stat:hover .label{color:var(--accent-line);}
   border:1px solid var(--border);background:var(--surface);color:var(--ink);min-height:36px;box-sizing:border-box;
 }
 input[type="date"],input[type="time"]{color-scheme:inherit;}
-#controls input[type="search"],.search{min-width:200px;}
+#controls input[type="search"],.search{min-width:250px;}
 .filter-chip{display:inline-flex;}
 .filter-chip input{position:absolute;opacity:0;pointer-events:none;}
 .filter-chip span,.chip{
@@ -257,6 +257,16 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
    Toolbar-Filter, kein Aktions-Button. */
 .dd-picker-wrap > .btn{background:var(--surface);}
 .dd-picker-wrap > .btn:hover:not(:disabled){background:var(--surface-alt);}
+/* Leeren-Icon INNERHALB des Auslöser-Buttons (statt als eigener Button
+   daneben) — dd-picker-btn-clearable reserviert dafür Platz am rechten Rand. */
+.dd-picker-btn-clearable{padding-right:34px!important;}
+.dd-picker-clear{
+  position:absolute;top:50%;right:6px;transform:translateY(-50%);
+  width:22px;height:22px;padding:0;border:0;border-radius:50%;background:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);cursor:pointer;
+}
+.dd-picker-clear:hover{background:var(--surface-alt);color:var(--ink);}
 .dd-picker-popover{
   position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;
   background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
@@ -440,6 +450,18 @@ table.dt th{
 }
 table.dt th a{display:block;text-decoration:none;color:inherit;}
 table.dt th a:hover,table.dt th a.active{color:var(--accent-line);}
+/* Client-seitige Sortierung/Seitenweise-Anzeige, siehe static/js/sortable-table.js
+   (Gegenstück zu den serverseitig sortierten Tabellen mit <th><a sort=…>). */
+table.dt th.dt-sortable-col{cursor:pointer;user-select:none;}
+table.dt th.dt-sortable-col:hover{color:var(--accent-line);}
+table.dt th.dt-sort-asc,table.dt th.dt-sort-desc{color:var(--accent-line);}
+table.dt th.dt-sort-asc::after{content:" ▲";}
+table.dt th.dt-sort-desc::after{content:" ▼";}
+/* Enger als die Standard-.pager-Regel (margin-top:10px) — direkt an der
+   Tabelle gehören Zeilen/Seiten-Angabe optisch stärker zur Tabelle als zu
+   dem, was danach kommt; der übliche 16px-Abstand zur nächsten Aktionszeile
+   (siehe .toolbar) bleibt unverändert bestehen. */
+.sortable-table-pager{margin-top:4px;}
 table.dt td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--ink-muted);vertical-align:top;font-variant-numeric:tabular-nums;}
 table.dt tr:last-child td{border-bottom:none;}
 table.dt tbody tr:hover td{background:var(--surface-alt);}
@@ -569,16 +591,42 @@ td.mono{font-family:var(--font-mono);}
 .settings-layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:20px;align-items:start;min-width:0;}
 .settings-nav{
   background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;padding:10px;
-  display:flex;flex-direction:column;gap:2px;position:sticky;top:24px;
+  display:flex;flex-direction:column;gap:2px;position:sticky;top:81px;
 }
+/* top:81px = Höhe der global-sticky .topnav (57px) + 24px Abstand — NICHT
+   nur 24px wie zuvor: die Kopfleiste hat einen höheren z-index und deckte
+   dadurch beim Sticken den oberen Rand des Menüs ab ("Darstellung"
+   verschwand halb dahinter). Sticky ist hier zudem kein Komfort-Extra,
+   sondern Voraussetzung für das Scroll-Spy-Skript unten in dieser Datei:
+   dessen scrollIntoView({block:'nearest'}) auf den aktiven Menüpunkt ist
+   nur dann ein No-op, wenn das Menü ohnehin permanent sichtbar bleibt. Ohne
+   sticky scrollt das Menü mit der Seite weg, der Aufruf holt es bei jedem
+   Abschnittswechsel zurück ins Bild und kämpft dabei mit dem eigenen
+   Scrollen der Seite — fühlte sich an, als ließe sich gar nicht mehr
+   scrollen. */
 .settings-nav a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:7px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);text-decoration:none;}
 .settings-nav a:hover{background:var(--surface);}
 .settings-nav a.active{background:var(--accent-line-soft);color:var(--accent-line);font-weight:600;}
 .settings-nav a span.tag{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));color:var(--ink-faint);}
 .settings-nav .nav-divider{height:1px;background:var(--border);margin:6px 8px;}
-.settings-panel{min-width:0;max-width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 24px;}
-.settings-section{scroll-margin-top:24px;}
-.settings-section + .settings-section{margin-top:32px;padding-top:26px;border-top:1px solid var(--border);}
+/* Jeder Hauptbereich (Darstellung, Archivierung, …) ist jetzt eine eigene
+   Karte statt gemeinsam in einer einzigen großen .settings-panel-Karte zu
+   liegen, nur getrennt durch dieselbe dünne Linie wie die Unterabschnitte
+   darin — dadurch war beim Scrollen kein Unterschied zwischen "neuer
+   Hauptbereich" und "nur ein Unterabschnitt" erkennbar. .settings-panel ist
+   jetzt nur noch der vertikale Abstandshalter zwischen den Karten. */
+/* KEIN gap hier — .settings-panel wird auch als schlichter Layout-Wrapper auf
+   anderen Seiten wiederverwendet (z. B. Entitäten: #controls + #entities-table
+   direkt darin), die dort schon ihren eigenen Abstand mitbringen (#controls,
+   .toolbar{margin-bottom:14px}, App-Standard). Ein gap hier würde dort
+   zusätzlich draufaddieren, siehe .settings-section + .settings-section
+   unten für den Kartenabstand NUR zwischen den Einstellungen-Hauptbereichen. */
+.settings-panel{min-width:0;max-width:100%;}
+.settings-section + .settings-section{margin-top:20px;}
+.settings-section{
+  scroll-margin-top:24px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:22px 24px;box-shadow:var(--shadow);
+}
 .settings-panel .settings-section-title{
   margin:0 0 8px;font-size:calc(17px * var(--font-scale, 1));font-weight:700;line-height:1.3;color:var(--ink);
 }
@@ -589,11 +637,15 @@ td.mono{font-family:var(--font-mono);}
   margin:0 0 6px;font-size:calc(14.5px * var(--font-scale, 1));font-weight:700;line-height:1.35;color:var(--ink-muted);
 }
 .settings-minor-section{margin-top:20px;}
-.settings-compact-list{border-top:1px solid var(--border);}
 .settings-compact-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);}
+.settings-compact-row:last-of-type{border-bottom:none;}
 .settings-compact-row-text{min-width:0;}
 .settings-compact-label{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
 .settings-compact-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+/* Reiner Lesewert (nicht interaktiv) in einer Kompaktzeile — dieselbe
+   schlichte Mono-Darstellung wie .status-card-mono, bewusst OHNE Rahmen/
+   Hintergrund von .val, sonst wirkt ein reiner Anzeigewert wie ein Button. */
+.settings-compact-value{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);text-align:right;}
 .settings-compact-row .dd-picker-wrap,.settings-compact-row > select,.settings-compact-row > .val{flex-shrink:0;}
 @media (max-width:480px){
   .settings-compact-row{flex-wrap:wrap;}

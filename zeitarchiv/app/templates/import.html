@@ -73,7 +73,7 @@
   .import-delete-row .btn-danger{font-weight:600;}
   .import-delete-button{min-width:154px;}
   .import-filter-toolbar{flex-wrap:nowrap;overflow:hidden;}
-  .import-filter-toolbar .search{flex:1 1 180px;min-width:130px;}
+  .import-filter-toolbar .search{flex:1 1 180px;min-width:250px;}
   .import-filter-toolbar .count-chip{flex:none;}
   .count-chip{
     font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));padding:6px 12px;border-radius:999px;border:1px solid var(--border);
@@ -280,7 +280,7 @@
     </form>
     <form method="post" action="import/start" id="import-form">
       <div class="toolbar import-filter-toolbar">
-        <input type="search" class="search" placeholder="Symcon-ID oder Name suchen …" oninput="onImportSearch(this.value)" style="min-width:160px;">
+        <input type="search" class="search" placeholder="Symcon-ID oder Name suchen …" oninput="onImportSearch(this.value)">
         <span class="count-chip">{{ rows | selectattr('readable') | list | length }} Variablen erkannt</span>
         {% set unreadable_count = rows | rejectattr('readable') | list | length %}
         {% if unreadable_count %}
@@ -324,7 +324,7 @@
             <td>
               {% if row.readable %}
               <span class="map-picker entity-tooltip-host">
-                <input type="text" class="map-input" name="map_{{ row.variable_id }}" list="entity-datalist"
+                <input type="text" class="map-input" name="map_{{ row.variable_id }}"
                        placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)"
                        oninput="updateUnitCheck(this)">
                 <button type="button" class="map-clear" title="Auswahl ändern" aria-label="Ausgewählte HA-Entität entfernen" onclick="clearMapping(this)">×</button>
@@ -424,6 +424,7 @@
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/number-format.js?v={{ js_v }}"></script>
   <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="static/js/map-entity-picker.js?v={{ js_v }}"></script>
   <script>
     function showImportTab(name) {
       const url = new URL(window.location.href);

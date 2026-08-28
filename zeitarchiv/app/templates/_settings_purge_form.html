@@ -32,13 +32,13 @@
     {% endif %}
     {% if purge_preview.rows %}
       <div class="tbl-wrap">
-        <table class="dt">
-          <thead><tr><th>Entität</th><th>Entfernbar</th><th>Hot Buffer</th><th>Archiv</th><th>Monate</th></tr></thead>
+        <table class="dt" data-sortable data-paginate data-page-size="10">
+          <thead><tr><th>Entität</th><th title="Physisch entfernbar / insgesamt markiert">Entfernbar / Markiert</th><th>Hot Buffer</th><th>Archiv</th><th>Monate</th></tr></thead>
           <tbody>
-          {% for row in purge_preview.rows[:50] %}
+          {% for row in purge_preview.rows %}
             <tr>
               <td><strong>{{ row.friendly_name or row.entity_id }}</strong>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}</td>
-              <td>{{ row.removable_rows | format_int }} / {{ row.marked_rows | format_int }}</td>
+              <td data-sort="{{ row.removable_rows }}">{{ row.removable_rows | format_int }} / {{ row.marked_rows | format_int }}</td>
               <td>{{ row.hot_rows | format_int }}</td>
               <td>{{ row.archive_rows | format_int }}</td>
               <td>{{ row.archive_months }}</td>
@@ -47,12 +47,11 @@
           </tbody>
         </table>
       </div>
-      {% if purge_preview.rows|length > 50 %}<p class="hint">Es werden die ersten 50 von {{ purge_preview.rows|length | format_int }} Entitäten angezeigt.</p>{% endif %}
     {% else %}
       <div class="empty">Aktuell sind keine Datensätze zur Löschung markiert.</div>
     {% endif %}
 </div>
-<div class="toolbar" style="margin:16px 0 0;">
+<div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;">
   <button type="button" class="btn"
           hx-get="settings/purge/marked" hx-include="#marked-points-search"
           hx-target="#marked-points-list" hx-swap="innerHTML"

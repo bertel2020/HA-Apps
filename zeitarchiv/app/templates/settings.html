@@ -72,6 +72,7 @@
       <div class="settings-panel">
         <section id="darstellung" class="settings-section">
           <h2 class="settings-section-title">Darstellung</h2>
+          <p class="settings-section-description">Aussehen der App sowie Standardwerte für Chart-Optionen festlegen.</p>
           <div id="darstellung-form">
             {% include "_settings_darstellung_form.html" %}
           </div>
@@ -140,6 +141,7 @@
 
         <section id="protokollierung" class="settings-section">
           <h2 class="settings-section-title">Protokollierung</h2>
+          <p class="settings-section-description">Loglevel der App und Protokollierung von HTTP-Anfragen steuern.</p>
           <div id="logging-settings">
             {% include "_settings_logging_form.html" %}
           </div>
@@ -147,28 +149,29 @@
 
         <section id="diagnose" class="settings-section">
           <h2 class="settings-section-title">Diagnose</h2>
+          <p class="settings-section-description">Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.</p>
           {% include "_settings_debug_tools.html" %}
           <div class="settings-subsection">
             <h3 class="settings-subsection-title">Diagnosebericht</h3>
-            <div class="actionbar" style="justify-content:flex-start;">
+            <p class="hint">Enthält Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.</p>
+            <div class="actionbar" style="justify-content:flex-end;">
               <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
             </div>
-            <p class="hint">Enthält Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.</p>
           </div>
           <div class="settings-subsection">
             <h3 class="settings-subsection-title">Prozess</h3>
             <div class="settings-compact-list">
               <div class="settings-compact-row" id="settings-ram" hx-get="settings/ram" hx-trigger="load" hx-swap="outerHTML">
                 <span class="settings-compact-label">RAM-Verbrauch</span>
-                <span class="val mono">wird geladen …</span>
+                <span class="settings-compact-value">wird geladen …</span>
               </div>
               <div class="settings-compact-row">
                 <span class="settings-compact-label">Startzeitpunkt</span>
-                <span class="val mono">{{ server_started_at }}</span>
+                <span class="settings-compact-value">{{ server_started_at }}</span>
               </div>
               <div class="settings-compact-row">
                 <span class="settings-compact-label">Laufzeit</span>
-                <span class="val mono">{{ uptime }}</span>
+                <span class="settings-compact-value">{{ uptime }}</span>
               </div>
             </div>
           </div>
@@ -209,7 +212,7 @@
             </div>
           </div>
 
-          <div class="actionbar" style="justify-content:flex-start;">
+          <div class="actionbar" style="justify-content:flex-end;">
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md" target="_blank" rel="noopener noreferrer">Dokumentation</a>
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
             <a class="btn" href="https://github.com/bertel2020/HA-Apps/issues" target="_blank" rel="noopener noreferrer">Fehler melden</a>
@@ -228,6 +231,8 @@
   <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="static/js/entity-picker.js?v={{ js_v }}"></script>
+  <script src="static/js/sortable-table.js?v={{ js_v }}"></script>
   <script>
     function toggleTokenVisibility(btn) {
       const el = document.getElementById('token-value');

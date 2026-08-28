@@ -155,6 +155,7 @@ _restore_startup_result = backup.apply_pending_restore(DATA_DIR, BACKUPS_DIR)
 BACKUP_DEFAULT_TIME = "03:30"
 BACKUP_DEFAULT_WEEKDAY = 6
 RETENTION_DEFAULT_TIME = "04:30"
+RETENTION_DEFAULT_WEEKDAY = 6
 BACKUP_WEEKDAY_OPTIONS = [
     (0, "Montag"), (1, "Dienstag"), (2, "Mittwoch"), (3, "Donnerstag"),
     (4, "Freitag"), (5, "Samstag"), (6, "Sonntag"),
@@ -598,19 +599,23 @@ def _run_retention_background(*, scheduled_for: float | None = None) -> bool:
 
 
 def _set_next_retention_run(now: datetime) -> float | None:
-    enabled = index.get_setting("retention_enforcement", "off") == "on"
+    schedule = index.get_setting("retention_enforcement", "off")
+    if schedule not in ("daily", "weekly"):
+        schedule = "off"
+    weekday = int(index.get_setting("retention_enforcement_weekday", str(RETENTION_DEFAULT_WEEKDAY)))
     next_run = next_scheduled_run(
         now,
-        "daily" if enabled else "off",
+        schedule,
         index.get_setting("retention_enforcement_time", RETENTION_DEFAULT_TIME),
+        weekday,
     )
     index.set_setting("retention_enforcement_next_run", "" if next_run is None else str(next_run.timestamp()))
     return None if next_run is None else next_run.timestamp()
 
 
 def _run_retention_enforcement_if_due(now: datetime) -> None:
-    """Führt genau einen fälligen täglichen Lauf aus, unabhängig von Requests."""
-    if index.get_setting("retention_enforcement", "off") != "on":
+    """Führt genau einen fälligen Lauf (täglich/wöchentlich) aus, unabhängig von Requests."""
+    if index.get_setting("retention_enforcement", "off") not in ("daily", "weekly"):
         return
     raw_next = index.get_setting("retention_enforcement_next_run", "")
     try:
@@ -859,7 +864,10 @@ def _settings_storage_index_context(report: dict | None = None) -> dict:
 
 def _settings_retention_context(result: str | None = None) -> dict:
     limited_count = sum(1 for entity in index.list_entities() if entity["retention"] != "unlimited")
-    enabled = index.get_setting("retention_enforcement", "off") == "on"
+    schedule = index.get_setting("retention_enforcement", "off")
+    if schedule not in BACKUP_SCHEDULE_LABELS:
+        schedule = "off"
+    enabled = schedule in ("daily", "weekly")
     next_raw = index.get_setting("retention_enforcement_next_run", "")
     try:
         next_ts = float(next_raw) if next_raw else None
@@ -915,6 +923,7 @@ def _settings_retention_context(result: str | None = None) -> dict:
     for job in index.list_retention_jobs(8):
         jobs.append({
             "created_at": f"{format_timestamp(job['created_at'], TZ)} {format_time(job['created_at'], TZ)}",
+            "created_at_ts": job["created_at"],
             "trigger": "Zeitplan" if job["trigger"] == "scheduled" else "Manuell",
             "status": status_labels.get(job["status"], job["status"]),
             "status_key": job["status"],
@@ -929,7 +938,13 @@ def _settings_retention_context(result: str | None = None) -> dict:
     last_success_raw = index.get_setting("retention_last_success", "")
     return {
         "retention_enforcement_enabled": enabled,
+        "retention_enforcement_schedule": schedule,
+        "retention_enforcement_options": list(BACKUP_SCHEDULE_LABELS.items()),
         "retention_enforcement_time": index.get_setting("retention_enforcement_time", RETENTION_DEFAULT_TIME),
+        "retention_enforcement_weekday": int(
+            index.get_setting("retention_enforcement_weekday", str(RETENTION_DEFAULT_WEEKDAY))
+        ),
+        "retention_weekday_options": BACKUP_WEEKDAY_OPTIONS,
         "retention_timezone": str(TZ),
         "retention_next_run": display_ts(str(next_ts) if next_ts is not None else None),
         "retention_last_success": display_ts(last_success_raw),
@@ -1434,16 +1449,21 @@ async def settings_retention_enforcement_toggle(request: Request) -> HTMLRespons
     als der Purge im Bereinigungs-Werkzeug ganze, nie zuvor markierte
     Zeiträume endgültig löscht."""
     form = await request.form()
-    enabled = form.get("retention_enforcement")
+    schedule = form.get("retention_enforcement")
     schedule_time = str(form.get("retention_enforcement_time", RETENTION_DEFAULT_TIME))
-    if enabled not in ("on", "off"):
-        raise HTTPException(status_code=400, detail="Ungültiger Wert")
+    weekday_raw = str(form.get("retention_enforcement_weekday", RETENTION_DEFAULT_WEEKDAY))
+    if schedule not in BACKUP_SCHEDULE_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültiger Zeitplan")
     try:
         parse_schedule_time(schedule_time)
+        weekday = int(weekday_raw)
+        if weekday not in range(7):
+            raise ValueError
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Ungültige Uhrzeit") from exc
-    index.set_setting("retention_enforcement", enabled)
+    index.set_setting("retention_enforcement", schedule)
     index.set_setting("retention_enforcement_time", schedule_time)
+    index.set_setting("retention_enforcement_weekday", str(weekday))
     _set_next_retention_run(datetime.now(TZ))
     return templates.TemplateResponse(
         request, "_settings_retention_form.html", _settings_retention_context()
@@ -1827,6 +1847,7 @@ def _backup_context(
             "status": status_labels.get(job["status"], job["status"]),
             "status_key": job["status"],
             "created_at": f"{format_timestamp(job['created_at'], TZ)} {format_time(job['created_at'], TZ)}",
+            "created_at_ts": job["created_at"],
             "duration": (
                 f"{max(0, round(job['finished_at'] - job['started_at']))} s"
                 if job["started_at"] is not None and job["finished_at"] is not None else "—"
@@ -2939,20 +2960,11 @@ def _resolve_entity_chart_options(entity) -> dict:
 @app.get("/charts", response_class=HTMLResponse)
 def charts_list(request: Request) -> HTMLResponse:
     charts = index.list_saved_charts()
-    friendly_names = {
-        row["entity_id"]: row["friendly_name"] or row["entity_id"]
-        for row in index.list_entities()
-    }
     rows = [
         {
             "id": c["id"],
             "name": c["name"],
             "entity_count": len(c["entity_ids"]),
-            "entity_names": ", ".join(c["entity_ids"][:3]) + (" …" if len(c["entity_ids"]) > 3 else ""),
-            "entity_tooltip_names": ", ".join(
-                friendly_names.get(entity_id, entity_id) for entity_id in c["entity_ids"]
-            ),
-            "entity_tooltip_ids": ", ".join(c["entity_ids"]),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
             "is_favorite": c["is_favorite"],
         }
@@ -3592,6 +3604,7 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
             "last_date": last_date,
             "is_favorite": bool(entity["is_favorite"]),
             "chart_options": chart_options,
+            "entity_chart_defaults": _get_entity_chart_defaults(),
         },
     )
 

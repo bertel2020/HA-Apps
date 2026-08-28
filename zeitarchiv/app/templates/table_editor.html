@@ -123,7 +123,7 @@
      dieselbe Breite, damit alle "Wert"-Slots über die Zeilentypen hinweg
      gleich aussehen. */
   .tbl-row-top .tbl-value-picker{flex:none;width:260px;}
-  .tbl-row-top .tbl-value-picker > button,.tbl-row-top .tbl-group-btn{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;}
+  .tbl-row-top .tbl-value-picker > button.btn,.tbl-row-top .tbl-group-btn{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;}
   /* Aggregation (Entität/Gruppe) — sitzt an derselben Stelle in der Zeile wie
      die Einheit bei Formel-Zeilen (direkt vor der Beschriftung), etwas
      breiter als deren 90px, da "Auto ▾" sonst zu knapp würde. Kurze
@@ -375,18 +375,34 @@
                         </div>
                       </span>
 
-                      <span class="dd-picker-wrap tbl-value-picker" x-show="row.row_type === 'entity'" @click.outside="row.entityPickerOpen = false">
+                      <span class="dd-picker-wrap tbl-value-picker" x-show="row.row_type === 'entity'"
+                            x-data="entityPicker(ENTITY_OPTIONS, row.entity_ids[0] || '', (id) => { row.entity_ids = id ? [id] : []; load(); })"
+                            @click.outside="open = false">
                         <button type="button" class="btn"
-                                @click="row.entityPickerOpen = !row.entityPickerOpen; row.entitySearch = ''; if (row.entityPickerOpen) $nextTick(() => $el.parentElement.querySelector('input[type=search]').focus())"
-                                x-text="row.entity_ids[0] ? (ENTITY_LABEL_BY_ID[row.entity_ids[0]] || row.entity_ids[0]) : 'Entität wählen …'"></button>
-                        <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="row.entityPickerOpen" x-cloak>
-                          <input type="search" placeholder="Suchen …" x-model="row.entitySearch">
-                          {% for opt in entity_options %}
-                          <div class="dd-picker-row" :class="{active: row.entity_ids[0] === '{{ opt.entity_id }}'}"
-                               x-show='!row.entitySearch || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.entitySearch.toLowerCase())'
-                               @click="row.entity_ids = ['{{ opt.entity_id }}']; row.entityPickerOpen = false; load()">{{ opt.label }}</div>
-                          {% endfor %}
+                                :class="{'dd-picker-btn-clearable': entityId}"
+                                @click="toggleOpen($refs.rowEntitySearch)"
+                                @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
+                                x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
+                        <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
+                                @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+                        <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="open" x-cloak>
+                          <input type="search" x-ref="rowEntitySearch" x-model="search" placeholder="Suchen …">
+                          <template x-for="opt in filtered()" :key="opt.entity_id">
+                            <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
+                                 @click="select(opt.entity_id)"
+                                 @mouseenter="scheduleHover(opt, $event.currentTarget)"
+                                 @mouseleave="clearHover()">
+                              <span x-text="opt.label"></span>
+                            </div>
+                          </template>
                         </div>
+                        <template x-teleport="body">
+                          <div class="entity-tooltip entity-tooltip-floating"
+                               :style="`display:${hoverTip ? 'block' : 'none'}; top:${hoverPos.top}px; left:${hoverPos.left}px; transform:translateY(-100%);`">
+                            <strong x-text="hoverTip && hoverTip.label"></strong>
+                            <code x-text="hoverTip && hoverTip.entity_id"></code>
+                          </div>
+                        </template>
                       </span>
 
                       <div class="tbl-group-wrap tbl-value-picker" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
@@ -489,7 +505,7 @@
                (top/height) je Badge kommt aus den tatsächlich gerenderten
                Zeilen der Tabelle daneben (letterPositions, siehe
                syncLetterPositions()), nicht aus nachgebautem CSS. -->
-          <div class="tbl-letters-gutter" x-show="editing" x-cloak :style="`height:${gutterHeight}px`">
+          <div class="tbl-letters-gutter" x-cloak :style="`display:${editing ? 'block' : 'none'}; height:${gutterHeight}px`">
             <template x-for="(row, idx) in rows" :key="row.uid">
               <div class="tbl-letter-slot" x-show="row.row_type !== 'separator'" :style="letterSlotStyle(row.uid)">
                 <div class="tbl-row-letter" :class="{'tbl-row-letter-sm': style.density === 'compact'}" x-text="rowLetters[row.uid]"></div>
@@ -529,6 +545,7 @@
   </div>
 
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/entity-picker.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
   <script>
@@ -760,7 +777,7 @@
         // erst über "Anpassen" umschalten zu müssen.
         editing: !TABLE_ID || new URLSearchParams(location.search).has('edit'),
         columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
-        rows: INITIAL_ROWS.map(r => ({formula_unit: '', aggregation: 'auto', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, aggPickerOpen: false, search: '', entitySearch: ''})),
+        rows: INITIAL_ROWS.map(r => ({formula_unit: '', aggregation: 'auto', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, search: ''})),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
         loading: false,
@@ -801,7 +818,7 @@
           this.load();
         },
         addRow(type) {
-          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', aggregation: 'auto', bold: false, pickerOpen: false, typePickerOpen: false, entityPickerOpen: false, aggPickerOpen: false, search: '', entitySearch: ''});
+          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', aggregation: 'auto', bold: false, pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, search: ''});
           this.load();
         },
         setRowType(row, type) {

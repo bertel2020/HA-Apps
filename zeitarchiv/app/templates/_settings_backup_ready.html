@@ -33,17 +33,19 @@
   {% if backup_jobs %}
   <h3 style="margin:24px 0 10px;">Ausführungsverlauf</h3>
   <div class="tbl-wrap">
-    <table class="dt">
-      <tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Dauer</th><th>Größe</th></tr>
+    <table class="dt" data-sortable data-paginate data-page-size="10">
+      <thead><tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Dauer</th><th>Größe</th></tr></thead>
+      <tbody>
       {% for job in backup_jobs %}
       <tr title="{{ job.error or '' }}">
-        <td>{{ job.created_at }}</td>
+        <td data-sort="{{ job.created_at_ts }}">{{ job.created_at }}</td>
         <td>{{ job.trigger }}</td>
         <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>
         <td>{{ job.duration }}</td>
         <td>{{ job.size }}</td>
       </tr>
       {% endfor %}
+      </tbody>
     </table>
   </div>
   {% endif %}

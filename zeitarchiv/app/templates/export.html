@@ -51,7 +51,7 @@
 
         <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="export-table" hx-include="#controls, [name=page_size]" hx-target="#export-table" hx-swap="innerHTML">
-          <input type="search" name="search" placeholder="Entität oder Name suchen …" onchange="resetExportPage()">
+          <input type="search" name="search" placeholder="Entität suchen …" onchange="resetExportPage()">
           <span class="dd-picker-wrap">
             <button type="button" class="btn" id="export-type-filter-btn" onclick="toggleDDPicker('export-type-filter')">Typ: Alle ▾</button>
             <div class="dd-picker-popover" id="export-type-filter-popover">

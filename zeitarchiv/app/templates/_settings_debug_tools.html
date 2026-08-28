@@ -7,10 +7,12 @@
     </p>
     {% if capture_armed %}
     <p class="save-status">⏳ Wartet auf den nächsten Schreibvorgang …</p>
-    <button type="button" class="btn btn-danger" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Abbrechen</button>
+    <div style="display:flex;justify-content:flex-end;">
+      <button type="button" class="btn btn-danger" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Abbrechen</button>
+    </div>
     {% elif capture_payload_json %}
     <p class="hint" style="margin:0 0 10px;">Aufgezeichnet um {{ capture_captured_at }} &middot; {{ capture_event_count }} Event(s)</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;justify-content:flex-end;">
       <a class="btn" href="settings/logging/capture-write/download">Herunterladen</a>
       <button type="button" class="btn" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Löschen</button>
     </div>
@@ -19,7 +21,9 @@
       <pre style="margin-top:8px;max-height:280px;overflow:auto;background:var(--surface-alt);border:1px solid var(--border);padding:12px;border-radius:8px;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));white-space:pre-wrap;word-break:break-word;">{{ capture_payload_json }}</pre>
     </details>
     {% else %}
-    <button type="button" class="btn" hx-post="settings/logging/capture-write/arm" hx-target="#debug-tools" hx-swap="outerHTML">Nächsten Schreibvorgang aufzeichnen</button>
+    <div style="display:flex;justify-content:flex-end;">
+      <button type="button" class="btn" hx-post="settings/logging/capture-write/arm" hx-target="#debug-tools" hx-swap="outerHTML">Nächsten Schreibvorgang aufzeichnen</button>
+    </div>
     {% endif %}
   </div>
 
@@ -30,52 +34,45 @@
     </p>
     {% if trace_entity_id %}
     <p class="save-status">🔴 Verfolgt <code>{{ trace_entity_id }}</code> &middot; noch {{ trace_expires_in_minutes }} Minute(n)</p>
-    <button type="button" class="btn btn-danger" hx-post="settings/logging/trace/stop" hx-target="#debug-tools" hx-swap="outerHTML">Trace beenden</button>
+    <div style="display:flex;justify-content:flex-end;">
+      <button type="button" class="btn btn-danger" hx-post="settings/logging/trace/stop" hx-target="#debug-tools" hx-swap="outerHTML">Trace beenden</button>
+    </div>
     {% else %}
     <form hx-post="settings/logging/trace/start" hx-target="#debug-tools" hx-swap="outerHTML"
           style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;"
-          x-data='{
-            open: false, search: "", entityId: "", hoverTip: null, hoverPos: {top: 0, left: 0},
-            options: {{ entity_options | tojson }},
-            label(id){ const o = this.options.find(o => o.entity_id === id); return o ? o.label : id; },
-            filtered(){ const q = this.search.toLowerCase(); return this.options.filter(o => !q || (o.label + " " + o.entity_id).toLowerCase().includes(q)); }
-          }'>
+          x-data='entityPicker({{ entity_options | tojson }}, "")'>
       <div class="field" style="margin:0;">
         <label>Entität</label>
-        <div style="display:flex;gap:6px;" @click.outside="open = false">
-          <span class="dd-picker-wrap entity-tooltip-host" style="flex:1;min-width:260px;">
-            <button type="button" class="btn" style="width:100%;text-align:left;"
-                    @click="open = !open; search = ''; if (open) $nextTick(() => $refs.traceSearch.focus())"
-                    x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
-            <span class="entity-tooltip" x-show="entityId" x-cloak>
-              <strong x-text="label(entityId)"></strong>
-              <code x-text="entityId"></code>
-            </span>
-            <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="width:320px;max-height:280px;overflow-y:auto;">
-              <input type="search" class="dd-picker-popover-search" x-ref="traceSearch" x-model="search" placeholder="Suchen …">
-              <template x-for="opt in filtered()" :key="opt.entity_id">
-                <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
-                     @click="hoverTip = null; entityId = opt.entity_id; open = false"
-                     @mouseenter="hoverTip = opt; const r = $el.getBoundingClientRect(); hoverPos = {top: r.top - 6, left: r.left}"
-                     @mouseleave="hoverTip = null">
-                  <span x-text="opt.label"></span>
-                </div>
-              </template>
-            </div>
-          </span>
-          <button type="button" class="btn btn-sm" x-show="entityId" x-cloak
-                  @click="entityId = ''" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
-          <input type="hidden" name="entity_id" :value="entityId">
-          <template x-teleport="body">
-            <div class="entity-tooltip entity-tooltip-floating"
-                 :style="`display:${hoverTip ? 'block' : 'none'}; top:${hoverPos.top}px; left:${hoverPos.left}px; transform:translateY(-100%);`">
-              <strong x-text="hoverTip && hoverTip.label"></strong>
-              <code x-text="hoverTip && hoverTip.entity_id"></code>
-            </div>
-          </template>
-        </div>
+        <span class="dd-picker-wrap" style="display:block;width:250px;" @click.outside="open = false">
+          <button type="button" class="btn" style="width:100%;text-align:left;"
+                  :class="{'dd-picker-btn-clearable': entityId}"
+                  @click="toggleOpen($refs.tracePickerSearch)"
+                  @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
+                  x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
+          <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
+                  @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+          <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="width:100%;max-height:280px;overflow-y:auto;">
+            <input type="search" class="dd-picker-popover-search" x-ref="tracePickerSearch" x-model="search" placeholder="Suchen …">
+            <template x-for="opt in filtered()" :key="opt.entity_id">
+              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
+                   @click="select(opt.entity_id)"
+                   @mouseenter="scheduleHover(opt, $event.currentTarget)"
+                   @mouseleave="clearHover()">
+                <span x-text="opt.label"></span>
+              </div>
+            </template>
+          </div>
+        </span>
+        <input type="hidden" name="entity_id" :value="entityId">
+        <template x-teleport="body">
+          <div class="entity-tooltip entity-tooltip-floating"
+               :style="`display:${hoverTip ? 'block' : 'none'}; top:${hoverPos.top}px; left:${hoverPos.left}px; transform:translateY(-100%);`">
+            <strong x-text="hoverTip && hoverTip.label"></strong>
+            <code x-text="hoverTip && hoverTip.entity_id"></code>
+          </div>
+        </template>
       </div>
-      <button type="submit" class="btn" :disabled="!entityId">Verfolgen starten (15 Min.)</button>
+      <button type="submit" class="btn" style="margin-left:auto;" :disabled="!entityId">Verfolgen starten (15 Min.)</button>
     </form>
     {% endif %}
   </div>

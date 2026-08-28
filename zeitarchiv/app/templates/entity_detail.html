@@ -240,7 +240,7 @@
             <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
             <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
             <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
-            <button type="button" class="menu-row" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
+            <button type="button" class="menu-row" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
           </div>
         </div>
       </div>
@@ -340,6 +340,11 @@
     // schickt den kompletten aktuellen Stand zurück (saveChartOptions()),
     // kein separater Speichern-Button.
     const CHART_OPTIONS = {{ chart_options | tojson }};
+    // Globale Startwerte (unabhängig von einer etwaigen Übersteuerung dieser
+    // Entität) — Grundlage für hasCustomOptions(), das "Optionen auf Standard
+    // zurücksetzen" (Aktionen) nur zeigt, wenn es dafür tatsächlich etwas zu
+    // tun gibt.
+    const CHART_DEFAULTS = {{ entity_chart_defaults | tojson }};
     // Dieselbe Optionen-Menü-Auswahl (Dynamische Y-Achse/Statistik in
     // Legende) wie chart_editor.html, hier nur mit einem einzelnen
     // Legenden-Chip statt einer Serienliste.
@@ -638,6 +643,24 @@
           } finally {
             location.reload();
           }
+        },
+        // Vergleicht den aktuellen (reaktiven) Options-Stand gegen die
+        // globalen Startwerte — chart_type dabei aufgelöst wie oben bei
+        // chartType, da CHART_DEFAULTS.chart_type "auto" sein kann, this.
+        // chartType aber nie.
+        hasCustomOptions() {
+          const defaultChartType = CHART_DEFAULTS.chart_type === 'auto' ? DEFAULT_CHART_TYPE : CHART_DEFAULTS.chart_type;
+          return (
+            this.continuous !== CHART_DEFAULTS.continuous ||
+            this.raw !== CHART_DEFAULTS.raw ||
+            this.chartType !== defaultChartType ||
+            this.showPoints !== CHART_DEFAULTS.show_points ||
+            this.showValues !== CHART_DEFAULTS.show_values ||
+            this.dynamicYAxis !== CHART_DEFAULTS.dynamic_y_axis ||
+            this.chartStats !== CHART_DEFAULTS.chart_stats ||
+            this.legendStyle !== CHART_DEFAULTS.legend_style ||
+            JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
+          );
         },
         toggleContinuous() { this._rangeAnchorMs = null; this.continuous = !this.continuous; this.load(); this.saveChartOptions(); },
         setCompareMode(mode) {

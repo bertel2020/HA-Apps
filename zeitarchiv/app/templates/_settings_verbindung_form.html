@@ -24,17 +24,15 @@
 <div class="field">
   <label>API-Token</label>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-    <div class="val mono" id="token-value" data-token="{{ api_token }}" data-masked="true" style="flex:1;min-width:200px;">••••••••••••••••</div>
+    <div class="val mono" id="token-value" data-token="{{ api_token }}" data-masked="true" style="flex:1;min-width:110px;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">••••••••••••••••</div>
     <button type="button" class="btn" onclick="toggleTokenVisibility(this)">Anzeigen</button>
     <button type="button" class="btn" onclick="copyToken()">Kopieren</button>
+    <button type="button" class="btn btn-danger"
+            hx-post="settings/token/generate" hx-target="#verbindung-form" hx-swap="innerHTML"
+            hx-confirm="Neuen Token erzeugen? Der bisherige wird sofort ungültig — die Integration in Home Assistant muss danach mit dem neuen Wert aktualisiert werden.">
+      Neu generieren
+    </button>
   </div>
   <p class="hint" id="token-copy-status">&nbsp;</p>
-</div>
-<div style="display:flex;gap:8px;">
-  <button type="button" class="btn"
-          hx-post="settings/token/generate" hx-target="#verbindung-form" hx-swap="innerHTML"
-          hx-confirm="Neuen Token erzeugen? Der bisherige wird sofort ungültig — die Integration in Home Assistant muss danach mit dem neuen Wert aktualisiert werden.">
-    Neu generieren
-  </button>
 </div>
 {% if token_saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

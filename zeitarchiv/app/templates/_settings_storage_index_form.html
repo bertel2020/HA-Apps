@@ -21,7 +21,7 @@
 
 {% if storage_audit.rows %}
 <div class="tbl-wrap">
-  <table class="dt compact">
+  <table class="dt compact" data-sortable data-paginate data-page-size="10">
     <thead><tr><th>Entität</th><th>Index</th><th>Tatsächlich</th><th>Differenz</th><th>Archivgröße</th></tr></thead>
     <tbody>
     {% for row in storage_audit.rows %}
@@ -42,7 +42,7 @@
 <p class="hint" style="color:var(--danger);">Die Vorschau hat noch nichts verändert.</p>
 {% endif %}
 {% elif not storage_audit.errors %}
-<div class="empty">Index und gespeicherte Rohdaten sind konsistent.</div>
+<p class="save-status">✓ Index und gespeicherte Rohdaten sind konsistent.</p>
 {% endif %}
 
 {% if storage_audit.errors %}
@@ -52,7 +52,7 @@
 {% endif %}
 {% endif %}
 
-<div class="toolbar" style="margin:16px 0 0;">
+<div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;">
   <button type="button" class="btn"
           hx-post="settings/storage-index/check" hx-target="#storage-index-form" hx-swap="innerHTML">
     Index prüfen
