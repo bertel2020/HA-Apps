@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.58.0 - 2026-08-28
+
+### Verbesserung
+
+- Einstellungen → Darstellung, Archivierung, Aufbewahrung, Protokollierung
+  und Diagnose (Prozess) nutzen jetzt durchgängig dieselbe kompakte
+  Zeilen-Liste wie bisher schon „Chart-Optionen“, mit kurzem Erklärtext zu
+  jeder Option statt freistehender Felder; auf schmalen Bildschirmen
+  bricht die Auswahl jetzt in eine eigene Zeile um.
+- Einstellungen → Schriftgröße: die Dropdown-Optionen (Kleiner … Größer)
+  zeigen jetzt eine echte Vorschau in der jeweiligen Schriftgröße statt
+  einheitlicher Schrift.
+- Diagnose → „Entität verfolgen“: Freitextfeld durch ein durchsuchbares
+  Entitäten-Dropdown ersetzt (Feld heißt jetzt „Entität“ statt
+  „Entity-ID“), mit Leeren-Button und Tooltip zur Entity-ID — sowohl in
+  der Liste als auch am ausgewählten Feld.
+- Verbindungsstatus (Einstellungen → Verbindung): Hinweisbox zu „Zähler
+  seit App-Neustart“/„Bei Auth-Fehlern“ entfernt.
+
+### Fehlerbehebung
+
+- `/favicon.ico` lieferte bisher 404 und erzeugte dadurch Log-Spam;
+  liefert jetzt das Addon-Icon aus.
+
 ## 0.57.0 - 2026-08-28
 
 ### Neu

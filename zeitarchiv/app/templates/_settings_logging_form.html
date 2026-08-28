@@ -1,10 +1,13 @@
 <div class="settings-subsection">
   <form id="logging-form">
-    <div style="display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;">
-      <div class="field" style="margin:0;">
-        <label>Anwendungs-Loglevel</label>
+    <div class="settings-compact-list">
+      <div class="settings-compact-row">
+        <div class="settings-compact-row-text">
+          <div class="settings-compact-label">Anwendungs-Loglevel</div>
+          <div class="settings-compact-hint">Mindest-Schweregrad für App-Logeinträge</div>
+        </div>
         <span class="dd-picker-wrap">
-          <button type="button" class="btn" id="log-level-btn" onclick="toggleDDPicker('log-level')">{% for k, l in log_level_options %}{% if k == log_level %}{{ l }}{% endif %}{% endfor %} ▾</button>
+          <button type="button" class="btn btn-sm" id="log-level-btn" onclick="toggleDDPicker('log-level')">{% for k, l in log_level_options %}{% if k == log_level %}{{ l }}{% endif %}{% endfor %} ▾</button>
           <input type="hidden" id="log-level-input" name="log_level" value="{{ log_level }}"
                  hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
                  hx-target="#logging-form" hx-swap="outerHTML">
@@ -15,10 +18,13 @@
           </div>
         </span>
       </div>
-      <div class="field" style="margin:0;">
-        <label>HTTP-Anfragen protokollieren</label>
+      <div class="settings-compact-row">
+        <div class="settings-compact-row-text">
+          <div class="settings-compact-label">HTTP-Anfragen protokollieren</div>
+          <div class="settings-compact-hint">Wirkt sofort, Zugangsdaten werden immer maskiert</div>
+        </div>
         <span class="dd-picker-wrap">
-          <button type="button" class="btn" id="access-log-mode-btn" onclick="toggleDDPicker('access-log-mode')">{% for k, l in access_log_options %}{% if k == access_log_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
+          <button type="button" class="btn btn-sm" id="access-log-mode-btn" onclick="toggleDDPicker('access-log-mode')">{% for k, l in access_log_options %}{% if k == access_log_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
           <input type="hidden" id="access-log-mode-input" name="access_log_mode" value="{{ access_log_mode }}"
                  hx-post="settings/logging" hx-trigger="change" hx-include="#logging-form"
                  hx-target="#logging-form" hx-swap="outerHTML">
@@ -30,9 +36,6 @@
         </span>
       </div>
     </div>
-    <p class="hint">
-      Wirkt sofort. „Alle Anfragen“ nur zur Fehlersuche &mdash; Zugangsdaten werden immer maskiert.
-    </p>
     <div class="actionbar" style="justify-content:flex-start;">
       <a class="btn" href="logs">Protokoll öffnen →</a>
     </div>

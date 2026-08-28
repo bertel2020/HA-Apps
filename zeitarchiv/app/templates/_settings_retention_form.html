@@ -24,11 +24,14 @@
 <form id="retention-schedule-form"
       hx-post="settings/retention-enforcement" hx-trigger="change"
       hx-target="#retention-form" hx-swap="innerHTML" hx-include="#retention-schedule-form">
-  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
-    <div class="field" style="margin:0;">
-      <label>Automatische Anwendung</label>
+  <div class="settings-compact-list">
+    <div class="settings-compact-row">
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Automatische Anwendung</div>
+        <div class="settings-compact-hint">Löscht abgelaufene Werte automatisch nach Zeitplan</div>
+      </div>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="retention-enforcement-btn" onclick="toggleDDPicker('retention-enforcement')">{{ 'An — täglich' if retention_enforcement_enabled else 'Aus' }} ▾</button>
+        <button type="button" class="btn btn-sm" id="retention-enforcement-btn" onclick="toggleDDPicker('retention-enforcement')">{{ 'An — täglich' if retention_enforcement_enabled else 'Aus' }} ▾</button>
         <input type="hidden" name="retention_enforcement" id="retention-enforcement-input" value="{{ 'on' if retention_enforcement_enabled else 'off' }}">
         <div class="dd-picker-popover" id="retention-enforcement-popover">
           <div class="dd-picker-row" onclick="selectDDOption('retention-enforcement', 'off', 'Aus')">Aus</div>
@@ -36,12 +39,15 @@
         </div>
       </span>
     </div>
-    <div class="field" style="margin:0;">
-      <label>Uhrzeit ({{ retention_timezone }})</label>
+    <div class="settings-compact-row">
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Uhrzeit ({{ retention_timezone }})</div>
+        <div class="settings-compact-hint">Tageszeit für den automatischen Lauf</div>
+      </div>
       {% set current_hour = retention_enforcement_time.split(':')[0] %}
       {% set current_minute = retention_enforcement_time.split(':')[1] %}
       <span class="dd-picker-wrap">
-        <button type="button" class="btn dd-time-btn" id="retention-time-btn" onclick="toggleDDPicker('retention-time')">{{ retention_enforcement_time }}</button>
+        <button type="button" class="btn btn-sm dd-time-btn" id="retention-time-btn" onclick="toggleDDPicker('retention-time')">{{ retention_enforcement_time }}</button>
         <div class="dd-picker-popover dd-time-popover" id="retention-time-popover">
           <div class="dd-time-spin">
             <div class="dd-time-spin-box">

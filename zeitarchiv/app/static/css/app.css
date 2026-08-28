@@ -265,6 +265,11 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 .dd-picker-popover.open{display:block;}
 .dd-picker-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
 .dd-picker-row:hover{background:var(--surface-alt);}
+/* Suchbare Varianten (Alpine-gesteuert statt der globalen .open-Klasse aus
+   dd-picker.js, siehe table_editor.html) — x-show schaltet die INLINE
+   display-Eigenschaft, die .open-Regel oben griffe hier nicht. */
+.dd-picker-popover-alpine{display:block;}
+.dd-picker-popover-search{width:100%;font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);margin-bottom:6px;box-sizing:border-box;}
 /* Markiert die aktuell gewählte Zeile in Picker-Popovern, die (anders als
    die meisten Filter-Dropdowns) eine dauerhafte Auswahl statt einer
    Aktionsliste darstellen — z. B. die Zeilentyp-/Rahmen-/Zeilenabstand-
@@ -492,6 +497,17 @@ td.mono{font-family:var(--font-mono);}
    Symcon-Import, deren Inhalt erst nach Auswahl per JS gesetzt wird) sollen
    vor der ersten Auswahl keine leere Sprechblase zeigen. */
 .entity-tooltip:empty{display:none!important;}
+/* .dd-picker-row setzt cursor:pointer (anklickbare Zeile) — als Tooltip-Host
+   würde die spätere .entity-tooltip-host-Regel das sonst auf cursor:help
+   überschreiben, obwohl die Zeile weiterhin ein Klickziel ist. */
+.dd-picker-row.entity-tooltip-host{cursor:pointer;}
+/* Variante für Zeilen INNERHALB eines scrollenden Containers (z. B. die
+   durchsuchbare Entitätenliste in .dd-picker-popover, overflow-y:auto):
+   dort schneidet der Container ein normal positioniertes .entity-tooltip
+   seitlich ab, sobald es über den schmalen Zeilenrahmen hinausragt. Per
+   Alpine x-teleport aus dem Container gehoben und stattdessen per
+   Inline-Style (JS, siehe Template) exakt an der Zeile positioniert. */
+.entity-tooltip.entity-tooltip-floating{position:fixed;left:auto;bottom:auto;}
 .entity-tooltip strong,.entity-tooltip code{display:block;white-space:nowrap;line-height:1.4;}
 .entity-tooltip strong{font-family:var(--font-display);font-size:calc(11.5px * var(--font-scale, 1));font-weight:700;}
 .entity-tooltip code{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:inherit;}
@@ -575,7 +591,15 @@ td.mono{font-family:var(--font-mono);}
 .settings-minor-section{margin-top:20px;}
 .settings-compact-list{border-top:1px solid var(--border);}
 .settings-compact-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);}
+.settings-compact-row-text{min-width:0;}
 .settings-compact-label{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+.settings-compact-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+.settings-compact-row .dd-picker-wrap,.settings-compact-row > select,.settings-compact-row > .val{flex-shrink:0;}
+@media (max-width:480px){
+  .settings-compact-row{flex-wrap:wrap;}
+  .settings-compact-row .dd-picker-wrap{width:100%;}
+  .settings-compact-row .dd-picker-wrap > .btn{width:100%;}
+}
 .btn-sm{padding:5px 10px;font-size:calc(12px * var(--font-scale, 1));}
 .settings-panel .settings-minor-title{
   margin:0 0 6px;font-size:calc(13px * var(--font-scale, 1));font-weight:700;line-height:1.4;color:var(--ink-faint);
@@ -665,16 +689,8 @@ select:disabled,textarea[readonly],textarea:disabled{background:var(--surface-al
    ohne die höhere Hinweiskarte in die Höhenberechnung einzubeziehen. */
 .connection-status-grid{display:block;margin-bottom:16px;}
 .connection-status-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr;gap:10px;margin-bottom:10px;}
-.connection-status-note{
-  display:grid;grid-template-columns:minmax(250px,.8fr) minmax(0,1.4fr);gap:12px 24px;
-  padding:12px 14px;border:1px solid var(--border);border-left:4px solid var(--accent-bar);border-radius:10px;background:var(--surface-alt);
-}
-.settings-panel .connection-status-note p.hint{margin:0;}
-.connection-status-note-item{display:flex;flex-direction:column;gap:2px;}
-.connection-status-note-item strong{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
 @media (max-width:900px){
   .connection-status-cards{grid-template-columns:1fr;}
-  .connection-status-note{grid-template-columns:1fr;}
 }
 
 .htmx-indicator{opacity:0;}

@@ -1,58 +1,68 @@
-<div class="field">
-  <label>Farbschema</label>
-  <span class="dd-picker-wrap">
-    <button type="button" class="btn" id="color-scheme-btn" onclick="toggleDDPicker('color-scheme')">{% for k, l in color_scheme_options %}{% if k == color_scheme %}{{ l }}{% endif %}{% endfor %} ▾</button>
-    <input type="hidden" name="color_scheme" id="color-scheme-input" value="{{ color_scheme }}"
-           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
-    <div class="dd-picker-popover" id="color-scheme-popover">
-      {% for key, label in color_scheme_options %}
-      <div class="dd-picker-row" onclick="selectDDOption('color-scheme', '{{ key }}', '{{ label }}'); document.documentElement.dataset.colorScheme = '{{ key }}';">{{ label }}</div>
-      {% endfor %}
+<div class="settings-compact-list">
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Farbschema</div>
+      <div class="settings-compact-hint">Petrol/Kupfer, HA-Blau oder Indigo/Blau</div>
     </div>
-  </span>
-  <p class="hint">„Zeitarchiv“: Petrol/Kupfer. „Home Assistant“: neutral mit HA-Blau. „Modern“: neutral mit Indigo/Blau.</p>
-</div>
-<div class="field">
-  <label>Darstellungsmodus</label>
-  <span class="dd-picker-wrap">
-    <button type="button" class="btn" id="color-mode-btn" onclick="toggleDDPicker('color-mode')">{% for k, l in color_mode_options %}{% if k == color_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
-    <input type="hidden" name="color_mode" id="color-mode-input" value="{{ color_mode }}"
-           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
-    <div class="dd-picker-popover" id="color-mode-popover">
-      {% for key, label in color_mode_options %}
-      <div class="dd-picker-row" onclick="selectDDOption('color-mode', '{{ key }}', '{{ label }}'); document.documentElement.dataset.colorMode = '{{ key }}';">{{ label }}</div>
-      {% endfor %}
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="color-scheme-btn" onclick="toggleDDPicker('color-scheme')">{% for k, l in color_scheme_options %}{% if k == color_scheme %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="color_scheme" id="color-scheme-input" value="{{ color_scheme }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="color-scheme-popover">
+        {% for key, label in color_scheme_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('color-scheme', '{{ key }}', '{{ label }}'); document.documentElement.dataset.colorScheme = '{{ key }}';">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Darstellungsmodus</div>
+      <div class="settings-compact-hint">Automatisch folgt dem System, sonst dauerhaft fest</div>
     </div>
-  </span>
-  <p class="hint">„Automatisch“ folgt dem System. „Hell“ und „Dunkel“ übersteuern die automatische Auswahl dauerhaft.</p>
-</div>
-<div class="field">
-  <label>Schriftgröße</label>
-  <span class="dd-picker-wrap">
-    <button type="button" class="btn" id="font-scale-btn" onclick="toggleDDPicker('font-scale')">{% for k, l in font_scale_options %}{% if k == font_scale %}{{ l }}{% endif %}{% endfor %} ▾</button>
-    <input type="hidden" name="font_scale" id="font-scale-input" value="{{ font_scale }}"
-           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
-    <div class="dd-picker-popover" id="font-scale-popover">
-      {% for key, label in font_scale_options %}
-      <div class="dd-picker-row" onclick="selectDDOption('font-scale', '{{ key }}', '{{ label }}'); document.documentElement.style.setProperty('--font-scale', '{{ font_scale_values[key] }}');">{{ label }}</div>
-      {% endfor %}
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="color-mode-btn" onclick="toggleDDPicker('color-mode')">{% for k, l in color_mode_options %}{% if k == color_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="color_mode" id="color-mode-input" value="{{ color_mode }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="color-mode-popover">
+        {% for key, label in color_mode_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('color-mode', '{{ key }}', '{{ label }}'); document.documentElement.dataset.colorMode = '{{ key }}';">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Schriftgröße</div>
+      <div class="settings-compact-hint">Wirkt sofort hier, andere Seiten erst beim nächsten Laden</div>
     </div>
-  </span>
-  <p class="hint">Wirkt sofort hier, andere offene Seiten erst beim nächsten Laden.</p>
-</div>
-<div class="field">
-  <label>Dashboard-Animation</label>
-  <span class="dd-picker-wrap">
-    <button type="button" class="btn" id="dashboard-animation-btn" onclick="toggleDDPicker('dashboard-animation')">{% for k, l in dashboard_animation_options %}{% if k == dashboard_animation %}{{ l }}{% endif %}{% endfor %} ▾</button>
-    <input type="hidden" name="dashboard_animation" id="dashboard-animation-input" value="{{ dashboard_animation }}"
-           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
-    <div class="dd-picker-popover" id="dashboard-animation-popover">
-      {% for key, label in dashboard_animation_options %}
-      <div class="dd-picker-row" onclick="selectDDOption('dashboard-animation', '{{ key }}', '{{ label }}')">{{ label }}</div>
-      {% endfor %}
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="font-scale-btn" onclick="toggleDDPicker('font-scale')">{% for k, l in font_scale_options %}{% if k == font_scale %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="font_scale" id="font-scale-input" value="{{ font_scale }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="font-scale-popover">
+        {% for key, label in font_scale_options %}
+        <div class="dd-picker-row" style="font-size:calc(14px * {{ font_scale_values[key] }});" onclick="selectDDOption('font-scale', '{{ key }}', '{{ label }}'); document.documentElement.style.setProperty('--font-scale', '{{ font_scale_values[key] }}');">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Dashboard-Animation</div>
+      <div class="settings-compact-hint">Ein-/Ausblenden der Charts auf angehefteten Kacheln</div>
     </div>
-  </span>
-  <p class="hint">Ein-/Ausblend-Animation der Charts auf angehefteten Dashboard-Kacheln. Gilt für alle Kacheln gemeinsam.</p>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="dashboard-animation-btn" onclick="toggleDDPicker('dashboard-animation')">{% for k, l in dashboard_animation_options %}{% if k == dashboard_animation %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="dashboard_animation" id="dashboard-animation-input" value="{{ dashboard_animation }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="dashboard-animation-popover">
+        {% for key, label in dashboard_animation_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('dashboard-animation', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
 </div>
 
 <div class="settings-minor-section">
@@ -64,7 +74,10 @@
   </p>
   <div class="settings-compact-list">
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Kontinuierlich</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Kontinuierlich</div>
+        <div class="settings-compact-hint">Linie statt Treppenstufen zwischen Punkten</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-continuous-btn" onclick="toggleDDPicker('entity-continuous')">{% for k, l in on_off_options %}{% if k == entity_continuous %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_continuous" id="entity-continuous-input" value="{{ entity_continuous }}"
@@ -77,7 +90,10 @@
       </span>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Rohwerte</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Rohwerte</div>
+        <div class="settings-compact-hint">Ungeglättete Einzelwerte statt Aggregation</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-raw-btn" onclick="toggleDDPicker('entity-raw')">{% for k, l in on_off_options %}{% if k == entity_raw %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_raw" id="entity-raw-input" value="{{ entity_raw }}"
@@ -90,7 +106,10 @@
       </span>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Punkte</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Punkte</div>
+        <div class="settings-compact-hint">Datenpunkte auf der Linie markieren</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-show-points-btn" onclick="toggleDDPicker('entity-show-points')">{% for k, l in on_off_options %}{% if k == entity_show_points %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_show_points" id="entity-show-points-input" value="{{ entity_show_points }}"
@@ -103,7 +122,10 @@
       </span>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Werte anzeigen</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Werte anzeigen</div>
+        <div class="settings-compact-hint">Zahlenwerte direkt am Punkt einblenden</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-show-values-btn" onclick="toggleDDPicker('entity-show-values')">{% for k, l in on_off_options %}{% if k == entity_show_values %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_show_values" id="entity-show-values-input" value="{{ entity_show_values }}"
@@ -116,7 +138,10 @@
       </span>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Dynamische Y-Achse</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Dynamische Y-Achse</div>
+        <div class="settings-compact-hint">Skala passt sich dem sichtbaren Bereich an</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-dynamic-y-axis-btn" onclick="toggleDDPicker('entity-dynamic-y-axis')">{% for k, l in on_off_options %}{% if k == entity_dynamic_y_axis %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_dynamic_y_axis" id="entity-dynamic-y-axis-input" value="{{ entity_dynamic_y_axis }}"
@@ -129,7 +154,10 @@
       </span>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Statistik in Legende</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Statistik in Legende</div>
+        <div class="settings-compact-hint">Min/Max/Ø direkt in der Legende zeigen</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-chart-stats-btn" onclick="toggleDDPicker('entity-chart-stats')">{% for k, l in on_off_options %}{% if k == entity_chart_stats %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_chart_stats" id="entity-chart-stats-input" value="{{ entity_chart_stats }}"
@@ -142,7 +170,10 @@
       </span>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Legenden-Kennzahlen</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Legenden-Kennzahlen</div>
+        <div class="settings-compact-hint">Welche Kennzahlen die Legende zeigt</div>
+      </div>
       <div class="legend-metrics-row" style="padding:0;justify-content:flex-end;"
            hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML"
            hx-include="#entity-legend-metrics-group">
@@ -157,7 +188,10 @@
       </div>
     </div>
     <div class="settings-compact-row">
-      <span class="settings-compact-label">Legenden-Stil</span>
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">Legenden-Stil</div>
+        <div class="settings-compact-hint">Darstellung der Legendeneinträge</div>
+      </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-legend-style-btn" onclick="toggleDDPicker('entity-legend-style')">{% for k, l in entity_legend_style_options %}{% if k == entity_legend_style %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="entity_legend_style" id="entity-legend-style-input" value="{{ entity_legend_style }}"

@@ -28,6 +28,7 @@ from typing import Annotated
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
@@ -311,6 +312,14 @@ async def _security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    # Browser fragen dieses Icon unabhängig vom aktuellen app_root-Präfix (Ingress)
+    # immer unter dem Wurzelpfad an — ohne diese Route landet das als 404 im
+    # Access-Log, obwohl das Addon-Icon längst existiert (addon/icon.png).
+    return FileResponse(APP_DIR.parent / "icon.png", media_type="image/png")
 # Cache-Busting fürs geteilte Stylesheet (Design-System, siehe app/static/css/README.md):
 # der Browser cacht static/-Antworten sonst über Deploys hinweg, weil StaticFiles
 # keinen Cache-Control-Header setzt und nur Last-Modified/ETag liefert — je nach
@@ -1030,6 +1039,10 @@ def _debug_tools_context() -> dict:
         "trace_expires_in_minutes": (
             max(1, round((trace_expires_at - now) / 60)) if trace_active else None
         ),
+        "entity_options": [
+            {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+            for row in index.list_entities()
+        ],
     }
 
 

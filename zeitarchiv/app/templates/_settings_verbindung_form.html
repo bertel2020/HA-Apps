@@ -18,16 +18,6 @@
         {% if last_auth_failure_at %}<span class="status-card-detail">Zuletzt {{ last_auth_failure_at }}</span>{% endif %}
       </div>
     </div>
-    <div class="connection-status-note">
-      <p class="hint connection-status-note-item">
-        <strong>Zähler seit App-Neustart</strong>
-        <span>Seit {{ server_started_at }} · nicht historisch</span>
-      </p>
-      <p class="hint connection-status-note-item">
-        <strong>Bei Auth-Fehlern</strong>
-        <span>Meist ist der Token in der Home-Assistant-Integration ungültig, etwa nach „Neu generieren“. Werte einzelner Entitäten stehen in der <a href="entities">Entitäten-Übersicht</a>.</span>
-      </p>
-    </div>
   </div>
 </div>
 

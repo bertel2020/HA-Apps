@@ -157,17 +157,19 @@
           </div>
           <div class="settings-subsection">
             <h3 class="settings-subsection-title">Prozess</h3>
-            <div class="field" id="settings-ram" hx-get="settings/ram" hx-trigger="load" hx-swap="outerHTML">
-              <label>RAM-Verbrauch</label>
-              <div class="val mono">wird geladen …</div>
-            </div>
-            <div class="field">
-              <label>Startzeitpunkt</label>
-              <div class="val mono">{{ server_started_at }}</div>
-            </div>
-            <div class="field">
-              <label>Laufzeit</label>
-              <div class="val mono">{{ uptime }}</div>
+            <div class="settings-compact-list">
+              <div class="settings-compact-row" id="settings-ram" hx-get="settings/ram" hx-trigger="load" hx-swap="outerHTML">
+                <span class="settings-compact-label">RAM-Verbrauch</span>
+                <span class="val mono">wird geladen …</span>
+              </div>
+              <div class="settings-compact-row">
+                <span class="settings-compact-label">Startzeitpunkt</span>
+                <span class="val mono">{{ server_started_at }}</span>
+              </div>
+              <div class="settings-compact-row">
+                <span class="settings-compact-label">Laufzeit</span>
+                <span class="val mono">{{ uptime }}</span>
+              </div>
             </div>
           </div>
         </section>

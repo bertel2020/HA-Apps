@@ -1,28 +1,35 @@
-<div class="field">
-  <label>Standard-Auflösung</label>
-  <span class="dd-picker-wrap">
-    <button type="button" class="btn" id="default-resolution-btn" onclick="toggleDDPicker('default-resolution')">{% for k, l in resolution_options %}{% if k == default_resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
-    <input type="hidden" name="default_resolution" id="default-resolution-input" value="{{ default_resolution }}"
-           hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
-    <div class="dd-picker-popover" id="default-resolution-popover">
-      {% for key, label in resolution_options %}
-      <div class="dd-picker-row" onclick="selectDDOption('default-resolution', '{{ key }}', '{{ label }}')">{{ label }}</div>
-      {% endfor %}
+<div class="settings-compact-list">
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Auflösung</div>
+      <div class="settings-compact-hint">Speichertakt für neu erkannte Entitäten</div>
     </div>
-  </span>
-</div>
-<div class="field">
-  <label>Standard-Aufbewahrung</label>
-  <span class="dd-picker-wrap">
-    <button type="button" class="btn" id="default-retention-btn" onclick="toggleDDPicker('default-retention')">{% for k, l in retention_options %}{% if k == default_retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
-    <input type="hidden" name="default_retention" id="default-retention-input" value="{{ default_retention }}"
-           hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
-    <div class="dd-picker-popover" id="default-retention-popover">
-      {% for key, label in retention_options %}
-      <div class="dd-picker-row" onclick="selectDDOption('default-retention', '{{ key }}', '{{ label }}')">{{ label }}</div>
-      {% endfor %}
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-resolution-btn" onclick="toggleDDPicker('default-resolution')">{% for k, l in resolution_options %}{% if k == default_resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_resolution" id="default-resolution-input" value="{{ default_resolution }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-resolution-popover">
+        {% for key, label in resolution_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-resolution', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Aufbewahrung</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Aufbewahrung“</div>
     </div>
-  </span>
-  <p class="hint">Standard für neue Entitäten. Durchsetzung unter „Aufbewahrung“.</p>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-retention-btn" onclick="toggleDDPicker('default-retention')">{% for k, l in retention_options %}{% if k == default_retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_retention" id="default-retention-input" value="{{ default_retention }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-retention-popover">
+        {% for key, label in retention_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-retention', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
 </div>
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
