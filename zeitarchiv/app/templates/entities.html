@@ -30,6 +30,19 @@
   .dtile-title{font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);margin-bottom:8px;padding-right:30px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .dtile-chart{height:auto;min-height:160px;flex:1;}
   .dtile-loading{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-faint);font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));}
+  /* Optionale Chart-Legende unter der Kachel (Kachelmenü, nur ab 2×2) — leer
+     und unsichtbar per Default, dashboard-tiles.js befüllt/zeigt sie nur bei
+     aktivierter Einstellung UND ausreichender Kachelgröße. flex:none neben
+     .dtile-chart{flex:1} in der flex-column .dtile-body: die Legende nimmt
+     nur ihre Eigenhöhe, der Chart bekommt den Rest. Die Chips selbst nutzen
+     .chart-legend-item aus app.css unverändert — Aussehen UND Inhalte
+     entsprechen 1:1 der Legende der zugrundeliegenden Chart-Seite. */
+  .dtile-legend{display:none;flex-wrap:wrap;gap:8px;padding-top:10px;flex:none;}
+  .dtile-legend.is-visible{display:flex;}
+  /* Tabellen-Stil (Legenden-Stil "Tabelle") als einzelnes Flex-Kind soll die
+     volle Kachelbreite füllen statt (wie ein Chip) auf Inhaltsbreite zu
+     schrumpfen. */
+  .dtile-legend .tbl-wrap{width:100%;}
   .dtile-add{display:flex;align-items:center;justify-content:center;min-height:206px;grid-column:span 1;grid-row:span 1;border-style:dashed;overflow:visible;}
   .dtile-add-btn{
     width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);

@@ -1,9 +1,10 @@
 // Dashboard-Kacheln auf der Übersichtsseite (Konzept "Offene Punkte",
 // erweitert um Vergleichstabellen) — rendert je Kachel entweder ein
 // kompaktes ECharts-Mini-Chart (Charts, über /api/query-multi, dasselbe wie
-// bei der vollen Chart-Seite chart_editor.html, nur ohne Legende/Zeitraum-
-// Toolbar/Tooltip-Feinschliff) oder eine reduzierte Mini-Tabelle (Vergleichs-
-// tabellen, über static/js/table-compute.js — derselbe Rechenkern wie
+// bei der vollen Chart-Seite chart_editor.html, nur ohne Zeitraum-Toolbar/
+// Tooltip-Feinschliff — eine einfache Legende ist ab 2×2 Kachelgröße optional
+// zuschaltbar, siehe Kachelmenü/renderLegend()) oder eine reduzierte Mini-
+// Tabelle (Vergleichstabellen, über static/js/table-compute.js — derselbe Rechenkern wie
 // table_editor.html). Bis zu 18 Kacheln gleichzeitig auf der meistbesuchten
 // Seite der App — ein IntersectionObserver rendert erst, sobald eine Kachel
 // tatsächlich sichtbar wird, statt alle sofort beim Laden zu initialisieren
@@ -54,14 +55,184 @@
   }
 
   const instances = new Map();  // chartId -> echarts instance
+  // chartId -> {items, legendMetrics, showStats} — die zuletzt geladenen und
+  // berechneten Legenden-Kennzahlen einer Chart-Kachel, unabhängig vom
+  // aktuellen Sichtbarkeitszustand der Legende zwischengespeichert. Ein
+  // Größenwechsel (Kachelmenü) kann die Legende so ohne erneuten API-Aufruf
+  // ein-/ausblenden, siehe setupSizePickers().
+  const legendCache = new Map();
+  // chartId -> Set<seriesName> — welche Serien über die Kachel-Legende
+  // ausgeblendet wurden (Klick auf einen Chip, siehe setupLegendToggles()).
+  // Bleibt über erneutes Rendern hinweg erhalten (Größenwechsel, Resize),
+  // damit eine einmal ausgeblendete Serie nicht bei jedem Neuladen wieder
+  // auftaucht — dieselbe Idee wie legendHiddenIds in chart_editor.html.
+  const legendHidden = new Map();
   let observer = null;
+
+  // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
+  // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
+  // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
+  // Sprach-Setting nur hier greifen muss.
+  const LOCALE = 'de-DE';
 
   function fmtAxis(range, ts) {
     const d = new Date(ts * 1000);
-    if (range === 'hour' || range === 'day') return d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
-    if (range === 'week' || range === 'month') return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
-    if (range === 'decade') return d.toLocaleDateString('de-DE', {year: 'numeric'});
-    return d.toLocaleDateString('de-DE', {month: 'short', year: 'numeric'});
+    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+    if (range === 'week' || range === 'month') return d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
+    if (range === 'decade') return d.toLocaleDateString(LOCALE, {year: 'numeric'});
+    return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
+  }
+
+  // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie in
+  // chart_editor.html/entity_detail.html, hier für den Tooltip-Zeitstempel unten.
+  function detectResolutionSeconds(points) {
+    if (!points || points.length < 2) return null;
+    const gaps = [];
+    for (let i = 1; i < points.length; i++) {
+      const gap = points[i].ts - points[i - 1].ts;
+      if (gap > 0) gaps.push(gap);
+    }
+    if (!gaps.length) return null;
+    gaps.sort((a, b) => a - b);
+    return gaps[Math.floor(gaps.length / 2)];
+  }
+
+  // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
+  // Daten, nicht nach dem Zeitraum-Namen — die Uhrzeit ist bei Tages-Buckets
+  // oder gröber ohnehin immer Mitternacht, also reine Information ohne Wert.
+  // Durchgehend über Intl (LOCALE) statt handgebauter Strings, damit sich
+  // Datum/Uhrzeit/Wochentag mit einer künftigen Sprachumschaltung automatisch
+  // anpassen. Der abgeschnittene Punkt hinter dem Wochentagskürzel
+  // (".replace") gleicht nur einen ICU-Unterschied zwischen Engines aus
+  // ("Mo" vs. "Mo.") — die Sprache/Reihenfolge selbst bleibt Intl überlassen.
+  function fmtTooltipTimestamp(ms, bucketSeconds) {
+    const d = new Date(ms);
+    if (bucketSeconds == null || bucketSeconds < 86400) {
+      return d.toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+    }
+    if (bucketSeconds < 86400 * 25) {
+      const weekday = d.toLocaleDateString(LOCALE, {weekday: 'short'}).replace(/\.$/, '');
+      const date = d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+      return `${weekday}, ${date}`;
+    }
+    if (bucketSeconds < 86400 * 200) {
+      return d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+    }
+    return d.toLocaleDateString(LOCALE, {year: 'numeric'});
+  }
+
+  const LEGEND_METRIC_LABELS = {last: 'Aktuell', min: 'Min', max: 'Max', average: 'Ø', sum: 'Summe'};
+
+  function escLegend(s) {
+    return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  // Chip-Variante (Standard) — dieselben Chips/Kennzahlen wie chart_editor.html
+  // (.chart-legend-item aus app.css), hier zusätzlich klickbar (siehe
+  // toggleTileLegendItem()), anders als die "static" (nicht umschaltbare)
+  // Variante auf entity_detail.html.
+  function renderLegendChips(items, legendMetrics, showStats, hiddenSet) {
+    return items.map(item => {
+      let values = '';
+      if (showStats) {
+        const parts = [];
+        for (const key of ['last', 'min', 'max', 'average', 'sum']) {
+          if (!legendMetrics.includes(key)) continue;
+          if (key === 'sum' && item.sum === null) continue;
+          parts.push(`<span>${LEGEND_METRIC_LABELS[key]} <strong>${escLegend(item[key])}</strong></span>`);
+        }
+        if (parts.length) values = `<span class="values">${parts.join('')}</span>`;
+      }
+      const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
+      return `<span class="chart-legend-item${inactive}" data-series="${escLegend(item.name)}" role="button" tabindex="0">`
+           + `<span class="dot" style="background:${item.color};"></span>`
+           + `<span class="name">${escLegend(item.name)}</span>${values}</span>`;
+    }).join('');
+  }
+
+  // Tabellen-Variante ("Legenden-Stil": Tabelle, Optionen-Menü der Chart-Seite)
+  // — dieselbe Spalten-Darstellung wie .chart-legend-table in chart_editor.html
+  // (table.dt compact). Zeilen sind wie die Chips klickbare Serien-Umschalter
+  // (dieselbe .chart-legend-table-row-Klasse/CSS wie dort, siehe app.css).
+  function renderLegendTable(items, legendMetrics, showStats, hiddenSet) {
+    const cols = showStats ? ['last', 'min', 'max', 'average', 'sum'].filter(k => legendMetrics.includes(k)) : [];
+    const headerCells = cols.map(key => `<th>${LEGEND_METRIC_LABELS[key]}</th>`).join('');
+    const rows = items.map(item => {
+      const cells = cols.map(key => `<td>${escLegend(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
+      const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
+      return `<tr class="chart-legend-table-row${inactive}" data-series="${escLegend(item.name)}" role="button" tabindex="0">`
+           + `<td class="legend-name-col"><span class="legend-name-cell">`
+           + `<span class="dot" style="background:${item.color};"></span>`
+           + `<span class="name">${escLegend(item.name)}</span></span></td>${cells}</tr>`;
+    }).join('');
+    return `<div class="tbl-wrap"><table class="dt compact chart-legend-table">`
+         + `<thead><tr><th class="legend-name-col">Name</th>${headerCells}</tr></thead>`
+         + `<tbody>${rows}</tbody></table></div>`;
+  }
+
+  // el = die .dtile-body (Chart-Kachel-Link), legend = {items, legendMetrics,
+  // showStats, style} — siehe Aufbau in renderTile(). Zeigt/versteckt UND
+  // befüllt die .dtile-legend-Zeile — Kachelmenü-Toggle UND Größenwechsel
+  // (setupSizePickers) rufen das mit demselben, aus legendCache
+  // wiederverwendeten Objekt auf, ohne neu zu laden.
+  //
+  // Aussehen UND Inhalte 1:1 von der Chart-Seite übernommen, inklusive des
+  // dort gewählten Legenden-Stils (Chips/Tabelle) — beide Varianten sind
+  // klickbare Serien-Umschalter (siehe setupLegendToggles()).
+  function renderLegend(el, legend, visible) {
+    const legendEl = el.querySelector('.dtile-legend');
+    if (!legendEl) return;
+    legendEl.classList.toggle('is-visible', visible);
+    if (!visible || !legend) { legendEl.innerHTML = ''; return; }
+    const {items, legendMetrics, showStats, style} = legend;
+    const chartId = el.closest('.dtile')?.dataset.itemId;
+    const hiddenSet = legendHidden.get(chartId) || new Set();
+    legendEl.innerHTML = style === 'table'
+      ? renderLegendTable(items, legendMetrics, showStats, hiddenSet)
+      : renderLegendChips(items, legendMetrics, showStats, hiddenSet);
+  }
+
+  // Klick/Enter/Leertaste auf einen Legenden-Chip ODER eine Tabellenzeile
+  // blendet die zugehörige Serie im Chart ein/aus, statt (wie der Rest der
+  // Kachel) zur Chart-Seite zu navigieren — dieselbe Aktion wie
+  // toggleLegendItem() in chart_editor.html, hier über dispatchAction auf die
+  // (unsichtbare, siehe legend:{show:false} in renderTile()) ECharts-eigene
+  // Legendenauswahl. preventDefault/stopPropagation laufen für JEDEN Klick
+  // innerhalb der Legende, auch daneben (leerer Bereich) — sonst würde ein
+  // Klick dort zur Chart-Seite navigieren, weil die Legende immer innerhalb
+  // der Kachel-<a> liegt. Eine Delegation pro Kachel statt pro Chip/Zeile:
+  // .dtile-legend wird bei jedem Neurendern nur per innerHTML ersetzt, das
+  // Element selbst (und damit sein Listener) bleibt erhalten — einmaliges
+  // Verdrahten in setupLegendToggles() reicht.
+  function toggleTileLegendItem(legendEl) {
+    return (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const item = e.target.closest('.chart-legend-item, .chart-legend-table-row');
+      if (!item || !legendEl.contains(item)) return;
+      const tile = legendEl.closest('.dtile');
+      const chartId = tile?.dataset.itemId;
+      const seriesName = item.dataset.series;
+      const chart = instances.get(chartId);
+      if (!chartId || !seriesName || !chart) return;
+      let hiddenSet = legendHidden.get(chartId);
+      if (!hiddenSet) { hiddenSet = new Set(); legendHidden.set(chartId, hiddenSet); }
+      if (hiddenSet.has(seriesName)) hiddenSet.delete(seriesName); else hiddenSet.add(seriesName);
+      item.classList.toggle('inactive', hiddenSet.has(seriesName));
+      chart.dispatchAction({type: 'legendToggleSelect', name: seriesName});
+    };
+  }
+
+  function setupLegendToggles() {
+    document.querySelectorAll('.dtile-legend').forEach(legendEl => {
+      if (legendEl.dataset.toggleBound) return;
+      legendEl.dataset.toggleBound = 'true';
+      const handler = toggleTileLegendItem(legendEl);
+      legendEl.addEventListener('click', handler);
+      legendEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') handler(e);
+      });
+    });
   }
 
   async function renderTile(el) {
@@ -93,6 +264,44 @@
       chartEl.innerHTML = '<div class="dtile-loading">Keine Daten</div>';
       return;
     }
+    // Dieselbe Farbzuordnung wie echartsSeries weiter unten (PALETTE nach
+    // Serienindex) UND dieselbe Kennzahlen-Berechnung wie seriesStats() in
+    // chart_editor.html (Min/Max/Ø/Summe/Aktuell) — hier separat gebaut,
+    // damit die Legende VOR echarts.init() im DOM steht: der Chart-Container
+    // bekommt sonst beim ersten Rendern die volle (noch legendenlose)
+    // Kachelhöhe gemessen und die Legende schiebt ihn erst beim nächsten
+    // Resize-Event auf seine endgültige Höhe.
+    const legendItems = series.map((s, i) => {
+      const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
+      const minima = (s.points || []).map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
+      const maxima = (s.points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
+      const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
+      const unit = s.unit ? ` ${s.unit}` : '';
+      const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtCompactNumber(value, s.decimals)}${unit}`;
+      // Summe nur bei Zählern sinnvoll — siehe derselbe Kommentar in
+      // chart_editor.html (seriesStats()).
+      const hasSum = s.aggregation_type === 'counter';
+      return {
+        name: entityNames[s.entity_id] || s.friendly_name,
+        color: PALETTE[i % PALETTE.length],
+        last: values.length ? formatted(values[values.length - 1]) : '—',
+        min: minima.length ? formatted(Math.min(...minima)) : '—',
+        max: maxima.length ? formatted(Math.max(...maxima)) : '—',
+        average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+        sum: hasSum ? (values.length ? formatted(values.reduce((sum, v) => sum + v, 0)) : '—') : null,
+      };
+    });
+    const legendMetrics = JSON.parse(el.dataset.legendMetrics || '["sum"]');
+    const showStats = el.dataset.chartStats === 'true';
+    const legendStyle = el.dataset.legendStyle || 'chips';
+    const legend = {items: legendItems, legendMetrics, showStats, style: legendStyle};
+    legendCache.set(chartId, legend);
+    const tileEl = el.closest('.dtile');
+    const legendVisible = el.dataset.showLegend === 'true'
+      && parseInt(tileEl?.dataset.gridCols || '1', 10) >= 2
+      && parseInt(tileEl?.dataset.gridRows || '1', 10) >= 2;
+    renderLegend(el, legend, legendVisible);
+
     chartEl.innerHTML = '';
     let chart = instances.get(chartId);
     if (!chart) {
@@ -144,12 +353,25 @@
       };
     });
 
+    // Erste Serie mit genug angezeigten (resamplePoints()-) Punkten bestimmt
+    // die Tooltip-Zeitstempel-Form (fmtTooltipTimestamp) — dieselbe Logik wie
+    // chart_editor.html. Aus den resampelten, nicht den rohen Server-Punkten:
+    // bei manuell gesetzter Auflösung (Kachel-Auflösung ungleich "auto")
+    // resamplePoints() clientseitig gröber, die rohen Punkte wären dann
+    // feiner als das, was im Tooltip tatsächlich zu sehen ist. Erst innerhalb
+    // der Schleife unten gesetzt (dort liegen die resampelten displayPoints
+    // vor), hier nur deklariert.
+    let tooltipBucketSeconds = null;
+
     const echartsSeries = series.map((s, i) => {
       const color = PALETTE[i % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
       const displayPoints = resamplePoints(
         s.points, range, resolutionPreset, s.aggregation_type, data.window_start
       );
+      if (tooltipBucketSeconds == null) {
+        tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
+      }
       const lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, s.decimals]);
       if (s.chart_type === 'line' && lineData.length && data.window_end != null
           && lineData[lineData.length - 1][0] < data.window_end * 1000) {
@@ -181,6 +403,15 @@
       return cfg;
     });
 
+    // ECharts' eigene Legende bleibt unsichtbar (show:false, wie in
+    // chart_editor.html) — die sichtbare Legende ist das eigene HTML-Element
+    // (renderLegend()), legend.selected/data existieren hier nur, damit
+    // legendToggleSelect (setupLegendToggles()) überhaupt etwas zum
+    // Umschalten hat.
+    const hiddenSet = legendHidden.get(chartId);
+    const legendSelected = {};
+    echartsSeries.forEach(s => { legendSelected[s.name] = !hiddenSet || !hiddenSet.has(s.name); });
+
     chart.setOption({
       animation,
       textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
@@ -192,10 +423,27 @@
         // period_end statt window_end: eine laufende Periode (z. B. Woche)
         // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die noch
         // datenlose Zukunft — window_end (an "jetzt" gedeckelt) bleibt nur für
-        // den Linien-Haltepunkt oben (lineData.push(...)) maßgeblich.
-        max: (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 : undefined,
+        // den Linien-Haltepunkt oben (lineData.push(...)) maßgeblich. Eine
+        // Sekunde zurück, da period_end (wie window_end) EXKLUSIV ist — sonst
+        // reicht die Achse sichtbar bis zum Beginn der nächsten Periode (ein
+        // Achsen-Tick "01.09." für einen Monat, der am 31.08. endet).
+        max: (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 - 1000 : undefined,
         boundaryGap: [0, 0],
-        axisLabel: {formatter: v => fmtAxis(range, v / 1000), fontSize: scaledFont(10), color: inkFaint, hideOverlap: true},
+        axisLabel: {
+          // ECharts' eigene "nice tick"-Berechnung polstert eine Zeit-Achse
+          // intern minimal über min/max hinaus (auch mit explizit gesetztem
+          // max) — ohne diese Sperre erschiene trotz max oben vereinzelt noch
+          // ein Tick auf der falschen Seite der Periodengrenze (z. B. "01.09."
+          // für einen Monat, der am 31.08. endet). rawPeriodEndMs ist die
+          // EXKLUSIVE Grenze (Beginn der Folgeperiode) — ab dort wird die
+          // Beschriftung unterdrückt statt einfach nur die Achse zu kürzen.
+          formatter: v => {
+            const rawPeriodEndMs = (data.period_end ?? data.window_end) != null ? (data.period_end ?? data.window_end) * 1000 : null;
+            if (rawPeriodEndMs != null && v >= rawPeriodEndMs) return '';
+            return fmtAxis(range, v / 1000);
+          },
+          fontSize: scaledFont(10), color: inkFaint, hideOverlap: true,
+        },
         axisLine: {lineStyle: {color: borderColor}},
         axisTick: {show: false},
         splitLine: {show: false},
@@ -208,8 +456,7 @@
         textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: (params) => {
           if (!params.length) return '';
-          const d = new Date(params[0].axisValue);
-          const header = d.toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+          const header = fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
           const rows = params.map(p => {
             const unit = p.data[2] || '';
             const decimals = p.data[3];
@@ -219,7 +466,14 @@
           }).join('');
           return `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}`;
         },
+        // Kachel hat overflow:hidden (verhindert, dass z. B. die Legende das
+        // Kachel-Layout sprengt) — ohne appendToBody würde der Tooltip am
+        // Kachelrand abgeschnitten statt sichtbar über die Kachel
+        // hinauszuragen (siehe dieselbe Begründung in chart_editor.html/
+        // entity_detail.html).
+        appendToBody: true,
       },
+      legend: {show: false, data: echartsSeries.map(s => s.name), selected: legendSelected},
       series: echartsSeries,
     });
   }
@@ -309,6 +563,7 @@
     window.addEventListener('resize', () => instances.forEach(c => c.resize()));
     setupSizePickers();
     setupDragAndDrop();
+    setupLegendToggles();
   }
 
   function setupSizePickers() {
@@ -322,6 +577,11 @@
       const current = control.querySelector('.dtile-size-picker-head strong');
       const trigger = control.querySelector('.dtile-menu-btn');
       if (!tile || !cells.length || !preview || !current || !trigger) return;
+      // Nur bei Chart-Kacheln vorhanden (siehe _dashboard_tile_menu.html) —
+      // Vergleichstabellen haben keine Legende.
+      const legendRow = control.querySelector('.dtile-legend-row');
+      const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
+      const dtileBody = tile.querySelector('.dtile-body');
 
       // Bedienelemente dürfen nie den Drag-Vorgang der äußeren Kachel starten.
       control.addEventListener('dragstart', e => e.preventDefault());
@@ -375,6 +635,17 @@
             });
             clearPreview();
 
+            // Legende (Kachelmenü-Toggle) nur ab 2×2 sichtbar/bedienbar — beim
+            // Verkleinern ausblenden (Wert bleibt gespeichert, siehe
+            // set_dashboard_pin_legend()), beim Vergrößern ggf. wieder
+            // einblenden, ohne neu zu laden (legendCache).
+            const fitsLegend = gridCols >= 2 && gridRows >= 2;
+            if (legendRow) legendRow.style.display = fitsLegend ? '' : 'none';
+            if (dtileBody && dtileBody.dataset.showLegend !== undefined) {
+              const legend = legendCache.get(tile.dataset.itemId);
+              if (legend) renderLegend(dtileBody, legend, fitsLegend && dtileBody.dataset.showLegend === 'true');
+            }
+
             // Größere Tabellen dürfen den zusätzlichen Platz sofort nutzen;
             // Charts brauchen nach der CSS-Grid-Änderung ein explizites Resize.
             const tableBody = tile.querySelector('.dtile-body[data-columns]');
@@ -390,6 +661,33 @@
       control.addEventListener('focusout', e => {
         if (!control.contains(e.relatedTarget)) clearPreview();
       });
+
+      if (legendCheckbox && dtileBody) {
+        legendCheckbox.addEventListener('change', async () => {
+          const showLegend = legendCheckbox.checked;
+          legendCheckbox.disabled = true;
+          try {
+            const response = await fetch(`${base}/dashboard/legend`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId,
+                item_type: tile.dataset.itemType,
+                item_id: parseInt(tile.dataset.itemId, 10),
+                show_legend: showLegend,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            dtileBody.dataset.showLegend = String(showLegend);
+            const legend = legendCache.get(tile.dataset.itemId);
+            if (legend) renderLegend(dtileBody, legend, showLegend);
+          } catch (e) {
+            legendCheckbox.checked = !showLegend;
+          } finally {
+            legendCheckbox.disabled = false;
+          }
+        });
+      }
     });
   }
 

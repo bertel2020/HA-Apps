@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS entities (
     size_bytes INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
     display_mode TEXT NOT NULL DEFAULT 'onoff',
+    chart_options TEXT NOT NULL DEFAULT '{}',
     updated_at REAL NOT NULL
 );
 
@@ -251,6 +252,8 @@ CREATE TABLE IF NOT EXISTS saved_charts (
     dynamic_y_axis INTEGER NOT NULL DEFAULT 1,
     dashboard_animation INTEGER NOT NULL DEFAULT 1,
     chart_stats INTEGER NOT NULL DEFAULT 1,
+    legend_metrics TEXT NOT NULL DEFAULT '["sum"]',
+    legend_style TEXT NOT NULL DEFAULT 'chips',
     is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
@@ -307,6 +310,7 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     position INTEGER NOT NULL,
     grid_cols INTEGER NOT NULL DEFAULT 1,
     grid_rows INTEGER NOT NULL DEFAULT 1,
+    show_legend INTEGER NOT NULL DEFAULT 0,
     UNIQUE(dashboard_id, item_type, item_id)
 );
 
@@ -423,6 +427,19 @@ class Index:
             # als Dauer (h/m) oder als Rohwert/AN-Anteil anzeigen. 'onoff' erhält
             # das bisherige Verhalten für alle bestehenden Entitäten bei.
             self._conn.execute("ALTER TABLE entities ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'onoff'")
+        if "chart_options" not in columns:
+            # Individuelle Übersteuerung der Chart-Optionen (Optionen-Menü auf
+            # der Entität-eigenen Chart-Seite, entity_detail.html) — ein
+            # JSON-Objekt mit dem VOLLSTÄNDIGEN Options-Stand dieser Entität.
+            # Leer ('{}'), solange niemand etwas geändert hat: dann gelten die
+            # globalen Standardwerte (Setting "entity_chart_defaults", siehe
+            # main.py). Sobald die Entität zum ersten Mal eine Option ändert,
+            # wird der gesamte aktuelle Stand hier gespeichert ("forkt" von
+            # den Defaults ab) — spätere Änderungen an den globalen Defaults
+            # wirken sich auf bereits individualisierte Entitäten dann nicht
+            # mehr aus, bis sie über "Auf Standard zurücksetzen" wieder auf
+            # '{}' zurückgesetzt werden.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN chart_options TEXT NOT NULL DEFAULT '{}'")
 
         dp_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(deleted_points)")}
         if "id" not in dp_columns:
@@ -493,6 +510,20 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN chart_stats INTEGER NOT NULL DEFAULT 1"
             )
+        if "legend_metrics" not in sc_columns:
+            # Welche Kennzahlen die Legenden-Chips zeigen (Min/Max/Ø/Summe,
+            # siehe chart-legend-item im Template) — jetzt pro Chart
+            # konfigurierbar, standardmäßig nur Summe aktiv.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN legend_metrics TEXT NOT NULL DEFAULT "
+                "'[\"sum\"]'"
+            )
+        if "legend_style" not in sc_columns:
+            # Chips oder Tabelle (Optionen-Menü, "Legenden-Stil") — siehe
+            # legend_metrics oben, dieselbe Konfigurierbarkeit pro Chart.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN legend_style TEXT NOT NULL DEFAULT 'chips'"
+            )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -528,6 +559,10 @@ class Index:
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN grid_cols INTEGER NOT NULL DEFAULT 1")
         if "grid_rows" not in dashboard_columns:
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN grid_rows INTEGER NOT NULL DEFAULT 1")
+        if "show_legend" not in dashboard_columns:
+            # Legende unter dem Chart einer Dashboard-Kachel (Kachelmenü) — nur
+            # ab 2×2 sinnvoll darstellbar, siehe Template/dashboard-tiles.js.
+            self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN show_legend INTEGER NOT NULL DEFAULT 0")
         if "dashboard_id" not in dashboard_columns:
             # UNIQUE(item_type, item_id) muss zu UNIQUE(dashboard_id, item_type,
             # item_id) werden (Konzept "Dashboards": dasselbe Chart darf auf
@@ -1003,6 +1038,17 @@ class Index:
                 (int(favorite), time.time(), entity_id),
             )
 
+    def set_entity_chart_options(self, entity_id: str, options: dict) -> None:
+        """Speichert den vollständigen Chart-Optionen-Stand einer Entität
+        (Optionen-Menü, entity_detail.html) — {} setzt sie wieder auf die
+        globalen Standardwerte zurück ("Auf Standard zurücksetzen"), siehe
+        Kommentar bei der Spalten-Migration oben."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE entities SET chart_options = ?, updated_at = ? WHERE entity_id = ?",
+                (json.dumps(options), time.time(), entity_id),
+            )
+
     def list_distinct_units(self) -> list[str | None]:
         """Alle tatsächlich vorkommenden Einheiten (inkl. None für "ohne Einheit"),
         sortiert — Grundlage für den Einheit-Filter im CSV-Export (Konzept
@@ -1138,18 +1184,23 @@ class Index:
         dynamic_y_axis: bool = True,
         dashboard_animation: bool = True,
         chart_stats: bool = True,
+        legend_metrics: list[str] | None = None,
+        legend_style: str = "chips",
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
             cur = self._conn.execute(
                 "INSERT INTO saved_charts "
                 "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
-                "dynamic_y_axis, dashboard_animation, chart_stats, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
+                "created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
-                    int(dynamic_y_axis), int(dashboard_animation), int(chart_stats), now, now,
+                    int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
+                    json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
+                    legend_style, now, now,
                 ),
             )
             return cur.lastrowid
@@ -1166,16 +1217,20 @@ class Index:
         dynamic_y_axis: bool = True,
         dashboard_animation: bool = True,
         chart_stats: bool = True,
+        legend_metrics: list[str] | None = None,
+        legend_style: str = "chips",
     ) -> None:
         with self._lock, self._conn:
             self._conn.execute(
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
                 "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
-                "chart_stats = ?, updated_at = ? WHERE id = ?",
+                "chart_stats = ?, legend_metrics = ?, legend_style = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
-                    int(dynamic_y_axis), int(dashboard_animation), int(chart_stats), time.time(), chart_id,
+                    int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
+                    json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
+                    legend_style, time.time(), chart_id,
                 ),
             )
 
@@ -1186,6 +1241,8 @@ class Index:
         d["dynamic_y_axis"] = bool(d.get("dynamic_y_axis", 1))
         d["dashboard_animation"] = bool(d.get("dashboard_animation", 1))
         d["chart_stats"] = bool(d.get("chart_stats", 1))
+        d["legend_metrics"] = json.loads(d["legend_metrics"]) if d.get("legend_metrics") else ["sum"]
+        d["legend_style"] = d.get("legend_style") or "chips"
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["is_favorite"] = bool(d["is_favorite"])
         return d
@@ -1353,6 +1410,27 @@ class Index:
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
                 "WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
                 (int(grid_cols), int(grid_rows), dashboard_id, item_type, item_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_pin_legend(
+        self, dashboard_id: int, item_type: str, item_id: int, show_legend: bool
+    ) -> bool:
+        """Speichert, ob eine angeheftete Dashboard-Kachel ihre Chart-Legende
+        zeigt (nur bei Charts sinnvoll — Vergleichstabellen haben keine
+        Legende, siehe Aufrufer). Nur ab 2×2 Kachelgröße überhaupt sichtbar
+        (dashboard-tiles.js prüft das zusätzlich zur Laufzeit anhand der
+        aktuellen Größe), der gespeicherte Wert bleibt aber auch beim
+        Verkleinern unter 2×2 erhalten, damit er beim erneuten Vergrößern
+        nicht verloren geht.
+        """
+        if item_type != "chart":
+            raise ValueError("Legende ist nur für Charts verfügbar")
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET show_legend = ? "
+                "WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                (int(show_legend), dashboard_id, item_type, item_id),
             )
             return cursor.rowcount > 0
 

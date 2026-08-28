@@ -97,8 +97,6 @@
   .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
   .card{overflow:hidden;}
   #chart{width:100%;height:380px;max-width:100%;}
-  .stat-line{display:flex;gap:20px;flex-wrap:wrap;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
-  .stat-line strong{color:var(--ink);font-variant-numeric:tabular-nums;}
   @media (max-width:480px){
     #chart{height:280px;}
     .card{padding:14px;}
@@ -197,15 +195,52 @@
             <label class="menu-row">
               <span class="menu-row-label">Punkte</span>
               <span class="menu-toggle">
-                <input type="checkbox" :checked="showPoints" :disabled="chartType !== 'line'" @change="showPoints = !showPoints; render()">
+                <input type="checkbox" :checked="showPoints" :disabled="chartType !== 'line'" @change="showPoints = !showPoints; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
+            <label class="menu-row">
+              <span class="menu-row-label">Werte anzeigen</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="showValues" :disabled="chartType === 'timeline'" @change="showValues = !showValues; render(); saveChartOptions()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <label class="menu-row">
+              <span class="menu-row-label">Dynamische Y-Achse</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="dynamicYAxis" @change="dynamicYAxis = !dynamicYAxis; render(); saveChartOptions()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <label class="menu-row">
+              <span class="menu-row-label">Statistik in Legende</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render(); saveChartOptions()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <div class="menu-row legend-metrics-row" x-show="chartStats">
+              <template x-for="metric in legendMetricOptions" :key="metric.value">
+                <label class="legend-metric-check">
+                  <input type="checkbox" :value="metric.value" x-model="legendMetrics" @change="render(); saveChartOptions()">
+                  <span x-text="metric.label"></span>
+                </label>
+              </template>
+            </div>
+            <div class="menu-row" x-show="chartStats">
+              <span class="menu-row-label">Legenden-Stil</span>
+              <div class="seg">
+                <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'; saveChartOptions()">Chips</button>
+                <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">Tabelle</button>
+              </div>
+            </div>
             <div class="menu-divider"></div>
             <div class="menu-section-label">Aktionen</div>
             <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
             <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
             <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
+            <button type="button" class="menu-row" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
           </div>
         </div>
       </div>
@@ -214,9 +249,47 @@
     <div class="card">
       <div id="chart" x-show="points.length" :style="chartType === 'timeline' ? 'height:150px;' : ''"></div>
       <div class="empty" x-show="!points.length" x-text="loading ? 'Lädt …' : 'Keine Daten für diesen Zeitraum.'"></div>
-      <div class="stat-line" x-show="points.length">
-        <span>Punkte: <strong x-text="points.length"></strong></span>
-        <span x-show="!raw && (aggregationType === 'counter' || aggregationType === 'switch')">Summe: <strong x-text="fmtValue(total) + (UNIT ? ' ' + UNIT : '')"></strong></span>
+      <div class="chart-legend" x-show="points.length && chartStats && legendStyle === 'chips'">
+        <span class="chart-legend-item static">
+          <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
+          <span class="name">{{ friendly_name or entity_id }}</span>
+          <span class="values">
+            <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="entityStat.last"></strong></span>
+            <span x-show="legendMetrics.includes('min')">Min <strong x-text="entityStat.min"></strong></span>
+            <span x-show="legendMetrics.includes('max')">Max <strong x-text="entityStat.max"></strong></span>
+            <span x-show="legendMetrics.includes('average')">Ø <strong x-text="entityStat.average"></strong></span>
+            <span x-show="legendMetrics.includes('sum') && entityStat.sum !== null">Summe <strong x-text="entityStat.sum"></strong></span>
+          </span>
+        </span>
+      </div>
+      <div class="tbl-wrap chart-legend-table-wrap" x-show="points.length && chartStats && legendStyle === 'table'">
+        <table class="dt compact chart-legend-table">
+          <thead>
+            <tr>
+              <th class="legend-name-col">Name</th>
+              <th x-show="legendMetrics.includes('last')">Aktuell</th>
+              <th x-show="legendMetrics.includes('min')">Min</th>
+              <th x-show="legendMetrics.includes('max')">Max</th>
+              <th x-show="legendMetrics.includes('average')">Ø</th>
+              <th x-show="legendMetrics.includes('sum')">Summe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="legend-name-col">
+                <span class="legend-name-cell">
+                  <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
+                  <span>{{ friendly_name or entity_id }}</span>
+                </span>
+              </td>
+              <td x-show="legendMetrics.includes('last')" x-text="entityStat.last"></td>
+              <td x-show="legendMetrics.includes('min')" x-text="entityStat.min"></td>
+              <td x-show="legendMetrics.includes('max')" x-text="entityStat.max"></td>
+              <td x-show="legendMetrics.includes('average')" x-text="entityStat.average"></td>
+              <td x-show="legendMetrics.includes('sum')" x-text="entityStat.sum ?? '—'"></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -249,6 +322,11 @@
       root.load();
     }
 
+    // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
+    // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
+    // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
+    // Sprach-Setting nur hier greifen muss.
+    const LOCALE = 'de-DE';
     const ENTITY_ID = {{ entity_id | tojson }};
     const DISPLAY_NAME = {{ (friendly_name or entity_id) | tojson }};
     const BASE = {{ base | tojson }};
@@ -256,6 +334,22 @@
     // null = "Automatisch" (Konzept Abschnitt 03) — sonst feste Anzahl Nachkommastellen,
     // pro Entität im Konfigurationsbereich einstellbar.
     const DECIMALS = {{ decimals | tojson }};
+    // Effektiver Options-Stand dieser Entität — globale Defaults, von einer
+    // etwaigen eigenen Übersteuerung übersteuert (main.py,
+    // _resolve_entity_chart_options()). Jede Änderung im Optionen-Menü
+    // schickt den kompletten aktuellen Stand zurück (saveChartOptions()),
+    // kein separater Speichern-Button.
+    const CHART_OPTIONS = {{ chart_options | tojson }};
+    // Dieselbe Optionen-Menü-Auswahl (Dynamische Y-Achse/Statistik in
+    // Legende) wie chart_editor.html, hier nur mit einem einzelnen
+    // Legenden-Chip statt einer Serienliste.
+    const LEGEND_METRIC_OPTIONS = [
+      {value: 'last', label: 'Aktuell'},
+      {value: 'min', label: 'Min'},
+      {value: 'max', label: 'Max'},
+      {value: 'average', label: 'Durchschnitt'},
+      {value: 'sum', label: 'Summe'},
+    ];
     const DEFAULT_CHART_TYPE = {{ ('bar' if aggregation_type in ('counter', 'switch') else 'line') | tojson }};
     // Nur bei Schalter-Entitäten (binary_sensor/switch/input_boolean) im
     // Konfigurationsbereich umschaltbar (Konzept: Anzeigemodus) — steuert, ob
@@ -288,10 +382,10 @@
       // windowEnd ist exklusiv — für die Anzeige eine Sekunde zurück, sonst wirkt
       // z. B. ein Monat so, als würde er schon im Folgemonat enden.
       const end = new Date(windowEnd * 1000 - 1000);
-      const fmtDay = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'});
-      const fmtDayMonth = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
-      const fmtMonthYear = d => d.toLocaleDateString('de-DE', {month: 'long', year: 'numeric'});
-      const fmtTime = d => d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+      const fmtDay = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const fmtDayMonth = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
+      const fmtMonthYear = d => d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+      const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
       switch (range) {
         case 'hour':
           return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
@@ -343,6 +437,44 @@
       return labels[range] || 'Vorjahreszeitraum';
     }
 
+    // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie
+    // in chart_editor.html, hier für den Tooltip-Zeitstempel-Formatter unten.
+    function detectResolutionSeconds(points) {
+      if (!points || points.length < 2) return null;
+      const gaps = [];
+      for (let i = 1; i < points.length; i++) {
+        const gap = points[i].ts - points[i - 1].ts;
+        if (gap > 0) gaps.push(gap);
+      }
+      if (!gaps.length) return null;
+      gaps.sort((a, b) => a - b);
+      return gaps[Math.floor(gaps.length / 2)];
+    }
+
+    // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
+    // Daten, nicht nach dem Zeitraum-Namen — die Uhrzeit ist bei Tages-Buckets
+    // oder gröber ohnehin immer Mitternacht, also reine Information ohne Wert.
+    // Durchgehend über Intl (LOCALE) statt handgebauter Strings, damit sich
+    // Datum/Uhrzeit/Wochentag mit einer künftigen Sprachumschaltung automatisch
+    // anpassen. Der abgeschnittene Punkt hinter dem Wochentagskürzel
+    // (".replace") gleicht nur einen ICU-Unterschied zwischen Engines aus
+    // ("Mo" vs. "Mo.") — die Sprache/Reihenfolge selbst bleibt Intl überlassen.
+    function fmtTooltipTimestamp(ms, bucketSeconds) {
+      const d = new Date(ms);
+      if (bucketSeconds == null || bucketSeconds < 86400) {
+        return d.toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+      }
+      if (bucketSeconds < 86400 * 25) {
+        const weekday = d.toLocaleDateString(LOCALE, {weekday: 'short'}).replace(/\.$/, '');
+        const date = d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+        return `${weekday}, ${date}`;
+      }
+      if (bucketSeconds < 86400 * 200) {
+        return d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+      }
+      return d.toLocaleDateString(LOCALE, {year: 'numeric'});
+    }
+
     // Bewusst außerhalb des Alpine-x-data-Objekts: Alpine macht jede Eigenschaft
     // dort reaktiv, indem es sie in einen Proxy einwickelt. ECharts verlässt sich
     // intern (zrender-Eventsystem, WeakMap-Lookups per Objekt-Identität) darauf,
@@ -360,15 +492,23 @@
           {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}, {key: 'decade', label: 'Dekade'},
         ],
         range: 'day',
-        chartType: DEFAULT_CHART_TYPE,
-        showPoints: false,
+        // chart_type "auto" (globaler Default) löst hier zum entitätstyp-
+        // abhängigen DEFAULT_CHART_TYPE auf — "line"/"bar" (eigene Wahl,
+        // global oder pro Entität übersteuert) gilt dagegen direkt.
+        chartType: CHART_OPTIONS.chart_type === 'auto' ? DEFAULT_CHART_TYPE : CHART_OPTIONS.chart_type,
+        showPoints: CHART_OPTIONS.show_points,
+        showValues: CHART_OPTIONS.show_values,
+        dynamicYAxis: CHART_OPTIONS.dynamic_y_axis,
+        chartStats: CHART_OPTIONS.chart_stats,
+        legendMetrics: [...CHART_OPTIONS.legend_metrics],
+        legendStyle: CHART_OPTIONS.legend_style,
         compare: false,
         compareMode: 'previous',
         optionsMenuOpen: false,
         compareMenuOpen: false,
-        raw: false,
+        raw: CHART_OPTIONS.raw,
         offset: 0,
-        continuous: false,
+        continuous: CHART_OPTIONS.continuous,
         points: [],
         comparePoints: [],
         compareWindowStart: null,
@@ -388,6 +528,26 @@
         // wechseln auf "Tag" fälschlich auf heute springen.
         _rangeAnchorMs: null,
         get total() { return this.points.reduce((sum, p) => sum + (p.value || 0), 0); },
+        get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
+        // Min/Max/Ø/Summe für den Legenden-Chip (siehe Template) — dieselbe
+        // Berechnung wie seriesStats() in chart_editor.html, hier nur für die
+        // eine Serie dieser Seite statt für eine Liste. Summe nur bei Zählern
+        // sinnvoll (Bucket-Werte sind dort bereits Deltas je Zeitfenster) und
+        // nicht im Rohwerte-Modus (Einzelmesswerte statt Deltas).
+        get entityStat() {
+          const values = this.points.map(p => p.value).filter(Number.isFinite);
+          const minima = this.points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
+          const maxima = this.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
+          const hasSum = this.aggregationType === 'counter' && !this.raw;
+          const formatted = value => fmtValue(value) + (UNIT ? ' ' + UNIT : '');
+          return {
+            last: values.length ? formatted(values[values.length - 1]) : '—',
+            min: minima.length ? formatted(Math.min(...minima)) : '—',
+            max: maxima.length ? formatted(Math.max(...maxima)) : '—',
+            average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+            sum: hasSum ? (values.length ? formatted(this.total) : '—') : null,
+          };
+        },
         get canGoForward() { return this.offset < 0; },
         // "Als Chart speichern" (Optionen-Menü) — übergibt die aktuell
         // betrachtete Entität + Zeitraum-/Vergleichs-Einstellungen an
@@ -443,7 +603,43 @@
           if (this.canGoForward) { this._rangeAnchorMs = null; this.offset += 1; this.load(); }
         },
         goToNow() { this._rangeAnchorMs = null; this.offset = 0; this.load(); },
-        toggleContinuous() { this._rangeAnchorMs = null; this.continuous = !this.continuous; this.load(); },
+        // Optionen-Menü (Konzept "Pro Entität speicherbare Chart-Optionen") —
+        // kein Speichern-Button, jede Änderung im Menü sendet sofort den
+        // gesamten aktuellen Options-Stand. Fire-and-forget wie
+        // toggleFavorite() (favorite-toggle.js): ein Netzwerkfehler soll die
+        // Bedienung nicht blockieren, die Anzeige selbst hat sich ja schon
+        // (optimistisch, über die reaktiven Alpine-Felder) geändert — beim
+        // nächsten Laden der Seite greift dann wieder der zuletzt tatsächlich
+        // gespeicherte Stand.
+        async saveChartOptions() {
+          try {
+            await fetch(`${BASE}/entities/${ENTITY_ID}/chart-options`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                continuous: this.continuous, raw: this.raw, chart_type: this.chartType,
+                show_points: this.showPoints, show_values: this.showValues,
+                dynamic_y_axis: this.dynamicYAxis, chart_stats: this.chartStats,
+                legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
+              }),
+            });
+          } catch (e) {
+            // Netzwerkfehler: nächster Seitenaufruf lädt wieder den zuletzt
+            // gespeicherten Stand, siehe Kommentar oben.
+          }
+        },
+        // "Auf Standard zurücksetzen" (Optionen-Menü, Aktionen) — wirft die
+        // individuelle Übersteuerung dieser Entität weg und lädt die Seite
+        // neu, damit alle Felder wieder die (dann wieder live geltenden)
+        // globalen Defaults zeigen, statt sie hier einzeln nachzubauen.
+        async resetChartOptions() {
+          try {
+            await fetch(`${BASE}/entities/${ENTITY_ID}/chart-options/reset`, {method: 'POST'});
+          } finally {
+            location.reload();
+          }
+        },
+        toggleContinuous() { this._rangeAnchorMs = null; this.continuous = !this.continuous; this.load(); this.saveChartOptions(); },
         setCompareMode(mode) {
           this.compare = true;
           this.compareMode = mode;
@@ -464,6 +660,7 @@
           this.raw = !this.raw;
           if (this.raw) { this.compare = false; this.chartType = 'line'; }
           this.load();
+          this.saveChartOptions();
         },
 
         // Diagrammtyp-Wahl (Linie/Balken/Zeitstrahl) — eigene Methode statt
@@ -483,6 +680,7 @@
             this.raw = false;
           }
           this.load();
+          this.saveChartOptions();
         },
 
         async load() {
@@ -521,21 +719,23 @@
         render() {
           if (!this.points.length) return;
           if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           // Kurze, zum Zeitraum passende Beschriftung statt immer Datum+Uhrzeit —
           // sonst überlappen sich die Achsenbeschriftungen bei vielen Punkten.
           const fmt = ts => {
             const d = new Date(ts * 1000);
             if (this.range === 'hour' || this.range === 'day') {
-              return d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+              return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
             }
             if (this.range === 'week' || this.range === 'month') {
-              return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+              return d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
             }
             if (this.range === 'decade') {
-              return d.toLocaleDateString('de-DE', {year: 'numeric'});
+              return d.toLocaleDateString(LOCALE, {year: 'numeric'});
             }
-            return d.toLocaleDateString('de-DE', {month: 'short', year: 'numeric'});
+            return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
           };
+          const tooltipBucketSeconds = detectResolutionSeconds(this.points);
 
           if (this.chartType === 'timeline') {
             this.renderTimeline(fmt);
@@ -560,6 +760,16 @@
             itemStyle: {color: getComputedStyle(document.body).getPropertyValue(this.chartType === 'bar' ? '--chart-bar' : '--chart-line')},
             lineStyle: {width: 1.5},
             smooth: this.chartType === 'line',
+            // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/Punkt,
+            // zusätzlich zum Tooltip. Ohne Einheit (die steht schon an der
+            // Y-Achse) — hier reicht die reine Zahl.
+            label: {
+              show: this.showValues,
+              position: 'top',
+              fontSize: Math.round(10.5 * uiFontScale * 10) / 10,
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              formatter: params => fmtValue(params.value[1]),
+            },
             // Ohne Deckelung errechnet ECharts die Balkenbreite auf einer
             // Zeit-Achse aus dem Abstand zu benachbarten Punkten — bei nur
             // einem einzigen Punkt (z. B. "Jahr" einer Entität, die erst
@@ -624,7 +834,6 @@
             if (this.chartType === 'line') compareSeries.smooth = true;
             series.push(compareSeries);
           }
-          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const option = {
             textStyle: {
               fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
@@ -650,20 +859,40 @@
               // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die
               // noch datenlose Zukunft — windowEnd (an "jetzt" gedeckelt) bleibt
               // nur für den Linien-Haltepunkt maßgeblich (siehe periodEnd oben).
-              max: this.periodEnd != null ? this.periodEnd * 1000 : undefined,
+              // Eine Sekunde zurück, da periodEnd EXKLUSIV ist — sonst reicht die
+              // Achse sichtbar bis zum Beginn der nächsten Periode (ein Achsen-Tick
+              // "01.09." für einen Monat, der am 31.08. endet).
+              max: this.periodEnd != null ? this.periodEnd * 1000 - 1000 : undefined,
               // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
               // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
               // einem Bucket: die Achse reichte weit über das eigentliche Fenster
               // hinaus) — boundaryGap:[0,0] unterbindet dieses Auto-Polster, min/max
               // bleiben dadurch die tatsächlichen Achsengrenzen.
               boundaryGap: [0, 0],
-              axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
+              axisLabel: {
+                // ECharts' "nice tick"-Berechnung polstert die Achse intern
+                // minimal über max hinaus (trotz explizitem max oben) — ohne
+                // diese Sperre erschiene sonst vereinzelt noch ein Tick jenseits
+                // der Periodengrenze (z. B. "01.09." für einen Monat, der am
+                // 31.08. endet). this.periodEnd (EXKLUSIV, Beginn der Folge-
+                // periode) ist die Grenze, ab der die Beschriftung unterdrückt wird.
+                formatter: v => (this.periodEnd != null && v >= this.periodEnd * 1000) ? '' : fmt(v / 1000),
+                hideOverlap: true,
+              },
             },
             yAxis: {
               type: 'value',
               name: DURATION_DISPLAY ? 'Dauer' : (UNIT || undefined),
               nameLocation: 'end',
               nameTextStyle: {align: 'left'},
+              // Dieselbe Fest/Dynamisch-Logik wie im (Mehrentitäten-)Chart-Editor
+              // (chart_editor.html, dort für mehrere Achsen verallgemeinert) —
+              // "fest" bindet die Achse an 0, "dynamisch" lässt ECharts frei auf
+              // den tatsächlichen Datenbereich skalieren (scale:true, sonst
+              // erzwingt eine value-Achse per Default immer die Einbindung der Null).
+              min: this.dynamicYAxis ? undefined : value => Math.min(0, value.min),
+              max: this.dynamicYAxis ? undefined : value => Math.max(0, value.max),
+              scale: this.dynamicYAxis,
               axisLabel: {formatter: v => UNIT ? `${fmtValue(v)} ${UNIT}` : fmtValue(v)},
             },
             tooltip: {
@@ -673,18 +902,28 @@
               // Achsenposition) — für die Vorperiode ist das aber der VERSCHOBENE,
               // nicht der tatsächliche Zeitpunkt (siehe Kommentar bei shiftMs oben).
               // Jede Zeile bekommt hier stattdessen ihre eigene echte Zeit aus dem
-              // dritten Datenfeld.
-              // Nur Zeit + Wert je Zeile — keine Serien-Bezeichnung mehr (Farbpunkt
-              // vom Marker reicht zur Unterscheidung zwischen Haupt- und Vorperiode).
-              formatter: params => params.map(p => {
-                const d = new Date(p.data[2]);
-                const pad = n => String(n).padStart(2, '0');
-                const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-                const val = UNIT ? `${fmtValue(p.value[1])} ${UNIT}` : fmtValue(p.value[1]);
-                return `<div style="display:flex;justify-content:space-between;gap:18px;">`
-                     + `<span>${p.marker}${time}</span>`
-                     + `<strong style="margin-left:8px;">${val}</strong></div>`;
-              }).join(''),
+              // dritten Datenfeld — nur wenn sie tatsächlich auseinanderfällt
+              // (aktiver Vergleich, der Normalfall ohne Vergleich hat ohnehin nur
+              // eine Zeile): sonst eine gemeinsame Kopfzeile statt das Datum je
+              // Zeile zu wiederholen (dieselbe Logik wie chart_editor.html). Immer
+              // einheitlich ÜBER dem Wert. Keine Serien-Bezeichnung (Farbpunkt vom
+              // Marker reicht zur Unterscheidung zwischen Haupt- und Vorperiode).
+              formatter: params => {
+                const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
+                const sameTime = times.every(t => t === times[0]);
+                const row = p => {
+                  const val = UNIT ? `${fmtValue(p.value[1])} ${UNIT}` : fmtValue(p.value[1]);
+                  return `<span style="display:flex;align-items:center;gap:5px;">${p.marker}<strong>${val}</strong></span>`;
+                };
+                if (sameTime) {
+                  return `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:4px;">${times[0]}</div>`
+                       + params.map(p => `<div style="margin-bottom:2px;">${row(p)}</div>`).join('');
+                }
+                return params.map((p, i) =>
+                  `<div style="display:flex;align-items:center;gap:5px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:2px;">${p.marker}${times[i]}</div>`
+                  + `<strong style="display:block;margin-bottom:4px;">${UNIT ? `${fmtValue(p.value[1])} ${UNIT}` : fmtValue(p.value[1])}</strong>`
+                ).join('');
+              },
               // appendToBody: die Karte hat overflow:hidden (verhindert, dass die
               // Zeitraum-Buttons das Seitenlayout sprengen) — ohne appendToBody
               // würde das Tooltip an den Kartenrändern abgeschnitten statt sichtbar
@@ -735,9 +974,17 @@
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
-              max: this.periodEnd != null ? this.periodEnd * 1000 : undefined,
+              // Eine Sekunde zurück, siehe Kommentar bei der Linien-/Balken-
+              // Chart-Achse oben (periodEnd ist exklusiv).
+              max: this.periodEnd != null ? this.periodEnd * 1000 - 1000 : undefined,
               boundaryGap: [0, 0],
-              axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
+              // Siehe Kommentar bei der Linien-/Balken-Chart-Achse oben — ECharts
+              // polstert die Achse trotz max intern minimal weiter, deshalb
+              // zusätzlich die Beschriftung ab periodEnd unterdrücken.
+              axisLabel: {
+                formatter: v => (this.periodEnd != null && v >= this.periodEnd * 1000) ? '' : fmt(v / 1000),
+                hideOverlap: true,
+              },
             },
             // Eine einzelne Kategorie = eine Zeile — bewusst ohne Achsenlinie/
             // -beschriftung, das Band selbst macht klar, worum es geht (Legende/
@@ -778,6 +1025,11 @@
         },
 
         init() {
+          // Verteidigt gegen eine widersprüchliche Kombination aus den
+          // globalen Defaults (z. B. Rohwerte + Diagrammtyp Balken gleichzeitig
+          // gesetzt) — dieselbe Vorrangregel wie toggleRaw()/setChartType()
+          // schon zur Laufzeit durchsetzen: Rohwerte schließt Balken aus.
+          if (this.raw && this.chartType === 'bar') this.chartType = 'line';
           this.load();
           window.addEventListener('resize', () => chartInstance && chartInstance.resize());
           // ResizeObserver zusätzlich zu window-resize: die Kartenbreite kann sich

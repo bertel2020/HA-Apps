@@ -42,6 +42,11 @@ Kachel-Ansicht wie unter **Dashboards**, nur fest der Startseite zugeordnet.
   "**+ Neuer Chart**"/"**+ Neue Tabelle**" (führt sofort in den jeweiligen
   Editor) sowie einer Liste bereits gespeicherter, noch nicht angehefteter
   Charts/Tabellen zum Anklicken.
+- Chart-Kacheln ab Größe 2×2 können über das Kachelmenü (⋮) eine Legende
+  einblenden ("Legende anzeigen") — Aussehen und Inhalt entsprechen dabei
+  exakt der Legende des zugrundeliegenden Charts; ein Klick auf die
+  Legende blendet die jeweilige Reihe ein/aus, ohne zum Chart zu
+  navigieren.
 - **Dashboard fixieren** (Editor, Schalter "Fixiert"): sperrt Umsortieren,
   Größenändern und Entfernen von Kacheln auf der Ansicht selbst — schützt
   vor versehentlichem Verschieben auf einem z. B. dauerhaft angezeigten
@@ -61,10 +66,18 @@ Ein Klick öffnet die **Verlaufsansicht** einer einzelnen Entität:
   Intervallen.
 - **Vergleich** (Optionen-Menü): Vorperiode oder Vorjahr, mit passender
   Beschriftung ("Vortag", "Vorjahrestag" …).
-- **Min/Max/Durchschnitt** wahlweise direkt in der Legende sichtbar.
+- **Aktuell/Min/Max/Durchschnitt/Summe** wahlweise direkt in der Legende
+  sichtbar, wahlweise als Chips oder als Tabelle (Legenden-Stil); beide
+  lassen sich anklicken, um einzelne Reihen ein-/auszublenden.
 - **Als Chart speichern** (Optionen-Menü) legt die aktuelle Ansicht als
   eigenständiges, ggf. mehrere Entitäten umfassendes Chart ab — von dort aus
   an ein Dashboard anheftbar.
+- Alle Optionen im Optionen-Menü (Kontinuierlich, Rohwerte, Diagrammtyp,
+  Punkte, Werte anzeigen, Dynamische Y-Achse, Legenden-Statistik und
+  -Kennzahlen, Legenden-Stil) werden pro Entität dauerhaft gespeichert;
+  die Startwerte dafür lassen sich unter **Einstellungen → Darstellung**
+  ändern, "Optionen auf Standard zurücksetzen" wirft eine Entität wieder
+  auf diese Startwerte zurück.
 
 ### Entität konfigurieren
 
@@ -217,7 +230,7 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation |
+| **Darstellung** | Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standard-Auflösung/-Aufbewahrung für neu erkannte Entitäten (wirkt nie rückwirkend auf bestehende) |
 | **Rotation** | Zeigt Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten Wert) — manuell nachziehbar |
 | **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe "Bereinigung" oben) |

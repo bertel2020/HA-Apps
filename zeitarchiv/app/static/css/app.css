@@ -365,7 +365,63 @@ a.menu-row{text-decoration:none;}
 .menu-toggle input:checked ~ .track .thumb{transform:translateX(14px);}
 .menu-toggle input:disabled{cursor:default;}
 .menu-toggle input:disabled ~ .track{opacity:.4;}
+
+/* Welche Kennzahlen "Statistik in Legende" anzeigt (Min/Max/Ø/Summe) —
+   eingerückte Checkbox-Reihe direkt unter dem Toggle, nur sichtbar solange
+   dieser aktiv ist (x-show="chartStats" im Template). */
+.legend-metrics-row{padding:2px 10px 8px 10px;display:flex;flex-wrap:wrap;justify-content:flex-start;gap:10px;cursor:default;}
+.legend-metric-check{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;}
+.legend-metric-check input{margin:0;cursor:pointer;}
+
+/* Eigene Legende statt ECharts' eingebauter (dort stummgeschaltet) — jeder
+   Chip ist gleichzeitig Serien-Umschalter UND (bei aktivem "Statistik in
+   Legende") Min/Max/Ø/Summe-Anzeige derselben Entität, eine Zeile statt
+   getrennter Legende + Statistik-Kacheln darunter. Von chart_editor.html
+   UND der Entität-eigenen Chart-Seite (entity_detail.html) genutzt. */
+.chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.chart-legend-item{
+  display:flex;align-items:baseline;gap:9px;max-width:100%;
+  padding:6px 13px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface-alt);cursor:pointer;font:inherit;color:inherit;
+  transition:opacity .15s ease,border-color .15s ease;
+}
+.chart-legend-item:hover{border-color:var(--accent-line);}
+.chart-legend-item.inactive{opacity:.4;}
+/* Für die per role="button"/tabindex="0" bedienbaren Chips in den Dashboard-
+   Kacheln (dashboard-tiles.js) — echte <button>-Chips (chart_editor.html)
+   bekommen ihren Fokusring bereits vom Browser. */
+.chart-legend-item[tabindex]:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
+.chart-legend-item .dot{width:9px;height:9px;border-radius:999px;flex:none;}
+.chart-legend-item .name{
+  font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1));
+}
+.chart-legend-item .values{
+  display:flex;gap:9px;flex:none;font-family:var(--font-mono);color:var(--ink-muted);
+  white-space:nowrap;font-size:calc(11px * var(--font-scale, 1));
+}
+/* Nicht klickbar — für Legenden ohne Serien-Umschalter-Funktion (Entität-
+   eigene Chart-Seite: nur eine Serie; Dashboard-Kachel-Legende: reine
+   Anzeige, siehe entity_detail.html/dashboard-tiles.js). */
+.chart-legend-item.static{cursor:default;}
+.chart-legend-item.static:hover{border-color:var(--border);}
 .menu-row:has(input:disabled){cursor:default;color:var(--ink-faint);}
+
+/* Alternative "Statistik in Legende"-Darstellung als Tabelle (Optionen-Menü,
+   "Legenden-Stil") statt der Chip-Reihe — dieselben table.dt-Regeln oben,
+   nur mit rechtsbündigen Zahlenspalten und Farbpunkt in der Namensspalte. */
+.chart-legend-table th:not(.legend-name-col),.chart-legend-table td:not(.legend-name-col){
+  text-align:right;font-variant-numeric:tabular-nums;
+}
+.chart-legend-table td.legend-name-col{font-weight:600;color:var(--ink);}
+.chart-legend-table .legend-name-cell{display:inline-flex;align-items:center;gap:8px;}
+.chart-legend-table .legend-name-cell .dot{width:9px;height:9px;border-radius:999px;flex:none;}
+/* Zeilen sind wie die Chips klickbare Serien-Umschalter (chart_editor.html:
+   toggleLegendItem(); dashboard-tiles.js: dieselbe Aktion über
+   toggleTileLegendItem()). */
+.chart-legend-table-row{cursor:pointer;}
+.chart-legend-table-row.inactive{opacity:.4;}
+.chart-legend-table-row[tabindex]:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 
 /* Datentabellen */
 .tbl-wrap{
@@ -517,6 +573,10 @@ td.mono{font-family:var(--font-mono);}
   margin:0 0 6px;font-size:calc(14.5px * var(--font-scale, 1));font-weight:700;line-height:1.35;color:var(--ink-muted);
 }
 .settings-minor-section{margin-top:20px;}
+.settings-compact-list{border-top:1px solid var(--border);}
+.settings-compact-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);}
+.settings-compact-label{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+.btn-sm{padding:5px 10px;font-size:calc(12px * var(--font-scale, 1));}
 .settings-panel .settings-minor-title{
   margin:0 0 6px;font-size:calc(13px * var(--font-scale, 1));font-weight:700;line-height:1.4;color:var(--ink-faint);
 }

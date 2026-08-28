@@ -44,9 +44,14 @@
        data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
        data-resolution-preset="{{ tile.resolution_preset }}"
        data-dynamic-y-axis="{{ 'true' if tile.dynamic_y_axis else 'false' }}"
+       data-show-legend="{{ 'true' if tile.show_legend else 'false' }}"
+       data-chart-stats="{{ 'true' if tile.chart_stats else 'false' }}"
+       data-legend-metrics='{{ tile.legend_metrics | tojson }}'
+       data-legend-style="{{ tile.legend_style }}"
        data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>
+      <div class="dtile-legend"></div>
     </a>
   </div>
   {% else %}

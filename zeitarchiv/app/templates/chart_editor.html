@@ -67,28 +67,9 @@
   .period-label{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);display:block;margin-bottom:14px;}
   #chart{width:100%;height:420px;max-width:100%;}
   .card{overflow:hidden;}
-  /* Eigene Legende statt ECharts' eingebauter (dort stummgeschaltet, siehe
-     render()) — jeder Chip ist gleichzeitig Serien-Umschalter UND (bei
-     aktivem "Statistik in Legende") Min/Max/Ø-Anzeige derselben Entität,
-     eine Zeile statt getrennter Legende + Statistik-Kacheln darunter. */
-  .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
-  .chart-legend-item{
-    display:flex;align-items:baseline;gap:9px;max-width:100%;
-    padding:6px 13px;border-radius:20px;border:1px solid var(--border);
-    background:var(--surface-alt);cursor:pointer;font:inherit;color:inherit;
-    transition:opacity .15s ease,border-color .15s ease;
-  }
-  .chart-legend-item:hover{border-color:var(--accent-line);}
-  .chart-legend-item.inactive{opacity:.4;}
-  .chart-legend-item .dot{width:9px;height:9px;border-radius:999px;flex:none;}
-  .chart-legend-item .name{
-    font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
-    text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1));
-  }
-  .chart-legend-item .values{
-    display:flex;gap:9px;flex:none;font-family:var(--font-mono);color:var(--ink-muted);
-    white-space:nowrap;font-size:calc(11px * var(--font-scale, 1));
-  }
+  /* .chart-legend/.chart-legend-item: siehe app.css — von der Entität-eigenen
+     Chart-Seite (entity_detail.html) mitgenutzt, deshalb zentral statt hier
+     lokal definiert. */
   .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
   .save-row input[type=text]{
     font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));padding:9px 14px;border-radius:8px;
@@ -211,6 +192,13 @@
                 </span>
               </label>
               <label class="menu-row">
+                <span class="menu-row-label">Werte anzeigen</span>
+                <span class="menu-toggle">
+                  <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
+                  <span class="track"><span class="thumb"></span></span>
+                </span>
+              </label>
+              <label class="menu-row">
                 <span class="menu-row-label">Dynamische Y-Achse</span>
                 <span class="menu-toggle">
                   <input type="checkbox" :checked="dynamicYAxis" @change="dynamicYAxis = !dynamicYAxis; render()">
@@ -224,6 +212,21 @@
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
+              <div class="menu-row legend-metrics-row" x-show="chartStats">
+                <template x-for="metric in legendMetricOptions" :key="metric.value">
+                  <label class="legend-metric-check">
+                    <input type="checkbox" :value="metric.value" x-model="legendMetrics" @change="render()">
+                    <span x-text="metric.label"></span>
+                  </label>
+                </template>
+              </div>
+              <div class="menu-row" x-show="chartStats">
+                <span class="menu-row-label">Legenden-Stil</span>
+                <div class="seg">
+                  <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">Chips</button>
+                  <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'">Tabelle</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -241,19 +244,61 @@
              aktivem "Statistik in Legende" zeigt jeder Chip zusätzlich
              Min/Max/Ø derselben Entität — eine Zeile, zwei Zwecke, statt
              Legende und Statistik-Kacheln getrennt untereinander. -->
-        <div class="chart-legend" x-show="hasData">
+        <div class="chart-legend" x-show="hasData && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)">
               <span class="dot" :style="{background: stat.color}"></span>
               <span class="name" x-text="stat.name"></span>
               <span class="values" x-show="chartStats">
-                <span>Min <strong x-text="stat.min"></strong></span>
-                <span>Max <strong x-text="stat.max"></strong></span>
-                <span>Ø <strong x-text="stat.average"></strong></span>
+                <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="stat.last"></strong></span>
+                <span x-show="legendMetrics.includes('min')">Min <strong x-text="stat.min"></strong></span>
+                <span x-show="legendMetrics.includes('max')">Max <strong x-text="stat.max"></strong></span>
+                <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
+                <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Summe <strong x-text="stat.sum"></strong></span>
               </span>
             </button>
           </template>
+        </div>
+        <!-- Alternative Legenden-Darstellung als Tabelle (Optionen-Menü, "Legenden-
+             Stil") — dieselben Serien-Statistiken wie die Chips oben, nur als
+             Spalten statt als Zeile pro Chip; bei vielen Serien/Kennzahlen besser
+             lesbar. Nur sichtbar, wenn "Statistik in Legende" aktiv ist — ohne
+             Kennzahlen wäre eine Tabelle nur eine Namensliste ohne Mehrwert
+             gegenüber den (auch als Serien-Umschalter nutzbaren) Chips. Zeilen
+             sind wie die Chips klickbare Serien-Umschalter (dieselbe
+             toggleLegendItem()-Action). -->
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table'">
+          <table class="dt compact chart-legend-table">
+            <thead>
+              <tr>
+                <th class="legend-name-col">Name</th>
+                <th x-show="legendMetrics.includes('last')">Aktuell</th>
+                <th x-show="legendMetrics.includes('min')">Min</th>
+                <th x-show="legendMetrics.includes('max')">Max</th>
+                <th x-show="legendMetrics.includes('average')">Ø</th>
+                <th x-show="legendMetrics.includes('sum')">Summe</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="stat in seriesStats" :key="stat.entityId">
+                <tr class="chart-legend-table-row" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
+                    @click="toggleLegendItem(stat.entityId, stat.name)">
+                  <td class="legend-name-col">
+                    <span class="legend-name-cell">
+                      <span class="dot" :style="{background: stat.color}"></span>
+                      <span x-text="stat.name"></span>
+                    </span>
+                  </td>
+                  <td x-show="legendMetrics.includes('last')" x-text="stat.last"></td>
+                  <td x-show="legendMetrics.includes('min')" x-text="stat.min"></td>
+                  <td x-show="legendMetrics.includes('max')" x-text="stat.max"></td>
+                  <td x-show="legendMetrics.includes('average')" x-text="stat.average"></td>
+                  <td x-show="legendMetrics.includes('sum')" x-text="stat.sum ?? '—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
 
         <div class="save-row" x-show="editing">
@@ -271,6 +316,11 @@
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script>
+    // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
+    // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
+    // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
+    // Sprach-Setting nur hier greifen muss.
+    const LOCALE = 'de-DE';
     const BASE = {{ base | tojson }};
     const CHART_ID = {{ chart_id | tojson }};
     const CHART_NAME = {{ chart_name | tojson }};
@@ -284,6 +334,17 @@
     const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
     const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};
     const CHART_STATS = {{ chart_stats | tojson }};
+    const LEGEND_METRICS = {{ legend_metrics | tojson }};
+    const LEGEND_STYLE = {{ legend_style | tojson }};
+    // Reihenfolge bestimmt sowohl die Checkbox-Liste im Optionen-Menü als auch
+    // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
+    const LEGEND_METRIC_OPTIONS = [
+      {value: 'last', label: 'Aktuell'},
+      {value: 'min', label: 'Min'},
+      {value: 'max', label: 'Max'},
+      {value: 'average', label: 'Durchschnitt'},
+      {value: 'sum', label: 'Summe'},
+    ];
     // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
     // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
     // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart
@@ -320,10 +381,10 @@
       if (windowStart == null || windowEnd == null) return '';
       const start = new Date(windowStart * 1000);
       const end = new Date(windowEnd * 1000 - 1000);
-      const fmtDay = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'});
-      const fmtDayMonth = d => d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
-      const fmtMonthYear = d => d.toLocaleDateString('de-DE', {month: 'long', year: 'numeric'});
-      const fmtTime = d => d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+      const fmtDay = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const fmtDayMonth = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
+      const fmtMonthYear = d => d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+      const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
       switch (range) {
         case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
         case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? 'Heute' : fmtDay(start));
@@ -405,6 +466,32 @@
         }
       }
       return `${Math.round(seconds)} Sekunden`;
+    }
+
+    // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
+    // Daten (detectResolutionSeconds), nicht nach dem Zeitraum-Namen — die
+    // Auflösung kann pro Zeitraum manuell überschrieben werden (Auflösung:
+    // Automatisch/medium/coarse), und die Uhrzeit ist bei Tages-Buckets oder
+    // gröber ohnehin immer Mitternacht, also reine Information ohne Wert.
+    // Durchgehend über Intl (LOCALE) statt handgebauter Strings, damit sich
+    // Datum/Uhrzeit/Wochentag mit einer künftigen Sprachumschaltung automatisch
+    // anpassen. Der abgeschnittene Punkt hinter dem Wochentagskürzel
+    // (".replace") gleicht nur einen ICU-Unterschied zwischen Engines aus
+    // ("Mo" vs. "Mo.") — die Sprache/Reihenfolge selbst bleibt Intl überlassen.
+    function fmtTooltipTimestamp(ms, bucketSeconds) {
+      const d = new Date(ms);
+      if (bucketSeconds == null || bucketSeconds < 86400) {
+        return d.toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+      }
+      if (bucketSeconds < 86400 * 25) {
+        const weekday = d.toLocaleDateString(LOCALE, {weekday: 'short'}).replace(/\.$/, '');
+        const date = d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+        return `${weekday}, ${date}`;
+      }
+      if (bucketSeconds < 86400 * 200) {
+        return d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+      }
+      return d.toLocaleDateString(LOCALE, {year: 'numeric'});
     }
 
     function resamplePoints(points, range, preset, aggregationType, windowStart) {
@@ -536,6 +623,7 @@
         compare: COMPARE,
         compareMode: COMPARE_MODE,
         showPoints: false,
+        showValues: false,
         raw: false,
         resolutionPreset: RESOLUTION_PRESET,
         dynamicYAxis: DYNAMIC_Y_AXIS,
@@ -548,6 +636,11 @@
         // darauf zugreift) war es an anderer Stelle in dieser Datei
         // nachweislich nicht (siehe autoResolutionLabel-Kommentar oben).
         chartStats: CHART_STATS,
+        legendMetrics: [...LEGEND_METRICS],
+        // Welche der beiden "Statistik in Legende"-Darstellungen gezeigt
+        // wird — wie legendMetrics ein gespeichertes Chart-Feld (siehe
+        // save()), damit sie beim erneuten Öffnen erhalten bleibt.
+        legendStyle: LEGEND_STYLE,
         legendHiddenIds: [],
         optionsMenuOpen: false,
         compareMenuOpen: false,
@@ -566,6 +659,7 @@
         _requestId: 0,
 
         get selectedCount() { return this.selectedEntityIds.length; },
+        get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
         labelFor(entityId) { return ENTITY_LABELS[entityId] || entityId; },
         get hasData() { return this.series.some(s => s.points.length > 0); },
         // "Punkte" markiert einzelne Datenpunkte auf einer Linie — für
@@ -602,13 +696,21 @@
             const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
             const unit = s.unit ? ` ${s.unit}` : '';
             const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, s.decimals)}${unit}`;
+            // Summe nur bei Zählern sinnvoll — Bucket-Werte sind dort bereits
+            // Deltas je Zeitfenster (siehe query.py), deren Summe den
+            // Gesamtverbrauch im Zeitraum ergibt. Bei Standard-Entitäten (Momentan-
+            // messwerte) oder im Rohwerte-Modus (Einzelmesswerte statt Deltas)
+            // wäre eine Summe dagegen bedeutungslos.
+            const hasSum = s.aggregation_type === 'counter' && !this.raw;
             return {
               entityId: s.entity_id,
               name: this.entityNames[s.entity_id] || s.friendly_name,
               color: PALETTE[i % PALETTE.length],
+              last: values.length ? formatted(values[values.length - 1]) : '—',
               min: minima.length ? formatted(Math.min(...minima)) : '—',
               max: maxima.length ? formatted(Math.max(...maxima)) : '—',
               average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+              sum: hasSum ? (values.length ? formatted(values.reduce((sum, v) => sum + v, 0)) : '—') : null,
             };
           });
         },
@@ -719,18 +821,37 @@
         render() {
           if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
           if (!this.hasData) { chartInstance.clear(); return; }
+          // Aus den TATSÄCHLICH ANGEZEIGTEN (resamplePoints()-) Punkten
+          // ermittelt, nicht aus den rohen Server-Punkten wie
+          // computeAutoResolutionLabel(): bei manuell gesetzter Auflösung
+          // (medium/coarse) resampelt resamplePoints() clientseitig gröber,
+          // die rohen Punkte wären dann feiner als das, was im Tooltip
+          // tatsächlich zu sehen ist (z. B. "00:00" statt "Mo, 04.08.2026"
+          // bei Tages-Buckets aus stündlichen Rohpunkten). Erst innerhalb der
+          // Schleife unten gesetzt (dort liegen die resampelten mainPoints
+          // vor), hier nur deklariert.
+          let tooltipBucketSeconds = null;
+          // Gemeinsamer Werte-Formatter für Tooltip UND "Werte anzeigen"-Labels
+          // (data[1]=Wert, data[3]=Einheit, data[4]=Nachkommastellen, data[5]=
+          // Dauer-Anzeige) — dieselben Indizes wie beim Aufbau von mainData/
+          // compareData unten. noUnit für die Labels über den Balken/Punkten —
+          // dort reicht die reine Zahl, die Einheit steht schon an der Y-Achse.
+          const formatPointValue = (data, noUnit) => {
+            const [, value, , unit, decimals, isDuration] = data;
+            return isDuration ? NumberFormat.fmtDuration(value) : (unit && !noUnit ? `${fmtNum(value, decimals)} ${unit}` : fmtNum(value, decimals));
+          };
           const fmt = ts => {
             const d = new Date(ts * 1000);
             if (this.range === 'hour' || this.range === 'day') {
-              return d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
+              return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
             }
             if (this.range === 'week' || this.range === 'month') {
-              return d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+              return d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
             }
             if (this.range === 'decade') {
-              return d.toLocaleDateString('de-DE', {year: 'numeric'});
+              return d.toLocaleDateString(LOCALE, {year: 'numeric'});
             }
-            return d.toLocaleDateString('de-DE', {month: 'short', year: 'numeric'});
+            return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
           };
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
@@ -802,6 +923,9 @@
               s.points, this.range, this.resolutionPreset,
               s.aggregation_type, this.windowStart
             );
+            if (tooltipBucketSeconds == null) {
+              tooltipBucketSeconds = detectResolutionSeconds(mainPoints);
+            }
             const mainData = mainPoints.map(p => [p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
             if (chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
@@ -815,6 +939,17 @@
               data: mainData,
               lineStyle: {width: 1.5, color},
               itemStyle: {color},
+              // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
+              // Punkt, zusätzlich zum Tooltip. Nur die Hauptserie, nicht die
+              // Vergleichs-Nebenserie (siehe cmp weiter unten) — sonst überlagern
+              // sich bei aktivem Vergleich zwei Beschriftungen je Zeitpunkt.
+              label: {
+                show: this.showValues,
+                position: 'top',
+                fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
+                color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+                formatter: params => formatPointValue(params.data, true),
+              },
               // Deckelt die Balkenbreite auf einer Zeit-Achse — ohne diese
               // fehlt ECharts bei sehr wenigen Punkten (z. B. "Jahr" einer
               // gerade erst begonnenen Entität, ein einziger Balken) der
@@ -893,13 +1028,29 @@
               // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die
               // noch datenlose Zukunft — windowEnd (an "jetzt" gedeckelt) bleibt
               // nur für den Linien-Haltepunkt maßgeblich (siehe periodEnd oben).
-              max: (this.periodEnd ?? this.windowEnd) != null ? (this.periodEnd ?? this.windowEnd) * 1000 : undefined,
+              // Eine Sekunde zurück, da periodEnd/windowEnd EXKLUSIV sind — sonst
+              // reicht die Achse sichtbar bis zum Beginn der nächsten Periode (ein
+              // Achsen-Tick "01.09." für einen Monat, der am 31.08. endet).
+              max: (this.periodEnd ?? this.windowEnd) != null ? (this.periodEnd ?? this.windowEnd) * 1000 - 1000 : undefined,
               // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
               // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
               // einem Bucket) — boundaryGap:[0,0] unterbindet dieses Auto-Polster,
               // min/max bleiben dadurch die tatsächlichen Achsengrenzen.
               boundaryGap: [0, 0],
-              axisLabel: {formatter: v => fmt(v / 1000), hideOverlap: true},
+              axisLabel: {
+                // ECharts' "nice tick"-Berechnung polstert die Achse intern
+                // minimal über max hinaus (trotz explizitem max oben) — ohne
+                // diese Sperre erschiene sonst vereinzelt noch ein Tick jenseits
+                // der Periodengrenze (z. B. "01.09." für einen Monat, der am
+                // 31.08. endet). periodEnd/windowEnd (EXKLUSIV, Beginn der
+                // Folgeperiode) ist die Grenze, ab der die Beschriftung
+                // unterdrückt wird.
+                formatter: v => {
+                  const rawEnd = this.periodEnd ?? this.windowEnd;
+                  return (rawEnd != null && v >= rawEnd * 1000) ? '' : fmt(v / 1000);
+                },
+                hideOverlap: true,
+              },
             },
             yAxis,
             // ECharts' eigene Legende ist unsichtbar (show:false) — die
@@ -917,20 +1068,27 @@
               // Eigener Formatter statt valueFormatter, aus demselben Grund wie in
               // entity_detail.html: bei aktivem Vergleich hat jede Zeile ihre eigene
               // tatsächliche Zeit im dritten Datenfeld, nicht die (bei der
-              // Vorperiode verschobene) Achsenposition.
-              formatter: params => params.map(p => {
-                const d = new Date(p.data[2]);
-                const pad = n => String(n).padStart(2, '0');
-                const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                const unit = p.data[3];
-                const decimals = p.data[4];
-                const isDuration = p.data[5];
-                const val = isDuration ? NumberFormat.fmtDuration(p.value[1]) : (unit ? `${fmtNum(p.value[1], decimals)} ${unit}` : fmtNum(p.value[1], decimals));
-                return `<div style="display:flex;justify-content:space-between;gap:18px;">`
-                     + `<span>${p.marker}${p.seriesName}</span>`
-                     + `<strong style="margin-left:8px;">${val}</strong></div>`
-                     + `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);">${time}</div>`;
-              }).join(''),
+              // Vorperiode verschobene) Achsenposition. Ohne Vergleich (der
+              // Normalfall) teilen sich alle Serien denselben Zeitpunkt — dann
+              // eine gemeinsame Kopfzeile statt das Datum bei jeder Serie zu
+              // wiederholen; nur wenn die Zeiten tatsächlich auseinanderfallen
+              // (Vergleich aktiv), bekommt jede Zeile ihr eigenes Datum, aber
+              // weiterhin einheitlich ÜBER dem Wert (wie überall sonst in der
+              // App, siehe dashboard-tiles.js/entity_detail.html).
+              formatter: params => {
+                const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
+                const sameTime = times.every(t => t === times[0]);
+                const row = p => `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
+                                + `<span>${p.marker}${p.seriesName}</span>`
+                                + `<strong style="margin-left:8px;">${formatPointValue(p.data)}</strong></div>`;
+                if (sameTime) {
+                  return `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:4px;">${times[0]}</div>`
+                       + params.map(row).join('');
+                }
+                return params.map((p, i) =>
+                  `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:2px;">${times[i]}</div>${row(p)}`
+                ).join('');
+              },
               appendToBody: true,
             },
             series: echartsSeries,
@@ -959,6 +1117,8 @@
             resolution_preset: this.resolutionPreset,
             dynamic_y_axis: this.dynamicYAxis,
             chart_stats: this.chartStats,
+            legend_metrics: this.legendMetrics,
+            legend_style: this.legendStyle,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

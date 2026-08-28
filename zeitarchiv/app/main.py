@@ -950,6 +950,7 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
     dashboard_animation = index.get_setting("dashboard_animation", "1")
     if dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
         dashboard_animation = "1"
+    entity_defaults = _get_entity_chart_defaults()
     return {
         "font_scale": index.get_setting("font_scale", "1"),
         "font_scale_options": list(FONT_SCALE_LABELS.items()),
@@ -960,6 +961,22 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         "color_mode_options": list(COLOR_MODE_LABELS.items()),
         "dashboard_animation": dashboard_animation,
         "dashboard_animation_options": list(DASHBOARD_ANIMATION_LABELS.items()),
+        # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
+        # (entity_detail.html) — siehe _get_entity_chart_defaults()/
+        # _resolve_entity_chart_options() weiter unten in dieser Datei. Bool-
+        # Felder als "1"/"0"-Strings fürs Dropdown-Muster (wie dashboard_animation
+        # oben), nicht als Python-bool.
+        "entity_continuous": "1" if entity_defaults["continuous"] else "0",
+        "entity_raw": "1" if entity_defaults["raw"] else "0",
+        "entity_show_points": "1" if entity_defaults["show_points"] else "0",
+        "entity_show_values": "1" if entity_defaults["show_values"] else "0",
+        "entity_dynamic_y_axis": "1" if entity_defaults["dynamic_y_axis"] else "0",
+        "entity_chart_stats": "1" if entity_defaults["chart_stats"] else "0",
+        "entity_legend_metrics": entity_defaults["legend_metrics"],
+        "entity_legend_metric_options": list(_ENTITY_LEGEND_METRIC_LABELS.items()),
+        "entity_legend_style": entity_defaults["legend_style"],
+        "entity_legend_style_options": list(_ENTITY_LEGEND_STYLE_LABELS.items()),
+        "on_off_options": list(_ON_OFF_LABELS.items()),
         "saved": saved,
     }
 
@@ -1152,6 +1169,35 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         raise HTTPException(status_code=400, detail="Ungültige Dashboard-Animation")
     if dashboard_animation is not None:
         index.set_setting("dashboard_animation", str(dashboard_animation))
+
+    # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
+    # (entity_detail.html) — jedes Feld postet wie oben einzeln für sich,
+    # _update_entity_chart_default() liest/schreibt das gemeinsame
+    # "entity_chart_defaults"-Setting darum jedes Mal frisch statt es über
+    # mehrere Requests hinweg im Speicher zu halten.
+    bool_fields = {
+        "entity_continuous": "continuous", "entity_raw": "raw",
+        "entity_show_points": "show_points", "entity_show_values": "show_values",
+        "entity_dynamic_y_axis": "dynamic_y_axis", "entity_chart_stats": "chart_stats",
+    }
+    for form_key, option_key in bool_fields.items():
+        value = form.get(form_key)
+        if value is None:
+            continue
+        if value not in _ON_OFF_LABELS:
+            raise HTTPException(status_code=400, detail="Ungültiger Wert")
+        _update_entity_chart_default(option_key, value == "1")
+    entity_legend_style = form.get("entity_legend_style")
+    if entity_legend_style is not None and entity_legend_style not in _CHART_LEGEND_STYLES:
+        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+    if entity_legend_style is not None:
+        _update_entity_chart_default("legend_style", entity_legend_style)
+    if "entity_legend_metrics" in form:
+        entity_legend_metrics = form.getlist("entity_legend_metrics")
+        if not set(entity_legend_metrics) <= _CHART_LEGEND_METRICS:
+            raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        _update_entity_chart_default("legend_metrics", entity_legend_metrics)
+
     return templates.TemplateResponse(
         request, "_settings_darstellung_form.html", _settings_darstellung_context(saved=True)
     )
@@ -1348,9 +1394,10 @@ def settings_purge_marked(
     request: Request,
     search: str = Query(default="", max_length=200),
     page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=10, le=200),
 ) -> HTMLResponse:
     """On-demand-Detailansicht der einzelnen Soft-Delete-Markierungen."""
-    result = index.list_deleted_points(search=search, page=page, page_size=50)
+    result = index.list_deleted_points(search=search, page=page, page_size=page_size)
     rows = [
         {
             **row,
@@ -2734,6 +2781,41 @@ def entity_favorite_toggle(entity_id: str) -> dict:
     return {"is_favorite": new_state}
 
 
+class _EntityChartOptionsBody(BaseModel):
+    continuous: bool
+    raw: bool
+    chart_type: str
+    show_points: bool
+    show_values: bool
+    dynamic_y_axis: bool
+    chart_stats: bool
+    legend_metrics: list[str]
+    legend_style: str
+
+
+@app.post("/entities/{entity_id}/chart-options")
+def entity_set_chart_options(entity_id: str, body: _EntityChartOptionsBody) -> dict:
+    """Speichert die aktuellen Chart-Optionen (Optionen-Menü, entity_detail.html)
+    als vollständigen Snapshot für diese Entität — jede Änderung im Menü
+    schickt sofort den gesamten aktuellen Stand, kein separater Speichern-
+    Button (siehe Kommentar bei _resolve_entity_chart_options())."""
+    _require_entity(entity_id)
+    data = body.model_dump()
+    _validate_entity_chart_options(data)
+    index.set_entity_chart_options(entity_id, data)
+    return {"ok": True}
+
+
+@app.post("/entities/{entity_id}/chart-options/reset")
+def entity_reset_chart_options(entity_id: str) -> dict:
+    """"Auf Standard zurücksetzen" (Optionen-Menü) — wirft die individuelle
+    Übersteuerung weg, die Entität folgt danach wieder live den globalen
+    Defaults."""
+    _require_entity(entity_id)
+    index.set_entity_chart_options(entity_id, {})
+    return {"ok": True}
+
+
 @app.post("/entities/{entity_id}/values/delete-all")
 @_storage_locked(lambda args: args["entity_id"])
 def entity_delete_all_values(entity_id: str) -> dict:
@@ -2770,6 +2852,75 @@ _CHART_RANGE_OPTIONS = [
     ("month", "Monat"), ("year", "Jahr"), ("decade", "Dekade"),
 ]
 _CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse"}
+_CHART_LEGEND_METRICS = {"last", "min", "max", "average", "sum"}
+_CHART_LEGEND_STYLES = {"chips", "table"}
+
+# Optionen-Menü der Entität-eigenen Chart-Seite (entity_detail.html) — im
+# Gegensatz zum Chart-Editor (saved_charts, ein Feld pro Chart) hier zweistufig:
+# ein globaler Default (Setting "entity_chart_defaults", Einstellungen →
+# Darstellung) plus eine optionale, vollständige Übersteuerung pro Entität
+# (entities.chart_options), siehe _resolve_entity_chart_options() unten.
+_ENTITY_CHART_TYPES = {"auto", "line", "bar"}
+_ENTITY_CHART_OPTION_DEFAULTS = {
+    "continuous": False,
+    "raw": False,
+    "chart_type": "auto",
+    "show_points": False,
+    "show_values": False,
+    "dynamic_y_axis": False,
+    "chart_stats": True,
+    "legend_metrics": ["last", "min", "max", "average", "sum"],
+    "legend_style": "chips",
+}
+_ON_OFF_LABELS = {"1": "An", "0": "Aus"}
+_ENTITY_LEGEND_STYLE_LABELS = {"chips": "Chips", "table": "Tabelle"}
+_ENTITY_LEGEND_METRIC_LABELS = {"last": "Aktuell", "min": "Min", "max": "Max", "average": "Durchschnitt", "sum": "Summe"}
+
+
+def _validate_entity_chart_options(data: dict) -> None:
+    if "chart_type" in data and data["chart_type"] not in _ENTITY_CHART_TYPES:
+        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+    if "legend_metrics" in data and not set(data["legend_metrics"]) <= _CHART_LEGEND_METRICS:
+        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+    if "legend_style" in data and data["legend_style"] not in _CHART_LEGEND_STYLES:
+        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+
+
+def _get_entity_chart_defaults() -> dict:
+    defaults = dict(_ENTITY_CHART_OPTION_DEFAULTS)
+    raw = index.get_setting("entity_chart_defaults")
+    if raw:
+        try:
+            stored = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            stored = {}
+        for key in defaults:
+            if key in stored:
+                defaults[key] = stored[key]
+    return defaults
+
+
+def _update_entity_chart_default(key: str, value) -> None:
+    current = _get_entity_chart_defaults()
+    current[key] = value
+    index.set_setting("entity_chart_defaults", json.dumps(current))
+
+
+def _resolve_entity_chart_options(entity) -> dict:
+    """Effektive Chart-Optionen einer Entität — globale Defaults, von den
+    (vollständigen, siehe set_entity_chart_options()) Overrides der Entität
+    übersteuert, sobald diese mindestens einmal geändert wurden."""
+    options = _get_entity_chart_defaults()
+    raw = entity["chart_options"] if entity is not None else None
+    if raw:
+        try:
+            overrides = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            overrides = {}
+        for key in options:
+            if key in overrides:
+                options[key] = overrides[key]
+    return options
 
 
 @app.get("/charts", response_class=HTMLResponse)
@@ -2821,6 +2972,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "resolution_preset": chart["resolution_preset"] if chart else prefill.get("resolution_preset", "auto"),
         "dynamic_y_axis": chart["dynamic_y_axis"] if chart else True,
         "chart_stats": chart["chart_stats"] if chart else True,
+        "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
+        "legend_style": chart["legend_style"] if chart else "chips",
         "entity_names": chart["entity_names"] if chart else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
@@ -2873,6 +3026,8 @@ class _SaveChartBody(BaseModel):
     resolution_preset: str = "auto"
     dynamic_y_axis: bool = True
     chart_stats: bool = True
+    legend_metrics: list[str] = ["sum"]
+    legend_style: str = "chips"
 
 
 @app.post("/charts")
@@ -2885,11 +3040,16 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
         raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
+    if not set(body.legend_metrics) <= _CHART_LEGEND_METRICS:
+        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+    if body.legend_style not in _CHART_LEGEND_STYLES:
+        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
         entity_names, body.resolution_preset, body.dynamic_y_axis,
-        chart_stats=body.chart_stats,
+        chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
+        legend_style=body.legend_style,
     )
     return {"id": chart_id}
 
@@ -2914,11 +3074,16 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
         raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
+    if not set(body.legend_metrics) <= _CHART_LEGEND_METRICS:
+        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+    if body.legend_style not in _CHART_LEGEND_STYLES:
+        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
         body.continuous, entity_names, body.resolution_preset,
-        body.dynamic_y_axis, chart_stats=body.chart_stats,
+        body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
+        legend_style=body.legend_style,
     )
     return {"id": chart_id}
 
@@ -2967,6 +3132,14 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
                 "resolution_preset": c["resolution_preset"],
                 "dynamic_y_axis": c["dynamic_y_axis"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
+                "show_legend": bool(p["show_legend"]),
+                # Kachel-Legende übernimmt Aussehen UND Inhalte 1:1 von der
+                # zugrundeliegenden Chart-Seite (chart_editor.html) — welche
+                # Kennzahlen (Min/Max/Ø/Summe/Aktuell), ob überhaupt welche
+                # gezeigt werden, und Chips vs. Tabelle sind dort konfiguriert,
+                # nicht hier erneut.
+                "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
+                "legend_style": c["legend_style"],
             })
         elif p["item_type"] == "table":
             t = index.get_saved_table(p["item_id"])
@@ -3073,6 +3246,25 @@ def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     ):
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
+
+
+class _LegendDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    item_type: str
+    item_id: int
+    show_legend: bool
+
+
+@app.post("/dashboard/legend")
+def dashboard_legend(body: _LegendDashboardTileBody) -> dict:
+    if body.item_type != "chart":
+        raise HTTPException(status_code=422, detail="Legende ist nur für Charts verfügbar")
+    _require_dashboard_unlocked(body.dashboard_id)
+    if not index.set_dashboard_pin_legend(
+        body.dashboard_id, body.item_type, body.item_id, body.show_legend
+    ):
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "show_legend": body.show_legend}
 
 
 # -- Dashboards (Konzept "Dashboards"-Menüpunkt: mehrere, unabhängige
@@ -3370,6 +3562,7 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
     # Konvention wie bei entity_cleanup() unten.
     first_date = datetime.fromtimestamp(entity["first_ts"], TZ).strftime("%Y-%m-%d") if entity["first_ts"] else None
     last_date = datetime.fromtimestamp(entity["last_ts"], TZ).strftime("%Y-%m-%d") if entity["last_ts"] else None
+    chart_options = _resolve_entity_chart_options(entity)
     return templates.TemplateResponse(
         request,
         "entity_detail.html",
@@ -3385,6 +3578,7 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
             "first_date": first_date,
             "last_date": last_date,
             "is_favorite": bool(entity["is_favorite"]),
+            "chart_options": chart_options,
         },
     )
 

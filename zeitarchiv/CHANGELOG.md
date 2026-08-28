@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.57.0 - 2026-08-28
+
+### Neu
+
+- Chart-Optionen (Kontinuierlich, Rohwerte, Diagrammtyp, Punkte, Werte
+  anzeigen, Dynamische Y-Achse, Statistik in Legende, Legenden-Kennzahlen,
+  Legenden-Stil) werden jetzt pro Entität dauerhaft gespeichert, statt bei
+  jedem Seitenaufruf auf die Werkseinstellung zurückzufallen. Unter
+  Einstellungen → Darstellung lassen sich die globalen Startwerte dafür
+  festlegen; im Optionen-Menü der Entität-Seite gibt es „Optionen auf
+  Standard zurücksetzen“.
+- Neue Legendenkennzahl „Aktuell“ (letzter Wert) in Chart-Legenden;
+  „Letzter“ heißt jetzt „Aktuell“.
+- Neuer Legenden-Stil „Tabelle“ als Alternative zu den Chip-Legenden, in
+  der Entität-Chart-Seite, im Chart-Editor und auf Dashboard-Kacheln.
+  Tabellen- wie Chip-Legenden lassen sich jetzt beide per Klick auf eine
+  Zeile/einen Chip ein- und ausblenden.
+- Dashboard-Kacheln (ab Größe 2×2) können jetzt optional eine Legende
+  anzeigen („Legende anzeigen“ im Kachel-Menü) — Aussehen und Inhalt
+  entsprechen dabei exakt der Legende des zugrundeliegenden Charts.
+- Option „Werte anzeigen“ (Datenwerte direkt über Balken/Punkten, ohne
+  Einheit) für die Entität-Chart-Seite und den Chart-Editor.
+
+### Verbesserung
+
+- Chart-Tooltips (Entität-Seite, Chart-Editor, Dashboard-Kacheln) zeigen
+  das Datum jetzt einheitlich oben an; teilen sich mehrere Reihen denselben
+  Zeitpunkt, erscheint das Datum nur noch einmal statt pro Zeile.
+- Chart-Tooltip-Datumsformat richtet sich jetzt nach der tatsächlich
+  angezeigten Bucket-Auflösung (Tag/Woche/Monat/Jahr) statt nach dem Namen
+  des gewählten Zeitraums; bei Tages-Buckets erscheint zusätzlich die
+  Wochentagsabkürzung; Sekunden entfallen bei untertägigen Zeitstempeln.
+- Home-Assistant-Import: Bedienelemente (Rohhistorie/Langzeitstatistik,
+  Zeitraum, „Verfügbarkeit erneut prüfen“, Zeitpunkt/Frische-Hinweis) in
+  eine eigene Zeile unter dem Hinweistext gruppiert; „Wiederholungen
+  verdichten“/„Duplikate automatisch entfernen“ werden nur noch bei
+  passendem aktivem Filter eingeblendet statt nur ausgegraut; „Schnitt“
+  heißt jetzt „Durchschnitt“.
+- „Chart-Optionen (Standardwerte)“ unter Einstellungen → Darstellung
+  kompakter und einheitlicher zur restlichen App gestaltet; die globale
+  Diagrammtyp-Vorgabe entfällt (bleibt immer „Automatisch“, die
+  Übersteuerung je Entität ist davon unberührt); „Ø“ heißt dort jetzt
+  ausgeschrieben „Durchschnitt“.
+- Markierte-Datensätze-Dialog (Einstellungen) nutzt jetzt dieselbe
+  Pagination wie der Rest der App (Erste/Letzte Seite, editierbare
+  Seitenzahl, Seitengröße wählbar).
+
+### Fehlerbehebung
+
+- Chart-Editor: Tooltip-Datumsformat berücksichtigte bei aktivem manuellem
+  Auflösungs-Preset die unresamplten statt der tatsächlich angezeigten
+  Daten und formatierte dadurch falsch (z. B. Uhrzeit statt Wochentag/Datum
+  bei Tages-Buckets).
+- Entität-Chart-Seite: Farbe des Legenden-Punkts entsprach nicht immer der
+  tatsächlichen Balken-/Linienfarbe.
+- Dashboard-Kachel-Legende: Stil-Änderung wurde nicht gespeichert; die
+  Legende diente außerdem versehentlich als Link zur Chart-Seite statt zum
+  Ein-/Ausblenden von Reihen; die Tabellen-Legende füllte nicht die volle
+  Kachelbreite; der Tooltip wurde vom `overflow:hidden` der Kachel
+  abgeschnitten.
+- Dashboard-Detailseiten zeigten bei Bestätigungsabfragen den nativen,
+  ungestylten Browser-Dialog statt des app-eigenen Dialogs
+  (fehlendes Skript-Include).
+
 ## 0.56.0 - 2026-08-27
 
 ### Neu

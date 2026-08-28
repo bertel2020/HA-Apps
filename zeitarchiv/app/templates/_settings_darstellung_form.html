@@ -54,4 +54,121 @@
   </span>
   <p class="hint">Ein-/Ausblend-Animation der Charts auf angehefteten Dashboard-Kacheln. Gilt für alle Kacheln gemeinsam.</p>
 </div>
+
+<div class="settings-minor-section">
+  <h4 class="settings-minor-title">Chart-Optionen (Standardwerte)</h4>
+  <p class="hint" style="margin:0 0 10px;">
+    Startwerte für das Optionen-Menü der Entität-eigenen Chart-Seite. Ändert eine Entität dort selbst
+    etwas, merkt sie sich das dauerhaft für sich — spätere Änderungen hier wirken sich dann nicht mehr
+    auf sie aus, bis sie über "Auf Standard zurücksetzen" wieder auf diese Defaults zurückgesetzt wird.
+  </p>
+  <div class="settings-compact-list">
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Kontinuierlich</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-continuous-btn" onclick="toggleDDPicker('entity-continuous')">{% for k, l in on_off_options %}{% if k == entity_continuous %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_continuous" id="entity-continuous-input" value="{{ entity_continuous }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-continuous-popover">
+          {% for key, label in on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-continuous', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Rohwerte</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-raw-btn" onclick="toggleDDPicker('entity-raw')">{% for k, l in on_off_options %}{% if k == entity_raw %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_raw" id="entity-raw-input" value="{{ entity_raw }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-raw-popover">
+          {% for key, label in on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-raw', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Punkte</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-show-points-btn" onclick="toggleDDPicker('entity-show-points')">{% for k, l in on_off_options %}{% if k == entity_show_points %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_show_points" id="entity-show-points-input" value="{{ entity_show_points }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-show-points-popover">
+          {% for key, label in on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-show-points', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Werte anzeigen</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-show-values-btn" onclick="toggleDDPicker('entity-show-values')">{% for k, l in on_off_options %}{% if k == entity_show_values %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_show_values" id="entity-show-values-input" value="{{ entity_show_values }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-show-values-popover">
+          {% for key, label in on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-show-values', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Dynamische Y-Achse</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-dynamic-y-axis-btn" onclick="toggleDDPicker('entity-dynamic-y-axis')">{% for k, l in on_off_options %}{% if k == entity_dynamic_y_axis %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_dynamic_y_axis" id="entity-dynamic-y-axis-input" value="{{ entity_dynamic_y_axis }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-dynamic-y-axis-popover">
+          {% for key, label in on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-dynamic-y-axis', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Statistik in Legende</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-chart-stats-btn" onclick="toggleDDPicker('entity-chart-stats')">{% for k, l in on_off_options %}{% if k == entity_chart_stats %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_chart_stats" id="entity-chart-stats-input" value="{{ entity_chart_stats }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-chart-stats-popover">
+          {% for key, label in on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-chart-stats', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Legenden-Kennzahlen</span>
+      <div class="legend-metrics-row" style="padding:0;justify-content:flex-end;"
+           hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML"
+           hx-include="#entity-legend-metrics-group">
+        <span id="entity-legend-metrics-group" style="display:contents;">
+          {% for key, label in entity_legend_metric_options %}
+          <label class="legend-metric-check">
+            <input type="checkbox" name="entity_legend_metrics" value="{{ key }}" {% if key in entity_legend_metrics %}checked{% endif %}>
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </span>
+      </div>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">Legenden-Stil</span>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="entity-legend-style-btn" onclick="toggleDDPicker('entity-legend-style')">{% for k, l in entity_legend_style_options %}{% if k == entity_legend_style %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="entity_legend_style" id="entity-legend-style-input" value="{{ entity_legend_style }}"
+               hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="entity-legend-style-popover">
+          {% for key, label in entity_legend_style_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('entity-legend-style', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+  </div>
+</div>
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

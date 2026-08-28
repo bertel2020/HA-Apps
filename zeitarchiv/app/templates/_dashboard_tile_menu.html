@@ -18,6 +18,20 @@
       {% endfor %}
     </div>
     <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
+    {% if tile.kind == 'chart' %}
+    <div class="dtile-menu-divider"></div>
+    <!-- Nur ab 2×2 sinnvoll darstellbar (siehe dashboard-tiles.js) — bei
+         kleineren Kacheln versteckt statt entfernt, der Wert bleibt beim
+         Verkleinern erhalten (setupSizePickers() blendet diese Zeile beim
+         Größenwechsel dynamisch ein/aus). -->
+    <label class="menu-row dtile-legend-row" style="{{ '' if tile.grid_cols >= 2 and tile.grid_rows >= 2 else 'display:none;' }}">
+      <span class="menu-row-label">Legende anzeigen</span>
+      <span class="menu-toggle">
+        <input type="checkbox" class="dtile-legend-checkbox" {% if tile.show_legend %}checked{% endif %}>
+        <span class="track"><span class="thumb"></span></span>
+      </span>
+    </label>
+    {% endif %}
     <div class="dtile-menu-divider"></div>
     <button type="button" class="dtile-menu-remove" role="menuitem" draggable="false"
             hx-post="{{ href_base }}{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"

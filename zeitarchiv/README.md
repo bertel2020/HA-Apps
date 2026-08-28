@@ -318,7 +318,7 @@ nicht verändert.
 ## Lizenz
 
 Dieses Projekt steht unter der [Apache License 2.0](LICENSE).
-Copyright 2026 Roberto / bertel2020.
+Copyright 2026 bertel2020.
 
 Die verwendeten Drittanbieter-Komponenten und deren Lizenzen sind in
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) aufgeführt.

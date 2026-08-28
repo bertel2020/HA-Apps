@@ -123,19 +123,21 @@
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Rückgängig (letzte Löschung)
   </button>
+  {% if filter == 'duplicates' %}
   <button class="btn btn-danger-outline"
-          {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"
-          {% elif filter != 'duplicates' %}disabled title="Erst den Filter „Duplikate” wählen"{% endif %}
+          {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"{% endif %}
           hx-post="{{ base }}/entities/{{ entity_id }}/rows/duplicates-preview"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Duplikate automatisch entfernen
   </button>
+  {% endif %}
+  {% if filter == 'repetitions' %}
   <button class="btn btn-danger-outline"
-          {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"
-          {% elif filter != 'repetitions' %}disabled title="Erst den Filter „Wiederholungen” wählen"{% endif %}
+          {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"{% endif %}
           hx-post="{{ base }}/entities/{{ entity_id }}/rows/repetitions-preview"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Wiederholungen verdichten
   </button>
+  {% endif %}
   {% endif %}
 </div>

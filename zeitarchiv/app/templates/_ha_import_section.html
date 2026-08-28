@@ -16,8 +16,6 @@
 {% else %}
 <form id="ha-form" method="post" action="import/ha/dry-run">
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
-    <input type="search" class="search btn-sm" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:140px;max-width:240px;">
-
     <input type="hidden" name="history_source" id="ha-source-input" value="{{ ha_history_source }}">
     <span class="seg-toggle" role="group" aria-label="Quelle">
       <button type="button" class="{{ 'active' if ha_history_source == 'raw' }}" onclick="onHaSourceChange('raw')">Rohhistorie</button>
@@ -28,12 +26,6 @@
       <option value="{{ value }}" {% if value == ha_period %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
-
-    <button type="button" class="btn btn-sm" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
-      {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
-      <span class="htmx-indicator"> &middot; prüft …</span>
-    </button>
-    <span class="count-chip" id="ha-marked-count">0 markiert</span>
 
     <span class="dd-picker-wrap">
       <button type="button" class="btn" id="ha-range-btn" onclick="toggleDDPicker('ha-range')" title="Zeitraum">{% for value, label in ha_range_options %}{% if value == ha_range_preset %}{{ label }}{% endif %}{% endfor %} ▾</button>
@@ -50,6 +42,20 @@
       <label for="ha-date-to" style="font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);">Bis</label>
       <input type="date" id="ha-date-to" name="date_to" value="{{ ha_date_to }}">
     </span>
+
+    <button type="button" class="btn btn-sm" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
+      {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
+      <span class="htmx-indicator"> &middot; prüft …</span>
+    </button>
+
+    {% if ha_availability_checked_at_label %}
+    <span class="ha-checked-at" title="Zeitpunkt der letzten Verfügbarkeitsprüfung für diese Quelle">Geprüft: {{ ha_availability_checked_at_label }}{% if ha_availability_stale %} · <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben. Für einen aktuellen Stand oben auf „Verfügbarkeit erneut prüfen“ klicken.">⏳ Nicht mehr taufrisch</span>{% endif %}</span>
+    {% endif %}
+  </div>
+
+  <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
+    <input type="search" class="search btn-sm" placeholder="Entität suchen …" oninput="onHaSearch(this.value)" style="min-width:140px;max-width:240px;">
+    <span class="count-chip" id="ha-marked-count">0 markiert</span>
   </div>
 
   <div class="tbl-wrap">
@@ -65,13 +71,7 @@
         <th><a href="#" onclick="sortHaTable('type');return false;">Typ<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
         <th><a href="#" onclick="sortHaTable('art');return false;">Art<span class="sort-arrow"></span></a></th>
-        <th>
-          {# checked_at/stale-Badge bewusst INNERHALB des <a> (nicht als
-             Geschwister-Element): table.dt th a{display:block} (app.css)
-             würde ein Geschwisterelement sonst auf eine eigene Zeile
-             umbrechen, statt in derselben Zeile wie "Verfügbar" zu bleiben. #}
-          <a href="#" onclick="sortHaTable('available');return false;">Verfügbar{% if ha_availability_checked_at_label %} <span class="ha-checked-at" title="Zeitpunkt der letzten Verfügbarkeitsprüfung für diese Quelle">({{ ha_availability_checked_at_label }})</span>{% endif %}{% if ha_availability_stale %} <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben. Für einen aktuellen Stand oben auf „Verfügbarkeit erneut prüfen“ klicken.">⏳ Nicht mehr taufrisch</span>{% endif %}<span class="sort-arrow"></span></a>
-        </th>
+        <th><a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
