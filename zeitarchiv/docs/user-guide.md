@@ -14,6 +14,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
 - [Entität konfigurieren](#entität-konfigurieren)
 - [Bereinigung](#bereinigung)
+- [Datenhandling](#datenhandling)
 - [Charts](#charts)
 - [Vergleichstabellen](#vergleichstabellen)
 - [Statistik](#statistik)
@@ -254,6 +255,186 @@ eine Vorschau vorab, wie viele Zeilen tatsächlich entfernbar sind
 (inklusive Aufschlüsselung nach laufendem Monat und Archiv), bevor der
 Schritt tatsächlich ausgeführt wird. Dieser Schritt ist endgültig — danach
 ist "Rückgängig" nicht mehr möglich.
+
+## Datenhandling
+
+Dieser Abschnitt erklärt genauer, was hinter den Kulissen passiert, wenn
+Werte gelöscht, geändert, hinzugefügt oder automatisch aufgeräumt werden —
+und wie sich das jeweils auf Charts, Tabellen, Speicherplatz und
+Wiederherstellbarkeit auswirkt.
+
+### Der Weg eines Werts
+
+Jeder eingehende Wert durchläuft dieselben Stationen, unabhängig davon, ob
+er von der Integration kommt oder manuell hinzugefügt wurde:
+
+```text
+Eingehender Wert
+      │
+      ▼
+Hot Buffer (laufender Monat, unkomprimiert)
+      │
+      │  Rotation: automatisch beim ersten Wert eines neuen Kalendermonats,
+      │  oder manuell nachgeholt (z. B. bei einer länger stillen Entität)
+      ▼
+Archiv (abgeschlossene Monate, komprimiert)  ──►  Rollups (Stunde/Tag · Monat · Jahr)
+      │                                                     │
+      │              Aufbewahrung (Retention)                │
+      │     entfernt ganze überfällige Monate aus Archiv     │
+      │              UND den zugehörigen Rollups             │
+      ▼                                                     ▼
+              endgültig entfernt — kein "Rückgängig"
+```
+
+Charts und Tabellen greifen für kurze, aktuelle Zeiträume auf den Hot
+Buffer zu und für längere/vergangene Zeiträume auf Archiv und Rollups —
+diese Umschaltung geschieht automatisch und ist beim Ansehen nicht
+sichtbar. Die Rotation selbst verändert an den Werten nichts, sie
+verschiebt nur den laufenden Monat vom Hot Buffer ins Archiv, sobald er
+abgeschlossen ist.
+
+### Aufbewahrung (Retention)
+
+Die je Entität konfigurierte Aufbewahrungsfrist (Zahnrad-Symbol → **Aufbewahrung**,
+siehe [Entität konfigurieren](#entität-konfigurieren)) wird nicht laufend
+angewendet, sondern nur, wenn die Aufbewahrungs-Durchsetzung tatsächlich
+läuft:
+
+- **Manuell** über **Einstellungen → Aufbewahrung** — mit einer Vorschau,
+  die zeigt, was ein Lauf entfernen würde, bevor er tatsächlich ausgeführt
+  wird.
+- **Automatisch**, wenn unter **Einstellungen → Aufbewahrung** ein Zeitplan
+  (täglich oder wöchentlich, mit Uhrzeit) hinterlegt ist. Ein einzelner
+  Wartungsplaner prüft im Hintergrund regelmäßig, ob der nächste geplante
+  Lauf fällig ist; war die App zum geplanten Zeitpunkt nicht aktiv, wird
+  **höchstens ein** verpasster Lauf nachgeholt, nie mehrere auf einmal.
+- Ein Lauf betrifft immer **nur ganze, abgeschlossene Kalendermonate** — ein
+  Monat wird komplett entfernt, sobald sein Ende älter als die
+  Aufbewahrungsfrist ist, niemals teilweise. Entfernt werden dabei
+  gleichzeitig der Archiv-Monat und die dazugehörigen Rollup-Zeilen
+  (Stunde/Tag, Monat, Jahr), damit beide nie auseinanderlaufen; im laufenden
+  Monat (Hot Buffer) werden überfällige Zeilen direkt entfernt.
+- Als **Unbegrenzt** markierte Entitäten werden dabei komplett übersprungen.
+- Aufbewahrung, Backup, Import und Rotation greifen nie gleichzeitig auf den
+  Datenbestand zu — läuft bereits einer dieser Vorgänge, wartet ein
+  zeitgleich fälliger automatischer Aufbewahrungslauf nicht, sondern wird
+  für diesen Termin übersprungen (der nächste reguläre Termin läuft normal
+  weiter).
+
+**Wichtig:** Anders als eine geänderte Auflösung (wirkt nur auf künftig
+eintreffende Werte, siehe [Häufige Fragen](#häufige-fragen)) wirkt eine
+verkürzte Aufbewahrungsfrist beim nächsten Durchlauf **rückwirkend** auf
+bereits gespeicherte, abgeschlossene Monate. Eine Frist heraufzusetzen oder
+auf Unbegrenzt zu stellen ist dagegen jederzeit gefahrlos — dadurch wird nie
+etwas gelöscht, das bereits entfernt wurde, ist es endgültig weg.
+
+Diese Löschung ist **nicht** das Soft-Delete aus dem Bereinigen-Tab, sondern
+sofort endgültig — es gibt keine Vorstufe und kein "Rückgängig". Ein Backup
+vor einer erstmalig aktivierten oder deutlich verkürzten Aufbewahrungsfrist
+ist deshalb empfehlenswert.
+
+### Werte löschen: drei Stufen
+
+Werte, die über **Bereinigen** entfernt werden (einzeln oder als Auswahl),
+durchlaufen drei klar getrennte Stufen — nur die letzte davon ist
+endgültig:
+
+```text
+Wert vorhanden
+      │
+      │  Bereinigen → "Löschen"
+      ▼
+Als gelöscht markiert (Soft-Delete)
+  · verschwindet sofort aus Charts, Tabellen, Rohwert-Listen, Export, Statistik
+  · die Datei auf der Festplatte bleibt dabei unverändert
+  · zählt weiterhin zum belegten Speicherplatz
+      │                                    │
+      │  Bereinigen →                      │  Einstellungen → Speicherplatz →
+      │  "Rückgängig (letzte Löschung)"    │  "Bereinigen" (mit Vorschau)
+      ▼                                    ▼
+Wert wieder sichtbar                Physisch entfernt
+                                       · Archiv- bzw. Hot-Buffer-Datei neu geschrieben
+                                       · betroffene Rollups neu berechnet
+                                       · endgültig, kein "Rückgängig" mehr möglich
+```
+
+Zur Markierung ("Löschen"):
+
+- Es wird nichts aus einer Datei entfernt — lediglich vermerkt, dass dieses
+  Vorkommen (Entität + Zeitstempel) ab sofort überall ausgeblendet werden
+  soll. Bei zwei Werten mit exakt demselben Zeitstempel (Duplikat) lässt
+  sich so gezielt nur einer der beiden löschen, ohne den anderen
+  mitzunehmen.
+- Jeder Löschvorgang (ein Klick auf "Löschen", egal ob ein Wert oder eine
+  ganze Auswahl) bildet einen eigenen **Stapel**.
+
+Zu "Rückgängig (letzte Löschung)":
+
+- Macht **immer nur den zuletzt ausgeführten Stapel** rückgängig — es gibt
+  keinen längeren Verlauf und kein Zurückspringen über mehrere
+  Löschvorgänge hinweg. Ein zweiter Klick auf "Rückgängig" ohne
+  zwischenzeitliches erneutes Löschen bewirkt nichts mehr.
+- Funktioniert nur, solange der Stapel noch nicht physisch bereinigt wurde
+  (siehe unten) — danach existiert die Markierung nicht mehr, es gibt
+  nichts mehr rückgängig zu machen.
+
+Zu "Bereinigen" unter **Einstellungen → Speicherplatz**:
+
+- Das ist der einzige Schritt in diesem Kapitel, der Dateien auf der
+  Festplatte tatsächlich verändert: Die betroffene Archiv- bzw.
+  Hot-Buffer-Datei wird ohne die markierten Zeilen neu geschrieben, die
+  davon abhängigen Rollup-Werte werden neu berechnet. Sind in einem
+  gesamten Archiv-Monat alle Werte als gelöscht markiert, wird die
+  Monatsdatei (samt Rollup-Zeilen) komplett entfernt statt leer neu
+  geschrieben.
+- Eine Vorschau zeigt vorab, wie viele Zeilen tatsächlich entfernbar sind
+  (aufgeschlüsselt nach laufendem Monat und Archiv), bevor der Schritt
+  bestätigt wird.
+- Danach sind die betroffenen Werte unwiederbringlich weg — auch mit einem
+  neuen Backup lässt sich das nicht mehr innerhalb der App rückgängig
+  machen (nur eine Wiederherstellung aus einem **älteren** Backup, das vor
+  diesem Schritt erstellt wurde, brächte die Werte zurück).
+
+### Werte ändern und hinzufügen
+
+**Korrigieren** (einen bestehenden Wert bearbeiten) und **Hinzufügen**
+(einen fehlenden Messpunkt manuell ergänzen) laufen technisch **anders**
+als Löschen: Es handelt sich um direkte Schreibvorgänge, nicht um das oben
+beschriebene Markieren-Modell.
+
+> ⚠️ **Für Korrigieren und Hinzufügen gibt es kein "Rückgängig".** Anders
+> als beim Löschen wird keine Markierung gesetzt, sondern der Wert sofort
+> direkt in der Hot-Buffer- bzw. Archiv-Datei überschrieben bzw. ergänzt.
+> Ein versehentlich falsch korrigierter oder falsch eingetragener Wert lässt
+> sich nur durch eine erneute manuelle Korrektur beheben — oder, falls
+> schon zu spät bemerkt, durch die Wiederherstellung eines vorherigen
+> Backups. Vor umfangreicheren manuellen Korrekturen lohnt sich deshalb ein
+> kurzer Blick auf **System → Backup / Restore**.
+
+Bei "Korrigieren" wird bei mehreren Werten mit demselben Zeitstempel
+(Duplikat) gezielt nur der erste zu diesem Zeitstempel gefundene Wert
+angepasst, die übrigen bleiben unverändert. Ändert sich der Wert zwischen
+Laden der Seite und Bestätigen des Korrigieren-Dialogs (z. B. weil er
+zwischenzeitlich schon gelöscht wurde), passiert schlicht nichts — ohne
+Fehlermeldung.
+
+### Lücken, Duplikate, Wiederholungen und Zählerrückgänge im Detail
+
+Die vier zusätzlichen Markierungen im Bereinigen-Tab (neben Ausreißern)
+folgen jeweils einer eigenen, festen Regel:
+
+| Kategorie | Regel | Was "Bereinigen" konkret tut |
+| --- | --- | --- |
+| **Lücke** | Der zeitliche Abstand zweier aufeinanderfolgender Werte überschreitet die je Entität eingestellte Schwelle (**Lücken-Erkennung**, in Minuten; "Aus" deaktiviert die Erkennung komplett) | Nur eine Markierung, keine automatische Aktion — Lücken werden angezeigt, nicht gelöscht |
+| **Duplikat** | Zwei oder mehr Werte teilen sich exakt denselben Zeitstempel (nicht nur einen ähnlichen) | Der chronologisch zuerst gespeicherte Wert bleibt erhalten, alle weiteren zum selben Zeitstempel werden zum Löschen vorgeschlagen |
+| **Wiederholung** | Ein Wert ist (nach Rundung auf die eingestellten Nachkommastellen) identisch zum zuletzt *behaltenen* Wert — dieselbe Regel, die auch beim Eintreffen neuer Werte laufend zur Verdichtung verwendet wird (siehe [Wertänderungsfilter](#entität-konfigurieren)) | Der erste Wert einer Serie gleicher Werte bleibt erhalten, alle folgenden werden vorgeschlagen — **außer** seit dem letzten behaltenen Wert sind bereits 6 Stunden vergangen (Lebenszeichenregel), dann bleibt auch ein unveränderter Wert erhalten |
+| **Zählerrückgang** | Nur bei Zähler-Entitäten: ein Wert liegt niedriger als der unmittelbar vorherige behaltene Wert | Nur eine Markierung, **niemals** automatisch gelöscht — ein Rückgang kann ein echtes Ereignis sein (z. B. Zählertausch, Reset nach Neustart) |
+
+Wichtig: Diese Markierungen schließen sich **nicht gegenseitig aus**. Ein
+und derselbe Wert kann z. B. gleichzeitig als Ausreißer **und** als Teil
+eines Duplikats markiert sein — die Filter-Reiter im Bereinigen-Tab wählen
+jeweils nur aus, welche Werte eine bestimmte Markierung tragen, sie teilen
+die Liste nicht in getrennte, überschneidungsfreie Gruppen auf.
 
 ## Charts
 
@@ -505,10 +686,17 @@ konfigurierten Zeitplan belassen.
 
 ## Häufige Fragen
 
-**Wirkt sich eine geänderte Auflösung oder Aufbewahrung auf bereits
-gespeicherte Werte aus?**
-Nein. Änderungen an der Entitätskonfiguration wirken ausschließlich auf
-künftig eintreffende bzw. künftig berechnete Werte.
+**Wirkt sich eine geänderte Auflösung auf bereits gespeicherte Werte aus?**
+Nein. Eine geänderte Auflösung wirkt ausschließlich auf künftig
+eintreffende Werte, nie rückwirkend auf bereits archivierte Daten.
+
+**Wirkt sich eine geänderte Aufbewahrungsfrist auf bereits gespeicherte
+Werte aus?**
+Ja, sobald die Aufbewahrungs-Durchsetzung als Nächstes läuft — anders als
+bei der Auflösung ist das hier bewusst rückwirkend gewollt: eine verkürzte
+Frist entfernt dann auch längst archivierte, überfällige Monate. Details
+und wie man das sicher handhabt (Vorschau, Unbegrenzt, Backup vorher)
+stehen unter [Datenhandling → Aufbewahrung](#aufbewahrung-retention).
 
 **Ist eine gelöschte Entität wirklich weg?**
 Nach "Alle Werte löschen" oder "Entität entfernen" ja, endgültig. Vorher
