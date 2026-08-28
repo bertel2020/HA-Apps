@@ -100,3 +100,8 @@ unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
   (aktuell deutsch, Komma als Dezimaltrennzeichen); eine künftige
   Sprachumschaltung ändert nur diese eine Datei, nicht jede einzelne
   Tabellen-/Chart-Seite.
+- **`sortable-table.js`**: einheitliches Sortierverhalten für längere
+  Listen-/Verwaltungstabellen (Bereinigungs-Vorschau, Indexkonsistenz,
+  Ausführungsverläufe, Duplikate je Entität, Symcon-Zuordnungsbericht),
+  inklusive automatischer Seitenumbrüche bei vielen Zeilen — neue Tabellen
+  dieser Art sollten dieses Modul statt einer eigenen Sortierlogik nutzen.

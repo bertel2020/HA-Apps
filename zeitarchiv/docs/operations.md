@@ -36,10 +36,12 @@ kein gleichzeitiger Schreibverkehr während der Operation.
 ## Retention-Durchsetzung
 
 `storage/retention.py`, ausgeführt manuell (Vorschau + Klick) oder geplant
-(täglich zur konfigurierten lokalen Uhrzeit, `settings.retention_enforcement`
-+ `retention_enforcement_time`). Nächster/letzter Lauf in
-`retention_jobs` protokolliert (überlebt Neustarts). Nach einer Downtime wird
-höchstens **ein** verpasster Lauf nachgeholt, nie mehrere rückwirkend.
+(täglich oder wöchentlich zur konfigurierten lokalen Uhrzeit,
+`settings.retention_enforcement` + `retention_enforcement_time`; bei
+wöchentlichem Modus zusätzlich `retention_enforcement_weekday`). Nächster/
+letzter Lauf in `retention_jobs` protokolliert (überlebt Neustarts). Nach
+einer Downtime wird höchstens **ein** verpasster Lauf nachgeholt, nie
+mehrere rückwirkend.
 
 ## Wartungsplaner
 

@@ -1,47 +1,85 @@
 # Benutzerhandbuch
 
 Dieses Dokument ist die ausführliche Anleitung für Nutzer der App — Schritt
-für Schritt, aufgabenorientiert. Für einen kurzen Überblick (Installation,
-Funktionsliste) siehe die [App-README](../README.md); technische Interna für
-Entwickler stehen in den übrigen Dokumenten dieses Ordners (siehe
-[README.md](README.md)).
+für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
+Überblick (was die App ist, Kernfunktionen auf einen Blick) siehe die
+[App-README](../README.md); technische Interna für Entwickler stehen in den
+übrigen Dokumenten dieses Ordners (siehe [README.md](README.md)).
+
+## Inhalt
+
+- [Erste Schritte](#erste-schritte)
+- [Die Übersichtsseite](#die-übersichtsseite)
+- [Dashboards](#dashboards)
+- [Entitäten und Verläufe](#entitäten-und-verläufe)
+- [Entität konfigurieren](#entität-konfigurieren)
+- [Bereinigung](#bereinigung)
+- [Charts](#charts)
+- [Vergleichstabellen](#vergleichstabellen)
+- [Statistik](#statistik)
+- [Import und Export](#import-und-export)
+- [Backup / Restore](#backup--restore)
+- [Einstellungen im Detail](#einstellungen-im-detail)
+- [Typische Aufgaben](#typische-aufgaben)
+- [Häufige Fragen](#häufige-fragen)
 
 ## Erste Schritte
 
 1. **App installieren** — über den Add-on-Store (Repository
    `https://github.com/bertel2020/HA-Apps` hinzufügen) oder manuell. Details:
    [App-README → Installation](../README.md#installation).
-2. **API-Token kopieren** — Zeitarchiv öffnen, **Einstellungen → Verbindung**,
-   Token kopieren.
+2. **API-Token kopieren** — Zeitarchiv über die Home-Assistant-Seitenleiste
+   öffnen, **Einstellungen → Verbindung**, Token kopieren. Der Token wird
+   beim ersten Start automatisch erzeugt und ist nur für diese Zeitarchiv-
+   Installation gültig.
 3. **Integration installieren** — [github.com/bertel2020/HA-Zeitarchiv](https://github.com/bertel2020/HA-Zeitarchiv),
    über HACS oder manuell. In Home Assistant unter **Einstellungen → Geräte
    & Dienste → Integration hinzufügen → Zeitarchiv** Host (`localhost`),
    Port (`8127`) und Token eintragen.
 4. **Archivfilter festlegen** — auf der Integrationskachel **Konfigurieren →
    Archivfilter bearbeiten**: Domains, einzelne Entitäten, Bereiche oder
-   Geräte auswählen. Ohne Filter kommen keine Daten an.
+   Geräte auswählen. Ohne Filter kommen keine Daten an; die App wartet dann
+   untätig, ohne Fehler anzuzeigen.
 5. Nach dem ersten empfangenen Wert erscheint die Entität automatisch in
    **Entitäten** — mit den globalen Standardwerten aus **Einstellungen →
-   Archivierung**.
+   Archivierung**. Diese Standards lassen sich pro Entität jederzeit
+   individuell überschreiben (siehe [Entität konfigurieren](#entität-konfigurieren)).
+6. Filter, Token oder Standards lassen sich jederzeit nachträglich ändern —
+   bereits archivierte Werte bleiben davon unberührt, nur künftige Werte
+   folgen den neuen Einstellungen.
+
+**Woran erkenne ich, dass Daten ankommen?** Unter **Einstellungen →
+Verbindung** zeigt "Letzter empfangener Wert" den Zeitpunkt des zuletzt
+verarbeiteten Schreibvorgangs. Bleibt dieser Wert dauerhaft leer oder alt,
+liegt es entweder an fehlenden Archivfiltern (Schritt 4) oder an einem
+falschen Token/Host in der Integration (Schritt 3).
 
 ## Die Übersichtsseite
 
-Die Startseite zeigt eine Kennzahlenübersicht (Anzahl Entitäten, Datensätze,
-Speicherbedarf) und darunter das **Standard-Dashboard** — dieselbe
-Kachel-Ansicht wie unter **Dashboards**, nur fest der Startseite zugeordnet.
+Die Startseite (Sidebar-Eintrag "Zeitarchiv") zeigt oben eine
+Kennzahlenübersicht (Anzahl Entitäten, Datensätze, Speicherbedarf) und
+darunter das **Standard-Dashboard** — dieselbe Kachel-Ansicht wie unter
+**Dashboards**, nur fest der Startseite zugeordnet und nicht umbenennbar
+oder löschbar. Es lässt sich wie jedes andere Dashboard mit Kacheln
+bestücken, umsortieren und fixieren (siehe unten).
 
 ## Dashboards
 
 - **Dashboards**-Menüpunkt (Hauptnavigation) klappt eine Liste aller
   vorhandenen Dashboards auf. Von dort: neues Dashboard anlegen, ein
-  bestehendes öffnen, umbenennen oder löschen.
+  bestehendes öffnen, umbenennen oder löschen. Es gibt keine Obergrenze für
+  die Anzahl der Dashboards.
 - Jedes Dashboard zeigt bis zu 18 Kacheln (Charts und Vergleichstabellen
   gemischt) in frei wählbarer Größe (1×1 bis 3×3). Per Drag-and-drop
-  anordnen; über das Kachelmenü (⋮) Größe ändern oder entfernen.
+  anordnen; über das Kachelmenü (⋮) Größe ändern oder entfernen. Das
+  Entfernen einer Kachel löscht nur die Platzierung, nicht das zugrunde
+  liegende Chart oder die Tabelle.
 - **Kachel hinzufügen:** die "+"-Kachel öffnet ein Menü mit direktem Link
   "**+ Neuer Chart**"/"**+ Neue Tabelle**" (führt sofort in den jeweiligen
-  Editor) sowie einer Liste bereits gespeicherter, noch nicht angehefteter
-  Charts/Tabellen zum Anklicken.
+  Editor, das Ergebnis landet nach dem Speichern automatisch auf diesem
+  Dashboard) sowie einer Liste bereits gespeicherter, noch nicht
+  angehefteter Charts/Tabellen zum Anklicken. Ein Chart oder eine Tabelle
+  kann gleichzeitig auf mehreren Dashboards angeheftet sein.
 - Chart-Kacheln ab Größe 2×2 können über das Kachelmenü (⋮) eine Legende
   einblenden ("Legende anzeigen") — Aussehen und Inhalt entsprechen dabei
   exakt der Legende des zugrundeliegenden Charts; ein Klick auf die
@@ -51,217 +89,434 @@ Kachel-Ansicht wie unter **Dashboards**, nur fest der Startseite zugeordnet.
   Größenändern und Entfernen von Kacheln auf der Ansicht selbst — schützt
   vor versehentlichem Verschieben auf einem z. B. dauerhaft angezeigten
   Wandtablet. Umbenennen und Löschen des Dashboards bleiben im Editor
-  weiterhin möglich. Löschen eines Dashboards entfernt nur die
-  Kachel-Anordnung — die zugrunde liegenden Charts/Tabellen bleiben erhalten
-  und lassen sich anderswo neu anheften.
+  weiterhin möglich; nur die Kachel-Ansicht selbst ist gesperrt.
+- **Dashboard löschen** entfernt nur die Kachel-Anordnung dieses
+  Dashboards — die zugrunde liegenden Charts/Tabellen bleiben erhalten und
+  lassen sich über "+ Kachel hinzufügen" anderswo neu anheften.
+- Die Ein-/Ausblend-Animation der Kachel-Charts (kurzes Auf- statt
+  Sofort-Erscheinen) gilt zentral für alle Kacheln auf allen Dashboards und
+  lässt sich unter **Einstellungen → Darstellung** abschalten.
 
 ## Entitäten und Verläufe
 
-**Entitäten** listet alle bekannten Entitäten, durchsuchbar und filterbar.
-Ein Klick öffnet die **Verlaufsansicht** einer einzelnen Entität:
+**Entitäten** listet alle bekannten Entitäten, durchsuchbar über den Namen
+oder die Entity-ID und filterbar (z. B. nach Domain). Ein Klick auf eine
+Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
 
-- Zeitraum-Navigation von Stunde bis Dekade, vor/zurück blätterbar, wahlweise
-  laufendes ("bis heute") oder rollierendes Fenster ("letzte 24 h").
-- Linie oder Balken; bei Schaltern zusätzlich ein Zeitstrahl mit AN/AUS-
-  Intervallen.
-- **Vergleich** (Optionen-Menü): Vorperiode oder Vorjahr, mit passender
-  Beschriftung ("Vortag", "Vorjahrestag" …).
-- **Aktuell/Min/Max/Durchschnitt/Summe** wahlweise direkt in der Legende
-  sichtbar, wahlweise als Chips oder als Tabelle (Legenden-Stil); beide
-  lassen sich anklicken, um einzelne Reihen ein-/auszublenden.
-- **Als Chart speichern** (Optionen-Menü) legt die aktuelle Ansicht als
-  eigenständiges, ggf. mehrere Entitäten umfassendes Chart ab — von dort aus
-  an ein Dashboard anheftbar.
-- Alle Optionen im Optionen-Menü (Kontinuierlich, Rohwerte, Diagrammtyp,
-  Punkte, Werte anzeigen, Dynamische Y-Achse, Legenden-Statistik und
-  -Kennzahlen, Legenden-Stil) werden pro Entität dauerhaft gespeichert;
-  die Startwerte dafür lassen sich unter **Einstellungen → Darstellung**
-  ändern, "Optionen auf Standard zurücksetzen" wirft eine Entität wieder
-  auf diese Startwerte zurück.
+### Zeitraum-Navigation
 
-### Entität konfigurieren
+- Auswahl von Stunde, Tag, Woche, Monat, Jahr oder Dekade als Basiseinheit;
+  Vor-/Zurück-Pfeile blättern jeweils um eine Einheit.
+- **Laufend** ("bis heute") zeigt den aktuellen, noch nicht abgeschlossenen
+  Zeitraum, z. B. "diese Woche bis jetzt" — auch bevor für die restliche
+  Periode überhaupt Daten vorliegen, reicht die Achse bis zur vollen
+  Kalendergrenze (z. B. bis Sonntag bei "Woche").
+- **Rollierend** zeigt stattdessen ein festes Zeitfenster relativ zu jetzt,
+  z. B. "letzte 24 Stunden" oder "letzte 30 Tage", unabhängig von
+  Kalendergrenzen.
 
-Über das Zahnrad-Symbol einer Entität:
+### Darstellung
+
+- **Diagrammtyp:** Linie oder Balken; bei Schalter-Entitäten (`switch`,
+  `binary_sensor` u. Ä.) zusätzlich ein Zeitstrahl, der die AN-Intervalle
+  als durchgehende Balken zeigt statt einzelner Punkte.
+- Linien lassen sich glätten (Optionen-Menü), was kurzfristiges Rauschen
+  visuell unterdrückt, ohne die zugrunde liegenden Werte zu verändern.
+- **Rohwerte** zeigt statt aggregierter Punkte jeden einzelnen
+  gespeicherten Messwert im Zeitraum — sinnvoll bei genauerer Prüfung
+  kurzer Zeiträume, bei sehr langen Zeiträumen begrenzt durch das
+  Abfragelimit.
+- **Dynamische Y-Achse** skaliert die Achse auf die tatsächliche
+  Wertespanne des angezeigten Zeitraums statt bei 0 zu beginnen — macht
+  kleine Schwankungen sichtbarer, kann die visuelle Größe von Änderungen
+  aber auch überzeichnen.
+- **Werte anzeigen** blendet die Zahlenwerte direkt neben den Datenpunkten
+  ein.
+
+### Vergleich
+
+Über das Optionen-Menü lässt sich die aktuelle Ansicht mit der Vorperiode
+oder dem Vorjahr überlagern. Die Beschriftung passt sich automatisch an den
+gewählten Zeitraum an (z. B. "Vortag" bei Tagesansicht, "Vorjahrestag" beim
+Jahresvergleich einer Tagesansicht) und erscheint direkt im Button, sodass
+die aktive Vergleichsoption ohne Menüaufruf erkennbar bleibt.
+
+### Kennzahlen und Legende
+
+Aktuell/Min/Max/Durchschnitt/Summe des angezeigten Zeitraums lassen sich
+wahlweise direkt einblenden — als kompakte Chips oder als kleine Tabelle
+(einstellbar über den Legenden-Stil). Beide Darstellungen sind anklickbar,
+um einzelne Reihen ein- oder auszublenden, ohne den Zeitraum zu verlassen.
+
+### Ansicht sichern
+
+**Als Chart speichern** (Optionen-Menü) legt die aktuelle Ansicht —
+inklusive aller gewählten Optionen und ggf. bereits hinzugefügter weiterer
+Entitäten — als eigenständiges Chart ab, das sich danach wie jedes andere
+Chart bearbeiten und auf ein Dashboard anheften lässt.
+
+### Gespeicherte Optionen
+
+Alle Optionen im Optionen-Menü (Kontinuierlich/Rollierend, Rohwerte,
+Diagrammtyp, Punkte anzeigen, Werte anzeigen, Dynamische Y-Achse,
+Legenden-Statistik und -Kennzahlen, Legenden-Stil) werden **pro Entität**
+dauerhaft gespeichert und beim nächsten Aufruf automatisch wieder
+angewendet. Die Startwerte für neu geöffnete Entitäten lassen sich unter
+**Einstellungen → Darstellung** ändern; "Optionen auf Standard
+zurücksetzen" (im Optionen-Menü der Entität) wirft nur diese eine Entität
+wieder auf diese Startwerte zurück.
+
+## Entität konfigurieren
+
+Über das Zahnrad-Symbol einer Entität (in der Liste oder in der
+Verlaufsansicht) erreichbar:
 
 | Feld | Bedeutung |
 | --- | --- |
-| Auflösung | Mindestabstand zwischen zwei gespeicherten Werten (z. B. "alle 5 Minuten") |
+| Auflösung | Mindestabstand zwischen zwei gespeicherten Werten (z. B. "alle 5 Minuten"); engmaschigere Quellwerte werden entsprechend verdichtet |
 | Aufbewahrung | Wie lange Werte behalten werden, bevor eine aktivierte automatische Löschung greift (**Unbegrenzt** möglich) |
-| Nachkommastellen | Automatisch oder feste Anzahl (0–3) für die Anzeige |
-| Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte, behält aber mindestens alle 6 Stunden ein Lebenszeichen |
-| Lücken-Erkennung | Schwellwert in Minuten für die Bereinigung — "Aus" deaktiviert die Markierung |
-| Ausreißer-Erkennung | Schwellwert in Prozent (Sprung gegenüber dem Vorwert) — "Aus" deaktiviert die Markierung |
-| Anzeigemodus | Bei Schaltern: Rohwert (AN/AUS) oder Zeit (Einschaltdauer) |
+| Nachkommastellen | Automatisch oder feste Anzahl (0–3) für die Anzeige in Charts, Tabellen und Rohwert-Listen |
+| Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte (spart Speicherplatz bei trägen Sensoren), behält aber mindestens alle 6 Stunden ein Lebenszeichen, damit lange Stillstände von fehlenden Daten unterscheidbar bleiben |
+| Lücken-Erkennung | Schwellwert in Minuten, ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — "Aus" deaktiviert die Markierung |
+| Ausreißer-Erkennung | Schwellwert in Prozent, um den ein Wert gegenüber dem Vorwert mindestens abweichen muss, um als Ausreißer markiert zu werden — "Aus" deaktiviert die Markierung |
+| Anzeigemodus | Nur bei Schaltern: Rohwert (AN/AUS als Zustand) oder Zeit (kumulierte Einschaltdauer je Zeitraum) |
 
-Am Seitenende: **Alle Werte löschen** (entfernt alle Daten, behält die
-Konfiguration) und **Entität entfernen** (löscht auch die Konfiguration —
-sendet Home Assistant die Entität weiter, wird sie beim nächsten Wert mit
-den aktuellen Standards neu angelegt). Beide verlangen eine explizite
-Bestätigung und sind nicht rückgängig zu machen.
+Änderungen an Auflösung, Aufbewahrung oder Nachkommastellen wirken nur auf
+künftig eintreffende bzw. künftig berechnete Werte, nie rückwirkend auf
+bereits archivierte Daten.
+
+Am Seitenende dieser Konfigurationsseite stehen zwei endgültige Aktionen:
+
+- **Alle Werte löschen** entfernt sämtliche Daten dieser Entität (laufender
+  Monat, Archiv, Rollups), behält aber die individuelle Konfiguration
+  (Auflösung, Aufbewahrung usw.) bei. Sinnvoll, um bei einer fehlerhaft
+  konfigurierten Quelle noch einmal bei null anzufangen, ohne die
+  Einstellungen neu setzen zu müssen.
+- **Entität entfernen** löscht zusätzlich auch die Konfiguration. Sendet
+  Home Assistant die Entität weiter, wird sie beim nächsten empfangenen
+  Wert automatisch wieder mit den aktuellen globalen Standards neu
+  angelegt.
+
+Beide Aktionen verlangen vor der Ausführung eine eindeutige Bestätigung
+(Eingabe des Entitätsnamens) und sind danach nicht rückgängig zu machen.
+Charts oder Tabellen, die diese Entität verwenden, zeigen ab diesem
+Zeitpunkt schlicht keine Daten mehr für sie.
 
 ## Bereinigung
 
-Von der Verlaufsansicht über "Bereinigen" erreichbar, drei Reiter:
+Von der Verlaufsansicht über den Button "Bereinigen" erreichbar, drei
+Reiter:
 
-1. **Bereinigen** — erkannte Ausreißer, Lücken, Duplikate und gerundet
-   gleiche Wiederholungen als Liste, je mit Begründung (z. B. "3 Std. 50 Min.
-   seit vorherigem Wert 21,2 °C um 08:10"). Auswählen und löschen — das ist
-   zunächst ein **Soft-Delete**: die Werte verschwinden aus jeder Anzeige,
-   sind aber über "Rückgängig (letzte Löschung)" wiederherstellbar, solange
-   nicht endgültig bereinigt wurde (siehe unten).
-2. **Korrigieren** — einzelne Werte direkt bearbeiten (Klick auf die
-   Wert-Zelle) statt zu löschen, z. B. um einen erkennbaren Sensor-Ausreißer
-   auf einen plausiblen Wert zu setzen statt die Lücke offen zu lassen.
-3. **Hinzufügen** — einen fehlenden Messpunkt manuell mit Zeitstempel und
-   Wert ergänzen (deutsches Zahlenformat, Komma als Dezimaltrennzeichen).
+### 1. Bereinigen
 
-Die Kopfzeile zeigt sowohl die Datensatzanzahl im gewählten Zeitraum als auch
-den sichtbaren Gesamtbestand samt Ausreißern/Lücken/Duplikaten/
-Wiederholungen über die **komplette** Historie der Entität.
+Erkannte Ausreißer, Lücken, Duplikate und gerundet gleiche Wiederholungen
+werden als Liste angezeigt, je mit einer kurzen Begründung (z. B. "3 Std.
+50 Min. seit vorherigem Wert 21,2 °C um 08:10"). Einzelne Einträge oder alle
+zusammen auswählen und löschen — das ist zunächst ein **Soft-Delete**: Die
+Werte verschwinden sofort aus jeder Anzeige (Charts, Tabellen, Rohwerte),
+sind aber über "Rückgängig (letzte Löschung)" wiederherstellbar, solange
+noch keine endgültige Bereinigung stattgefunden hat (siehe unten).
 
-**Endgültig entfernen:** Soft-gelöschte Werte bleiben Datenträgerplatz, bis
-sie unter **Einstellungen → Speicherplatz** physisch bereinigt werden — dort
-zeigt eine Vorschau vorab, wie viele Zeilen tatsächlich entfernbar sind
-(inklusive Aufschlüsselung nach laufendem Monat/Archiv). Dieser Schritt ist
-endgültig.
+Bei steigenden Zählern (Home-Assistant-`state_class` `total_increasing`,
+z. B. Energiezähler) werden niedrigere Folgewerte gesondert als mögliche
+Zähler-Resets protokolliert und unter "Zählerrückgänge" markiert; sie
+bleiben standardmäßig gespeichert, da ein Reset (z. B. Zählertausch) ein
+gültiges Ereignis sein kann und nicht automatisch als Fehler gilt.
+
+Wiederholungen (gerundet gleiche Folgewerte) lassen sich mit derselben
+Sechs-Stunden-Lebenszeichenregel wie der laufende Wertänderungsfilter auch
+nachträglich verdichten — nützlich, wenn der Filter erst später aktiviert
+wurde und ältere Daten noch unverdichtet vorliegen.
+
+### 2. Korrigieren
+
+Einzelne Werte direkt bearbeiten (Klick auf die Wert-Zelle in der
+Rohwert-Tabelle) statt zu löschen — etwa um einen erkennbaren
+Sensor-Ausreißer auf einen plausiblen Wert zu setzen, statt an dieser
+Stelle eine Lücke offenzulassen. Die Rohwert-Tabelle zeigt dabei die
+Einheit direkt neben jedem Wert.
+
+### 3. Hinzufügen
+
+Einen fehlenden Messpunkt manuell mit Zeitstempel und Wert ergänzen —
+Zahlen im deutschen Format mit Komma als Dezimaltrennzeichen (z. B. `21,5`).
+
+### Kopfzeile und endgültiges Entfernen
+
+Die Kopfzeile des Bereinigungsbereichs zeigt sowohl die Datensatzanzahl im
+aktuell gewählten Zeitraum als auch den sichtbaren Gesamtbestand samt
+Ausreißern/Lücken/Duplikaten/Wiederholungen über die **komplette** Historie
+der Entität — unabhängig vom gerade angezeigten Ausschnitt.
+
+Soft-gelöschte Werte belegen weiterhin Speicherplatz, bis sie unter
+**Einstellungen → Speicherplatz** physisch bereinigt werden. Dort zeigt
+eine Vorschau vorab, wie viele Zeilen tatsächlich entfernbar sind
+(inklusive Aufschlüsselung nach laufendem Monat und Archiv), bevor der
+Schritt tatsächlich ausgeführt wird. Dieser Schritt ist endgültig — danach
+ist "Rückgängig" nicht mehr möglich.
 
 ## Charts
 
-Eigener Editor (**Charts** → neues Chart oder Bearbeiten eines bestehenden):
-mehrere Entitäten überlagern, automatische getrennte Y-Achsen bei
-unterschiedlichen Einheiten, wählbare Auflösung (inkl. "Automatisch" mit
-Anzeige der tatsächlich verwendeten Auflösung), Punkte an/aus, Rohwerte,
-dynamische Y-Achse, Legenden-Statistik. Mehrere Entitäten lassen sich per
-Ziehen oder Pfeil-Buttons neu anordnen — das bestimmt Legenden-, Statistik-
-und Farbreihenfolge.
+Eigener Editor, erreichbar über **Charts** → neues Chart oder Bearbeiten
+eines bestehenden:
+
+- Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
+  automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
+  in einem Chart sinnvoll lesbar bleiben.
+- **Auflösung** wählbar, inklusive "Automatisch" — dabei zeigt ein kleiner
+  Hinweis direkt an, welche Auflösung das für den aktuell gewählten
+  Zeitraum tatsächlich bedeutet (z. B. "≈ 1 Stunde").
+- Punkte an/aus, Rohwerte, dynamische Y-Achse, Legenden-Statistik — dieselben
+  Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
+  Chart konfiguriert statt je Entität.
+- Mehrere Entitäten lassen sich per Ziehen oder über Pfeil-Buttons neu
+  anordnen — das bestimmt die Reihenfolge in Legende, Statistik-Anzeige und
+  Farbzuordnung.
+- Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
+  Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
 
 ## Vergleichstabellen
 
-Eigener Editor (**Tabellen** → neue Tabelle): **Zeilen** sind Größen
-(Entität, Gruppe mehrerer Entitäten, Formel, oder eine rein optische
-Trennlinie), **Spalten** sind Zeiträume (frei benannt, z. B. "Heute", "Aug
-Vorjahr", "2026", jeweils mit Zeitraum-Typ und Versatz).
+Eigener Editor, erreichbar über **Tabellen** → neue Tabelle:
 
-- **Aggregation je Zeile:** Automatisch (Zähler → Summe, sonst Durchschnitt),
-  Ø Durchschnitt, Min, Max oder Σ Summe — Min/Max nutzen die echten
-  Extremwerte der Rohdaten, nicht den Durchschnitt der kleinsten Zeitscheibe.
+- **Zeilen** sind Größen: eine einzelne Entität, eine Gruppe mehrerer
+  Entitäten (wird zu einem Summenwert zusammengefasst), eine Formel, oder
+  eine rein optische Trennlinie ohne eigene Daten.
+- **Spalten** sind Zeiträume: frei benannt (z. B. "Heute", "Aug Vorjahr",
+  "2026"), jeweils mit einem Zeitraum-Typ (Tag, Woche, Monat, Jahr …) und
+  einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger, usw.). So
+  lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende Jahre in
+  zwölf Spalten nebeneinanderstellen.
+
+### Aggregation und Formatierung
+
+- **Aggregation je Zeile:** Automatisch (bei Zählern die Summe, sonst der
+  Durchschnitt), Ø Durchschnitt, Min, Max oder Σ Summe. Min/Max nutzen dabei
+  die echten Extremwerte der zugrunde liegenden Rohdaten, nicht den
+  Durchschnitt der kleinsten verfügbaren Zeitscheibe.
 - **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
-- **Formeln** referenzieren andere Zeilen über ihr Buchstaben-Kürzel (A, B, C
-  …), z. B. `A / B * 100`; nur Zeilen *oberhalb* sind referenzierbar. Beim
-  Umsortieren von Zeilen werden Formel-Referenzen automatisch mitkorrigiert.
-- **Darstellung** (Zebra-Streifen, Kopfzeile/erste Spalte hervorheben,
-  Beschriftung fett, Rahmen horizontal/Gitter/ohne, Dichte
-  komfortabel/kompakt) ist rein optisch, ändert nie berechnete Werte.
 
-Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — kein
-eingefrorener Schnappschuss.
+### Formeln
+
+Formel-Zeilen referenzieren andere Zeilen über ihr Buchstaben-Kürzel (A, B,
+C …), z. B. `A / B * 100`. Referenzierbar sind dabei nur Zeilen *oberhalb*
+der Formel-Zeile. Beim Umsortieren von Zeilen (Ziehen oder Pfeil-Buttons)
+werden die Buchstaben-Referenzen in bestehenden Formeln automatisch
+mitkorrigiert, sodass eine Formel weiterhin dieselbe fachliche Zeile
+referenziert wie vor dem Verschieben — nicht einfach dieselbe Position. Eine
+Formel-Zeile übernimmt, sofern nicht eigens angegeben, automatisch die
+Einheit der ersten referenzierten Zeile.
+
+### Darstellung
+
+Zebra-Streifen, Kopfzeile/erste Spalte hervorheben, Beschriftung fett,
+Rahmen (horizontal/Gitter/ohne) sowie Dichte (komfortabel/kompakt) sind rein
+optische Einstellungen und wirken sich nie auf die berechneten Werte aus.
+
+Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
+Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
 
 ## Statistik
 
-Entitätenzahl, Datensätze, Speicherbedarf, Wachstum über die Zeit sowie
-Aufschlüsselungen nach Typ, Auflösung und Aufbewahrung. Die
-Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und Backups,
-wo diese ebenfalls Platz belegen.
+Zeigt Entitätenzahl, Datensätze, Speicherbedarf und Wachstum über die Zeit,
+sowie Aufschlüsselungen nach Typ, Auflösung und Aufbewahrung. Ein interner
+Planer erfasst unabhängig von Seitenaufrufen höchstens stündlich einen
+realen Bestandsschnappschuss, sodass die Wachstumsansicht auch ohne
+regelmäßigen Besuch der Seite aussagekräftig bleibt.
+
+Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
+Backups, da auch diese Speicherplatz belegen, aber in der reinen
+Entitäten-Statistik nicht enthalten sind.
 
 ## Import und Export
 
-- **Symcon:** ZIP des `db`-Ordners hochladen, optional `settings.json` für
-  Namen/Einheiten, Variablen prüfen und Home-Assistant-Entitäten zuordnen.
-  Bei abweichenden Einheiten (z. B. `klx` → `lx`) einen Umrechnungsfaktor
-  angeben.
-- **CSV:** Trennzeichen sowie Zeit-, Wert- und Zielspalte frei zuordnen,
-  Ergebnis vor dem eigentlichen Import prüfen.
-- **Home Assistant:** bestehende Recorder-Daten direkt aus der laufenden
-  Home-Assistant-Instanz übernehmen, ohne Symcon oder eine hochgeladene
-  Datei. Zur Auswahl stehen nur Entitäten, die bereits in Zeitarchiv bekannt
-  sind (also von der Home-Assistant-Integration konfiguriert wurden und
-  mindestens einen Live-Wert übertragen haben). Zwei Quellen zur Wahl:
-  - **Rohhistorie:** Einzelmesswerte über die Home-Assistant-REST-API — Home
-    Assistant hält sie standardmäßig aber nur einige Tage vor.
-  - **Langzeitstatistik:** von Home Assistant per Voreinstellung dauerhaft
-    aufbewahrte Stunden-/Tagesaggregate (Mittelwert bzw. fortlaufende Summe,
-    je nachdem was die Entität führt) über die Home-Assistant-WebSocket-API
-    — deckt damit auch deutlich ältere Zeiträume ab, dafür nur als Aggregat
-    statt als Einzelmesswert. Steht nur für Entitäten mit Home-Assistant-
-    `state_class` zur Verfügung (i. d. R. `sensor.*`), erkennbar an der
-    Markierung „Nicht unterstützt“ in der Spalte „Art“.
+Erreichbar über **Import**, vier Reiter:
 
-  Zeitraum wählen (Voreinstellung/verfügbare Voreinstellungen unterscheiden
-  sich je nach Quelle — bei Langzeitstatistik z. B. auch „Letztes Jahr“),
-  optional „Verfügbarkeit prüfen“ für eine Vorschau, welche Entitäten in
-  Home Assistant tatsächlich Daten der gewählten Quelle haben und für
-  welchen Zeitraum. Das Ergebnis bleibt je Quelle/Auflösung erhalten — auch
-  nach einem Seitenwechsel oder einem Wechsel zwischen Rohhistorie und
-  Langzeitstatistik (bis zum nächsten Neustart des Add-ons) —, der
-  Spaltenkopf „Verfügbar“ zeigt dazu den Zeitpunkt der letzten Prüfung; ab
-  15 Minuten erscheint ein Hinweis, dass der Stand veraltet sein könnte.
-  Benötigt die Add-on-Berechtigung `homeassistant_api` sowie eine
-  Home-Assistant-Installation mit Supervisor (nicht bei Home Assistant
-  Container).
-- **Reports** (vierter Reiter): jeder tatsächlich ausgeführte Import bleibt
-  mit Quelle, Zuordnung, importierten/übersprungenen Datensätzen und
-  eventuellen Fehlern nachvollziehbar, filterbar nach Quelle/Status,
-  sortierbar, mit JSON-Download je Eintrag. Reine Vorschauen erzeugen keinen
-  Report.
-- **CSV-Export:** vollständige Rohdatenhistorie einer Entität herunterladen.
+### Symcon
 
-Importe füllen nur **fehlende** Zeitstempel im laufenden Hot Buffer auf —
-bereits vorhandene Messpunkte werden übersprungen, bestehende Monatsarchive
-nie überschrieben. Ein erneuter Symcon-Upload derselben Quelle dupliziert
-also nichts.
+ZIP des `db`-Ordners hochladen, optional eine `settings.json` für Namen und
+Einheiten ergänzen. Danach: Variablen prüfen und den gewünschten
+Home-Assistant-Entitäten zuordnen. Weichen Quell- und Zieleinheit
+voneinander ab (z. B. `klx` in Symcon vs. `lx` in Home Assistant), erscheint
+ein Hinweis und ein Umrechnungsfaktor kann angegeben werden (hier `1000`).
+Vor dem eigentlichen Import lässt sich die Zuordnung noch einmal prüfen.
+
+### CSV
+
+Trennzeichen sowie Zeit-, Wert- und Zielspalte frei zuordnen, das Ergebnis
+vor dem eigentlichen Import prüfen (Vorschau der ersten Zeilen mit erkannten
+Werten).
+
+### Home Assistant
+
+Bestehende Recorder-Daten direkt aus der laufenden Home-Assistant-Instanz
+übernehmen, ohne Symcon oder eine hochgeladene Datei. Zur Auswahl stehen nur
+Entitäten, die bereits in Zeitarchiv bekannt sind — also von der
+Home-Assistant-Integration konfiguriert wurden und mindestens einen
+Live-Wert übertragen haben.
+
+Zwei Quellen zur Wahl:
+
+- **Rohhistorie:** Einzelmesswerte über die Home-Assistant-REST-API. Home
+  Assistant hält diese standardmäßig aber nur einige Tage vor, deckt also
+  nur die jüngste Vergangenheit ab.
+- **Langzeitstatistik:** von Home Assistant per Voreinstellung dauerhaft
+  aufbewahrte Stunden-/Tagesaggregate (Mittelwert bzw. fortlaufende Summe,
+  je nachdem was die Entität in Home Assistant führt) über die
+  Home-Assistant-WebSocket-API — deckt damit auch deutlich ältere
+  Zeiträume ab, allerdings nur als Aggregat statt als Einzelmesswert. Steht
+  nur für Entitäten mit Home-Assistant-`state_class` zur Verfügung (i. d. R.
+  `sensor.*`-Entitäten), erkennbar an der Markierung "Nicht unterstützt" in
+  der Spalte "Art" bei allen anderen.
+
+Ablauf: Zeitraum wählen (die verfügbaren Voreinstellungen unterscheiden
+sich je nach Quelle — bei Langzeitstatistik steht z. B. zusätzlich "Letztes
+Jahr" zur Verfügung), optional "Verfügbarkeit prüfen" für eine Vorschau,
+welche Entitäten in Home Assistant tatsächlich Daten der gewählten Quelle
+haben und für welchen Zeitraum. Das Prüfergebnis bleibt je Quelle/Auflösung
+erhalten — auch nach einem Seitenwechsel oder einem Wechsel zwischen
+Rohhistorie und Langzeitstatistik, bis zum nächsten Neustart des Add-ons.
+Der Spaltenkopf "Verfügbar" zeigt dazu den Zeitpunkt der letzten Prüfung; ab
+15 Minuten erscheint ein Hinweis, dass der Stand veraltet sein könnte und
+eine erneute Prüfung sinnvoll ist.
+
+Dieser Import benötigt die Add-on-Berechtigung `homeassistant_api` sowie
+eine Home-Assistant-Installation mit Supervisor (steht bei Home Assistant
+Container nicht zur Verfügung).
+
+### Reports
+
+Jeder tatsächlich ausgeführte Import (Symcon, CSV oder Home Assistant)
+bleibt hier mit Quelle, Zuordnung, Laufzeit, importierten und
+übersprungenen Datensätzen sowie eventuellen Fehlern nachvollziehbar. Reine
+Vorschauen (z. B. "Verfügbarkeit prüfen") erzeugen keinen Report. Die Liste
+lässt sich nach Quelle und Status filtern (wirkt sofort bei Auswahl) und
+nach jeder Spalte sortieren; ein Klick auf eine Zeile öffnet die
+Detailansicht mit JSON-Download. Reports sind seitenweise darstellbar und
+lassen sich gesammelt löschen, wenn sie nicht mehr benötigt werden.
+
+### Duplikatschutz
+
+Importe ergänzen ausschließlich fehlende Zeitstempel im laufenden Hot
+Buffer. Bereits vorhandene Messpunkte derselben Entität und desselben
+Zeitstempels werden übersprungen — auch bei abweichender Event-ID —,
+bestehende Monatsarchive werden dabei nie überschrieben. Ein erneuter
+Symcon- oder CSV-Upload derselben Quelle dupliziert also nichts, ebenso
+wenig ein wiederholter Home-Assistant-Import über denselben Zeitraum.
+
+### CSV-Export
+
+Von der Verlaufsansicht einer Entität aus: die vollständige
+Rohdatenhistorie dieser einen Entität bis zum Exportlimit als CSV
+herunterladen.
 
 ## Backup / Restore
 
 Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 
-- **Backup erstellen:** kompletter Datenbestand als ZIP, herunterladbar.
-  Zusätzlich zu, nicht statt der automatischen Home-Assistant-Snapshots.
+- **Backup erstellen:** kompletter Datenbestand (Index, Hot Buffer,
+  Monatsarchive, Rollups) als ZIP, direkt herunterladbar. Zusätzlich zu,
+  nicht statt der automatischen Home-Assistant-Snapshots — ein
+  Home-Assistant-Snapshot sichert den Add-on-Zustand als Ganzes, ein
+  Zeitarchiv-Backup ist unabhängig davon portabel und lässt sich auch
+  außerhalb von Home Assistant aufbewahren.
 - **Zeitplan:** automatisch nach Zeitplan (Intervall, Uhrzeit, ggf.
   Wochentag), mit automatischer Aufräumung älterer Backups nach Anzahl
-  und/oder Alter.
+  und/oder Alter, damit der Speicherplatz nicht unbegrenzt wächst.
 - **Prüfen:** Prüfsummen-Check eines vorhandenen Backups, ohne es
-  anzuwenden.
-- **Wiederherstellen:** ersetzt den aktuellen Datenbestand — der bisherige
-  Stand wird vor dem Überschreiben in ein Rollback-Verzeichnis verschoben,
-  nicht gelöscht (siehe [operations.md](operations.md) für die technischen
-  Garantien).
+  anzuwenden — sinnvoll, um die Integrität eines Backups vor einem
+  tatsächlichen Wiederherstellungsbedarf zu bestätigen.
+- **Wiederherstellen:** ersetzt den aktuellen Datenbestand vollständig
+  durch den Inhalt des gewählten Backups. Der bisherige Stand wird vor dem
+  Überschreiben in ein Rollback-Verzeichnis verschoben, nicht gelöscht —
+  bei Bedarf lässt sich der Zustand vor der Wiederherstellung also
+  zurückholen. Nach einer Wiederherstellung empfiehlt sich ein kurzer Blick
+  auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
+  Datensatzmengen wieder vorhanden sind.
 
 ## Einstellungen im Detail
 
 | Bereich | Enthält |
 | --- | --- |
 | **Darstellung** | Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
-| **Archivierung** | Standard-Auflösung/-Aufbewahrung für neu erkannte Entitäten (wirkt nie rückwirkend auf bestehende) |
-| **Rotation** | Zeigt Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten Wert) — manuell nachziehbar |
-| **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe "Bereinigung" oben) |
-| **Aufbewahrung** | Vorschau fälliger Löschungen, Zeitplan für automatische Durchsetzung, Lauf-Historie |
-| **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Schreibzugriffe/Auth-Fehler seit Start |
-| **Protokollierung** | Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung |
-| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen; eine Entität 15 Minuten lang verfolgen; Diagnosebericht herunterladen; Prozess-Start/-Laufzeit |
+| **Archivierung** | Standard-Auflösung/-Aufbewahrung für neu erkannte Entitäten (wirkt nie rückwirkend auf bestehende Entitäten) |
+| **Rotation** | Zeigt Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat |
+| **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung) oben) |
+| **Aufbewahrung** | Vorschau fälliger Löschungen, Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag), Lauf-Historie |
+| **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start |
+| **Protokollierung** | Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung — hilfreich bei der Fehlersuche, sollte im Normalbetrieb aber sparsam eingestellt bleiben |
+| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen; eine einzelne Entität 15 Minuten lang verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit |
 | **Über Zeitarchiv** | Version, Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
+
+Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
+sofort — die Zeitarchiv-Integration muss danach mit dem neuen Token
+aktualisiert werden, sonst schlagen weitere Schreibversuche fehl.
 
 ## Typische Aufgaben
 
-**"Ein Sensor sendet unplausible Ausreißer."** → Entität öffnen →
-Zahnrad-Symbol → Ausreißer-Erkennung auf einen passenden Prozentsatz
-einstellen → zurück zur Verlaufsansicht → **Bereinigen** → erkannte
-Ausreißer prüfen und löschen (Soft-Delete, rückgängig machbar) →
-**Einstellungen → Speicherplatz**, wenn der Platz tatsächlich freigegeben
-werden soll.
+**"Ein Sensor sendet unplausible Ausreißer."**
+→ Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf einen
+passenden Prozentsatz einstellen → zurück zur Verlaufsansicht →
+**Bereinigen** → erkannte Ausreißer prüfen und löschen (Soft-Delete,
+rückgängig machbar) → **Einstellungen → Speicherplatz**, wenn der Platz
+tatsächlich freigegeben werden soll.
 
 **"Ich will Innen- und Außentemperatur über die letzten 12 Monate
-vergleichen."** → **Tabellen** → neue Tabelle → 12 Spalten (Zeitraum-Typ
-"Monat", Versatz 0 bis −11) → zwei Zeilen (je eine Entität) → optional eine
-Formel-Zeile für die Differenz.
+vergleichen."**
+→ **Tabellen** → neue Tabelle → 12 Spalten (Zeitraum-Typ "Monat", Versatz 0
+bis −11) → zwei Zeilen (je eine Entität) → optional eine Formel-Zeile für
+die Differenz.
 
 **"Ein Dashboard auf einem Wandtablet soll sich nicht versehentlich
-verändern."** → Dashboard öffnen → Editor → "Fixiert" aktivieren.
+verändern."**
+→ Dashboard öffnen → Editor → "Fixiert" aktivieren.
 
 **"Ich möchte alte Symcon-Daten übernehmen, ohne HA-Live-Daten zu
-verdoppeln."** → **Import → Symcon** → ZIP hochladen → Zuordnung prüfen →
-Import starten. Bereits vorhandene Zeitstempel werden automatisch
-übersprungen, unabhängig von der Quelle.
+verdoppeln."**
+→ **Import → Symcon** → ZIP hochladen → Zuordnung prüfen → Import starten.
+Bereits vorhandene Zeitstempel werden automatisch übersprungen, unabhängig
+von der Quelle.
 
 **"Ich nutze kein Symcon und möchte trotzdem die bisherige HA-Historie
-übernehmen."** → **Import → Home Assistant** → Entitäten auswählen,
-optional „Verfügbarkeit prüfen“ → Vorschau (Dry Run) → Import starten.
+übernehmen."**
+→ **Import → Home Assistant** → Entitäten auswählen, optional
+"Verfügbarkeit prüfen" → Vorschau (Dry Run) → Import starten.
+
+**"Eine Entität sendet nicht mehr, ich will sie aber behalten."**
+→ Entität einfach unverändert lassen — bereits archivierte Werte bleiben
+erhalten, Charts und Tabellen zeigen weiterhin die vorhandene Historie.
+Erst bei Bedarf über das Zahnrad-Symbol **Alle Werte löschen** oder
+**Entität entfernen** verwenden.
+
+**"Ich will vor einem größeren Eingriff (Import, Bereinigung, Update) auf
+Nummer sicher gehen."**
+→ **System → Backup / Restore** → Backup erstellen → herunterladen oder im
+konfigurierten Zeitplan belassen.
+
+## Häufige Fragen
+
+**Wirkt sich eine geänderte Auflösung oder Aufbewahrung auf bereits
+gespeicherte Werte aus?**
+Nein. Änderungen an der Entitätskonfiguration wirken ausschließlich auf
+künftig eintreffende bzw. künftig berechnete Werte.
+
+**Ist eine gelöschte Entität wirklich weg?**
+Nach "Alle Werte löschen" oder "Entität entfernen" ja, endgültig. Vorher
+lohnt sich ein Backup (siehe oben), falls die Löschung ein Versehen war.
+
+**Warum sieht ein Chart trotz aktiver Integration keine neuen Werte?**
+Meist fehlt ein passender Archivfilter in der Integration (siehe
+[Erste Schritte](#erste-schritte), Schritt 4), oder Token/Host in der
+Integrationskonfiguration stimmen nicht mit **Einstellungen → Verbindung**
+überein.
+
+**Kann ich ein Chart oder eine Tabelle für mehrere Dashboards
+verwenden?**
+Ja — ein und dasselbe Chart oder dieselbe Tabelle lässt sich auf beliebig
+vielen Dashboards anheften; es gibt jeweils nur eine gemeinsame
+Definition, Änderungen wirken sich überall gleichzeitig aus.
+
+**Was passiert mit einer Kachel, wenn das zugrunde liegende Chart oder
+die Tabelle gelöscht wird?**
+Die Kachel verschwindet von allen Dashboards, auf denen sie angeheftet
+war.

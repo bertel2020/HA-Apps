@@ -19,16 +19,36 @@ Ausführliches, aufgabenorientiertes Benutzerhandbuch:
 [docs/user-guide.md](docs/user-guide.md). Technische Dokumentation für
 Entwickler: [docs/](docs/README.md).
 
+## Was Zeitarchiv ist
+
+Der Home-Assistant-Recorder ist auf kurze Aufbewahrung und den laufenden
+Betrieb ausgelegt — für Auswertungen über Monate oder Jahre reicht das nicht.
+Zeitarchiv schließt diese Lücke: Es übernimmt ausgewählte Zustandsänderungen
+von Home Assistant, verdichtet abgeschlossene Monate spaltenorientiert und
+verlustfrei, und stellt daraus schnelle Langzeitauswertungen bereit — als
+eigene, in die Home-Assistant-Oberfläche eingebettete Anwendung, nicht als
+weitere Lovelace-Karte.
+
+Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
+
+- Die **[Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv)**
+  läuft in Home Assistant selbst und entscheidet, welche Entitäten
+  archiviert werden.
+- Diese **App** läuft als eigenständiges Add-on, empfängt die Werte über
+  eine token-gesicherte API, speichert sie dauerhaft und stellt Archiv,
+  Auswertung und Datenpflege über den Ingress bereit.
+
 ## Auf einen Blick
 
 | | |
 | --- | --- |
-| **Kompaktes Archiv** | Abgeschlossene Monate als Parquet mit zstd-Kompression |
-| **Schnelle Langzeitansichten** | Vorbereitete Rollups von Stunde bis Jahr |
-| **Eigene Dashboards** | Frei kombinierbare Charts und Vergleichstabellen |
-| **Datenpflege** | Ausreißer, Lücken und Duplikate untersuchen und bereinigen |
-| **Datenübernahme** | Symcon-ZIPs samt Einheitenprüfung und frei zuordenbare CSV-Dateien importieren |
-| **Sicherung** | Prüfbare ZIP-Backups mit Wiederherstellung und Zeitplan |
+| **Kompaktes Archiv** | Abgeschlossene Monate als Parquet mit zstd-Kompression, unabhängig von der Recorder-Aufbewahrung |
+| **Schnelle Langzeitansichten** | Vorbereitete Rollups von Stunde bis Jahr statt teurer Live-Aggregation |
+| **Eigene Dashboards** | Frei kombinierbare Charts und Vergleichstabellen auf beliebig vielen Dashboards |
+| **Datenpflege** | Ausreißer, Lücken und Duplikate erkennen, korrigieren oder bereinigen |
+| **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
+| **Sicherung** | Prüfbare, portable ZIP-Backups mit Wiederherstellung und Zeitplan |
+| **Sicherheit** | Ingress-Authentifizierung, tokenpflichtige API, strikt getrennter Schreibzugang |
 
 ## Zusammenspiel
 
@@ -91,133 +111,40 @@ Auf der Integrationskachel **Konfigurieren → Archivfilter bearbeiten** öffnen
 und Domains, Entitäten, Bereiche oder Geräte auswählen. Ohne passende Filter
 wartet die App auf Daten, archiviert aber nichts.
 
-## Die Oberfläche
+## Kernfunktionen
 
-### Dashboards
+Details zur Bedienung jeder Seite stehen im
+[Benutzerhandbuch](docs/user-guide.md); hier nur ein funktionaler Überblick.
 
-Kacheln lassen sich auf beliebig viele benannte Dashboards verteilen statt
-nur auf eine Startseite. Der Menüpunkt **Dashboards** klappt eine Liste
-aller vorhandenen Dashboards auf, pro Dashboard eine Kachel-Ansicht (bis zu
-18 frei angeordnete Kacheln, Charts und Tabellen gemischt, Drag-and-drop,
-Größen 1×1 bis 3×3, Direktlink zum Anlegen eines neuen Charts/einer neuen
-Tabelle im Anheften-Menü) sowie einen Editor zum Anlegen/Umbenennen/Löschen.
-Ein Dashboard lässt sich dort zusätzlich fixieren — verhindert versehentliches
-Umsortieren, Größenändern oder Entfernen von Kacheln auf der Ansicht, ohne
-Umbenennen/Löschen im Editor einzuschränken. Die Ein-/Ausblend-Animation der
-Kachel-Charts gilt weiterhin zentral für alle Kacheln und lässt sich unter
-**Einstellungen → Darstellung** deaktivieren.
+**Dashboards.** Charts und Vergleichstabellen lassen sich als Kacheln auf
+beliebig vielen, frei benannten Dashboards anordnen — nicht nur auf einer
+einzigen Startseite.
 
-### Entitäten und Verläufe
+**Entitäten und Verläufe.** Jede archivierte Entität besitzt eine eigene
+Verlaufsansicht mit Zeitraum-Navigation von Stunde bis Dekade, Vergleich mit
+Vorperiode oder Vorjahr sowie individuell einstellbarer Auflösung,
+Aufbewahrung und Rundung.
 
-Die Entitätenliste ist durchsuchbar, filterbar und konfigurierbar. Jede
-Entität besitzt eine eigene Verlaufsansicht mit:
+**Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
+unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren
+einzelne Entitäten, Summengruppen und Formeln über frei gewählte
+Zeitspalten (z. B. Monat für Monat über mehrere Jahre).
 
-- Linie oder Balken, bei Schalter-Entitäten zusätzlich als Zeitstrahl mit den
-  AN-Intervallen;
-- geglättete Linien oder Balken;
-- Navigation von Stunde bis Dekade;
-- laufendem oder rollierendem Zeitfenster;
-- Vergleich mit Vorperiode oder Vorjahr;
-- individuell einstellbarer Auflösung, Aufbewahrung und Rundung;
-- optionalem Wertänderungsfilter, der gerundet gleiche Folgewerte überspringt
-  und mindestens alle sechs Stunden ein Lebenszeichen behält.
+**Datenpflege.** Ausreißer, Lücken, doppelte Zeitstempel und gerundet
+gleiche Wiederholungen werden erkannt und lassen sich einzeln korrigieren
+oder als zunächst rückgängig machbare Soft-Delete-Markierung entfernen.
+Physisch entfernt werden markierte Werte erst durch einen separaten,
+endgültigen Schritt.
 
-Ein laufender, nicht-kontinuierlicher Zeitraum zeigt dabei immer bis zur
-vollen Kalendergrenze (z. B. bis Sonntag bei „Woche"), auch bevor für die
-restliche Periode bereits Daten vorliegen. Über „Als Chart speichern" im
-Optionen-Menü lässt sich die aktuelle Ansicht direkt als eigenständiges,
-mehrere Entitäten fähiges Chart ablegen.
+**Statistik.** Entitätenzahl, Datensätze, Speicherbedarf und Wachstum über
+die Zeit, aufgeschlüsselt nach Typ, Auflösung und Aufbewahrung.
 
-### Charts und Tabellen
-
-Eigene Charts können mehrere Entitäten überlagern. Unterschiedliche Einheiten
-erhalten getrennte Y-Achsen, Linien werden geglättet. Bei „Automatisch"
-zeigt ein kleiner Hinweis direkt an, welche Auflösung das gerade tatsächlich
-bedeutet (z. B. „≈ 1 Stunde"). Minimum, Maximum und Durchschnitt des
-aktuellen Zeitraums stehen wahlweise direkt in der Legende, zusammen mit der
-Ein-/Ausblendung einzelner Entitäten. Der aktivierbare Vergleich benennt
-Vorperiode und Vorjahresperiode passend zum Zeitraum, beispielsweise
-„Vortag“ und „Vorjahrestag“, und zeigt die gewählte Option direkt im Button.
-Seltener geänderte Einstellungen (Auflösung, Punkte, Kontinuierlich,
-Rohwerte, dynamische Y-Achse, Legenden-Statistik) sitzen gesammelt in einem
-Optionen-Menü. In einem Chart lassen sich mehrere Entitäten sowohl per
-Ziehen als auch über Pfeil-Buttons neu anordnen — das bestimmt Legenden-,
-Statistik- und Farbreihenfolge.
-
-Vergleichstabellen unterstützen einzelne Entitäten, Summengruppen, Formeln,
-Trennzeilen und frei gewählte Zeitspalten. Jede Entitäts-/Gruppen-Zeile
-wählt ihre Aggregation selbst (Automatisch, Ø Durchschnitt, Min, Max, Σ
-Summe), jede Spalte ihre Nachkommastellen (Automatisch oder 0–3). Eine
-Trennzeile zieht eine durchgehende Linie über die gesamte Tabellenbreite,
-rein optisch zur Gliederung, ohne eigene Daten. Spalten und Zeilen lassen
-sich per Ziehen oder über Pfeil-Buttons neu anordnen; beim Umsortieren von
-Zeilen werden die Buchstaben-Referenzen (A/B/C …) in Formel-Zeilen
-automatisch korrigiert, sodass eine Formel weiterhin dieselbe Zeile
-referenziert wie vor dem Verschieben. Eine Formel-Zeile übernimmt ohne
-eigene Angabe die Einheit der ersten referenzierten Zeile. Die Darstellung
-(Zebra-Streifen, Kopfzeile/
-erste Spalte hervorheben, Beschriftung fett, Rahmen horizontal/Gitter/ohne,
-Dichte komfortabel/kompakt) ist rein optisch und wirkt sich nie auf die
-berechneten Werte aus.
-
-### Bereinigung
-
-Der Bearbeitungsbereich einer Entität (Tabs **Bereinigen**/**Korrigieren**/
-**Hinzufügen**) erkennt konfigurierbare Ausreißer, Lücken, doppelte
-Zeitstempel und gerundet gleiche Folgewerte; jeder Fund zeigt eine
-Begründung mit Vorwert/Zeitstempel bzw. den betroffenen Werten. Wiederholungen
-lassen sich mit derselben Sechs-Stunden-Lebenszeichenregel auch nachträglich
-verdichten. Bei steigenden Zählern (`total_increasing`) werden niedrigere
-Folgewerte als mögliche Zähler-Resets protokolliert und unter
-„Zählerrückgänge“ markiert; sie bleiben standardmäßig gespeichert. Die
-Rohwert-Tabelle zeigt die Einheit direkt neben jedem Wert.
-Die Kopfzeile zeigt Datensatzanzahl im gewählten Zeitraum, sichtbaren
-Gesamtbestand sowie Ausreißer/Lücken/Duplikate/Wiederholungen über die
-komplette Historie der Entität.
-Markierungen sind zunächst weich und können rückgängig gemacht
-werden. Erst **Einstellungen → Speicherplatz** entfernt markierte Werte
-physisch und berechnet betroffene Rollups neu.
-
-Zusätzlich stehen zwei bewusst getrennte, endgültige Aktionen bereit:
-
-- **Alle Werte löschen** in der Entitätskonfiguration entfernt Hot Buffer,
-  Monatsarchive und Rollups, behält aber die individuelle Entitätskonfiguration.
-- **Entität entfernen** in der Entitätskonfiguration löscht Werte und Konfiguration.
-  Sendet die HA-Integration die Entity-ID weiter, wird sie beim nächsten Wert
-  automatisch wieder mit den aktuellen Standards angelegt.
-
-Beide Aktionen verlangen vor der Ausführung eine eindeutige Bestätigung.
-
-### Statistik
-
-Die Statistik zeigt Entitäten, Datensätze, Speicherbedarf, Wachstum sowie
-Aufschlüsselungen nach Typ, Auflösung und Aufbewahrung. Ein interner Planer
-erfasst unabhängig von Seitenaufrufen höchstens stündlich einen realen
-Bestandsschnappschuss.
-
-### Import und Export
-
-- **Symcon:** ZIP des `db`-Ordners hochladen, optional eine `settings.json`
-  für Namen und Einheiten ergänzen, Variablen prüfen und HA-Entitäten
-  zuordnen. Weichen Quell- und Zieleinheit voneinander ab, erscheint ein
-  Hinweis und ein Umrechnungsfaktor kann angegeben werden, etwa `1000` für
-  `klx` nach `lx`.
-- **CSV-Datei:** Trennzeichen, Zeit-, Wert- und Zielspalte frei zuordnen und
-  das Ergebnis vor dem Import prüfen.
-- **Reports:** Im dritten Import-Reiter bleibt jeder tatsächlich ausgeführte Import mit Quelle,
-  Zuordnung, Laufzeit, importierten und übersprungenen Datensätzen sowie
-  möglichen Fehlern nachvollziehbar. Die Liste lässt sich nach Quelle und
-  Status filtern (wirkt sofort bei Auswahl) und nach jeder Spalte sortieren;
-  ein Klick auf eine Zeile öffnet die Detailansicht mit JSON-Download.
-  Reports sind seitenweise darstellbar und können gesammelt gelöscht werden.
-- **CSV-Export:** Die vollständige Rohdatenhistorie einer Entität bis zum
-  Exportlimit herunterladen.
-
-Importe ergänzen fehlende Zeitstempel im laufenden Hot Buffer. Bereits
-vorhandene Messpunkte derselben Entität und desselben Zeitstempels werden
-auch bei abweichender Event-ID übersprungen; bestehende Monatsarchive werden
-dabei nicht überschrieben. Dieselbe Zeitstempelprüfung schützt auch die
-laufende Datenübernahme vor unmittelbar entstehenden Duplikaten.
+**Import und Export.** Bestehende Historie lässt sich aus Symcon-Exporten,
+frei zuordenbaren CSV-Dateien oder direkt aus der laufenden
+Home-Assistant-Instanz (Rohhistorie oder Langzeitstatistik) übernehmen.
+Jeder Import bleibt als Report nachvollziehbar; bereits vorhandene
+Zeitstempel werden dabei nie dupliziert. Die vollständige Rohdatenhistorie
+einer Entität lässt sich als CSV exportieren.
 
 ## Speicherung und Aufbewahrung
 
@@ -226,35 +153,22 @@ laufender Monat      abgeschlossene Monate        Langzeitabfragen
 Hot Buffer (CSV)  ─► Parquet + zstd            ─► vorberechnete Rollups
 ```
 
-Neu erkannte Entitäten übernehmen die globalen Standards unter
-**Einstellungen → Archivierung**. Auf der Konfigurationsseite einer Entität
-lassen sich diese Werte individuell überschreiben.
-
-Die automatische Aufbewahrung ist standardmäßig deaktiviert. Wird sie
-aktiviert, läuft sie täglich zur gewählten lokalen Uhrzeit. Vor jedem Lauf ist
-eine Vorschau verfügbar; Werte mit der Einstellung **Unbegrenzt** bleiben
+Der laufende Monat liegt als anhängbare CSV-Datei vor. Abgeschlossene Monate
+werden spaltenorientiert und verlustfrei komprimiert; daraus vorberechnete
+Rollups (Stunde bis Jahr) machen Langzeitauswertungen schnell, ohne bei jeder
+Abfrage über Rohdaten aggregieren zu müssen. Die automatische, standardmäßig
+deaktivierte Aufbewahrungs-Durchsetzung entfernt Werte jenseits der je
+Entität konfigurierten Frist; als **Unbegrenzt** markierte Entitäten bleiben
 unangetastet.
-
-Eine Hot-Datei wird normalerweise beim ersten Wert eines neuen Monats
-rotiert. Entitäten, die nicht mehr senden, können unter **Einstellungen →
-Rotation** manuell nachgezogen werden.
 
 ## Backup und Wiederherstellung
 
-Unter **System → Backup / Restore** lassen sich vollständige, portable
-ZIP-Backups erstellen, planen, prüfen, herunterladen und wiederherstellen.
-Enthalten sind Index, Hot Buffer, Monatsarchive und Rollups.
-
-Zeitarchiv prüft vor einer Wiederherstellung unter anderem:
-
-- Manifest und SHA-256-Prüfsummen;
-- ZIP-Struktur und Pfade;
-- entpackte Größe und Kompressionsverhältnis;
-- Integrität des SQLite-Indexes.
-
-Die Veröffentlichung eines Backups erfolgt atomar. Eine Wiederherstellung ist
-vorbereitet und rollback-fähig. Supervisor-Backups stoppen die App als Cold
-Backup; separat erzeugte portable ZIPs werden nicht redundant eingebettet.
+Vollständige, portable ZIP-Backups (Index, Hot Buffer, Monatsarchive,
+Rollups) lassen sich erstellen, planen, prüfen und wiederherstellen —
+zusätzlich zu, nicht statt der automatischen Home-Assistant-Snapshots. Eine
+Wiederherstellung wird vor der Anwendung geprüft (Prüfsummen, ZIP-Struktur,
+Index-Integrität) und ist rollback-fähig: Der bisherige Datenbestand wird vor
+dem Überschreiben verschoben, nicht gelöscht.
 
 ## Sicherheit und Netzwerk
 
@@ -282,28 +196,17 @@ und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
 | `settings.json` | 16 MiB |
 | Entpackte ZIP-Daten | 5 GiB |
 
-## Einstellungen
+## Einstellungen und Konfiguration
 
-| Bereich | Zweck |
-| --- | --- |
-| Darstellung | Farbschema, Hell-/Dunkelmodus, Schriftgröße und Dashboard-Kachel-Animation |
-| Archivierung | Standards für Auflösung und Aufbewahrung neuer Entitäten |
-| Rotation | Ausstehende Monatsrotationen prüfen und ausführen |
-| Speicherplatz | Speicherindex prüfen/reparieren sowie Löschmarkierungen endgültig anwenden |
-| Aufbewahrung | Vorschau, täglicher Zeitplan und Laufhistorie |
-| Verbindung | API-Token und aktueller Schreibstatus |
-| Protokollierung | Loglevel und HTTP-Protokollierung |
-| Diagnose | Schreibvorgang aufzeichnen, Entität verfolgen, Diagnosebericht, Prozess-Laufzeit |
-| Über Zeitarchiv | Version, Zeitzone und Datenverzeichnis |
-
-Die einzige Supervisor-Option ist `timezone`; erwartet wird eine IANA-Zeitzone
-wie `Europe/Berlin`. Alle übrigen Einstellungen liegen im Zeitarchiv-Index.
+Darstellung, Archivierungs-Standards, Aufbewahrung, Verbindung, Diagnose und
+mehr werden vollständig in der App verwaltet und im Zeitarchiv-Index
+gespeichert — siehe [Benutzerhandbuch → Einstellungen im
+Detail](docs/user-guide.md#einstellungen-im-detail). Die einzige
+Supervisor-Option ist `timezone` (IANA-Zeitzone, Standard `Europe/Berlin`).
 
 Beim Start sowie nach Datenimporten gleicht Zeitarchiv die abgeleiteten
-Indexkennzahlen automatisch mit Parquet-Archiv und Hot Buffer ab. Eine
-zusätzliche Vorschau unter **Speicherplatz → Indexkonsistenz** zeigt mögliche
-Abweichungen vor einer manuellen Reparatur; Rohwerte und Rollups werden dabei
-nicht verändert.
+Indexkennzahlen automatisch mit Parquet-Archiv und Hot Buffer ab, um
+Inkonsistenzen früh sichtbar zu machen.
 
 ## Bekannte Grenzen
 

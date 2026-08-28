@@ -38,10 +38,19 @@ Release-Reihenfolge): [operations.md](operations.md).
 
 ```text
 app/
-  main.py              FastAPI-App, alle Ingress-Routen (~5000 Zeilen)
+  main.py              FastAPI-App, Ingress-Routen (~4300 Zeilen, Budget 4.800)
   api_routes.py         Öffentliche REST-API (/api/write, /api/health, /api/query*)
-  security.py            Token-Erzeugung/-Prüfung
-  formatting.py           Zahlen-/Datums-/Label-Formatierung (Jinja-Filter)
+  import_routes.py       Ingress-Routen für Symcon-/CSV-/HA-Import
+  report_routes.py        Ingress-Routen für Import-Reports
+  route_support.py         Gemeinsame Hilfsfunktionen für Ingress-Routen
+  backup_scheduler.py       Geplante Backups (Intervall, Aufräumung)
+  security.py                Token-Erzeugung/-Prüfung
+  formatting.py                Zahlen-/Datums-/Label-Formatierung (Jinja-Filter)
+  limits.py                     Zentrale Ressourcen-/Größenlimits
+  log_source.py, logging_setup.py   Log-Konfiguration und -Zugriff (Diagnose-Seite)
+  supervisor_stats.py            Supervisor-/Prozess-Kennzahlen
+  timezone_config.py              IANA-Zeitzonen-Handling
+  version.py                       Laufzeit-Versionsauskunft
   storage/
     paths.py               Pfadvalidierung (Entity-ID, Symlink-Schutz)
     coordinator.py          Entitäts-/Exklusiv-Sperren
@@ -51,10 +60,14 @@ app/
     ingestion.py             Crash-fester, idempotenter Schreibpfad
     query.py                 Zeitraum-/Fenster-Logik für Charts/Tabellen
     index.py                 SQLite-Index (Metadaten, gespeicherte Objekte)
-    cleanup.py                Ausreißer/Lücken/Duplikate, Soft-Delete, Purge
-    retention.py               Endgültige Aufbewahrungs-Durchsetzung
-    backup.py                   ZIP-Export/-Import/-Restore
-    symcon_import.py, csv_import.py   Datenübernahme
+    reconcile.py              Index-Konsistenzabgleich mit Archiv/Hot Buffer
+    cleanup.py                 Ausreißer/Lücken/Duplikate, Soft-Delete, Purge
+    entity_removal.py           Endgültiges Löschen/Entfernen einer Entität
+    retention.py                 Endgültige Aufbewahrungs-Durchsetzung
+    backup.py                     ZIP-Export/-Import/-Restore
+    symcon_import.py, csv_import.py   Datenübernahme aus Symcon/CSV
+    ha_import.py, ha_statistics.py     Datenübernahme aus laufender HA-Instanz
+    import_reports.py                   Protokollierung ausgeführter Importe
   templates/               Jinja2-Seiten (Server-Side-Rendering + htmx-Fragmente)
   static/js/                Alpine.js-Komponenten, ECharts-Wrapper
 ```

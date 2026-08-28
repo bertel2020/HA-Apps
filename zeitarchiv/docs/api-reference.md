@@ -54,7 +54,9 @@ Kategorien und ihre Bedeutung: [ingestion.md](ingestion.md).
 
 ## `GET /api/health`
 
-Authentifiziert wie `/api/write`. Antwort: `{"status": "ok", "version": "0.40.0"}`.
+Authentifiziert wie `/api/write`. Antwort: `{"status": "ok", "version": "<aktuelle App-Version>"}`
+(z. B. `"0.59.0"`) — `version` wird zur Laufzeit aus der installierten App
+gelesen, nicht fest kodiert.
 Von der Integration für den Reauth-Fluss genutzt (falscher Token → 401).
 
 ## `GET /api/query` (Ingress-intern)
