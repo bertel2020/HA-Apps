@@ -244,6 +244,16 @@
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
+              <div class="menu-row">
+                <span class="menu-row-label">Nachkommastellen</span>
+                <div class="seg">
+                  <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">Auto</button>
+                  <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
+                  <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
+                  <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
+                  <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
+                </div>
+              </div>
               <label class="menu-row">
                 <span class="menu-row-label">Statistik in Legende</span>
                 <span class="menu-toggle">
@@ -376,6 +386,12 @@
     const LEGEND_METRICS = {{ legend_metrics | tojson }};
     const LEGEND_STYLE = {{ legend_style | tojson }};
     const CHART_TYPE = {{ chart_type | tojson }};
+    // "auto" = jede Serie behält ihre eigene entities.decimals-Einstellung,
+    // sonst gilt dieser Wert einheitlich für ALLE Serien dieses Charts (siehe
+    // effectiveDecimals() weiter unten) — dieselbe Override-Konvention wie
+    // die Werte-Kachel-Übersteuerung auf Dashboards.
+    const DECIMALS = {{ decimals | tojson }};
+    const SHOW_VALUES = {{ show_values | tojson }};
     // Reihenfolge bestimmt sowohl die Checkbox-Liste im Optionen-Menü als auch
     // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
     const LEGEND_METRIC_OPTIONS = [
@@ -683,7 +699,7 @@
         compare: COMPARE,
         compareMode: COMPARE_MODE,
         showPoints: false,
-        showValues: false,
+        showValues: SHOW_VALUES,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -710,6 +726,7 @@
         // wird — wie legendMetrics ein gespeichertes Chart-Feld (siehe
         // save()), damit sie beim erneuten Öffnen erhalten bleibt.
         legendStyle: LEGEND_STYLE,
+        decimals: DECIMALS,
         legendHiddenIds: [],
         optionsMenuOpen: false,
         compareMenuOpen: false,
@@ -766,6 +783,13 @@
           }
           return '';
         },
+        // Nachkommastellen-Override (Optionen-Menü, "Nachkommastellen") — bei
+        // "Auto" behält jede Serie ihre eigene entities.decimals-Einstellung
+        // (s.decimals, vom Server je Entität geliefert), sonst gilt dieser
+        // Wert für ALLE Serien einheitlich statt individuell.
+        effectiveDecimals(s) {
+          return this.decimals === 'auto' ? s.decimals : parseInt(this.decimals, 10);
+        },
         get seriesStats() {
           return this.series.map((s, i) => {
             const values = s.points.map(p => p.value).filter(Number.isFinite);
@@ -773,7 +797,7 @@
             const maxima = s.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
             const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
             const unit = s.unit ? ` ${s.unit}` : '';
-            const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, s.decimals)}${unit}`;
+            const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, this.effectiveDecimals(s))}${unit}`;
             // Summe bei Zählern sinnvoll — Bucket-Werte sind dort bereits
             // Deltas je Zeitfenster (siehe query.py), deren Summe den
             // Gesamtverbrauch im Zeitraum ergibt — UND bei Schaltern, deren
@@ -1035,9 +1059,10 @@
           // kein Wert unpassend abgeschnitten wirkt.
           const unitDecimals = new Map();
           this.series.forEach(s => {
-            if (s.decimals == null) return;
+            const d = this.effectiveDecimals(s);
+            if (d == null) return;
             const current = unitDecimals.get(axisKey(s));
-            if (current == null || s.decimals < current) unitDecimals.set(axisKey(s), s.decimals);
+            if (current == null || d < current) unitDecimals.set(axisKey(s), d);
           });
           // singleBucket erzwingt eine bei 0 startende Y-Achse, unabhängig
           // vom gespeicherten Schalter-Zustand — bei einem bereits vor
@@ -1088,6 +1113,7 @@
             // der Server für Rohwerte (ungebuckelte Einzelmesswerte) immer Linie
             // liefert.
             const chartType = s.chart_type;
+            const seriesDecimals = this.effectiveDecimals(s);
             const displayName = this.entityNames[s.entity_id] || s.friendly_name;
             legendSelected[displayName] = !this.legendHiddenIds.includes(s.entity_id);
             const mainPoints = resamplePoints(
@@ -1101,7 +1127,7 @@
             // Kategorie 0 statt eines Zeitstempels — der Halte-Punkt bis
             // windowEnd (nächster Block) ergibt auf einer Achse mit nur einer
             // Kategorie ohnehin keinen Sinn und entfällt deshalb hier.
-            const mainData = mainPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
+            const mainData = mainPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)]);
             if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
@@ -1170,7 +1196,7 @@
                 s.compare_points, this.range, this.resolutionPreset,
                 s.aggregation_type, s.compare_window_start
               );
-              const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit, s.decimals, isDurationSeries(s)]);
+              const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)]);
               if (chartType === 'line' && compareData.length && this.windowEnd != null
                   && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
                 const last = compareData[compareData.length - 1];
@@ -1420,6 +1446,8 @@
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
             chart_type: this.timeline ? 'timeline' : 'auto',
+            decimals: this.decimals,
+            show_values: this.showValues,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

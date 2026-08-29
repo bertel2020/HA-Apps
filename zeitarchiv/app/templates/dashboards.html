@@ -12,10 +12,10 @@
      .entity-picker) — bei voller Seitenbreite (.page: max-width 1120px)
      ergibt das genau 3 statt 4 Kacheln pro Zeile, bleibt aber responsiv. */
   .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:20px;}
-  .dash-card{display:flex;flex-direction:column;gap:8px;}
-  .dash-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));}
+  .dash-card{display:flex;flex-direction:column;gap:8px;position:relative;}
+  .dash-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:60px;}
   .dash-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .dash-card .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px;}
+  .dash-card .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:auto;padding-top:10px;}
   .dash-grid-add{display:flex;align-items:center;justify-content:center;min-height:150px;border-style:dashed;text-decoration:none;}
   .dash-grid-add-btn{
     display:flex;align-items:center;justify-content:center;
@@ -24,6 +24,34 @@
   }
   .dash-grid-add:hover .dash-grid-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
   [x-cloak]{display:none!important;}
+  /* Favorit links, Kachelmenü rechts davon — dieselbe Optik/Struktur wie auf
+     der Tabellen-/Chart-Übersicht (tables.html/charts.html), hier unter
+     .dash-card statt .chart-card. */
+  .card-top-actions{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:2px;z-index:2;}
+  .fav-star{
+    background:none;border:none;cursor:pointer;
+    font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+  .card-menu{position:relative;}
+  .card-menu-btn{
+    width:24px;height:24px;padding:0;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);color:var(--ink-faint);font-size:calc(17px * var(--font-scale, 1));line-height:1;cursor:pointer;
+  }
+  .card-menu-btn:hover,.card-menu.is-open .card-menu-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  .card-menu-popover{
+    position:absolute;top:30px;right:0;width:180px;padding:6px;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);cursor:default;z-index:5;
+  }
+  .card-menu-item{
+    display:block;width:100%;padding:7px 8px;border:0;border-radius:6px;background:transparent;
+    color:var(--ink);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));text-align:left;cursor:pointer;
+  }
+  .card-menu-item:hover{background:var(--surface-alt);}
+  .card-menu-item-danger{color:var(--danger);}
+  .card-menu-item-danger:hover{background:var(--danger-soft);}
+  .card-menu-divider{height:1px;background:var(--border);margin:6px -2px;}
 </style>
 </head>
 <body>
@@ -36,14 +64,30 @@
       <div class="dash-grid">
         {% for d in dashboards %}
         <div class="card dash-card" id="dash-card-{{ d.id }}">
+          <div class="card-top-actions">
+            {% if not d.is_default %}
+            <button type="button" class="fav-star {{ 'active' if d.is_favorite else '' }}" aria-pressed="{{ 'true' if d.is_favorite else 'false' }}"
+                    title="Favorit" onclick="toggleFavorite('dashboards/{{ d.id }}/favorite', this)">★</button>
+            {% endif %}
+            <div class="card-menu" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}">
+              <button type="button" class="card-menu-btn" @click.stop="menuOpen = !menuOpen"
+                      :aria-expanded="menuOpen.toString()" aria-haspopup="menu"
+                      aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
+              <div class="card-menu-popover" x-show="menuOpen" x-cloak role="menu" @click.outside="menuOpen = false">
+                <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateDashboard({{ d.id }})">Duplizieren</button>
+                {% if not d.is_default %}
+                <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; setDefaultDashboard({{ d.id }})">Als Standard festlegen</button>
+                <div class="card-menu-divider"></div>
+                <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteDashboard({{ d.id }}, $el)">Löschen</button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
           <h3><a href="dashboards/{{ d.id }}">{{ d.name }}</a></h3>
           <div class="meta">{{ pin_counts.get(d.id, 0) }} Kachel{{ 'n' if pin_counts.get(d.id, 0) != 1 else '' }}{{ ' · Standard' if d.is_default else '' }}{{ ' · 🔒 Fixiert' if d.locked else '' }}</div>
           <div class="actions">
             <a class="btn" href="dashboards/{{ d.id }}">Öffnen</a>
             <a class="btn" href="dashboards/{{ d.id }}/edit">Bearbeiten</a>
-            {% if not d.is_default %}
-            <button type="button" class="btn btn-danger" onclick="deleteDashboard({{ d.id }}, this)">Löschen</button>
-            {% endif %}
           </div>
         </div>
         {% endfor %}
@@ -55,7 +99,15 @@
   </div>
 
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="static/js/favorite-toggle.js?v={{ js_v }}"></script>
   <script>
+    // Reload statt lokalem Umsortieren, dieselbe Konvention wie tables.html/
+    // charts.html — sonst müsste hier die is_favorite-Sortierung von
+    // list_dashboards() im Frontend nachgebaut werden.
+    document.querySelector('.settings-panel').addEventListener('favorite-changed', () => {
+      window.location.reload();
+    });
+
     async function deleteDashboard(id, btn) {
       if (!await appConfirm('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.', {danger: true})) return;
       btn.disabled = true;
@@ -67,6 +119,37 @@
           alert('Löschen fehlgeschlagen.');
         }
       }).catch(() => { btn.disabled = false; alert('Löschen fehlgeschlagen.'); });
+    }
+
+    // Kopie bleibt auf der Liste sichtbar (kein Sprung in den Editor) — ein
+    // Reload reicht, dieselbe Konvention wie duplicateTable()/duplicateChart().
+    async function duplicateDashboard(id) {
+      try {
+        const res = await fetch(`dashboards/${id}/duplicate`, {method: 'POST'});
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          alert('Duplizieren fehlgeschlagen.');
+        }
+      } catch (e) {
+        alert('Duplizieren fehlgeschlagen.');
+      }
+    }
+
+    // Verschiebt is_default auf dieses Dashboard — Reload, damit sowohl die
+    // "Standard"-Markierung/Sortierung hier als auch das Topnav-Dropdown
+    // (nav_dashboards_list nutzt dieselbe list_dashboards()) konsistent sind.
+    async function setDefaultDashboard(id) {
+      try {
+        const res = await fetch(`dashboards/${id}/set-default`, {method: 'POST'});
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          alert('Konnte nicht als Standard festgelegt werden.');
+        }
+      } catch (e) {
+        alert('Konnte nicht als Standard festgelegt werden.');
+      }
     }
   </script>
 </body>

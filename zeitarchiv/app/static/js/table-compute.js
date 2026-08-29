@@ -145,12 +145,19 @@ window.TableCompute = (() => {
   // — ein Request je Spalte an /api/query-multi (alle in dieser Spalte
   // gebrauchten Entitäten auf einmal), Formel-Zeilen danach in Zeilen-
   // Reihenfolge ausgewertet (Verkettung: eine Formel darf eine bereits
-  // berechnete FRÜHERE Formel-Zeile referenzieren).
+  // berechnete FRÜHERE Formel-Zeile referenzieren). windowStarts[colIndex]
+  // ist der von derselben Anfrage mitgelieferte, tatsächlich aufgelöste
+  // Fensterbeginn (Sekunden, siehe query.py `window_start`) — Grundlage für
+  // die Beschriftungs-Platzhalter ({jahr}, {monat}, …, siehe resolveLabel()
+  // unten). Bleibt null, solange die Spalte keine Entität/Gruppen-Zeile
+  // referenziert (kein Request nötig) — resolveLabel() liefert dann
+  // unverändert die rohe Beschriftung zurück.
   async function computeValues(base, columns, rows) {
     const letters = rowLetters(rows);
     const entityRows = rows.filter(r => r.row_type === 'entity' || r.row_type === 'group');
     const allEntityIds = [...new Set(entityRows.flatMap(r => r.entity_ids))];
     const values = columns.map(() => new Array(rows.length).fill(null));
+    const windowStarts = columns.map(() => null);
 
     for (let ci = 0; ci < columns.length; ci++) {
       if (!allEntityIds.length) continue;
@@ -166,6 +173,7 @@ window.TableCompute = (() => {
       } catch (e) {
         data = {series: []};
       }
+      windowStarts[ci] = data.window_start ?? null;
       const byEntity = {};
       (data.series || []).forEach(s => { byEntity[s.entity_id] = s; });
       rows.forEach((row, ri) => {
@@ -213,8 +221,73 @@ window.TableCompute = (() => {
       });
     });
 
-    return values;
+    return {values, windowStarts};
   }
+
+  // Monatsnamen/-kürzel für resolveLabel() unten — dieselbe Wortwahl wie der
+  // Rest der Oberfläche (z. B. previousYearPeriodLabel in entity_detail.html),
+  // hier nur als Kalender-Vokabular statt Zeitraum-Namen.
+  const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+  // ISO-8601-Kalenderwoche (Woche 1 = die Woche mit dem ersten Donnerstag des
+  // Jahres) — Standardalgorithmus über den nächsten Donnerstag derselben
+  // Woche, damit Jahreswechsel innerhalb einer Woche (z. B. 30./31. Dezember)
+  // korrekt der Woche des jeweils überwiegenden Jahres zugeordnet werden.
+  function isoWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const diff = d - firstThursday;
+    return 1 + Math.round(diff / (7 * 24 * 3600 * 1000));
+  }
+
+  // Bekannte Platzhalter für Spalten-Beschriftungen — siehe LABEL_VARIABLES
+  // unten (Einfügehilfe im Editor) für die Anzeige-Beschriftung je Token.
+  // Nur diese Namen werden ersetzt; ein Tippfehler wie "{jhar}" matcht das
+  // Muster nicht und bleibt deshalb sichtbar im Text stehen, statt
+  // kommentarlos zu verschwinden.
+  const LABEL_TOKEN_PATTERN = /\{(jahr|jahr_kurz|quartal|monat|monat_kurz|monat_nr|woche|tag|dekade)\}/g;
+
+  // Ersetzt Platzhalter in einer Spalten-Beschriftung durch Kalenderwerte des
+  // TATSÄCHLICH aufgelösten Zeitraums dieser Spalte (windowStartEpoch, aus
+  // computeValues() oben) — nicht des heutigen Datums. Eine Spalte "Jahr,
+  // Versatz -1" mit Beschriftung "{jahr}" zeigt dadurch automatisch das
+  // Vorjahr, nächstes Jahr automatisch das dann aktuelle Vorjahr, ganz ohne
+  // manuelles Nachpflegen. Labels ohne "{" sowie windowStartEpoch == null
+  // (z. B. bevor computeValues() das erste Mal gelaufen ist) geben die
+  // Beschriftung unverändert zurück.
+  function resolveLabel(label, windowStartEpoch) {
+    if (!label || !label.includes('{') || windowStartEpoch == null) return label;
+    const d = new Date(windowStartEpoch * 1000);
+    const tokenValues = {
+      jahr: String(d.getFullYear()),
+      jahr_kurz: String(d.getFullYear()).slice(-2),
+      // Bewusst nur die Ziffer, kein "Q"-Präfix — konsistent mit den übrigen
+      // numerischen Token (woche/tag/monat_nr). Wer "Q3" will, schreibt
+      // "Q{quartal}"; mit eingebautem Präfix würde genau das zu "QQ3" führen.
+      quartal: String(Math.floor(d.getMonth() / 3) + 1),
+      monat: MONTH_NAMES[d.getMonth()],
+      monat_kurz: MONTH_NAMES_SHORT[d.getMonth()],
+      monat_nr: String(d.getMonth() + 1).padStart(2, '0'),
+      woche: String(isoWeekNumber(d)),
+      tag: String(d.getDate()),
+      dekade: `${Math.floor(d.getFullYear() / 10) * 10}er`,
+    };
+    return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[token]);
+  }
+
+  // Einfügehilfe im Editor (siehe table_editor.html) — Token + Anzeigename,
+  // in der Reihenfolge, in der sie im Popover erscheinen. Eigene Liste statt
+  // Object.keys() auf tokenValues in resolveLabel(), weil die Anzeige-
+  // Reihenfolge (grob → fein) bewusst anders ist als der Ersetzungs-Code sie
+  // bräuchte.
+  const LABEL_VARIABLES = [
+    ['jahr', 'Jahr'], ['jahr_kurz', 'Jahr (kurz)'], ['quartal', 'Quartal'],
+    ['monat', 'Monat'], ['monat_kurz', 'Monat (kurz)'], ['monat_nr', 'Monat (Nr.)'],
+    ['woche', 'Woche'], ['tag', 'Tag'], ['dekade', 'Dekade'],
+  ];
 
   // CSS-Klassen für die Darstellungs-Optionen (Zebra/Rahmen/Dichte/Kopfzeile)
   // — dieselbe Zuordnung für die volle Tabellen-Seite UND die Dashboard-
@@ -234,5 +307,8 @@ window.TableCompute = (() => {
     return classes.join(' ');
   }
 
-  return {evalFormula, inheritedFormulaUnit, fmtNum, cellText, rowLetters, computeValues, styleClasses};
+  return {
+    evalFormula, inheritedFormulaUnit, fmtNum, cellText, rowLetters, computeValues, styleClasses,
+    resolveLabel, LABEL_VARIABLES,
+  };
 })();

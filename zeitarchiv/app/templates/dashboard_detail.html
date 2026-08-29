@@ -13,6 +13,17 @@
      zweiten, unabhängigen Seitentiefe eingehängt. */
   [x-cloak]{display:none!important;}
   .dashboard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:var(--dashboard-row-height);gap:14px;align-items:stretch;}
+  /* Präziser Modus: Gitter und Zeilenhöhe halbieren sich gleichzeitig (3->6
+     Spalten) — bestehende Kachelgrößen wirken dadurch weiterhin gleich groß,
+     weil set_dashboard_precise_mode() sie beim Umschalten mitverdoppelt.
+     grid-column/-row selbst kommen unverändert aus --tile-cols/--tile-rows
+     (s.u.), die hier nicht neu gesetzt werden müssen. */
+  .dashboard-grid.is-precise{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:calc(var(--dashboard-row-height) / 2);}
+  /* Lücken auffüllen — der Browser packt spätere, kleinere Kacheln in Lücken
+     statt strikt der Anheft-Reihenfolge zu folgen. Unabhängig vom Präzisen
+     Modus kombinierbar, deshalb eine eigene Klasse statt in is-precise mit
+     eingebaut. */
+  .dashboard-grid.is-dense{grid-auto-flow:dense;}
   .dtile{
     position:relative;min-width:0;grid-column:span var(--tile-cols,1);grid-row:span var(--tile-rows,1);
     border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:visible;cursor:grab;
@@ -28,6 +39,61 @@
   .dtile-title{font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);margin-bottom:8px;padding-right:30px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .dtile-chart{height:auto;min-height:160px;flex:1;}
   .dtile-loading{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-faint);font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));}
+  /* Werte-Kachel (item_type='entity') — reiner aktueller Wert statt Chart/
+     Tabelle, siehe _dashboard_tiles_context() in main.py. */
+  /* Dreiteiliges Layout über die volle Kachelhöhe: Titel bleibt oben (eigene
+     Zeile, linksbündig, .stat .label-Optik), Sparkline bleibt unten (eigene
+     Zeile, volle Breite), der Wert (mit Einheit/Alter) füllt den Rest der
+     Höhe (flex:1) und wird darin auf beiden Achsen zentriert. Titel/Sparkline
+     bekommen dadurch flex:none, damit nur die Wert-Zeile wächst/schrumpft. */
+  .dtile-entity-body{display:flex;flex-direction:column;gap:4px;}
+  .dtile-entity-body .dtile-title{
+    flex:none;text-align:left;margin-bottom:0;
+    font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:500;
+  }
+  .dtile-entity-value{
+    flex:1;min-height:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;
+  }
+  .dtile-entity-main{display:flex;align-items:baseline;gap:5px;}
+  .dtile-entity-number{font-family:var(--font-display);font-size:calc(28px * var(--font-scale, 1));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .dtile-entity-unit{font-size:calc(14px * var(--font-scale, 1));color:var(--ink-muted);}
+  /* Wie .stat .sub-value: kein Mono, dieselbe dezente Farbe/Größe — bleibt
+     unabhängig vom Alter immer neutral, siehe .dtile-entity.is-warn/is-stale
+     unten (nur der Kartenrahmen zeigt "veraltet" an, nicht der Text). Kein
+     margin-left:auto mehr — sitzt jetzt als normales, mitzentriertes Element
+     neben Wert/Einheit statt separat rechtsbündig. */
+  .dtile-entity-age{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  /* Letzter Wert älter als 15 Minuten (gelb) bzw. eine Stunde (rot) — nur der
+     Kartenrahmen hebt das hervor, der Wert selbst bleibt immer schwarz
+     (Konzept-Wunsch). is-warn/is-stale werden sowohl beim Server-Rendern
+     (Erstanzeige) als auch client-seitig nach jedem Live-Fetch gesetzt
+     (dashboard-tiles.js renderEntityTile()) — Letzteres ist die verlässliche
+     Quelle, siehe der last_value-Bug, der zum Umstieg auf Live-Fetches
+     geführt hat. #D9A22B dieselbe Gold-Farbe wie der Favoriten-Stern
+     (.fav-star.active), da die App keine eigene Gelb/Warn-Variable kennt;
+     Rot wiederverwendet die bestehende --danger-Variable. */
+  .dtile-entity.is-warn{border-width:2px;border-color:#D9A22B;}
+  .dtile-entity.is-stale{border-width:2px;border-color:var(--danger);}
+  /* .sparkline/.area/.line selbst kommen aus app.css (dieselbe Optik wie die
+     Statistik-Kacheln der Übersichtsseite) — dieser Wrapper regelt nur den
+     Abstand zur Werte-Zeile darüber. */
+  .dtile-entity-sparkline{flex:none;width:100%;margin-top:6px;}
+  /* Einzeilige Kachel (unabhängig von der Spaltenzahl — 1x1 UND z. B. 2x1
+     haben dieselbe begrenzte Höhe): weniger Abstand statt Inhalte
+     auszublenden, damit Titel + Wert + (falls aktiv) Sparkline trotzdem
+     hineinpassen. Nur an data-grid-rows geknüpft, nicht zusätzlich an
+     data-grid-cols — sonst bliebe z. B. 2x1 unkomprimiert und Inhalt könnte
+     abgeschnitten werden, obwohl 1x1 (dieselbe Höhe) schon komprimiert. */
+  .dtile-entity[data-grid-rows="1"] .dtile-body{padding:10px 10px 8px;}
+  .dtile-entity[data-grid-rows="1"] .dtile-entity-body{gap:2px;}
+  .dtile-entity[data-grid-rows="1"] .dtile-entity-number{font-size:calc(20px * var(--font-scale, 1));}
+  .dtile-entity[data-grid-rows="1"] .dtile-entity-sparkline{margin-top:2px;}
+  .dtile-picker-search{
+    width:100%;box-sizing:border-box;font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));
+    padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-alt);
+    color:var(--ink);margin:10px 16px 0;width:calc(100% - 32px);
+  }
+  .dtile-picker-list{max-height:280px;overflow-y:auto;padding:10px 10px 12px;}
   /* Optionale Chart-Legende unter der Kachel — siehe entities.html (dieselbe
      Regeln, hier dupliziert wie der Rest des .dtile-Blocks). Die Chips selbst
      nutzen .chart-legend-item aus app.css unverändert — Aussehen UND Inhalte
@@ -44,11 +110,34 @@
     color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));line-height:1;cursor:pointer;
   }
   .dtile-add-btn:hover{color:var(--accent-line);border-color:var(--accent-line);}
-  .dtile-picker{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;width:240px;max-height:260px;overflow-y:auto;
-    background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
+  /* Größeres "Kachel hinzufügen"-Popup mit Registerkarten (Charts/Tabellen/
+     Werte) statt der früheren, alle drei Abschnitte untereinander
+     stapelnden Liste — dieselbe position:fixed-Overlay-Mechanik wie das
+     Werte-Kachel-Einstellungs-Popup oben (siehe .dtile-settings-overlay). */
+  .dtile-picker-overlay{
+    position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;padding:16px;cursor:default;
   }
-  .dtile-picker-label{margin:0 4px 6px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);}
+  .dtile-picker-modal{
+    width:360px;max-width:100%;max-height:100%;background:var(--surface);border-radius:12px;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;text-align:left;
+  }
+  .dtile-picker-header{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:14px 16px;border-bottom:1px solid var(--border);
+  }
+  .dtile-picker-title{margin:0;font-weight:600;font-size:calc(15px * var(--font-scale, 1));color:var(--ink);}
+  .dtile-picker-close{
+    flex:none;width:28px;height:28px;padding:0;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));cursor:pointer;
+  }
+  .dtile-picker-close:hover{color:var(--accent-line);border-color:var(--accent-line);}
+  .dtile-picker-tabs{display:flex;gap:4px;padding:12px 16px 0;}
+  .dtile-picker-tabs button{
+    flex:1;padding:7px 0;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+    color:var(--ink-muted);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));cursor:pointer;
+  }
+  .dtile-picker-tabs button.active{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
   .dtile-picker-item{
     display:block;width:100%;text-align:left;padding:8px 10px;border-radius:7px;border:none;background:none;
     color:var(--ink);font-size:calc(13px * var(--font-scale, 1));cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -65,7 +154,7 @@
   }
   .dtile-menu-btn:hover,.dtile-menu.is-open .dtile-menu-btn{color:var(--accent-line);border-color:var(--accent-line);}
   .dtile-menu-popover{
-    position:absolute;top:30px;right:0;width:174px;padding:10px;background:var(--surface);
+    position:absolute;top:30px;right:0;width:216px;padding:10px;background:var(--surface);
     border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);cursor:default;
   }
   .dtile-size-picker-head{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;margin-bottom:8px;}
@@ -75,6 +164,35 @@
     width:24px;height:24px;padding:0;border:1px solid var(--border);border-radius:4px;background:var(--surface-alt);cursor:pointer;
   }
   .dtile-size-cell.is-selected,.dtile-size-cell.is-preview{background:var(--accent-line-soft);border-color:var(--accent-line);}
+  /* Präziser Modus: 6x6 statt 3x3 Zellen — kleinere Zellen statt eines
+     breiteren Popovers, damit .dtile-menu-popover für beide Modi gleich
+     breit bleiben kann. */
+  .dtile-menu.is-precise .dtile-size-grid{grid-template-columns:repeat(6,18px);grid-template-rows:repeat(6,18px);}
+  .dtile-menu.is-precise .dtile-size-cell{width:18px;height:18px;}
+  /* Nachkommastellen-Override (Werte-Kacheln) — dieselbe Zellen-Optik wie
+     die Kachelgröße oben, nur als eine einzelne Reihe mit Ziffern statt
+     eines Rasters. */
+  .dtile-decimals-picker-head{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;margin-bottom:8px;}
+  .dtile-decimals-picker-head strong{float:right;color:var(--ink);font-family:var(--font-mono);}
+  .dtile-decimals-row{display:flex;gap:4px;}
+  .dtile-decimals-cell{
+    flex:1;padding:5px 0;border:1px solid var(--border);border-radius:6px;background:var(--surface-alt);
+    color:var(--ink);font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
+  }
+  .dtile-decimals-cell:hover{border-color:var(--accent-line);}
+  .dtile-decimals-cell.is-selected{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
+  /* Eigener Kachel-Titel (Werte-Kacheln) — dieselbe Feld-Optik wie die
+     Entitäten-Suche des "+"-Pickers (.dtile-picker-search). */
+  .dtile-title-field{display:flex;flex-direction:column;gap:5px;}
+  /* .menu-row-label hat sonst keine eigene Schriftgröße (erbt sie normalerweise
+     von .menu-row) — hier explizit dieselbe Größe wie die übrigen
+     Options-Überschriften (Kachelgröße/Nachkommastellen), sonst wirkt "Titel"
+     im Vergleich überdimensioniert. */
+  .dtile-title-field .menu-row-label{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);}
+  .dtile-title-input{
+    width:100%;box-sizing:border-box;font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));
+    padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+  }
   .dtile-size-preview{text-align:center;margin-top:7px;color:var(--ink-faint);font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));}
   .dtile-menu-divider{height:1px;background:var(--border);margin:10px -2px 8px;}
   .dtile-menu-remove{
@@ -82,6 +200,39 @@
     color:var(--danger);font-family:inherit;font-size:calc(12px * var(--font-scale, 1));text-align:left;cursor:pointer;
   }
   .dtile-menu-remove:hover{background:var(--danger-soft);}
+
+  /* Großes Einstellungs-Popup für Werte-Kacheln (siehe Kommentar in
+     _dashboard_tile_menu.html) — position:fixed statt der relativen
+     .dtile-menu-popover-Positionierung, damit es unabhängig von der
+     (oft sehr kleinen) Kachel selbst mittig im Sichtfenster erscheint. */
+  .dtile-settings-overlay{
+    position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;padding:16px;cursor:default;
+  }
+  .dtile-settings-modal{
+    width:380px;max-width:100%;max-height:100%;background:var(--surface);border-radius:12px;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;text-align:left;
+  }
+  .dtile-settings-header{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:14px 16px;border-bottom:1px solid var(--border);
+  }
+  .dtile-settings-title{
+    margin:0;min-width:0;flex:1;font-weight:600;font-size:calc(15px * var(--font-scale, 1));
+    color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .dtile-settings-close{
+    flex:none;width:28px;height:28px;padding:0;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));cursor:pointer;
+  }
+  .dtile-settings-close:hover{color:var(--accent-line);border-color:var(--accent-line);}
+  .dtile-settings-body{padding:16px;overflow-y:auto;}
+  .dtile-settings-section + .dtile-settings-section{border-top:1px solid var(--border);margin-top:16px;padding-top:16px;}
+  .dtile-settings-section .dtile-size-preview{margin-top:9px;}
+  .dtile-settings-footer{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 16px;border-top:1px solid var(--border);
+  }
 
   .dtile-table-preview{height:auto;min-height:160px;flex:1;overflow:auto;}
   .dtile-mini-table{width:100%;font-size:calc(11px * var(--font-scale, 1));}

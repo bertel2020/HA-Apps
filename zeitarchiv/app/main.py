@@ -707,7 +707,7 @@ def entities_view(request: Request) -> HTMLResponse:
         "total_size": format_size(overview["total_size_bytes"]),
         "rows_sparkline": _sparkline_paths([s["total_rows"] for s in snapshots]),
         "size_sparkline": _sparkline_paths([s["total_size_bytes"] for s in snapshots]),
-        **_dashboard_tiles_context(1),
+        **_dashboard_tiles_context(index.get_default_dashboard_id()),
     }
     return templates.TemplateResponse(request, "entities.html", context)
 
@@ -2825,6 +2825,7 @@ class _EntityChartOptionsBody(BaseModel):
     chart_stats: bool
     legend_metrics: list[str]
     legend_style: str
+    decimals: str
 
 
 @app.post("/entities/{entity_id}/chart-options")
@@ -2910,7 +2911,9 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "chart_stats": True,
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
+    "decimals": "auto",
 }
+_ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
 _ON_OFF_LABELS = {"1": "An", "0": "Aus"}
 _ENTITY_LEGEND_STYLE_LABELS = {"chips": "Chips", "table": "Tabelle"}
 _ENTITY_LEGEND_METRIC_LABELS = {"last": "Aktuell", "min": "Min", "max": "Max", "average": "Durchschnitt", "sum": "Summe"}
@@ -2923,6 +2926,8 @@ def _validate_entity_chart_options(data: dict) -> None:
         raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
     if "legend_style" in data and data["legend_style"] not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+    if "decimals" in data and data["decimals"] not in _ENTITY_CHART_DECIMALS:
+        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
 
 
 def _get_entity_chart_defaults() -> dict:
@@ -3005,6 +3010,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
         "legend_style": chart["legend_style"] if chart else "chips",
         "chart_type": chart["chart_type"] if chart else "auto",
+        "decimals": chart["decimals"] if chart else "auto",
+        "show_values": chart["show_values"] if chart else False,
         "entity_names": chart["entity_names"] if chart else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
@@ -3060,6 +3067,8 @@ class _SaveChartBody(BaseModel):
     legend_metrics: list[str] = ["sum"]
     legend_style: str = "chips"
     chart_type: str = "auto"
+    decimals: str = "auto"
+    show_values: bool = False
 
 
 @app.post("/charts")
@@ -3078,12 +3087,15 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
     if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
         raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+    if body.decimals not in _ENTITY_CHART_DECIMALS:
+        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
         entity_names, body.resolution_preset, body.dynamic_y_axis,
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
+        decimals=body.decimals, show_values=body.show_values,
     )
     return {"id": chart_id}
 
@@ -3114,12 +3126,15 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
     if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
         raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+    if body.decimals not in _ENTITY_CHART_DECIMALS:
+        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
         body.continuous, entity_names, body.resolution_preset,
         body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
+        decimals=body.decimals, show_values=body.show_values,
     )
     return {"id": chart_id}
 
@@ -3138,6 +3153,24 @@ def charts_favorite_toggle(chart_id: int) -> dict:
     new_state = not chart["is_favorite"]
     index.set_chart_favorite(chart_id, new_state)
     return {"is_favorite": new_state}
+
+
+@app.post("/charts/{chart_id}/duplicate")
+def charts_duplicate(chart_id: int) -> dict:
+    """Kopie bleibt bewusst unfavorisiert (create_saved_chart() setzt keinen
+    is_favorite-Wert) — sonst gäbe es nach dem Duplizieren eines Favoriten
+    zwei inhaltsgleiche favorisierte Karten."""
+    chart = index.get_saved_chart(chart_id)
+    if chart is None:
+        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+    new_id = index.create_saved_chart(
+        f"{chart['name']} (Kopie)", chart["entity_ids"], chart["range_key"], chart["continuous"],
+        chart["entity_names"], chart["resolution_preset"], chart["dynamic_y_axis"],
+        chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
+        legend_style=chart["legend_style"], chart_type=chart["chart_type"],
+        decimals=chart["decimals"], show_values=chart["show_values"],
+    )
+    return {"id": new_id}
 
 
 def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
@@ -3176,6 +3209,7 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
                 "legend_style": c["legend_style"], "chart_type": c["chart_type"],
+                "show_values": c["show_values"], "decimals": c["decimals"],
             })
         elif p["item_type"] == "table":
             t = index.get_saved_table(p["item_id"])
@@ -3186,14 +3220,71 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
                 "columns": t["columns"], "rows": t["rows"], "style": t["style"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
+        elif p["item_type"] == "entity":
+            e = index.get_entity(p["item_entity_id"])
+            if e is None:
+                continue
+            is_switch = e["aggregation_type"] == "switch"
+            # Kachel-Override hat Vorrang vor der entity-eigenen Einstellung,
+            # "auto" (Feld-Default) bedeutet ausdrücklich "entity-eigenen Wert
+            # übernehmen" statt selbst "auto" an format_value() zu reichen.
+            effective_decimals = p["decimals"] if p["decimals"] != "auto" else (e["decimals"] or "auto")
+            if e["last_value"] is None:
+                value_text = "–"
+            elif is_switch:
+                # Momentaner Zustand — anders als der chart-eigene
+                # display_mode='time' (Summe der Einschaltdauer über einen
+                # Zeitraum, siehe dashboard-tiles.js isDuration) geht es hier
+                # um "gerade an oder aus", das display_mode nicht berührt.
+                value_text = "An" if e["last_value"] else "Aus"
+            else:
+                value_text = format_value(e["last_value"], decimals_to_int(effective_decimals))
+            seconds_ago = (time.time() - e["last_ts"]) if e["last_ts"] is not None else None
+            # Zwei Schwellen (Konzept-Wunsch): 15 Minuten (gelb) und eine
+            # Stunde (rot) — unabhängig vom Auflösungsintervall der Entität,
+            # bewusst feste, für den Nutzer nachvollziehbare Werte statt einer
+            # datenabhängigen Heuristik. Nur der Kartenrahmen zeigt das an
+            # (siehe .dtile-entity.is-warn/is-stale), der Wert selbst bleibt
+            # immer schwarz.
+            if seconds_ago is None:
+                staleness = "fresh"
+            elif seconds_ago > 3600:
+                staleness = "stale"
+            elif seconds_ago > 900:
+                staleness = "warn"
+            else:
+                staleness = "fresh"
+            tiles.append({
+                "kind": "entity", "entity_id": e["entity_id"],
+                "name": p["title"] or e["friendly_name"] or e["entity_id"],
+                # Roher Override fürs Titel-Eingabefeld im Kachelmenü — anders
+                # als "name" oben (mit friendly_name-Fallback) soll das Feld
+                # leer bleiben, solange kein eigener Titel gesetzt ist.
+                "custom_title": p["title"] or "",
+                "value_text": value_text, "unit": "" if is_switch else (e["unit"] or ""),
+                "is_switch": is_switch, "decimals": effective_decimals,
+                "age_text": f"vor {format_uptime(seconds_ago)}" if seconds_ago is not None else "nie",
+                "staleness": staleness,
+                "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
+                "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),
+            })
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
+    pinned_entity_ids = {p["item_entity_id"] for p in pins if p["item_type"] == "entity"}
     dashboard = index.get_dashboard(dashboard_id)
     dashboard_locked = bool(dashboard["locked"]) if dashboard else False
+    dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
+    dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
     return {
         "dashboard_id": dashboard_id,
         "dashboard_name": dashboard["name"] if dashboard else "Dashboard",
         "dashboard_locked": dashboard_locked,
+        # Präziser Modus: Gitter/Zeilenhöhe halbiert (.dashboard-grid.is-precise),
+        # Größen-Picker geht dann bis 6x6 statt 3x3 (siehe _dashboard_tile_menu.html).
+        "dashboard_precise": dashboard_precise,
+        # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
+        # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
+        "dashboard_fill_gaps": dashboard_fill_gaps,
         "base": base,
         "tiles": tiles,
         # Fixiertes Dashboard: keine neuen Kacheln anheften, siehe dashboard_locked
@@ -3202,6 +3293,15 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
         "can_add_tile": len(tiles) < index.DASHBOARD_TILE_LIMIT and not dashboard_locked,
         "unpinned_charts": [c for c in index.list_saved_charts() if c["id"] not in pinned_chart_ids],
         "unpinned_tables": [t for t in index.list_saved_tables() if t["id"] not in pinned_table_ids],
+        # Werte-Kachel-Picker filtert client-seitig per Suchfeld (siehe
+        # dashboard-tiles.js setupEntityPinSearch()) statt eines eigenen
+        # Server-Roundtrips — dieselbe Größenordnung wie die Entitätenliste
+        # anderswo in der App (Tabellen-Editor-Picker), kein Pagination-Bedarf.
+        "unpinned_entities": [
+            {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+            for row in index.list_entities()
+            if row["entity_id"] not in pinned_entity_ids
+        ],
     }
 
 
@@ -3244,6 +3344,7 @@ def charts_unpin(request: Request, chart_id: int, dashboard_id: int = 1, base: s
 class _DashboardPinRef(BaseModel):
     item_type: str
     item_id: int
+    item_entity_id: str | None = None
 
 
 class _ReorderDashboardBody(BaseModel):
@@ -3255,8 +3356,10 @@ class _ResizeDashboardTileBody(BaseModel):
     dashboard_id: int = 1
     item_type: str
     item_id: int
-    grid_cols: int = Field(ge=1, le=3)
-    grid_rows: int = Field(ge=1, le=3)
+    # Obergrenze 6 (Präziser Modus) statt 3 — die eigentliche, vom aktuellen
+    # Modus abhängige Grenze prüft index.set_dashboard_pin_size() (max_size).
+    grid_cols: int = Field(ge=1, le=6)
+    grid_rows: int = Field(ge=1, le=6)
 
 
 @app.post("/dashboard/reorder")
@@ -3268,7 +3371,7 @@ def dashboard_reorder(body: _ReorderDashboardBody) -> dict:
     eigener Pfad statt "/charts/reorder"/"/tables/reorder", weil eine
     Kachel-Reihenfolge Charts UND Tabellen gemischt enthalten kann."""
     _require_dashboard_unlocked(body.dashboard_id)
-    index.reorder_dashboard_pins(body.dashboard_id, [(p.item_type, p.item_id) for p in body.pins])
+    index.reorder_dashboard_pins(body.dashboard_id, [(p.item_type, p.item_id, p.item_entity_id) for p in body.pins])
     return {"ok": True}
 
 
@@ -3277,9 +3380,15 @@ def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     if body.item_type not in {"chart", "table"}:
         raise HTTPException(status_code=422, detail="Ungültiger Dashboard-Kacheltyp")
     _require_dashboard_unlocked(body.dashboard_id)
-    if not index.set_dashboard_pin_size(
-        body.dashboard_id, body.item_type, body.item_id, body.grid_cols, body.grid_rows
-    ):
+    dashboard = index.get_dashboard(body.dashboard_id)
+    max_size = 6 if dashboard and dashboard["precise_mode"] else 3
+    try:
+        updated = index.set_dashboard_pin_size(
+            body.dashboard_id, body.item_type, body.item_id, body.grid_cols, body.grid_rows, max_size=max_size
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
 
@@ -3301,6 +3410,111 @@ def dashboard_legend(body: _LegendDashboardTileBody) -> dict:
     ):
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "show_legend": body.show_legend}
+
+
+# -- Werte-Kacheln (item_type='entity'): eine Entität direkt anheften, ohne
+# zuerst ein Chart/eine Tabelle anzulegen (Konzept-Erweiterung). Eigene Routen
+# statt die obigen chart/table-Endpunkte zu erweitern, weil eine entity_id
+# (TEXT) statt einer Integer-item_id identifiziert wird. ---------------------
+
+@app.post("/dashboard/pin-entity/{entity_id}", response_class=HTMLResponse)
+def dashboard_pin_entity(request: Request, entity_id: str, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+    _require_entity(entity_id)
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    index.pin_entity_to_dashboard(dashboard_id, entity_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+
+
+@app.post("/dashboard/unpin-entity/{entity_id}", response_class=HTMLResponse)
+def dashboard_unpin_entity(request: Request, entity_id: str, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+    _require_dashboard_unlocked(dashboard_id)
+    index.unpin_entity_from_dashboard(dashboard_id, entity_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+
+
+class _ResizeDashboardEntityTileBody(BaseModel):
+    dashboard_id: int = 1
+    entity_id: str
+    grid_cols: int = Field(ge=1, le=6)
+    grid_rows: int = Field(ge=1, le=6)
+
+
+@app.post("/dashboard/entity-size")
+def dashboard_entity_size(body: _ResizeDashboardEntityTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    dashboard = index.get_dashboard(body.dashboard_id)
+    max_size = 6 if dashboard and dashboard["precise_mode"] else 3
+    try:
+        updated = index.set_dashboard_entity_pin_size(
+            body.dashboard_id, body.entity_id, body.grid_cols, body.grid_rows, max_size=max_size
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
+
+
+class _SparklineDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    entity_id: str
+    show_sparkline: bool
+
+
+@app.post("/dashboard/sparkline")
+def dashboard_sparkline(body: _SparklineDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    if not index.set_dashboard_entity_pin_sparkline(body.dashboard_id, body.entity_id, body.show_sparkline):
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "show_sparkline": body.show_sparkline}
+
+
+class _ShowAgeDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    entity_id: str
+    show_age: bool
+
+
+@app.post("/dashboard/entity-show-age")
+def dashboard_entity_show_age(body: _ShowAgeDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    if not index.set_dashboard_entity_pin_show_age(body.dashboard_id, body.entity_id, body.show_age):
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "show_age": body.show_age}
+
+
+class _DecimalsDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    entity_id: str
+    decimals: str
+
+
+@app.post("/dashboard/entity-decimals")
+def dashboard_entity_decimals(body: _DecimalsDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        updated = index.set_dashboard_entity_pin_decimals(body.dashboard_id, body.entity_id, body.decimals)
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "decimals": body.decimals}
+
+
+class _TitleDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    entity_id: str
+    title: str = ""
+
+
+@app.post("/dashboard/entity-title")
+def dashboard_entity_title(body: _TitleDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    title = body.title.strip()
+    if not index.set_dashboard_entity_pin_title(body.dashboard_id, body.entity_id, title or None):
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "title": title}
 
 
 # -- Dashboards (Konzept "Dashboards"-Menüpunkt: mehrere, unabhängige
@@ -3382,10 +3596,57 @@ def dashboards_lock(dashboard_id: int, body: _DashboardLockBody) -> dict:
     return {"ok": True, "locked": body.locked}
 
 
+class _DashboardPreciseModeBody(BaseModel):
+    precise_mode: bool
+
+
+@app.post("/dashboards/{dashboard_id}/precise-mode")
+def dashboards_precise_mode(dashboard_id: int, body: _DashboardPreciseModeBody) -> dict:
+    if not index.set_dashboard_precise_mode(dashboard_id, body.precise_mode):
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    return {"ok": True, "precise_mode": body.precise_mode}
+
+
+class _DashboardFillGapsBody(BaseModel):
+    fill_gaps: bool
+
+
+@app.post("/dashboards/{dashboard_id}/fill-gaps")
+def dashboards_fill_gaps(dashboard_id: int, body: _DashboardFillGapsBody) -> dict:
+    if not index.set_dashboard_fill_gaps(dashboard_id, body.fill_gaps):
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    return {"ok": True, "fill_gaps": body.fill_gaps}
+
+
 @app.post("/dashboards/{dashboard_id}/delete")
 def dashboards_delete(dashboard_id: int) -> dict:
     if not index.delete_dashboard(dashboard_id):
         raise HTTPException(status_code=400, detail="Dashboard kann nicht gelöscht werden")
+    return {"ok": True}
+
+
+@app.post("/dashboards/{dashboard_id}/favorite")
+def dashboards_favorite_toggle(dashboard_id: int) -> dict:
+    dashboard = index.get_dashboard(dashboard_id)
+    if dashboard is None:
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    new_state = not dashboard["is_favorite"]
+    index.set_dashboard_favorite(dashboard_id, new_state)
+    return {"is_favorite": new_state}
+
+
+@app.post("/dashboards/{dashboard_id}/duplicate")
+def dashboards_duplicate(dashboard_id: int) -> dict:
+    new_id = index.duplicate_dashboard(dashboard_id)
+    if new_id is None:
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+    return {"id": new_id}
+
+
+@app.post("/dashboards/{dashboard_id}/set-default")
+def dashboards_set_default(dashboard_id: int) -> dict:
+    if not index.set_default_dashboard(dashboard_id):
+        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
     return {"ok": True}
 
 
@@ -3569,6 +3830,20 @@ def tables_favorite_toggle(table_id: int) -> dict:
     return {"is_favorite": new_state}
 
 
+@app.post("/tables/{table_id}/duplicate")
+def tables_duplicate(table_id: int) -> dict:
+    """Kopie bleibt bewusst unfavorisiert (create_saved_table() setzt keinen
+    is_favorite-Wert) — sonst gäbe es nach dem Duplizieren eines Favoriten
+    zwei inhaltsgleiche favorisierte Karten."""
+    table = index.get_saved_table(table_id)
+    if table is None:
+        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+    new_id = index.create_saved_table(
+        f"{table['name']} (Kopie)", table["columns"], table["rows"], table["style"],
+    )
+    return {"id": new_id}
+
+
 @app.post("/tables/{table_id}/pin", response_class=HTMLResponse)
 def tables_pin(request: Request, table_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
     if index.get_saved_table(table_id) is None:
@@ -3599,6 +3874,11 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
     first_date = datetime.fromtimestamp(entity["first_ts"], TZ).strftime("%Y-%m-%d") if entity["first_ts"] else None
     last_date = datetime.fromtimestamp(entity["last_ts"], TZ).strftime("%Y-%m-%d") if entity["last_ts"] else None
     chart_options = _resolve_entity_chart_options(entity)
+    # "Nachkommastellen" im Optionen-Menü übersteuert, sofern nicht "Auto", die
+    # globale Anzeige-Einstellung der Entität (entities.decimals, Konfiguration-
+    # Seite) nur für diese Chart-Ansicht — dieselbe Override-Konvention wie die
+    # Werte-Kachel-Übersteuerung auf Dashboards (dashboard_pins.decimals).
+    effective_decimals = chart_options["decimals"] if chart_options["decimals"] != "auto" else entity["decimals"]
     return templates.TemplateResponse(
         request,
         "entity_detail.html",
@@ -3608,7 +3888,7 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
             "aggregation_type": entity["aggregation_type"],
             "type_label": format_type(entity["aggregation_type"]),
             "unit": entity["unit"],
-            "decimals": decimals_to_int(entity["decimals"]),
+            "decimals": decimals_to_int(effective_decimals),
             "display_mode": entity["display_mode"],
             "base": "..",
             "first_date": first_date,

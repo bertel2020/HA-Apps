@@ -51,6 +51,28 @@
         </div>
         <p class="sub" style="margin-top:6px;">Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.</p>
       </div>
+
+      <div class="field">
+        <div class="field-switch-row">
+          <label class="switch">
+            <input type="checkbox" id="dash-precise" x-model="preciseMode">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+          <label for="dash-precise">Präziser Modus</label>
+        </div>
+        <p class="sub" style="margin-top:6px;">Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.</p>
+      </div>
+
+      <div class="field">
+        <div class="field-switch-row">
+          <label class="switch">
+            <input type="checkbox" id="dash-fill-gaps" x-model="fillGaps">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+          <label for="dash-fill-gaps">Lücken auffüllen</label>
+        </div>
+        <p class="sub" style="margin-top:6px;">Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.</p>
+      </div>
       {% endif %}
 
       <div class="save-row">
@@ -74,6 +96,8 @@
         dashboardId: DASHBOARD_ID,
         name: {{ (dashboard.name if dashboard else '') | tojson }},
         locked: {{ 'true' if dashboard and dashboard.locked else 'false' }},
+        preciseMode: {{ 'true' if dashboard and dashboard.precise_mode else 'false' }},
+        fillGaps: {{ 'true' if dashboard and dashboard.fill_gaps else 'false' }},
         saving: false,
         savedMessage: '',
 
@@ -97,6 +121,14 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({locked: this.locked}),
               });
               if (!lockRes.ok) { alert('Speichern der Fixierung fehlgeschlagen.'); return; }
+              const preciseRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/precise-mode`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({precise_mode: this.preciseMode}),
+              });
+              if (!preciseRes.ok) { alert('Speichern des Präzisen Modus fehlgeschlagen.'); return; }
+              const fillGapsRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/fill-gaps`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fill_gaps: this.fillGaps}),
+              });
+              if (!fillGapsRes.ok) { alert('Speichern von "Lücken auffüllen" fehlgeschlagen.'); return; }
             }
             window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
           } finally {

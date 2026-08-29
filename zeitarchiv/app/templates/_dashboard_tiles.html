@@ -30,7 +30,7 @@
 {% set base = base | default('.') %}
 {% set dashboard_id = dashboard_id | default(1) %}
 {% set href_base = '' if base == '.' else base + '/' %}
-<div id="dashboard-grid" class="dashboard-grid" data-base="{{ base }}" data-dashboard-id="{{ dashboard_id }}">
+<div id="dashboard-grid" class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}" data-base="{{ base }}" data-dashboard-id="{{ dashboard_id }}" data-precise="{{ 'true' if dashboard_precise else 'false' }}">
   {% for tile in tiles %}
   {% if tile.kind == 'chart' %}
   <div class="dtile" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="chart" data-item-id="{{ tile.id }}"
@@ -49,13 +49,15 @@
        data-legend-metrics='{{ tile.legend_metrics | tojson }}'
        data-legend-style="{{ tile.legend_style }}"
        data-chart-type="{{ tile.chart_type }}"
+       data-show-values="{{ 'true' if tile.show_values else 'false' }}"
+       data-decimals="{{ tile.decimals }}"
        data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>
       <div class="dtile-legend"></div>
     </a>
   </div>
-  {% else %}
+  {% elif tile.kind == 'table' %}
   <div class="dtile dtile-table" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="table" data-item-id="{{ tile.id }}"
        data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
        style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
@@ -67,31 +69,90 @@
       <div class="dtile-table-preview"><div class="dtile-loading">&hellip;</div></div>
     </a>
   </div>
+  {% else %}
+  <div class="dtile dtile-entity{{ ' is-warn' if tile.staleness == 'warn' else '' }}{{ ' is-stale' if tile.staleness == 'stale' else '' }}"
+       draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="entity" data-item-id="0"
+       data-item-entity-id="{{ tile.entity_id }}"
+       data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
+       style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
+       {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+    {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
+    <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
+       data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
+       data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"
+       data-show-age="{{ 'true' if tile.show_age else 'false' }}">
+      <div class="dtile-title">{{ tile.name }}</div>
+      <div class="dtile-entity-value">
+        <span class="dtile-entity-main">
+          <span class="dtile-entity-number">{{ tile.value_text }}</span>
+          {% if tile.unit %}<span class="dtile-entity-unit">{{ tile.unit }}</span>{% endif %}
+        </span>
+        {% if tile.show_age %}<span class="dtile-entity-age" title="Letzter Wert">{{ tile.age_text }}</span>{% endif %}
+      </div>
+      {% if tile.show_sparkline %}
+      <div class="dtile-entity-sparkline"><div class="dtile-loading">&hellip;</div></div>
+      {% endif %}
+    </a>
+  </div>
   {% endif %}
   {% endfor %}
   {% if can_add_tile %}
-  <div class="dtile dtile-add" x-data="{open: false}" x-cloak>
-    <button type="button" class="dtile-add-btn" @click="open = !open" title="Chart oder Tabelle anheften">+</button>
-    <div class="dtile-picker" x-show="open" @click.outside="open = false">
-      <p class="dtile-picker-label">Chart anheften</p>
-      {% for c in unpinned_charts %}
-      <button type="button" class="dtile-picker-item"
-              hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
-              hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
-        {{ c.name }}
-      </button>
-      {% endfor %}
-      <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}charts/new">+ Neuer Chart</a>
-
-      <p class="dtile-picker-label">Tabelle anheften</p>
-      {% for t in unpinned_tables %}
-      <button type="button" class="dtile-picker-item"
-              hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
-              hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
-        {{ t.name }}
-      </button>
-      {% endfor %}
-      <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}tables/new">+ Neue Tabelle</a>
+  <!-- Größeres, tab-basiertes "Kachel hinzufügen"-Popup statt der früheren,
+       auf einmal alle drei Abschnitte (Chart/Tabelle/Werte-Kachel) unter-
+       einander stapelnden Liste in einem schmalen Popover — bei vielen
+       gespeicherten Charts/Tabellen wurde das schnell unübersichtlich lang.
+       Ein gemeinsames Suchfeld filtert jeweils nur die gerade aktive
+       Registerkarte, dieselbe x-show-Filterung wie zuvor nur bei der
+       Entitäten-Suche. -->
+  <div class="dtile dtile-add" x-data="{open: false, tab: 'chart', search: ''}" x-cloak>
+    <button type="button" class="dtile-add-btn" @click="open = !open" title="Chart, Tabelle oder Entität anheften">+</button>
+    <div class="dtile-picker-overlay" x-show="open" @pointerdown.stop @click.self="open = false" @keydown.escape.window="open = false">
+      <div class="dtile-picker-modal">
+        <div class="dtile-picker-header">
+          <p class="dtile-picker-title">Kachel hinzufügen</p>
+          <button type="button" class="dtile-picker-close" @click="open = false" aria-label="Schließen">✕</button>
+        </div>
+        <div class="dtile-picker-tabs" role="tablist">
+          <button type="button" role="tab" :class="{active: tab === 'chart'}" @click="tab = 'chart'; search = ''">Charts</button>
+          <button type="button" role="tab" :class="{active: tab === 'table'}" @click="tab = 'table'; search = ''">Tabellen</button>
+          <button type="button" role="tab" :class="{active: tab === 'entity'}" @click="tab = 'entity'; search = ''">Werte</button>
+        </div>
+        <input type="search" class="dtile-picker-search" placeholder="Suchen …" x-model="search">
+        <div class="dtile-picker-list">
+          <div x-show="tab === 'chart'">
+            {% for c in unpinned_charts %}
+            <button type="button" class="dtile-picker-item"
+                    x-show='!search || {{ c.name | lower | tojson }}.includes(search.toLowerCase())'
+                    hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                    hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+              {{ c.name }}
+            </button>
+            {% endfor %}
+            <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}charts/new">+ Neuer Chart</a>
+          </div>
+          <div x-show="tab === 'table'">
+            {% for t in unpinned_tables %}
+            <button type="button" class="dtile-picker-item"
+                    x-show='!search || {{ t.name | lower | tojson }}.includes(search.toLowerCase())'
+                    hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                    hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+              {{ t.name }}
+            </button>
+            {% endfor %}
+            <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}tables/new">+ Neue Tabelle</a>
+          </div>
+          <div x-show="tab === 'entity'">
+            {% for e in unpinned_entities %}
+            <button type="button" class="dtile-picker-item"
+                    x-show='!search || {{ (e.label ~ " " ~ e.entity_id) | lower | tojson }}.includes(search.toLowerCase())'
+                    hx-post="{{ href_base }}dashboard/pin-entity/{{ e.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                    hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+              {{ e.label }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   {% endif %}

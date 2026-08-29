@@ -125,7 +125,7 @@ Existenz-Check in `Index.__init__()`.
 | `backup_jobs`, `retention_jobs` | Dauerhafte Job-Historie (Status, Fehler, Kennzahlen) — überlebt Neustarts, im Gegensatz zu einem reinen "letzter Lauf"-Zeitstempel |
 | `saved_charts` | Gespeicherte Chart-**Abfragen** (Entitäten + Zeitraum-Einstellungen), kein Datenschnappschuss — Werte werden bei jedem Aufruf live nachgeladen |
 | `saved_tables`, `table_columns`, `table_rows` | Vergleichstabellen: Struktur (Zeilen=Größen, Spalten=Zeiträume) getrennt von `style_json` (rein optische Darstellung, siehe [frontend.md](frontend.md)) |
-| `dashboards`, `dashboard_pins` | Mehrere benannte Dashboards; eine gemeinsame Pin-Tabelle für Charts UND Tabellen (`item_type`/`item_id`), da beide gemeinsam sortiert werden müssen |
+| `dashboards`, `dashboard_pins` | Mehrere benannte Dashboards (Favorit, Standard, Präziser Modus, Lücken auffüllen); eine gemeinsame Pin-Tabelle für Charts, Tabellen UND direkt gepinnte Entitäten ("Werte-Kacheln", `item_type`/`item_id`/`item_entity_id`), da alle drei gemeinsam sortiert werden müssen |
 
 ### Gecachte Vorschauen (`settings`-Tabelle)
 

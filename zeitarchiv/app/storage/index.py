@@ -296,7 +296,10 @@ CREATE TABLE IF NOT EXISTS dashboards (
     name TEXT NOT NULL,
     position INTEGER NOT NULL,
     is_default INTEGER NOT NULL DEFAULT 0,
-    locked INTEGER NOT NULL DEFAULT 0
+    locked INTEGER NOT NULL DEFAULT 0,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    precise_mode INTEGER NOT NULL DEFAULT 0,
+    fill_gaps INTEGER NOT NULL DEFAULT 0
 );
 
 -- dashboard_id verweist auf dashboards.id — mehrere, unabhängige Dashboards
@@ -308,11 +311,28 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     dashboard_id INTEGER NOT NULL DEFAULT 1,
     item_type TEXT NOT NULL,
     item_id INTEGER NOT NULL,
+    -- Nur bei item_type='entity' befüllt (Werte-Kacheln, direkt angeheftete
+    -- Entität ohne zugrundeliegendes Chart/Tabelle) — Entitäten haben eine
+    -- entity_id (TEXT), keine Integer-ID wie saved_charts/saved_tables,
+    -- item_id bleibt für diese Zeilen ungenutzt (0).
+    item_entity_id TEXT,
     position INTEGER NOT NULL,
     grid_cols INTEGER NOT NULL DEFAULT 1,
     grid_rows INTEGER NOT NULL DEFAULT 1,
     show_legend INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(dashboard_id, item_type, item_id)
+    -- Nur bei Werte-Kacheln (item_type='entity') nutzbar — kleiner
+    -- Roh-Verlauf statt/neben dem reinen aktuellen Wert.
+    show_sparkline INTEGER NOT NULL DEFAULT 0,
+    -- Nur bei Werte-Kacheln: Nachkommastellen-Override für die Anzeige
+    -- ("auto" = das entity-eigene Feld verwenden, sonst 0-3 wie dort).
+    decimals TEXT NOT NULL DEFAULT 'auto',
+    -- Nur bei Werte-Kacheln: eigener Kachel-Titel statt des entity-eigenen
+    -- friendly_name — NULL/leer bedeutet "übernehmen".
+    title TEXT,
+    -- Nur bei Werte-Kacheln: "vor X"-Alter neben dem Wert ein-/ausblendbar —
+    -- Standard an, da das bisherige (einzige) Verhalten.
+    show_age INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(dashboard_id, item_type, item_id, item_entity_id)
 );
 
 -- Eine Spalte = ein Zeitraum ("2026", "Aug VJ", "Heute", …) — label ist frei
@@ -535,6 +555,25 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN chart_type TEXT NOT NULL DEFAULT 'auto'"
             )
+        if "show_values" not in sc_columns:
+            # "Werte anzeigen" (Optionen-Menü, "Darstellung") — bislang nur ein
+            # Laufzeit-Alpine-Feld ohne Persistenz (chart_editor.html setzte es
+            # bei jedem Laden stumm auf false zurück); jetzt wie chart_stats/
+            # dynamic_y_axis ein gespeichertes Chart-Feld, damit auch die
+            # Dashboard-Kachel-Vorschau (main.py _dashboard_tiles_context())
+            # dieselbe Einstellung übernehmen kann.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN show_values INTEGER NOT NULL DEFAULT 0"
+            )
+        if "decimals" not in sc_columns:
+            # Nachkommastellen-Übersteuerung (Optionen-Menü, "Darstellung") —
+            # "auto" übernimmt weiterhin je Serie deren eigene entities.decimals-
+            # Einstellung, sonst gilt dieser Wert für ALLE Serien des Charts
+            # einheitlich (main.py chart_editor.html render()). Dieselbe
+            # Konvention wie entities.decimals/dashboard_pins.decimals.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'"
+            )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -600,6 +639,54 @@ class Index:
             )
             self._conn.execute("DROP TABLE dashboard_pins_old")
 
+        dashboard_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboard_pins)")}
+        if "item_entity_id" not in dashboard_columns:
+            # Werte-Kacheln: eine Entität direkt anheften, ohne zuerst ein
+            # Chart/eine Tabelle anzulegen. Entitäten haben aber keine
+            # Integer-ID wie saved_charts/saved_tables — zusätzliche Spalte,
+            # bei Chart-/Tabellen-Pins ungenutzt (NULL). Die UNIQUE-Beschränkung
+            # muss sie mit einschließen (sonst dürfte pro Dashboard nur eine
+            # einzige Werte-Kachel existieren, weil item_id für alle den
+            # Platzhalter 0 trägt) — SQLite kann eine UNIQUE-Beschränkung nicht
+            # per ALTER TABLE ändern, deshalb wieder Tabelle neu aufbauen (wie
+            # beim dashboard_id-Umbau oben).
+            self._conn.execute("ALTER TABLE dashboard_pins RENAME TO dashboard_pins_old")
+            self._conn.execute(
+                """CREATE TABLE dashboard_pins (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dashboard_id INTEGER NOT NULL DEFAULT 1,
+                    item_type TEXT NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    item_entity_id TEXT,
+                    position INTEGER NOT NULL,
+                    grid_cols INTEGER NOT NULL DEFAULT 1,
+                    grid_rows INTEGER NOT NULL DEFAULT 1,
+                    show_legend INTEGER NOT NULL DEFAULT 0,
+                    show_sparkline INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(dashboard_id, item_type, item_id, item_entity_id)
+                )"""
+            )
+            self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, grid_cols, grid_rows, show_legend) "
+                "SELECT dashboard_id, item_type, item_id, position, grid_cols, grid_rows, show_legend FROM dashboard_pins_old"
+            )
+            self._conn.execute("DROP TABLE dashboard_pins_old")
+
+        dashboard_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboard_pins)")}
+        if "decimals" not in dashboard_columns:
+            # Nachkommastellen-Override für Werte-Kacheln — reine ALTER TABLE-
+            # Ergänzung, nicht Teil der UNIQUE-Beschränkung, deshalb ohne den
+            # Tabellen-Neuaufbau wie oben.
+            self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
+        if "title" not in dashboard_columns:
+            # Eigener Kachel-Titel für Werte-Kacheln statt des entity-eigenen
+            # friendly_name — NULL (Standard) bedeutet "übernehmen".
+            self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN title TEXT")
+        if "show_age" not in dashboard_columns:
+            # "vor X"-Alter neben dem Wert ein-/ausblendbar — Standard an
+            # (bisheriges, einziges Verhalten).
+            self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN show_age INTEGER NOT NULL DEFAULT 1")
+
         dashboards_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboards)")}
         if "locked" not in dashboards_columns:
             # Fixieren (Konzept "Dashboard sperren"): verhindert versehentliche
@@ -608,6 +695,22 @@ class Index:
             # unabhängig vom Sperrstatus möglich, betrifft also nur die
             # Kachel-Aktionen auf der Dashboard-Ansichtsseite selbst.
             self._conn.execute("ALTER TABLE dashboards ADD COLUMN locked INTEGER NOT NULL DEFAULT 0")
+        if "is_favorite" not in dashboards_columns:
+            # Favorit (dieselbe Konvention wie saved_charts/saved_tables) —
+            # bestimmt sowohl die Sortierung auf /dashboards als auch im
+            # Topnav-Dropdown, da beide dieselbe list_dashboards() nutzen.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
+        if "precise_mode" not in dashboards_columns:
+            # Präziser Modus: Gitter/Zeilenhöhe halbiert sich (3->6 Spalten,
+            # siehe .dashboard-grid.is-precise in dashboard_detail.html/
+            # entities.html) — set_dashboard_precise_mode() passt beim
+            # Umschalten die gespeicherten Kachelgrößen entsprechend an.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN precise_mode INTEGER NOT NULL DEFAULT 0")
+        if "fill_gaps" not in dashboards_columns:
+            # "Lücken auffüllen" (grid-auto-flow: dense, siehe .dashboard-grid.
+            # is-dense) — Standard aus, damit bestehende Dashboards ihre
+            # heutige strikte Reihenfolge-Anordnung nicht ungefragt ändern.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN fill_gaps INTEGER NOT NULL DEFAULT 0")
 
         # Einmalige Anlage des migrierten Default-Dashboards ("Übersicht", fest
         # verankert an id=1, siehe dashboard_pins-Migration oben) — nur beim
@@ -1198,6 +1301,8 @@ class Index:
         legend_metrics: list[str] | None = None,
         legend_style: str = "chips",
         chart_type: str = "auto",
+        decimals: str = "auto",
+        show_values: bool = False,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1205,14 +1310,14 @@ class Index:
                 "INSERT INTO saved_charts "
                 "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, decimals, show_values, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, chart_type, now, now,
+                    legend_style, chart_type, decimals, int(show_values), now, now,
                 ),
             )
             return cur.lastrowid
@@ -1232,18 +1337,21 @@ class Index:
         legend_metrics: list[str] | None = None,
         legend_style: str = "chips",
         chart_type: str = "auto",
+        decimals: str = "auto",
+        show_values: bool = False,
     ) -> None:
         with self._lock, self._conn:
             self._conn.execute(
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
                 "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
-                "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, updated_at = ? WHERE id = ?",
+                "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
+                "show_values = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, chart_type, time.time(), chart_id,
+                    legend_style, chart_type, decimals, int(show_values), time.time(), chart_id,
                 ),
             )
 
@@ -1257,6 +1365,8 @@ class Index:
         d["legend_metrics"] = json.loads(d["legend_metrics"]) if d.get("legend_metrics") else ["sum"]
         d["legend_style"] = d.get("legend_style") or "chips"
         d["chart_type"] = d.get("chart_type") or "auto"
+        d["decimals"] = d.get("decimals") or "auto"
+        d["show_values"] = bool(d.get("show_values", 0))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["is_favorite"] = bool(d["is_favorite"])
         return d
@@ -1295,9 +1405,37 @@ class Index:
     # macht es umbenennbar, aber nicht löschbar). ------------------------------
 
     def list_dashboards(self) -> list[dict]:
+        # Das Standard-Dashboard bleibt immer an erster Stelle, unabhängig von
+        # Favoriten — danach Favoriten, sonst die bisherige manuelle Reihenfolge
+        # (dieselbe Konvention wie list_saved_charts()/list_saved_tables()).
+        # Wirkt sowohl auf /dashboards als auch auf das Topnav-Dropdown, da
+        # beide dieselbe Methode nutzen (main.py _template_globals()).
         with self._lock, self._conn:
-            rows = self._conn.execute("SELECT * FROM dashboards ORDER BY position ASC, id ASC").fetchall()
+            rows = self._conn.execute(
+                "SELECT * FROM dashboards ORDER BY is_default DESC, is_favorite DESC, position ASC, id ASC"
+            ).fetchall()
             return [dict(row) for row in rows]
+
+    def get_default_dashboard_id(self) -> int:
+        """Liefert die id des aktuellen Standard-Dashboards — Fallback 1, falls
+        (sollte praktisch nie vorkommen) keine Zeile is_default gesetzt hat."""
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT id FROM dashboards WHERE is_default = 1 LIMIT 1").fetchone()
+            return row["id"] if row else 1
+
+    def set_default_dashboard(self, dashboard_id: int) -> bool:
+        """Verschiebt is_default auf ein anderes Dashboard — genau eine Zeile
+        trägt es je zu jeder Zeit, deshalb erst das alte Standard-Dashboard
+        zurücksetzen, dann das neue setzen, beides in derselben Transaktion."""
+        with self._lock, self._conn:
+            exists = self._conn.execute(
+                "SELECT 1 FROM dashboards WHERE id = ?", (dashboard_id,)
+            ).fetchone()
+            if exists is None:
+                return False
+            self._conn.execute("UPDATE dashboards SET is_default = 0 WHERE is_default = 1")
+            self._conn.execute("UPDATE dashboards SET is_default = 1 WHERE id = ?", (dashboard_id,))
+            return True
 
     def get_dashboard(self, dashboard_id: int) -> dict | None:
         with self._lock, self._conn:
@@ -1325,6 +1463,89 @@ class Index:
                 "UPDATE dashboards SET locked = ? WHERE id = ?", (1 if locked else 0, dashboard_id)
             )
             return cursor.rowcount > 0
+
+    def set_dashboard_favorite(self, dashboard_id: int, favorite: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET is_favorite = ? WHERE id = ?", (1 if favorite else 0, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_precise_mode(self, dashboard_id: int, precise: bool) -> bool:
+        """Verdoppelt beim Einschalten die gespeicherte Größe jeder
+        angehefteten Kachel (Gitter/Zeilenhöhe halbieren sich gleichzeitig,
+        siehe .dashboard-grid.is-precise) — ohne das würden alle Kacheln beim
+        Umschalten plötzlich nur noch halb so groß wirken. Beim Ausschalten
+        umgekehrt auf die alte Obergrenze (3) gekappt statt rechnerisch
+        halbiert — eine im Präzisen Modus z. B. auf 5 gesetzte Kachel hat
+        kein eindeutiges "halbes" Äquivalent im gröberen Gitter."""
+        with self._lock, self._conn:
+            exists = self._conn.execute(
+                "SELECT 1 FROM dashboards WHERE id = ?", (dashboard_id,)
+            ).fetchone()
+            if exists is None:
+                return False
+            self._conn.execute(
+                "UPDATE dashboards SET precise_mode = ? WHERE id = ?", (1 if precise else 0, dashboard_id)
+            )
+            if precise:
+                self._conn.execute(
+                    "UPDATE dashboard_pins SET grid_cols = grid_cols * 2, grid_rows = grid_rows * 2 "
+                    "WHERE dashboard_id = ?", (dashboard_id,),
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE dashboard_pins SET grid_cols = MIN(grid_cols, 3), grid_rows = MIN(grid_rows, 3) "
+                    "WHERE dashboard_id = ?", (dashboard_id,),
+                )
+            return True
+
+    def set_dashboard_fill_gaps(self, dashboard_id: int, fill_gaps: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET fill_gaps = ? WHERE id = ?", (1 if fill_gaps else 0, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
+    def duplicate_dashboard(self, dashboard_id: int) -> int | None:
+        """Kopiert Name UND angeheftete Kacheln (dashboard_pins) auf ein neues
+        Dashboard. Weder is_default noch locked noch is_favorite werden
+        übernommen — die Kopie ist ein ganz normales, neues Dashboard, das
+        genauso wenig automatisch gesperrt oder favorisiert startet wie ein
+        frisch angelegtes."""
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT name FROM dashboards WHERE id = ?", (dashboard_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            max_pos = self._conn.execute("SELECT MAX(position) FROM dashboards").fetchone()[0]
+            cursor = self._conn.execute(
+                "INSERT INTO dashboards (name, position) VALUES (?, ?)",
+                (f"{row['name']} (Kopie)", (max_pos or 0) + 1),
+            )
+            new_id = cursor.lastrowid
+            pins = self._conn.execute(
+                "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
+                "show_sparkline, decimals, title, show_age "
+                "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
+                (dashboard_id,),
+            ).fetchall()
+            self._conn.executemany(
+                "INSERT INTO dashboard_pins "
+                "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
+                "show_sparkline, decimals, title, show_age) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
+                        p["grid_cols"], p["grid_rows"], p["show_legend"], p["show_sparkline"],
+                        p["decimals"], p["title"], p["show_age"],
+                    )
+                    for p in pins
+                ],
+            )
+            return new_id
 
     def delete_dashboard(self, dashboard_id: int) -> bool:
         """False bei unbekannter id ODER beim Default-Dashboard (is_default) —
@@ -1407,18 +1628,21 @@ class Index:
             return True
 
     def set_dashboard_pin_size(
-        self, dashboard_id: int, item_type: str, item_id: int, grid_cols: int, grid_rows: int
+        self, dashboard_id: int, item_type: str, item_id: int, grid_cols: int, grid_rows: int, max_size: int = 3
     ) -> bool:
         """Speichert die Rastergröße einer angehefteten Dashboard-Kachel.
 
         Die Validierung lebt zusätzlich zur API auch hier, damit kein anderer
-        Aufrufer ungültige CSS-Grid-Spannen persistieren kann. False bedeutet:
-        Die angegebene Kachel ist nicht (mehr) angeheftet.
+        Aufrufer ungültige CSS-Grid-Spannen persistieren kann. max_size ist 3
+        normal, 6 im Präzisen Modus (siehe dashboard_size() in main.py, das
+        anhand des Dashboards entscheidet) — der Picker in
+        _dashboard_tile_menu.html geht entsprechend weit. False bedeutet: Die
+        angegebene Kachel ist nicht (mehr) angeheftet.
         """
         if item_type not in {"chart", "table"}:
             raise ValueError("Ungültiger Dashboard-Kacheltyp")
-        if not 1 <= int(grid_cols) <= 3 or not 1 <= int(grid_rows) <= 3:
-            raise ValueError("Dashboard-Kachelgröße muss zwischen 1 und 3 liegen")
+        if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
+            raise ValueError(f"Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen")
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
@@ -1459,19 +1683,119 @@ class Index:
                 (dashboard_id, item_type, item_id),
             )
 
-    def reorder_dashboard_pins(self, dashboard_id: int, pins: list[tuple[str, int]]) -> None:
+    # -- Werte-Kacheln (item_type='entity') — eine Entität direkt angeheftet,
+    # ohne zuerst ein Chart/eine Tabelle anzulegen (Konzept-Erweiterung).
+    # Eigene Methoden statt die obigen chart/table-Funktionen um item_entity_id
+    # zu erweitern: deren item_id-basierte Signatur bleibt dadurch unverändert
+    # für alle bestehenden Aufrufer (charts_pin/tables_pin/dashboard_size/…). --
+
+    def pin_entity_to_dashboard(self, dashboard_id: int, entity_id: str) -> bool:
+        """Wie pin_item_to_dashboard(), nur über entity_id statt einer
+        Integer-item_id — item_id bleibt für diese Zeilen der Platzhalter 0,
+        die eigentliche Identität trägt item_entity_id (siehe UNIQUE-
+        Beschränkung der Tabelle)."""
+        with self._lock, self._conn:
+            count = self._conn.execute(
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
+            if count >= self.DASHBOARD_TILE_LIMIT:
+                return False
+            if self._conn.execute(
+                "SELECT 1 FROM dashboard_pins WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (dashboard_id, entity_id),
+            ).fetchone():
+                return True  # schon angeheftet — kein Fehler, einfach nichts weiter tun
+            max_pos = self._conn.execute(
+                "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
+            self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, item_entity_id, position) "
+                "VALUES (?, 'entity', 0, ?, ?)",
+                (dashboard_id, entity_id, (max_pos or 0) + 1),
+            )
+            return True
+
+    def unpin_entity_from_dashboard(self, dashboard_id: int, entity_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "DELETE FROM dashboard_pins WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (dashboard_id, entity_id),
+            )
+
+    def set_dashboard_entity_pin_size(
+        self, dashboard_id: int, entity_id: str, grid_cols: int, grid_rows: int, max_size: int = 6
+    ) -> bool:
+        if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
+            raise ValueError(f"Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen")
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (int(grid_cols), int(grid_rows), dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_sparkline(
+        self, dashboard_id: int, entity_id: str, show_sparkline: bool
+    ) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET show_sparkline = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (int(show_sparkline), dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_show_age(self, dashboard_id: int, entity_id: str, show_age: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET show_age = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (int(show_age), dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_decimals(self, dashboard_id: int, entity_id: str, decimals: str) -> bool:
+        if decimals not in ("auto", "0", "1", "2", "3"):
+            raise ValueError("Ungültige Nachkommastellen")
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET decimals = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (decimals, dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_title(self, dashboard_id: int, entity_id: str, title: str | None) -> bool:
+        """title=None/leer setzt auf "übernehmen" zurück (entity-eigener
+        friendly_name statt eines eigenen Kachel-Titels, siehe
+        _dashboard_tiles_context() in main.py)."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET title = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (title or None, dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def reorder_dashboard_pins(self, dashboard_id: int, pins: list[tuple[str, int, str | None]]) -> None:
         """Setzt position neu, komplett durchnummeriert nach der übergebenen
         Reihenfolge (Drag&Drop auf einer Dashboard-Seite, funktioniert über
-        Charts UND Tabellen hinweg gemischt). pins ist eine Liste aus
-        (item_type, item_id) — der UPDATE trifft nur tatsächlich vorhandene
-        Pins DIESES Dashboards, ein veralteter/manipulierter Eintrag fügt nie
-        einen neuen hinzu (das bleibt pin_item_to_dashboard() vorbehalten)."""
+        Charts, Tabellen UND Werte-Kacheln hinweg gemischt). pins ist eine
+        Liste aus (item_type, item_id, item_entity_id) — item_entity_id ist
+        bei Werte-Kacheln nötig, da deren item_id für alle den Platzhalter 0
+        trägt und sie sonst nicht voneinander unterscheidbar wären ("IS" statt
+        "=" für den NULL-sicheren Vergleich bei Chart-/Tabellen-Pins). Der
+        UPDATE trifft nur tatsächlich vorhandene Pins DIESES Dashboards, ein
+        veralteter/manipulierter Eintrag fügt nie einen neuen hinzu (das
+        bleibt pin_item_to_dashboard()/pin_entity_to_dashboard() vorbehalten)."""
         with self._lock, self._conn:
             self._conn.executemany(
-                "UPDATE dashboard_pins SET position = ? WHERE dashboard_id = ? AND item_type = ? AND item_id = ?",
+                "UPDATE dashboard_pins SET position = ? "
+                "WHERE dashboard_id = ? AND item_type = ? AND item_id = ? AND item_entity_id IS ?",
                 [
-                    (position, dashboard_id, item_type, item_id)
-                    for position, (item_type, item_id) in enumerate(pins, start=1)
+                    (position, dashboard_id, item_type, item_id, item_entity_id)
+                    for position, (item_type, item_id, item_entity_id) in enumerate(pins, start=1)
                 ],
             )
 
@@ -1826,6 +2150,13 @@ class Index:
             )
             self._conn.execute(
                 "DELETE FROM entities WHERE entity_id = ?", (entity_id,)
+            )
+            # Werte-Kacheln referenzieren die Entität direkt (kein Chart/keine
+            # Tabelle dazwischen) — ohne diese Bereinigung bliebe ein
+            # verwaister Pin zurück, siehe dieselbe Aufräumlogik in
+            # delete_saved_chart()/delete_saved_table().
+            self._conn.execute(
+                "DELETE FROM dashboard_pins WHERE item_type = 'entity' AND item_entity_id = ?", (entity_id,)
             )
 
     def mark_deleted(

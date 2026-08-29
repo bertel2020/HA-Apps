@@ -270,6 +270,15 @@
     // echter Übergänge gezeichnet).
     const chartType = el.dataset.chartType || 'auto';
     const timeline = chartType === 'timeline';
+    // Nachkommastellen-Override (Optionen-Menü, "Darstellung") — bei "Auto"
+    // behält jede Serie ihre eigene entities.decimals-Einstellung (s.decimals,
+    // vom Server je Entität geliefert), sonst gilt dieser Wert für ALLE Serien
+    // dieser Kachel einheitlich, genau wie in chart_editor.html (effectiveDecimals()).
+    const decimalsOverride = el.dataset.decimals || 'auto';
+    const effectiveDecimals = s => decimalsOverride === 'auto' ? s.decimals : parseInt(decimalsOverride, 10);
+    // "Werte anzeigen" (Optionen-Menü) — bislang nicht an die Dashboard-Kachel
+    // durchgereicht, siehe showValues-Verwendung im echartsSeries-Aufbau unten.
+    const showValues = el.dataset.showValues === 'true';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -304,7 +313,7 @@
       const maxima = (s.points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
       const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
       const unit = s.unit ? ` ${s.unit}` : '';
-      const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtCompactNumber(value, s.decimals)}${unit}`;
+      const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtCompactNumber(value, effectiveDecimals(s))}${unit}`;
       // Summe bei Zählern UND bei Schaltern sinnvoll (Bucket-Werte sind dort
       // bereits Einschaltsekunden) — siehe derselbe Kommentar in
       // chart_editor.html (seriesStats()). Im Zeitstrahl-/Rohwerte-Modus
@@ -388,9 +397,10 @@
     // gemeinsamen Achse — dieselbe Regel wie in chart_editor.html.
     const unitDecimals = new Map();
     series.forEach(s => {
-      if (s.decimals == null) return;
+      const d = effectiveDecimals(s);
+      if (d == null) return;
       const current = unitDecimals.get(s.unit);
-      if (current == null || s.decimals < current) unitDecimals.set(s.unit, s.decimals);
+      if (current == null || d < current) unitDecimals.set(s.unit, d);
     });
     const yAxis = units.map((u, i) => {
       const decimals = unitDecimals.get(u);
@@ -437,17 +447,38 @@
     const echartsSeries = series.map((s, i) => {
       const color = PALETTE[i % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
-      const displayPoints = resamplePoints(
-        s.points, range, resolutionPreset, s.aggregation_type, data.window_start
-      );
-      if (tooltipBucketSeconds == null) {
-        tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
-      }
-      const lineData = displayPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, s.unit, s.decimals]);
-      if (!singleBucket && s.chart_type === 'line' && lineData.length && data.window_end != null
-          && lineData[lineData.length - 1][0] < data.window_end * 1000) {
-        const last = lineData[lineData.length - 1];
-        lineData.push([data.window_end * 1000, last[1], last[2], last[3]]);
+      let lineData;
+      if (singleBucket) {
+        // resamplePoints() kennt nur "medium"/"coarse" (RESOLUTION_SECONDS),
+        // für "full" gibt sie unverändert alle Rohpunkte zurück — ohne diesen
+        // eigenen Zweig würde jeder einzelne Bucket-Punkt als eigener
+        // Tooltip-Eintrag auf derselben Kategorie (x=0) landen, statt zu
+        // einem einzigen Balkenwert für den ganzen Zeitraum zusammengefasst
+        // zu werden (sichtbar als lange Dopplung im Tooltip). Dieselbe Summe-
+        // vs.-Durchschnitt-Regel wie in den Legenden-Kennzahlen oben.
+        const rawValues = (s.points || []).map(p => p.value).filter(Number.isFinite);
+        if (!rawValues.length) {
+          lineData = [];
+        } else {
+          const isSumType = s.aggregation_type === 'counter' || s.aggregation_type === 'switch';
+          const aggregate = isSumType
+            ? rawValues.reduce((sum, v) => sum + v, 0)
+            : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
+          lineData = [[0, aggregate, s.unit, effectiveDecimals(s)]];
+        }
+      } else {
+        const displayPoints = resamplePoints(
+          s.points, range, resolutionPreset, s.aggregation_type, data.window_start
+        );
+        if (tooltipBucketSeconds == null) {
+          tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
+        }
+        lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s)]);
+        if (s.chart_type === 'line' && lineData.length && data.window_end != null
+            && lineData[lineData.length - 1][0] < data.window_end * 1000) {
+          const last = lineData[lineData.length - 1];
+          lineData.push([data.window_end * 1000, last[1], last[2], last[3]]);
+        }
       }
       const cfg = {
         // Angepasster Anzeigename (chart_editor.html, "Angezeigte Namen") hat
@@ -459,6 +490,16 @@
         data: lineData,
         lineStyle: {width: 2, color},
         itemStyle: {color},
+        // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
+        // Punkt, dieselbe Konvention wie entity_detail.html (ohne Einheit,
+        // die steht schon an der Y-Achse).
+        label: {
+          show: showValues,
+          position: 'top',
+          fontSize: scaledFont(10),
+          color: inkMuted,
+          formatter: params => fmtCompactNumber(params.value[1], params.value[3]),
+        },
         barMaxWidth: singleBucket ? undefined : 28,
         // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. u.) sitzt mit
         // seiner Mitte GENAU auf dem Bucket-Zeitstempel — beim ersten/letzten
@@ -686,9 +727,9 @@
     const visibleCols = columns.slice(0, TABLE_TILE_MAX_COLS_PER_GRID_COL * gridCols);
     const visibleRows = rows.slice(0, TABLE_TILE_MAX_ROWS_PER_GRID_ROW * gridRows);
     const base = el.closest('#dashboard-grid')?.dataset.base || '.';
-    let values;
+    let values, windowStarts;
     try {
-      values = await TableCompute.computeValues(base, columns, rows);
+      ({values, windowStarts} = await TableCompute.computeValues(base, columns, rows));
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
       return;
@@ -696,7 +737,11 @@
 
     const styleClasses = TableCompute.styleClasses(style);
     let html = `<table class="dt compact dtile-mini-table ${styleClasses}"><tr><th>&nbsp;</th>`;
-    visibleCols.forEach(c => { html += `<th>${escapeHtml(c.label)}</th>`; });
+    // Beschriftungs-Platzhalter (z. B. "{jahr}") wurden beim Speichern bewusst
+    // NICHT aufgelöst (siehe table_editor.html save()) — sonst würde eine so
+    // beschriftete Spalte hier ewig denselben, beim Speichern eingefrorenen
+    // Wert zeigen statt sich mit der Zeit automatisch zu aktualisieren.
+    visibleCols.forEach((c, ci) => { html += `<th>${escapeHtml(TableCompute.resolveLabel(c.label, windowStarts[ci]))}</th>`; });
     if (columns.length > visibleCols.length) html += '<th>…</th>';
     html += '</tr>';
     visibleRows.forEach((row, ri) => {
@@ -726,22 +771,105 @@
     return div.innerHTML;
   }
 
+  // Baut dieselbe Linie+Füllfläche-Sparkline (SVG-Pfade, gerade Segmente) wie
+  // die Statistik-Kacheln der Übersichtsseite (main.py _sparkline_paths(),
+  // entities.html .sparkline/.area/.line) — hier als JS-Gegenstück, weil die
+  // Werte-Kachel ihre Punkte client-seitig lädt statt sie beim Seitenaufbau
+  // serverseitig fertig mitzubekommen.
+  // padX 0 statt der stat-Kachel-üblichen 2 (siehe _sparkline_paths() in
+  // main.py, für dieselbe Optik dort so übernommen): die Werte-Kachel legt
+  // die Sparkline direkt unter Titel/Wert, ein seitlicher Versatz fiel dort
+  // sichtbar als "mehr Rand als beim Text" auf. padY bleibt bei 2, um den
+  // Linienstrich oben/unten nicht am Rand der Sparkline abzuschneiden — dort
+  // störte der kleine Versatz optisch nicht.
+  function sparklinePaths(values, width = 84, height = 28, padX = 0, padY = 2) {
+    if (values.length < 2) return null;
+    const lo = Math.min(...values), hi = Math.max(...values);
+    const span = (hi - lo) || 1;
+    const step = (width - 2 * padX) / (values.length - 1);
+    const points = values.map((v, i) => [
+      padX + i * step,
+      padY + (height - 2 * padY) * (1 - (v - lo) / span),
+    ]);
+    const line = 'M' + points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L');
+    const area = `${line} L${points[points.length - 1][0].toFixed(1)},${height} L${points[0][0].toFixed(1)},${height} Z`;
+    return {line, area};
+  }
+
+  // Aktueller Wert + Alter + optionale Sparkline einer Werte-Kachel — ein
+  // einziger Roh-Query-Fetch (letzte 24h) deckt alle drei ab. Bewusst NICHT
+  // auf entities.last_value/last_ts (die Datenbankspalten) verlassen: die
+  // werden nur über den echten Ingestion-Pfad gepflegt
+  // (complete_ingest_event()) — Demo-/Importdaten, die diesen Pfad umgehen,
+  // lassen last_value dauerhaft NULL, obwohl echte archivierte Werte
+  // existieren (genau der gemeldete Bug: Kachel zeigt "–" trotz sichtbarer
+  // Sparkline-Kurve). Der servergerenderte Anfangszustand (siehe
+  // _dashboard_tiles_context() in main.py) bleibt als Platzhalter stehen,
+  // falls dieser Fetch fehlschlägt oder keine Punkte liefert.
+  async function renderEntityTile(el) {
+    const base = document.getElementById('dashboard-grid')?.dataset.base || '.';
+    const entityId = el.dataset.entityId;
+    const sparklineEl = el.querySelector('.dtile-entity-sparkline');
+    let data;
+    try {
+      const res = await fetch(`${base}/api/query?entity_id=${encodeURIComponent(entityId)}&range=day&raw=true`);
+      data = await res.json();
+    } catch (e) {
+      return;
+    }
+    const points = (data.points || []).filter(p => Number.isFinite(p.value));
+    if (!points.length) return;  // kein besseres Ergebnis als der Server-Platzhalter
+
+    const last = points[points.length - 1];
+    const numberEl = el.querySelector('.dtile-entity-number');
+    const ageEl = el.querySelector('.dtile-entity-age');
+    if (numberEl) {
+      numberEl.textContent = el.dataset.isSwitch === 'true'
+        ? (last.value ? 'An' : 'Aus')
+        : NumberFormat.fmt(last.value, el.dataset.decimals === 'auto' ? null : parseInt(el.dataset.decimals, 10));
+    }
+    const secondsAgo = Date.now() / 1000 - last.ts;
+    if (ageEl) ageEl.textContent = `vor ${NumberFormat.fmtDuration(secondsAgo)}`;
+    // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
+    // is-stale in dashboard_detail.html/entities.html), der Wert bleibt immer
+    // schwarz — dieselben zwei Schwellen (15 Min./1 Std.) wie beim
+    // Server-Rendern (main.py _dashboard_tiles_context()), hier maßgeblich
+    // seit last_value/last_ts als Datenquelle unzuverlässig sind.
+    const tileEl = el.closest('.dtile');
+    if (tileEl) {
+      tileEl.classList.toggle('is-warn', secondsAgo > 900 && secondsAgo <= 3600);
+      tileEl.classList.toggle('is-stale', secondsAgo > 3600);
+    }
+
+    if (sparklineEl) {
+      const paths = sparklinePaths(points.map(p => p.value));
+      sparklineEl.innerHTML = paths
+        ? `<svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">`
+          + `<path class="area" d="${paths.area}"/><path class="line" d="${paths.line}"/></svg>`
+        : '';
+    }
+  }
+
   function setup() {
     const chartTiles = document.querySelectorAll('.dtile-body[data-entity-ids]');
     const tableTiles = document.querySelectorAll('.dtile-body[data-columns]');
-    if (!chartTiles.length && !tableTiles.length) return;
+    const entityTiles = document.querySelectorAll('.dtile-entity-body[data-entity-id]');
+    if (!chartTiles.length && !tableTiles.length && !entityTiles.length) return;
     if (observer) observer.disconnect();
     observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const el = entry.target;
-          if (el.dataset.columns != null) renderTableTile(el); else renderTile(el);
+          if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
+          else if (el.dataset.columns != null) renderTableTile(el);
+          else renderTile(el);
           observer.unobserve(el);
         }
       });
     }, {rootMargin: '150px'});
     chartTiles.forEach(el => observer.observe(el));
     tableTiles.forEach(el => observer.observe(el));
+    entityTiles.forEach(el => observer.observe(el));
     window.addEventListener('resize', () => instances.forEach(c => c.resize()));
     setupSizePickers();
     setupDragAndDrop();
@@ -752,6 +880,13 @@
     const grid = document.getElementById('dashboard-grid');
     const base = grid?.dataset.base || '.';
     const dashboardId = parseInt(grid?.dataset.dashboardId || '1', 10);
+    // Präziser Modus verdoppelt Gitter/Zeilenhöhe (siehe .dashboard-grid.is-
+    // precise) — die "ab wann passt eine Legende rein"-Schwelle muss deshalb
+    // mitwachsen, sonst würde sie in einer nur halb so großen Kachel (im
+    // feineren Gitter dieselbe Zellenzahl, aber kleinere Zellen) fälschlich
+    // als "passt" gelten. 3 statt einer exakten Verdopplung auf 4 (Konzept-
+    // Wunsch: 3×3 im Präzisen Modus soll reichen).
+    const legendThreshold = grid?.dataset.precise === 'true' ? 3 : 2;
     document.querySelectorAll('.dtile-menu').forEach(control => {
       const tile = control.closest('.dtile[data-item-id]');
       const cells = Array.from(control.querySelectorAll('.dtile-size-cell'));
@@ -760,8 +895,12 @@
       const trigger = control.querySelector('.dtile-menu-btn');
       if (!tile || !cells.length || !preview || !current || !trigger) return;
       // Nur bei Chart-Kacheln vorhanden (siehe _dashboard_tile_menu.html) —
-      // Vergleichstabellen haben keine Legende.
-      const legendRow = control.querySelector('.dtile-legend-row');
+      // Vergleichstabellen haben keine Legende. Der ganze Wrapper (Divider +
+      // Zeile) wird zusammen versteckt, siehe Kommentar im Template.
+      const legendRow = control.querySelector('.dtile-legend-wrap');
+      // Nur bei Werte-Kacheln vorhanden (siehe _dashboard_tile_menu.html).
+      const sparklineCheckbox = control.querySelector('.dtile-sparkline-checkbox');
+      const showAgeCheckbox = control.querySelector('.dtile-show-age-checkbox');
       const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
       const dtileBody = tile.querySelector('.dtile-body');
 
@@ -791,11 +930,15 @@
         cell.addEventListener('click', async () => {
           const gridCols = parseInt(cell.dataset.cols, 10);
           const gridRows = parseInt(cell.dataset.rows, 10);
+          const isEntityTile = tile.dataset.itemType === 'entity';
           try {
-            const response = await fetch(`${base}/dashboard/size`, {
+            const response = await fetch(`${base}/dashboard/${isEntityTile ? 'entity-size' : 'size'}`, {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
+              body: JSON.stringify(isEntityTile ? {
+                dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId,
+                grid_cols: gridCols, grid_rows: gridRows,
+              } : {
                 dashboard_id: dashboardId,
                 item_type: tile.dataset.itemType,
                 item_id: parseInt(tile.dataset.itemId, 10),
@@ -821,7 +964,7 @@
             // Verkleinern ausblenden (Wert bleibt gespeichert, siehe
             // set_dashboard_pin_legend()), beim Vergrößern ggf. wieder
             // einblenden, ohne neu zu laden (legendCache).
-            const fitsLegend = gridCols >= 2 && gridRows >= 2;
+            const fitsLegend = gridCols >= legendThreshold && gridRows >= legendThreshold;
             if (legendRow) legendRow.style.display = fitsLegend ? '' : 'none';
             if (dtileBody && dtileBody.dataset.showLegend !== undefined) {
               const legend = legendCache.get(tile.dataset.itemId);
@@ -868,6 +1011,132 @@
           } finally {
             legendCheckbox.disabled = false;
           }
+        });
+      }
+
+      if (sparklineCheckbox) {
+        sparklineCheckbox.addEventListener('change', async () => {
+          const showSparkline = sparklineCheckbox.checked;
+          sparklineCheckbox.disabled = true;
+          try {
+            const response = await fetch(`${base}/dashboard/sparkline`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId, show_sparkline: showSparkline,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) entityBody.dataset.showSparkline = String(showSparkline);
+            let sparklineEl = tile.querySelector('.dtile-entity-sparkline');
+            if (showSparkline) {
+              if (!sparklineEl) {
+                sparklineEl = document.createElement('div');
+                sparklineEl.className = 'dtile-entity-sparkline';
+                entityBody?.appendChild(sparklineEl);
+              }
+              if (entityBody) await renderEntityTile(entityBody);
+            } else if (sparklineEl) {
+              sparklineEl.remove();
+            }
+          } catch (e) {
+            sparklineCheckbox.checked = !showSparkline;
+          } finally {
+            sparklineCheckbox.disabled = false;
+          }
+        });
+      }
+
+      if (showAgeCheckbox) {
+        showAgeCheckbox.addEventListener('change', async () => {
+          const showAge = showAgeCheckbox.checked;
+          showAgeCheckbox.disabled = true;
+          try {
+            const response = await fetch(`${base}/dashboard/entity-show-age`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId, show_age: showAge,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) entityBody.dataset.showAge = String(showAge);
+            let ageEl = tile.querySelector('.dtile-entity-age');
+            if (showAge) {
+              if (!ageEl) {
+                ageEl = document.createElement('span');
+                ageEl.className = 'dtile-entity-age';
+                ageEl.title = 'Letzter Wert';
+                entityBody?.querySelector('.dtile-entity-value')?.appendChild(ageEl);
+              }
+              if (entityBody) await renderEntityTile(entityBody);
+            } else if (ageEl) {
+              ageEl.remove();
+            }
+          } catch (e) {
+            showAgeCheckbox.checked = !showAge;
+          } finally {
+            showAgeCheckbox.disabled = false;
+          }
+        });
+      }
+
+      // Nachkommastellen-Override (Werte-Kacheln) — dieselbe kleine
+      // Zellen-Reihe wie die Kachelgröße oben, statt eines nativen <select>:
+      // passt optisch besser in den schmalen Popover und fügt sich neben dem
+      // Größen-Picker als "noch eine Reihe kleiner Kacheln" nahtlos ein.
+      const decimalsCells = Array.from(control.querySelectorAll('.dtile-decimals-cell'));
+      const decimalsHead = control.querySelector('.dtile-decimals-picker-head strong');
+      const DECIMALS_HEAD_LABELS = {auto: 'Auto', '0': '0', '1': '1', '2': '2', '3': '3'};
+      decimalsCells.forEach(cell => {
+        cell.addEventListener('click', async () => {
+          const decimals = cell.dataset.decimals;
+          try {
+            const response = await fetch(`${base}/dashboard/entity-decimals`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId, decimals}),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            decimalsCells.forEach(option => option.classList.toggle('is-selected', option === cell));
+            if (decimalsHead) decimalsHead.textContent = DECIMALS_HEAD_LABELS[decimals] || decimals;
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) {
+              entityBody.dataset.decimals = decimals;
+              await renderEntityTile(entityBody);
+            }
+          } catch (e) {
+            trigger.title = 'Nachkommastellen konnten nicht gespeichert werden';
+          }
+        });
+      });
+
+      // Eigener Kachel-Titel (Werte-Kacheln) — speichert beim Verlassen des
+      // Felds oder Enter, nicht bei jedem Tastendruck (sonst ein Request pro
+      // Zeichen). Leeres Feld setzt auf den entity-eigenen friendly_name
+      // zurück (siehe set_dashboard_entity_pin_title() in index.py).
+      const titleInput = control.querySelector('.dtile-title-input');
+      if (titleInput) {
+        const titleEl = tile.querySelector('.dtile-title');
+        const saveTitle = async () => {
+          const title = titleInput.value.trim();
+          try {
+            const response = await fetch(`${base}/dashboard/entity-title`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId, title}),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            if (titleEl) titleEl.textContent = title || titleInput.placeholder;
+          } catch (e) {
+            trigger.title = 'Titel konnte nicht gespeichert werden';
+          }
+        };
+        titleInput.addEventListener('blur', saveTitle);
+        titleInput.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); titleInput.blur(); }
         });
       }
     });
@@ -921,6 +1190,7 @@
     const dashboardId = parseInt(grid.dataset.dashboardId || '1', 10);
     const pins = Array.from(grid.querySelectorAll('.dtile[data-item-id]')).map(el => ({
       item_type: el.dataset.itemType, item_id: parseInt(el.dataset.itemId, 10),
+      item_entity_id: el.dataset.itemEntityId || null,
     }));
     try {
       await fetch(`${base}/dashboard/reorder`, {

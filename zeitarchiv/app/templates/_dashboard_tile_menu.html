@@ -1,14 +1,97 @@
-<div class="dtile-menu" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}">
+{% set size_max = 6 if dashboard_precise else 3 %}
+{% set legend_threshold = 3 if dashboard_precise else 2 %}
+<div class="dtile-menu{{ ' is-precise' if dashboard_precise else '' }}" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}">
   <button type="button" class="dtile-menu-btn" draggable="false"
           @pointerdown.stop @click.prevent.stop="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen.toString()" aria-haspopup="menu"
+          :aria-expanded="menuOpen.toString()" aria-haspopup="{{ 'dialog' if tile.kind == 'entity' else 'menu' }}"
           aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
+  {% if tile.kind == 'entity' %}
+  <!-- Werte-Kacheln bekommen ein eigenes, größeres Einstellungs-Popup statt
+       der kleinen Popover-Liste von Chart/Tabelle-Kacheln — deutlich mehr
+       Optionen (Größe, Sparkline, Alter, Nachkommastellen, Titel) als bei den
+       anderen beiden Kachel-Arten, ein schmales Dropdown wirkte hier gedrängt.
+       position:fixed statt der relativen Popover-Positionierung, damit das
+       Popup unabhängig von der (ggf. sehr kleinen) Kachel selbst mittig im
+       Sichtfenster erscheint. Bleibt bewusst offen, bis "Fertig"/X/Klick auf
+       den Hintergrund kommt (kein Auto-Schließen je Einstellung wie beim
+       kleinen Menü) — mehrere Einstellungen sollen sich in einem Aufruf
+       ändern lassen. -->
+  <div class="dtile-settings-overlay" x-show="menuOpen" x-cloak role="dialog" aria-modal="true" aria-label="Kachel-Einstellungen"
+       @pointerdown.stop @click.self="menuOpen = false" @keydown.escape.window="menuOpen = false">
+    <div class="dtile-settings-modal">
+      <div class="dtile-settings-header">
+        <p class="dtile-settings-title">{{ tile.name }}</p>
+        <button type="button" class="dtile-settings-close" @click="menuOpen = false" aria-label="Schließen">✕</button>
+      </div>
+      <div class="dtile-settings-body">
+
+        <div class="dtile-settings-section">
+          <div class="dtile-size-picker-head">Kachelgröße <strong>{{ tile.grid_cols }}×{{ tile.grid_rows }}</strong></div>
+          <div class="dtile-size-grid" role="grid" aria-label="Kachelgröße bis {{ size_max }} mal {{ size_max }} auswählen">
+            {% for row in range(1, size_max + 1) %}
+            {% for col in range(1, size_max + 1) %}
+            <button type="button"
+                    class="dtile-size-cell{% if col <= tile.grid_cols and row <= tile.grid_rows %} is-selected{% endif %}"
+                    role="gridcell" draggable="false" data-cols="{{ col }}" data-rows="{{ row }}"
+                    aria-label="{{ col }} mal {{ row }}" title="{{ col }}×{{ row }}"></button>
+            {% endfor %}
+            {% endfor %}
+          </div>
+          <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
+        </div>
+
+        <div class="dtile-settings-section">
+          <label class="menu-row dtile-sparkline-row">
+            <span class="menu-row-label">Sparkline</span>
+            <span class="menu-toggle">
+              <input type="checkbox" class="dtile-sparkline-checkbox" {% if tile.show_sparkline %}checked{% endif %}>
+              <span class="track"><span class="thumb"></span></span>
+            </span>
+          </label>
+          <label class="menu-row dtile-show-age-row">
+            <span class="menu-row-label">Alter</span>
+            <span class="menu-toggle">
+              <input type="checkbox" class="dtile-show-age-checkbox" {% if tile.show_age %}checked{% endif %}>
+              <span class="track"><span class="thumb"></span></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="dtile-settings-section">
+          <div class="dtile-decimals-picker-head">Nachkommastellen <strong>{{ {'auto': 'Auto', '0': '0', '1': '1', '2': '2', '3': '3'}[tile.decimals] }}</strong></div>
+          <div class="dtile-decimals-row" role="group" aria-label="Nachkommastellen wählen">
+            {% for value, label in [('auto', 'Auto'), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
+            <button type="button" class="dtile-decimals-cell{% if tile.decimals == value %} is-selected{% endif %}"
+                    data-decimals="{{ value }}"
+                    title="{{ 'Automatisch' if value == 'auto' else (value ~ ' Nachkommastelle' ~ ('n' if value != '1' else '')) }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="dtile-settings-section">
+          <div class="dtile-title-field">
+            <span class="menu-row-label">Titel</span>
+            <input type="text" class="dtile-title-input" value="{{ tile.custom_title }}" placeholder="{{ tile.name }}">
+          </div>
+        </div>
+
+      </div>
+      <div class="dtile-settings-footer">
+        <button type="button" class="btn danger btn-sm" draggable="false"
+                hx-post="{{ href_base }}dashboard/unpin-entity/{{ tile.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                hx-target="#dashboard-grid" hx-swap="outerHTML"
+                hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?">Vom Dashboard entfernen</button>
+        <button type="button" class="btn btn-sm" @click="menuOpen = false">Fertig</button>
+      </div>
+    </div>
+  </div>
+  {% else %}
   <div class="dtile-menu-popover" x-show="menuOpen" x-cloak role="menu"
        @pointerdown.stop @click.outside="menuOpen = false">
     <div class="dtile-size-picker-head">Kachelgröße <strong>{{ tile.grid_cols }}×{{ tile.grid_rows }}</strong></div>
-    <div class="dtile-size-grid" role="grid" aria-label="Kachelgröße bis 3 mal 3 auswählen">
-      {% for row in range(1, 4) %}
-      {% for col in range(1, 4) %}
+    <div class="dtile-size-grid" role="grid" aria-label="Kachelgröße bis {{ size_max }} mal {{ size_max }} auswählen">
+      {% for row in range(1, size_max + 1) %}
+      {% for col in range(1, size_max + 1) %}
       <button type="button"
               class="dtile-size-cell{% if col <= tile.grid_cols and row <= tile.grid_rows %} is-selected{% endif %}"
               role="gridcell" draggable="false" data-cols="{{ col }}" data-rows="{{ row }}"
@@ -19,18 +102,23 @@
     </div>
     <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
     {% if tile.kind == 'chart' %}
-    <div class="dtile-menu-divider"></div>
-    <!-- Nur ab 2×2 sinnvoll darstellbar (siehe dashboard-tiles.js) — bei
-         kleineren Kacheln versteckt statt entfernt, der Wert bleibt beim
-         Verkleinern erhalten (setupSizePickers() blendet diese Zeile beim
-         Größenwechsel dynamisch ein/aus). -->
-    <label class="menu-row dtile-legend-row" style="{{ '' if tile.grid_cols >= 2 and tile.grid_rows >= 2 else 'display:none;' }}">
-      <span class="menu-row-label">Legende anzeigen</span>
-      <span class="menu-toggle">
-        <input type="checkbox" class="dtile-legend-checkbox" {% if tile.show_legend %}checked{% endif %}>
-        <span class="track"><span class="thumb"></span></span>
-      </span>
-    </label>
+    <!-- Divider UND Zeile stecken zusammen in einem Wrapper, der als Ganzes
+         versteckt wird (statt nur die Zeile selbst) — sonst bliebe der
+         Divider sichtbar, während die Zeile kollabiert, sichtbar als zwei
+         Trennlinien ohne Inhalt dazwischen. dashboard-tiles.js blendet
+         diesen Wrapper beim Größenwechsel dynamisch ein/aus (siehe
+         setupSizePickers()), der Wert selbst bleibt beim Verkleinern unter
+         die Schwelle erhalten. -->
+    <div class="dtile-legend-wrap" style="{{ '' if tile.grid_cols >= legend_threshold and tile.grid_rows >= legend_threshold else 'display:none;' }}">
+      <div class="dtile-menu-divider"></div>
+      <label class="menu-row dtile-legend-row">
+        <span class="menu-row-label">Legende anzeigen</span>
+        <span class="menu-toggle">
+          <input type="checkbox" class="dtile-legend-checkbox" {% if tile.show_legend %}checked{% endif %}>
+          <span class="track"><span class="thumb"></span></span>
+        </span>
+      </label>
+    </div>
     {% endif %}
     <div class="dtile-menu-divider"></div>
     <button type="button" class="dtile-menu-remove" role="menuitem" draggable="false"
@@ -39,4 +127,5 @@
             hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?"
             @click="menuOpen = false">Vom Dashboard entfernen</button>
   </div>
+  {% endif %}
 </div>

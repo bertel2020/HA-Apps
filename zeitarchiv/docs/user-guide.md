@@ -68,24 +68,43 @@ bestücken, umsortieren und fixieren (siehe unten).
 
 - **Dashboards**-Menüpunkt (Hauptnavigation) klappt eine Liste aller
   vorhandenen Dashboards auf. Von dort: neues Dashboard anlegen, ein
-  bestehendes öffnen, umbenennen oder löschen. Es gibt keine Obergrenze für
-  die Anzahl der Dashboards.
-- Jedes Dashboard zeigt bis zu 18 Kacheln (Charts und Vergleichstabellen
-  gemischt) in frei wählbarer Größe (1×1 bis 3×3). Per Drag-and-drop
-  anordnen; über das Kachelmenü (⋮) Größe ändern oder entfernen. Das
+  bestehendes öffnen, umbenennen, favorisieren, duplizieren, als
+  **Standard-Dashboard** festlegen (dieses erscheint dann auf der
+  Übersichtsseite und steht in Listen immer an erster Stelle) oder löschen.
+  Es gibt keine Obergrenze für die Anzahl der Dashboards.
+- Jedes Dashboard zeigt bis zu 18 Kacheln — Charts, Vergleichstabellen und
+  **Werte-Kacheln** gemischt — in frei wählbarer Größe (1×1 bis 3×3, im
+  Präzisen Modus bis 6×6). Per Drag-and-drop anordnen; über das Kachelmenü
+  (⋮) Größe ändern, duplizieren (Charts/Tabellen) oder entfernen. Das
   Entfernen einer Kachel löscht nur die Platzierung, nicht das zugrunde
   liegende Chart oder die Tabelle.
-- **Kachel hinzufügen:** die "+"-Kachel öffnet ein Menü mit direktem Link
-  "**+ Neuer Chart**"/"**+ Neue Tabelle**" (führt sofort in den jeweiligen
-  Editor, das Ergebnis landet nach dem Speichern automatisch auf diesem
-  Dashboard) sowie einer Liste bereits gespeicherter, noch nicht
-  angehefteter Charts/Tabellen zum Anklicken. Ein Chart oder eine Tabelle
-  kann gleichzeitig auf mehreren Dashboards angeheftet sein.
-- Chart-Kacheln ab Größe 2×2 können über das Kachelmenü (⋮) eine Legende
-  einblenden ("Legende anzeigen") — Aussehen und Inhalt entsprechen dabei
-  exakt der Legende des zugrundeliegenden Charts; ein Klick auf die
-  Legende blendet die jeweilige Reihe ein/aus, ohne zum Chart zu
-  navigieren.
+- **Werte-Kachel:** pinnt den aktuellen Wert einer einzelnen Entität direkt
+  aufs Dashboard, ohne dafür ein Chart anzulegen — mit optionaler
+  Sparkline, optionaler Altersanzeige des letzten Werts und einem eigenen
+  Nachkommastellen- und Titel-Override. Ist der letzte Wert älter als 15
+  Minuten bzw. eine Stunde, hebt sich der Kartenrahmen gelb bzw. rot
+  hervor. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
+  größeren Einstellungs-Popup (⋮), da hier deutlich mehr Optionen als bei
+  Chart-/Tabellen-Kacheln zusammenkommen.
+- **Kachel hinzufügen:** die "+"-Kachel öffnet ein Popup mit Registerkarten
+  für Charts, Tabellen und Werte-Kacheln, jeweils mit Suchfeld. Charts und
+  Tabellen lassen sich direkt aus der Liste anheften oder über "+ Neuer
+  Chart"/"+ Neue Tabelle" neu anlegen (landet nach dem Speichern
+  automatisch auf diesem Dashboard); Werte-Kacheln werden über die
+  Entitäten-Suche ausgewählt. Ein Chart oder eine Tabelle kann gleichzeitig
+  auf mehreren Dashboards angeheftet sein.
+- Chart-Kacheln ab Größe 2×2 (im Präzisen Modus ab 3×3) können über das
+  Kachelmenü (⋮) eine Legende einblenden ("Legende anzeigen") — Aussehen
+  und Inhalt entsprechen dabei exakt der Legende des zugrundeliegenden
+  Charts, inklusive dessen "Werte anzeigen"- und Nachkommastellen-
+  Einstellung; ein Klick auf die Legende blendet die jeweilige Reihe
+  ein/aus, ohne zum Chart zu navigieren.
+- **Präziser Modus** (Dashboard-Editor): verdoppelt das Kachelraster von 3
+  auf 6 Spalten bei halber Zeilenhöhe — bestehende Kacheln behalten dabei
+  ihre optische Größe, weil ihre Größenangabe automatisch mitverdoppelt
+  wird. **Lücken auffüllen** lässt spätere, kleinere Kacheln freie Lücken
+  im Raster füllen statt strikt der Anheft-Reihenfolge zu folgen. Beide
+  Schalter sind unabhängig voneinander kombinierbar.
 - **Dashboard fixieren** (Editor, Schalter "Fixiert"): sperrt Umsortieren,
   Größenändern und Entfernen von Kacheln auf der Ansicht selbst — schützt
   vor versehentlichem Verschieben auf einem z. B. dauerhaft angezeigten
@@ -133,6 +152,8 @@ Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
   aber auch überzeichnen.
 - **Werte anzeigen** blendet die Zahlenwerte direkt neben den Datenpunkten
   ein.
+- **Nachkommastellen** übersteuert für diese Ansicht die globale Anzeige-
+  Einstellung der Entität (Automatisch oder fest 0–3).
 
 ### Vergleich
 
@@ -453,9 +474,12 @@ eines bestehenden:
   zu vergleichen. Vergleichen, Kontinuierlich und Dynamische Y-Achse sind
   bei dieser Auflösung deaktiviert, da sie für einen einzelnen
   Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
-- Punkte an/aus, Rohwerte, dynamische Y-Achse, Legenden-Statistik — dieselben
-  Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
-  Chart konfiguriert statt je Entität.
+- Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,
+  Nachkommastellen, Legenden-Statistik — dieselben Optionen wie in der
+  Verlaufsansicht einer einzelnen Entität, hier aber je Chart konfiguriert
+  statt je Entität; Nachkommastellen gilt dabei einheitlich für alle
+  Entitäten des Charts. Alle Einstellungen werden mit dem Chart gespeichert
+  und gelten dann auch für dessen Vorschau auf Dashboards.
 - Bei ausschließlich Schalter-Entitäten (`switch`, `binary_sensor` u. Ä.)
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
@@ -477,7 +501,12 @@ Eigener Editor, erreichbar über **Tabellen** → neue Tabelle:
   "2026"), jeweils mit einem Zeitraum-Typ (Tag, Woche, Monat, Jahr …) und
   einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger, usw.). So
   lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende Jahre in
-  zwölf Spalten nebeneinanderstellen.
+  zwölf Spalten nebeneinanderstellen. Die Beschriftung kann Platzhalter
+  wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten, die sich
+  automatisch auf den jeweiligen Zeitraum der Spalte auflösen (Einfüge-
+  Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des aufgelösten
+  Werts). **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch
+  auf denselben Zeitraum ein Jahr zuvor (schaltjahrsicher).
 
 ### Aggregation und Formatierung
 

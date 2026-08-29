@@ -215,6 +215,16 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
+            <div class="menu-row">
+              <span class="menu-row-label">Nachkommastellen</span>
+              <div class="seg">
+                <button :class="{active: decimals === 'auto'}" @click="setDecimals('auto')">Auto</button>
+                <button :class="{active: decimals === '0'}" @click="setDecimals('0')">0</button>
+                <button :class="{active: decimals === '1'}" @click="setDecimals('1')">1</button>
+                <button :class="{active: decimals === '2'}" @click="setDecimals('2')">2</button>
+                <button :class="{active: decimals === '3'}" @click="setDecimals('3')">3</button>
+              </div>
+            </div>
             <label class="menu-row">
               <span class="menu-row-label">Dynamische Y-Achse</span>
               <span class="menu-toggle">
@@ -340,9 +350,13 @@
     const DISPLAY_NAME = {{ (friendly_name or entity_id) | tojson }};
     const BASE = {{ base | tojson }};
     const UNIT = {{ (unit or '') | tojson }};
-    // null = "Automatisch" (Konzept Abschnitt 03) — sonst feste Anzahl Nachkommastellen,
-    // pro Entität im Konfigurationsbereich einstellbar.
-    const DECIMALS = {{ decimals | tojson }};
+    // null = "Automatisch" (Konzept Abschnitt 03) — sonst feste Anzahl Nachkommastellen.
+    // Ausgangswert ist bereits der effektive Stand (main.py, entity_detail()):
+    // Konfigurationsbereich-Default ODER, sofern gesetzt, die Optionen-Menü-
+    // Übersteuerung dieser Chart-Ansicht (CHART_OPTIONS.decimals) — "let" statt
+    // "const", weil setDecimals() unten diesen Wert bei jeder Änderung im Menü
+    // sofort aktualisiert, ohne die Seite neu zu laden.
+    let DECIMALS = {{ decimals | tojson }};
     // Effektiver Options-Stand dieser Entität — globale Defaults, von einer
     // etwaigen eigenen Übersteuerung übersteuert (main.py,
     // _resolve_entity_chart_options()). Jede Änderung im Optionen-Menü
@@ -382,6 +396,15 @@
     function fmtValue(v) {
       if (DURATION_DISPLAY) return NumberFormat.fmtDuration(v);
       return NumberFormat.fmt(v, DECIMALS);
+    }
+
+    // Wandelt den gespeicherten decimals-String ("auto" oder eine Ziffer) in den
+    // Parameter für NumberFormat.fmt() um — dieselbe Konvention wie
+    // formatting.decimals_to_int() auf dem Server.
+    function decimalsStringToInt(value) {
+      if (value == null || value === 'auto') return null;
+      const n = parseInt(value, 10);
+      return Number.isNaN(n) ? null : n;
     }
 
     // Gesamt-Einschaltdauer aus rohen AN/AUS-Zeitstempeln — dieselbe Paar-
@@ -532,6 +555,7 @@
         chartStats: CHART_OPTIONS.chart_stats,
         legendMetrics: [...CHART_OPTIONS.legend_metrics],
         legendStyle: CHART_OPTIONS.legend_style,
+        decimals: CHART_OPTIONS.decimals,
         compare: false,
         compareMode: 'previous',
         optionsMenuOpen: false,
@@ -665,6 +689,7 @@
                 show_points: this.showPoints, show_values: this.showValues,
                 dynamic_y_axis: this.dynamicYAxis, chart_stats: this.chartStats,
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
+                decimals: this.decimals,
               }),
             });
           } catch (e) {
@@ -698,8 +723,19 @@
             this.dynamicYAxis !== CHART_DEFAULTS.dynamic_y_axis ||
             this.chartStats !== CHART_DEFAULTS.chart_stats ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
+            this.decimals !== CHART_DEFAULTS.decimals ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
           );
+        },
+        // Nachkommastellen-Wahl (Optionen-Menü, Darstellung) — aktualisiert
+        // DECIMALS (von fmtValue() gelesen) sofort mit, ein Neuladen reicht
+        // sonst nicht: der Chart selbst braucht dafür kein neues /api/query
+        // (nur die Formatierung ändert sich), deshalb render() statt load().
+        setDecimals(value) {
+          this.decimals = value;
+          DECIMALS = decimalsStringToInt(value);
+          this.render();
+          this.saveChartOptions();
         },
         toggleContinuous() { this._rangeAnchorMs = null; this.continuous = !this.continuous; this.load(); this.saveChartOptions(); },
         setCompareMode(mode) {

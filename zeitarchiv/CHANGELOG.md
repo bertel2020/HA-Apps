@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.62.0 - 2026-08-29
+
+### Neu
+
+- Werte-Kachel: pinnt den aktuellen Wert einer Entität direkt aufs
+  Dashboard (mit Sparkline, Altersanzeige und eigenem Nachkommastellen-/
+  Titel-Override), inklusive eines größeren Einstellungs-Popups dafür.
+- Dashboards: Favoriten, Duplizieren, wählbares Standard-Dashboard,
+  Präziser Modus (6 statt 3 Spalten) und "Lücken auffüllen".
+- Charts und Tabellen lassen sich jetzt duplizieren; "Kachel hinzufügen"
+  zeigt Charts/Tabellen/Werte-Kacheln übersichtlich in Registerkarten
+  statt einer langen Liste.
+- Nachkommastellen-Override jetzt auch im Chart-Editor und in der
+  Entität-eigenen Verlaufsansicht einstellbar.
+- Vergleichstabellen: Platzhalter-Variablen (Jahr, Monat, Quartal, Woche …)
+  für Spaltenbeschriftungen mit Einfüge-Hilfe, sowie ein schaltjahrsicherer
+  Vorjahresvergleich für Spalten.
+
+### Fehlerbehebung
+
+- Dashboard-Kacheln eines Charts übernahmen "Werte anzeigen" und die
+  Nachkommastellen-Einstellung bislang nicht vom gespeicherten Chart.
+- Diverse kleinere Layout- und Bedienungskorrekturen an Dashboard-Kacheln
+  und deren Menüs.
+
 ## 0.61.0 - 2026-08-29
 
 ### Neu

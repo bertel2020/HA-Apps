@@ -10,9 +10,9 @@
 <style>
   .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:20px;}
   .chart-card{display:flex;flex-direction:column;gap:8px;position:relative;}
-  .chart-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:22px;}
+  .chart-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:60px;}
   .chart-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .chart-card .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px;}
+  .chart-card .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:auto;padding-top:10px;}
   .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:150px;border-style:dashed;text-decoration:none;}
   .chart-grid-add-btn{
     display:flex;align-items:center;justify-content:center;
@@ -20,12 +20,38 @@
     color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));line-height:1;
   }
   .chart-grid-add:hover .chart-grid-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  /* Favorit links, Kachelmenü rechts davon — beide in einer gemeinsamen,
+     oben rechts positionierten Reihe statt je einzeln absolut positioniert,
+     damit sie sich nicht überlappen können. */
+  .card-top-actions{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:2px;z-index:2;}
   .fav-star{
-    position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;
+    background:none;border:none;cursor:pointer;
     font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
   }
   .fav-star.active{color:#D9A22B;opacity:1;}
   .fav-star:hover{color:#D9A22B;opacity:1;}
+  /* Kachelmenü — dieselbe Optik/Struktur wie das "⋮"-Menü auf Dashboard-
+     Kacheln (siehe .dtile-menu* in dashboard_detail.html/entities.html),
+     hier unter eigenem Klassennamen, weil diese Karten (Tabellen-/Chart-
+     Übersicht) kein Drag&Drop/keine Kachelgröße kennen — nur zwei Einträge. */
+  .card-menu{position:relative;}
+  .card-menu-btn{
+    width:24px;height:24px;padding:0;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);color:var(--ink-faint);font-size:calc(17px * var(--font-scale, 1));line-height:1;cursor:pointer;
+  }
+  .card-menu-btn:hover,.card-menu.is-open .card-menu-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  .card-menu-popover{
+    position:absolute;top:30px;right:0;width:150px;padding:6px;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);cursor:default;z-index:5;
+  }
+  .card-menu-item{
+    display:block;width:100%;padding:7px 8px;border:0;border-radius:6px;background:transparent;
+    color:var(--ink);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));text-align:left;cursor:pointer;
+  }
+  .card-menu-item:hover{background:var(--surface-alt);}
+  .card-menu-item-danger{color:var(--danger);}
+  .card-menu-item-danger:hover{background:var(--danger-soft);}
+  .card-menu-divider{height:1px;background:var(--border);margin:6px -2px;}
 </style>
 </head>
 <body>
@@ -38,14 +64,25 @@
         <div class="chart-grid">
           {% for row in rows %}
           <div class="card chart-card">
-            <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
-                    title="Favorit" onclick="toggleFavorite('tables/{{ row.id }}/favorite', this)">★</button>
+            <div class="card-top-actions">
+              <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
+                      title="Favorit" onclick="toggleFavorite('tables/{{ row.id }}/favorite', this)">★</button>
+              <div class="card-menu" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}">
+                <button type="button" class="card-menu-btn" @click.stop="menuOpen = !menuOpen"
+                        :aria-expanded="menuOpen.toString()" aria-haspopup="menu"
+                        aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
+                <div class="card-menu-popover" x-show="menuOpen" x-cloak role="menu" @click.outside="menuOpen = false">
+                  <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateTable({{ row.id }})">Duplizieren</button>
+                  <div class="card-menu-divider"></div>
+                  <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteTable({{ row.id }}, $el)">Löschen</button>
+                </div>
+              </div>
+            </div>
             <h3><a href="tables/{{ row.id }}">{{ row.name }}</a></h3>
             <div class="meta">{{ row.row_count }} Zeile{{ 'n' if row.row_count != 1 else '' }} &middot; {{ row.column_count }} Spalte{{ 'n' if row.column_count != 1 else '' }}</div>
             <div class="actions">
               <a class="btn" href="tables/{{ row.id }}">Ansehen</a>
               <a class="btn" href="tables/{{ row.id }}?edit=1">Bearbeiten</a>
-              <button type="button" class="btn btn-danger" onclick="deleteTable({{ row.id }}, this)">Löschen</button>
             </div>
           </div>
           {% endfor %}
@@ -74,6 +111,22 @@
           alert('Löschen fehlgeschlagen.');
         }
       }).catch(() => { btn.disabled = false; alert('Löschen fehlgeschlagen.'); });
+    }
+
+    // Kopie bleibt auf der Liste sichtbar (kein Sprung in den Editor) — ein
+    // Reload reicht, dieselbe Konvention wie beim Favoriten-Umschalten oben,
+    // damit Zeilen-/Spaltenzahl und Sortierung der neuen Karte korrekt sind.
+    async function duplicateTable(id) {
+      try {
+        const res = await fetch(`tables/${id}/duplicate`, {method: 'POST'});
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          alert('Duplizieren fehlgeschlagen.');
+        }
+      } catch (e) {
+        alert('Duplizieren fehlgeschlagen.');
+      }
     }
   </script>
 </body>

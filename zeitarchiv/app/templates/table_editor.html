@@ -71,6 +71,24 @@
   }
   .tbl-col-add:hover{color:var(--accent-line);border-color:var(--accent-line);}
 
+  /* Beschriftungsfeld mit eingelassenem Variablen-Button (Platzhalter wie
+     "{jahr}") — Button sitzt IM Feld statt daneben, damit die schmale
+     Spaltenkarte (190px) nicht noch ein zusätzliches Element pro Zeile
+     bekommt. padding-right auf dem Input reserviert den Platz. */
+  .tbl-label-wrap{position:relative;display:block;}
+  .tbl-label-wrap input[type=text]{padding-right:24px;}
+  .tbl-label-var-btn{
+    position:absolute;right:2px;top:50%;transform:translateY(-50%);
+    width:20px;height:20px;padding:0;border:none;background:none;
+    color:var(--ink-faint);cursor:pointer;
+    font-size:calc(14px * var(--font-scale, 1));font-weight:600;line-height:1;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;letter-spacing:-1px;
+  }
+  .tbl-label-var-btn:hover{color:var(--accent-line);background:var(--surface-alt);}
+  .tbl-var-popover{width:210px;}
+  .tbl-var-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .tbl-var-example{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+
   /* Zeilen (Größen) — vertikale Liste, ein Kärtchen je Zeile. */
   .tbl-rows{display:flex;flex-direction:column;gap:8px;}
   .tbl-row-card{
@@ -307,7 +325,25 @@
                     <button type="button" class="tbl-col-remove" title="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
                   </div>
                   <span class="tbl-field-label">Beschriftung</span>
-                  <input type="text" :placeholder="suggestColumnLabel(col)" x-model="col.label">
+                  <!-- position:fixed aus demselben Grund wie die beiden
+                       Picker unten (.tbl-columns scrollt horizontal). Der
+                       Button sitzt im Feld selbst (padding-right auf dem
+                       Input reserviert den Platz), nicht daneben — siehe
+                       .tbl-label-wrap oben im CSS. -->
+                  <span class="tbl-label-wrap" x-data="{ open: false, top: 0, left: 0 }" @click.outside="open = false">
+                    <input type="text" x-ref="input" :placeholder="suggestColumnLabel(col)" x-model="col.label">
+                    <button type="button" class="tbl-label-var-btn" title="Variable einfügen" aria-label="Variable einfügen"
+                            @click="open = !open; if (open) { const r = $el.getBoundingClientRect(); top = r.bottom + 6; left = r.left; }">{}</button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine tbl-var-popover" x-show="open" x-cloak
+                         :style="`position:fixed;top:${top}px;left:${left}px;`">
+                      <template x-for="[token, varLabel] in LABEL_VARIABLES" :key="token">
+                        <div class="dd-picker-row tbl-var-row" @click="insertColumnVariable(col, token, $refs.input); open = false">
+                          <span x-text="varLabel"></span>
+                          <span class="tbl-var-example" x-text="TableCompute.resolveLabel('{' + token + '}', windowStarts[col.uid])"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </span>
                   <span class="tbl-field-label">Zeitraum-Typ</span>
                   <!-- x-data lokal statt col.xxx: .tbl-columns scrollt horizontal
                        (overflow-x:auto), was rechnerisch auch overflow-y:auto
@@ -330,6 +366,9 @@
                   </span>
                   <span class="tbl-field-label" x-text="`Versatz (${versatzUnit(col)})`"></span>
                   <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
+                  <label class="cbx">
+                    <input type="checkbox" x-model="col.year_over_year" @change="load()"> Vorjahresvergleich
+                  </label>
                   <span class="tbl-field-label">Nachkommastellen</span>
                   <!-- position:fixed aus demselben Grund wie beim Zeitraum-Typ-
                        Picker oben (.tbl-columns scrollt horizontal, ein normal
@@ -516,7 +555,7 @@
             <table class="dt compact" :class="TableCompute.styleClasses(style)" x-ref="previewTable">
               <tr>
                 <th class="tbl-label-col">&nbsp;</th>
-                <template x-for="col in columns" :key="col.uid"><th x-text="col.label.trim() || suggestColumnLabel(col)"></th></template>
+                <template x-for="col in columns" :key="col.uid"><th x-text="renderedColumnLabel(col)"></th></template>
               </tr>
               <template x-for="(row, idx) in rows" :key="row.uid">
                 <tr :data-row-uid="row.uid" :class="{'tbl-bold': row.bold && row.row_type !== 'separator', 'tbl-separator-row': row.row_type === 'separator'}">
@@ -584,13 +623,50 @@
     // selbst, das bleibt dadurch ein normales, unverändertes Zahlenfeld
     // (Spinner-Pfeile bleiben rechtsbündig wie bei jedem anderen Zahlenfeld).
     const UNIT_PLURAL_SIMPLE = {hour: 'Stunden', day: 'Tage', week: 'Wochen', month: 'Monate', year: 'Jahre', decade: 'Dekaden'};
+    // Dieselbe Wortwahl wie previousYearPeriodLabel() in entity_detail.html
+    // (Chart-Vorjahresvergleich) — hier als Vorschlag statt Umschalt-Label,
+    // damit "Tag, Versatz 0, Vorjahresvergleich" ohne eigene Beschriftung
+    // "Vorjahrestag" statt nur "Tag" vorschlägt.
+    const YEAR_OVER_YEAR_LABELS = {hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche', month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade'};
+    // Einfügehilfe für Beschriftungs-Platzhalter (siehe TableCompute.resolveLabel) —
+    // Token + Anzeigename kommen aus table-compute.js, damit Editor und die
+    // Ersetzungs-Logik nie auseinanderlaufen können.
+    const LABEL_VARIABLES = TableCompute.LABEL_VARIABLES;
 
     function suggestColumnLabel(col) {
       const offset = col.offset || 0;
+      if (col.year_over_year) {
+        if (offset === 0) return YEAR_OVER_YEAR_LABELS[col.range_key] || 'Vorjahreszeitraum';
+        if (offset === -1) return `${PREVIOUS_LABELS[col.range_key] || 'Vorperiode'} (Vorjahr)`;
+        const unit = PLURAL_UNITS[col.range_key] || 'Perioden';
+        const base = offset < 0 ? `Vor ${Math.abs(offset)} ${unit}` : `In ${offset} ${unit}`;
+        return `${base} (Vorjahr)`;
+      }
       if (offset === 0) return RANGE_LABELS[col.range_key] || 'Zeitraum';
       if (offset === -1) return PREVIOUS_LABELS[col.range_key] || 'Vorperiode';
       const unit = PLURAL_UNITS[col.range_key] || 'Perioden';
       return offset < 0 ? `Vor ${Math.abs(offset)} ${unit}` : `In ${offset} ${unit}`;
+    }
+
+    // Fügt einen Beschriftungs-Platzhalter ("{jahr}" etc.) an der aktuellen
+    // Cursor-Position im Beschriftungsfeld ein, statt ihn einfach anzuhängen —
+    // das Feld bleibt dadurch frei weiter editierbar (z. B. "Ist {jahr}" durch
+    // Klick zwischen "Ist " und dem Cursor). inputEl kommt als $refs.input aus
+    // dem lokalen x-data-Scope der Spaltenkarte (siehe Markup), nicht aus
+    // Alpines flachem $refs-Register, das innerhalb von x-for sonst nur den
+    // zuletzt gerenderten Treffer behielte.
+    function insertColumnVariable(col, token, inputEl) {
+      const text = col.label || '';
+      const start = inputEl ? (inputEl.selectionStart ?? text.length) : text.length;
+      const end = inputEl ? (inputEl.selectionEnd ?? text.length) : text.length;
+      const insertText = `{${token}}`;
+      col.label = text.slice(0, start) + insertText + text.slice(end);
+      if (!inputEl) return;
+      const pos = start + insertText.length;
+      Alpine.nextTick(() => {
+        inputEl.focus();
+        inputEl.setSelectionRange(pos, pos);
+      });
     }
 
     function versatzUnit(col) {
@@ -776,10 +852,11 @@
         // ?edit=1 hierher, um direkt im Bearbeiten-Modus zu starten statt
         // erst über "Anpassen" umschalten zu müssen.
         editing: !TABLE_ID || new URLSearchParams(location.search).has('edit'),
-        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
+        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
         rows: INITIAL_ROWS.map(r => ({formula_unit: '', aggregation: 'auto', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, search: ''})),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
+        windowStarts: {},  // col.uid -> tatsächlich aufgelöster Fensterbeginn (Sekunden) | null
         loading: false,
         saving: false,
         savedMessage: '',
@@ -885,6 +962,14 @@
 
         suggestRowLabel(row) { return suggestRowLabel(row); },
         suggestColumnLabel(col) { return suggestColumnLabel(col); },
+        // Tatsächlich angezeigter Spaltenname: eigene Beschriftung (mit
+        // aufgelösten Platzhaltern) oder sonst der Vorschlag — dasselbe
+        // Fallback-Prinzip wie resolvedRowLabel() unten.
+        renderedColumnLabel(col) {
+          const raw = col.label.trim();
+          if (!raw) return suggestColumnLabel(col);
+          return TableCompute.resolveLabel(raw, this.windowStarts[col.uid]);
+        },
         suggestFormulaUnit(row) {
           for (const col of this.columns) {
             const cell = this.values[col.uid] && this.values[col.uid][row.uid];
@@ -893,6 +978,7 @@
           return '';
         },
         versatzUnit(col) { return versatzUnit(col); },
+        insertColumnVariable(col, token, inputEl) { insertColumnVariable(col, token, inputEl); },
         clampOffset(col) { if (col.offset > 0) col.offset = 0; },
         // Tatsächlich angezeigter/gespeicherter Name — eigene Beschriftung,
         // sonst der Vorschlag (friendly_name der Entität), sonst zuletzt
@@ -919,7 +1005,7 @@
         // hier nur die Umwandlung dorthin und die Ergebnisse zurück in
         // this.values[col.uid][row.uid].
         async load() {
-          if (!this.columns.length || !this.rows.length) { this.values = {}; return; }
+          if (!this.columns.length || !this.rows.length) { this.values = {}; this.windowStarts = {}; return; }
           const requestId = ++this._loadSeq;
           this.loading = true;
           const plainColumns = this.columns.map(c => ({range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year}));
@@ -927,14 +1013,17 @@
             row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
             formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
           }));
-          const computed = await TableCompute.computeValues(BASE, plainColumns, plainRows);
+          const {values: computed, windowStarts} = await TableCompute.computeValues(BASE, plainColumns, plainRows);
           if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
           const newValues = {};
+          const newWindowStarts = {};
           this.columns.forEach((col, ci) => {
             newValues[col.uid] = {};
             this.rows.forEach((row, ri) => { newValues[col.uid][row.uid] = computed[ci][ri]; });
+            newWindowStarts[col.uid] = windowStarts[ci];
           });
           this.values = newValues;
+          this.windowStarts = newWindowStarts;
           this.loading = false;
         },
 
