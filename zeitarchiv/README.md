@@ -143,8 +143,11 @@ die Zeit, aufgeschlüsselt nach Typ, Auflösung und Aufbewahrung.
 frei zuordenbaren CSV-Dateien oder direkt aus der laufenden
 Home-Assistant-Instanz (Rohhistorie oder Langzeitstatistik) übernehmen.
 Jeder Import bleibt als Report nachvollziehbar; bereits vorhandene
-Zeitstempel werden dabei nie dupliziert. Die vollständige Rohdatenhistorie
-einer Entität lässt sich als CSV exportieren.
+Zeitstempel werden dabei nie dupliziert. Der laufende Monat wird automatisch
+im Hot Buffer ergänzt; historische Lücken in abgeschlossenen Archiven lassen
+sich optional schließen. Der Dry Run stellt zusätzlich eine ausführliche
+Debug-Datei zur Diagnose bereit. Die vollständige Rohdatenhistorie einer
+Entität lässt sich als CSV exportieren.
 
 ## Speicherung und Aufbewahrung
 

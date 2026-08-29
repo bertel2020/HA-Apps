@@ -61,6 +61,26 @@ def append_many(data_dir: Path, entity_id: str, rows: list[tuple[float, float]],
             handle.write(f"{ts},{value}\n")
 
 
+def append_records(
+    data_dir: Path, entity_id: str, records: list[HotRecord], tz: ZoneInfo
+) -> None:
+    """Bulk-Variante von append() inklusive optionaler Event-ID.
+
+    Wird insbesondere benötigt, wenn eine irrtümliche Archivdatei des
+    laufenden Monats zurück in den Hot Buffer geführt wird: bereits
+    archivierte Live-Ereignisse dürfen dabei ihre Idempotenz-ID nicht
+    verlieren.
+    """
+    if not records:
+        return
+    path = hot_path(data_dir, entity_id, records[0][0], tz)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for ts, value, event_id in records:
+            suffix = f",{event_id}" if event_id else ""
+            handle.write(f"{ts},{value}{suffix}\n")
+
+
 def read_rows(path: Path) -> list[tuple[float, float]]:
     """Liest eine Hot-CSV-Datei als (ts, value)-Paare — leer, falls die Datei fehlt."""
     return [(ts, value) for ts, value, _event_id in iter_records(path)]

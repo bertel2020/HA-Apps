@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -214,10 +215,10 @@ def _statistic_value(entry: dict) -> float | None:
     measurement-Entitäten (falls HA es doch mitliefert) hier nichts
     Sinnvolles bedeutet."""
     mean = entry.get("mean")
-    if isinstance(mean, (int, float)):
+    if isinstance(mean, (int, float)) and math.isfinite(mean):
         return round(float(mean), 3)
     total = entry.get("sum")
-    if isinstance(total, (int, float)):
+    if isinstance(total, (int, float)) and math.isfinite(total):
         return round(float(total), 3)
     return None
 
@@ -230,6 +231,8 @@ def _bucket_ts(entry: dict) -> float | None:
     Totalausfall führt."""
     start = entry.get("start")
     if isinstance(start, (int, float)):
+        if not math.isfinite(start):
+            return None
         return start / 1000.0 if start > 1e12 else float(start)
     if isinstance(start, str):
         try:
@@ -263,6 +266,7 @@ def fetch_statistics_rows(
     (Stunde/Tag) liefert je Bucket höchstens einen Punkt, Buckets über
     mehrere Chunks hinweg überschneiden sich nie."""
     result = HistoryFetchResult()
+    seen_timestamps: set[float] = set()
     for window_start, window_end in _chunk_ranges(start, end, period):
         responses = _ws_call([{
             "type": "recorder/statistics_during_period",
@@ -278,15 +282,42 @@ def fetch_statistics_rows(
         entries = (response.get("result") or {}).get(entity_id) or []
         for entry in entries:
             if not isinstance(entry, dict):
+                result.skipped += 1
+                result.discarded.append({
+                    "reason": "Statistik-Eintrag ist kein Objekt",
+                    "entry_type": type(entry).__name__,
+                    "value": repr(entry)[:500],
+                })
                 continue
             ts = _bucket_ts(entry)
             if ts is None:
                 result.skipped += 1
+                result.discarded.append({
+                    "reason": "Statistik-Zeitstempel fehlt oder ist ungültig",
+                    "start": entry.get("start"),
+                    "mean": entry.get("mean"),
+                    "sum": entry.get("sum"),
+                })
                 continue
             value = _statistic_value(entry)
             if value is None:
                 result.skipped += 1
+                result.discarded.append({
+                    "reason": "Statistik enthält weder Mittelwert noch Summe",
+                    "start": entry.get("start"),
+                    "mean": entry.get("mean"),
+                    "sum": entry.get("sum"),
+                })
                 continue
+            if ts in seen_timestamps:
+                result.discarded.append({
+                    "reason": "Statistik-Zeitstempel ist doppelt",
+                    "start": entry.get("start"),
+                    "timestamp": ts,
+                    "value": value,
+                })
+                continue
+            seen_timestamps.add(ts)
             result.rows.append((ts, value))
             if len(result.rows) > max_rows:
                 raise ValueError(

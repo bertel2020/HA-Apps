@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import urllib.error
 import urllib.parse
@@ -165,7 +166,8 @@ def _parse_state(state: str, domain: str) -> float | None:
             return None
         return 1.0 if normalized == "on" else 0.0
     try:
-        return round(float(state), 3)
+        value = float(state)
+        return round(value, 3) if math.isfinite(value) else None
     except (TypeError, ValueError):
         return None
 
@@ -178,6 +180,23 @@ def _iso(dt: datetime) -> str:
 class HistoryFetchResult:
     rows: list[tuple[float, float]] = field(default_factory=list)
     skipped: int = 0
+    # Ausschließlich für den expliziten HA-Debug-Download: enthält die
+    # verworfenen Minimalfelder und den konkreten Grund, aber niemals Header,
+    # Tokens oder vollständige HA-Attribute. Der normale Importbericht nutzt
+    # weiterhin nur den kompakten Zähler ``skipped``.
+    discarded: list[dict[str, object]] = field(default_factory=list)
+
+
+def _discard(result: HistoryFetchResult, reason: str, entry: object) -> None:
+    detail: dict[str, object] = {"reason": reason}
+    if isinstance(entry, dict):
+        for key in ("entity_id", "state", "last_changed", "last_updated"):
+            if key in entry:
+                detail[key] = entry[key]
+    else:
+        detail["entry_type"] = type(entry).__name__
+        detail["value"] = repr(entry)[:500]
+    result.discarded.append(detail)
 
 
 def fetch_history_rows(
@@ -209,21 +228,27 @@ def fetch_history_rows(
         entries = payload[0] if isinstance(payload, list) and payload else []
         for entry in entries:
             if not isinstance(entry, dict):
+                result.skipped += 1
+                _discard(result, "Eintrag ist kein Objekt", entry)
                 continue
             changed = entry.get("last_changed") or entry.get("last_updated")
             if not changed:
                 result.skipped += 1
+                _discard(result, "Zeitstempel fehlt", entry)
                 continue
             try:
                 ts = datetime.fromisoformat(str(changed).replace("Z", "+00:00")).timestamp()
             except ValueError:
                 result.skipped += 1
+                _discard(result, "Zeitstempel ist ungültig", entry)
                 continue
             value = _parse_state(str(entry.get("state")), domain)
             if value is None:
                 result.skipped += 1
+                _discard(result, "Zustand ist nicht importierbar", entry)
                 continue
             if last_ts is not None and ts <= last_ts:
+                _discard(result, "Zeitstempel ist doppelt oder nicht aufsteigend", entry)
                 continue
             result.rows.append((ts, value))
             last_ts = ts

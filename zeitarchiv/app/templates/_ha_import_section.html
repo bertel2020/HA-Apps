@@ -43,18 +43,17 @@
       <input type="date" id="ha-date-to" name="date_to" value="{{ ha_date_to }}">
     </span>
 
-    <button type="button" class="btn btn-sm" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML">
-      {{ "Verfügbarkeit erneut prüfen" if ha_availability_checked else "Verfügbarkeit prüfen" }}
-      <span class="htmx-indicator"> &middot; prüft …</span>
+    <button type="button" class="btn btn-sm" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML" hx-indicator="#ha-availability-status">
+      Verfügbarkeit prüfen
     </button>
-
-    {% if ha_availability_checked_at_label %}
-    <span class="ha-checked-at" title="Zeitpunkt der letzten Verfügbarkeitsprüfung für diese Quelle">Geprüft: {{ ha_availability_checked_at_label }}{% if ha_availability_stale %} · <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben. Für einen aktuellen Stand oben auf „Verfügbarkeit erneut prüfen“ klicken.">⏳ Nicht mehr taufrisch</span>{% endif %}</span>
-    {% endif %}
+    <span class="ha-checked-at" id="ha-availability-status" title="Status der Verfügbarkeitsprüfung für diese Quelle">
+      <span class="ha-status-idle">{% if ha_availability_checked_at_label %}Geprüft: {{ ha_availability_checked_at_label }}{% else %}Noch nicht geprüft{% endif %}{% if ha_availability_stale %} · <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben.">⏳ Nicht mehr taufrisch</span>{% endif %}</span>
+      <span class="htmx-indicator">Prüfung läuft …</span>
+    </span>
   </div>
 
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
-    <input type="search" class="search btn-sm" placeholder="Entität suchen …" oninput="onHaSearch(this.value)">
+    <input type="search" class="search" id="ha-entity-search" placeholder="Entität suchen …" oninput="onHaSearch(this.value)">
     <span class="count-chip" id="ha-marked-count">0 markiert</span>
   </div>
 
@@ -140,11 +139,11 @@
   <div class="actionbar">
     <label class="hint" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;">
       <input type="checkbox" name="include_existing_months" {% if ha_include_existing_months %}checked{% endif %}>
-      Bereits vorhandene Monate ergänzen
+      Archivierte Monate ergänzen
     </label>
     <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
     <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Import starten</button>
-    <span class="hint">Bei vorhandenen Monaten werden nur fehlende Zeitstempel ergänzt; vorhandene Werte bleiben unverändert.</span>
+    <span class="hint">Optional für historische Lücken: In abgeschlossenen Monaten werden nur fehlende Zeitstempel ergänzt; vorhandene Werte bleiben unverändert. Der laufende Monat wird immer automatisch im Hot Buffer ergänzt.</span>
     {% if ha_history_source == "stats" %}
     <span class="hint">Langzeitstatistik liefert Stunden-/Tagesmittelwerte (bzw. Zählerstände) statt Rohmesswerte — für Zeiträume, für die HA keine Rohhistorie mehr vorhält. Werden für denselben laufenden Monat beide Quellen importiert, stehen Roh- und Aggregatwerte nebeneinander im selben Verlauf.</span>
     {% else %}

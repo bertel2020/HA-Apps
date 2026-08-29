@@ -20,6 +20,12 @@
       <span style="color:var(--ink);text-align:right;">{{ item.plan.rows_to_merge | format_int }} Zeilen ({{ item.plan.months_to_merge | join(', ') }})</span>
     </div>
     {% endif %}
+    {% if item.plan.current_archives_to_repair %}
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--danger);padding:3px 0;">
+      <span>Fehlerhaftes Archiv des laufenden Monats wird repariert</span>
+      <span style="text-align:right;">{{ item.plan.rows_to_recover | format_int }} vorhandene Zeilen → Hot Buffer ({{ item.plan.current_archives_to_repair | join(', ') }})</span>
+    </div>
+    {% endif %}
     {% if item.plan.months_to_update %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
       <span>Vorhandene Monate (werden ergänzt)</span>
@@ -45,5 +51,11 @@
 
   {% if not items and not errors %}
   <p style="font-size:calc(13px * var(--font-scale, 1));color:var(--ink-faint);">Keine Entität ausgewählt — nichts zu importieren.</p>
+  {% endif %}
+
+  {% if items or errors %}
+  <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+    <button type="submit" class="btn" formaction="import/ha/debug" formmethod="post">Debug-Datei herunterladen</button>
+  </div>
   {% endif %}
 </div>

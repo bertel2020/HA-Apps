@@ -402,6 +402,8 @@ class ImportPlan:
     rows_to_import: int = 0
     rows_to_merge: int = 0
     rows_to_update: int = 0
+    current_archives_to_repair: list[str] = field(default_factory=list)
+    rows_to_recover: int = 0
     # Nur vom eigenen CSV-Import (csv_import.py) befüllt — Zeilen, die sich
     # nicht als (Zeitstempel, Wert) lesen ließen und deshalb schon beim
     # Einlesen (nicht erst hier bei der Monats-Klassifizierung) aussortiert
@@ -421,6 +423,8 @@ class ImportResult:
     rows_imported: int = 0
     rows_merged: int = 0
     rows_updated: int = 0
+    repaired_current_months: list[str] = field(default_factory=list)
+    rows_recovered: int = 0
     skipped_rows: int = 0
     source_rows: int = 0
     duplicate_rows: int = 0
@@ -450,21 +454,18 @@ def _classify_months(
 ]:
     """Teilt die Monate einer Variable in vier Gruppen (Konzept Abschnitt 04):
 
-    - to_import: liegt komplett vor dem ersten vorhandenen Zeitarchiv-Wert und
-      hat noch keine Archivdatei &mdash; wird als neue Monats-Archivdatei
-      geschrieben, wie bisher.
-    - to_merge: überlappt den ersten vorhandenen Wert, hat aber noch KEINE
-      Archivdatei. Das kann nur der laufende Monat sein &mdash; jeder frühere
-      überlappende Monat wäre durch die normale Rotation längst archiviert.
-      Wird zeilenweise in den Hot Buffer zusammengeführt (import_variable()),
-      Duplikate (exakt gleicher Zeitstempel) werden dabei ausgelassen.
+    - to_import: abgeschlossener Monat ohne Archivdatei; wird als neue
+      Monats-Archivdatei geschrieben.
+    - to_merge: ausschließlich der tatsächliche laufende Kalendermonat; wird
+      zeilenweise in den Hot Buffer zusammengeführt. Eine irrtümlich bereits
+      vorhandene Archivdatei dieses Monats wird dabei verlustfrei repariert.
     - to_update: Archivdatei existiert schon und include_existing_months wurde
       explizit aktiviert. Nur noch nicht vorhandene Zeitstempel werden ergänzt.
     - to_skip: Archivdatei existiert schon und die Ergänzungsoption ist aus.
     """
-    existing_first_ts = entity["first_ts"]
     entity_id = entity["entity_id"]
     archive_dir = entity_dir(data_dir, "archive", entity_id)
+    current_label = datetime.now(tz).strftime("%Y-%m")
     to_import: list[tuple[int, int, str, list[tuple[float, float]]]] = []
     to_merge: list[tuple[int, int, str, list[tuple[float, float]]]] = []
     to_update: list[tuple[int, int, str, list[tuple[float, float]]]] = []
@@ -472,15 +473,18 @@ def _classify_months(
     for (year, month), month_rows in sorted(by_month.items()):
         label = f"{year:04d}-{month:02d}"
         archive_path = archive_dir / f"{label}.parquet"
-        month_end_ts = _month_end_ts(year, month, tz)
-        overlaps_existing = existing_first_ts is not None and month_end_ts > existing_first_ts
-        if archive_path.exists():
+        # Der tatsächliche aktuelle Kalendermonat gehört IMMER in den Hot
+        # Buffer. Diese Prüfung muss vor archive_path.exists() kommen: ältere
+        # Importversionen konnten irrtümlich schon eine Archivdatei für den
+        # laufenden Monat anlegen. Sie wird beim Schreiben verlustfrei in den
+        # Hot Buffer zurückgeführt (siehe _recover_current_archive()).
+        if label == current_label:
+            to_merge.append((year, month, label, month_rows))
+        elif archive_path.exists():
             if include_existing_months:
                 to_update.append((year, month, label, month_rows))
             else:
                 to_skip.append(label)
-        elif overlaps_existing:
-            to_merge.append((year, month, label, month_rows))
         else:
             to_import.append((year, month, label, month_rows))
     return to_import, to_merge, to_update, to_skip
@@ -489,14 +493,81 @@ def _classify_months(
 def _new_rows_for_merge(
     data_dir: Path, entity_id: str, month_rows: list[tuple[float, float]], tz: ZoneInfo
 ) -> list[tuple[float, float]]:
-    """Filtert Symcon-Zeilen heraus, deren Zeitstempel exakt mit einer bereits
-    im Hot Buffer vorhandenen Zeile übereinstimmt (Duplikat-Prüfung für den
-    laufenden Monat, Konzept Abschnitt 04) — der Hot Buffer ist die einzige
-    Quelle für den noch offenen Monat, es gibt dafür keine Archivdatei."""
-    existing_ts = {
-        ts for ts, _ in hotbuffer.read_rows(hotbuffer.hot_path(data_dir, entity_id, month_rows[0][0], tz))
-    }
-    return sorted(row for row in month_rows if row[0] not in existing_ts)
+    """Filtert Quellzeilen mit bereits bekanntem Zeitstempel heraus.
+
+    Normalerweise liegt der laufende Monat ausschließlich im Hot Buffer. Für
+    die Reparatur älterer Importfehler wird zusätzlich eine eventuell noch
+    vorhandene aktuelle Archivdatei berücksichtigt.
+    """
+    hot_path = hotbuffer.hot_path(data_dir, entity_id, month_rows[0][0], tz)
+    existing_ts = {ts for ts, _ in hotbuffer.read_rows(hot_path)}
+    label = hotbuffer.month_key(month_rows[0][0], tz)
+    archive_path = entity_dir(data_dir, "archive", entity_id) / f"{label}.parquet"
+    if archive_path.exists():
+        existing_ts.update(pq.read_table(archive_path, columns=["ts"]).column("ts").to_pylist())
+    new_by_ts: dict[float, tuple[float, float]] = {}
+    for row in month_rows:
+        if row[0] not in existing_ts and row[0] not in new_by_ts:
+            new_by_ts[row[0]] = row
+    return sorted(new_by_ts.values())
+
+
+def _current_archive_records_to_recover(
+    data_dir: Path, entity_id: str, label: str, month_rows: list[tuple[float, float]], tz: ZoneInfo
+) -> list[hotbuffer.HotRecord]:
+    archive_path = entity_dir(data_dir, "archive", entity_id) / f"{label}.parquet"
+    if not archive_path.exists():
+        return []
+    table = pq.read_table(archive_path)
+    event_ids = (
+        table.column("event_id").to_pylist()
+        if "event_id" in table.column_names
+        else [None] * table.num_rows
+    )
+    archive_rows = list(zip(
+        table.column("ts").to_pylist(),
+        table.column("value").to_pylist(),
+        event_ids,
+    ))
+    hot_path = hotbuffer.hot_path(data_dir, entity_id, month_rows[0][0], tz)
+    existing_hot_ts = {ts for ts, _ in hotbuffer.read_rows(hot_path)}
+    return sorted(
+        (row for row in archive_rows if row[0] not in existing_hot_ts),
+        key=lambda row: row[0],
+    )
+
+
+def _recover_current_archive(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    aggregation_type: str,
+    year: int,
+    month: int,
+    label: str,
+    month_rows: list[tuple[float, float]],
+    tz: ZoneInfo,
+) -> int:
+    """Repariert eine unzulässige Archivdatei des laufenden Monats.
+
+    Erst werden alle noch nicht im Hot Buffer vorhandenen Archivzeilen dort
+    angehängt, danach wird ausschließlich die nun redundante Archivdatei samt
+    laufendem Rollup entfernt. Dadurch bleibt der Vorgang auch bei einem
+    Abbruch vor dem Löschen verlustfrei.
+    """
+    archive_path = entity_dir(data_dir, "archive", entity_id) / f"{label}.parquet"
+    if not archive_path.exists():
+        return 0
+    recovered = _current_archive_records_to_recover(
+        data_dir, entity_id, label, month_rows, tz
+    )
+    if recovered:
+        hotbuffer.append_records(data_dir, entity_id, recovered, tz)
+    old_size = archive_path.stat().st_size
+    archive_path.unlink()
+    index.add_size_bytes(entity_id, -old_size)
+    rollup.remove_month(data_dir, entity_id, aggregation_type, year, month, tz)
+    return len(recovered)
 
 
 def _new_rows_for_archive(
@@ -582,6 +653,17 @@ def plan_import_rows(
         len(_new_rows_for_archive(archive_dir / f"{label}.parquet", month_rows))
         for _, _, label, month_rows in to_update
     )
+    current_repairs = []
+    rows_to_recover = 0
+    for _, _, label, month_rows in to_merge:
+        archive_path = archive_dir / f"{label}.parquet"
+        if archive_path.exists():
+            current_repairs.append(label)
+            rows_to_recover += len(
+                _current_archive_records_to_recover(
+                    data_dir, entity_id, label, month_rows, tz
+                )
+            )
     return ImportPlan(
         entity_id=entity_id,
         variable_id=source_label,
@@ -592,6 +674,8 @@ def plan_import_rows(
         rows_to_import=sum(len(rows) for _, _, _, rows in to_import),
         rows_to_merge=rows_to_merge,
         rows_to_update=rows_to_update,
+        current_archives_to_repair=current_repairs,
+        rows_to_recover=rows_to_recover,
         skipped_rows=skipped_rows,
         factor=factor,
     )
@@ -686,6 +770,12 @@ def import_rows(
         # Rollups für abgeschlossene Perioden lesen bei der nächsten Abfrage
         # ohnehin live aus dem Hot Buffer neu (Abschnitt 05/06), ein expliziter
         # Rollup-Schreibvorgang ist hier anders als bei to_import nicht nötig.
+        if (archive_dir / f"{label}.parquet").exists():
+            result.rows_recovered += _recover_current_archive(
+                data_dir, index, entity_id, aggregation_type,
+                year, month, label, month_rows, tz,
+            )
+            result.repaired_current_months.append(label)
         new_rows = _new_rows_for_merge(data_dir, entity_id, month_rows, tz)
         result.duplicate_rows += len(month_rows) - len(new_rows)
         if new_rows:
@@ -703,10 +793,17 @@ def import_rows(
         result.duplicate_rows += len(month_rows) - len(new_rows)
         if new_rows:
             old_size = archive_path.stat().st_size
-            old_table = pq.read_table(archive_path, columns=["ts", "value"])
-            new_table = pa.table(
-                {"ts": [r[0] for r in new_rows], "value": [r[1] for r in new_rows]}
-            )
+            old_table = pq.read_table(archive_path)
+            new_columns: dict[str, pa.Array] = {}
+            for field in old_table.schema:
+                if field.name == "ts":
+                    values = [r[0] for r in new_rows]
+                elif field.name == "value":
+                    values = [r[1] for r in new_rows]
+                else:
+                    values = [None] * len(new_rows)
+                new_columns[field.name] = pa.array(values, type=field.type)
+            new_table = pa.table(new_columns, schema=old_table.schema)
             combined = pa.concat_tables([old_table, new_table]).sort_by("ts")
             temporary = archive_path.with_name(f".{archive_path.name}.importing")
             try:
@@ -733,11 +830,6 @@ def import_rows(
         _backfill_index_stats(index, entity_id, written_rows)
 
     return result
-
-
-def _month_end_ts(year: int, month: int, tz: ZoneInfo) -> float:
-    end_year, end_month = (year + 1, 1) if month == 12 else (year, month + 1)
-    return datetime(end_year, end_month, 1, tzinfo=tz).timestamp()
 
 
 def _backfill_index_stats(index: Index, entity_id: str, rows: list[tuple[float, float]]) -> None:

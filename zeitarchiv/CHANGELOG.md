@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.64.0 - 2026-08-29
+
+### Neu
+
+- Der Home-Assistant-Dry-Run bietet einen Debug-Download als ZIP. Die Datei
+  enthält die abgerufenen, übernommenen und verworfenen Werte samt Gründen,
+  Monatszuordnung, Importplan und aktuellem Archiv-/Hot-Buffer-Zustand, aber
+  keine Zugangstoken oder Autorisierungsheader.
+
+### Verbesserung
+
+- Suchfeld und Schaltfläche der Verfügbarkeitsprüfung entsprechen wieder den
+  kompakten Standardmaßen der App. Der laufende Zustand und der Zeitstempel
+  der letzten Prüfung stehen in einem dynamisch breiten Status-Chip direkt
+  neben der Schaltfläche.
+- Die Option zum Ergänzen bestehender Daten heißt nun präziser
+  "Archivierte Monate ergänzen". Sie ist nur für echte Lücken in bereits
+  abgeschlossenen Monatsarchiven erforderlich; der laufende Monat wird immer
+  automatisch in den Hot Buffer importiert.
+- Langzeitstatistik-Abfragen entfernen doppelte Werte an Chunk-Grenzen und
+  sämtliche Home-Assistant-Importpfade verwerfen nicht endliche Zahlen
+  (`NaN`/`Inf`) nachvollziehbar.
+
+### Fehlerbehebung
+
+- Daten des laufenden Kalendermonats landen wieder zuverlässig im Hot Buffer,
+  auch wenn bereits frühere Monatsarchive vorhanden sind.
+- Irrtümlich angelegte Archive des laufenden Monats werden beim Import
+  verlustfrei in den Hot Buffer zurückgeführt und anschließend entfernt.
+- Beim Ergänzen und Reparieren von Archiven bleiben Zusatzspalten wie die
+  Event-ID erhalten; vorhandene Zeitstempel und Werte werden nicht ersetzt.
+
 ## 0.63.0 - 2026-08-29
 
 ### Neu

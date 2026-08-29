@@ -37,7 +37,6 @@
   .upload-error{margin-top:12px;border:1px solid var(--danger);background:var(--danger-soft);border-radius:10px;padding:12px 16px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
 
   .source-badge{font-family:var(--font-mono);padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);}
-  .btn-sm{font-size:calc(12px * var(--font-scale, 1));padding:6px 11px;}
 
   /* Segmentierter Umschalter (Rohhistorie/Langzeitstatistik im HA-Import) —
      dieselbe Randfarbe/-stärke wie .btn, aber als zusammenhängende Gruppe
@@ -58,12 +57,12 @@
   .ha-art-badge.has-data{color:var(--accent-line);border-color:var(--accent-line);}
   .ha-art-badge.no-data{color:var(--ink-faint);}
   .ha-art-badge.unknown{color:var(--ink-faint);border-style:dashed;cursor:help;}
-  /* Zeitpunkt der letzten Verfügbarkeitsprüfung im Spaltenkopf "Verfügbar"
-     (siehe _HaAvailabilityCache) — bewusst als kleiner Chip statt reinem
-     Text, damit er sich vom Spaltentitel klar absetzt; liegt INNERHALB des
-     <a> (siehe Vorlage), damit table.dt th a{display:block} (app.css) ihn
-     nicht auf eine eigene Zeile umbricht. */
-  .ha-checked-at{display:inline-block;font-weight:600;font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--accent-line);background:var(--accent-line-soft);border-radius:999px;padding:1px 8px;white-space:nowrap;margin-left:5px;vertical-align:middle;}
+  /* Status und Zeitpunkt der HA-Verfügbarkeitsprüfung. hx-indicator setzt
+     während der Anfrage .htmx-request direkt auf diesen Chip. */
+  .ha-checked-at{display:inline-flex;align-items:center;width:auto;max-width:100%;font-weight:600;font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--accent-line);background:var(--accent-line-soft);border-radius:999px;padding:1px 8px;white-space:nowrap;margin-left:5px;vertical-align:middle;}
+  .ha-checked-at.htmx-request .ha-status-idle{display:none;}
+  .ha-checked-at .htmx-indicator{display:none;opacity:1;}
+  .ha-checked-at.htmx-request .htmx-indicator{display:inline;}
   .ha-stale-badge{display:inline-block;font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--danger);color:var(--danger);background:var(--danger-soft);cursor:help;white-space:nowrap;margin-left:6px;vertical-align:middle;}
   /* Verfügbar-Spalte: Zeitraum/Anzahl als zwei Zeilen (siehe Vorlage) statt
      einem zusammengesetzten Text — die zweite Zeile (Anzahl) bewusst
@@ -74,6 +73,7 @@
   .import-delete-button{min-width:154px;}
   .import-filter-toolbar{flex-wrap:nowrap;overflow:hidden;}
   .import-filter-toolbar .search{flex:1 1 180px;min-width:250px;}
+  .import-filter-toolbar #ha-entity-search{flex:0 1 250px;width:250px;min-width:250px;}
   .import-filter-toolbar .count-chip{flex:none;}
   .count-chip{
     font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));padding:6px 12px;border-radius:999px;border:1px solid var(--border);

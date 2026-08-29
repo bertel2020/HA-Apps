@@ -10,11 +10,13 @@ Methoden — dieselbe Technik wie ReportService.router())."""
 from __future__ import annotations
 
 import dataclasses
+import io
 import json
 import logging
 import math
 import shutil
 import threading
+import tempfile
 import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -25,8 +27,11 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.background import BackgroundTask
+
+import pyarrow.parquet as pq
 
 from .formatting import (
     format_int,
@@ -44,9 +49,11 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size
-from .storage import csv_import, ha_import, ha_statistics, import_reports, symcon_import
+from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
+from .storage.paths import entity_dir
+from .version import APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -1024,6 +1031,147 @@ class ImportService:
             return {}, str(exc)
 
 
+    def _ha_debug_row(self, ts: float, value: float) -> dict:
+        return {
+            "timestamp": ts,
+            "utc": datetime.fromtimestamp(ts, timezone.utc).isoformat(),
+            "local": datetime.fromtimestamp(ts, self.deps.tz).isoformat(),
+            "value": value,
+        }
+
+
+    def _ha_debug_entity(
+        self,
+        entity_id: str,
+        history: ha_import.HistoryFetchResult,
+        include_existing_months: bool,
+    ) -> dict:
+        """Vollständiger, secrets-freier Diagnosezustand einer Entität.
+
+        Enthält sämtliche vom HA-Abruf normalisierten Werte, alle verworfenen
+        Minimalfelder samt Grund sowie die tatsächlich gespeicherten Rohwerte
+        der betroffenen Hot-/Archivmonate. Auth-Header, Supervisor-Token und
+        HA-Attribute werden an keiner Stelle übernommen.
+        """
+        entity = self.deps.index.get_entity(entity_id)
+        if entity is None:
+            return {"entity_id": entity_id, "error": "Entität ist nicht mehr in Zeitarchiv bekannt"}
+        plan = symcon_import.plan_import_rows(
+            self.deps.data_dir,
+            self.deps.index,
+            history.rows,
+            entity_id,
+            self.deps.tz,
+            source_label=entity_id,
+            skipped_rows=history.skipped,
+            include_existing_months=include_existing_months,
+        )
+        by_month = symcon_import._group_by_month(history.rows, self.deps.tz)
+        current_label = datetime.now(self.deps.tz).strftime("%Y-%m")
+        months = []
+        for (year, month), source_rows in sorted(by_month.items()):
+            label = f"{year:04d}-{month:02d}"
+            archive_path = entity_dir(self.deps.data_dir, "archive", entity_id) / f"{label}.parquet"
+            hot_path = hotbuffer.hot_path(
+                self.deps.data_dir, entity_id, source_rows[0][0], self.deps.tz
+            )
+            archive_rows: list[dict] = []
+            archive_error = None
+            if archive_path.exists():
+                try:
+                    table = pq.read_table(archive_path)
+                    event_ids = (
+                        table.column("event_id").to_pylist()
+                        if "event_id" in table.column_names
+                        else [None] * table.num_rows
+                    )
+                    archive_rows = [
+                        {**self._ha_debug_row(ts, value), "event_id": event_id}
+                        for ts, value, event_id in zip(
+                            table.column("ts").to_pylist(),
+                            table.column("value").to_pylist(),
+                            event_ids,
+                        )
+                    ]
+                except Exception as exc:
+                    archive_error = f"{type(exc).__name__}: {exc}"
+            hot_rows = [
+                {
+                    **self._ha_debug_row(ts, value),
+                    "event_id": event_id,
+                }
+                for ts, value, event_id in hotbuffer.read_records(hot_path)
+            ]
+            month_start = datetime(year, month, 1, tzinfo=self.deps.tz)
+            next_month = (
+                month_start.replace(year=year + 1, month=1)
+                if month == 12
+                else month_start.replace(month=month + 1)
+            )
+            deleted_counts = self.deps.index.get_deleted_counts(
+                entity_id, month_start.timestamp(), next_month.timestamp()
+            )
+            if label in plan.months_to_merge:
+                action = "hot_buffer_ergaenzen"
+            elif label in plan.months_to_update:
+                action = "archiv_ergaenzen"
+            elif label in plan.months_to_import:
+                action = "archiv_neu_anlegen"
+            else:
+                action = "ueberspringen"
+            months.append({
+                "month": label,
+                "is_current_month": label == current_label,
+                "planned_action": action,
+                "source_rows": [self._ha_debug_row(ts, value) for ts, value in source_rows],
+                "archive": {
+                    "exists": archive_path.exists(),
+                    "relative_path": str(archive_path.relative_to(self.deps.data_dir)),
+                    "error": archive_error,
+                    "rows": archive_rows,
+                },
+                "hot_buffer": {
+                    "exists": hot_path.exists(),
+                    "relative_path": str(hot_path.relative_to(self.deps.data_dir)),
+                    "rows": hot_rows,
+                },
+                "soft_deleted_timestamps": [
+                    {"timestamp": ts, "occurrences": count}
+                    for ts, count in sorted(deleted_counts.items())
+                ],
+            })
+        return {
+            "entity_id": entity_id,
+            "entity_metadata": dict(entity),
+            "fetch": {
+                "accepted_count": len(history.rows),
+                "skipped_count": history.skipped,
+                "discarded": history.discarded,
+            },
+            "plan": dataclasses.asdict(plan),
+            "months": months,
+        }
+
+
+    def _ha_debug_zip(self, payload: dict) -> tuple[Path, str]:
+        timestamp = datetime.now(self.deps.tz).strftime("%Y%m%d-%H%M%S")
+        filename = f"zeitarchiv-ha-import-debug-{timestamp}.zip"
+        temporary = tempfile.NamedTemporaryFile(
+            prefix="zeitarchiv-ha-debug-", suffix=".zip", delete=False
+        )
+        path = Path(temporary.name)
+        temporary.close()
+        try:
+            with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                with archive.open("debug.json", "w") as binary:
+                    with io.TextIOWrapper(binary, encoding="utf-8") as text_stream:
+                        json.dump(payload, text_stream, ensure_ascii=False, indent=2, default=str)
+            return path, filename
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
+
+
 
 
     def router(self) -> APIRouter:
@@ -1277,11 +1425,10 @@ class ImportService:
             """Startet den Import der zugeordneten Variablen im Hintergrund (Konzept
             Abschnitt 04) und liefert sofort die Fortschrittsanzeige zurück, statt auf
             den kompletten Schreibvorgang zu warten — bei hunderten Monaten und
-            Millionen Zeilen kann das sonst minutenlang blockieren. Nie destruktiv:
-            import_variable() überspringt jeden Monat, der mit bereits vorhandenen
-            Zeitarchiv-Daten überlappt oder für den schon eine Archivdatei existiert,
-            statt sie zu überschreiben. Dieselbe Klassifizierung wie /import/dry-run,
-            damit Vorschau und Ergebnis nie auseinanderlaufen."""
+            Millionen Zeilen kann das sonst minutenlang blockieren. Bestehende
+            Archivmonate werden übersprungen; nur der tatsächliche laufende Monat
+            wird duplikatsicher im Hot Buffer ergänzt. Dieselbe Klassifizierung wie
+            /import/dry-run hält Vorschau und Ergebnis deckungsgleich."""
             form = await request.form()
             def admit_import() -> None:
                 with self._import_admission_lock:
@@ -1702,6 +1849,90 @@ class ImportService:
             )
 
 
+        @router.post("/import/ha/debug")
+        async def import_ha_debug(request: Request) -> FileResponse:
+            """Erzeugt auf expliziten Klick eine vollständige Debug-ZIP.
+
+            Der Dry Run selbst bleibt schnell und erzeugt keine liegenbleibende
+            Datei. Der Download wiederholt den HA-Abruf mit denselben
+            Formularparametern und löscht die temporäre ZIP unmittelbar nach
+            der Übertragung. SUPERVISOR_TOKEN und HTTP-/WS-Header gelangen
+            nicht in den Payload.
+            """
+            generated_at = datetime.now(timezone.utc)
+            form = await request.form()
+            raw_entity_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
+            history_source, period = self._ha_source_params(form)
+            entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
+            start, end = self._ha_date_range(
+                range_preset, date_from, date_to, history_source
+            )
+            fetched: dict[str, ha_import.HistoryFetchResult] = {}
+            errors = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            if entity_ids:
+                fetched, fetch_errors = await run_in_threadpool(
+                    self._fetch_ha_history,
+                    entity_ids,
+                    start,
+                    end,
+                    history_source,
+                    period,
+                )
+                errors.extend(fetch_errors)
+            elif not unknown_ids:
+                errors.append("Keine Entität ausgewählt")
+
+            def build_payload() -> dict:
+                with self.deps.coordinator.entities(sorted(fetched)):
+                    entities = []
+                    for entity_id, history in fetched.items():
+                        try:
+                            entities.append(
+                                self._ha_debug_entity(
+                                    entity_id, history, include_existing_months
+                                )
+                            )
+                        except Exception as exc:
+                            entities.append({
+                                "entity_id": entity_id,
+                                "error": f"{type(exc).__name__}: {exc}",
+                            })
+                return {
+                    "format": "zeitarchiv-ha-import-debug",
+                    "format_version": 1,
+                    "generated_at": generated_at.isoformat(),
+                    "app_version": APP_VERSION,
+                    "timezone": str(self.deps.tz),
+                    "security_note": (
+                        "Enthält Messwerte und Entitätsmetadaten, aber keine "
+                        "Tokens, Authentifizierungsheader oder HA-Attribute."
+                    ),
+                    "request": {
+                        "entity_ids": raw_entity_ids,
+                        "range_preset": range_preset,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "resolved_start_utc": start.isoformat(),
+                        "resolved_end_utc": end.isoformat(),
+                        "history_source": history_source,
+                        "period": period if history_source == "stats" else None,
+                        "include_existing_months": include_existing_months,
+                    },
+                    "current_month": datetime.now(self.deps.tz).strftime("%Y-%m"),
+                    "errors": errors,
+                    "entities": entities,
+                }
+
+            payload = await run_in_threadpool(build_payload)
+            path, filename = await run_in_threadpool(self._ha_debug_zip, payload)
+            return FileResponse(
+                path,
+                media_type="application/zip",
+                filename=filename,
+                background=BackgroundTask(path.unlink, missing_ok=True),
+            )
+
+
 
         @router.post("/import/ha/start", response_class=HTMLResponse)
         async def import_ha_start(request: Request) -> HTMLResponse:
@@ -1765,11 +1996,18 @@ class ImportService:
                         rows_imported = sum(r.rows_imported for r in results)
                         rows_merged = sum(r.rows_merged for r in results)
                         rows_updated = sum(r.rows_updated for r in results)
+                        rows_recovered = sum(r.rows_recovered for r in results)
                         logger.info(
                             "Home-Assistant-Import abgeschlossen · Quelle=%s · Entitäten=%d · Zeilen importiert=%d · "
-                            "Zeilen zusammengeführt=%d · bestehende Monate ergänzt=%d · Fehler=%d",
-                            history_source, len(results), rows_imported, rows_merged, rows_updated, len(errors),
+                            "Zeilen zusammengeführt=%d · bestehende Monate ergänzt=%d · aus aktuellem Archiv gerettet=%d · Fehler=%d",
+                            history_source, len(results), rows_imported, rows_merged, rows_updated, rows_recovered, len(errors),
                         )
+                        repaired_months = sum(len(r.repaired_current_months) for r in results)
+                        if repaired_months:
+                            logger.warning(
+                                "HA-Import reparierte %d unzulässige Archivdatei(en) des laufenden Monats",
+                                repaired_months,
+                            )
                         if results and not errors and rows_imported + rows_merged + rows_updated == 0:
                             # Kein Fehler, aber auch keine einzige neue Zeile
                             # geschrieben, obwohl Entitäten ausgewählt waren und

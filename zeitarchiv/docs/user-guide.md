@@ -596,9 +596,22 @@ welche Entitäten in Home Assistant tatsächlich Daten der gewählten Quelle
 haben und für welchen Zeitraum. Das Prüfergebnis bleibt je Quelle/Auflösung
 erhalten — auch nach einem Seitenwechsel oder einem Wechsel zwischen
 Rohhistorie und Langzeitstatistik, bis zum nächsten Neustart des Add-ons.
-Der Spaltenkopf "Verfügbar" zeigt dazu den Zeitpunkt der letzten Prüfung; ab
-15 Minuten erscheint ein Hinweis, dass der Stand veraltet sein könnte und
-eine erneute Prüfung sinnvoll ist.
+Ein Status-Chip rechts neben "Verfügbarkeit prüfen" zeigt den laufenden
+Prüfstatus und anschließend den Zeitpunkt der letzten Prüfung; ab 15 Minuten
+erscheint ein Hinweis, dass der Stand veraltet sein könnte.
+
+Der laufende Kalendermonat wird unabhängig vom bereits vorhandenen
+Datenbestand immer automatisch in den Hot Buffer importiert. Die Option
+"Archivierte Monate ergänzen" ist nur erforderlich, wenn in bereits
+abgeschlossenen Monatsarchiven echte historische Lücken geschlossen werden
+sollen. Vorhandene Zeitstempel und Werte bleiben dabei unverändert.
+
+Nach einem Dry Run kann eine Debug-Datei als ZIP heruntergeladen werden. Sie
+enthält alle für die Diagnose relevanten abgerufenen, übernommenen und
+verworfenen Werte samt Gründen, Monatszuordnung, Importplan und aktuellem
+Archiv-/Hot-Buffer-Zustand. Zugangstoken und Autorisierungsheader werden nicht
+aufgenommen. Da der Export dennoch Messwerte und Entitätsmetadaten enthält,
+sollte er nur gezielt weitergegeben werden.
 
 Dieser Import benötigt die Add-on-Berechtigung `homeassistant_api` sowie
 eine Home-Assistant-Installation mit Supervisor (steht bei Home Assistant
@@ -617,12 +630,13 @@ lassen sich gesammelt löschen, wenn sie nicht mehr benötigt werden.
 
 ### Duplikatschutz
 
-Importe ergänzen ausschließlich fehlende Zeitstempel im laufenden Hot
-Buffer. Bereits vorhandene Messpunkte derselben Entität und desselben
-Zeitstempels werden übersprungen — auch bei abweichender Event-ID —,
-bestehende Monatsarchive werden dabei nie überschrieben. Ein erneuter
-Symcon- oder CSV-Upload derselben Quelle dupliziert also nichts, ebenso
-wenig ein wiederholter Home-Assistant-Import über denselben Zeitraum.
+Importe ergänzen ausschließlich fehlende Zeitstempel. Der laufende Monat
+landet im Hot Buffer; bereits abgeschlossene Archive werden nur mit aktivierter
+Option "Archivierte Monate ergänzen" um fehlende Zeitstempel erweitert.
+Vorhandene Messpunkte derselben Entität und desselben Zeitstempels werden
+übersprungen — auch bei abweichender Event-ID — und niemals ersetzt. Ein
+erneuter Symcon- oder CSV-Upload derselben Quelle dupliziert also nichts,
+ebenso wenig ein wiederholter Home-Assistant-Import über denselben Zeitraum.
 
 ### CSV-Export
 
