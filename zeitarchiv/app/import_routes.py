@@ -469,6 +469,7 @@ class ImportService:
         date_to: str = "",
         history_source: str = "raw",
         period: str = ha_statistics.DEFAULT_PERIOD,
+        include_existing_months: bool = False,
     ) -> dict:
         """Auswahlliste für den Home-Assistant-Import-Reiter — bewusst NICHT über
         die HA-API entdeckt (/api/states), sondern self.deps.index.list_entities(): nur
@@ -558,6 +559,7 @@ class ImportService:
             "ha_range_preset": range_preset if range_preset in range_options else "max",
             "ha_date_from": date_from or default_from,
             "ha_date_to": date_to or default_to,
+            "ha_include_existing_months": include_existing_months,
         }
 
 
@@ -849,7 +851,7 @@ class ImportService:
 
 
 
-    def _ha_form_params(self, form) -> tuple[list[str], str, str, str]:
+    def _ha_form_params(self, form) -> tuple[list[str], str, str, str, bool]:
         # range_preset wird bewusst NICHT hier gegen HA_RANGE_PRESETS_RAW/
         # _STATS validiert — welches der beiden Presets-Sets gilt, hängt von
         # history_source ab (siehe _ha_source_params()), das an dieser Stelle
@@ -860,7 +862,8 @@ class ImportService:
         range_preset = str(form.get("range_preset") or "max")
         date_from = str(form.get("date_from") or "")
         date_to = str(form.get("date_to") or "")
-        return entity_ids, range_preset, date_from, date_to
+        include_existing_months = form.get("include_existing_months") == "on"
+        return entity_ids, range_preset, date_from, date_to, include_existing_months
 
 
 
@@ -1562,7 +1565,7 @@ class ImportService:
             Neuzeichnen erhalten bleibt."""
             form = await request.form()
             check_entity_ids = [str(v).strip() for v in form.getlist("check_entity_ids") if str(v).strip()]
-            selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            selected_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             known_ids, unknown_ids = self._known_ha_entity_ids(check_entity_ids)
             if unknown_ids:
@@ -1594,6 +1597,7 @@ class ImportService:
                     selected_ids=set(selected_ids), range_preset=range_preset,
                     date_from=date_from, date_to=date_to,
                     history_source=history_source, period=period,
+                    include_existing_months=include_existing_months,
                 ),
             )
 
@@ -1613,7 +1617,7 @@ class ImportService:
             auf "max" zurückgesetzt, falls er für die neue Quelle nicht
             existiert, siehe _ha_import_context())."""
             form = await request.form()
-            selected_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            selected_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_section.html",
@@ -1621,6 +1625,7 @@ class ImportService:
                     selected_ids=set(selected_ids), range_preset=range_preset,
                     date_from=date_from, date_to=date_to,
                     history_source=history_source, period=period,
+                    include_existing_months=include_existing_months,
                 ),
             )
 
@@ -1633,7 +1638,7 @@ class ImportService:
             beim HA-Import überhaupt einen Sinn ergibt (Symcon/CSV kennen ihre Quelle
             vollständig, ohne HAs begrenzte Recorder-Aufbewahrung)."""
             form = await request.form()
-            raw_entity_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            raw_entity_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
@@ -1661,6 +1666,7 @@ class ImportService:
                             plan = symcon_import.plan_import_rows(
                                 self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                 source_label=entity_id, skipped_rows=history.skipped,
+                                include_existing_months=include_existing_months,
                             )
                         except ValueError as exc:
                             errors.append(f"{entity_id}: {exc}")
@@ -1683,7 +1689,12 @@ class ImportService:
                 "HA-Dry-Run · Quelle=%s · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
                 history_source,
                 len(items),
-                sum(item["plan"].rows_to_import + item["plan"].rows_to_merge for item in items),
+                sum(
+                    item["plan"].rows_to_import
+                    + item["plan"].rows_to_merge
+                    + item["plan"].rows_to_update
+                    for item in items
+                ),
                 len(errors),
             )
             return self.deps.templates.TemplateResponse(
@@ -1700,7 +1711,7 @@ class ImportService:
             Vorlage (_ha_import_result.html) wie beim Dry Run, aus demselben Grund."""
             started_at = datetime.now(timezone.utc)
             form = await request.form()
-            raw_entity_ids, range_preset, date_from, date_to = self._ha_form_params(form)
+            raw_entity_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
@@ -1731,6 +1742,7 @@ class ImportService:
                                 result = symcon_import.import_rows(
                                     self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                     source_label=entity_id, skipped_rows=history.skipped,
+                                    include_existing_months=include_existing_months,
                                 )
                             except ValueError as exc:
                                 errors.append(f"{entity_id}: {exc}")
@@ -1752,12 +1764,13 @@ class ImportService:
                         results = [item["result"] for item in items]
                         rows_imported = sum(r.rows_imported for r in results)
                         rows_merged = sum(r.rows_merged for r in results)
+                        rows_updated = sum(r.rows_updated for r in results)
                         logger.info(
                             "Home-Assistant-Import abgeschlossen · Quelle=%s · Entitäten=%d · Zeilen importiert=%d · "
-                            "Zeilen zusammengeführt=%d · Fehler=%d",
-                            history_source, len(results), rows_imported, rows_merged, len(errors),
+                            "Zeilen zusammengeführt=%d · bestehende Monate ergänzt=%d · Fehler=%d",
+                            history_source, len(results), rows_imported, rows_merged, rows_updated, len(errors),
                         )
-                        if results and not errors and rows_imported + rows_merged == 0:
+                        if results and not errors and rows_imported + rows_merged + rows_updated == 0:
                             # Kein Fehler, aber auch keine einzige neue Zeile
                             # geschrieben, obwohl Entitäten ausgewählt waren und
                             # HA tatsächlich geantwortet hat — unterscheidet den
@@ -1785,6 +1798,7 @@ class ImportService:
                             "date_to": date_to,
                             "history_source": history_source,
                             "period": period if history_source == "stats" else None,
+                            "include_existing_months": include_existing_months,
                         },
                         results=[dataclasses.asdict(result) for result in results],
                         errors=errors,
@@ -1799,4 +1813,3 @@ class ImportService:
 
 
         return router
-

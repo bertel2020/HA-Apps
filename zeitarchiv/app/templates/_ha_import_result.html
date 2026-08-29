@@ -20,6 +20,12 @@
       <span style="color:var(--ink);text-align:right;">{{ item.result.rows_merged | format_int }} Zeilen ({{ item.result.merged_months | join(', ') }})</span>
     </div>
     {% endif %}
+    {% if item.result.updated_months %}
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
+      <span>Vorhandene Monate ergänzt</span>
+      <span style="color:var(--ink);text-align:right;">{{ item.result.rows_updated | format_int }} neue Zeilen ({{ item.result.updated_months | join(', ') }})</span>
+    </div>
+    {% endif %}
     {% if item.result.skipped_months %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);padding:3px 0;">
       <span>Bereits vorhandene Monate (übersprungen)</span><span style="text-align:right;">{{ item.result.skipped_months | join(', ') }}</span>

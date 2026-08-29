@@ -397,9 +397,11 @@ class ImportPlan:
     variable_id: str
     months_to_import: list[str] = field(default_factory=list)
     months_to_merge: list[str] = field(default_factory=list)
+    months_to_update: list[str] = field(default_factory=list)
     months_to_skip: list[str] = field(default_factory=list)
     rows_to_import: int = 0
     rows_to_merge: int = 0
+    rows_to_update: int = 0
     # Nur vom eigenen CSV-Import (csv_import.py) befüllt — Zeilen, die sich
     # nicht als (Zeitstempel, Wert) lesen ließen und deshalb schon beim
     # Einlesen (nicht erst hier bei der Monats-Klassifizierung) aussortiert
@@ -414,9 +416,11 @@ class ImportResult:
     variable_id: str
     imported_months: list[str] = field(default_factory=list)
     merged_months: list[str] = field(default_factory=list)
+    updated_months: list[str] = field(default_factory=list)
     skipped_months: list[str] = field(default_factory=list)
     rows_imported: int = 0
     rows_merged: int = 0
+    rows_updated: int = 0
     skipped_rows: int = 0
     source_rows: int = 0
     duplicate_rows: int = 0
@@ -433,13 +437,18 @@ def _scaled_raw_rows(variable: SymconVariable, factor: float) -> list[tuple[floa
 
 
 def _classify_months(
-    data_dir: Path, entity, by_month: dict[tuple[int, int], list[tuple[float, float]]], tz: ZoneInfo
+    data_dir: Path,
+    entity,
+    by_month: dict[tuple[int, int], list[tuple[float, float]]],
+    tz: ZoneInfo,
+    include_existing_months: bool = False,
 ) -> tuple[
+    list[tuple[int, int, str, list[tuple[float, float]]]],
     list[tuple[int, int, str, list[tuple[float, float]]]],
     list[tuple[int, int, str, list[tuple[float, float]]]],
     list[str],
 ]:
-    """Teilt die Monate einer Variable in drei Gruppen (Konzept Abschnitt 04):
+    """Teilt die Monate einer Variable in vier Gruppen (Konzept Abschnitt 04):
 
     - to_import: liegt komplett vor dem ersten vorhandenen Zeitarchiv-Wert und
       hat noch keine Archivdatei &mdash; wird als neue Monats-Archivdatei
@@ -449,14 +458,16 @@ def _classify_months(
       überlappende Monat wäre durch die normale Rotation längst archiviert.
       Wird zeilenweise in den Hot Buffer zusammengeführt (import_variable()),
       Duplikate (exakt gleicher Zeitstempel) werden dabei ausgelassen.
-    - to_skip: Archivdatei existiert schon &mdash; wird nie angefasst, das bleibt
-      die einzige harte "nie destruktiv"-Grenze.
+    - to_update: Archivdatei existiert schon und include_existing_months wurde
+      explizit aktiviert. Nur noch nicht vorhandene Zeitstempel werden ergänzt.
+    - to_skip: Archivdatei existiert schon und die Ergänzungsoption ist aus.
     """
     existing_first_ts = entity["first_ts"]
     entity_id = entity["entity_id"]
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     to_import: list[tuple[int, int, str, list[tuple[float, float]]]] = []
     to_merge: list[tuple[int, int, str, list[tuple[float, float]]]] = []
+    to_update: list[tuple[int, int, str, list[tuple[float, float]]]] = []
     to_skip: list[str] = []
     for (year, month), month_rows in sorted(by_month.items()):
         label = f"{year:04d}-{month:02d}"
@@ -464,12 +475,15 @@ def _classify_months(
         month_end_ts = _month_end_ts(year, month, tz)
         overlaps_existing = existing_first_ts is not None and month_end_ts > existing_first_ts
         if archive_path.exists():
-            to_skip.append(label)
+            if include_existing_months:
+                to_update.append((year, month, label, month_rows))
+            else:
+                to_skip.append(label)
         elif overlaps_existing:
             to_merge.append((year, month, label, month_rows))
         else:
             to_import.append((year, month, label, month_rows))
-    return to_import, to_merge, to_skip
+    return to_import, to_merge, to_update, to_skip
 
 
 def _new_rows_for_merge(
@@ -483,6 +497,22 @@ def _new_rows_for_merge(
         ts for ts, _ in hotbuffer.read_rows(hotbuffer.hot_path(data_dir, entity_id, month_rows[0][0], tz))
     }
     return sorted(row for row in month_rows if row[0] not in existing_ts)
+
+
+def _new_rows_for_archive(
+    archive_path: Path, month_rows: list[tuple[float, float]]
+) -> list[tuple[float, float]]:
+    """Liefert nur Quellzeilen mit noch unbekanntem Zeitstempel.
+
+    Vorhandene Archivwerte gewinnen immer; die Opt-in-Funktion ergänzt Lücken
+    und ersetzt niemals bereits gespeicherte Messwerte.
+    """
+    existing_ts = set(pq.read_table(archive_path, columns=["ts"]).column("ts").to_pylist())
+    new_by_ts: dict[float, tuple[float, float]] = {}
+    for row in month_rows:
+        if row[0] not in existing_ts and row[0] not in new_by_ts:
+            new_by_ts[row[0]] = row
+    return sorted(new_by_ts.values())
 
 
 def _group_by_month(
@@ -528,6 +558,7 @@ def plan_import_rows(
     source_label: str = "",
     skipped_rows: int = 0,
     factor: float = 1.0,
+    include_existing_months: bool = False,
 ) -> ImportPlan:
     """Generischer Dry-Run-Kern: berechnet, was import_rows() für bereits
     geparste (ts, value)-Zeilen tun würde, ohne etwas zu schreiben — von
@@ -540,18 +571,27 @@ def plan_import_rows(
     if entity is None:
         raise ValueError(f"Unbekannte Entität: {entity_id}")
     by_month = _group_by_month(rows, tz)
-    to_import, to_merge, to_skip = _classify_months(data_dir, entity, by_month, tz)
+    to_import, to_merge, to_update, to_skip = _classify_months(
+        data_dir, entity, by_month, tz, include_existing_months
+    )
     rows_to_merge = sum(
         len(_new_rows_for_merge(data_dir, entity_id, month_rows, tz)) for _, _, _, month_rows in to_merge
+    )
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+    rows_to_update = sum(
+        len(_new_rows_for_archive(archive_dir / f"{label}.parquet", month_rows))
+        for _, _, label, month_rows in to_update
     )
     return ImportPlan(
         entity_id=entity_id,
         variable_id=source_label,
         months_to_import=[label for _, _, label, _ in to_import],
         months_to_merge=[label for _, _, label, _ in to_merge],
+        months_to_update=[label for _, _, label, _ in to_update],
         months_to_skip=to_skip,
         rows_to_import=sum(len(rows) for _, _, _, rows in to_import),
         rows_to_merge=rows_to_merge,
+        rows_to_update=rows_to_update,
         skipped_rows=skipped_rows,
         factor=factor,
     )
@@ -592,6 +632,7 @@ def import_rows(
     skipped_rows: int = 0,
     on_month_done: Callable[[str, int], None] | None = None,
     factor: float = 1.0,
+    include_existing_months: bool = False,
 ) -> ImportResult:
     """Generischer Import-Kern: schreibt bereits geparste (ts, value)-Zeilen in
     eine bestehende Zeitarchiv-Entität — dieselbe Monats-Klassifizierung wie
@@ -607,7 +648,9 @@ def import_rows(
     aggregation_type = entity["aggregation_type"]
 
     by_month = _group_by_month(rows, tz)
-    to_import, to_merge, to_skip = _classify_months(data_dir, entity, by_month, tz)
+    to_import, to_merge, to_update, to_skip = _classify_months(
+        data_dir, entity, by_month, tz, include_existing_months
+    )
 
     result = ImportResult(
         entity_id=entity_id,
@@ -620,6 +663,7 @@ def import_rows(
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     archive_dir.mkdir(parents=True, exist_ok=True)
     written_rows: list[tuple[float, float]] = []
+    archived_month_updated = False
 
     for year, month, label, month_rows in to_import:
         month_rows.sort()
@@ -652,6 +696,38 @@ def import_rows(
         written_rows.extend(new_rows)
         if on_month_done is not None:
             on_month_done(label, len(new_rows))
+
+    for year, month, label, month_rows in to_update:
+        archive_path = archive_dir / f"{label}.parquet"
+        new_rows = _new_rows_for_archive(archive_path, month_rows)
+        result.duplicate_rows += len(month_rows) - len(new_rows)
+        if new_rows:
+            old_size = archive_path.stat().st_size
+            old_table = pq.read_table(archive_path, columns=["ts", "value"])
+            new_table = pa.table(
+                {"ts": [r[0] for r in new_rows], "value": [r[1] for r in new_rows]}
+            )
+            combined = pa.concat_tables([old_table, new_table]).sort_by("ts")
+            temporary = archive_path.with_name(f".{archive_path.name}.importing")
+            try:
+                pq.write_table(combined, temporary, compression="zstd")
+                temporary.replace(archive_path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            index.add_size_bytes(entity_id, archive_path.stat().st_size - old_size)
+            archived_month_updated = True
+
+        result.updated_months.append(label)
+        result.rows_updated += len(new_rows)
+        written_rows.extend(new_rows)
+        if on_month_done is not None:
+            on_month_done(label, len(new_rows))
+
+    if archived_month_updated:
+        # Ein ergänzter Zählerwert kann auch den Referenzwert des Folgemonats
+        # verändern. Deshalb alle Rollups der Entität atomar aus den nun
+        # vollständigen Roharchiven neu aufbauen, nicht nur den einen Monat.
+        rollup.rebuild_entity_rollups(data_dir, entity_id, aggregation_type, tz)
 
     if written_rows:
         _backfill_index_stats(index, entity_id, written_rows)

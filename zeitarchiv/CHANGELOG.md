@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.63.0 - 2026-08-29
+
+### Neu
+
+- Home-Assistant-Import: Bereits archivierte Monate können jetzt optional
+  ergänzt werden. Dabei werden ausschließlich noch fehlende Zeitstempel
+  übernommen; vorhandene Werte bleiben unverändert.
+- Dry Run und Importergebnis weisen ergänzte Bestandsmonate und die Anzahl
+  der neu übernommenen Zeilen separat aus.
+
+### Verbesserung
+
+- Nach dem Ergänzen archivierter Monate werden die Rollups der betroffenen
+  Entität vollständig neu aufgebaut, damit insbesondere Zählergrenzen und
+  nachfolgende Monatswerte konsistent bleiben.
+
 ## 0.62.0 - 2026-08-29
 
 ### Neu

@@ -138,8 +138,13 @@
   </div>
 
   <div class="actionbar">
+    <label class="hint" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;">
+      <input type="checkbox" name="include_existing_months" {% if ha_include_existing_months %}checked{% endif %}>
+      Bereits vorhandene Monate ergänzen
+    </label>
     <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
     <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML">Import starten</button>
+    <span class="hint">Bei vorhandenen Monaten werden nur fehlende Zeitstempel ergänzt; vorhandene Werte bleiben unverändert.</span>
     {% if ha_history_source == "stats" %}
     <span class="hint">Langzeitstatistik liefert Stunden-/Tagesmittelwerte (bzw. Zählerstände) statt Rohmesswerte — für Zeiträume, für die HA keine Rohhistorie mehr vorhält. Werden für denselben laufenden Monat beide Quellen importiert, stehen Roh- und Aggregatwerte nebeneinander im selben Verlauf.</span>
     {% else %}
