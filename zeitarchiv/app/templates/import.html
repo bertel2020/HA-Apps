@@ -38,16 +38,29 @@
 
   .source-badge{font-family:var(--font-mono);padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);}
 
-  /* Segmentierter Umschalter (Rohhistorie/Langzeitstatistik im HA-Import) —
+  /* Segmentierter Umschalter der drei HA-Importmodi —
      dieselbe Randfarbe/-stärke wie .btn, aber als zusammenhängende Gruppe
      statt einzelner Buttons, damit die aktive Wahl auf einen Blick als
      EINE Auswahl zu erkennen ist, nicht als zwei unabhängige Knöpfe. */
   .seg-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-  .seg-toggle button{font-size:calc(12px * var(--font-scale, 1));padding:6px 11px;border:none;background:var(--surface-alt);color:var(--ink);cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .seg-toggle button{font-size:calc(13px * var(--font-scale, 1));line-height:1.4;padding:7px 12px;border:none;background:var(--surface-alt);color:var(--ink);cursor:pointer;font-family:inherit;white-space:nowrap;}
   .seg-toggle button+button{border-left:1px solid var(--border);}
   .seg-toggle button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
   .seg-toggle button:hover:not(.active){background:var(--surface);}
-  #ha-period-select{font-size:calc(12px * var(--font-scale, 1));padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);}
+  .ha-import-config{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-bottom:20px;}
+  .ha-import-config-block{display:flex;flex-direction:column;align-items:flex-start;gap:6px;}
+  .ha-import-config-label,.ha-import-field>span:first-child{font-family:var(--font-display);font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);}
+  .ha-full-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+  .ha-import-field{display:flex;flex-direction:column;align-items:flex-start;gap:6px;color:var(--ink-muted);font-family:var(--font-display);}
+  .ha-import-select,#ha-period-select{width:250px;max-width:100%;}
+  .ha-custom-range{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;}
+  .ha-import-check-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .ha-archive-option-row{display:inline-flex;align-items:center;gap:6px;}
+  .ha-archive-option{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;}
+  .ha-archive-option input{margin:0;}
+  .ha-archive-info{display:inline-flex;align-items:center;justify-content:center;color:var(--ink-muted);font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1;cursor:help;}
+  .ha-archive-info:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;border-radius:50%;}
+  .ha-archive-info:focus-visible::after{opacity:1;visibility:visible;transition-delay:0s;}
 
   /* Wie .badge (app.css), aber für die HA-Verfügbarkeitsprüfung: kein
      Zeitarchiv-Aggregationstyp, sondern ob HA für die Entität aktuell
@@ -59,7 +72,11 @@
   .ha-art-badge.unknown{color:var(--ink-faint);border-style:dashed;cursor:help;}
   /* Status und Zeitpunkt der HA-Verfügbarkeitsprüfung. hx-indicator setzt
      während der Anfrage .htmx-request direkt auf diesen Chip. */
-  .ha-checked-at{display:inline-flex;align-items:center;width:auto;max-width:100%;font-weight:600;font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));color:var(--accent-line);background:var(--accent-line-soft);border-radius:999px;padding:1px 8px;white-space:nowrap;margin-left:5px;vertical-align:middle;}
+  .ha-checked-at{display:inline-flex;align-items:center;width:auto;max-width:100%;min-height:32px;box-sizing:border-box;font-weight:600;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));line-height:1.4;border:1px solid var(--border);border-radius:999px;padding:5px 11px;white-space:nowrap;vertical-align:middle;}
+  .ha-checked-at.is-idle{color:var(--ink-muted);background:var(--surface-alt);}
+  .ha-checked-at.is-checked{color:var(--accent-line);background:var(--accent-line-soft);border-color:var(--accent-line);}
+  .ha-checked-at.is-error{color:var(--danger);background:var(--danger-soft);border-color:var(--danger);}
+  .ha-checked-at.htmx-request{color:var(--accent-line);background:var(--accent-line-soft);border-color:var(--accent-line);}
   .ha-checked-at.htmx-request .ha-status-idle{display:none;}
   .ha-checked-at .htmx-indicator{display:none;opacity:1;}
   .ha-checked-at.htmx-request .htmx-indicator{display:inline;}
@@ -173,6 +190,10 @@
 
   @media (max-width:1050px){
     .import-filter-toolbar{flex-wrap:wrap;overflow:visible;}
+  }
+  @media (max-width:600px){
+    .ha-full-controls,.ha-import-field,.ha-import-select,#ha-period-select,.ha-custom-range{width:100%;}
+    .ha-import-field .dd-picker-wrap,.ha-import-field .dd-picker-wrap>.btn{width:100%;}
   }
 
   /* Reiter, die den Symcon-Assistenten und den eigenen CSV-Import sauber
@@ -402,12 +423,13 @@
     <div class="callout">
       <strong>So funktioniert der Import aus Home Assistant:</strong>
       <ol class="import-steps">
-        <li>Zur Auswahl stehen nur Entitäten, die bereits in Zeitarchiv bekannt sind — also von der Home-Assistant-Integration konfiguriert wurden und mindestens einen Live-Wert übertragen haben.</li>
-        <li>Entitäten auswählen und einen Zeitraum festlegen — Zeitarchiv liest die vorhandene Recorder-Historie direkt über die Home-Assistant-API.</li>
-        <li>Home Assistant hält Rohhistorie standardmäßig nur wenige Tage vor; ältere Werte sind dort nicht mehr abrufbar. Vorschau prüfen und Import starten.</li>
+        <li>Importmodus wählen: Der empfohlene Vollimport verbindet ältere Langzeitstatistik automatisch mit der jüngeren Rohhistorie. Beide Quellen können auch einzeln importiert werden.</li>
+        <li>Gewünschte Zeiträume festlegen und bei Bedarf die Verfügbarkeit prüfen. Zur Auswahl stehen Entitäten, die bereits mindestens einen Live-Wert an Zeitarchiv übertragen haben.</li>
+        <li>Entitäten markieren und den Dry Run starten. Die Vorschau zeigt verfügbare Werte, die berechnete Schnittstelle sowie neue oder zu ergänzende Monate.</li>
+        <li>Import starten. Vorhandene Zeitstempel und Werte werden niemals ersetzt; der laufende Monat wird im Hot Buffer ergänzt.</li>
       </ol>
-      <p class="symcon-import-note">Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import nur noch nicht vorhandene Zeitstempel.</p>
-      <p class="symcon-import-note">Home Assistant kann am Anfang eines abgefragten Zeitfensters einen künstlichen &bdquo;Zustand zu diesem Zeitpunkt&ldquo; melden &mdash; dieser wird beim Zusammenfügen mehrerer Zeitfenster automatisch als Duplikat erkannt und nicht doppelt übernommen.</p>
+      <p class="symcon-import-note">Beim Vollimport endet die ältere Stundenstatistik an einer eindeutigen Schnittstelle, an der die Rohhistorie beginnt. Dadurch entstehen durch die Zusammenführung weder zeitliche Lücken noch Überschneidungen.</p>
+      <p class="symcon-import-note">Bereits archivierte Monate werden nur ergänzt, wenn &bdquo;Archivlücken ergänzen&ldquo; aktiviert ist.</p>
     </div>
     {% include "_ha_import_section.html" %}
     </div>

@@ -185,6 +185,11 @@ class HistoryFetchResult:
     # Tokens oder vollständige HA-Attribute. Der normale Importbericht nutzt
     # weiterhin nur den kompakten Zähler ``skipped``.
     discarded: list[dict[str, object]] = field(default_factory=list)
+    # Optionale, rein beschreibende Quellenmetadaten. Der kombinierte
+    # Vollimport hält hier Roh-/Statistikbereich und die exakt verwendete
+    # Schnittstelle fest; einfache Rohhistorien-/Statistikabrufe lassen das
+    # Dict leer. Die gespeicherten Messreihen bleiben dadurch unverändert.
+    source_details: dict[str, object] = field(default_factory=dict)
 
 
 def _discard(result: HistoryFetchResult, reason: str, entry: object) -> None:
@@ -271,6 +276,10 @@ class EntityAvailability:
     # ohne state_class) — bei der Rohhistorie hier immer True, jede Domain
     # kann grundsätzlich Zustände haben.
     supported: bool = True
+    # Der Vollimport kombiniert zwei Quellen. Deren getrennte Bereiche und
+    # Zähler bleiben hier für die UI erhalten, während first_ts/last_ts/count
+    # weiterhin eine kompakte Gesamtsicht liefern.
+    details: dict[str, object] = field(default_factory=dict)
 
     @property
     def has_data(self) -> bool:

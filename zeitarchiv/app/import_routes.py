@@ -76,6 +76,9 @@ HA_RANGE_PRESETS_RAW = {
 }
 HA_RANGE_PRESET_DAYS_RAW = {"10d": 10, "30d": 30}
 HA_MAX_RANGE_DAYS_RAW = 365
+HA_RANGE_PRESETS_FULL_RAW = {
+    key: HA_RANGE_PRESETS_RAW[key] for key in ("max", "30d", "10d")
+}
 
 HA_RANGE_PRESETS_STATS = {
     "max": "Verfügbare Statistik (max.)",
@@ -86,6 +89,14 @@ HA_RANGE_PRESETS_STATS = {
 }
 HA_RANGE_PRESET_DAYS_STATS = {"30d": 30, "90d": 90, "365d": 365}
 HA_MAX_RANGE_DAYS_STATS = 3650
+
+# Der geführte Vollimport verwendet immer Stundenstatistik: Nur so kostet die
+# saubere Schnittstelle zur Rohhistorie höchstens einen Teil einer Stunde statt
+# bei Tageswerten potenziell fast einen ganzen Tag verfügbarer Rohdaten.
+HA_FULL_IMPORT_PERIOD = "hour"
+HA_RANGE_PRESETS_FULL_STATS = {
+    key: HA_RANGE_PRESETS_STATS[key] for key in ("max", "365d", "90d", "30d")
+}
 
 # Ab wann eine gecachte Verfügbarkeitsprüfung (siehe _HaAvailabilityCache) als
 # veraltet gilt und die Tabelle warnt — HA-Zustände ändern sich laufend, eine
@@ -153,8 +164,9 @@ class _ImportProgress:
 
 
 class _HaAvailabilityCache:
-    """Cache der zuletzt geprüften HA-Verfügbarkeit je Quelle/Auflösung
-    (history_source + period, siehe _ha_cache_key()) — ohne das ginge eine
+    """Cache der zuletzt geprüften HA-Verfügbarkeit je Importkonfiguration
+    (Quelle, Auflösung, Zeiträume und Vollimport-Statistikoption; siehe
+    _ha_cache_key()) — ohne das ginge eine
     bereits geprüfte Verfügbarkeit bei jedem GET /import (Seitenwechsel,
     Neuladen) verloren: _ha_import_context() kannte sie bisher nur für die
     Dauer der jeweiligen POST-Antwort, die dieselbe Vorlage neu rendert.
@@ -164,7 +176,7 @@ class _HaAvailabilityCache:
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
-        # key: _ha_cache_key(history_source, period) -> {"checked_at": float,
+        # key: _ha_cache_key(...) -> {"checked_at": float,
         # "availability": dict[str, EntityAvailability], "error": str | None}
         self.entries: dict[str, dict] = {}
 
@@ -202,18 +214,43 @@ class ImportService:
 
 
     @staticmethod
-    def _ha_cache_key(history_source: str, period: str) -> str:
-        return f"stats:{period}" if history_source == "stats" else "raw"
+    def _ha_cache_key(
+        history_source: str,
+        period: str,
+        range_preset: str = "max",
+        stats_range_preset: str = "max",
+        include_long_term_stats: bool = True,
+    ) -> str:
+        return ":".join((
+            history_source,
+            period if history_source in ("stats", "full") else "-",
+            range_preset,
+            stats_range_preset if history_source == "full" else "-",
+            "stats" if history_source == "full" and include_long_term_stats else "nostats",
+        ))
 
 
-    def _ha_cache_lookup(self, history_source: str, period: str) -> dict | None:
+    def _ha_cache_lookup(
+        self,
+        history_source: str,
+        period: str,
+        range_preset: str = "max",
+        stats_range_preset: str = "max",
+        include_long_term_stats: bool = True,
+    ) -> dict | None:
         with self._ha_availability_cache.lock:
-            return self._ha_availability_cache.entries.get(self._ha_cache_key(history_source, period))
+            return self._ha_availability_cache.entries.get(self._ha_cache_key(
+                history_source, period, range_preset,
+                stats_range_preset, include_long_term_stats,
+            ))
 
 
     def _ha_cache_store(
         self, history_source: str, period: str,
         availability: dict[str, ha_import.EntityAvailability], error: str | None,
+        range_preset: str = "max",
+        stats_range_preset: str = "max",
+        include_long_term_stats: bool = True,
     ) -> None:
         entry = {
             "checked_at": datetime.now(timezone.utc).timestamp(),
@@ -221,7 +258,10 @@ class ImportService:
             "error": error,
         }
         with self._ha_availability_cache.lock:
-            self._ha_availability_cache.entries[self._ha_cache_key(history_source, period)] = entry
+            self._ha_availability_cache.entries[self._ha_cache_key(
+                history_source, period, range_preset,
+                stats_range_preset, include_long_term_stats,
+            )] = entry
 
 
     def _load_symcon_names(self) -> dict[str, dict[str, str | None]]:
@@ -474,9 +514,11 @@ class ImportService:
         range_preset: str = "max",
         date_from: str = "",
         date_to: str = "",
-        history_source: str = "raw",
+        history_source: str = "full",
         period: str = ha_statistics.DEFAULT_PERIOD,
         include_existing_months: bool = False,
+        stats_range_preset: str = "max",
+        include_long_term_stats: bool = True,
     ) -> dict:
         """Auswahlliste für den Home-Assistant-Import-Reiter — bewusst NICHT über
         die HA-API entdeckt (/api/states), sondern self.deps.index.list_entities(): nur
@@ -506,8 +548,17 @@ class ImportService:
         default_from = (now - timedelta(days=10)).strftime("%Y-%m-%d")
         default_to = now.strftime("%Y-%m-%d")
         ha_available = ha_import.token_available()
-        range_options = HA_RANGE_PRESETS_STATS if history_source == "stats" else HA_RANGE_PRESETS_RAW
-        cache_entry = self._ha_cache_lookup(history_source, period)
+        range_options = (
+            HA_RANGE_PRESETS_STATS if history_source == "stats"
+            else HA_RANGE_PRESETS_FULL_RAW if history_source == "full"
+            else HA_RANGE_PRESETS_RAW
+        )
+        if history_source == "full":
+            period = HA_FULL_IMPORT_PERIOD
+        cache_entry = self._ha_cache_lookup(
+            history_source, period, range_preset,
+            stats_range_preset, include_long_term_stats,
+        )
         availability: dict[str, ha_import.EntityAvailability] = cache_entry["availability"] if cache_entry else {}
         availability_error = cache_entry["error"] if cache_entry else None
         checked_at = cache_entry["checked_at"] if cache_entry else None
@@ -517,6 +568,10 @@ class ImportService:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
             not_supported = avail is not None and not avail.supported
+            full_details = (
+                self._ha_full_availability_context(avail.details)
+                if avail is not None and history_source == "full" else {}
+            )
             # Die Verfügbar-Spalte zeigt Zeitraum und Anzahl als zwei
             # getrennte Zeilen (available_range/available_count) statt einem
             # zusammengesetzten Text — available_label bleibt der Ein-Zeilen-
@@ -526,11 +581,14 @@ class ImportService:
             if avail is not None:
                 if not_supported:
                     available_label = "Führt keine Langzeitstatistik"
-                elif avail.has_data:
+                elif avail.has_data and history_source != "full":
                     available_range, available_count = self._ha_availability_range_and_count(avail, history_source)
-                else:
-                    kind = "Statistik" if history_source == "stats" else "Rohhistorie"
-                    available_label = f"Keine {kind} im gewählten Zeitraum"
+                elif not avail.has_data:
+                    if history_source == "full":
+                        available_label = "Keine importierbaren Daten im gewählten Zeitraum"
+                    else:
+                        kind = "Statistik" if history_source == "stats" else "Rohhistorie"
+                        available_label = f"Keine {kind} im gewählten Zeitraum"
             entities.append({
                 "entity_id": entity_id,
                 "friendly_name": row["friendly_name"] or entity_id,
@@ -546,6 +604,7 @@ class ImportService:
                 # roher Unix-Zeitstempel statt des formatierten Labels, damit
                 # "12.08.2025" nicht lexikografisch vor "9.08.2025" sortiert.
                 "available_first_ts": avail.first_ts if avail is not None else None,
+                "full_details": full_details,
             })
         return {
             "ha_available": ha_available,
@@ -559,7 +618,7 @@ class ImportService:
                 if checked_at is not None else None
             ),
             "ha_availability_stale": stale,
-            "ha_history_source": history_source if history_source in ("raw", "stats") else "raw",
+            "ha_history_source": history_source if history_source in ("full", "raw", "stats") else "full",
             "ha_period": period if period in ha_statistics.PERIODS else ha_statistics.DEFAULT_PERIOD,
             "ha_period_options": list(ha_statistics.PERIODS.items()),
             "ha_range_options": list(range_options.items()),
@@ -567,6 +626,11 @@ class ImportService:
             "ha_date_from": date_from or default_from,
             "ha_date_to": date_to or default_to,
             "ha_include_existing_months": include_existing_months,
+            "ha_stats_range_options": list(HA_RANGE_PRESETS_FULL_STATS.items()),
+            "ha_stats_range_preset": (
+                stats_range_preset if stats_range_preset in HA_RANGE_PRESETS_FULL_STATS else "max"
+            ),
+            "ha_include_long_term_stats": include_long_term_stats,
         }
 
 
@@ -858,7 +922,7 @@ class ImportService:
 
 
 
-    def _ha_form_params(self, form) -> tuple[list[str], str, str, str, bool]:
+    def _ha_form_params(self, form) -> tuple[list[str], str, str, str, bool, str, bool]:
         # range_preset wird bewusst NICHT hier gegen HA_RANGE_PRESETS_RAW/
         # _STATS validiert — welches der beiden Presets-Sets gilt, hängt von
         # history_source ab (siehe _ha_source_params()), das an dieser Stelle
@@ -870,17 +934,24 @@ class ImportService:
         date_from = str(form.get("date_from") or "")
         date_to = str(form.get("date_to") or "")
         include_existing_months = form.get("include_existing_months") == "on"
-        return entity_ids, range_preset, date_from, date_to, include_existing_months
+        stats_range_preset = str(form.get("stats_range_preset") or "max")
+        include_long_term_stats = form.get("include_long_term_stats") == "on"
+        return (
+            entity_ids, range_preset, date_from, date_to,
+            include_existing_months, stats_range_preset, include_long_term_stats,
+        )
 
 
 
     def _ha_source_params(self, form) -> tuple[str, str]:
-        history_source = str(form.get("history_source") or "raw")
-        if history_source not in ("raw", "stats"):
-            history_source = "raw"
+        history_source = str(form.get("history_source") or "full")
+        if history_source not in ("full", "raw", "stats"):
+            history_source = "full"
         period = str(form.get("period") or ha_statistics.DEFAULT_PERIOD)
         if period not in ha_statistics.PERIODS:
             period = ha_statistics.DEFAULT_PERIOD
+        if history_source == "full":
+            period = HA_FULL_IMPORT_PERIOD
         return history_source, period
 
 
@@ -925,6 +996,32 @@ class ImportService:
         return start, end
 
 
+    def _ha_request_ranges(
+        self,
+        range_preset: str,
+        date_from: str,
+        date_to: str,
+        history_source: str,
+        stats_range_preset: str = "max",
+    ) -> tuple[datetime, datetime, datetime]:
+        """Liefert Roh-/Statistikbeginn und gemeinsames Ende eines Abrufs."""
+        if history_source == "full":
+            raw_start, end = self._ha_date_range(
+                range_preset, date_from, date_to, "raw"
+            )
+            valid_stats_preset = (
+                stats_range_preset if stats_range_preset in HA_RANGE_PRESETS_FULL_STATS else "max"
+            )
+            stats_start, _stats_end = self._ha_date_range(
+                valid_stats_preset, "", "", "stats"
+            )
+            return raw_start, stats_start, end
+        start, end = self._ha_date_range(
+            range_preset, date_from, date_to, history_source
+        )
+        return start, start, end
+
+
 
     def _ha_available_label(self, history: ha_import.HistoryFetchResult, history_source: str = "raw") -> str:
         """Beschreibt, was tatsächlich in HA gefunden wurde — rows ist nach
@@ -932,6 +1029,14 @@ class ImportService:
         erste/letzte Eintrag ist also der älteste/neueste tatsächlich
         abgerufene Messpunkt (nicht der angefragte Zeitraum, der ja über das
         hinausgehen kann, was HA noch vorhält)."""
+        if history_source == "full":
+            details = history.source_details
+            raw = details.get("raw", {})
+            stats = details.get("stats", {})
+            return (
+                f"{format_int(int(stats.get('used_count', 0)))} Statistik-Werte · "
+                f"{format_int(int(raw.get('used_count', 0)))} Rohwerte"
+            )
         noun = "Statistik-Werte" if history_source == "stats" else "Werte"
         if not history.rows:
             return f"Keine {'Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie'} im gewählten Zeitraum gefunden"
@@ -940,6 +1045,49 @@ class ImportService:
             f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
             f"{format_int(len(history.rows))} {noun}"
         )
+
+
+    def _ha_full_summary(self, history: ha_import.HistoryFetchResult) -> dict:
+        """Für Dry Run/Ergebnis vorformatierte Details des kombinierten Abrufs."""
+        details = history.source_details
+        raw = details.get("raw", {})
+        stats = details.get("stats", {})
+
+        def range_label(part: dict, noun: str) -> str:
+            first_ts = part.get("used_first_ts")
+            last_ts = part.get("used_last_ts")
+            count = int(part.get("used_count", 0))
+            if first_ts is None or last_ts is None:
+                return f"Keine {noun} verwendet"
+            return (
+                f"{format_timestamp(float(first_ts), self.deps.tz)} – "
+                f"{format_timestamp(float(last_ts), self.deps.tz)} · "
+                f"{format_int(count)} {noun}"
+            )
+
+        cutover_ts = details.get("cutover_ts")
+        stats_enabled = bool(stats.get("enabled", False))
+        stats_supported = stats.get("supported")
+        stats_label = range_label(stats, "Statistik-Werte")
+        if stats_enabled and stats_supported is False:
+            stats_label = "Für diese Entität nicht unterstützt"
+        elif not stats_enabled:
+            stats_label = "Nicht angefordert"
+        return {
+            "stats_label": stats_label,
+            "raw_label": range_label(raw, "Rohwerte"),
+            "cutover_label": (
+                f"{format_timestamp(float(cutover_ts), self.deps.tz)} "
+                f"{format_time(float(cutover_ts), self.deps.tz)}"
+                if cutover_ts is not None else None
+            ),
+            "raw_discarded_at_seam": int(raw.get("discarded_at_seam", 0)),
+            "stats_discarded_at_seam": int(stats.get("discarded_at_seam", 0)),
+            "boundary_anchor": raw.get("boundary_anchor"),
+            "stats_enabled": stats_enabled,
+            "stats_supported": stats_supported,
+            "seam_status": details.get("seam_status"),
+        }
 
 
 
@@ -958,6 +1106,32 @@ class ImportService:
         range_label = f"{format_timestamp(avail.first_ts, self.deps.tz)} – {format_timestamp(avail.last_ts, self.deps.tz)}"
         count_label = f"{format_int(avail.count)} {noun}"
         return range_label, count_label
+
+
+    def _ha_full_availability_context(self, details: dict) -> dict:
+        """Formatiert die getrennten Quellbereiche für die Vollimport-Tabelle."""
+        def source(raw: dict, noun: str) -> dict:
+            count = int(raw.get("count", 0))
+            first_ts = raw.get("first_ts")
+            last_ts = raw.get("last_ts")
+            supported = bool(raw.get("supported", True))
+            if not supported:
+                label = "Nicht unterstützt"
+            elif count and first_ts is not None and last_ts is not None:
+                label = (
+                    f"{format_timestamp(float(first_ts), self.deps.tz)} – "
+                    f"{format_timestamp(float(last_ts), self.deps.tz)} · "
+                    f"{format_int(count)} {noun}"
+                )
+            else:
+                label = "Keine Daten gefunden"
+            return {"count": count, "supported": supported, "label": label}
+
+        return {
+            "raw": source(details.get("raw", {}), "Rohwerte"),
+            "stats": source(details.get("stats", {}), "Statistik-Werte"),
+            "stats_enabled": bool(details.get("stats_enabled", False)),
+        }
 
 
     def _fetch_ha_history(self,
@@ -1008,6 +1182,268 @@ class ImportService:
                     label, entity_id, history.skipped, history.skipped + len(history.rows),
                 )
         return fetched, errors
+
+
+    @staticmethod
+    def _ha_full_cutover(raw_first_ts: float, period: str = HA_FULL_IMPORT_PERIOD) -> float:
+        """Nächste vollständige Statistikgrenze in UTC (Vollimport: Stunde)."""
+        seconds = 86_400 if period == "day" else 3_600
+        return math.ceil(raw_first_ts / seconds) * seconds
+
+
+    def _combine_ha_full_history(
+        self,
+        raw: ha_import.HistoryFetchResult,
+        stats: ha_import.HistoryFetchResult | None,
+        raw_start: datetime,
+        stats_start: datetime,
+        end: datetime,
+        period: str = HA_FULL_IMPORT_PERIOD,
+        stats_supported: bool | None = None,
+        stats_requested: bool | None = None,
+    ) -> ha_import.HistoryFetchResult:
+        """Vereinigt beide HA-Quellen mit einer echten halb-offenen Grenze.
+
+        Statistik-Buckets werden als Intervalle behandelt, nicht nur als Punkte:
+        Ein Stundenwert mit Zeitstempel 10:00 belegt [10:00, 11:00). Nur wenn
+        der Bucket direkt vor der nächsten vollen Grenze vorhanden ist, werden
+        Rohwerte vor dieser Grenze verworfen. Fehlt er, bleiben alle Rohwerte
+        erhalten und nur vollständig davor endende Statistik-Buckets werden
+        verwendet. Dadurch erzeugt Zeitarchiv selbst weder Überlappung noch eine
+        künstliche Lücke.
+        """
+        stats_enabled = stats is not None if stats_requested is None else stats_requested
+        stats = stats or ha_import.HistoryFetchResult()
+        bucket_seconds = 86_400 if period == "day" else 3_600
+        raw_rows = sorted(raw.rows)
+        stats_rows = sorted(stats.rows)
+        cutover_ts: float | None = None
+        seam_status = "nur_rohhistorie"
+        boundary_anchor: tuple[float, float] | None = None
+
+        if raw_rows and stats_rows:
+            candidate = self._ha_full_cutover(raw_rows[0][0], period)
+            covering_bucket = any(
+                ts < candidate and ts + bucket_seconds >= candidate
+                for ts, _value in stats_rows
+            )
+            cutover_ts = candidate if covering_bucket else raw_rows[0][0]
+            used_stats = [row for row in stats_rows if row[0] + bucket_seconds <= cutover_ts]
+            used_raw = [row for row in raw_rows if row[0] >= cutover_ts]
+            if covering_bucket and not any(ts == cutover_ts for ts, _value in used_raw):
+                previous_raw = [row for row in raw_rows if row[0] < cutover_ts]
+                if previous_raw:
+                    # HA-Zustände gelten bis zur nächsten Änderung. Genau wie
+                    # der Recorder bei einer period-Abfrage einen Zustand am
+                    # Fensterbeginn synthetisiert, setzen wir den letzten
+                    # bekannten Rohzustand auf die halb-offene Schnittstelle.
+                    # So endet der Statistik-Bucket dort und der Rohbereich
+                    # beginnt am selben Zeitpunkt, ohne Messintervalle zu
+                    # überlagern oder einen leeren Abschnitt zu erzeugen.
+                    boundary_anchor = (cutover_ts, previous_raw[-1][1])
+                    used_raw.insert(0, boundary_anchor)
+            seam_status = "nahtlos" if covering_bucket else "quellenluecke_nicht_vergroessert"
+        elif stats_rows:
+            used_stats = stats_rows
+            used_raw = []
+            seam_status = "nur_langzeitstatistik"
+        else:
+            used_stats = []
+            used_raw = raw_rows
+
+        combined_rows = sorted([*used_stats, *used_raw])
+        if len(combined_rows) > MAX_IMPORT_ROWS_PER_ENTITY:
+            raise ValueError(
+                f"HA-Vollimport enthält mehr als {MAX_IMPORT_ROWS_PER_ENTITY:,} Datenpunkte".replace(",", ".")
+            )
+
+        discarded = [
+            {**entry, "source": "raw"} for entry in raw.discarded
+        ] + [
+            {**entry, "source": "stats"} for entry in stats.discarded
+        ]
+        used_raw_set = set(used_raw)
+        used_stats_set = set(used_stats)
+        discarded.extend({
+            "reason": "Rohwert liegt im vollständig durch Statistik abgedeckten Übergangsintervall",
+            "source": "raw",
+            "timestamp": ts,
+            "value": value,
+            "cutover_timestamp": cutover_ts,
+        } for ts, value in raw_rows if (ts, value) not in used_raw_set)
+        discarded.extend({
+            "reason": "Statistik-Bucket überschreitet die Schnittstelle zur Rohhistorie",
+            "source": "stats",
+            "timestamp": ts,
+            "value": value,
+            "cutover_timestamp": cutover_ts,
+        } for ts, value in stats_rows if (ts, value) not in used_stats_set)
+
+        def bounds(rows: list[tuple[float, float]]) -> tuple[float | None, float | None]:
+            return (rows[0][0], rows[-1][0]) if rows else (None, None)
+
+        raw_first, raw_last = bounds(used_raw)
+        stats_first, stats_last = bounds(used_stats)
+        return ha_import.HistoryFetchResult(
+            rows=combined_rows,
+            skipped=raw.skipped + stats.skipped,
+            discarded=discarded,
+            source_details={
+                "mode": "full",
+                "period": period,
+                "cutover_ts": cutover_ts,
+                "seam_status": seam_status,
+                "raw": {
+                    "requested_start_utc": raw_start.isoformat(),
+                    "requested_end_utc": end.isoformat(),
+                    "fetched_count": len(raw_rows),
+                    "used_count": len(used_raw),
+                    "used_first_ts": raw_first,
+                    "used_last_ts": raw_last,
+                    "discarded_at_seam": sum(1 for row in raw_rows if row not in used_raw_set),
+                    "boundary_anchor": (
+                        {"timestamp": boundary_anchor[0], "value": boundary_anchor[1]}
+                        if boundary_anchor else None
+                    ),
+                },
+                "stats": {
+                    "enabled": stats_enabled,
+                    "supported": stats_supported,
+                    "requested_start_utc": stats_start.isoformat(),
+                    "requested_end_utc": end.isoformat(),
+                    "fetched_count": len(stats_rows),
+                    "used_count": len(used_stats),
+                    "used_first_ts": stats_first,
+                    "used_last_ts": stats_last,
+                    "discarded_at_seam": len(stats_rows) - len(used_stats),
+                },
+            },
+        )
+
+
+    def _fetch_ha_full_history(
+        self,
+        entity_ids: list[str],
+        raw_start: datetime,
+        stats_start: datetime,
+        end: datetime,
+        include_long_term_stats: bool = True,
+    ) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
+        """Rohhistorie zuerst, anschließend optional Stundenstatistik."""
+        fetched: dict[str, ha_import.HistoryFetchResult] = {}
+        errors: list[str] = []
+        raw_by_entity: dict[str, ha_import.HistoryFetchResult | None] = {}
+
+        # Wirklich zuerst alle Rohbereiche bestimmen: Erst deren frühester
+        # verfügbarer Wert entscheidet, wo die Statistik später endet.
+        for entity_id in entity_ids:
+            try:
+                raw_by_entity[entity_id] = ha_import.fetch_history_rows(
+                    entity_id, entity_id.split(".", 1)[0], raw_start, end
+                )
+            except (ha_import.HaApiError, ValueError) as exc:
+                raw_by_entity[entity_id] = None
+                errors.append(f"{entity_id} · Rohhistorie: {exc}")
+                logger.warning("HA-Vollimport: Rohhistorie für %s nicht abrufbar · %s", entity_id, exc)
+
+        statistic_meta: dict[str, ha_statistics.StatisticMeta] = {}
+        if include_long_term_stats:
+            try:
+                statistic_meta = ha_statistics.fetch_statistic_meta(entity_ids)
+            except ha_import.HaApiError as exc:
+                errors.append(f"Langzeitstatistik-Metadaten: {exc}")
+                logger.warning("HA-Vollimport: Statistik-Metadaten nicht abrufbar · %s", exc)
+
+        for entity_id in entity_ids:
+            raw = raw_by_entity[entity_id]
+            stats: ha_import.HistoryFetchResult | None = None
+            meta = statistic_meta.get(entity_id)
+            stats_supported = meta.supported if meta is not None else False
+            if include_long_term_stats and stats_supported:
+                try:
+                    stats_end = end
+                    if raw is not None and raw.rows:
+                        stats_end = min(
+                            end,
+                            datetime.fromtimestamp(
+                                self._ha_full_cutover(raw.rows[0][0]), timezone.utc
+                            ),
+                        )
+                    stats = ha_statistics.fetch_statistics_rows(
+                        entity_id, stats_start, stats_end, HA_FULL_IMPORT_PERIOD
+                    )
+                except (ha_import.HaApiError, ValueError) as exc:
+                    errors.append(f"{entity_id} · Langzeitstatistik: {exc}")
+                    logger.warning("HA-Vollimport: Statistik für %s nicht abrufbar · %s", entity_id, exc)
+
+            if raw is None and stats is None:
+                continue
+            try:
+                fetched[entity_id] = self._combine_ha_full_history(
+                    raw or ha_import.HistoryFetchResult(),
+                    stats,
+                    raw_start,
+                    stats_start,
+                    end,
+                    HA_FULL_IMPORT_PERIOD,
+                    stats_supported=stats_supported if include_long_term_stats else None,
+                    stats_requested=include_long_term_stats,
+                )
+            except ValueError as exc:
+                errors.append(f"{entity_id} · Vollimport: {exc}")
+        return fetched, errors
+
+
+    def _fetch_ha_full_availability(
+        self,
+        entity_ids: list[str],
+        raw_start: datetime,
+        stats_start: datetime,
+        end: datetime,
+        include_long_term_stats: bool = True,
+    ) -> tuple[dict[str, ha_import.EntityAvailability], str | None]:
+        """Gebündelte, getrennt ausgewiesene Vorschau beider Vollimportquellen."""
+        errors: list[str] = []
+        try:
+            domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
+            raw = ha_import.fetch_availability(domains, raw_start, end)
+        except ha_import.HaApiError as exc:
+            raw = {entity_id: ha_import.EntityAvailability(entity_id) for entity_id in entity_ids}
+            errors.append(f"Rohhistorie: {exc}")
+        if include_long_term_stats:
+            try:
+                stats = ha_statistics.fetch_statistics_availability(
+                    entity_ids, stats_start, end, HA_FULL_IMPORT_PERIOD
+                )
+            except ha_import.HaApiError as exc:
+                stats = {entity_id: ha_import.EntityAvailability(entity_id) for entity_id in entity_ids}
+                errors.append(f"Langzeitstatistik: {exc}")
+        else:
+            stats = {entity_id: ha_import.EntityAvailability(entity_id, supported=False) for entity_id in entity_ids}
+
+        result: dict[str, ha_import.EntityAvailability] = {}
+        for entity_id in entity_ids:
+            raw_avail = raw.get(entity_id, ha_import.EntityAvailability(entity_id))
+            stats_avail = stats.get(entity_id, ha_import.EntityAvailability(entity_id))
+            timestamps = [
+                ts for ts in (raw_avail.first_ts, stats_avail.first_ts) if ts is not None
+            ]
+            last_timestamps = [
+                ts for ts in (raw_avail.last_ts, stats_avail.last_ts) if ts is not None
+            ]
+            result[entity_id] = ha_import.EntityAvailability(
+                entity_id=entity_id,
+                first_ts=min(timestamps) if timestamps else None,
+                last_ts=max(last_timestamps) if last_timestamps else None,
+                count=raw_avail.count + stats_avail.count,
+                supported=True,
+                details={
+                    "raw": dataclasses.asdict(raw_avail),
+                    "stats": dataclasses.asdict(stats_avail),
+                    "stats_enabled": include_long_term_stats,
+                },
+            )
+        return result, " · ".join(errors) if errors else None
 
 
     def _fetch_ha_availability(
@@ -1147,6 +1583,7 @@ class ImportService:
                 "accepted_count": len(history.rows),
                 "skipped_count": history.skipped,
                 "discarded": history.discarded,
+                "source_details": history.source_details,
             },
             "plan": dataclasses.asdict(plan),
             "months": months,
@@ -1679,8 +2116,8 @@ class ImportService:
 
 
         # ---------------------------------------------------------------------------
-        # Home-Assistant-Import (Rohhistorie direkt über die HA-Core-API, siehe
-        # storage/ha_import.py) — kein Datei-Upload, Quelle und Ziel sind dieselbe
+        # Home-Assistant-Import (Rohhistorie über die HA-Core-REST-API und
+        # Langzeitstatistik über WebSocket) — kein Datei-Upload, Quelle und Ziel sind dieselbe
         # Entitäts-ID. Teilt sich wie der CSV-Import die generische Monats-
         # Klassifizierung mit dem Symcon-Import (plan_import_rows()/import_rows()).
         # Anders als bei Symcon/CSV muss die Ziel-Entität hier NICHT frei wählbar
@@ -1712,7 +2149,10 @@ class ImportService:
             Neuzeichnen erhalten bleibt."""
             form = await request.form()
             check_entity_ids = [str(v).strip() for v in form.getlist("check_entity_ids") if str(v).strip()]
-            selected_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
+            (
+                selected_ids, range_preset, date_from, date_to,
+                include_existing_months, stats_range_preset, include_long_term_stats,
+            ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             known_ids, unknown_ids = self._known_ha_entity_ids(check_entity_ids)
             if unknown_ids:
@@ -1723,15 +2163,26 @@ class ImportService:
                     "HA-Verfügbarkeitsprüfung: unbekannte Entitäts-IDs verworfen · %s", unknown_ids
                 )
             if known_ids:
-                start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
-                availability, availability_error = await run_in_threadpool(
-                    self._fetch_ha_availability, known_ids, start, end, history_source, period
+                start, stats_start, end = self._ha_request_ranges(
+                    range_preset, date_from, date_to, history_source, stats_range_preset
                 )
+                if history_source == "full":
+                    availability, availability_error = await run_in_threadpool(
+                        self._fetch_ha_full_availability,
+                        known_ids, start, stats_start, end, include_long_term_stats,
+                    )
+                else:
+                    availability, availability_error = await run_in_threadpool(
+                        self._fetch_ha_availability, known_ids, start, end, history_source, period
+                    )
                 # Auch ein Fehlschlag wird gecacht (leeres availability-Dict) —
                 # sonst würde ein Seitenwechsel nach einem Fehlschlag wieder
                 # kommentarlos auf "noch nie geprüft" zurückfallen, statt den
                 # zuletzt aufgetretenen Fehler weiter anzuzeigen.
-                self._ha_cache_store(history_source, period, availability, availability_error)
+                self._ha_cache_store(
+                    history_source, period, availability, availability_error,
+                    range_preset, stats_range_preset, include_long_term_stats,
+                )
                 if availability_error is None:
                     with_data = sum(1 for a in availability.values() if a.has_data)
                     logger.info(
@@ -1745,6 +2196,8 @@ class ImportService:
                     date_from=date_from, date_to=date_to,
                     history_source=history_source, period=period,
                     include_existing_months=include_existing_months,
+                    stats_range_preset=stats_range_preset,
+                    include_long_term_stats=include_long_term_stats,
                 ),
             )
 
@@ -1764,7 +2217,10 @@ class ImportService:
             auf "max" zurückgesetzt, falls er für die neue Quelle nicht
             existiert, siehe _ha_import_context())."""
             form = await request.form()
-            selected_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
+            (
+                selected_ids, range_preset, date_from, date_to,
+                include_existing_months, stats_range_preset, include_long_term_stats,
+            ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_section.html",
@@ -1773,6 +2229,8 @@ class ImportService:
                     date_from=date_from, date_to=date_to,
                     history_source=history_source, period=period,
                     include_existing_months=include_existing_months,
+                    stats_range_preset=stats_range_preset,
+                    include_long_term_stats=include_long_term_stats,
                 ),
             )
 
@@ -1785,7 +2243,10 @@ class ImportService:
             beim HA-Import überhaupt einen Sinn ergibt (Symcon/CSV kennen ihre Quelle
             vollständig, ohne HAs begrenzte Recorder-Aufbewahrung)."""
             form = await request.form()
-            raw_entity_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
+            (
+                raw_entity_ids, range_preset, date_from, date_to,
+                include_existing_months, stats_range_preset, include_long_term_stats,
+            ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
@@ -1798,10 +2259,18 @@ class ImportService:
                     request, "_ha_import_dry_run.html", {**context, "items": items, "errors": errors}
                 )
 
-            start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
-            fetched, fetch_errors = await run_in_threadpool(
-                self._fetch_ha_history, entity_ids, start, end, history_source, period
+            start, stats_start, end = self._ha_request_ranges(
+                range_preset, date_from, date_to, history_source, stats_range_preset
             )
+            if history_source == "full":
+                fetched, fetch_errors = await run_in_threadpool(
+                    self._fetch_ha_full_history,
+                    entity_ids, start, stats_start, end, include_long_term_stats,
+                )
+            else:
+                fetched, fetch_errors = await run_in_threadpool(
+                    self._fetch_ha_history, entity_ids, start, end, history_source, period
+                )
             errors.extend(fetch_errors)
 
             def plan_locked() -> list[dict]:
@@ -1823,6 +2292,9 @@ class ImportService:
                             "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
                             "available_label": self._ha_available_label(history, history_source),
                             "plan": plan,
+                            "full_summary": (
+                                self._ha_full_summary(history) if history_source == "full" else None
+                            ),
                         })
                     return result
 
@@ -1861,23 +2333,28 @@ class ImportService:
             """
             generated_at = datetime.now(timezone.utc)
             form = await request.form()
-            raw_entity_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
+            (
+                raw_entity_ids, range_preset, date_from, date_to,
+                include_existing_months, stats_range_preset, include_long_term_stats,
+            ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
-            start, end = self._ha_date_range(
-                range_preset, date_from, date_to, history_source
+            start, stats_start, end = self._ha_request_ranges(
+                range_preset, date_from, date_to, history_source, stats_range_preset
             )
             fetched: dict[str, ha_import.HistoryFetchResult] = {}
             errors = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
             if entity_ids:
-                fetched, fetch_errors = await run_in_threadpool(
-                    self._fetch_ha_history,
-                    entity_ids,
-                    start,
-                    end,
-                    history_source,
-                    period,
-                )
+                if history_source == "full":
+                    fetched, fetch_errors = await run_in_threadpool(
+                        self._fetch_ha_full_history,
+                        entity_ids, start, stats_start, end, include_long_term_stats,
+                    )
+                else:
+                    fetched, fetch_errors = await run_in_threadpool(
+                        self._fetch_ha_history,
+                        entity_ids, start, end, history_source, period,
+                    )
                 errors.extend(fetch_errors)
             elif not unknown_ids:
                 errors.append("Keine Entität ausgewählt")
@@ -1899,7 +2376,7 @@ class ImportService:
                             })
                 return {
                     "format": "zeitarchiv-ha-import-debug",
-                    "format_version": 1,
+                    "format_version": 2,
                     "generated_at": generated_at.isoformat(),
                     "app_version": APP_VERSION,
                     "timezone": str(self.deps.tz),
@@ -1913,9 +2390,18 @@ class ImportService:
                         "date_from": date_from,
                         "date_to": date_to,
                         "resolved_start_utc": start.isoformat(),
+                        "resolved_stats_start_utc": (
+                            stats_start.isoformat() if history_source == "full" else None
+                        ),
                         "resolved_end_utc": end.isoformat(),
                         "history_source": history_source,
-                        "period": period if history_source == "stats" else None,
+                        "period": period if history_source in ("stats", "full") else None,
+                        "stats_range_preset": (
+                            stats_range_preset if history_source == "full" else None
+                        ),
+                        "include_long_term_stats": (
+                            include_long_term_stats if history_source == "full" else None
+                        ),
                         "include_existing_months": include_existing_months,
                     },
                     "current_month": datetime.now(self.deps.tz).strftime("%Y-%m"),
@@ -1942,7 +2428,10 @@ class ImportService:
             Vorlage (_ha_import_result.html) wie beim Dry Run, aus demselben Grund."""
             started_at = datetime.now(timezone.utc)
             form = await request.form()
-            raw_entity_ids, range_preset, date_from, date_to, include_existing_months = self._ha_form_params(form)
+            (
+                raw_entity_ids, range_preset, date_from, date_to,
+                include_existing_months, stats_range_preset, include_long_term_stats,
+            ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
@@ -1958,10 +2447,18 @@ class ImportService:
                     "Home-Assistant-Import gestartet · Quelle=%s · Entitäten=%d · Zeitraum=%s",
                     history_source, len(entity_ids), range_preset,
                 )
-                start, end = self._ha_date_range(range_preset, date_from, date_to, history_source)
-                fetched, fetch_errors = await run_in_threadpool(
-                    self._fetch_ha_history, entity_ids, start, end, history_source, period
+                start, stats_start, end = self._ha_request_ranges(
+                    range_preset, date_from, date_to, history_source, stats_range_preset
                 )
+                if history_source == "full":
+                    fetched, fetch_errors = await run_in_threadpool(
+                        self._fetch_ha_full_history,
+                        entity_ids, start, stats_start, end, include_long_term_stats,
+                    )
+                else:
+                    fetched, fetch_errors = await run_in_threadpool(
+                        self._fetch_ha_history, entity_ids, start, end, history_source, period
+                    )
                 errors.extend(fetch_errors)
 
                 def execute_ha_import() -> tuple[list[dict], dict]:
@@ -1983,6 +2480,9 @@ class ImportService:
                                 "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
                                 "available_label": self._ha_available_label(history, history_source),
                                 "result": result,
+                                "full_summary": (
+                                    self._ha_full_summary(history) if history_source == "full" else None
+                                ),
                             })
                         reconciliation = self.deps.run_storage_reconciliation(
                             entity_ids=sorted(fetched.keys()), repair=True
@@ -2035,7 +2535,13 @@ class ImportService:
                             "date_from": date_from,
                             "date_to": date_to,
                             "history_source": history_source,
-                            "period": period if history_source == "stats" else None,
+                            "period": period if history_source in ("stats", "full") else None,
+                            "stats_range_preset": (
+                                stats_range_preset if history_source == "full" else None
+                            ),
+                            "include_long_term_stats": (
+                                include_long_term_stats if history_source == "full" else None
+                            ),
                             "include_existing_months": include_existing_months,
                         },
                         results=[dataclasses.asdict(result) for result in results],

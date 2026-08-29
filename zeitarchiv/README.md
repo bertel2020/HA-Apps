@@ -141,7 +141,9 @@ die Zeit, aufgeschlüsselt nach Typ, Auflösung und Aufbewahrung.
 
 **Import und Export.** Bestehende Historie lässt sich aus Symcon-Exporten,
 frei zuordenbaren CSV-Dateien oder direkt aus der laufenden
-Home-Assistant-Instanz (Rohhistorie oder Langzeitstatistik) übernehmen.
+Home-Assistant-Instanz übernehmen. Der empfohlene Vollimport verbindet ältere
+Stundenstatistik automatisch und ohne zeitliche Überschneidung mit der jüngeren
+Rohhistorie; beide Quellen bleiben auch einzeln importierbar.
 Jeder Import bleibt als Report nachvollziehbar; bereits vorhandene
 Zeitstempel werden dabei nie dupliziert. Der laufende Monat wird automatisch
 im Hot Buffer ergänzt; historische Lücken in abgeschlossenen Archiven lassen

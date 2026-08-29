@@ -575,7 +575,15 @@ Entitäten, die bereits in Zeitarchiv bekannt sind — also von der
 Home-Assistant-Integration konfiguriert wurden und mindestens einen
 Live-Wert übertragen haben.
 
-Zwei Quellen zur Wahl:
+Der empfohlene **Vollimport** verbindet beide Quellen automatisch. Die
+Einzelmodi bleiben für gezielte Importe verfügbar:
+
+- **Vollimport:** ermittelt zuerst die tatsächlich verfügbare Rohhistorie und
+  ergänzt davor die ältere Stundenstatistik. Die Schnittstelle wird
+  für jede Entität einzeln auf eine volle Stunde gelegt. Der letzte bekannte
+  Rohzustand wird an dieser Grenze fortgeführt; Statistik-Buckets enden exakt
+  davor. Dadurch erzeugt Zeitarchiv weder eine Lücke noch eine zeitliche
+  Überschneidung zwischen den Quellen.
 
 - **Rohhistorie:** Einzelmesswerte über die Home-Assistant-REST-API. Home
   Assistant hält diese standardmäßig aber nur einige Tage vor, deckt also
@@ -589,26 +597,34 @@ Zwei Quellen zur Wahl:
   `sensor.*`-Entitäten), erkennbar an der Markierung "Nicht unterstützt" in
   der Spalte "Art" bei allen anderen.
 
-Ablauf: Zeitraum wählen (die verfügbaren Voreinstellungen unterscheiden
+Ablauf: Importmodus und Zeitraum wählen (die verfügbaren Voreinstellungen unterscheiden
 sich je nach Quelle — bei Langzeitstatistik steht z. B. zusätzlich "Letztes
 Jahr" zur Verfügung), optional "Verfügbarkeit prüfen" für eine Vorschau,
 welche Entitäten in Home Assistant tatsächlich Daten der gewählten Quelle
 haben und für welchen Zeitraum. Das Prüfergebnis bleibt je Quelle/Auflösung
 erhalten — auch nach einem Seitenwechsel oder einem Wechsel zwischen
-Rohhistorie und Langzeitstatistik, bis zum nächsten Neustart des Add-ons.
+Vollimport, Rohhistorie und Langzeitstatistik, bis zum nächsten Neustart des Add-ons.
 Ein Status-Chip rechts neben "Verfügbarkeit prüfen" zeigt den laufenden
 Prüfstatus und anschließend den Zeitpunkt der letzten Prüfung; ab 15 Minuten
 erscheint ein Hinweis, dass der Stand veraltet sein könnte.
 
+Beim Vollimport werden Roh- und Statistikzeitraum getrennt gewählt. Der Dry
+Run weist je Entität beide verwendeten Bereiche, die berechnete Schnittstelle,
+bewusst verworfene Übergangswerte und den fortgeführten Rohwert-Anker aus.
+Entitäten ohne Langzeitstatistik werden weiterhin vollständig mit ihrer
+verfügbaren Rohhistorie importiert; ein Ausfall einer Quelle verhindert nicht,
+dass erfolgreich abgerufene Werte der anderen Quelle verarbeitet werden.
+
 Der laufende Kalendermonat wird unabhängig vom bereits vorhandenen
 Datenbestand immer automatisch in den Hot Buffer importiert. Die Option
-"Archivierte Monate ergänzen" ist nur erforderlich, wenn in bereits
+"Archivlücken ergänzen" ist nur erforderlich, wenn in bereits
 abgeschlossenen Monatsarchiven echte historische Lücken geschlossen werden
 sollen. Vorhandene Zeitstempel und Werte bleiben dabei unverändert.
 
 Nach einem Dry Run kann eine Debug-Datei als ZIP heruntergeladen werden. Sie
 enthält alle für die Diagnose relevanten abgerufenen, übernommenen und
-verworfenen Werte samt Gründen, Monatszuordnung, Importplan und aktuellem
+verworfenen Werte samt Gründen, Quellenbereichen und Schnittstelle,
+Monatszuordnung, Importplan und aktuellem
 Archiv-/Hot-Buffer-Zustand. Zugangstoken und Autorisierungsheader werden nicht
 aufgenommen. Da der Export dennoch Messwerte und Entitätsmetadaten enthält,
 sollte er nur gezielt weitergegeben werden.
@@ -632,7 +648,7 @@ lassen sich gesammelt löschen, wenn sie nicht mehr benötigt werden.
 
 Importe ergänzen ausschließlich fehlende Zeitstempel. Der laufende Monat
 landet im Hot Buffer; bereits abgeschlossene Archive werden nur mit aktivierter
-Option "Archivierte Monate ergänzen" um fehlende Zeitstempel erweitert.
+Option "Archivlücken ergänzen" um fehlende Zeitstempel erweitert.
 Vorhandene Messpunkte derselben Entität und desselben Zeitstempels werden
 übersprungen — auch bei abweichender Event-ID — und niemals ersetzt. Ein
 erneuter Symcon- oder CSV-Upload derselben Quelle dupliziert also nichts,
