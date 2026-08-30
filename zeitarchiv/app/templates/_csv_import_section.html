@@ -10,7 +10,7 @@
     <input type="file" name="file" id="csv-file-input" accept=".csv" style="display:none;"
            hx-post="import/csv/upload" hx-trigger="change" hx-encoding="multipart/form-data"
            hx-target="#csv-section" hx-swap="outerHTML"
-           hx-on::response-error="alert('Bitte eine CSV-Datei hochladen.')">
+           hx-on::response-error="appAlert('Bitte eine CSV-Datei hochladen.')">
   </label>
 </div>
 {% else %}

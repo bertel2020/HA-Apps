@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.68.0 - 2026-08-31
+
+### Neu
+
+- Die Übersichten von Dashboards, Charts und Tabellen haben ein Suchfeld und
+  eine wählbare Sortierung (neueste, älteste, Name auf- oder absteigend).
+  „Favoriten zuerst“ ist dabei ein eigener Schalter und lässt sich mit jeder
+  Sortierung kombinieren. Beides wird je Ansicht im Browser gemerkt.
+- Chart-Kacheln zeigen zusätzlich den Diagrammtyp. Enthält ein Chart Linien-
+  und Balkenreihen zugleich, werden beide genannt.
+- Die Sparkline einer Werte-Kachel lässt sich zusätzlich auf einen Punkt je
+  15 Minuten verdichten.
+- Der Demo-Datengenerator kann mit `--append` eine bestehende Demo-Instanz um
+  die Werte seit dem letzten Lauf ergänzen, statt die komplette Historie neu
+  zu erzeugen. Regelmäßig ausgeführt bleibt eine Demo-Instanz dadurch aktuell,
+  ohne bei jedem Lauf Monate neu zu berechnen.
+
+### Verbesserung
+
+- Vergleichstabellen laden ihre Spalten parallel statt nacheinander. Die
+  Ladezeit hängt dadurch kaum noch von der Spaltenanzahl ab.
+- Dashboards, Charts und Tabellen führen jeweils eindeutige Namen: Groß- und
+  Kleinschreibung sowie Randleerzeichen bleiben dabei unberücksichtigt.
+  Namen sind auf 50 Zeichen begrenzt. Kopien zählen selbstständig hoch
+  („(Kopie)“, „(Kopie 2)“ …).
+- Die Kacheln der drei Übersichten sind kompakter: „Ansehen“ und „Öffnen“
+  entfallen, weil die gesamte Kachel den Eintrag öffnet, und „Bearbeiten“ ist
+  ins Kachelmenü gewandert. Alle Kacheln sind gleich hoch und bieten Platz für
+  den längsten erlaubten Namen; die Angaben darunter stehen dadurch über alle
+  Kacheln hinweg auf einer Linie.
+- Chart-Optionen zeigen nur noch, was für die aktuelle Darstellung Wirkung
+  hat: „Punkte“ und „Rohwerte“ bei Linien, „Werte anzeigen“ bei Balken.
+  Bisher waren diese Schalter dauerhaft sichtbar und lediglich deaktiviert.
+- Meldungen und Rückfragen erscheinen durchgängig im App-Look statt als
+  Browserdialog mit vorangestellter Serveradresse. Die Index-Optimierung
+  fragt vor dem Start nach und meldet den Fortschritt am Schaltknopf.
+- Im Präzisen Modus fügt sich die Kachel „+“ in das feinere Raster ein, statt
+  über ihre Zeile hinauszuragen.
+
+### Fehlerbehebung
+
+- Auf den Übersichten ließen sich mehrere Kachelmenüs gleichzeitig öffnen,
+  und ein geöffnetes Menü wurde von der Kachel darunter überdeckt.
+
 ## 0.67.0 - 2026-08-30
 
 ### Neu

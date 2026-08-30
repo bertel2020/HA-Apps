@@ -159,9 +159,13 @@ window.TableCompute = (() => {
     const values = columns.map(() => new Array(rows.length).fill(null));
     const windowStarts = columns.map(() => null);
 
-    for (let ci = 0; ci < columns.length; ci++) {
-      if (!allEntityIds.length) continue;
-      const col = columns[ci];
+    // Alle Spalten-Requests parallel statt nacheinander — bei vielen Spalten
+    // (z. B. 12 Monatsspalten) dominiert sonst die Summe der Round-Trips die
+    // Ladezeit. Die Auswertung je Spalte bleibt unabhängig, nur die
+    // Formel-Zeilen unten brauchen alle Spaltenwerte und laufen deshalb erst
+    // nach dem gemeinsamen await.
+    await Promise.all(columns.map(async (col, ci) => {
+      if (!allEntityIds.length) return;
       const params = new URLSearchParams({
         entity_ids: allEntityIds.join(','), range: col.range_key, offset: String(col.offset || 0),
         continuous: 'false', year_over_year: String(!!col.year_over_year),
@@ -199,7 +203,7 @@ window.TableCompute = (() => {
         const memberUnits = [...new Set(members.map(member => member.unit || ''))];
         values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : ''};
       });
-    }
+    }));
 
     columns.forEach((col, ci) => {
       rows.forEach((row, ri) => {

@@ -573,7 +573,7 @@
         <p class="tbl-hint" x-show="loading" style="margin-top:8px;">Lädt …</p>
 
         <div class="save-row" x-show="editing">
-          <input type="text" placeholder="Name der Tabelle …" x-model="name">
+          <input type="text" placeholder="Name der Tabelle …" maxlength="{{ max_name_length }}" x-model="name">
           <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if table_id else "Tabelle erstellen" }}</button>
           {% if table_id %}
           <button type="button" class="btn btn-danger" @click="deleteTable()">Löschen</button>
@@ -1028,16 +1028,16 @@
         },
 
         async save() {
-          if (!this.name.trim()) { alert('Bitte einen Namen für die Tabelle angeben.'); return; }
-          if (!this.columns.length) { alert('Bitte mindestens eine Spalte anlegen.'); return; }
-          if (!this.rows.length) { alert('Bitte mindestens eine Zeile anlegen.'); return; }
+          if (!this.name.trim()) { appAlert('Bitte einen Namen für die Tabelle angeben.'); return; }
+          if (!this.columns.length) { appAlert('Bitte mindestens eine Spalte anlegen.'); return; }
+          if (!this.rows.length) { appAlert('Bitte mindestens eine Zeile anlegen.'); return; }
           for (const row of this.rows) {
             if ((row.row_type === 'entity' || row.row_type === 'group') && !row.entity_ids.length) {
-              alert(`Zeile "${this.resolvedRowLabel(row)}" braucht mindestens eine Entität.`);
+              appAlert(`Zeile "${this.resolvedRowLabel(row)}" braucht mindestens eine Entität.`);
               return;
             }
             if (row.row_type === 'formula' && !row.formula.trim()) {
-              alert(`Zeile "${this.resolvedRowLabel(row)}" braucht eine Formel.`);
+              appAlert(`Zeile "${this.resolvedRowLabel(row)}" braucht eine Formel.`);
               return;
             }
           }
@@ -1066,7 +1066,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              alert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || 'Speichern fehlgeschlagen.');
               return;
             }
             const data = await res.json();

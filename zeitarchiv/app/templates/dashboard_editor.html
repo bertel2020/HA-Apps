@@ -37,7 +37,7 @@
 
       <div class="field">
         <label for="dash-name">Name</label>
-        <input id="dash-name" type="text" x-model="name" placeholder="Name des Dashboards …" @keydown.enter="save()">
+        <input id="dash-name" type="text" x-model="name" maxlength="{{ max_name_length }}" placeholder="Name des Dashboards …" @keydown.enter="save()">
       </div>
 
       {% if dashboard %}
@@ -102,7 +102,7 @@
         savedMessage: '',
 
         async save() {
-          if (!this.name.trim()) { alert('Bitte einen Namen für das Dashboard angeben.'); return; }
+          if (!this.name.trim()) { appAlert('Bitte einen Namen für das Dashboard angeben.'); return; }
           this.saving = true;
           this.savedMessage = '';
           try {
@@ -112,7 +112,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              alert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || 'Speichern fehlgeschlagen.');
               return;
             }
             const data = await res.json();
@@ -120,15 +120,15 @@
               const lockRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/lock`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({locked: this.locked}),
               });
-              if (!lockRes.ok) { alert('Speichern der Fixierung fehlgeschlagen.'); return; }
+              if (!lockRes.ok) { appAlert('Speichern der Fixierung fehlgeschlagen.'); return; }
               const preciseRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/precise-mode`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({precise_mode: this.preciseMode}),
               });
-              if (!preciseRes.ok) { alert('Speichern des Präzisen Modus fehlgeschlagen.'); return; }
+              if (!preciseRes.ok) { appAlert('Speichern des Präzisen Modus fehlgeschlagen.'); return; }
               const fillGapsRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/fill-gaps`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fill_gaps: this.fillGaps}),
               });
-              if (!fillGapsRes.ok) { alert('Speichern von "Lücken auffüllen" fehlgeschlagen.'); return; }
+              if (!fillGapsRes.ok) { appAlert('Speichern von "Lücken auffüllen" fehlgeschlagen.'); return; }
             }
             window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
           } finally {
@@ -142,7 +142,7 @@
           if (res.ok) {
             window.location.href = `${BASE}/dashboards`;
           } else {
-            alert('Löschen fehlgeschlagen.');
+            appAlert('Löschen fehlgeschlagen.');
           }
         },
       };

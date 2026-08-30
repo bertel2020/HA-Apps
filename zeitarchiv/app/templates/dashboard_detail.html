@@ -106,6 +106,12 @@
      schrumpfen. */
   .dtile-legend .tbl-wrap{width:100%;}
   .dtile-add{display:flex;align-items:center;justify-content:center;min-height:206px;grid-column:span 1;grid-row:span 1;border-style:dashed;overflow:visible;}
+  /* Präziser Modus: Spalten und Zeilenhöhe sind halbiert (s.o.), eine 1x1-
+     Zelle wäre also nur ein Sechstel breit und halb so hoch — die feste
+     min-height:206px würde sie zusätzlich über ihre Gitterzeile hinaus
+     drücken. 2x2 Zellen entsprechen genau einer normalen Kachel, analog zur
+     Verdopplung der Kachelgrößen in set_dashboard_precise_mode(). */
+  .dashboard-grid.is-precise .dtile-add{grid-column:span 2;grid-row:span 2;}
   .dtile-add-btn{
     width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);
     color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));line-height:1;cursor:pointer;

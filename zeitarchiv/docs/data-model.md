@@ -127,6 +127,24 @@ Existenz-Check in `Index.__init__()`.
 | `saved_tables`, `table_columns`, `table_rows` | Vergleichstabellen: Struktur (Zeilen=Größen, Spalten=Zeiträume) getrennt von `style_json` (rein optische Darstellung, siehe [frontend.md](frontend.md)) |
 | `dashboards`, `dashboard_pins` | Mehrere benannte Dashboards (Favorit, Standard, Präziser Modus, Lücken auffüllen); eine gemeinsame Pin-Tabelle für Charts, Tabellen UND direkt gepinnte Entitäten ("Werte-Kacheln", `item_type`/`item_id`/`item_entity_id`), da alle drei gemeinsam sortiert werden müssen |
 
+### Eindeutige Namen (`dashboards`, `saved_charts`, `saved_tables`)
+
+Die drei Tabellen führen jeweils eindeutige, höchstens
+`MAX_SAVED_NAME_LENGTH` (50) Zeichen lange Namen. Die Prüfung sitzt in
+`Index._ensure_valid_name_locked()` und läuft innerhalb derselben
+Transaktion wie das `INSERT`/`UPDATE`, das sie absichert — also nicht als
+UNIQUE-Constraint in der Tabelle: verglichen wird ohne Groß-/Kleinschreibung
+und ohne Randleerzeichen, und zwar mit Pythons `casefold()`. SQLite kennt
+ohne ICU-Erweiterung nur ASCII-Faltung und hielte "Küche" und "KÜCHE"
+deshalb für verschiedene Namen.
+
+Verletzungen werfen `DuplicateNameError` bzw. `NameTooLongError` (beide
+`InvalidNameError`); ein zentraler Exception-Handler in `main.py` übersetzt
+sie nach `409` bzw. `400`. Die Duplizieren-Routen umgehen die Kollision
+selbst, indem sie über `copy_name_for()` den ersten freien Namen der Reihe
+"(Kopie)", "(Kopie 2)" … wählen und den Ursprungsnamen dabei so weit kürzen,
+dass der Zusatz noch in die Längengrenze passt.
+
 ### Gecachte Vorschauen (`settings`-Tabelle)
 
 Drei rechenintensive Vorschauen (Retention-Übersicht, Duplikat-Übersicht,

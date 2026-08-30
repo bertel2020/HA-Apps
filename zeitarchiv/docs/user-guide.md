@@ -10,6 +10,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 
 - [Erste Schritte](#erste-schritte)
 - [Die Übersichtsseite](#die-übersichtsseite)
+- [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)
 - [Dashboards](#dashboards)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
 - [Entität konfigurieren](#entität-konfigurieren)
@@ -64,6 +65,36 @@ darunter das **Standard-Dashboard** — dieselbe Kachel-Ansicht wie unter
 oder löschbar. Es lässt sich wie jedes andere Dashboard mit Kacheln
 bestücken, umsortieren und fixieren (siehe unten).
 
+## Übersichten durchsuchen und sortieren
+
+Die drei Übersichten **Dashboards**, **Charts** und **Tabellen** funktionieren
+gleich: eine Kachel je Eintrag, darüber eine Zeile zum Suchen und Sortieren.
+
+- **Suche** filtert nach dem Namen, ohne auf Groß- und Kleinschreibung zu
+  achten. Umlaute lassen sich auch umschrieben eingeben: „ubersicht“ oder
+  „uebersicht“ findet ebenso „Übersicht“.
+- **Sortierung**: neueste zuerst (Vorgabe), älteste zuerst, Name A–Z oder
+  Name Z–A.
+- **Favoriten zuerst** ist ein eigener Schalter neben der Sortierung, kein
+  eigener Sortiermodus. Eingeschaltet stehen favorisierte Einträge oben,
+  innerhalb der Favoriten und darunter gilt die gewählte Sortierung
+  unverändert weiter — beides ist also frei kombinierbar. Der Schalter ist
+  standardmäßig aktiv.
+- Suchbegriffe wirken nur für den Moment; die gewählte Sortierung und der
+  Favoriten-Schalter werden je Übersicht im Browser gemerkt und gelten beim
+  nächsten Aufruf wieder.
+
+Ein Klick auf eine Kachel öffnet den Eintrag. Alles Weitere — Bearbeiten,
+Duplizieren, Löschen — steht im Kachelmenü (⋮) oben rechts, der Stern daneben
+schaltet den Favoriten um.
+
+**Namen** von Dashboards, Charts und Tabellen sind jeweils innerhalb ihrer
+Gattung eindeutig und höchstens 50 Zeichen lang. Beim Vergleich spielen Groß-
+und Kleinschreibung sowie Leerzeichen am Rand keine Rolle: neben einem Chart
+„Wind“ lässt sich kein zweites „wind“ anlegen. Ein bereits vergebener Name
+wird beim Speichern mit einem Hinweis abgelehnt. Duplikate zählen selbst
+hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
+
 ## Dashboards
 
 - **Dashboards**-Menüpunkt (Hauptnavigation) klappt eine Liste aller
@@ -72,6 +103,11 @@ bestücken, umsortieren und fixieren (siehe unten).
   **Standard-Dashboard** festlegen (dieses erscheint dann auf der
   Übersichtsseite und steht in Listen immer an erster Stelle) oder löschen.
   Es gibt keine Obergrenze für die Anzahl der Dashboards.
+- Ein Klick auf die Kachel öffnet das Dashboard; „Bearbeiten“, „Duplizieren“,
+  „Als Standard festlegen“ und „Löschen“ stehen im Kachelmenü (⋮).
+  Suchfeld, Sortierung und der Schalter „Favoriten zuerst“ über den Kacheln
+  funktionieren wie bei Charts und Tabellen (siehe
+  [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)).
 - Jedes Dashboard zeigt bis zu 18 Kacheln — Charts, Vergleichstabellen und
   **Werte-Kacheln** gemischt — in frei wählbarer Größe (1×1 bis 3×3, im
   Präzisen Modus bis 6×6). Per Drag-and-drop anordnen; über das Kachelmenü
@@ -82,7 +118,7 @@ bestücken, umsortieren und fixieren (siehe unten).
   aufs Dashboard, ohne dafür ein Chart anzulegen. Nach dem Anheften öffnet
   sich sofort die Konfiguration. Die Sparkline ist standardmäßig aktiv und
   zeigt die im Zeitarchiv gespeicherten Rohpunkte der letzten 24 Stunden;
-  alternativ lässt sie sich auf einen Punkt je 5 Minuten, 30 Minuten oder
+  alternativ lässt sie sich auf einen Punkt je 5, 15 oder 30 Minuten oder je
   Stunde verdichten. Entität, Anzeige der letzten Aktualisierung,
   Nachkommastellen und Titel sind direkt in der Kachel bearbeitbar. Ist der
   letzte Wert älter als 15
@@ -150,6 +186,10 @@ Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
   gespeicherten Messwert im Zeitraum — sinnvoll bei genauerer Prüfung
   kurzer Zeiträume, bei sehr langen Zeiträumen begrenzt durch das
   Abfragelimit.
+- Das Optionen-Menü zeigt nur, was für die aktuelle Darstellung überhaupt
+  wirkt: **Punkte** und **Rohwerte** gehören zu Liniencharts, **Werte
+  anzeigen** zu Balken. Beim Umschalten des Diagrammtyps wechseln die
+  angebotenen Optionen entsprechend mit.
 - **Dynamische Y-Achse** skaliert die Achse auf die tatsächliche
   Wertespanne des angezeigten Zeitraums statt bei 0 zu beginnen — macht
   kleine Schwankungen sichtbarer, kann die visuelle Größe von Änderungen
@@ -463,8 +503,15 @@ die Liste nicht in getrennte, überschneidungsfreie Gruppen auf.
 
 ## Charts
 
+Die Chart-Übersicht listet alle gespeicherten Charts als Kacheln mit Suche,
+Sortierung und Favoriten-Schalter (siehe
+[Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)).
+Jede Kachel nennt den Diagrammtyp, die Anzahl der Entitäten und den Zeitraum.
+Enthält ein Chart Linien- und Balkenreihen zugleich — etwa eine Temperatur
+neben einem Zähler —, werden beide Typen genannt.
+
 Eigener Editor, erreichbar über **Charts** → neues Chart oder Bearbeiten
-eines bestehenden:
+eines bestehenden (Kachelmenü ⋮):
 
 - Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
   automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
@@ -496,7 +543,13 @@ eines bestehenden:
 
 ## Vergleichstabellen
 
-Eigener Editor, erreichbar über **Tabellen** → neue Tabelle:
+Die Tabellen-Übersicht listet alle gespeicherten Tabellen als Kacheln mit
+Suche, Sortierung und Favoriten-Schalter (siehe
+[Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren));
+jede Kachel nennt die Anzahl ihrer Zeilen und Spalten.
+
+Eigener Editor, erreichbar über **Tabellen** → neue Tabelle oder Bearbeiten
+einer bestehenden (Kachelmenü ⋮):
 
 - **Zeilen** sind Größen: eine einzelne Entität, eine Gruppe mehrerer
   Entitäten (wird zu einem Summenwert zusammengefasst), eine Formel, oder

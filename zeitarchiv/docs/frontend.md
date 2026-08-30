@@ -100,9 +100,24 @@ unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
   (`static/js/dd-picker.js` für einfache Fälle, Alpine-`x-data` direkt für
   Picker, die pro Listenzeile mehrfach vorkommen — siehe Kommentare in
   `table_editor.html` zu genau dieser Abwägung).
-- **`confirm-dialog.js`**: App-eigener Bestätigungsdialog statt
-  `window.confirm()` — konsistentes Aussehen, in den drei Farbschemata
-  korrekt eingefärbt.
+- **`confirm-dialog.js`**: App-eigene Dialoge statt der Browser-Varianten —
+  konsistentes Aussehen, in den drei Farbschemata korrekt eingefärbt.
+  `appConfirm(text, {danger})` ersetzt `window.confirm()` (und greift über
+  das `htmx:confirm`-Event auch für `hx-confirm`), `appAlert(text)` ersetzt
+  `window.alert()`. In der App wird keine der beiden Browser-Funktionen mehr
+  direkt aufgerufen: der native Dialog stellt der Meldung die Serveradresse
+  voran („Auf 192.168.x.x:8123 wird Folgendes angezeigt“) und lässt sich
+  nicht gestalten.
+- **`card-browser.js`**: Suche und Sortierung der Kachel-Übersichten
+  (Dashboards, Charts, Tabellen). Bewusst rein clientseitig — anders als die
+  Entitäten-Übersicht, die per htmx auf dem Server filtert: diese Listen
+  umfassen typischerweise ein paar Dutzend Einträge und stehen ohnehin
+  vollständig im DOM. Sortiert wird über eigene Schlüssel je Kachel
+  (`data-name`, `data-created`, `data-favorite`) statt über die vom Server
+  gelieferte Reihenfolge; dadurch bleiben die `ORDER BY`-Klauseln der
+  `list_*`-Methoden unangetastet, die z. B. auch das Dashboard-Dropdown der
+  Topnav versorgen. „Favoriten zuerst“ ist ein eigener, mit jeder Sortierung
+  kombinierbarer Schalter, kein Sortiermodus.
 - **`number-format.js`**: einzige Stelle, die ein Zahlenformat kennt
   (aktuell deutsch, Komma als Dezimaltrennzeichen); eine künftige
   Sprachumschaltung ändert nur diese eine Datei, nicht jede einzelne

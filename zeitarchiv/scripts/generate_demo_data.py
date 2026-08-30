@@ -17,6 +17,17 @@ läuft — SQLite-Zugriffe aus zwei Prozessen parallel sind nicht vorgesehen.
 Beispiele:
     python3 scripts/generate_demo_data.py --data-dir /tmp/zeitarchiv-demo
     python3 scripts/generate_demo_data.py --data-dir /tmp/zeitarchiv-demo --months 12 --clean
+    python3 scripts/generate_demo_data.py --data-dir /tmp/zeitarchiv-demo --append
+
+--append ergänzt eine bereits vorhandene Demo-Instanz um die Werte seit dem
+letzten Lauf statt die komplette Historie neu zu würfeln — z. B. per Cron
+regelmäßig ausgeführt, bleibt eine Demo-Instanz so ein "lebendes" System, das
+nie hinter das aktuelle Datum zurückfällt. Zähler- und Schalter-Entitäten
+knüpfen dabei an ihren zuletzt gespeicherten Wert an (kein Zählersprung/
+-rücksetzer beim Fortsetzen); überlappende Zeitstempel werden von
+import_rows() ohnehin dedupliziert, ein Sicherheitsabstand ist also
+unkritisch. Ohne vorhandene Demo-Daten fällt --append automatisch auf eine
+normale Vollerzeugung (--months) zurück.
 """
 
 from __future__ import annotations
@@ -32,9 +43,12 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.storage import reconcile  # noqa: E402
+import pyarrow.parquet as pq  # noqa: E402
+
+from app.storage import hotbuffer, reconcile  # noqa: E402
 from app.storage.entity_removal import delete_all_values  # noqa: E402
 from app.storage.index import Index  # noqa: E402
+from app.storage.paths import entity_dir, storage_area_dir  # noqa: E402
 from app.storage.symcon_import import import_rows  # noqa: E402
 
 CONTINUOUS_STEP_MINUTES = 5
@@ -368,12 +382,22 @@ def simulate_household(
     start: datetime, end: datetime, tz: ZoneInfo, rng: random.Random,
     weather: WeatherContext, schedules: dict[str, dict[str, list[ApplianceCycle]]],
     rain_schedule: dict[str, list[ApplianceCycle]],
+    counter_seed: dict[str, float] | None = None,
+    appliance_seed: dict[str, float] | None = None,
+    rain_seed: float = 0.0,
 ) -> dict[str, list[Row]]:
     """Ein einziger Durchlauf durch den gesamten Zeitraum, der alle
     Leistungs-/Zähler-Entitäten konsistent zueinander erzeugt: die
     Zählerstände integrieren exakt dieselben Werte, die auch als
     Leistungs-Sensoren geschrieben werden, statt unabhängig neu gewürfelt zu
-    werden."""
+    werden.
+
+    counter_seed/appliance_seed/rain_seed knüpfen beim Fortsetzen einer
+    bestehenden Demo-Instanz (--append) an die zuletzt gespeicherten Werte
+    an, statt bei jedem Lauf neue Zufalls-Startwerte zu würfeln — sonst
+    sähe man beim Fortsetzen einen Zählersprung/-rücksetzer an der
+    Anschlussstelle. Fehlt ein Schlüssel (Erstlauf ohne vorhandene Demo-
+    Daten), gilt weiterhin der bisherige Zufalls-Startwert."""
     series: dict[str, list[Row]] = {
         "indoor_temp": [], "outdoor_temp": [], "humidity": [], "indoor_humidity": [], "wind": [],
         "load_power": [], "heizung": [], "waschmaschine": [], "spuelmaschine": [], "trockner": [], "wallbox": [],
@@ -381,16 +405,22 @@ def simulate_household(
         "waschmaschine_an": [], "spuelmaschine_an": [], "trockner_an": [], "regensensor": [],
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
     }
+    counter_seed = counter_seed or {}
+    appliance_seed = appliance_seed or {}
     step_hours = CONTINUOUS_STEP_MINUTES / 60
-    pv_ertrag_total = rng.uniform(3000, 15000)
-    bezug_total = rng.uniform(6000, 20000)
-    einspeisung_total = rng.uniform(500, 6000)
-    waschmaschine_energie_total = rng.uniform(50, 400)
-    spuelmaschine_energie_total = rng.uniform(50, 400)
-    trockner_energie_total = rng.uniform(50, 400)
-    wallbox_energie_total = rng.uniform(200, 2500)
-    on_state = {"waschmaschine": 0.0, "spuelmaschine": 0.0, "trockner": 0.0}
-    rain_state = 0.0
+    pv_ertrag_total = counter_seed.get("pv_ertrag", rng.uniform(3000, 15000))
+    bezug_total = counter_seed.get("bezug", rng.uniform(6000, 20000))
+    einspeisung_total = counter_seed.get("einspeisung", rng.uniform(500, 6000))
+    waschmaschine_energie_total = counter_seed.get("waschmaschine_energie", rng.uniform(50, 400))
+    spuelmaschine_energie_total = counter_seed.get("spuelmaschine_energie", rng.uniform(50, 400))
+    trockner_energie_total = counter_seed.get("trockner_energie", rng.uniform(50, 400))
+    wallbox_energie_total = counter_seed.get("wallbox_energie", rng.uniform(200, 2500))
+    on_state = {
+        "waschmaschine": appliance_seed.get("waschmaschine", 0.0),
+        "spuelmaschine": appliance_seed.get("spuelmaschine", 0.0),
+        "trockner": appliance_seed.get("trockner", 0.0),
+    }
+    rain_state = rain_seed
 
     for index, dt in enumerate(_time_range(start, end, CONTINUOUS_STEP_MINUTES)):
         ts = dt.timestamp()
@@ -454,9 +484,9 @@ def simulate_household(
     return series
 
 
-def gen_water_counter(start: datetime, end: datetime, rng: random.Random) -> list[Row]:
+def gen_water_counter(start: datetime, end: datetime, rng: random.Random, start_total: float | None = None) -> list[Row]:
     rows: list[Row] = []
-    total = rng.uniform(120, 600)
+    total = start_total if start_total is not None else rng.uniform(120, 600)
     for dt in _time_range(start, end, COUNTER_STEP_MINUTES):
         hour = dt.hour
         active_hours = 6 <= hour <= 23
@@ -466,7 +496,7 @@ def gen_water_counter(start: datetime, end: datetime, rng: random.Random) -> lis
     return rows
 
 
-def gen_presence(start: datetime, end: datetime, rng: random.Random) -> list[Row]:
+def gen_presence(start: datetime, end: datetime, rng: random.Random, start_state: float | None = None) -> list[Row]:
     def prob_home(hour: int) -> float:
         if 0 <= hour < 7:
             return 0.95
@@ -479,7 +509,7 @@ def gen_presence(start: datetime, end: datetime, rng: random.Random) -> list[Row
         return 0.9
 
     rows: list[Row] = []
-    state = 1.0
+    state = start_state if start_state is not None else 1.0
     recheck_prob = 0.12  # pro Schritt geprüft, nicht bei jedem Schritt neu gewürfelt
     for dt in _time_range(start, end, PRESENCE_STEP_MINUTES):
         if rng.random() < recheck_prob:
@@ -514,6 +544,83 @@ def write_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity,
         import_rows(data_dir, index, current_rows, entity.entity_id, tz, source_label="demo")
 
 
+# Entity-ID -> Schlüssel in simulate_household()s counter_seed-Dict (siehe
+# dortiger Kommentar) — beim Fortsetzen (--append) wird hierüber der aktuell
+# gespeicherte Zählerstand jeder Entität als neuer Startwert übernommen.
+COUNTER_SEED_ENTITY_KEYS = {
+    "sensor.demo_pv_ertrag": "pv_ertrag",
+    "sensor.demo_stromzaehler_bezug": "bezug",
+    "sensor.demo_stromzaehler_einspeisung": "einspeisung",
+    "sensor.demo_waschmaschine_energie": "waschmaschine_energie",
+    "sensor.demo_spuelmaschine_energie": "spuelmaschine_energie",
+    "sensor.demo_trockner_energie": "trockner_energie",
+    "sensor.demo_wallbox_energie": "wallbox_energie",
+}
+APPLIANCE_SEED_ENTITY_KEYS = {
+    "binary_sensor.demo_waschmaschine_an": "waschmaschine",
+    "binary_sensor.demo_spuelmaschine_an": "spuelmaschine",
+    "binary_sensor.demo_trockner_an": "trockner",
+}
+# Repräsentative, bei JEDEM Simulationsschritt geschriebene Entität — ihr
+# last_ts dient als Anker dafür, "bis wohin wurde die Demo-Instanz zuletzt
+# simuliert" (anders als Schalter/Zähler, die absichtlich nur sporadisch
+# schreiben und deshalb kein verlässliches Lückenmaß wären).
+APPEND_ANCHOR_ENTITY_ID = "sensor.demo_gesamtwirkleistung"
+
+
+def _last_actual_point(data_dir: Path, entity_id: str) -> Row | None:
+    """Letzter tatsächlich gespeicherter (ts, value)-Punkt einer Entität,
+    direkt aus Hot Buffer/Archiv gelesen statt über entities.last_value —
+    Letzteres wird nur vom echten Ingestion-Pfad gepflegt (complete_ingest_event())
+    und bleibt für per import_rows() geschriebene Daten (Demo, CSV-/Symcon-
+    Import) dauerhaft NULL, siehe derselbe Bug/Workaround in
+    _dashboard_tiles_context() (main.py)/dashboard-tiles.js. Dieselbe Datei-
+    Fundlogik wie reconcile._entity_storage_stats(), hier zusätzlich mit dem
+    Wert statt nur dem Zeitstempel."""
+    best: Row | None = None
+    hot_dir = storage_area_dir(data_dir, "hot")
+    for path in sorted(hot_dir.glob(f"{entity_id}-*.csv")) if hot_dir.exists() else []:
+        for ts, value, _event_id in hotbuffer.iter_records(path):
+            if best is None or ts > best[0]:
+                best = (ts, value)
+    if best is not None:
+        return best
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+    archive_files = sorted(archive_dir.glob("*.parquet")) if archive_dir.exists() else []
+    if not archive_files:
+        return None
+    table = pq.read_table(archive_files[-1])
+    if table.num_rows == 0:
+        return None
+    ts_col = table.column("ts").to_pylist()
+    value_col = table.column("value").to_pylist()
+    last_index = max(range(len(ts_col)), key=lambda i: ts_col[i])
+    return (ts_col[last_index], value_col[last_index])
+
+
+def _read_counter_seed(data_dir: Path) -> dict[str, float]:
+    seed: dict[str, float] = {}
+    for entity_id, key in COUNTER_SEED_ENTITY_KEYS.items():
+        point = _last_actual_point(data_dir, entity_id)
+        if point is not None:
+            seed[key] = point[1]
+    return seed
+
+
+def _read_appliance_seed(data_dir: Path) -> dict[str, float]:
+    seed: dict[str, float] = {}
+    for entity_id, key in APPLIANCE_SEED_ENTITY_KEYS.items():
+        point = _last_actual_point(data_dir, entity_id)
+        if point is not None:
+            seed[key] = point[1]
+    return seed
+
+
+def _read_last_value(data_dir: Path, entity_id: str) -> float | None:
+    point = _last_actual_point(data_dir, entity_id)
+    return point[1] if point is not None else None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-dir", type=Path, required=True, help="Zeitarchiv-Datenverzeichnis (wird bei Bedarf angelegt)")
@@ -521,12 +628,14 @@ def main() -> None:
     parser.add_argument("--tz", default="Europe/Berlin", help="IANA-Zeitzone (Standard: Europe/Berlin)")
     parser.add_argument("--seed", type=int, default=42, help="Zufalls-Seed für reproduzierbare Läufe (Standard: 42)")
     parser.add_argument("--clean", action="store_true", help="Werte vorhandener demo_*-Entitäten im Zielverzeichnis zuerst bereinigen (Entitäten selbst bleiben bestehen)")
+    parser.add_argument("--append", action="store_true", help="Statt die komplette Historie neu zu würfeln: nur die Werte seit dem letzten Lauf ergänzen (--months wird dabei ignoriert) — macht aus der Demo-Instanz ein 'lebendes' System, z. B. per Cron. Ohne vorhandene Demo-Daten wird automatisch auf eine normale Vollerzeugung zurückgefallen")
     args = parser.parse_args()
+    if args.append and args.clean:
+        parser.error("--append und --clean schließen sich gegenseitig aus.")
 
     tz = ZoneInfo(args.tz)
     rng = random.Random(args.seed)
     now = datetime.now(tz)
-    start = now - timedelta(days=args.months * 30)
 
     index = Index(args.data_dir / "index.sqlite")
 
@@ -542,10 +651,43 @@ def main() -> None:
             delete_all_values(args.data_dir, index, entity_id)
         print(f"{len(existing & wanted)} vorhandene Demo-Entität(en) bereinigt.")
 
+    counter_seed: dict[str, float] = {}
+    appliance_seed: dict[str, float] = {}
+    rain_seed = 0.0
+    water_seed: float | None = None
+    presence_seed: float | None = None
+
+    if args.append:
+        anchor = index.get_entity(APPEND_ANCHOR_ENTITY_ID)
+        if anchor is None or anchor["last_ts"] is None:
+            print("Keine vorhandenen Demo-Daten gefunden — erzeuge stattdessen die volle "
+                  f"Historie ({args.months} Monate).")
+            start = now - timedelta(days=args.months * 30)
+        else:
+            # Einen Schritt nach dem letzten bekannten Wert statt genau darauf —
+            # Überlappung wäre ohnehin unkritisch (import_rows() dedupliziert
+            # nach Zeitstempel), so entsteht aber gar nicht erst unnötig viel
+            # verworfene Redundanz.
+            start = datetime.fromtimestamp(anchor["last_ts"], tz) + timedelta(minutes=CONTINUOUS_STEP_MINUTES)
+            if start >= now:
+                print("Demo-Daten sind bereits aktuell — nichts zu ergänzen.")
+                return
+            counter_seed = _read_counter_seed(args.data_dir)
+            appliance_seed = _read_appliance_seed(args.data_dir)
+            rain_seed = _read_last_value(args.data_dir, "binary_sensor.demo_regensensor") or 0.0
+            water_seed = _read_last_value(args.data_dir, "sensor.demo_wasserzaehler")
+            presence_seed = _read_last_value(args.data_dir, "binary_sensor.demo_praesenz_wohnzimmer")
+            print(f"Ergänze Demo-Daten ab {start.isoformat()} bis {now.isoformat()}.")
+    else:
+        start = now - timedelta(days=args.months * 30)
+
     weather = WeatherContext(start, now, rng)
     schedules = build_appliance_schedules(start, now, rng)
     rain_schedule = build_rain_schedule(start, now, weather, rng)
-    household = simulate_household(start, now, tz, rng, weather, schedules, rain_schedule)
+    household = simulate_household(
+        start, now, tz, rng, weather, schedules, rain_schedule,
+        counter_seed=counter_seed, appliance_seed=appliance_seed, rain_seed=rain_seed,
+    )
 
     rows_by_key = {
         "sensor.demo_wohnzimmer_temperatur": household["indoor_temp"],
@@ -570,8 +712,8 @@ def main() -> None:
         "sensor.demo_pv_ertrag": household["pv_ertrag"],
         "sensor.demo_stromzaehler_bezug": household["stromzaehler_bezug"],
         "sensor.demo_stromzaehler_einspeisung": household["stromzaehler_einspeisung"],
-        "sensor.demo_wasserzaehler": gen_water_counter(start, now, rng),
-        "binary_sensor.demo_praesenz_wohnzimmer": gen_presence(start, now, rng),
+        "sensor.demo_wasserzaehler": gen_water_counter(start, now, rng, start_total=water_seed),
+        "binary_sensor.demo_praesenz_wohnzimmer": gen_presence(start, now, rng, start_state=presence_seed),
         "binary_sensor.demo_regensensor": household["regensensor"],
     }
 

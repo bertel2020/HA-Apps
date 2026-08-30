@@ -176,10 +176,16 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
-            <label class="menu-row">
+            <!-- Nur bei Linien überhaupt eine Wahl: "Balken" setzt raw hart auf
+                 false (Bucket-Summen), "Zeitstrahl" hart auf true (AN/AUS-
+                 Übergänge) — siehe setChartType(). In beiden Fällen war die
+                 Zeile bisher nur ein dauerhaft deaktivierter Schalter ohne
+                 Aussage. Das :disabled bleibt für die Zeitraum-Grenze: Rohwerte
+                 gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
+            <label class="menu-row" x-show="chartType === 'line'">
               <span class="menu-row-label">Rohwerte</span>
               <span class="menu-toggle">
-                <input type="checkbox" :checked="raw" :disabled="chartType !== 'line' || !['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
@@ -201,17 +207,23 @@
                 {% endif %}
               </div>
             </div>
-            <label class="menu-row">
+            <!-- "Punkte" markiert einzelne Datenpunkte auf einer Linie,
+                 "Werte anzeigen" schreibt eine Zahl an jeden Datenpunkt: bei
+                 Balken bleibt das lesbar, an einer Linie (oft hunderte Punkte)
+                 überdeckt es die Kurve. Deshalb je Diagrammtyp nur die
+                 sinnvolle der beiden Zeilen — früher waren beide immer
+                 sichtbar und nur wechselseitig deaktiviert. -->
+            <label class="menu-row" x-show="chartType === 'line'">
               <span class="menu-row-label">Punkte</span>
               <span class="menu-toggle">
-                <input type="checkbox" :checked="showPoints" :disabled="chartType !== 'line'" @change="showPoints = !showPoints; render(); saveChartOptions()">
+                <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
-            <label class="menu-row">
+            <label class="menu-row" x-show="chartType === 'bar'">
               <span class="menu-row-label">Werte anzeigen</span>
               <span class="menu-toggle">
-                <input type="checkbox" :checked="showValues" :disabled="chartType === 'timeline'" @change="showValues = !showValues; render(); saveChartOptions()">
+                <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>

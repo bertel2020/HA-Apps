@@ -32,6 +32,45 @@ _RESOLUTION_SECONDS = {
     "1h": 60 * 60,
 }
 
+# Dashboards, Charts und Tabellen führen jeweils eindeutige Namen: die
+# Oberfläche adressiert sie durchgehend über den Namen (Topnav-Dropdown,
+# Kachel-Anheftdialog, Kachelüberschriften) — zwei gleich heißende Einträge
+# sind dort nicht auseinanderzuhalten.
+_NAME_UNIQUE_TABLES = {
+    "dashboards": "Ein Dashboard",
+    "saved_charts": "Ein Chart",
+    "saved_tables": "Eine Tabelle",
+}
+
+
+# Obergrenze für Dashboard-/Chart-/Tabellennamen. 50 Zeichen reichen für
+# beschreibende Namen ("Wohnzimmer Temperatur und Luftfeuchte" = 36) und halten
+# sie zugleich dort lesbar, wo sie ungekürzt erscheinen müssen: im
+# Dashboard-Dropdown der Topnav, in Kachelüberschriften und vor allem auf den
+# Übersichtskacheln, deren Titelhöhe auf genau diese Länge ausgelegt ist
+# (siehe .chart-card h3 / .dash-card h3 in charts/tables/dashboards.html).
+MAX_SAVED_NAME_LENGTH = 50
+
+
+class InvalidNameError(ValueError):
+    """Oberklasse für abgelehnte Dashboard-/Chart-/Tabellennamen."""
+
+
+class DuplicateNameError(InvalidNameError):
+    """Der gewünschte Name ist innerhalb seiner Gattung schon vergeben."""
+
+
+class NameTooLongError(InvalidNameError):
+    """Der gewünschte Name überschreitet MAX_SAVED_NAME_LENGTH."""
+
+
+def _normalized_name(name: str) -> str:
+    """Vergleichsform eines Namens: ohne Randleerzeichen, ohne Groß-/
+    Kleinschreibung. Bewusst casefold() in Python statt LOWER() in SQL —
+    SQLite kennt (ohne ICU) nur ASCII und hielte "Küche" und "KÜCHE"
+    deshalb für verschiedene Namen."""
+    return name.strip().casefold()
+
 
 def should_accept_write(
     resolution: str,
@@ -1299,6 +1338,84 @@ class Index:
             )
             return cur.rowcount
 
+    # -- Eindeutige Namen (Dashboards/Charts/Tabellen) -------------------------
+    # Die drei folgenden Helfer setzen voraus, dass der Aufrufer self._lock
+    # bereits hält (threading.Lock ist nicht reentrant) — sie laufen deshalb
+    # innerhalb derselben Transaktion wie das INSERT/UPDATE, das sie absichern,
+    # und können nicht mit einem parallelen Schreibvorgang um die Wette prüfen.
+
+    def _taken_names_locked(self, table: str, exclude_id: int | None) -> set[str]:
+        # table stammt ausschließlich aus _NAME_UNIQUE_TABLES (feste Literale
+        # der Aufrufer), nie aus Nutzereingaben — die f-String-Interpolation
+        # eines Tabellennamens ist hier deshalb unbedenklich; Platzhalter sind
+        # für Tabellennamen in SQLite ohnehin nicht zulässig. Bewusst eine
+        # echte Prüfung statt assert: die fällt unter "python -O" weg und
+        # damit genau die Absicherung der Interpolation.
+        if table not in _NAME_UNIQUE_TABLES:
+            raise ValueError(f"Keine Namenstabelle: {table}")
+        rows = self._conn.execute(f"SELECT id, name FROM {table}").fetchall()
+        return {
+            _normalized_name(row["name"]) for row in rows if row["id"] != exclude_id
+        }
+
+    def _ensure_valid_name_locked(
+        self, table: str, name: str, exclude_id: int | None = None
+    ) -> None:
+        trimmed = name.strip()
+        if len(trimmed) > MAX_SAVED_NAME_LENGTH:
+            raise NameTooLongError(
+                f"Der Name darf höchstens {MAX_SAVED_NAME_LENGTH} Zeichen lang "
+                f"sein (aktuell {len(trimmed)})."
+            )
+        if _normalized_name(trimmed) in self._taken_names_locked(table, exclude_id):
+            raise DuplicateNameError(
+                f'{_NAME_UNIQUE_TABLES[table]} mit dem Namen "{trimmed}" '
+                "gibt es bereits. Bitte einen anderen Namen wählen."
+            )
+
+    def _unused_name_locked(
+        self, table: str, first: str, following: Callable[[int], str]
+    ) -> str:
+        """Erster freier Name: zuerst `first`, danach `following(2)`,
+        `following(3)`, … — für automatisch vergebene Namen, die nicht an der
+        Eindeutigkeitsprüfung scheitern dürfen."""
+        taken = self._taken_names_locked(table, None)
+        candidate = first
+        counter = 2
+        while _normalized_name(candidate) in taken:
+            candidate = following(counter)
+            counter += 1
+        return candidate
+
+    def _copy_name_locked(self, table: str, name: str) -> str:
+        """"X (Kopie)", danach "X (Kopie 2)" usw. — sonst liefe schon das
+        zweite Duplizieren desselben Eintrags in die Eindeutigkeitsprüfung.
+
+        Der Ursprungsname wird so weit gekürzt, dass Name + Zusatz die
+        Längengrenze einhalten: sonst ließe sich ein Eintrag mit bereits
+        maximal langem Namen überhaupt nicht mehr duplizieren, weil das
+        create_*() darunter an der eigenen Längenprüfung scheiterte."""
+        stem = name.strip()
+
+        def mit_zusatz(zusatz: str) -> str:
+            return f"{stem[:MAX_SAVED_NAME_LENGTH - len(zusatz)].rstrip()}{zusatz}"
+
+        return self._unused_name_locked(
+            table, mit_zusatz(" (Kopie)"), lambda n: mit_zusatz(f" (Kopie {n})")
+        )
+
+    def copy_name_for(self, table: str, name: str) -> str:
+        """Öffentliche Variante von _copy_name_locked() für die Duplizieren-
+        Routen, die den Namen VOR dem eigentlichen create_*() brauchen."""
+        with self._lock, self._conn:
+            return self._copy_name_locked(table, name)
+
+    def free_name_for(self, table: str, base: str) -> str:
+        """Freier Vorgabename ("Neues Dashboard", "Neues Dashboard 2", …) für
+        den Fall, dass beim Anlegen gar kein Name eingegeben wurde."""
+        with self._lock, self._conn:
+            return self._unused_name_locked(table, base, lambda n: f"{base} {n}")
+
     def create_saved_chart(
         self,
         name: str,
@@ -1318,6 +1435,7 @@ class Index:
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
+            self._ensure_valid_name_locked("saved_charts", name)
             cur = self._conn.execute(
                 "INSERT INTO saved_charts "
                 "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
@@ -1353,6 +1471,7 @@ class Index:
         show_values: bool = False,
     ) -> None:
         with self._lock, self._conn:
+            self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
             self._conn.execute(
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
                 "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
@@ -1456,6 +1575,7 @@ class Index:
 
     def create_dashboard(self, name: str) -> int:
         with self._lock, self._conn:
+            self._ensure_valid_name_locked("dashboards", name)
             max_pos = self._conn.execute("SELECT MAX(position) FROM dashboards").fetchone()[0]
             cursor = self._conn.execute(
                 "INSERT INTO dashboards (name, position) VALUES (?, ?)", (name, (max_pos or 0) + 1)
@@ -1464,6 +1584,7 @@ class Index:
 
     def rename_dashboard(self, dashboard_id: int, name: str) -> bool:
         with self._lock, self._conn:
+            self._ensure_valid_name_locked("dashboards", name, exclude_id=dashboard_id)
             cursor = self._conn.execute(
                 "UPDATE dashboards SET name = ? WHERE id = ?", (name, dashboard_id)
             )
@@ -1534,7 +1655,7 @@ class Index:
             max_pos = self._conn.execute("SELECT MAX(position) FROM dashboards").fetchone()[0]
             cursor = self._conn.execute(
                 "INSERT INTO dashboards (name, position) VALUES (?, ?)",
-                (f"{row['name']} (Kopie)", (max_pos or 0) + 1),
+                (self._copy_name_locked("dashboards", row["name"]), (max_pos or 0) + 1),
             )
             new_id = cursor.lastrowid
             pins = self._conn.execute(
@@ -1763,7 +1884,7 @@ class Index:
     def set_dashboard_entity_pin_sparkline_resolution(
         self, dashboard_id: int, entity_id: str, resolution: str
     ) -> bool:
-        if resolution not in ("raw", "5min", "30min", "1h"):
+        if resolution not in ("raw", "5min", "15min", "30min", "1h"):
             raise ValueError("Ungültige Sparkline-Auflösung")
         with self._lock, self._conn:
             cursor = self._conn.execute(
@@ -1881,6 +2002,7 @@ class Index:
     def create_saved_table(self, name: str, columns: list[dict], rows: list[dict], style: dict | None = None) -> int:
         now = time.time()
         with self._lock, self._conn:
+            self._ensure_valid_name_locked("saved_tables", name)
             cur = self._conn.execute(
                 "INSERT INTO saved_tables (name, style_json, created_at, updated_at) VALUES (?, ?, ?, ?)",
                 (name, json.dumps(style or {}), now, now),
@@ -1898,6 +2020,7 @@ class Index:
         # eine Abfrage-Definition, jedes Speichern schreibt den kompletten,
         # aktuellen Bearbeitungsstand fest).
         with self._lock, self._conn:
+            self._ensure_valid_name_locked("saved_tables", name, exclude_id=table_id)
             self._conn.execute(
                 "UPDATE saved_tables SET name = ?, style_json = ?, updated_at = ? WHERE id = ?",
                 (name, json.dumps(style or {}), time.time(), table_id),

@@ -99,6 +99,7 @@ cd addon
 | `--tz` | `Europe/Berlin` | IANA-Zeitzone für Monats-/Tagesgrenzen |
 | `--seed` | `42` | Zufalls-Seed — gleicher Seed erzeugt reproduzierbar dieselben Werte |
 | `--clean` | *(aus)* | Vorhandene `demo_*`-Entitäten im Zielverzeichnis vor dem Erzeugen sauber entfernen (für wiederholte Läufe) |
+| `--append` | *(aus)* | Statt der kompletten Historie nur die Werte seit dem letzten Lauf ergänzen (`--months` wird dabei ignoriert) — siehe [Lebende Demo-Instanz](#lebende-demo-instanz-append). Schließt sich mit `--clean` gegenseitig aus |
 
 Am Ende zeigt das Skript eine kurze Zusammenfassung (Anzahl geschriebener
 Werte je Entität, Ergebnis des anschließenden Indexabgleichs).
@@ -157,6 +158,36 @@ Eine einzelne Demo-Entität komplett entfernen (inkl. Konfiguration, nicht
 nur Werte) geht weiterhin nur über die Oberfläche: Entität öffnen →
 Zahnrad-Symbol → **Entität entfernen** (siehe
 [user-guide.md](user-guide.md#entität-konfigurieren)).
+
+## Lebende Demo-Instanz (`--append`)
+
+`--append` ergänzt eine bereits vorhandene Demo-Instanz um die Werte seit dem
+letzten Lauf, statt die komplette Historie neu zu würfeln — regelmäßig
+ausgeführt (z. B. per Cron) bleibt eine Demo-Instanz so ein "lebendes"
+System, das nie hinter das aktuelle Datum zurückfällt, ohne bei jedem Lauf
+Monate an Daten neu zu berechnen:
+
+```bash
+# z. B. alle 15 Minuten per Cron
+.venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis --append
+```
+
+- Der Anker "bis wohin wurde zuletzt simuliert" ist der letzte Zeitstempel
+  von `sensor.demo_gesamtwirkleistung` (bei jedem Simulationsschritt
+  geschrieben, anders als Schalter/Zähler mit absichtlich sporadischen
+  Schreibvorgängen). Ist die Instanz bereits aktuell, beendet sich das
+  Skript ohne etwas zu schreiben.
+- Zähler (`_energie`, `_ertrag`, Stromzähler, Wasserzähler) und Schalter-
+  Zustände knüpfen dabei an ihren zuletzt tatsächlich gespeicherten Wert an
+  — kein Zählersprung/-rücksetzer an der Anschlussstelle. Überlappende
+  Zeitstempel wären ohnehin unkritisch: `import_rows()` dedupliziert danach.
+- Findet `--append` kein vorhandenes `sensor.demo_gesamtwirkleistung` (leeres
+  Zielverzeichnis), fällt es automatisch auf eine normale Vollerzeugung mit
+  `--months` zurück.
+- Läuft auf demselben Datenverzeichnis wie eine bereits gestartete Instanz
+  nicht parallel dazu ausführen (siehe [Voraussetzungen](#voraussetzungen))
+  — ein Cron-Job gehört also auf ein Datenverzeichnis, dessen Server währenddessen
+  gestoppt ist, oder muss dessen Neustart selbst mit einplanen.
 
 ## Grenzen
 

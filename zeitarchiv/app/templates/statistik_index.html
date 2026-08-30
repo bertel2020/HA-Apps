@@ -49,7 +49,7 @@
         <div class="stat"><div class="label">Geschätzte Größe danach</div><div class="value">{{ index_optimization.estimated_after_size }}</div><div class="sub-value">nur vollständig freie Seiten</div></div>
       </div>
       {% if index_optimization.can_optimize %}<div class="index-maintenance-actions">
-        <form method="post" action="{{ app_root }}/statistik/index/optimize" onsubmit="return confirm('Index jetzt optimieren? Schreibzugriffe werden währenddessen kurz pausiert.');">
+        <form method="post" action="{{ app_root }}/statistik/index/optimize" id="index-optimize-form">
           <button class="btn {{ 'primary' if index_optimization.recommended else '' }}" type="submit">Index optimieren</button>
         </form>
       </div>{% endif %}
@@ -81,5 +81,28 @@
   </div>
 </div>
 <script src="../static/js/sortable-table.js?v={{ js_v }}"></script>
+<script src="../static/js/confirm-dialog.js?v={{ js_v }}"></script>
+<script>
+  // Bestätigung im App-Look statt des nativen confirm()-Dialogs (dieselbe
+  // appConfirm()-Mechanik wie beim Löschen von Charts/Tabellen). form.submit()
+  // löst absichtlich KEIN weiteres submit-Event aus, deshalb genügt das
+  // einmalige preventDefault() ohne zusätzliche Schleifen-Absicherung.
+  // Danach übernimmt der Button die Rückmeldung: das VACUUM läuft synchron,
+  // die Seite steht bis zur Antwort — ohne sichtbaren Zustandswechsel wirkt
+  // der Klick sonst folgenlos.
+  const optimizeForm = document.getElementById('index-optimize-form');
+  optimizeForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const ok = await appConfirm(
+      'Index jetzt optimieren? Die Indexdatei wird kompakt neu geschrieben, '
+      + 'Schreibzugriffe werden währenddessen kurz pausiert.',
+      {confirmLabel: 'Optimieren'}
+    );
+    if (!ok) return;
+    const button = optimizeForm.querySelector('button[type=submit]');
+    if (button) { button.disabled = true; button.textContent = 'Index wird optimiert …'; }
+    optimizeForm.submit();
+  });
+</script>
 </body>
 </html>

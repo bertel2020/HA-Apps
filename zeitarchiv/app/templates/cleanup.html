@@ -449,10 +449,10 @@
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ts: parseFloat(cell.dataset.ts), old_value: parseFloat(cell.dataset.oldValue), new_value: newValue}),
         });
-        if (!res.ok) { alert('Korrigieren fehlgeschlagen.'); btn.disabled = false; return; }
+        if (!res.ok) { appAlert('Korrigieren fehlgeschlagen.'); btn.disabled = false; return; }
         htmx.trigger('#controls', 'change');
       } catch (e) {
-        alert('Korrigieren fehlgeschlagen.');
+        appAlert('Korrigieren fehlgeschlagen.');
         btn.disabled = false;
       }
     }

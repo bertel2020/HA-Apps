@@ -130,7 +130,7 @@
         window.location.reload();
       } catch (error) {
         button.disabled = false;
-        alert('Die Werte konnten nicht gelöscht werden.');
+        appAlert('Die Werte konnten nicht gelöscht werden.');
       }
     }
 
@@ -151,7 +151,7 @@
         window.location.href = `${BASE}/entities`;
       } catch (error) {
         button.disabled = false;
-        alert('Die Entität konnte nicht entfernt werden.');
+        appAlert('Die Entität konnte nicht entfernt werden.');
       }
     }
   </script>

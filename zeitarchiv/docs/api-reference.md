@@ -92,3 +92,7 @@ is_current}`, ein Eintrag in `series` je Entität mit `friendly_name`, `unit`,
 
 FastAPI-Standard: `4xx`/`5xx` mit `{"detail": "..."}`. Auth-Fehler immer
 `401`. Validierungsfehler (Pydantic) `422`. Zu große Batches/Abfragen `413`.
+Beim Speichern von Dashboards, Charts und Tabellen: bereits vergebener Name
+`409`, zu langer Name `400` (siehe [data-model.md](data-model.md#eindeutige-namen-dashboards-saved_charts-saved_tables)).
+Die `detail`-Meldung ist in beiden Fällen für die direkte Anzeige in der
+Oberfläche formuliert.

@@ -118,7 +118,9 @@ Details zur Bedienung jeder Seite stehen im
 
 **Dashboards.** Charts und Vergleichstabellen lassen sich als Kacheln auf
 beliebig vielen, frei benannten Dashboards anordnen — nicht nur auf einer
-einzigen Startseite.
+einzigen Startseite. Die Übersichten von Dashboards, Charts und Tabellen
+bieten Suche, wählbare Sortierung und einen davon unabhängigen Schalter
+„Favoriten zuerst“.
 
 **Entitäten und Verläufe.** Jede archivierte Entität besitzt eine eigene
 Verlaufsansicht mit Zeitraum-Navigation von Stunde bis Dekade, Vergleich mit

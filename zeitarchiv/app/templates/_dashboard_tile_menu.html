@@ -98,9 +98,9 @@
         <div class="dtile-settings-section">
           <div class="dtile-decimals-picker-head">Sparkline-Auflösung</div>
           <div class="dtile-sparkline-resolution-row" role="group" aria-label="Sparkline-Auflösung wählen">
-            {% for value, label in [('raw', 'Roh'), ('5min', '5 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
+            {% for value, label in [('raw', 'Roh'), ('5min', '5 Min'), ('15min', '15 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
             <button type="button" class="dtile-sparkline-resolution-cell{% if tile.sparkline_resolution == value %} is-selected{% endif %}"
-                    data-resolution="{{ value }}" title="{{ {'raw': 'Alle gespeicherten Rohdatenpunkte', '5min': 'Ein Punkt je 5 Minuten', '30min': 'Ein Punkt je 30 Minuten', '1h': 'Ein Punkt je Stunde'}[value] }}">{{ label }}</button>
+                    data-resolution="{{ value }}" title="{{ {'raw': 'Alle gespeicherten Rohdatenpunkte', '5min': 'Ein Punkt je 5 Minuten', '15min': 'Ein Punkt je 15 Minuten', '30min': 'Ein Punkt je 30 Minuten', '1h': 'Ein Punkt je Stunde'}[value] }}">{{ label }}</button>
             {% endfor %}
           </div>
         </div>

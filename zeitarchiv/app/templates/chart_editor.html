@@ -201,10 +201,17 @@
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
-              <label class="menu-row">
+              <!-- Nur bei mindestens einer Linien-Serie sinnvoll: Balken zeigen
+                   Bucket-Summen (Zähler/Schalter), Rohwerte wären dort keine
+                   Verfeinerung, sondern ein anderer Diagrammtyp. Im
+                   Zeitstrahl-Modus erzwingt toggleTimeline() ohnehin raw = true
+                   — beides war bisher nur ein toter bzw. deaktivierter
+                   Schalter. Das :disabled bleibt für die Zeitraum-Grenze:
+                   Rohwerte gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
+              <label class="menu-row" x-show="!timeline && hasLineSeries">
                 <span class="menu-row-label">Rohwerte</span>
                 <span class="menu-toggle">
-                  <input type="checkbox" :checked="raw" :disabled="timeline || !['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                  <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
@@ -224,10 +231,10 @@
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
-              <label class="menu-row">
+              <label class="menu-row" x-show="hasBarSeries">
                 <span class="menu-row-label">Werte anzeigen</span>
                 <span class="menu-toggle">
-                  <input type="checkbox" :checked="showValues" :disabled="timeline" @change="showValues = !showValues; render()">
+                  <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
                   <span class="track"><span class="thumb"></span></span>
                 </span>
               </label>
@@ -351,7 +358,7 @@
         </div>
 
         <div class="save-row" x-show="editing">
-          <input type="text" placeholder="Name des Charts …" x-model="name">
+          <input type="text" placeholder="Name des Charts …" maxlength="{{ max_name_length }}" x-model="name">
           <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if chart_id else "Chart erstellen" }}</button>
           {% if chart_id %}
           <button type="button" class="btn btn-danger" @click="deleteChart()">Löschen</button>
@@ -753,6 +760,13 @@
         // render()) ohne jede Wirkung, deshalb nur sichtbar, wenn mindestens
         // eine der aktuell geladenen Serien tatsächlich als Linie gerendert wird.
         get hasLineSeries() { return this.series.some(s => s.chart_type === 'line'); },
+        // Gegenstück für "Werte anzeigen": eine Zahl je Balken bleibt lesbar,
+        // dieselbe Beschriftung an jedem Punkt einer Linie (oft hunderte je
+        // Serie) überdeckt dagegen die Kurve — deshalb nur bei mindestens
+        // einer Balken-Serie angeboten. Im Zeitstrahl-/Rohwerte-Modus liefert
+        // der Server ausschließlich chart_type 'line', die Zeile verschwindet
+        // dort also automatisch (früher: :disabled="timeline").
+        get hasBarSeries() { return this.series.some(s => s.chart_type === 'bar'); },
         // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
         // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
         // timeline-Kommentar oben.
@@ -1423,8 +1437,8 @@
         },
 
         async save() {
-          if (!this.name.trim()) { alert('Bitte einen Namen für das Chart angeben.'); return; }
-          if (this.selectedEntityIds.length === 0) { alert('Bitte mindestens eine Entität auswählen.'); return; }
+          if (!this.name.trim()) { appAlert('Bitte einen Namen für das Chart angeben.'); return; }
+          if (this.selectedEntityIds.length === 0) { appAlert('Bitte mindestens eine Entität auswählen.'); return; }
           this.saving = true;
           this.savedMessage = '';
           // Nur Namen tatsächlich ausgewählter Entitäten mitschicken — eine
@@ -1456,7 +1470,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              alert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || 'Speichern fehlgeschlagen.');
               return;
             }
             const data = await res.json();

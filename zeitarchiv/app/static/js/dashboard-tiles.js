@@ -797,7 +797,7 @@
   }
 
   function resampleSparklinePoints(points, resolution) {
-    const bucketSeconds = {raw: 0, '5min': 5 * 60, '30min': 30 * 60, '1h': 60 * 60}[resolution] || 0;
+    const bucketSeconds = {raw: 0, '5min': 5 * 60, '15min': 15 * 60, '30min': 30 * 60, '1h': 60 * 60}[resolution] || 0;
     if (!bucketSeconds || points.length < 2) return points;
     const buckets = new Map();
     points.forEach(point => {
@@ -1066,7 +1066,7 @@
 
       const sparklineResolutionHead = control.querySelector('.dtile-sparkline-resolution-row')
         ?.previousElementSibling?.querySelector('strong');
-      const SPARKLINE_RESOLUTION_LABELS = {raw: 'Rohdaten', '5min': '5 Min', '30min': '30 Min', '1h': '1 Std'};
+      const SPARKLINE_RESOLUTION_LABELS = {raw: 'Rohdaten', '5min': '5 Min', '15min': '15 Min', '30min': '30 Min', '1h': '1 Std'};
       sparklineResolutionCells.forEach(cell => {
         cell.addEventListener('click', async () => {
           const resolution = cell.dataset.resolution;

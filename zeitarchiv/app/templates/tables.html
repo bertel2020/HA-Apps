@@ -8,12 +8,38 @@
 <link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
-  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:20px;}
-  .chart-card{display:flex;flex-direction:column;gap:8px;position:relative;}
-  .chart-card h3{margin:0;font-size:calc(15px * var(--font-scale, 1));padding-right:60px;}
-  .chart-card .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .chart-card .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:auto;padding-top:10px;}
-  .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:150px;border-style:dashed;text-decoration:none;}
+  /* Schmalere Karten als früher (340px): seit "Ansehen"/"Bearbeiten" aus der
+     Karte heraus sind (Titel öffnet, Kachelmenü bearbeitet), trägt sie nur
+     noch Titel + Kennzahlenzeile und braucht die alte Breite nicht mehr. */
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px;}
+  .chart-card{display:flex;flex-direction:column;gap:6px;position:relative;padding:16px 18px;}
+  .chart-card h3{
+    overflow-wrap:anywhere;margin:0;font-size:calc(15px * var(--font-scale, 1));line-height:1.35;
+    /* Platz für vier Titelzeilen freihalten: so viele braucht der längste
+       erlaubte Name (MAX_SAVED_NAME_LENGTH = 50 Zeichen) selbst in der
+       schmalsten Kachel (240px). Dadurch sind alle Kacheln gleich hoch,
+       unabhängig von der Namenslänge, statt zeilenweise zu wachsen. */
+    min-height:calc(4 * 1.35em);
+  }
+  /* Stern und Kachelmenü sitzen oben rechts über dem Titel. Statt auf JEDER
+     Zeile Platz für sie freizuhalten (früher padding-right:60px) weicht nur
+     die erste Zeile aus — ein schwebender Platzhalter in ihrer Größe. Das
+     spart bei langen Namen eine ganze Zeile. */
+  .chart-card h3::before{content:'';float:right;width:44px;height:1.35em;}
+  /* margin-top:auto schiebt die Infozeile an den unteren Kachelrand —
+     die Karten einer Reihe sind gleich hoch (Grid-Stretch), die Angaben
+     stehen dadurch über alle Karten hinweg auf einer Linie. */
+  .chart-card .meta{margin-top:auto;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  /* Die ganze Karte öffnet die Tabelle, nicht nur der Titeltext — ohne
+     "Ansehen"-Button bliebe sonst nur ein schmales Klickziel übrig. Stern und
+     Kachelmenü liegen über dieser Fläche (.card-top-actions, z-index 2).
+     color:inherit, weil der Titel eine Überschrift bleiben soll: mit der
+     Standard-Linkfarbe sähen besuchte und unbesuchte Karten unterschiedlich
+     aus (violett/blau nebeneinander). */
+  .chart-card h3 a{color:inherit;text-decoration:none;}
+  .chart-card:hover h3 a{color:var(--accent-line);}
+  .chart-card h3 a::after{content:'';position:absolute;inset:0;border-radius:inherit;}
+  .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:96px;border-style:dashed;text-decoration:none;}
   .chart-grid-add-btn{
     display:flex;align-items:center;justify-content:center;
     width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);
@@ -24,6 +50,12 @@
      oben rechts positionierten Reihe statt je einzeln absolut positioniert,
      damit sie sich nicht überlappen können. */
   .card-top-actions{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:2px;z-index:2;}
+  /* Karte mit offenem Menü über ihre Nachbarn heben — dieselbe Regel wie
+     .dtile:has(.dtile-menu.is-open) auf den Dashboard-Seiten. Ohne sie malt
+     die NÄCHSTE Karte ihr eigenes .card-top-actions (z-index 2, eigener
+     Stapelkontext) über das darüber liegende Popover der vorigen Karte, weil
+     bei gleichem z-index die spätere DOM-Reihenfolge gewinnt. */
+  .chart-card:has(.card-menu.is-open){z-index:20;}
   .fav-star{
     background:none;border:none;cursor:pointer;
     font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
@@ -44,9 +76,13 @@
     position:absolute;top:30px;right:0;width:150px;padding:6px;background:var(--surface);
     border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);cursor:default;z-index:5;
   }
+  /* text-decoration/box-sizing wegen "Bearbeiten": der einzige Eintrag, der
+     ein <a> statt eines <button> ist (echter Link, damit Mittelklick/neuer
+     Tab funktionieren). */
   .card-menu-item{
-    display:block;width:100%;padding:7px 8px;border:0;border-radius:6px;background:transparent;
+    display:block;width:100%;box-sizing:border-box;padding:7px 8px;border:0;border-radius:6px;background:transparent;
     color:var(--ink);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));text-align:left;cursor:pointer;
+    text-decoration:none;
   }
   .card-menu-item:hover{background:var(--surface-alt);}
   .card-menu-item-danger{color:var(--danger);}
@@ -60,18 +96,51 @@
     <h1>Tabellen</h1>
     <p class="sub">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen — Zeilen (Entität/Gruppe/Formel) × Spalten (Zeitraum). &middot; <a href="tables/new">+ Neue Tabelle</a></p>
 
-    <div class="settings-panel">
-        <div class="chart-grid">
+    <div class="settings-panel" data-card-browser-root>
+        <div class="card-browser" data-storage-key="zeitarchiv.tables.sort">
+          <input type="search" class="search card-browser-search" placeholder="Tabelle suchen …" aria-label="Tabellen durchsuchen">
+          <span class="card-browser-sortgroup">
+            <span class="card-browser-sort-label">Sortierung</span>
+            {% set sort_options = [
+              ('neueste', 'Neueste zuerst'), ('aelteste', 'Älteste zuerst'),
+              ('name_asc', 'Name A–Z'), ('name_desc', 'Name Z–A')
+            ] %}
+            <span class="dd-picker-wrap">
+              <button type="button" class="btn" id="tables-sort-btn" onclick="toggleDDPicker('tables-sort')">Neueste zuerst ▾</button>
+              <input type="hidden" id="tables-sort-input" class="card-browser-sort" value="neueste">
+              <div class="dd-picker-popover" id="tables-sort-popover">
+                {% for value, label in sort_options %}
+                <div class="dd-picker-row" data-value="{{ value }}"
+                     onclick="selectDDOption('tables-sort', '{{ value }}', '{{ label }}')">{{ label }}</div>
+                {% endfor %}
+              </div>
+            </span>
+          </span>
+          <button type="button" class="chip card-browser-fav" data-aktiv="1" aria-pressed="true"
+                  title="Favoriten unabhängig von der Sortierung nach oben ziehen">★ Favoriten zuerst</button>
+          <p class="card-browser-empty" hidden>Keine Tabelle passt zur Suche.</p>
+        </div>
+        <div class="chart-grid" data-card-grid>
           {% for row in rows %}
-          <div class="card chart-card">
+          <div class="card chart-card" data-name="{{ row.name }}" data-created="{{ row.created_at }}"
+               data-favorite="{{ 1 if row.is_favorite else 0 }}">
             <div class="card-top-actions">
               <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
                       title="Favorit" onclick="toggleFavorite('tables/{{ row.id }}/favorite', this)">★</button>
-              <div class="card-menu" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}">
-                <button type="button" class="card-menu-btn" @click.stop="menuOpen = !menuOpen"
+              <!-- click.outside am Wrapper (der den Button einschließt), nicht am
+                   Popover: am Popover zählte der Klick auf den eigenen Button als
+                   "außen" und schloss das Menü sofort wieder, was nur ein
+                   @click.stop am Button auffangen konnte — genau dieses .stop
+                   hinderte dann aber die ANDEREN Karten daran, ihr click.outside
+                   zu sehen, sodass sich beliebig viele Menüs gleichzeitig
+                   aufklappen ließen. -->
+              <div class="card-menu" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}"
+                   @click.outside="menuOpen = false">
+                <button type="button" class="card-menu-btn" @click="menuOpen = !menuOpen"
                         :aria-expanded="menuOpen.toString()" aria-haspopup="menu"
                         aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
-                <div class="card-menu-popover" x-show="menuOpen" x-cloak role="menu" @click.outside="menuOpen = false">
+                <div class="card-menu-popover" x-show="menuOpen" x-cloak role="menu">
+                  <a class="card-menu-item" role="menuitem" href="tables/{{ row.id }}?edit=1">Bearbeiten</a>
                   <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateTable({{ row.id }})">Duplizieren</button>
                   <div class="card-menu-divider"></div>
                   <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteTable({{ row.id }}, $el)">Löschen</button>
@@ -80,13 +149,9 @@
             </div>
             <h3><a href="tables/{{ row.id }}">{{ row.name }}</a></h3>
             <div class="meta">{{ row.row_count }} Zeile{{ 'n' if row.row_count != 1 else '' }} &middot; {{ row.column_count }} Spalte{{ 'n' if row.column_count != 1 else '' }}</div>
-            <div class="actions">
-              <a class="btn" href="tables/{{ row.id }}">Ansehen</a>
-              <a class="btn" href="tables/{{ row.id }}?edit=1">Bearbeiten</a>
-            </div>
           </div>
           {% endfor %}
-          <a class="card chart-grid-add" href="tables/new" title="Neue Tabelle">
+          <a class="card chart-grid-add card-browser-add" href="tables/new" title="Neue Tabelle">
             <span class="chart-grid-add-btn">+</span>
           </a>
         </div>
@@ -95,6 +160,8 @@
 
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="static/js/card-browser.js?v={{ js_v }}"></script>
   <script>
     document.querySelector('.settings-panel').addEventListener('favorite-changed', () => {
       window.location.reload();
@@ -108,9 +175,9 @@
           btn.closest('.chart-card').remove();
         } else {
           btn.disabled = false;
-          alert('Löschen fehlgeschlagen.');
+          appAlert('Löschen fehlgeschlagen.');
         }
-      }).catch(() => { btn.disabled = false; alert('Löschen fehlgeschlagen.'); });
+      }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
     }
 
     // Kopie bleibt auf der Liste sichtbar (kein Sprung in den Editor) — ein
@@ -122,10 +189,10 @@
         if (res.ok) {
           window.location.reload();
         } else {
-          alert('Duplizieren fehlgeschlagen.');
+          appAlert('Duplizieren fehlgeschlagen.');
         }
       } catch (e) {
-        alert('Duplizieren fehlgeschlagen.');
+        appAlert('Duplizieren fehlgeschlagen.');
       }
     }
   </script>

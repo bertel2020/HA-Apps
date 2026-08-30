@@ -93,7 +93,14 @@ from .storage import (
     rotate,
 )
 from .storage import query as query_mod
-from .storage.index import DEFAULT_RESOLUTION, DEFAULT_RETENTION, Index
+from .storage.index import (
+    DEFAULT_RESOLUTION,
+    DEFAULT_RETENTION,
+    MAX_SAVED_NAME_LENGTH,
+    DuplicateNameError,
+    Index,
+    InvalidNameError,
+)
 from .storage.ingestion import IngestionService
 from .storage.coordinator import StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
@@ -349,6 +356,11 @@ templates.env.globals["css_v"] = int((APP_DIR / "static" / "css" / "app.css").st
 # einfacher als js_v-Kopien an jeder <script>-Stelle zu pflegen, und ändert sich
 # ohnehin bei jedem Deploy dieses Verzeichnisses.
 templates.env.globals["js_v"] = int(max(p.stat().st_mtime for p in (APP_DIR / "static" / "js").glob("*.js")))
+# Namenslänge für Dashboards/Charts/Tabellen: als maxlength in die
+# Eingabefelder, damit die Grenze schon beim Tippen gilt statt erst beim
+# Speichern. Die verbindliche Prüfung bleibt serverseitig
+# (_ensure_valid_name_locked() im Index) — maxlength ist nur die Bequemlichkeit.
+templates.env.globals["max_name_length"] = MAX_SAVED_NAME_LENGTH
 # Upload-Grenzen zentral aus limits.py an die Oberfläche weiterreichen. So
 # zeigen die Dropzones stets dieselben Werte an, die das Backend tatsächlich
 # durchsetzt, statt leicht veraltende Zahlen in mehreren Templates zu pflegen.
@@ -482,6 +494,19 @@ async def _result_limit_handler(
     _request: Request, exc: cleanup.ResultLimitExceeded
 ) -> JSONResponse:
     return JSONResponse(status_code=413, content={"detail": str(exc)})
+
+
+@app.exception_handler(InvalidNameError)
+async def _invalid_name_handler(
+    _request: Request, exc: InvalidNameError
+) -> JSONResponse:
+    """Abgelehnter Dashboard-/Chart-/Tabellenname — zentral statt in jeder
+    einzelnen Speichern-Route, weil die Prüfung selbst im Index sitzt (siehe
+    _ensure_valid_name_locked()). 409 Conflict bei einer Namenskollision (die
+    Anfrage ist wohlgeformt, sie kollidiert nur mit dem Bestand), 400 bei einem
+    zu langen Namen. Die Editoren zeigen "detail" unverändert an."""
+    status = 409 if isinstance(exc, DuplicateNameError) else 400
+    return JSONResponse(status_code=status, content={"detail": str(exc)})
 
 
 def _storage_locked(entity_ids_getter):
@@ -3068,15 +3093,41 @@ def _resolve_entity_chart_options(entity) -> dict:
     return options
 
 
+def _chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
+    """Wie das Chart tatsächlich gezeichnet wird, für die Übersichtskachel.
+
+    Gespeichert ist nur "auto" oder "timeline" — bei "auto" entscheidet der
+    Aggregationstyp JEDER Entität einzeln (Zähler/Schalter → Balken, sonst
+    Linie, dieselbe Regel wie _resolved_chart_type() in storage/query.py).
+    Ein Chart kann deshalb beides zugleich enthalten."""
+    if chart["chart_type"] == "timeline":
+        return "Zeitstrahl"
+    vorhanden = {
+        "Balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "Linie"
+        for entity_id in chart["entity_ids"]
+    }
+    # Feste Reihenfolge statt der ungeordneten Menge, damit ein gemischtes
+    # Chart nicht mal "Linie + Balken" und mal "Balken + Linie" anzeigt.
+    return " + ".join(typ for typ in ("Linie", "Balken") if typ in vorhanden)
+
+
 @app.get("/charts", response_class=HTMLResponse)
 def charts_list(request: Request) -> HTMLResponse:
     charts = index.list_saved_charts()
+    # Einmal alle Entitätstypen holen statt je Chart einzeln nachzuschlagen.
+    aggregation_types = {
+        row["entity_id"]: row["aggregation_type"] for row in index.list_entities()
+    }
     rows = [
         {
             "id": c["id"],
             "name": c["name"],
             "entity_count": len(c["entity_ids"]),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
+            "type_label": _chart_type_label(c, aggregation_types),
+            # Nur für "Neueste/Älteste zuerst" im Browser (card-browser.js),
+            # nicht zum Anzeigen — deshalb roh statt formatiert.
+            "created_at": c["created_at"],
             "is_favorite": c["is_favorite"],
         }
         for c in charts
@@ -3265,7 +3316,8 @@ def charts_duplicate(chart_id: int) -> dict:
     if chart is None:
         raise HTTPException(status_code=404, detail="Chart nicht gefunden")
     new_id = index.create_saved_chart(
-        f"{chart['name']} (Kopie)", chart["entity_ids"], chart["range_key"], chart["continuous"],
+        index.copy_name_for("saved_charts", chart["name"]),
+        chart["entity_ids"], chart["range_key"], chart["continuous"],
         chart["entity_names"], chart["resolution_preset"], chart["dynamic_y_axis"],
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
@@ -3692,7 +3744,10 @@ def dashboards_list(request: Request) -> HTMLResponse:
 
 @app.post("/dashboards")
 def dashboards_create(body: _DashboardCreateBody) -> dict:
-    name = body.name.strip() or "Neues Dashboard"
+    # Ohne Eingabe einen freien Vorgabenamen wählen ("Neues Dashboard 2", …)
+    # statt an der Eindeutigkeitsprüfung zu scheitern — der Nutzer hat hier
+    # ja gerade KEINEN Namen genannt, den man ihm zurückweisen könnte.
+    name = body.name.strip() or index.free_name_for("dashboards", "Neues Dashboard")
     dashboard_id = index.create_dashboard(name)
     return {"id": dashboard_id, "name": name}
 
@@ -3991,7 +4046,8 @@ def tables_duplicate(table_id: int) -> dict:
     if table is None:
         raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
     new_id = index.create_saved_table(
-        f"{table['name']} (Kopie)", table["columns"], table["rows"], table["style"],
+        index.copy_name_for("saved_tables", table["name"]),
+        table["columns"], table["rows"], table["style"],
     )
     return {"id": new_id}
 

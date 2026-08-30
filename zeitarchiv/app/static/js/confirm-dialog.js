@@ -1,10 +1,14 @@
 // Eigenes Bestätigungs-Popup im App-Look, als Ersatz für den nativen
 // window.confirm()/hx-confirm-Dialog des Browsers (passt sonst optisch nicht
-// zur restlichen Oberfläche). Zwei Wege, es auszulösen:
+// zur restlichen Oberfläche). Drei Wege, es auszulösen:
 //   1. hx-confirm="..." auf einem htmx-Element — hier über das htmx:confirm-
 //      Event abgefangen (siehe htmx-Doku zu hx-confirm für dieses Muster).
 //   2. Direkter Aufruf window.appConfirm(text, {danger}) für Bestätigungen
 //      außerhalb von htmx (z. B. Chart löschen), als Promise<boolean>.
+//   3. window.appAlert(text, {danger}) als Ersatz für window.alert() — reine
+//      Meldung, nur "OK" statt Abbrechen/Bestätigen. Der native alert() zeigte
+//      sonst Host und Port des Servers ("Auf 192.168.x.x:8127 wird Folgendes
+//      angezeigt") über der eigentlichen Nachricht.
 (function () {
   let overlay = null;
 
@@ -51,6 +55,26 @@
       overlay.onclick = (e) => { if (e.target === overlay) close(false); };
       document.addEventListener('keydown', onKeydown);
     });
+  };
+
+  // Meldung ohne Wahlmöglichkeit: derselbe Dialog, nur ohne "Abbrechen" und
+  // mit "OK" statt "Bestätigen". Gibt wie appConfirm ein Promise zurück (das
+  // immer true liefert), damit sich beides gleich verwenden lässt; die
+  // meisten Aufrufer feuern es einfach ab, ohne zu warten.
+  window.appAlert = function (message, opts) {
+    opts = opts || {};
+    if (!overlay) build();
+    const cancelBtn = overlay.querySelector('.confirm-cancel');
+    cancelBtn.style.display = 'none';
+    const promise = window.appConfirm(message, {
+      danger: opts.danger, confirmLabel: opts.confirmLabel || 'OK',
+    });
+    // appConfirm setzt den Fokus auf "Abbrechen" — das ist hier ausgeblendet,
+    // der Fokus liefe also ins Leere.
+    overlay.querySelector('.confirm-ok').focus();
+    // Erst nach dem Schließen zurücksetzen, sonst taucht "Abbrechen" beim
+    // nächsten appConfirm() nicht wieder auf.
+    return promise.then((result) => { cancelBtn.style.display = ''; return result; });
   };
 
   document.body.addEventListener('htmx:confirm', function (evt) {
