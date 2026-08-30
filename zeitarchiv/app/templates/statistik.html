@@ -32,6 +32,12 @@
   .storage-card .tbl-wrap{flex:1;min-width:280px;}
   .storage-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:8px;vertical-align:middle;}
   .storage-category-link{font-weight:600;white-space:nowrap;}
+  .storage-optimization-chip{
+    display:inline-block;margin-left:9px;padding:2px 7px;border:1px solid var(--warning,#c88719);
+    border-radius:999px;background:var(--warning-soft,rgba(200,135,25,.1));
+    color:var(--warning,#9a6410);font-family:var(--font-mono);
+    font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;vertical-align:middle;
+  }
   /* Die längste Kategorie bleibt bei normaler Schriftgröße einzeilig. Die
      beiden Zahlenspalten rücken dafür etwas nach rechts, behalten aber genug
      Platz für Werte bis in den GB-/100-%-Bereich. Unterhalb dieser Breite
@@ -154,7 +160,7 @@
           <tbody>
           {% for row in storage_breakdown %}
           <tr data-storage-label="{{ row.label }}">
-            <td class="label"><span class="storage-dot" data-key="{{ row.key }}"></span>{% if row.href %}<a class="storage-category-link" href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}</td>
+            <td class="label"><span class="storage-dot" data-key="{{ row.key }}"></span>{% if row.href %}<a class="storage-category-link" href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}{% if row.optimization_recommended %}<span class="storage-optimization-chip">Optimierung empfohlen</span>{% endif %}</td>
             <td data-sort="{{ row.bytes }}">{{ row.size }}</td>
             <td data-sort="{{ row.percent }}">{{ row.percent }} %</td>
           </tr>

@@ -16,6 +16,14 @@
   .index-table th:first-child{width:{{ '34%' if index_sizes_available else '68%' }};}
   .index-table th:nth-child(2){width:{{ '18%' if index_sizes_available else '32%' }};}
   .index-table th:nth-child(n+3){width:16%;}
+  .index-maintenance{margin:20px 0 26px;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
+  .index-maintenance h2{margin:0 0 5px;}
+  .index-maintenance .stat-row{margin:14px 0;}
+  .index-maintenance-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .index-status-stat.is-recommended{border-color:var(--warning,#c88719);background:var(--warning-soft,rgba(200,135,25,.1));box-shadow:0 0 0 1px var(--warning,#c88719);}
+  .index-status-stat.is-recommended .value{color:var(--warning,#9a6410);}
+  .index-optimization-result{margin:12px 0 0;font-size:calc(12.5px * var(--font-scale,1));font-weight:600;color:var(--accent-line);}
+  .index-optimization-result.is-error{color:var(--danger);}
 </style>
 </head>
 <body>
@@ -31,6 +39,22 @@
       <div class="stat"><div class="label">Fachtabellen</div><div class="value">{{ index_table_count }}</div></div>
       <div class="stat"><div class="label">Einträge gesamt</div><div class="value">{{ index_entry_count }}</div></div>
     </div>
+
+    <section class="index-maintenance">
+      <h2>Index-Optimierung</h2>
+      <p class="hint">SQLite verwendet freie Seiten automatisch wieder. Eine Optimierung schreibt die Indexdatei nur dann kompakt neu, wenn du sie ausdrücklich startest.</p>
+      <div class="stat-row">
+        <div class="stat index-status-stat {{ 'is-recommended' if index_optimization.recommended else '' }}"><div class="label">Status</div><div class="value">{{ index_optimization.status_label }}</div></div>
+        <div class="stat"><div class="label">Freier/reclaimbarer Speicher</div><div class="value">{{ index_optimization.reclaimable_size }}</div><div class="sub-value">{{ index_optimization.reclaimable_percent }} % der Indexdatei</div></div>
+        <div class="stat"><div class="label">Geschätzte Größe danach</div><div class="value">{{ index_optimization.estimated_after_size }}</div><div class="sub-value">nur vollständig freie Seiten</div></div>
+      </div>
+      {% if index_optimization.can_optimize %}<div class="index-maintenance-actions">
+        <form method="post" action="{{ app_root }}/statistik/index/optimize" onsubmit="return confirm('Index jetzt optimieren? Schreibzugriffe werden währenddessen kurz pausiert.');">
+          <button class="btn {{ 'primary' if index_optimization.recommended else '' }}" type="submit">Index optimieren</button>
+        </form>
+      </div>{% endif %}
+      {% if index_optimization_result %}<p class="index-optimization-result {{ '' if index_optimization_result.success else 'is-error' }}">{{ '✓ ' if index_optimization_result.success else '' }}{{ index_optimization_result.message }}</p>{% endif %}
+    </section>
 
     {% for group in index_groups %}
     <section class="index-group">

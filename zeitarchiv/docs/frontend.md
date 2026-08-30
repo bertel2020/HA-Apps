@@ -76,6 +76,13 @@ ausschließlich diese Variablen verwenden, nie feste Hex-Farben — Ausnahme:
 das Zeitarchiv-Logo (SVG) trägt bewusst feste Markenfarben, unabhängig vom
 gewählten Schema, wie eine Wortmarke.
 
+Das Schema `modern` trennt die Rollen bewusst: kühle Slate-Töne bilden
+Hintergrund, Flächen und Rahmen; Cobalt ist die primäre UI-Farbe für
+Navigation, Fokus und Auswahl; Teal bleibt Daten- und Chart-Akzent. Neue
+Komponenten dürfen diese Rollen nicht durch komponentenspezifische
+Festfarben vermischen. Warnungen und Fehler verwenden die globalen
+`--warning*`-/`--danger*`-Token.
+
 `--font-scale` (CSS-Variable, aus **Einstellungen → Darstellung**) skaliert
 praktisch jede `font-size` in `app.css` über `calc(Npx * var(--font-scale,
 1))` — neue Komponenten müssen dieses Muster übernehmen, sonst ignorieren

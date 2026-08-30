@@ -561,6 +561,17 @@ Interne Strukturen und freie SQLite-Seiten bleiben separat ausgewiesen. Die
 eigentlichen Messreihen liegen weiterhin in Hot Buffer, Archiv und Rollups,
 nicht im Index.
 
+Die Indexdetailseite zeigt außerdem den vollständig freien, durch eine
+Kompaktierung reclaimbaren Speicher. SQLite verwendet diese Seiten im
+laufenden Betrieb automatisch wieder. Eine manuelle **Index optimieren**-
+Aktion schreibt die Datenbankdatei kompakt neu; währenddessen pausieren
+Schreibzugriffe kurzzeitig. Eine Empfehlung erscheint erst bei einer
+Indexgröße ab 50 MB, mindestens 10 MB reclaimbarem Speicher und mindestens
+25 % freien Seiten. In diesem Fall wird auch der Index in der
+Speichernutzung mit **Optimierung empfohlen** markiert. Vor der Ausführung
+prüft Zeitarchiv den freien Plattenplatz und danach die SQLite-Integrität;
+eine automatische Optimierung findet nicht statt.
+
 Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
 Backups, da auch diese Speicherplatz belegen, aber in der reinen
 Entitäten-Statistik nicht enthalten sind.

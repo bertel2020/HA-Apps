@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.67.0 - 2026-08-30
+
+### Neu
+
+- Die Indexdetailseite zeigt vollständig freie, reclaimbare SQLite-Seiten,
+  eine konservative Optimierungsempfehlung und die geschätzte Dateigröße
+  nach einer Kompaktierung. Eine manuelle Aktion führt ein abgesichertes
+  `VACUUM` mit Schreibsperre, Speicherplatzprüfung und anschließender
+  Integritätsprüfung aus.
+- Empfiehlt Zeitarchiv eine Kompaktierung, wird der Index zusätzlich in der
+  Speichernutzung der Statistik entsprechend markiert.
+
+### Verbesserung
+
+- Das Farbschema „Modern“ verwendet jetzt kühle Slate-Flächen, Cobalt für
+  Navigation und aktive Bedienelemente sowie Teal als Daten- und
+  Diagrammakzent. Hell- und Dunkelmodus, Statusfarben, Schatten und die
+  vollständige Chart-Palette wurden auf bessere Trennung und Kontraste
+  abgestimmt.
+
 ## 0.66.0 - 2026-08-30
 
 ### Neu

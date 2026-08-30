@@ -2076,6 +2076,64 @@ class Index:
                 })
             return result
 
+    def get_database_maintenance_stats(self) -> dict:
+        """Liefert die sicher freigebbaren Seiten der SQLite-Datei.
+
+        ``freelist_count`` umfasst ausschließlich vollständig freie Seiten.
+        Teilweise leere B-Tree-Seiten werden bewusst nicht als garantiert
+        reclaimbar ausgewiesen, auch wenn VACUUM sie eventuell verdichten
+        könnte.
+        """
+        with self._lock:
+            page_size = int(self._conn.execute("PRAGMA page_size").fetchone()[0])
+            page_count = int(self._conn.execute("PRAGMA page_count").fetchone()[0])
+            freelist_count = int(
+                self._conn.execute("PRAGMA freelist_count").fetchone()[0]
+            )
+        return {
+            "page_size": page_size,
+            "page_count": page_count,
+            "freelist_count": freelist_count,
+            "database_bytes": page_size * page_count,
+            "reclaimable_bytes": page_size * freelist_count,
+        }
+
+    def vacuum_database(self) -> dict:
+        """Verdichtet den Index synchron und prüft ihn anschließend.
+
+        Der Aufrufer muss parallel laufende Dateioperationen über den
+        StorageCoordinator ausschließen. Der Index-Lock blockiert zusätzlich
+        reine SQLite-Schreibpfade, die keine Archivdateien anfassen.
+        """
+        with self._lock:
+            self._conn.commit()
+            before = self._get_database_maintenance_stats_unlocked()
+            self._conn.execute("VACUUM")
+            quick_check = str(
+                self._conn.execute("PRAGMA quick_check").fetchone()[0]
+            )
+            if quick_check != "ok":
+                raise sqlite3.DatabaseError(
+                    f"SQLite quick_check nach VACUUM: {quick_check}"
+                )
+            after = self._get_database_maintenance_stats_unlocked()
+        return {"before": before, "after": after, "quick_check": quick_check}
+
+    def _get_database_maintenance_stats_unlocked(self) -> dict:
+        """Interne Variante für Aufrufer, die ``self._lock`` schon halten."""
+        page_size = int(self._conn.execute("PRAGMA page_size").fetchone()[0])
+        page_count = int(self._conn.execute("PRAGMA page_count").fetchone()[0])
+        freelist_count = int(
+            self._conn.execute("PRAGMA freelist_count").fetchone()[0]
+        )
+        return {
+            "page_size": page_size,
+            "page_count": page_count,
+            "freelist_count": freelist_count,
+            "database_bytes": page_size * page_count,
+            "reclaimable_bytes": page_size * freelist_count,
+        }
+
     def get_last_write_ts(self) -> float | None:
         """Zeitpunkt des zuletzt AKZEPTIERTEN Werts über alle Entitäten hinweg
         (MAX(last_ts), von record_write() gepflegt) — für die Einstellungen,

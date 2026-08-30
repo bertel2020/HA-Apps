@@ -55,6 +55,19 @@ Backup, Import, Rotation und Retention greifen wegen
 `StorageCoordinator.exclusive()` nie gleichzeitig auf den Datenbestand zu —
 sie warten ggf. aufeinander, nie parallel.
 
+## SQLite-Index-Wartung
+
+Die Indexdetailseite zeigt mit `PRAGMA freelist_count` ausschließlich
+vollständig freie, von SQLite im laufenden Betrieb automatisch
+wiederverwendbare Seiten. „Optimierung empfohlen“ erscheint konservativ ab
+50 MB Indexgröße, 10 MB reclaimbarem Speicher und 25 % freien Seiten.
+
+Die ausschließlich manuell gestartete Optimierung führt `VACUUM` unter
+`StorageCoordinator.exclusive()` und dem Index-Lock aus. Vorher müssen die
+doppelte aktuelle Indexgröße plus 16 MB Sicherheitsreserve frei sein; danach
+läuft `PRAGMA quick_check`. Es gibt bewusst weder einen periodischen Lauf
+noch eine automatische Ausführung beim Löschen von Messwerten.
+
 ## Versionierung und Release
 
 **Kanonische Version:** `addon/VERSION` (SemVer, eine Zeile). Alles andere

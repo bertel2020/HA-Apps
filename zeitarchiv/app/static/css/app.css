@@ -63,56 +63,45 @@
   --shadow:0 1px 2px rgba(0,0,0,.4);
 }
 
-/* Modernes, cleanes Schema: neutrales Zinc-Grau mit Indigo/Teal-Akzent,
-   ohne warme/organische Note bei den beiden Haupt-Akzenten — bewusst
-   abgesetzt von den anderen Schemata.
-
-   Zweite Überarbeitung (nach einer reinen Kontrast-Korrektur) — diesmal
-   auf gestalterisches Feedback statt nur Zahlen: die helle Variante wirkte
-   als große Flächenfarbe (z. B. `.tbl-style-header-accent`, eine volle
-   Tabellen-Kopfzeile) zu grell, UND Primär-/Sekundärfarbe lagen mit Indigo
-   und (dem zuvor kontrast-korrigierten, aber weiterhin blauen) Sky zu nah
-   beieinander, um in Charts als zwei klar unterscheidbare Serien zu lesen.
-   Zwei Korrekturen: 1) Indigo eine Tailwind-Stufe dunkler/entsättigter
-   (600→700) — bleibt eindeutig Indigo, wirkt aber als Vollfläche ruhiger.
-   2) Sekundärfarbe von Sky (Hue ~200°, zu nah an Indigos ~245°) auf Teal
-   (Hue ~175°) gewechselt — deutlich größerer Hue-Abstand bei weiterhin
-   kühlem, "unorganischem" Charakter. Die komplette Chart-1..8-Palette
-   wurde danach neu über den Farbkreis verteilt statt einzelner Tailwind-
-   "500"-Swatches, jede Farbe einzeln auf ≥3:1 (Chart-1/2 zusätzlich ≥4.5:1,
-   da zugleich Text-/Badge-Farbe) gegen Weiß geprüft. */
+/* Modernes, cleanes Schema: kühles Slate statt neutralem Zinc, ruhiges
+   Cobalt als einzige UI-Primärfarbe und Teal nur als Daten-/Chart-Akzent.
+   Die Flächenstufen sind bewusst deutlicher als im vorherigen Modern-Schema,
+   damit Karten nicht mit dem Seitenhintergrund verschmelzen. */
 :root[data-color-scheme="modern"]{
-  --bg:#FAFAFA; --surface:#FFFFFF; --surface-alt:#F4F4F5; --border:#E4E4E7; --border-strong:#D4D4D8;
-  --ink:#18181B; --ink-muted:#71717A; --ink-faint:#86868E;
-  --accent-line:#4338CA; --accent-bar:#0F766E; --accent-line-soft:#EEF2FF; --accent-bar-soft:#F0FDFA;
-  --accent-contrast:#FFFFFF; --danger:#DC2626; --danger-soft:#FEE2E2; --danger-contrast:#FFFFFF;
-  --chart-line:#4338CA; --chart-bar:#0F766E;
-  --chart-1:#4338CA; --chart-2:#0F766E; --chart-3:#B45309; --chart-4:#B91C1C;
-  --chart-5:#7E22CE; --chart-6:#15803D; --chart-7:#BE185D; --chart-8:#64748B;
-  --shadow:0 1px 2px rgba(24,24,27,.06),0 1px 1px rgba(24,24,27,.04);
+  --bg:#F6F7FB; --surface:#FFFFFF; --surface-alt:#EEF1F6; --border:#D9DEE8; --border-strong:#C4CBD8;
+  --ink:#172033; --ink-muted:#566176; --ink-faint:#7B8598;
+  --accent-line:#3157C8; --accent-bar:#0E7C86; --accent-line-soft:#E9EEFF; --accent-bar-soft:#E4F5F5;
+  --accent-contrast:#FFFFFF; --danger:#C83737; --danger-soft:#FCE8E8; --danger-contrast:#FFFFFF;
+  --warning:#A96700; --warning-soft:#FFF4D6;
+  --chart-line:#3157C8; --chart-bar:#0E7C86;
+  --chart-1:#3157C8; --chart-2:#0E7C86; --chart-3:#B85C00; --chart-4:#7646B8;
+  --chart-5:#C83737; --chart-6:#2F7D4A; --chart-7:#B33A70; --chart-8:#5D6B82;
+  --shadow:0 1px 2px rgba(23,32,51,.07),0 3px 10px rgba(23,32,51,.04);
 }
 @media (prefers-color-scheme: dark){
   :root[data-color-scheme="modern"]:not([data-color-mode]),
   :root[data-color-scheme="modern"][data-color-mode="auto"]{
-    --bg:#09090B; --surface:#18181B; --surface-alt:#27272A; --border:#3F3F46; --border-strong:#52525B;
-    --ink:#FAFAFA; --ink-muted:#A1A1AA; --ink-faint:#71717A;
-    --accent-line:#818CF8; --accent-bar:#2DD4BF; --accent-line-soft:#1E1B4B; --accent-bar-soft:#0F2C29;
-    --accent-contrast:#09090B; --danger:#F87171; --danger-soft:#3F1D1D; --danger-contrast:#09090B;
-    --chart-line:#818CF8; --chart-bar:#2DD4BF;
-    --chart-1:#818CF8; --chart-2:#2DD4BF; --chart-3:#FBBF24; --chart-4:#F87171;
-    --chart-5:#C084FC; --chart-6:#4ADE80; --chart-7:#F472B6; --chart-8:#94A3B8;
-    --shadow:0 1px 2px rgba(0,0,0,.4);
+    --bg:#0F1218; --surface:#171C25; --surface-alt:#222936; --border:#303949; --border-strong:#465166;
+    --ink:#F3F6FB; --ink-muted:#B3BDCC; --ink-faint:#7F8A9D;
+    --accent-line:#7EA1FF; --accent-bar:#4FB7B7; --accent-line-soft:#233463; --accent-bar-soft:#143B3E;
+    --accent-contrast:#0F1218; --danger:#F07A7A; --danger-soft:#401F25; --danger-contrast:#0F1218;
+    --warning:#E6A15A; --warning-soft:#3C2C18;
+    --chart-line:#7EA1FF; --chart-bar:#4FB7B7;
+    --chart-1:#7EA1FF; --chart-2:#4FB7B7; --chart-3:#E6A15A; --chart-4:#B994E8;
+    --chart-5:#F07A7A; --chart-6:#72C38A; --chart-7:#E48CB4; --chart-8:#9AA8BC;
+    --shadow:0 1px 2px rgba(0,0,0,.38);
   }
 }
 :root[data-color-scheme="modern"][data-color-mode="dark"]{
-  --bg:#09090B; --surface:#18181B; --surface-alt:#27272A; --border:#3F3F46; --border-strong:#52525B;
-  --ink:#FAFAFA; --ink-muted:#A1A1AA; --ink-faint:#71717A;
-  --accent-line:#818CF8; --accent-bar:#2DD4BF; --accent-line-soft:#1E1B4B; --accent-bar-soft:#0F2C29;
-  --accent-contrast:#09090B; --danger:#F87171; --danger-soft:#3F1D1D; --danger-contrast:#09090B;
-  --chart-line:#818CF8; --chart-bar:#2DD4BF;
-  --chart-1:#818CF8; --chart-2:#2DD4BF; --chart-3:#FBBF24; --chart-4:#F87171;
-  --chart-5:#C084FC; --chart-6:#4ADE80; --chart-7:#F472B6; --chart-8:#94A3B8;
-  --shadow:0 1px 2px rgba(0,0,0,.4);
+  --bg:#0F1218; --surface:#171C25; --surface-alt:#222936; --border:#303949; --border-strong:#465166;
+  --ink:#F3F6FB; --ink-muted:#B3BDCC; --ink-faint:#7F8A9D;
+  --accent-line:#7EA1FF; --accent-bar:#4FB7B7; --accent-line-soft:#233463; --accent-bar-soft:#143B3E;
+  --accent-contrast:#0F1218; --danger:#F07A7A; --danger-soft:#401F25; --danger-contrast:#0F1218;
+  --warning:#E6A15A; --warning-soft:#3C2C18;
+  --chart-line:#7EA1FF; --chart-bar:#4FB7B7;
+  --chart-1:#7EA1FF; --chart-2:#4FB7B7; --chart-3:#E6A15A; --chart-4:#B994E8;
+  --chart-5:#F07A7A; --chart-6:#72C38A; --chart-7:#E48CB4; --chart-8:#9AA8BC;
+  --shadow:0 1px 2px rgba(0,0,0,.38);
 }
 
 :root[data-color-mode="light"]{color-scheme:light;}
