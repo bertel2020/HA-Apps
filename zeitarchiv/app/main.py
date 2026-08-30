@@ -2301,6 +2301,9 @@ def statistik_view(request: Request) -> HTMLResponse:
             "entity_count": format_int(row["entity_count"]),
             "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
+            "entity_count_raw": row["entity_count"],
+            "total_rows_raw": row["total_rows"],
+            "total_size_raw": row["total_size_bytes"],
         }
         for row in index.get_stats_by_type()
     ]
@@ -2310,6 +2313,9 @@ def statistik_view(request: Request) -> HTMLResponse:
             "entity_count": format_int(row["entity_count"]),
             "total_rows": format_int(row['total_rows']),
             "total_size": format_size(row["total_size_bytes"]),
+            "entity_count_raw": row["entity_count"],
+            "total_rows_raw": row["total_rows"],
+            "total_size_raw": row["total_size_bytes"],
         }
         for row in index.get_stats_by_resolution()
     ]
@@ -2330,6 +2336,7 @@ def statistik_view(request: Request) -> HTMLResponse:
             "entity_id": row["entity_id"],
             "friendly_name": row["friendly_name"],
             "count": format_int(row['count']),
+            "count_raw": row["count"],
         }
         for row in duplicate_rows
     ]
@@ -3173,7 +3180,9 @@ def charts_duplicate(chart_id: int) -> dict:
     return {"id": new_id}
 
 
-def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
+def _dashboard_tiles_context(
+    dashboard_id: int, base: str = ".", auto_open_entity_id: str | None = None
+) -> dict:
     """Für die Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene
     Punkte", erweitert um Vergleichstabellen UND um mehrere unabhängige
     Dashboards) — sowohl vom initialen Laden von "/"/"/dashboards/{id}" als
@@ -3267,6 +3276,7 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
                 "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),
+                "sparkline_resolution": p["sparkline_resolution"],
             })
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
@@ -3275,6 +3285,10 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
     dashboard_locked = bool(dashboard["locked"]) if dashboard else False
     dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
     dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
+    all_entities = [
+        {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+        for row in index.list_entities()
+    ]
     return {
         "dashboard_id": dashboard_id,
         "dashboard_name": dashboard["name"] if dashboard else "Dashboard",
@@ -3287,6 +3301,11 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
         "dashboard_fill_gaps": dashboard_fill_gaps,
         "base": base,
         "tiles": tiles,
+        "auto_open_entity_id": auto_open_entity_id,
+        "entity_pin_options": [
+            {**row, "pinned": row["entity_id"] in pinned_entity_ids}
+            for row in all_entities
+        ],
         # Fixiertes Dashboard: keine neuen Kacheln anheften, siehe dashboard_locked
         # in _dashboard_tiles.html/_dashboard_tile_menu.html für die restlichen
         # Layout-Aktionen (Größe/Entfernen/Umsortieren).
@@ -3297,11 +3316,7 @@ def _dashboard_tiles_context(dashboard_id: int, base: str = ".") -> dict:
         # dashboard-tiles.js setupEntityPinSearch()) statt eines eigenen
         # Server-Roundtrips — dieselbe Größenordnung wie die Entitätenliste
         # anderswo in der App (Tabellen-Editor-Picker), kein Pagination-Bedarf.
-        "unpinned_entities": [
-            {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
-            for row in index.list_entities()
-            if row["entity_id"] not in pinned_entity_ids
-        ],
+        "unpinned_entities": [row for row in all_entities if row["entity_id"] not in pinned_entity_ids],
     }
 
 
@@ -3423,7 +3438,30 @@ def dashboard_pin_entity(request: Request, entity_id: str, dashboard_id: int = 1
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_entity_to_dashboard(dashboard_id, entity_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+    return templates.TemplateResponse(
+        request, "_dashboard_tiles.html",
+        _dashboard_tiles_context(dashboard_id, base, auto_open_entity_id=entity_id),
+    )
+
+
+@app.post("/dashboard/entity/{entity_id}", response_class=HTMLResponse)
+async def dashboard_entity_change(
+    request: Request, entity_id: str, dashboard_id: int = 1, base: str = "."
+) -> HTMLResponse:
+    _require_dashboard_unlocked(dashboard_id)
+    form = await request.form()
+    new_entity_id = str(form.get("new_entity_id", "")).strip()
+    _require_entity(new_entity_id)
+    try:
+        updated = index.set_dashboard_entity_pin_entity(dashboard_id, entity_id, new_entity_id)
+    except ValueError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return templates.TemplateResponse(
+        request, "_dashboard_tiles.html",
+        _dashboard_tiles_context(dashboard_id, base, auto_open_entity_id=new_entity_id),
+    )
 
 
 @app.post("/dashboard/unpin-entity/{entity_id}", response_class=HTMLResponse)
@@ -3468,6 +3506,26 @@ def dashboard_sparkline(body: _SparklineDashboardTileBody) -> dict:
     if not index.set_dashboard_entity_pin_sparkline(body.dashboard_id, body.entity_id, body.show_sparkline):
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "show_sparkline": body.show_sparkline}
+
+
+class _SparklineResolutionDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    entity_id: str
+    resolution: str
+
+
+@app.post("/dashboard/sparkline-resolution")
+def dashboard_sparkline_resolution(body: _SparklineResolutionDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        updated = index.set_dashboard_entity_pin_sparkline_resolution(
+            body.dashboard_id, body.entity_id, body.resolution
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    return {"ok": True, "resolution": body.resolution}
 
 
 class _ShowAgeDashboardTileBody(BaseModel):

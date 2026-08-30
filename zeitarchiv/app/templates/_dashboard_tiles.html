@@ -80,14 +80,15 @@
     <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
        data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
        data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"
-       data-show-age="{{ 'true' if tile.show_age else 'false' }}">
+       data-show-age="{{ 'true' if tile.show_age else 'false' }}"
+       data-sparkline-resolution="{{ tile.sparkline_resolution }}">
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-entity-value">
         <span class="dtile-entity-main">
           <span class="dtile-entity-number">{{ tile.value_text }}</span>
           {% if tile.unit %}<span class="dtile-entity-unit">{{ tile.unit }}</span>{% endif %}
         </span>
-        {% if tile.show_age %}<span class="dtile-entity-age" title="Letzter Wert">{{ tile.age_text }}</span>{% endif %}
+        {% if tile.show_age %}<span class="dtile-entity-age" title="Letzte Aktualisierung">{{ tile.age_text }}</span>{% endif %}
       </div>
       {% if tile.show_sparkline %}
       <div class="dtile-entity-sparkline"><div class="dtile-loading">&hellip;</div></div>

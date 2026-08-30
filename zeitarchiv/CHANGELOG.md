@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.65.0 - 2026-08-30
+
+### Neu
+
+- Die Sparkline-Auflösung von Werte-Kacheln ist pro Kachel als Rohdaten,
+  5 Minuten, 30 Minuten oder 1 Stunde konfigurierbar.
+
+### Verbesserung
+
+- Neue Werte-Kacheln öffnen direkt ihre Konfiguration und zeigen die
+  Sparkline standardmäßig an. Entität, Sparkline-Auflösung, letzte
+  Aktualisierung, Nachkommastellen und Titel lassen sich dort bearbeiten.
+- Titel, Wertezeile, Einheit und letzte Aktualisierung nutzen den verfügbaren
+  Kachelraum ausgewogener und bleiben auch bei kleinen Kacheln lesbar.
+- Chart-Optionen zeigen die Nachkommastellen ohne Umbruch in einer eigenen,
+  zentrierten zweiten Zeile.
+- Statistik: Das Wachstumsdiagramm verwendet dynamische Y-Achsen; sämtliche
+  Tabellen sind nach demselben Muster wie die Entitätenliste sortierbar.
+- Der Home-Assistant-Import bietet eine durchsuchbare Entitätenauswahl und
+  orientiert Suchfeld, Verfügbarkeitsprüfung und Statusanzeige am App-Standard.
+  Die Option heißt nun „Archivlücken füllen“ und erklärt ihre Wirkung in
+  einer eigenen kompakten Hilfe.
+- Tooltips erscheinen beim Überfahren nach 600 ms statt nach 450 ms. Per
+  Tastatur fokussierte Hinweise bleiben ohne Verzögerung zugänglich.
+
+### Fehlerbehebung
+
+- Die Dashboard-Datenbankmigration erhält die Einstellung zur
+  Legendendarstellung vorhandener Kacheln.
+
 ## 0.64.0 - 2026-08-29
 
 ### Neu

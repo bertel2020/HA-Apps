@@ -12,7 +12,7 @@
 // ersetzt nur die BEDIENUNG: das native Datalist-Popup lässt sich weder
 // scrollen noch mit Tooltip versehen, deshalb eine eigene, scrollbare
 // Liste mit denselben Einträgen (nur Friendly Names, Entity-ID per
-// verzögertem Tooltip — dieselbe 450ms-Verzögerung wie beim Entity-Picker).
+// verzögertem Tooltip — dieselbe 600ms-Verzögerung wie beim Entity-Picker).
 (function () {
   const datalist = document.getElementById('entity-datalist');
   if (!datalist) return;
@@ -72,7 +72,7 @@
       tooltip.style.left = r.left + 'px';
       tooltip.style.transform = 'translateY(-100%)';
       tooltip.style.display = 'block';
-    }, 450);
+    }, 600);
   }
 
   function render(filterText) {

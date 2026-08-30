@@ -796,6 +796,18 @@
     return {line, area};
   }
 
+  function resampleSparklinePoints(points, resolution) {
+    const bucketSeconds = {raw: 0, '5min': 5 * 60, '30min': 30 * 60, '1h': 60 * 60}[resolution] || 0;
+    if (!bucketSeconds || points.length < 2) return points;
+    const buckets = new Map();
+    points.forEach(point => {
+      // Der letzte Punkt je Bucket eignet sich gleichermaßen für Sensoren,
+      // kumulative Zähler und Schalter und lässt den aktuellen Stand intakt.
+      buckets.set(Math.floor(point.ts / bucketSeconds), point);
+    });
+    return Array.from(buckets.values()).sort((a, b) => a.ts - b.ts);
+  }
+
   // Aktueller Wert + Alter + optionale Sparkline einer Werte-Kachel — ein
   // einziger Roh-Query-Fetch (letzte 24h) deckt alle drei ab. Bewusst NICHT
   // auf entities.last_value/last_ts (die Datenbankspalten) verlassen: die
@@ -842,7 +854,10 @@
     }
 
     if (sparklineEl) {
-      const paths = sparklinePaths(points.map(p => p.value));
+      const sparklinePoints = resampleSparklinePoints(
+        points, el.dataset.sparklineResolution || 'raw'
+      );
+      const paths = sparklinePaths(sparklinePoints.map(p => p.value));
       sparklineEl.innerHTML = paths
         ? `<svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">`
           + `<path class="area" d="${paths.area}"/><path class="line" d="${paths.line}"/></svg>`
@@ -900,6 +915,7 @@
       const legendRow = control.querySelector('.dtile-legend-wrap');
       // Nur bei Werte-Kacheln vorhanden (siehe _dashboard_tile_menu.html).
       const sparklineCheckbox = control.querySelector('.dtile-sparkline-checkbox');
+      const sparklineResolutionCells = Array.from(control.querySelectorAll('.dtile-sparkline-resolution-cell'));
       const showAgeCheckbox = control.querySelector('.dtile-show-age-checkbox');
       const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
       const dtileBody = tile.querySelector('.dtile-body');
@@ -1048,6 +1064,34 @@
         });
       }
 
+      const sparklineResolutionHead = control.querySelector('.dtile-sparkline-resolution-row')
+        ?.previousElementSibling?.querySelector('strong');
+      const SPARKLINE_RESOLUTION_LABELS = {raw: 'Rohdaten', '5min': '5 Min', '30min': '30 Min', '1h': '1 Std'};
+      sparklineResolutionCells.forEach(cell => {
+        cell.addEventListener('click', async () => {
+          const resolution = cell.dataset.resolution;
+          try {
+            const response = await fetch(`${base}/dashboard/sparkline-resolution`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId, resolution,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            sparklineResolutionCells.forEach(option => option.classList.toggle('is-selected', option === cell));
+            if (sparklineResolutionHead) sparklineResolutionHead.textContent = SPARKLINE_RESOLUTION_LABELS[resolution];
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) {
+              entityBody.dataset.sparklineResolution = resolution;
+              if (entityBody.dataset.showSparkline === 'true') await renderEntityTile(entityBody);
+            }
+          } catch (e) {
+            trigger.title = 'Sparkline-Auflösung konnte nicht gespeichert werden';
+          }
+        });
+      });
+
       if (showAgeCheckbox) {
         showAgeCheckbox.addEventListener('change', async () => {
           const showAge = showAgeCheckbox.checked;
@@ -1068,7 +1112,7 @@
               if (!ageEl) {
                 ageEl = document.createElement('span');
                 ageEl.className = 'dtile-entity-age';
-                ageEl.title = 'Letzter Wert';
+                ageEl.title = 'Letzte Aktualisierung';
                 entityBody?.querySelector('.dtile-entity-value')?.appendChild(ageEl);
               }
               if (entityBody) await renderEntityTile(entityBody);

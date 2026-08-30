@@ -79,9 +79,13 @@ bestücken, umsortieren und fixieren (siehe unten).
   Entfernen einer Kachel löscht nur die Platzierung, nicht das zugrunde
   liegende Chart oder die Tabelle.
 - **Werte-Kachel:** pinnt den aktuellen Wert einer einzelnen Entität direkt
-  aufs Dashboard, ohne dafür ein Chart anzulegen — mit optionaler
-  Sparkline, optionaler Altersanzeige des letzten Werts und einem eigenen
-  Nachkommastellen- und Titel-Override. Ist der letzte Wert älter als 15
+  aufs Dashboard, ohne dafür ein Chart anzulegen. Nach dem Anheften öffnet
+  sich sofort die Konfiguration. Die Sparkline ist standardmäßig aktiv und
+  zeigt die im Zeitarchiv gespeicherten Rohpunkte der letzten 24 Stunden;
+  alternativ lässt sie sich auf einen Punkt je 5 Minuten, 30 Minuten oder
+  Stunde verdichten. Entität, Anzeige der letzten Aktualisierung,
+  Nachkommastellen und Titel sind direkt in der Kachel bearbeitbar. Ist der
+  letzte Wert älter als 15
   Minuten bzw. eine Stunde, hebt sich der Kartenrahmen gelb bzw. rot
   hervor. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
   größeren Einstellungs-Popup (⋮), da hier deutlich mehr Optionen als bei
@@ -544,6 +548,10 @@ Planer erfasst unabhängig von Seitenaufrufen höchstens stündlich einen
 realen Bestandsschnappschuss, sodass die Wachstumsansicht auch ohne
 regelmäßigen Besuch der Seite aussagekräftig bleibt.
 
+Alle Tabellen lassen sich durch Anklicken ihrer Spaltenüberschriften wie die
+Entitätenliste sortieren. Das Wachstumsdiagramm passt seine beiden Y-Achsen
+dynamisch an den jeweils sichtbaren Wertebereich an.
+
 Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
 Backups, da auch diese Speicherplatz belegen, aber in der reinen
 Entitäten-Statistik nicht enthalten sind.
@@ -617,7 +625,7 @@ dass erfolgreich abgerufene Werte der anderen Quelle verarbeitet werden.
 
 Der laufende Kalendermonat wird unabhängig vom bereits vorhandenen
 Datenbestand immer automatisch in den Hot Buffer importiert. Die Option
-"Archivlücken ergänzen" ist nur erforderlich, wenn in bereits
+"Archivlücken füllen" ist nur erforderlich, wenn in bereits
 abgeschlossenen Monatsarchiven echte historische Lücken geschlossen werden
 sollen. Vorhandene Zeitstempel und Werte bleiben dabei unverändert.
 
@@ -648,7 +656,7 @@ lassen sich gesammelt löschen, wenn sie nicht mehr benötigt werden.
 
 Importe ergänzen ausschließlich fehlende Zeitstempel. Der laufende Monat
 landet im Hot Buffer; bereits abgeschlossene Archive werden nur mit aktivierter
-Option "Archivlücken ergänzen" um fehlende Zeitstempel erweitert.
+Option "Archivlücken füllen" um fehlende Zeitstempel erweitert.
 Vorhandene Messpunkte derselben Entität und desselben Zeitstempels werden
 übersprungen — auch bei abweichender Event-ID — und niemals ersetzt. Ein
 erneuter Symcon- oder CSV-Upload derselben Quelle dupliziert also nichts,

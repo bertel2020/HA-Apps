@@ -146,45 +146,51 @@
     <div class="card storage-card">
       <div id="storage-pie"></div>
       <div class="tbl-wrap">
-        <table class="dt stats-dt storage-usage-table">
+        <table class="dt stats-dt storage-usage-table" data-sortable>
           <colgroup>
             <col class="stats-col-storage-label"><col class="stats-col-storage-size"><col class="stats-col-storage-percent">
           </colgroup>
-          <tr><th>Kategorie</th><th>Größe</th><th>Anteil</th></tr>
+          <thead><tr><th>Kategorie</th><th>Größe</th><th>Anteil</th></tr></thead>
+          <tbody>
           {% for row in storage_breakdown %}
           <tr data-storage-label="{{ row.label }}">
             <td class="label"><span class="storage-dot" data-key="{{ row.key }}"></span>{% if row.href %}<a class="storage-category-link" href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}</td>
-            <td>{{ row.size }}</td>
-            <td>{{ row.percent }} %</td>
+            <td data-sort="{{ row.bytes }}">{{ row.size }}</td>
+            <td data-sort="{{ row.percent }}">{{ row.percent }} %</td>
           </tr>
           {% endfor %}
-          <tr><td class="label"><strong>Gesamt</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr>
+          </tbody>
+          <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr></tfoot>
         </table>
       </div>
     </div>
     <h2>Nach Typ</h2>
     <div class="tbl-wrap">
-      <table class="dt stats-dt">
+      <table class="dt stats-dt" data-sortable>
         <colgroup>
           <col class="stats-col-label"><col class="stats-col-count"><col class="stats-col-rows"><col class="stats-col-size">
         </colgroup>
-        <tr><th>Typ</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr>
+        <thead><tr><th>Typ</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr></thead>
+        <tbody>
         {% for row in by_type %}
-        <tr><td class="label">{{ row.label }}</td><td>{{ row.entity_count }}</td><td>{{ row.total_rows }}</td><td>{{ row.total_size }}</td></tr>
+        <tr><td class="label">{{ row.label }}</td><td data-sort="{{ row.entity_count_raw }}">{{ row.entity_count }}</td><td data-sort="{{ row.total_rows_raw }}">{{ row.total_rows }}</td><td data-sort="{{ row.total_size_raw }}">{{ row.total_size }}</td></tr>
         {% endfor %}
+        </tbody>
       </table>
     </div>
 
     <h2>Nach Auflösung</h2>
     <div class="tbl-wrap">
-      <table class="dt stats-dt">
+      <table class="dt stats-dt" data-sortable>
         <colgroup>
           <col class="stats-col-label"><col class="stats-col-count"><col class="stats-col-rows"><col class="stats-col-size">
         </colgroup>
-        <tr><th>Auflösung</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr>
+        <thead><tr><th>Auflösung</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr></thead>
+        <tbody>
         {% for row in by_resolution %}
-        <tr><td class="label">{{ row.label }}</td><td>{{ row.entity_count }}</td><td>{{ row.total_rows }}</td><td>{{ row.total_size }}</td></tr>
+        <tr><td class="label">{{ row.label }}</td><td data-sort="{{ row.entity_count_raw }}">{{ row.entity_count }}</td><td data-sort="{{ row.total_rows_raw }}">{{ row.total_rows }}</td><td data-sort="{{ row.total_size_raw }}">{{ row.total_size }}</td></tr>
         {% endfor %}
+        </tbody>
       </table>
     </div>
 
@@ -233,7 +239,7 @@
               <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
             </a>
           </td>
-          <td>{{ row.count }}</td>
+          <td data-sort="{{ row.count_raw }}">{{ row.count }}</td>
         </tr>
         {% endfor %}
         </tbody>
@@ -309,8 +315,8 @@
         grid: {left: 10, right: 10, top: 16, bottom: 40, containLabel: true},
         xAxis: {type: 'time'},
         yAxis: [
-          {type: 'value', axisLabel: {formatter: v => v.toLocaleString(NumberFormat.LOCALE)}},
-          {type: 'value', axisLabel: {formatter: fmtSize}, splitLine: {show: false}},
+          {type: 'value', scale: true, axisLabel: {formatter: v => v.toLocaleString(NumberFormat.LOCALE)}},
+          {type: 'value', scale: true, axisLabel: {formatter: fmtSize}, splitLine: {show: false}},
         ],
         legend: {bottom: 0, textStyle: {color: inkMuted}},
         tooltip: {

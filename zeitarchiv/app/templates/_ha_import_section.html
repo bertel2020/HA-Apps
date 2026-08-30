@@ -88,9 +88,12 @@
       <span class="ha-archive-option-row">
         <label class="ha-archive-option">
           <input type="checkbox" name="include_existing_months" {% if ha_include_existing_months %}checked{% endif %}>
-          <span>Archivlücken ergänzen</span>
+          <span>Archivlücken füllen</span>
         </label>
-        <span class="ha-archive-info" tabindex="0" role="img" aria-label="Information zu Archivlücken ergänzen" data-tooltip="Ergänzt in bereits archivierten, abgeschlossenen Monaten ausschließlich fehlende Zeitstempel. Vorhandene Werte werden nicht verändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist diese Option nicht erforderlich.">ⓘ</span>
+        <span class="ha-archive-help" tabindex="0" role="button" aria-label="Information zu Archivlücken füllen">
+          <span aria-hidden="true">i</span>
+          <span class="ha-archive-help-popover" role="tooltip">Füllt in abgeschlossenen Monatsarchiven ausschließlich fehlende Zeitstempel. Vorhandene Werte bleiben unverändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist die Option nicht nötig.</span>
+        </span>
       </span>
     </div>
 

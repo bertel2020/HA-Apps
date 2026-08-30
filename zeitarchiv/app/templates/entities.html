@@ -40,11 +40,11 @@
      bezogen) — siehe identische Regeln/Begründung in dashboard_detail.html. */
   .dtile-entity-body{display:flex;flex-direction:column;gap:4px;}
   .dtile-entity-body .dtile-title{
-    flex:none;text-align:left;margin-bottom:0;
+    flex:none;text-align:left;margin-bottom:0;padding-top:4px;
     font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:500;
   }
   .dtile-entity-value{
-    flex:1;min-height:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px;
+    flex:1;min-height:0;display:flex;align-content:center;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;
   }
   .dtile-entity-main{display:flex;align-items:baseline;gap:5px;}
   .dtile-entity-number{font-family:var(--font-display);font-size:calc(28px * var(--font-scale, 1));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -62,6 +62,7 @@
      data-grid-rows geknüpft, nicht zusätzlich an data-grid-cols. */
   .dtile-entity[data-grid-rows="1"] .dtile-body{padding:10px 10px 8px;}
   .dtile-entity[data-grid-rows="1"] .dtile-entity-body{gap:2px;}
+  .dtile-entity[data-grid-rows="1"] .dtile-title{padding-top:0;}
   .dtile-entity[data-grid-rows="1"] .dtile-entity-number{font-size:calc(20px * var(--font-scale, 1));}
   .dtile-entity[data-grid-rows="1"] .dtile-entity-sparkline{margin-top:2px;}
   .dtile-picker-search{
@@ -283,6 +284,7 @@
   <script src="static/vendor/echarts.min.js"></script>
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="static/js/entity-picker.js?v={{ js_v }}"></script>
   <script src="static/js/table-compute.js?v={{ js_v }}"></script>
   <script src="static/js/dashboard-tiles.js?v={{ js_v }}"></script>
 </body>

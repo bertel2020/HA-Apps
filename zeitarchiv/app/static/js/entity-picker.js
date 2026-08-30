@@ -46,7 +46,7 @@ function entityPicker(options, initialEntityId, onSelectFn) {
       this.entityId = '';
       if (typeof onSelectFn === 'function') onSelectFn('');
     },
-    // Verzögerung wie ein natives Tooltip (~450ms) — bei schnellem
+    // Verzögerung wie ein natives Tooltip (~600ms) — bei schnellem
     // Drüberfahren beim Scannen der Liste soll nicht jede Zeile aufblitzen.
     scheduleHover(opt, el) {
       this._clearHoverTimer();
@@ -54,7 +54,7 @@ function entityPicker(options, initialEntityId, onSelectFn) {
       this._hoverTimer = setTimeout(() => {
         this.hoverTip = opt;
         this.hoverPos = { top: rect.top - 6, left: rect.left };
-      }, 450);
+      }, 600);
     },
     hoverSelf(el) {
       if (!this.entityId) return;

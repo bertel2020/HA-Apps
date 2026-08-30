@@ -322,7 +322,10 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     show_legend INTEGER NOT NULL DEFAULT 0,
     -- Nur bei Werte-Kacheln (item_type='entity') nutzbar — kleiner
     -- Roh-Verlauf statt/neben dem reinen aktuellen Wert.
-    show_sparkline INTEGER NOT NULL DEFAULT 0,
+    show_sparkline INTEGER NOT NULL DEFAULT 1,
+    -- Visuelle Verdichtung der 24-h-Sparkline. "raw" zeigt jeden im
+    -- Zeitarchiv gespeicherten Punkt, alternativ ein Punkt je Zeit-Bucket.
+    sparkline_resolution TEXT NOT NULL DEFAULT 'raw',
     -- Nur bei Werte-Kacheln: Nachkommastellen-Override für die Anzeige
     -- ("auto" = das entity-eigene Feld verwenden, sonst 0-3 wie dort).
     decimals TEXT NOT NULL DEFAULT 'auto',
@@ -630,12 +633,15 @@ class Index:
                     position INTEGER NOT NULL,
                     grid_cols INTEGER NOT NULL DEFAULT 1,
                     grid_rows INTEGER NOT NULL DEFAULT 1,
+                    show_legend INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(dashboard_id, item_type, item_id)
                 )"""
             )
             self._conn.execute(
-                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, grid_cols, grid_rows) "
-                "SELECT 1, item_type, item_id, position, grid_cols, grid_rows FROM dashboard_pins_old"
+                "INSERT INTO dashboard_pins "
+                "(dashboard_id, item_type, item_id, position, grid_cols, grid_rows, show_legend) "
+                "SELECT 1, item_type, item_id, position, grid_cols, grid_rows, show_legend "
+                "FROM dashboard_pins_old"
             )
             self._conn.execute("DROP TABLE dashboard_pins_old")
 
@@ -662,7 +668,7 @@ class Index:
                     grid_cols INTEGER NOT NULL DEFAULT 1,
                     grid_rows INTEGER NOT NULL DEFAULT 1,
                     show_legend INTEGER NOT NULL DEFAULT 0,
-                    show_sparkline INTEGER NOT NULL DEFAULT 0,
+                    show_sparkline INTEGER NOT NULL DEFAULT 1,
                     UNIQUE(dashboard_id, item_type, item_id, item_entity_id)
                 )"""
             )
@@ -686,6 +692,10 @@ class Index:
             # "vor X"-Alter neben dem Wert ein-/ausblendbar — Standard an
             # (bisheriges, einziges Verhalten).
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN show_age INTEGER NOT NULL DEFAULT 1")
+        if "sparkline_resolution" not in dashboard_columns:
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN sparkline_resolution TEXT NOT NULL DEFAULT 'raw'"
+            )
 
         dashboards_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboards)")}
         if "locked" not in dashboards_columns:
@@ -1527,19 +1537,20 @@ class Index:
             new_id = cursor.lastrowid
             pins = self._conn.execute(
                 "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, decimals, title, show_age "
+                "show_sparkline, sparkline_resolution, decimals, title, show_age "
                 "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
                 (dashboard_id,),
             ).fetchall()
             self._conn.executemany(
                 "INSERT INTO dashboard_pins "
                 "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, decimals, title, show_age) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "show_sparkline, sparkline_resolution, decimals, title, show_age) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
                         p["grid_cols"], p["grid_rows"], p["show_legend"], p["show_sparkline"],
+                        p["sparkline_resolution"],
                         p["decimals"], p["title"], p["show_age"],
                     )
                     for p in pins
@@ -1709,8 +1720,9 @@ class Index:
                 "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
             ).fetchone()[0]
             self._conn.execute(
-                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, item_entity_id, position) "
-                "VALUES (?, 'entity', 0, ?, ?)",
+                "INSERT INTO dashboard_pins "
+                "(dashboard_id, item_type, item_id, item_entity_id, position, show_sparkline) "
+                "VALUES (?, 'entity', 0, ?, ?, 1)",
                 (dashboard_id, entity_id, (max_pos or 0) + 1),
             )
             return True
@@ -1743,6 +1755,38 @@ class Index:
                 "UPDATE dashboard_pins SET show_sparkline = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
                 (int(show_sparkline), dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_sparkline_resolution(
+        self, dashboard_id: int, entity_id: str, resolution: str
+    ) -> bool:
+        if resolution not in ("raw", "5min", "30min", "1h"):
+            raise ValueError("Ungültige Sparkline-Auflösung")
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET sparkline_resolution = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (resolution, dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_entity(
+        self, dashboard_id: int, old_entity_id: str, new_entity_id: str
+    ) -> bool:
+        """Wechselt die Entität einer Werte-Kachel, ohne Position und
+        Darstellungsoptionen der Kachel zu verlieren."""
+        with self._lock, self._conn:
+            if old_entity_id != new_entity_id and self._conn.execute(
+                "SELECT 1 FROM dashboard_pins WHERE dashboard_id = ? "
+                "AND item_type = 'entity' AND item_entity_id = ?",
+                (dashboard_id, new_entity_id),
+            ).fetchone():
+                raise ValueError("Diese Entität ist bereits auf dem Dashboard angeheftet")
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET item_entity_id = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (new_entity_id, dashboard_id, old_entity_id),
             )
             return cursor.rowcount > 0
 

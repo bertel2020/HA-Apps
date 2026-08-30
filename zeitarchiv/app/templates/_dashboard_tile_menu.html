@@ -1,6 +1,8 @@
 {% set size_max = 6 if dashboard_precise else 3 %}
 {% set legend_threshold = 3 if dashboard_precise else 2 %}
-<div class="dtile-menu{{ ' is-precise' if dashboard_precise else '' }}" x-data="{menuOpen: false}" :class="{'is-open': menuOpen}">
+<div class="dtile-menu{{ ' is-precise' if dashboard_precise else '' }}"
+     x-data="{menuOpen: {{ 'true' if tile.kind == 'entity' and auto_open_entity_id == tile.entity_id else 'false' }}}"
+     :class="{'is-open': menuOpen}">
   <button type="button" class="dtile-menu-btn" draggable="false"
           @pointerdown.stop @click.prevent.stop="menuOpen = !menuOpen"
           :aria-expanded="menuOpen.toString()" aria-haspopup="{{ 'dialog' if tile.kind == 'entity' else 'menu' }}"
@@ -26,6 +28,42 @@
       <div class="dtile-settings-body">
 
         <div class="dtile-settings-section">
+          <div class="dtile-title-field">
+            <span class="menu-row-label">Entität</span>
+            <form class="dd-picker-wrap dtile-entity-picker"
+                  x-data='entityPicker({{ entity_pin_options | tojson }}, {{ tile.entity_id | tojson }})'
+                  x-ref="entityForm" @click.outside="open = false"
+                  hx-post="{{ href_base }}dashboard/entity/{{ tile.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                  hx-target="#dashboard-grid" hx-swap="outerHTML">
+              <input type="hidden" name="new_entity_id" :value="entityId">
+              <button type="button" class="btn" @click="toggleOpen($refs.tileEntitySearch)"
+                      @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
+                      x-text="label(entityId) + ' ▾'"></button>
+              <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak>
+                <input type="search" class="dd-picker-popover-search" x-ref="tileEntitySearch"
+                       x-model="search" placeholder="Entität suchen …">
+                <div class="dtile-entity-picker-list">
+                  <template x-for="opt in filtered().filter(opt => !opt.pinned || opt.entity_id === entityId)" :key="opt.entity_id">
+                    <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
+                         @click="select(opt.entity_id); $nextTick(() => $refs.entityForm.requestSubmit())"
+                         @mouseenter="scheduleHover(opt, $event.currentTarget)" @mouseleave="clearHover()">
+                      <span x-text="opt.label"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <template x-teleport="body">
+                <div class="entity-tooltip entity-tooltip-floating"
+                     :style="`display:${hoverTip ? 'block' : 'none'}; top:${hoverPos.top}px; left:${hoverPos.left}px; transform:translateY(-100%);`">
+                  <strong x-text="hoverTip && hoverTip.label"></strong>
+                  <code x-text="hoverTip && hoverTip.entity_id"></code>
+                </div>
+              </template>
+            </form>
+          </div>
+        </div>
+
+        <div class="dtile-settings-section">
           <div class="dtile-size-picker-head">Kachelgröße <strong>{{ tile.grid_cols }}×{{ tile.grid_rows }}</strong></div>
           <div class="dtile-size-grid" role="grid" aria-label="Kachelgröße bis {{ size_max }} mal {{ size_max }} auswählen">
             {% for row in range(1, size_max + 1) %}
@@ -49,7 +87,7 @@
             </span>
           </label>
           <label class="menu-row dtile-show-age-row">
-            <span class="menu-row-label">Alter</span>
+            <span class="menu-row-label">Letzte Aktualisierung</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-show-age-checkbox" {% if tile.show_age %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
@@ -58,7 +96,17 @@
         </div>
 
         <div class="dtile-settings-section">
-          <div class="dtile-decimals-picker-head">Nachkommastellen <strong>{{ {'auto': 'Auto', '0': '0', '1': '1', '2': '2', '3': '3'}[tile.decimals] }}</strong></div>
+          <div class="dtile-decimals-picker-head">Sparkline-Auflösung</div>
+          <div class="dtile-sparkline-resolution-row" role="group" aria-label="Sparkline-Auflösung wählen">
+            {% for value, label in [('raw', 'Roh'), ('5min', '5 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
+            <button type="button" class="dtile-sparkline-resolution-cell{% if tile.sparkline_resolution == value %} is-selected{% endif %}"
+                    data-resolution="{{ value }}" title="{{ {'raw': 'Alle gespeicherten Rohdatenpunkte', '5min': 'Ein Punkt je 5 Minuten', '30min': 'Ein Punkt je 30 Minuten', '1h': 'Ein Punkt je Stunde'}[value] }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="dtile-settings-section">
+          <div class="dtile-decimals-picker-head">Nachkommastellen</div>
           <div class="dtile-decimals-row" role="group" aria-label="Nachkommastellen wählen">
             {% for value, label in [('auto', 'Auto'), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
             <button type="button" class="dtile-decimals-cell{% if tile.decimals == value %} is-selected{% endif %}"

@@ -371,6 +371,20 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
    Option gewählt wird ("Automatisch" vs. "1 Stunde" vs. "30 Minuten"). */
 .menu-row select{font-family:var(--font-mono);width:150px;flex:none;}
 .menu-row-label{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;white-space:normal;overflow-wrap:break-word;}
+.menu-row-stack{align-items:stretch;flex-direction:column;gap:6px;}
+.menu-row-stack>.menu-row-label{white-space:nowrap;}
+.menu-row-stack>.seg{align-self:center;max-width:100%;}
+.dtile-entity-picker{display:block;width:100%;}
+.dtile-entity-picker>.btn{width:100%;box-sizing:border-box;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dtile-entity-picker>.dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
+.dtile-entity-picker-list{max-height:220px;overflow-y:auto;}
+.dtile-sparkline-resolution-row{display:flex;gap:4px;}
+.dtile-sparkline-resolution-cell{
+  flex:1;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface-alt);
+  color:var(--ink);font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
+}
+.dtile-sparkline-resolution-cell:hover{border-color:var(--accent-line);}
+.dtile-sparkline-resolution-cell.is-selected{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
 /* Menü-Zeilen können auch reine Navigations-Links sein (a.menu-row) statt
    Einstellungen — Browser-Standard für Links zurückgesetzt, damit sie sich
    optisch nicht von den Toggle-/Auswahl-Zeilen im selben Menü unterscheiden. */
@@ -476,8 +490,12 @@ table.dt th a:hover,table.dt th a.active{color:var(--accent-line);}
 table.dt th.dt-sortable-col{cursor:pointer;user-select:none;}
 table.dt th.dt-sortable-col:hover{color:var(--accent-line);}
 table.dt th.dt-sort-asc,table.dt th.dt-sort-desc{color:var(--accent-line);}
-table.dt th.dt-sort-asc::after{content:" ▲";}
-table.dt th.dt-sort-desc::after{content:" ▼";}
+/* Dieselbe schlanke Richtungsanzeige wie in der serverseitig sortierten
+   Entitätenliste: kein geometrisches Dreieck, sondern ein normaler Pfeil in
+   Schriftgröße/-gewicht des Tabellenkopfs. Die Entitäten-Konvention zeigt
+   bei aufsteigender Sortierung nach unten und bei absteigender nach oben. */
+table.dt th.dt-sort-asc::after{content:" ↓";}
+table.dt th.dt-sort-desc::after{content:" ↑";}
 /* Enger als die Standard-.pager-Regel (margin-top:10px) — direkt an der
    Tabelle gehören Zeilen/Seiten-Angabe optisch stärker zur Tabelle als zu
    dem, was danach kommt; der übliche 16px-Abstand zur nächsten Aktionszeile
@@ -525,10 +543,10 @@ td.mono{font-family:var(--font-mono);}
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;
   opacity:0;visibility:hidden;transition:visibility 0s;
 }
-/* Verzögerung wie beim JS-Timer-Tooltip (~450ms, siehe entity-picker.js) —
+/* Verzögerung wie beim JS-Timer-Tooltip (~600ms, siehe entity-picker.js) —
    nur beim Erscheinen; das Verschwinden bleibt instant (transition-delay
    wird nur in der :hover-Regel gesetzt, nicht in der Basisregel). */
-[data-tooltip]:hover::after{opacity:1;visibility:visible;transition-delay:.45s;}
+[data-tooltip]:hover::after{opacity:1;visibility:visible;transition-delay:.6s;}
 /* Entitäten-Tooltips brauchen echtes Markup statt content:attr(...), damit
    Friendly Name und Entity-ID unterschiedlich formatiert, aber immer als zwei
    getrennte Zeilen erscheinen. max-content richtet die Box an der längeren
@@ -541,12 +559,10 @@ td.mono{font-family:var(--font-mono);}
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;text-align:left;
   visibility:hidden;transition:visibility 0s;
 }
-/* Verzögerung wie beim JS-Timer-Tooltip (~450ms, siehe entity-picker.js) —
-   nur beim Erscheinen; transition-delay steht bewusst nur in dieser Regel,
-   nicht in der Basisregel, damit das Verschwinden instant bleibt. */
-.entity-tooltip-host:hover>.entity-tooltip,.entity-tooltip-host:focus-within>.entity-tooltip{
-  visibility:visible;transition-delay:.45s;
-}
+/* Beim Überfahren gilt dieselbe 600ms-Verzögerung wie beim JS-Timer-Tooltip.
+   Tastaturfokus zeigt die Information sofort; das Verschwinden bleibt instant. */
+.entity-tooltip-host:hover>.entity-tooltip{visibility:visible;transition-delay:.6s;}
+.entity-tooltip-host:focus-within>.entity-tooltip{visibility:visible;}
 /* Hosts mit dynamisch befülltem Tooltip (z. B. die HA-Entität-Zuordnung im
    Symcon-Import, deren Inhalt erst nach Auswahl per JS gesetzt wird) sollen
    vor der ersten Auswahl keine leere Sprechblase zeigen. */
@@ -563,7 +579,7 @@ td.mono{font-family:var(--font-mono);}
    Inline-Style (JS, siehe Template) exakt an der Zeile positioniert. */
 /* Per JS geteleportet (body-Kind, kein .entity-tooltip-host-Vorfahre) —
    die :hover-Sichtbarkeitsregel oben greift hier nie. Sichtbarkeit kommt
-   stattdessen ausschließlich vom eigenen 450ms-JS-Timer (entity-picker.js/
+   stattdessen ausschließlich vom eigenen 600ms-JS-Timer (entity-picker.js/
    map-entity-picker.js), der display:block/none direkt per Inline-Style
    setzt; visibility hier fest auf "visible", damit dieser display-Wert
    überhaupt etwas bewirkt. */

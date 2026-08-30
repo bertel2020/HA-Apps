@@ -597,6 +597,7 @@
     // eingesetzt wird.
     (function () {
       let tip = null;
+      let tipTimer = null;
       function ensureTip() {
         if (!tip) {
           tip = document.createElement('div');
@@ -621,11 +622,21 @@
         el.style.top = top + 'px';
       }
       function hideTip() {
+        if (tipTimer) {
+          clearTimeout(tipTimer);
+          tipTimer = null;
+        }
         if (tip) tip.classList.remove('open');
       }
       document.addEventListener('mouseover', e => {
         const badge = e.target.closest('.flag-badge[data-tooltip]');
-        if (badge) showTip(badge);
+        if (badge) {
+          if (tipTimer) clearTimeout(tipTimer);
+          tipTimer = setTimeout(() => {
+            tipTimer = null;
+            showTip(badge);
+          }, 600);
+        }
       });
       document.addEventListener('mouseout', e => {
         const badge = e.target.closest('.flag-badge[data-tooltip]');
