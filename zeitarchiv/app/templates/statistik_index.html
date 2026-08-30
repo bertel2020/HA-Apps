@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Indexdetails</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  .index-intro{max-width:90ch;}
+  .index-group{margin-top:18px;}
+  .index-group h2{margin-bottom:4px;}
+  .index-group>.hint{margin-top:0;}
+  .index-table{min-width:{{ '760px' if index_sizes_available else '540px' }};}
+  .index-table th:first-child{width:{{ '34%' if index_sizes_available else '68%' }};}
+  .index-table th:nth-child(2){width:{{ '18%' if index_sizes_available else '32%' }};}
+  .index-table th:nth-child(n+3){width:16%;}
+</style>
+</head>
+<body>
+{% include "_topnav.html" %}
+<div class="page">
+  <h1>Indexdetails</h1>
+  <p class="sub"><a href="../statistik">&larr; Zurück zur Statistik</a></p>
+  <div class="settings-panel">
+    <p class="index-intro">Der Index ist die SQLite-Datei <code>index.sqlite</code>. Er enthält Metadaten, Konfiguration und Betriebsverläufe, aber nicht die eigentlichen Messreihen: Rohwerte liegen im Hot Buffer und Archiv, Aggregate in den Rollups.</p>
+    <div class="stat-row">
+      <div class="stat"><div class="label">Dateigröße</div><div class="value">{{ index_file_size }}</div></div>
+      {% if index_sizes_available %}<div class="stat"><div class="label">Fachdaten inkl. Indizes</div><div class="value">{{ index_allocated_size }}</div></div>{% endif %}
+      <div class="stat"><div class="label">Fachtabellen</div><div class="value">{{ index_table_count }}</div></div>
+      <div class="stat"><div class="label">Einträge gesamt</div><div class="value">{{ index_entry_count }}</div></div>
+    </div>
+
+    {% for group in index_groups %}
+    <section class="index-group">
+      <h2>{{ group.label }}</h2>
+      <p class="hint">{{ group.description }}</p>
+      <div class="tbl-wrap">
+        <table class="dt index-table" data-sortable>
+          <thead><tr><th>Tabelle</th><th>Einträge</th>{% if index_sizes_available %}<th>Daten</th><th>Indizes</th><th>Gesamt</th>{% endif %}</tr></thead>
+          <tbody>
+          {% for table in group.tables %}
+          <tr><td><code>{{ table.table }}</code></td><td data-sort="{{ table.rows }}">{{ table.rows_label }}</td>{% if index_sizes_available %}<td data-sort="{{ table.data_bytes or 0 }}">{{ table.data_size_label }}</td><td data-sort="{{ table.index_bytes or 0 }}">{{ table.index_size_label }}</td><td data-sort="{{ table.bytes or 0 }}">{{ table.size_label }}</td>{% endif %}</tr>
+          {% endfor %}
+          </tbody>
+          <tfoot><tr><td><strong>Bereich gesamt</strong></td><td><strong>{{ group.rows_label }}</strong></td>{% if index_sizes_available %}<td><strong>{{ group.data_size_label }}</strong></td><td><strong>{{ group.index_size_label }}</strong></td><td><strong>{{ group.size_label }}</strong></td>{% endif %}</tr></tfoot>
+        </table>
+      </div>
+    </section>
+    {% endfor %}
+
+    <section class="index-group">
+      <h2>SQLite-Struktur</h2>
+      {% if index_sizes_available %}<p class="hint">Die Tabellenwerte beruhen auf tatsächlich belegten SQLite-Seiten; zugehörige Indizes sind jeder Fachtabelle zugerechnet. {{ index_overhead_size }} entfallen auf interne SQLite-Strukturen und aktuell freie Datenbankseiten.</p>{% else %}<p class="hint">Die Dateigröße umfasst Fachtabellen, Indizes, interne Strukturen und freie Datenbankseiten. Diese SQLite-Laufzeit stellt keine verlässliche Seitengröße je Tabelle bereit; die Aufschlüsselung zeigt deshalb bewusst die Eintragszahlen statt geschätzter Größen.</p>{% endif %}
+    </section>
+  </div>
+</div>
+<script src="../static/js/sortable-table.js?v={{ js_v }}"></script>
+</body>
+</html>

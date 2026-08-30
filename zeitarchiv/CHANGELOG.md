@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.66.0 - 2026-08-30
+
+### Neu
+
+- Die Speichernutzung des SQLite-Index ist aus der Statistik heraus bis auf
+  einzelne Fachtabellen aufgeschlüsselt. Datenseiten, zugehörige Indizes und
+  Gesamtgröße werden je Tabelle und fachlichem Bereich getrennt ausgewiesen.
+
+### Verbesserung
+
+- Die Home-Assistant-Verfügbarkeitsprüfung fragt nur noch markierte Entitäten
+  ab. Ohne Auswahl bleibt die Aktion deaktiviert; unmarkierte Ergebnisse
+  bleiben unverändert.
+- Die Verfügbarkeitsanzeige verwendet hinter „Roh“ und „Statistik“ einheitlich
+  „Werte“ und erhält durch angepasste Spaltenbreiten mehr Platz.
+- Home-Assistant-Import-Reports bilden den Vollimport vollständig ab und
+  unterscheiden neu archivierte Werte, den laufenden Monat, gefüllte
+  Archivlücken und in den Hot Buffer gerettete Werte.
+- Die Index-Größenanalyse nutzt `dbstat` direkt und fällt bei abweichenden
+  Python-SQLite-Builds auf eine read-only Abfrage über das mitgelieferte
+  SQLite-Werkzeug zurück, ohne Speichergrößen zu schätzen.
+
 ## 0.65.0 - 2026-08-30
 
 ### Neu

@@ -1128,8 +1128,12 @@ class ImportService:
             return {"count": count, "supported": supported, "label": label}
 
         return {
-            "raw": source(details.get("raw", {}), "Rohwerte"),
-            "stats": source(details.get("stats", {}), "Statistik-Werte"),
+            # Die Zeilen sind im Template bereits mit "Roh:" bzw.
+            # "Statistik:" beschriftet. Dort genügt deshalb das neutrale
+            # "Werte"; "Roh: … Rohwerte" war unnötig doppelt und benötigte
+            # auf schmaleren Ansichten eine zusätzliche Zeile.
+            "raw": source(details.get("raw", {}), "Werte"),
+            "stats": source(details.get("stats", {}), "Werte"),
             "stats_enabled": bool(details.get("stats_enabled", False)),
         }
 
@@ -2138,23 +2142,21 @@ class ImportService:
             Button-Klick statt eines automatischen Ladens beim Öffnen des
             Reiters oder bei jedem Zeitraum-Wechsel: sonst würde jeder
             Seitenaufruf automatisch HA-Requests auslösen (siehe
-            _ha_import_context()-Docstring). check_entity_ids kommt aus
-            versteckten, IMMER mitgesendeten Feldern je Zeile (anders als
-            entity_ids, das nur die angehakten Checkboxen enthält) — geprüft
-            wird also die komplette sichtbare Liste, unabhängig von der
-            aktuellen Auswahl. Rendert dieselbe _ha_import_section.html neu
+            _ha_import_context()-Docstring). Geprüft werden ausschließlich
+            die aktuell als entity_ids übermittelten, markierten Entitäten —
+            dieselbe Auswahl, die anschließend auch Dry Run und Import nutzen.
+            Rendert dieselbe _ha_import_section.html neu
             (komplettes outerHTML-Swap, wie auch die CSV-Sektion bei
             Steuerungsänderungen) und reicht die aktuell angehakten
             entity_ids als ha_selected_ids durch, damit die Auswahl beim
             Neuzeichnen erhalten bleibt."""
             form = await request.form()
-            check_entity_ids = [str(v).strip() for v in form.getlist("check_entity_ids") if str(v).strip()]
             (
                 selected_ids, range_preset, date_from, date_to,
                 include_existing_months, stats_range_preset, include_long_term_stats,
             ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
-            known_ids, unknown_ids = self._known_ha_entity_ids(check_entity_ids)
+            known_ids, unknown_ids = self._known_ha_entity_ids(selected_ids)
             if unknown_ids:
                 # Kommt normalerweise nicht vor (die Zeilen kommen alle aus
                 # index.list_entities()) — deutet auf ein manipuliertes/
@@ -2189,16 +2191,18 @@ class ImportService:
                         "HA-Verfügbarkeit geprüft · Quelle=%s · Entitäten=%d · mit Daten=%d · Zeitraum=%s",
                         history_source, len(known_ids), with_data, range_preset,
                     )
-            return self.deps.templates.TemplateResponse(
-                request, "_ha_import_section.html",
-                self._ha_import_context(
+            context = self._ha_import_context(
                     selected_ids=set(selected_ids), range_preset=range_preset,
                     date_from=date_from, date_to=date_to,
                     history_source=history_source, period=period,
                     include_existing_months=include_existing_months,
                     stats_range_preset=stats_range_preset,
                     include_long_term_stats=include_long_term_stats,
-                ),
+                )
+            if not known_ids:
+                context["ha_availability_error"] = "Bitte mindestens eine Entität markieren."
+            return self.deps.templates.TemplateResponse(
+                request, "_ha_import_section.html", context
             )
 
 
@@ -2524,6 +2528,13 @@ class ImportService:
                         errors.append(f"Import abgebrochen: {exc}")
             try:
                 with self.deps.coordinator.exclusive():
+                    report_results = []
+                    for item in items:
+                        result_payload = dataclasses.asdict(item["result"])
+                        result_payload["available_label"] = item["available_label"]
+                        if item.get("full_summary") is not None:
+                            result_payload["full_summary"] = item["full_summary"]
+                        report_results.append(result_payload)
                     import_reports.create(
                         self.deps.data_dir,
                         source_type="ha",
@@ -2544,7 +2555,7 @@ class ImportService:
                             ),
                             "include_existing_months": include_existing_months,
                         },
-                        results=[dataclasses.asdict(result) for result in results],
+                        results=report_results,
                         errors=errors,
                         reconciliation=reconciliation_report,
                     )

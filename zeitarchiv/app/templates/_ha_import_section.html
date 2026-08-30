@@ -98,7 +98,7 @@
     </div>
 
     <div class="ha-import-check-row">
-      <button type="button" class="btn" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML" hx-indicator="#ha-availability-status">
+      <button type="button" class="btn" id="ha-availability-btn" title="Prüft nur die markierten Entitäten" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML" hx-indicator="#ha-availability-status">
         Verfügbarkeit prüfen
       </button>
       <span class="ha-checked-at {{ 'is-error' if ha_availability_error else ('is-checked' if ha_availability_checked_at_label else 'is-idle') }}" id="ha-availability-status" title="Status der Verfügbarkeitsprüfung für diesen Importmodus">
@@ -138,7 +138,6 @@
           data-sort-art="{{ '' if entity.has_data is none else ('0' if entity.supported == false else ('2' if entity.has_data else '1')) }}"
           data-sort-available="{{ entity.available_first_ts if entity.available_first_ts is not none else '' }}">
         <td>
-          <input type="hidden" name="check_entity_ids" value="{{ entity.entity_id }}">
           <input type="checkbox" class="ha-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onHaMarkChange(this)" {% if entity.entity_id in ha_selected_ids %}checked{% endif %}>
         </td>
         <td>
@@ -176,9 +175,9 @@
         </td>
         <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
           {% if ha_history_source == "full" and entity.full_details %}
-          <div><strong>Roh:</strong> {{ entity.full_details.raw.label }}</div>
+          <div class="ha-available-line"><strong>Roh:</strong> {{ entity.full_details.raw.label }}</div>
           {% if entity.full_details.stats_enabled %}
-          <div class="ha-available-count"><strong>Statistik:</strong> {{ entity.full_details.stats.label }}</div>
+          <div class="ha-available-line ha-available-count"><strong>Statistik:</strong> {{ entity.full_details.stats.label }}</div>
           {% endif %}
           {% elif entity.available_range %}
           <div>{{ entity.available_range }}</div>
@@ -255,6 +254,8 @@
       const count = document.querySelectorAll('.ha-mark-checkbox:checked').length;
       const chip = document.getElementById('ha-marked-count');
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = count + ' markiert'; }
+      const availabilityButton = document.getElementById('ha-availability-btn');
+      if (availabilityButton) availabilityButton.disabled = count === 0;
     }
     function onHaMarkChange(checkbox) {
       checkbox.closest('tr').classList.toggle('marked', checkbox.checked);

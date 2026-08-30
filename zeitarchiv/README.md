@@ -137,7 +137,9 @@ Physisch entfernt werden markierte Werte erst durch einen separaten,
 endgültigen Schritt.
 
 **Statistik.** Entitätenzahl, Datensätze, Speicherbedarf und Wachstum über
-die Zeit, aufgeschlüsselt nach Typ, Auflösung und Aufbewahrung.
+die Zeit, aufgeschlüsselt nach Typ, Auflösung und Aufbewahrung. Die
+Indexdetails zeigen zusätzlich die tatsächlich belegten Datenseiten und
+SQLite-Indizes jeder Fachtabelle.
 
 **Import und Export.** Bestehende Historie lässt sich aus Symcon-Exporten,
 frei zuordenbaren CSV-Dateien oder direkt aus der laufenden

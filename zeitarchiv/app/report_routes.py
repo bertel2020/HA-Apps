@@ -56,7 +56,12 @@ class ReportService:
         except (KeyError, TypeError, ValueError):
             finished_label, finished_date = "—", ""
         summary = report.get("summary", {})
-        rows_written = int(summary.get("rows_imported", 0)) + int(summary.get("rows_merged", 0))
+        rows_written = (
+            int(summary.get("rows_imported", 0))
+            + int(summary.get("rows_merged", 0))
+            + int(summary.get("rows_updated", 0))
+            + int(summary.get("rows_recovered", 0))
+        )
         rows_skipped = int(summary.get("rows_duplicate", 0)) + int(summary.get("rows_invalid", 0))
         duration_seconds = float(report.get("duration_seconds", 0) or 0)
         # *_label-Varianten fürs Template (NUMBER_LOCALE-Format, siehe
@@ -79,6 +84,8 @@ class ReportService:
                 "targets": format_int(int(summary.get("targets", 0))),
                 "rows_imported": format_int(int(summary.get("rows_imported", 0))),
                 "rows_merged": format_int(int(summary.get("rows_merged", 0))),
+                "rows_updated": format_int(int(summary.get("rows_updated", 0))),
+                "rows_recovered": format_int(int(summary.get("rows_recovered", 0))),
                 "rows_duplicate": format_int(int(summary.get("rows_duplicate", 0))),
                 "rows_invalid": format_int(int(summary.get("rows_invalid", 0))),
             },
@@ -87,6 +94,8 @@ class ReportService:
                     **result,
                     "rows_imported_label": format_int(int(result.get("rows_imported", 0))),
                     "rows_merged_label": format_int(int(result.get("rows_merged", 0))),
+                    "rows_updated_label": format_int(int(result.get("rows_updated", 0))),
+                    "rows_recovered_label": format_int(int(result.get("rows_recovered", 0))),
                     "duplicate_rows_label": format_int(int(result.get("duplicate_rows", 0))),
                     "skipped_rows_label": format_int(int(result.get("skipped_rows", 0))),
                 }

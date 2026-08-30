@@ -94,6 +94,7 @@
      einem zusammengesetzten Text — die zweite Zeile (Anzahl) bewusst
      leiser, sie ist die Detailinformation zur Zeitraum-Zeile darüber. */
   .ha-available-count{color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));}
+  .ha-available-line{white-space:nowrap;}
   .import-delete-row{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
   .import-delete-row .btn-danger{font-weight:600;}
   .import-delete-button{min-width:154px;}
@@ -173,11 +174,11 @@
      wie .symcon-name-cell oben (Kürzung auf dem Kind-Span, nicht auf dem
      Host selbst — sonst schneidet dessen overflow:hidden den eigenen
      Tooltip mit ab) federt die schmalere Entität-Spalte dafür ab. */
-  .ha-col-entity{width:260px;}
-  .ha-col-unit{width:72px;}
+  .ha-col-entity{width:225px;}
+  .ha-col-unit{width:60px;}
   .ha-col-type{width:118px;}
   .ha-col-art{width:150px;}
-  .ha-col-available{width:320px;}
+  .ha-col-available{width:367px;}
   /* <col>-Klassen setzen nur die Breite (das Einzige, was <col> an die
      Zellen durchreicht) — Textausrichtung muss wie bei .symcon-import-table
      oben per :nth-child() auf den tatsächlichen th/td sitzen. Typ = Spalte 3,

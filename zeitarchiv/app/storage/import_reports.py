@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 FORMAT = "zeitarchiv-import-report"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 _REPORT_ID_RE = re.compile(r"^\d{8}T\d{6}Z-(?:symcon|csv|ha)-[0-9a-f]{12}$")
 
 
@@ -35,7 +35,10 @@ def create(
         f"{uuid.uuid4().hex[:12]}"
     )
     rows_written = sum(
-        int(row.get("rows_imported", 0)) + int(row.get("rows_merged", 0))
+        int(row.get("rows_imported", 0))
+        + int(row.get("rows_merged", 0))
+        + int(row.get("rows_updated", 0))
+        + int(row.get("rows_recovered", 0))
         for row in results
     )
     incomplete = bool(errors) or any(int(row.get("skipped_rows", 0)) for row in results)
@@ -63,6 +66,8 @@ def create(
             "rows_read": sum(int(row.get("source_rows", 0)) for row in results),
             "rows_imported": sum(int(row.get("rows_imported", 0)) for row in results),
             "rows_merged": sum(int(row.get("rows_merged", 0)) for row in results),
+            "rows_updated": sum(int(row.get("rows_updated", 0)) for row in results),
+            "rows_recovered": sum(int(row.get("rows_recovered", 0)) for row in results),
             "rows_duplicate": sum(int(row.get("duplicate_rows", 0)) for row in results),
             "rows_invalid": sum(int(row.get("skipped_rows", 0)) for row in results),
             "months_imported": sum(len(row.get("imported_months", [])) for row in results),

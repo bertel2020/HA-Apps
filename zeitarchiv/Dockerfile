@@ -11,7 +11,7 @@ LABEL \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y nginx \
+    && apt-get install --no-install-recommends -y nginx sqlite3 \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 

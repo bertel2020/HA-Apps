@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
 import threading
 import time
 from collections.abc import Callable
@@ -417,6 +418,7 @@ class Index:
 
     def __init__(self, db_path: Path) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._db_path = db_path
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -1977,6 +1979,102 @@ class Index:
                 """
             ).fetchone()
             return dict(row)
+
+    def get_database_table_stats(self) -> list[dict]:
+        """Liefert Eintragszahl und belegte SQLite-Seiten je Fachtabelle.
+
+        ``dbstat`` ist Teil der üblichen SQLite-Builds, aber nicht zwingend
+        einkompiliert. Fehlt es, bleiben die Größen ``None``; die inhaltliche
+        Aufschlüsselung und Zeilenzahlen funktionieren weiterhin. Die Seiten
+        zugehöriger SQLite-Indizes werden der jeweiligen Fachtabelle
+        zugerechnet und zusätzlich separat ausgewiesen. Tabellen- und
+        Indexnamen stammen ausschließlich aus ``sqlite_master``; Tabellennamen
+        werden vor der COUNT-Abfrage als Identifier escaped und kommen nie aus
+        Request-Parametern.
+        """
+        with self._lock, self._conn:
+            table_names = [
+                row["name"]
+                for row in self._conn.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                ).fetchall()
+            ]
+            index_owners = {
+                row["name"]: row["tbl_name"]
+                for row in self._conn.execute(
+                    "SELECT name, tbl_name FROM sqlite_master "
+                    "WHERE type = 'index' AND name IS NOT NULL"
+                ).fetchall()
+                if row["tbl_name"] in table_names
+            }
+            sizes: dict[str, int] = {}
+            sizes_available = False
+            try:
+                sizes = {
+                    row["name"]: int(row["bytes"] or 0)
+                    for row in self._conn.execute(
+                        "SELECT name, SUM(pgsize) AS bytes FROM dbstat GROUP BY name"
+                    ).fetchall()
+                }
+                sizes_available = True
+            except sqlite3.OperationalError:
+                # Manche Python-Builds (insbesondere die lokale macOS-
+                # Entwicklung) binden SQLite ohne dbstat ein, obwohl das
+                # installierte sqlite3-Werkzeug die Erweiterung bereitstellt.
+                # Der read-only CLI-Fallback liefert dieselben Seitendaten und
+                # vermeidet bewusst ungenaue Schätzungen.
+                try:
+                    completed = subprocess.run(
+                        [
+                            "sqlite3", "-readonly", "-json", str(self._db_path),
+                            "SELECT name, SUM(pgsize) AS bytes FROM dbstat GROUP BY name",
+                        ],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    sizes = {
+                        str(row["name"]): int(row["bytes"] or 0)
+                        for row in json.loads(completed.stdout or "[]")
+                    }
+                    sizes_available = True
+                except (
+                    FileNotFoundError,
+                    subprocess.SubprocessError,
+                    json.JSONDecodeError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                ):
+                    pass
+            result = []
+            for table_name in table_names:
+                quoted = table_name.replace('"', '""')
+                count = self._conn.execute(
+                    f'SELECT COUNT(*) FROM "{quoted}"'
+                ).fetchone()[0]
+                table_index_names = [
+                    name for name, owner in index_owners.items() if owner == table_name
+                ]
+                data_bytes = sizes.get(table_name, 0) if sizes_available else None
+                index_bytes = (
+                    sum(sizes.get(name, 0) for name in table_index_names)
+                    if sizes_available else None
+                )
+                result.append({
+                    "table": table_name,
+                    "rows": int(count),
+                    "data_bytes": data_bytes,
+                    "index_bytes": index_bytes,
+                    "bytes": (
+                        int(data_bytes or 0) + int(index_bytes or 0)
+                        if sizes_available else None
+                    ),
+                    "index_count": len(table_index_names),
+                })
+            return result
 
     def get_last_write_ts(self) -> float | None:
         """Zeitpunkt des zuletzt AKZEPTIERTEN Werts über alle Entitäten hinweg

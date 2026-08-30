@@ -2349,7 +2349,12 @@ def statistik_view(request: Request) -> HTMLResponse:
             "bytes": row["bytes"],
             "size": format_size(row["bytes"]),
             "percent": round(row["bytes"] / storage_total_bytes * 100, 1) if storage_total_bytes else 0,
-            "href": {"backups": "backup", "import": "import", "reports": "import?tab=reports"}.get(row["key"]),
+            "href": {
+                "index": "statistik/index",
+                "backups": "backup",
+                "import": "import",
+                "reports": "import?tab=reports",
+            }.get(row["key"]),
         }
         for row in storage_breakdown_raw
     ]
@@ -2394,6 +2399,154 @@ def statistik_view(request: Request) -> HTMLResponse:
             "storage_breakdown": storage_breakdown,
             "storage_total_size": format_size(storage_total_bytes),
             "generated_at": f"{format_timestamp(now.timestamp(), TZ)} {format_time(now.timestamp(), TZ)}",
+        },
+    )
+
+
+_INDEX_DETAIL_GROUPS = [
+    {
+        "label": "Entitäten und Archivstatus",
+        "description": (
+            "Konfiguration, Anzeigenamen, Einheiten, letzter Wert sowie die vom "
+            "Dateibestand abgeleiteten Zeilen- und Größenstände jeder Entität."
+        ),
+        "tables": ["entities"],
+    },
+    {
+        "label": "Schreibsicherheit und Bereinigung",
+        "description": (
+            "Idempotenzstatus eingehender Ereignisse und vorgemerkte, noch nicht "
+            "physisch entfernte Rohwerte."
+        ),
+        "tables": ["ingested_events", "deleted_points"],
+    },
+    {
+        "label": "Charts, Tabellen und Dashboards",
+        "description": (
+            "Gespeicherte Ansichten, Tabellenaufbau, Dashboards sowie Position und "
+            "Darstellungsoptionen ihrer Kacheln; keine Messwerte."
+        ),
+        "tables": [
+            "saved_charts", "saved_tables", "table_columns", "table_rows",
+            "dashboards", "dashboard_pins",
+        ],
+    },
+    {
+        "label": "Statistikverlauf",
+        "description": (
+            "Stündliche Schnappschüsse von Datenbestand, Speichergröße und optionalem "
+            "RAM-Verbrauch für Verlaufsanzeigen."
+        ),
+        "tables": ["stats_snapshots", "memory_snapshots"],
+    },
+    {
+        "label": "Einstellungen und Wartung",
+        "description": (
+            "App-Einstellungen sowie Ausführungsverläufe von Backups und "
+            "Aufbewahrungsbereinigungen. Import-Reports selbst liegen als JSON-Dateien vor."
+        ),
+        "tables": ["settings", "backup_jobs", "retention_jobs"],
+    },
+]
+
+
+@app.get("/statistik/index", response_class=HTMLResponse)
+def statistik_index_detail(request: Request) -> HTMLResponse:
+    """Erklärt und quantifiziert den Inhalt der SQLite-Indexdatei."""
+    index_path = DATA_DIR / "index.sqlite"
+    file_bytes = index_path.stat().st_size if index_path.exists() else 0
+    table_stats = {row["table"]: row for row in index.get_database_table_stats()}
+    groups = []
+    assigned_tables: set[str] = set()
+    for definition in _INDEX_DETAIL_GROUPS:
+        tables = []
+        for table_name in definition["tables"]:
+            row = table_stats.get(table_name, {
+                "table": table_name, "rows": 0, "data_bytes": None,
+                "index_bytes": None, "bytes": None, "index_count": 0,
+            })
+            assigned_tables.add(table_name)
+            tables.append({
+                **row,
+                "rows_label": format_int(row["rows"]),
+                "data_size_label": (
+                    format_size(row["data_bytes"]) if row["data_bytes"] is not None else "—"
+                ),
+                "index_size_label": (
+                    format_size(row["index_bytes"]) if row["index_bytes"] is not None else "—"
+                ),
+                "size_label": format_size(row["bytes"]) if row["bytes"] is not None else "—",
+            })
+        group_data_bytes = sum(int(row["data_bytes"] or 0) for row in tables)
+        group_index_bytes = sum(int(row["index_bytes"] or 0) for row in tables)
+        group_sizes_available = any(row["bytes"] is not None for row in tables)
+        groups.append({
+            **definition,
+            "tables": tables,
+            "rows": sum(row["rows"] for row in tables),
+            "rows_label": format_int(sum(row["rows"] for row in tables)),
+            "bytes": sum(int(row["bytes"] or 0) for row in tables),
+            "data_size_label": format_size(group_data_bytes) if group_sizes_available else "—",
+            "index_size_label": format_size(group_index_bytes) if group_sizes_available else "—",
+            "size_label": (
+                format_size(group_data_bytes + group_index_bytes)
+                if group_sizes_available else "—"
+            ),
+        })
+    unassigned = [row for name, row in table_stats.items() if name not in assigned_tables]
+    if unassigned:
+        extra_tables = [{
+            **row,
+            "rows_label": format_int(row["rows"]),
+            "data_size_label": (
+                format_size(row["data_bytes"]) if row["data_bytes"] is not None else "—"
+            ),
+            "index_size_label": (
+                format_size(row["index_bytes"]) if row["index_bytes"] is not None else "—"
+            ),
+            "size_label": format_size(row["bytes"]) if row["bytes"] is not None else "—",
+        } for row in unassigned]
+        extra_sizes_available = any(row["bytes"] is not None for row in extra_tables)
+        groups.append({
+            "label": "Weitere Fachtabellen",
+            "description": "Noch keiner fachlichen Gruppe zugeordnete Tabellen.",
+            "tables": extra_tables,
+            "rows": sum(row["rows"] for row in extra_tables),
+            "rows_label": format_int(sum(row["rows"] for row in extra_tables)),
+            "bytes": sum(int(row["bytes"] or 0) for row in extra_tables),
+            "data_size_label": (
+                format_size(sum(int(row["data_bytes"] or 0) for row in extra_tables))
+                if extra_sizes_available else "—"
+            ),
+            "index_size_label": (
+                format_size(sum(int(row["index_bytes"] or 0) for row in extra_tables))
+                if extra_sizes_available else "—"
+            ),
+            "size_label": (
+                format_size(sum(int(row["bytes"] or 0) for row in extra_tables))
+                if extra_sizes_available else "—"
+            ),
+        })
+    sizes_available = any(row["bytes"] is not None for row in table_stats.values())
+    allocated_table_bytes = sum(int(row["bytes"] or 0) for row in table_stats.values())
+    overhead_bytes = (
+        max(0, file_bytes - allocated_table_bytes)
+        if sizes_available else None
+    )
+    return templates.TemplateResponse(
+        request,
+        "statistik_index.html",
+        {
+            "base": "..",
+            "index_file_size": format_size(file_bytes),
+            "index_table_count": format_int(len(table_stats)),
+            "index_entry_count": format_int(sum(row["rows"] for row in table_stats.values())),
+            "index_allocated_size": (
+                format_size(allocated_table_bytes) if sizes_available else None
+            ),
+            "index_groups": groups,
+            "index_overhead_size": format_size(overhead_bytes) if overhead_bytes is not None else None,
+            "index_sizes_available": sizes_available,
         },
     )
 

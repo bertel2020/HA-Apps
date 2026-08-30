@@ -552,6 +552,15 @@ Alle Tabellen lassen sich durch Anklicken ihrer Spaltenüberschriften wie die
 Entitätenliste sortieren. Das Wachstumsdiagramm passt seine beiden Y-Achsen
 dynamisch an den jeweils sichtbaren Wertebereich an.
 
+In der Speichernutzung führt **Index** zu einer Detailseite. Sie schlüsselt
+auf, welche SQLite-Tabellen Entitätsmetadaten, Schreibsicherheit und
+Bereinigung, Charts/Tabellen/Dashboards, Statistikverläufe sowie Einstellungen
+und Wartungshistorien enthalten. Pro Tabelle und Bereich werden Eintragszahl,
+belegte Datenseiten, zugehörige SQLite-Indizes und deren Gesamtgröße angezeigt.
+Interne Strukturen und freie SQLite-Seiten bleiben separat ausgewiesen. Die
+eigentlichen Messreihen liegen weiterhin in Hot Buffer, Archiv und Rollups,
+nicht im Index.
+
 Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
 Backups, da auch diese Speicherplatz belegen, aber in der reinen
 Entitäten-Statistik nicht enthalten sind.
@@ -609,8 +618,10 @@ Ablauf: Importmodus und Zeitraum wählen (die verfügbaren Voreinstellungen unte
 sich je nach Quelle — bei Langzeitstatistik steht z. B. zusätzlich "Letztes
 Jahr" zur Verfügung), optional "Verfügbarkeit prüfen" für eine Vorschau,
 welche Entitäten in Home Assistant tatsächlich Daten der gewählten Quelle
-haben und für welchen Zeitraum. Das Prüfergebnis bleibt je Quelle/Auflösung
-erhalten — auch nach einem Seitenwechsel oder einem Wechsel zwischen
+haben und für welchen Zeitraum. Geprüft werden dabei ausschließlich die
+markierten Entitäten; unmarkierte Zeilen bleiben unverändert. Das
+Prüfergebnis bleibt je Quelle/Auflösung erhalten — auch nach einem
+Seitenwechsel oder einem Wechsel zwischen
 Vollimport, Rohhistorie und Langzeitstatistik, bis zum nächsten Neustart des Add-ons.
 Ein Status-Chip rechts neben "Verfügbarkeit prüfen" zeigt den laufenden
 Prüfstatus und anschließend den Zeitpunkt der letzten Prüfung; ab 15 Minuten
@@ -651,6 +662,10 @@ lässt sich nach Quelle und Status filtern (wirkt sofort bei Auswahl) und
 nach jeder Spalte sortieren; ein Klick auf eine Zeile öffnet die
 Detailansicht mit JSON-Download. Reports sind seitenweise darstellbar und
 lassen sich gesammelt löschen, wenn sie nicht mehr benötigt werden.
+Home-Assistant-Reports unterscheiden beim Vollimport Rohhistorie und
+Langzeitstatistik und weisen neu archivierte Werte, Ergänzungen des laufenden
+Monats, gefüllte Archivlücken sowie aus einem unzulässigen aktuellen Archiv in
+den Hot Buffer gerettete Werte getrennt aus.
 
 ### Duplikatschutz
 
