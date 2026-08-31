@@ -729,7 +729,7 @@
     const base = el.closest('#dashboard-grid')?.dataset.base || '.';
     let values, windowStarts;
     try {
-      ({values, windowStarts} = await TableCompute.computeValues(base, columns, rows));
+      ({values, windowStarts} = await TableCompute.computeValues(base, visibleCols, visibleRows));
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
       return;

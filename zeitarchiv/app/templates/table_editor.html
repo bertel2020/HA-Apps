@@ -307,6 +307,7 @@
           <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
           {% endif %}
         </div>
+        {% if table_id %}{% include "_dashboard_usage.html" %}{% endif %}
         <p class="sub" x-show="editing">Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum) — dieselbe Perioden-Logik wie bei Charts, nur tabellarisch statt grafisch. Zeigt beim Ansehen immer aktuelle Werte, kein eingefrorener Schnappschuss.</p>
 
         <template x-if="editing">

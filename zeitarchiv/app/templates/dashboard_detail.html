@@ -270,8 +270,14 @@
     .dtile[data-grid-cols="3"]{grid-column:span 2;}
   }
   @media (max-width:520px){
-    .dashboard-grid{grid-template-columns:minmax(0,1fr);}
+    /* Die Desktop-Regel .dashboard-grid.is-precise ist spezifischer als die
+       bisherige mobile .dashboard-grid-Regel und hielt das Raster deshalb
+       im Präzisen Modus bei sechs schmalen Spalten. Auch .dtile-add hatte
+       dort durch die präzisere 2-Spalten-Regel Vorrang. Mobil werden daher
+       Raster und sämtliche Kacheln ausdrücklich auf eine Spalte gesetzt. */
+    .dashboard-grid,.dashboard-grid.is-precise{grid-template-columns:minmax(0,1fr);}
     .dtile,.dtile[data-grid-cols="2"],.dtile[data-grid-cols="3"]{grid-column:span 1;}
+    .dashboard-grid.is-precise .dtile{grid-column:span 1;}
   }
   .dash-title-row{display:flex;align-items:center;gap:10px;}
   .dash-rename-btn{color:var(--ink-faint);text-decoration:none;padding:2px;}

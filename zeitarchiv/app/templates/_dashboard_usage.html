@@ -1,0 +1,35 @@
+{# Gemeinsame Verwendungsanzeige für die geöffnete Chart-/Tabellenansicht.
+   Nutzt ausschließlich bestehende App-Bausteine (.chip, .menu-wrap,
+   .menu-popover, .menu-row), damit Interaktion und Theme identisch zu den
+   übrigen Optionen-Popovern bleiben. Rein informativ: Links öffnen das
+   Dashboard, Zuordnungen werden weiterhin dort verwaltet. #}
+<div class="dashboard-usage">
+  <span class="dashboard-usage-label">Verwendet in</span>
+  {% if not dashboard_usage %}
+  <span class="dashboard-usage-empty">keinem Dashboard</span>
+  {% elif dashboard_usage | length == 1 %}
+  {% set dashboard = dashboard_usage[0] %}
+  <a class="chip dashboard-usage-link" href="{{ base }}/dashboards/{{ dashboard.id }}">
+    {{ dashboard.name }}{% if dashboard.is_default %}<span class="dashboard-usage-default">Standard</span>{% endif %}
+  </a>
+  {% else %}
+  <div class="menu-wrap" x-data="{ usageOpen: false }" @click.outside="usageOpen = false">
+    <button type="button" class="chip menu-btn" :class="{active: usageOpen}"
+            @click="usageOpen = !usageOpen" :aria-expanded="usageOpen.toString()"
+            aria-haspopup="menu">
+      {{ dashboard_usage | length }} Dashboards <span class="chevron">▾</span>
+    </button>
+    <div class="menu-popover menu-popover-narrow dashboard-usage-popover" x-show="usageOpen" x-cloak
+         role="menu"
+         x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+      <div class="menu-section-label">Verwendet in</div>
+      {% for dashboard in dashboard_usage %}
+      <a class="menu-row dashboard-usage-row" role="menuitem" href="{{ base }}/dashboards/{{ dashboard.id }}">
+        <span>{{ dashboard.name }}</span>
+        {% if dashboard.is_default %}<span class="dashboard-usage-default">Standard</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>

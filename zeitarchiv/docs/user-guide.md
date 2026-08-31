@@ -101,7 +101,8 @@ hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
   vorhandenen Dashboards auf. Von dort: neues Dashboard anlegen, ein
   bestehendes öffnen, umbenennen, favorisieren, duplizieren, als
   **Standard-Dashboard** festlegen (dieses erscheint dann auf der
-  Übersichtsseite und steht in Listen immer an erster Stelle) oder löschen.
+  Übersichtsseite und steht in der Dashboard-Übersicht immer an erster Stelle,
+  unabhängig von Sortierung oder „Favoriten zuerst“) oder löschen.
   Es gibt keine Obergrenze für die Anzahl der Dashboards.
 - Ein Klick auf die Kachel öffnet das Dashboard; „Bearbeiten“, „Duplizieren“,
   „Als Standard festlegen“ und „Löschen“ stehen im Kachelmenü (⋮).
@@ -133,6 +134,11 @@ hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
   automatisch auf diesem Dashboard); Werte-Kacheln werden über die
   Entitäten-Suche ausgewählt. Ein Chart oder eine Tabelle kann gleichzeitig
   auf mehreren Dashboards angeheftet sein.
+- In der geöffneten Ansicht eines gespeicherten Charts oder einer Tabelle
+  zeigt **Verwendet in**, auf welchen Dashboards der Eintrag liegt. Ein
+  Dashboard ist direkt verlinkt; bei mehreren öffnet der Zähler eine kompakte
+  Liste mit Links. Die Zuordnung wird weiterhin im jeweiligen Dashboard
+  geändert.
 - Chart-Kacheln ab Größe 2×2 (im Präzisen Modus ab 3×3) können über das
   Kachelmenü (⋮) eine Legende einblenden ("Legende anzeigen") — Aussehen
   und Inhalt entsprechen dabei exakt der Legende des zugrundeliegenden
@@ -145,6 +151,8 @@ hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
   wird. **Lücken auffüllen** lässt spätere, kleinere Kacheln freie Lücken
   im Raster füllen statt strikt der Anheft-Reihenfolge zu folgen. Beide
   Schalter sind unabhängig voneinander kombinierbar.
+  Auf schmalen Displays bleibt die Darstellung auch im Präzisen Modus bewusst
+  einspaltig, damit Kacheln lesbar und bedienbar bleiben.
 - **Dashboard fixieren** (Editor, Schalter "Fixiert"): sperrt Umsortieren,
   Größenändern und Entfernen von Kacheln auf der Ansicht selbst — schützt
   vor versehentlichem Verschieben auf einem z. B. dauerhaft angezeigten
@@ -241,9 +249,9 @@ Verlaufsansicht) erreichbar:
 | --- | --- |
 | Auflösung | Mindestabstand zwischen zwei gespeicherten Werten (z. B. "alle 5 Minuten"); engmaschigere Quellwerte werden entsprechend verdichtet |
 | Aufbewahrung | Wie lange Werte behalten werden, bevor eine aktivierte automatische Löschung greift (**Unbegrenzt** möglich) |
-| Nachkommastellen | Automatisch oder feste Anzahl (0–3) für die Anzeige in Charts, Tabellen und Rohwert-Listen |
+| Nachkommastellen | „Automatisch“ zeigt bis zu drei Stellen und entfernt Nullen am Ende (z. B. 4 statt 4,000); eine feste Anzahl (0–3) rundet auf genau diese Stellen und ergänzt bei Bedarf Nullen (z. B. 4,00 bei 2 Stellen) |
 | Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte (spart Speicherplatz bei trägen Sensoren), behält aber mindestens alle 6 Stunden ein Lebenszeichen, damit lange Stillstände von fehlenden Daten unterscheidbar bleiben |
-| Lücken-Erkennung | Schwellwert in Minuten, ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — "Aus" deaktiviert die Markierung |
+| Lücken-Erkennung | Schwellwert von 1 Minute bis 1 Tag (einschließlich 6 und 12 Stunden), ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — „Aus“ deaktiviert die Markierung |
 | Ausreißer-Erkennung | Schwellwert in Prozent, um den ein Wert gegenüber dem Vorwert mindestens abweichen muss, um als Ausreißer markiert zu werden — "Aus" deaktiviert die Markierung |
 | Anzeigemodus | Nur bei Schaltern: Rohwert (AN/AUS als Zustand) oder Zeit (kumulierte Einschaltdauer je Zeitraum) |
 
@@ -540,6 +548,8 @@ eines bestehenden (Kachelmenü ⋮):
   Farbzuordnung.
 - Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
   Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
+- Die geöffnete Ansicht zeigt unter **Verwendet in** die Dashboards, auf denen
+  das gespeicherte Chart als Kachel liegt, und verlinkt direkt dorthin.
 
 ## Vergleichstabellen
 
@@ -592,6 +602,8 @@ optische Einstellungen und wirken sich nie auf die berechneten Werte aus.
 
 Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
 Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
+Unter **Verwendet in** sind die Dashboards, auf denen die Tabelle als Kachel
+liegt, direkt erreichbar.
 
 ## Statistik
 
@@ -624,6 +636,22 @@ Indexgröße ab 50 MB, mindestens 10 MB reclaimbarem Speicher und mindestens
 Speichernutzung mit **Optimierung empfohlen** markiert. Vor der Ausführung
 prüft Zeitarchiv den freien Plattenplatz und danach die SQLite-Integrität;
 eine automatische Optimierung findet nicht statt.
+
+Während der Optimierung wartet Zeitarchiv zunächst, bis bereits laufende
+Schreibvorgänge abgeschlossen sind. Neue Übertragungen der Home-Assistant-
+Integration pausieren an der Wartungssperre. Dauert die Optimierung länger als
+der HTTP-Timeout, behält die Integration den betroffenen Batch und versucht ihn
+ohne festes Retry-Limit erneut. Stabile Ereignis-IDs sorgen dafür, dass ein
+erneut gesendeter oder teilweise bereits verarbeiteter Batch keine doppelten
+Messwerte erzeugt. Im normalen Betrieb gehen durch die Optimierung daher keine
+Werte verloren.
+
+Die Integrationswarteschlange liegt allerdings nur im Arbeitsspeicher und ist
+auf 5.000 neue Ereignisse begrenzt. Wird sie während eines außergewöhnlich
+langen Rückstaus voll, werden weitere neue Ereignisse verworfen; ein Neustart
+von Home Assistant oder der Integration verwirft ebenfalls noch nicht
+übertragene Werte. Queue-Größe und verworfene Ereignisse sind auf der
+Geräteseite der Integration unter **Diagnose** sichtbar.
 
 Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
 Backups, da auch diese Speicherplatz belegen, aber in der reinen

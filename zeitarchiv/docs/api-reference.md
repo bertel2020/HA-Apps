@@ -3,10 +3,11 @@
 Zwei Zielgruppen, zwei Erreichbarkeiten (siehe [security.md](security.md)):
 
 - **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`.
-- **Nur Ingress, Port `8099`**: alles andere, inklusive `/api/query` und
-  `/api/query-multi` — diese sind KEINE öffentliche API, sondern werden vom
-  Browser-JS derselben Ingress-Session aufgerufen. Kein SemVer-Stabilitäts-
-  versprechen, können sich zwischen Versionen ändern.
+- **Nur Ingress, Port `8099`**: alles andere, inklusive `/api/query`,
+  `/api/query-multi` und `/api/query-table` — diese sind KEINE öffentliche
+  API, sondern werden vom Browser-JS derselben Ingress-Session aufgerufen.
+  Kein SemVer-Stabilitätsversprechen; sie können sich zwischen Versionen
+  ändern.
 
 Alle Endpunkte in `app/api_routes.py`; Implementierung siehe dort.
 
@@ -83,10 +84,31 @@ siehe [data-model.md](data-model.md)), `window_start`/`window_end`,
 
 Wie `/api/query`, aber `entity_ids` (kommagetrennt, max.
 `MAX_MULTI_QUERY_ENTITIES` = 25) statt `entity_id`, zusätzlich `year_over_year`
-(bool). Von Vergleichstabellen (`table-compute.js`) und Multi-Entitäts-Charts
-genutzt. Antwort: `{series: [...], window_start, window_end, period_end,
+(bool). Von Multi-Entitäts-Charts genutzt. Antwort:
+`{series: [...], window_start, window_end, period_end,
 is_current}`, ein Eintrag in `series` je Entität mit `friendly_name`, `unit`,
 `decimals`, `display_mode`, `aggregation_type`, `chart_type`, `points`.
+
+## `POST /api/query-table` (Ingress-intern)
+
+Lädt alle Zeiträume einer Vergleichstabelle in einer gemeinsamen Anfrage
+(maximal 25 Entitäten und 100 Spalten). Beispiel:
+
+```json
+{
+  "entity_ids": ["sensor.ertrag", "sensor.verbrauch"],
+  "columns": [
+    {"range_key": "day", "offset": 0, "year_over_year": false},
+    {"range_key": "day", "offset": -1, "year_over_year": false}
+  ]
+}
+```
+
+Die Antwort enthält je Spalte das aufgelöste Zeitfenster und je Entität die
+Metadaten sowie `aggregates` mit `auto`, `avg`, `min`, `max` und `sum`.
+Vollständige Punktreihen werden nicht übertragen. Ein request-lokaler
+Lese-Cache verwendet Quelldateien über alle Spalten wieder; Gruppen und
+Formelzeilen berechnet anschließend `table-compute.js` im Browser.
 
 ## Fehlerformate
 

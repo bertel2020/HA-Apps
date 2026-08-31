@@ -94,6 +94,7 @@
           <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
           {% endif %}
         </div>
+        {% if chart_id %}{% include "_dashboard_usage.html" %}{% endif %}
         <p class="sub" x-show="editing">Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.</p>
 
         <div class="entity-picker-field" x-show="editing">

@@ -64,9 +64,10 @@ Details zu jedem Schritt: [ingestion.md](ingestion.md).
 
 ```text
 Browser (Alpine.js-Komponente)
-   │ GET /api/query-multi?entity_ids=...&range=day&offset=0
+   │ GET /api/query-multi?... (Charts)
+   │ POST /api/query-table {...} (Vergleichstabellen)
    ▼
-app.api_routes.api_query_multi()
+app.api_routes.api_query_multi() / api_query_table()
    │ @locked(...)  ← Entitäts-Lesesperre (verhindert Lesen während Rewrite)
    ▼
 storage.query.query_series()  je Entität
@@ -74,13 +75,17 @@ storage.query.query_series()  je Entität
    │ Innerhalb des laufenden Zeitraums: live aus Hot Buffer
    │ Abgeschlossene Perioden: aus vorberechnetem Rollup (rollup.py)
    ▼
-JSON {series: [{points: [...]}]}  → ECharts / Tabellen-Renderer im Browser
+JSON {series: [{points: [...]}]}  → ECharts im Browser
+JSON {columns: [{series: [{aggregates: {...}}]}]} → Tabellen-Renderer
 ```
 
-Vergleichstabellen (`table-compute.js`) rufen `/api/query-multi` clientseitig
-selbst auf und aggregieren die Zellenwerte im Browser — der Server kennt
-keine "Tabellen-Abfrage", nur gespeicherte Spalten-/Zeilen-Struktur
-(`saved_tables`, siehe [data-model.md](data-model.md)).
+Vergleichstabellen (`table-compute.js`) senden alle benötigten Entitäten und
+Zeiträume gemeinsam an `/api/query-table`. Ein request-lokaler Lese-Cache
+verhindert, dass dieselbe Hot-Buffer-Datei für mehrere Spalten erneut geparst
+wird. Der Server gibt pro Entität und Zeitraum nur `auto`/`avg`/`min`/`max`/
+`sum` zurück; Gruppen- und Formelzeilen bleiben Darstellungslogik im Browser.
+Gespeichert wird weiterhin nur die Spalten-/Zeilen-Struktur (`saved_tables`,
+siehe [data-model.md](data-model.md)).
 
 ## Nebenläufigkeit
 

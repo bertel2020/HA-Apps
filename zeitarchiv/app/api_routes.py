@@ -52,6 +52,19 @@ class WriteRequest(BaseModel):
     events: list[EventIn] = Field(min_length=1, max_length=MAX_WRITE_EVENTS)
 
 
+class TableQueryColumn(BaseModel):
+    range_key: str
+    offset: int = 0
+    year_over_year: bool = False
+
+
+class TableQueryRequest(BaseModel):
+    """Alle Zeitfenster einer Vergleichstabelle in einem Storage-Snapshot."""
+
+    entity_ids: list[EntityId] = Field(min_length=1, max_length=MAX_MULTI_QUERY_ENTITIES)
+    columns: list[TableQueryColumn] = Field(min_length=1, max_length=100)
+
+
 @dataclass
 class ApiState:
     """Prozesslokaler Diagnosezustand, den auch die Settings-Routen anzeigen."""
@@ -88,6 +101,31 @@ def _validate_entity_id_or_400(entity_id: str) -> None:
         validate_entity_id(entity_id)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _table_aggregates(result: dict) -> dict[str, float | None]:
+    """Verdichtet eine Chart-Serie auf die fünf Tabellen-Aggregationen."""
+    points = result["points"]
+    total = sum((point["value"] or 0.0) for point in points)
+    average = total / len(points) if points else 0.0
+    minima = [
+        point["min"] if point["min"] is not None else point["value"]
+        for point in points
+        if point["min"] is not None or point["value"] is not None
+    ]
+    maxima = [
+        point["max"] if point["max"] is not None else point["value"]
+        for point in points
+        if point["max"] is not None or point["value"] is not None
+    ]
+    automatic = total if result["aggregation_type"] in ("counter", "switch") else average
+    return {
+        "auto": automatic,
+        "avg": average,
+        "min": min(minima) if minima else None,
+        "max": max(maxima) if maxima else None,
+        "sum": total,
+    }
 
 
 def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
@@ -251,5 +289,67 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             "series": series, "window_start": window_start, "window_end": window_end,
             "period_end": period_end, "is_current": is_current,
         }
+
+    @router.post("/api/query-table")
+    @locked(lambda args: args["body"].entity_ids)
+    def api_query_table(body: TableQueryRequest) -> dict:
+        """Lädt eine komplette Vergleichstabelle mit nur einer Sperr-/HTTP-Runde.
+
+        Alle Spalten teilen denselben Zeitpunkt und denselben request-lokalen
+        Lese-Cache. Besonders die laufende Monats-CSV jeder Entität wird damit
+        nur einmal geparst, auch wenn Tag, Monat und Jahr nebeneinander stehen.
+        """
+        ids = list(dict.fromkeys(body.entity_ids))
+        for entity_id in ids:
+            _validate_entity_id_or_400(entity_id)
+        for column in body.columns:
+            if column.range_key not in query_mod.RANGE_KEYS:
+                raise HTTPException(status_code=400, detail="Ungültiger Tabellenzeitraum")
+
+        now = datetime.now(deps.tz)
+        read_cache = query_mod.QueryReadCache()
+        column_results = []
+        for column in body.columns:
+            series = []
+            window_start = window_end = period_end = None
+            is_current = True
+            for entity_id in ids:
+                entity = deps.index.get_entity(entity_id)
+                result = query_mod.query_series(
+                    deps.data_dir,
+                    deps.index,
+                    entity_id,
+                    column.range_key,
+                    deps.tz,
+                    now,
+                    offset=column.offset,
+                    year_over_year=column.year_over_year,
+                    read_cache=read_cache,
+                )
+                series.append({
+                    "entity_id": entity_id,
+                    "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                    "unit": (entity["unit"] if entity else None) or "",
+                    "decimals": decimals_to_int(entity["decimals"]) if entity else None,
+                    "display_mode": (entity["display_mode"] if entity else None) or "onoff",
+                    "aggregation_type": result["aggregation_type"],
+                    # Tabellen brauchen nur einen Skalar je Zelle. Die teils
+                    # tausenden Chart-Punkte nicht als JSON zum Browser zu
+                    # schicken spart Transfer und dortige Reduktion.
+                    "aggregates": _table_aggregates(result),
+                })
+                if window_start is None and "window_start" in result:
+                    window_start = result["window_start"]
+                    window_end = result["window_end"]
+                    period_end = result["period_end"]
+                    is_current = result["is_current"]
+            column_results.append({
+                "series": series,
+                "window_start": window_start,
+                "window_end": window_end,
+                "period_end": period_end,
+                "is_current": is_current,
+            })
+        return {"columns": column_results}
 
     return router

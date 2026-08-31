@@ -125,7 +125,8 @@
       <div class="dash-grid" data-card-grid>
         {% for d in dashboards %}
         <div class="card dash-card" id="dash-card-{{ d.id }}" data-name="{{ d.name }}"
-             data-created="{{ d.position }}" data-favorite="{{ 1 if d.is_favorite else 0 }}">
+             data-created="{{ d.position }}" data-favorite="{{ 1 if d.is_favorite else 0 }}"
+             data-sort-first="{{ 1 if d.is_default else 0 }}">
           <div class="card-top-actions">
             {% if not d.is_default %}
             <button type="button" class="fav-star {{ 'active' if d.is_favorite else '' }}" aria-pressed="{{ 'true' if d.is_favorite else 'false' }}"

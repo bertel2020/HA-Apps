@@ -272,6 +272,7 @@ def iter_raw_rows(
     tz: ZoneInfo,
     now: datetime | None = None,
     max_rows: int | None = None,
+    hot_rows_loader: Callable[[Path], list[tuple[float, float]]] | None = None,
 ):
     """Streamt Rohwerte monatsweise und wendet Soft-Deletes je Partition an."""
     now_month_key = (now or datetime.now(tz)).strftime("%Y-%m")
@@ -287,7 +288,7 @@ def iter_raw_rows(
         )
         if month_key == now_month_key:
             path = hot_path(data_dir, entity_id, datetime(year, month, 15, tzinfo=tz).timestamp(), tz)
-            batches = [sorted(read_rows(path))]
+            batches = [sorted((hot_rows_loader or read_rows)(path))]
         else:
             archive_path = entity_dir(data_dir, "archive", entity_id) / f"{month_key}.parquet"
             if not archive_path.exists():

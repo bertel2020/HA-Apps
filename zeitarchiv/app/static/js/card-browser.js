@@ -7,7 +7,8 @@
 // Erwartetes Markup (siehe dashboards.html/charts.html/tables.html):
 //   <div class="card-browser" data-storage-key="…">   Suche, Sortierung, Favoriten
 //   <div class="…-grid" data-card-grid>               Container
-//     <div class="card …-card" data-name="…" data-created="…" data-favorite="0|1">
+//     <div class="card …-card" data-name="…" data-created="…" data-favorite="0|1"
+//          data-sort-first="0|1">
 //     <a class="card …-grid-add">                     bleibt immer letzte
 //
 // "Favoriten zuerst" ist bewusst KEINE der Sortierungen, sondern ein eigener
@@ -18,7 +19,9 @@
 // data-created ist bei Charts/Tabellen der Anlagezeitpunkt, bei Dashboards die
 // position — die vergibt create_dashboard() als fortlaufenden Zähler und
 // niemand ändert sie später (es gibt keine Umsortierfunktion für Dashboards),
-// sie ist damit ebenfalls die Anlagereihenfolge.
+// sie ist damit ebenfalls die Anlagereihenfolge. data-sort-first ist optional
+// und hält eine ausgezeichnete Karte vor ALLEN Sortierkriterien; aktuell nutzt
+// das die Dashboard-Übersicht für ihr jeweiliges Standard-Dashboard.
 (function () {
   const SORTIERER = {
     neueste: (a, b) => b.created - a.created,
@@ -72,6 +75,7 @@
       suchtext: suchform(el.dataset.name),
       created: Number(el.dataset.created || 0),
       favorit: el.dataset.favorite === '1' ? 1 : 0,
+      immerErste: el.dataset.sortFirst === '1' ? 1 : 0,
     }));
 
     // Zuletzt gewählte Sortierung und Favoriten-Schalter merken (nur diese
@@ -101,9 +105,14 @@
       const suche = suchform(suchfeld.value.trim());
       const vergleich = SORTIERER[sortierung.value] || SORTIERER[STANDARD_SORTIERUNG];
       const sichtbar = karten.filter(k => !suche || k.suchtext.includes(suche));
-      // Favoriten als vorgelagertes Kriterium, die gewählte Sortierung gilt
-      // darunter unverändert weiter.
-      sichtbar.sort((a, b) => (favAktiv() ? b.favorit - a.favorit : 0) || vergleich(a, b));
+      // Eine explizit ausgezeichnete Karte (Standard-Dashboard) bleibt vor
+      // Favoriten UND gewählter Sortierung. Für alle anderen Karten gelten
+      // beide Kriterien unverändert wie bisher.
+      sichtbar.sort((a, b) =>
+        b.immerErste - a.immerErste
+        || (favAktiv() ? b.favorit - a.favorit : 0)
+        || vergleich(a, b)
+      );
 
       karten.forEach(k => { k.el.hidden = true; });
       // appendChild verschiebt ein bereits vorhandenes Element, fügt es also

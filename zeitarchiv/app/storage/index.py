@@ -1733,6 +1733,25 @@ class Index:
             ).fetchone()
             return row is not None
 
+    def list_item_dashboards(self, item_type: str, item_id: int) -> list[dict]:
+        """Dashboards, auf denen ein gespeichertes Chart/eine Tabelle liegt.
+
+        Das Standard-Dashboard steht wie in allen Dashboard-Auswahlen zuerst;
+        die übrigen Namen folgen alphabetisch. Eine gemeinsame JOIN-Abfrage
+        vermeidet getrennte Pin- und Dashboard-Lookups in den Editor-Routen.
+        """
+        if item_type not in {"chart", "table"}:
+            raise ValueError("Ungültiger Dashboard-Kacheltyp")
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT d.id, d.name, d.is_default "
+                "FROM dashboard_pins p JOIN dashboards d ON d.id = p.dashboard_id "
+                "WHERE p.item_type = ? AND p.item_id = ? "
+                "ORDER BY d.is_default DESC, d.name COLLATE NOCASE ASC, d.id ASC",
+                (item_type, item_id),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def pin_item_to_dashboard(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
         """Heftet ein Chart oder eine Vergleichstabelle als neue letzte Kachel
         eines Dashboards an — False, wenn das Limit von 18 gleichzeitigen

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.69.0 - 2026-08-31
+
+### Neu
+
+- Geöffnete Charts und Vergleichstabellen zeigen, auf welchen Dashboards sie
+  verwendet werden. Ein einzelnes Dashboard ist direkt verlinkt; bei mehreren
+  öffnet der Zähler eine kompakte, ebenfalls verlinkte Liste.
+- Die Lücken-Erkennung bietet zusätzlich Schwellen von 6 und 12 Stunden.
+
+### Verbesserung
+
+- Größere Vergleichstabellen laden alle benötigten Entitäten und Zeiträume in
+  einer gemeinsamen Batch-Abfrage. Quelldateien werden dabei je Anfrage nur
+  einmal gelesen und an den Browser gehen nur die benötigten Aggregatwerte;
+  Dashboard-Kacheln berechnen außerdem nur ihren sichtbaren Ausschnitt.
+- Das Standard-Dashboard bleibt in der Dashboard-Übersicht immer an erster
+  Stelle — unabhängig von Sortierung und dem Schalter „Favoriten zuerst“.
+- Der Hilfetext zu Nachkommastellen erklärt „Automatisch“ und feste
+  Stellenzahlen jetzt mit konkreten Beispielen.
+- Im präzisen Dashboard-Modus werden Kacheln auf schmalen Displays zuverlässig
+  einspaltig dargestellt.
+
+### Dokumentation
+
+- Benutzerhandbuch, Frontend-Architektur und API-Referenz beschreiben die neue
+  Verwendungsanzeige, Tabellen-Batch-Abfrage und Speicheroptimierungen.
+
 ## 0.68.0 - 2026-08-31
 
 ### Neu

@@ -190,6 +190,8 @@ GAP_THRESHOLD_LABELS = {
     "15": "15 Minuten",
     "30": "30 Minuten",
     "60": "1 Stunde",
+    "360": "6 Stunden",
+    "720": "12 Stunden",
     "1440": "1 Tag",
     "off": "Aus",
 }

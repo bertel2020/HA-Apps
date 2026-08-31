@@ -3167,6 +3167,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "entity_names": chart["entity_names"] if chart else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
+        "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
         # compare/compare_mode sind (wie im Chart-Editor selbst) reine
         # Laufzeit-Ansichtseinstellungen, kein gespeichertes Chart-Feld — nur
         # der Anfangszustand eines gerade erst über prefill eröffneten neuen
@@ -3947,6 +3948,7 @@ def _table_editor_context(table: dict | None) -> dict:
         "style": table["style"] if table else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
+        "dashboard_usage": index.list_item_dashboards("table", table["id"]) if table else [],
         "base": "..",
     }
 

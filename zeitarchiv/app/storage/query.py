@@ -51,6 +51,28 @@ BAR_RESOLUTION = {
 }
 
 
+class QueryReadCache:
+    """Request-lokaler Cache für unveränderliche Lese-Snapshots.
+
+    Eine Vergleichstabelle fragt dieselbe Entität für mehrere Zeitfenster ab.
+    Ohne diesen Cache wird ihre laufende Monats-CSV für jede Spalte erneut
+    vollständig geparst. Der Cache lebt absichtlich nur für einen Request;
+    dadurch braucht der Append-Pfad keine globale Cache-Invalidierung.
+    """
+
+    def __init__(self) -> None:
+        self._hot_rows: dict[Path, list[tuple[float, float]]] = {}
+
+    def read_hot_rows(self, path: Path) -> list[tuple[float, float]]:
+        if path not in self._hot_rows:
+            self._hot_rows[path] = read_rows(path)
+        return self._hot_rows[path]
+
+
+def _hot_rows(path: Path, read_cache: QueryReadCache | None) -> list[tuple[float, float]]:
+    return read_cache.read_hot_rows(path) if read_cache is not None else read_rows(path)
+
+
 def _resolved_chart_type(aggregation_type: str, chart_type: str | None) -> str:
     if chart_type is not None:
         if chart_type not in ("line", "bar"):
@@ -163,9 +185,10 @@ def _window(
 
 
 def _read_hot_rows_filtered(
-    data_dir: Path, entity_id: str, index: Index, anchor_ts: float, start_ts: float, end_ts: float, tz: ZoneInfo
+    data_dir: Path, entity_id: str, index: Index, anchor_ts: float, start_ts: float, end_ts: float, tz: ZoneInfo,
+    read_cache: QueryReadCache | None = None,
 ) -> list[tuple[float, float]]:
-    rows = read_rows(hot_path(data_dir, entity_id, anchor_ts, tz))
+    rows = _hot_rows(hot_path(data_dir, entity_id, anchor_ts, tz), read_cache)
     in_range = sorted((ts, v) for ts, v in rows if start_ts <= ts <= end_ts)
     deleted_counts = index.get_deleted_counts(entity_id, start_ts, end_ts)
     return filter_deleted_occurrences(in_range, deleted_counts)
@@ -208,10 +231,13 @@ def _last_value_before(path: Path, before_ts: float) -> float | None:
     return None
 
 
-def _boundary_value(data_dir: Path, entity_id: str, before_ts: float, tz: ZoneInfo) -> float | None:
+def _boundary_value(
+    data_dir: Path, entity_id: str, before_ts: float, tz: ZoneInfo,
+    read_cache: QueryReadCache | None = None,
+) -> float | None:
     """Letzter Rohwert vor ``before_ts`` aus Hot Buffer oder Monatsarchiv."""
     before_local = datetime.fromtimestamp(before_ts, tz)
-    rows = read_rows(hot_path(data_dir, entity_id, before_ts, tz))
+    rows = _hot_rows(hot_path(data_dir, entity_id, before_ts, tz), read_cache)
     prior = sorted((ts, value) for ts, value in rows if ts < before_ts)
     if prior:
         return prior[-1][1]
@@ -243,6 +269,7 @@ def _query_live_fine(
     window_end: datetime,
     tz: ZoneInfo,
     now_local: datetime,
+    read_cache: QueryReadCache | None = None,
 ) -> list[rollup.FineRow]:
     """Stunde/Tag lesen IMMER Rohdaten, nie Rollups (Konzept Abschnitt 02) — über
     cleanup.list_raw_rows, damit auch das Navigieren in einen bereits archivierten
@@ -262,10 +289,11 @@ def _query_live_fine(
             tz,
             now=now_local,
             max_rows=MAX_RAW_QUERY_POINTS,
+            hot_rows_loader=read_cache.read_hot_rows if read_cache is not None else read_rows,
         )
     )
     boundary = (
-        _boundary_value(data_dir, entity_id, window_start.timestamp(), tz)
+        _boundary_value(data_dir, entity_id, window_start.timestamp(), tz, read_cache)
         if aggregation_type == "counter"
         else None
     )
@@ -350,6 +378,7 @@ def _query_completed_plus_live_fine(
     window_end: datetime,
     tz: ZoneInfo,
     now_local: datetime,
+    read_cache: QueryReadCache | None = None,
 ) -> list[rollup.FineRow]:
     """Für week/month: abgeschlossene Tage/Stunden aus dem Rollup + laufender
     Monat live aus dem Hot Buffer, an derselben Bucket-Größe (tag/stunde).
@@ -377,10 +406,11 @@ def _query_completed_plus_live_fine(
     live: list[rollup.FineRow] = []
     if live_start < window_end:
         rows = _read_hot_rows_filtered(
-            data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz
+            data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
+            read_cache,
         )
         boundary = (
-            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz)
+            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
             if aggregation_type == "counter"
             else None
         )
@@ -402,14 +432,16 @@ def _month_live_row(
     window_end: datetime,
     now_local: datetime,
     tz: ZoneInfo,
+    read_cache: QueryReadCache | None = None,
 ) -> rollup.FineRow | None:
     rows = _read_hot_rows_filtered(
-        data_dir, entity_id, index, now_local.timestamp(), month_start.timestamp(), window_end.timestamp(), tz
+        data_dir, entity_id, index, now_local.timestamp(), month_start.timestamp(), window_end.timestamp(), tz,
+        read_cache,
     )
     if not rows:
         return None
     boundary = (
-        _boundary_value(data_dir, entity_id, month_start.timestamp(), tz)
+        _boundary_value(data_dir, entity_id, month_start.timestamp(), tz, read_cache)
         if aggregation_type == "counter"
         else None
     )
@@ -432,6 +464,7 @@ def _query_year_level(
     window_end: datetime,
     tz: ZoneInfo,
     now_local: datetime,
+    read_cache: QueryReadCache | None = None,
 ) -> list[rollup.FineRow]:
     """Für year: immer Monatswerte aus monat.parquet + der laufende Monat live
     aus dem Hot Buffer — jahr.parquet wird hier NIE konsultiert, auch nicht für
@@ -465,6 +498,7 @@ def _query_year_level(
             window_end,
             now_local,
             tz,
+            read_cache,
         )
 
     resolution = (
@@ -543,6 +577,7 @@ def query_series(
     continuous: bool = False,
     year_over_year: bool = False,
     chart_type: str | None = None,
+    read_cache: QueryReadCache | None = None,
 ) -> dict:
     if range_key not in RANGE_KEYS:
         raise ValueError(f"Unbekannter Zeitraum: {range_key}")
@@ -568,17 +603,17 @@ def query_series(
     if range_key in ("hour", "day"):
         fine = _query_live_fine(
             data_dir, index, entity_id, aggregation_type, range_key, resolved_chart_type,
-            window_start, window_end, tz, now_local
+            window_start, window_end, tz, now_local, read_cache
         )
     elif range_key in ("week", "month"):
         fine = _query_completed_plus_live_fine(
             data_dir, index, entity_id, aggregation_type, resolved_chart_type,
-            window_start, window_end, tz, now_local
+            window_start, window_end, tz, now_local, read_cache
         )
     else:
         fine = _query_year_level(
             data_dir, index, entity_id, aggregation_type, range_key, resolved_chart_type,
-            window_start, window_end, tz, now_local
+            window_start, window_end, tz, now_local, read_cache
         )
 
     points = [
@@ -596,7 +631,7 @@ def query_series(
     # daher eine kuenstliche Luecke bis zum ersten Wert innerhalb des Fensters.
     if resolved_chart_type == "line" and aggregation_type == "standard":
         boundary_value = _boundary_value(
-            data_dir, entity_id, window_start.timestamp(), tz
+            data_dir, entity_id, window_start.timestamp(), tz, read_cache
         )
         if boundary_value is not None and (
             not points or points[0]["ts"] > window_start.timestamp()

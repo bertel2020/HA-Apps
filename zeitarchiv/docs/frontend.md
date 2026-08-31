@@ -45,17 +45,19 @@ Geteilte Berechnungslogik zwischen dem vollen Tabellen-Editor
 an der anderen vergessen wird. Arbeitet auf reinen Index-Arrays (Spalten,
 Zeilen), nicht auf Alpines reaktivem UID-Zustand.
 
-- Ruft `/api/query-multi` **clientseitig** auf, ein Request je Spalte
-  (Zeitraum), alle in dieser Spalte gebrauchten Entitäten gebündelt.
+- Ruft `/api/query-table` **einmal** für alle sichtbaren Spalten und benötigten
+  Entitäten auf. Der Endpunkt teilt einen request-lokalen Lese-Cache über alle
+  Zeiträume und liefert nur skalare Aggregate statt vollständiger Punktreihen.
+  Dashboard-Kacheln übergeben nur den tatsächlich sichtbaren Tabellenbereich.
 - Formel-Zeilen: ein kleiner handgeschriebener Ausdrucks-Parser
   (`evalFormula()`, unterstützt `+ - * / ()` und Zeilen-Buchstaben) statt
   `eval()`/`Function()` — bewusst, obwohl Formeln nur aus der eigenen
   Datenbank stammen (kein externer Angriffsvektor), weil ein handgebauter
   Parser für so einfache Ausdrücke die sauberere Wahl bleibt.
-- Aggregation je Zeile (`auto`/`avg`/`min`/`max`/`sum`) und Nachkommastellen
-  je Spalte sind rein clientseitige Darstellungslogik — der Server speichert
-  nur die Struktur (siehe [data-model.md](data-model.md)), berechnet nie
-  selbst eine Tabellenzelle.
+- Der Server berechnet je Entität und Zeitraum die Aggregate `auto`/`avg`/
+  `min`/`max`/`sum`. Gruppen, Formeln und Nachkommastellen je Spalte bleiben
+  clientseitige Darstellungslogik; gespeichert wird weiterhin nur die Struktur
+  (siehe [data-model.md](data-model.md)).
 - **Layout-Lektion (siehe `table_editor.html`-Kommentare):** Zeilen-Buchstaben
   (A/B/C) als *separate* Tabelle neben statt als Spalte innerhalb der
   Haupttabelle zu rendern, klingt sauberer, führt aber zu Zeilenhöhen-Drift
@@ -117,7 +119,13 @@ unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
   gelieferte Reihenfolge; dadurch bleiben die `ORDER BY`-Klauseln der
   `list_*`-Methoden unangetastet, die z. B. auch das Dashboard-Dropdown der
   Topnav versorgen. „Favoriten zuerst“ ist ein eigener, mit jeder Sortierung
-  kombinierbarer Schalter, kein Sortiermodus.
+  kombinierbarer Schalter, kein Sortiermodus. Kacheln mit
+  `data-sort-first="true"` bleiben unabhängig davon ganz vorn; die
+  Dashboard-Übersicht nutzt dies für das Standard-Dashboard.
+- **`_dashboard_usage.html`**: gemeinsame Verwendungsanzeige in geöffneten
+  Chart- und Tabellenansichten. Sie nutzt die bestehenden Chip-, Menü- und
+  Popover-Bausteine; bei mehreren Zuordnungen steht das Standard-Dashboard
+  zuerst, danach folgen die Namen alphabetisch.
 - **`number-format.js`**: einzige Stelle, die ein Zahlenformat kennt
   (aktuell deutsch, Komma als Dezimaltrennzeichen); eine künftige
   Sprachumschaltung ändert nur diese eine Datei, nicht jede einzelne
