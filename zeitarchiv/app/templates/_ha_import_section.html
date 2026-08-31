@@ -141,14 +141,14 @@
           <input type="checkbox" class="ha-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onHaMarkChange(this)" {% if entity.entity_id in ha_selected_ids %}checked{% endif %}>
         </td>
         <td>
-          <span class="ha-entity-cell entity-tooltip-host" tabindex="0">
+          <a href="entities/{{ entity.entity_id }}" class="ha-entity-cell entity-tooltip-host">
             <span class="ent-name" style="font-weight:600;">{{ entity.friendly_name or entity.entity_id }}</span>
             <span class="ent-id mono" style="color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));">{{ entity.entity_id }}</span>
             <span class="entity-tooltip ha-entity-tooltip" role="tooltip">
               <strong>{{ entity.friendly_name or entity.entity_id }}</strong>
               <code>{{ entity.entity_id }}</code>
             </span>
-          </span>
+          </a>
         </td>
         <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
         <td>{{ entity.unit or "—" }}</td>

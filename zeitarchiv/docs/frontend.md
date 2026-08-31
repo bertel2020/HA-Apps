@@ -58,6 +58,16 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   `min`/`max`/`sum`. Gruppen, Formeln und Nachkommastellen je Spalte bleiben
   clientseitige Darstellungslogik; gespeichert wird weiterhin nur die Struktur
   (siehe [data-model.md](data-model.md)).
+- Darstellungsoptionen liegen ausschließlich im `style_json` der Tabelle und
+  gelten identisch für Vollansicht und Dashboard-Kachel: Abschnittsnamen an
+  Trennzeilen, Hervorhebung von Formelzeilen, fixierte Beschriftungsspalte/
+  Kopfzeile, manuelle Spaltenbreiten (`_TableColumnBody.width`/
+  `style.label_col_width`), Header-/Werte-Ausrichtung, gleich breite
+  Werte-Spalten, abgesetzte Vergleichsspalten, prozentuale Abweichung unter
+  dem aktuellen Wert, ausgeschriebene Fehlwerte sowie ein-/ausblendbare,
+  optional kleinere oder ausgerichtete Einheiten und ausgerichtete
+  Dezimalstellen. Alte Tabellen behalten durch konservative Defaults ihre
+  bisherige Darstellung.
 - **Layout-Lektion (siehe `table_editor.html`-Kommentare):** Zeilen-Buchstaben
   (A/B/C) als *separate* Tabelle neben statt als Spalte innerhalb der
   Haupttabelle zu rendern, klingt sauberer, führt aber zu Zeilenhöhen-Drift
@@ -67,6 +77,24 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   selbst); visuell "abgesetzt" wirkt sie stattdessen über gezielte
   `:not(...)`-Selektor-Ausnahmen bei Kopfzeilen-Hervorhebung, nicht über
   physische Trennung vom DOM.
+- **Sticky-Header-Lektion:** `position:sticky` auf `<thead>`/`<tr>` wird von
+  Safari/WebKit nicht zuverlässig unterstützt — dort bleibt insbesondere die
+  Eck-Zelle (Kopfzeile × fixierte erste Spalte) unwirksam. Robust ist nur
+  `position:sticky` auf jeder `<th>` einzeln; bei zweistufiger Kopfzeile
+  braucht die zweite Zeile zusätzlich ein `top` in Höhe der ersten Zeile,
+  sonst überlappen sich beide beim Scrollen. Diese Höhe variiert mit Dichte/
+  Schriftgröße und wird deshalb per JS gemessen und als Custom Property
+  `--tbl-group-header-h` gesetzt (`syncLetterPositions()` im Editor,
+  `renderTableTile()` in `dashboard-tiles.js`).
+- **Gleich breite Werte-Spalten (`style.equal_value_cols`):** ein reiner
+  `width:1%`-CSS-Trick verteilt bei `table-layout:auto` den Platz NICHT
+  zuverlässig gleichmäßig, sobald sich Zahlenlängen zwischen Spalten stark
+  unterscheiden (Tages- vs. Jahressumme) — die schmalste Spalte bleibt an
+  ihren Mindest-Inhalt gebunden. Robust ist `table-layout:fixed` zusammen mit
+  einer `<colgroup>`: nur die Beschriftungsspalte bekommt eine explizite
+  `<col>`-Breite, alle übrigen `<col>`-Elemente ohne eigene Breite teilen
+  sich den Rest laut Spezifikation zu gleichen Teilen — motorunabhängig,
+  anders als Breiten über Zellen der "ersten Zeile" bei fixed layout.
 
 ## Theming
 

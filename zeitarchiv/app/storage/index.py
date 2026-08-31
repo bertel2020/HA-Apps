@@ -391,7 +391,11 @@ CREATE TABLE IF NOT EXISTS table_columns (
     range_key TEXT NOT NULL DEFAULT 'month',
     offset INTEGER NOT NULL DEFAULT 0,
     year_over_year INTEGER NOT NULL DEFAULT 0,
-    decimals TEXT NOT NULL DEFAULT 'auto'
+    decimals TEXT NOT NULL DEFAULT 'auto',
+    hidden INTEGER NOT NULL DEFAULT 0,
+    group_label TEXT NOT NULL DEFAULT '',
+    heatmap INTEGER NOT NULL DEFAULT 0,
+    width INTEGER
 );
 
 -- Eine Zeile ist eine von drei Arten (Konzept: v1 entity, v2 group, v3
@@ -416,7 +420,12 @@ CREATE TABLE IF NOT EXISTS table_rows (
     formula TEXT NOT NULL DEFAULT '',
     formula_unit TEXT NOT NULL DEFAULT '',
     bold INTEGER NOT NULL DEFAULT 0,
-    aggregation TEXT NOT NULL DEFAULT 'auto'
+    aggregation TEXT NOT NULL DEFAULT 'auto',
+    hidden INTEGER NOT NULL DEFAULT 0,
+    show_label INTEGER NOT NULL DEFAULT 0,
+    accent INTEGER NOT NULL DEFAULT 0,
+    percent_of_total INTEGER NOT NULL DEFAULT 0,
+    hide_if_empty INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -641,12 +650,50 @@ class Index:
             # ist das bisherige, implizite Verhalten (Zähler/Schalter -> Summe,
             # sonst Durchschnitt), siehe TableCompute.computeValues().
             self._conn.execute("ALTER TABLE table_rows ADD COLUMN aggregation TEXT NOT NULL DEFAULT 'auto'")
+        if "hidden" not in table_row_columns:
+            # Ausblenden einer Zeile in Vorschau/Kachel — die Zeile bleibt
+            # Teil der Berechnung/Buchstaben-Zuordnung, siehe main.py
+            # _TableRowBody.hidden.
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
+        if "show_label" not in table_row_columns:
+            # Löst den früheren GLOBALEN Schalter saved_tables.style_json.
+            # separator_labels ab (main.py _TableStyleBody hatte das Feld,
+            # jetzt lebt es pro Trennlinie als _TableRowBody.show_label).
+            # Bestehende Trennlinien MIT Abschnittsname bleiben dabei
+            # sichtbar (nutzerbestätigter Default) — sonst müsste jede
+            # vorhandene Beschriftung nach dem Umstieg einzeln neu
+            # aktiviert werden.
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN show_label INTEGER NOT NULL DEFAULT 0")
+            self._conn.execute(
+                "UPDATE table_rows SET show_label = 1 WHERE row_type = 'separator' AND label != ''"
+            )
+        if "accent" not in table_row_columns:
+            # Löst den früheren globalen Schalter style_json.formula_row_accent
+            # ab — jetzt pro Formelzeile einstellbar statt für alle gleichzeitig.
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN accent INTEGER NOT NULL DEFAULT 0")
+        if "percent_of_total" not in table_row_columns:
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN percent_of_total INTEGER NOT NULL DEFAULT 0")
+        if "hide_if_empty" not in table_row_columns:
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN hide_if_empty INTEGER NOT NULL DEFAULT 0")
 
         table_column_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(table_columns)")}
         if "decimals" not in table_column_columns:
             # Dieselbe Konvention wie das entity-eigene "Nachkommastellen"-Feld
             # (formatting.DECIMALS_LABELS) — rein für die Anzeige dieser Spalte.
             self._conn.execute("ALTER TABLE table_columns ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
+        if "hidden" not in table_column_columns:
+            self._conn.execute("ALTER TABLE table_columns ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
+        if "group_label" not in table_column_columns:
+            self._conn.execute("ALTER TABLE table_columns ADD COLUMN group_label TEXT NOT NULL DEFAULT ''")
+        if "heatmap" not in table_column_columns:
+            # War ursprünglich table_rows.heatmap (zeilenweise), jetzt
+            # spaltenweise — siehe main.py _TableColumnBody.heatmap.
+            self._conn.execute("ALTER TABLE table_columns ADD COLUMN heatmap INTEGER NOT NULL DEFAULT 0")
+        if "width" not in table_column_columns:
+            # NULL = automatische Breite (Standard-Tabellenlayout, siehe
+            # main.py _TableColumnBody.width) — kein DEFAULT 0 o.ä., damit
+            # bestehende Spalten unverändert automatisch breit bleiben.
+            self._conn.execute("ALTER TABLE table_columns ADD COLUMN width INTEGER")
 
         dashboard_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboard_pins)")}
         if "grid_cols" not in dashboard_columns:
@@ -1993,12 +2040,14 @@ class Index:
         # den Lock bereits halten (threading.Lock ist nicht reentrant, ein
         # zweites with self._lock hier würde deadlocken).
         self._conn.executemany(
-            "INSERT INTO table_columns (table_id, position, label, range_key, offset, year_over_year, decimals) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO table_columns "
+            "(table_id, position, label, range_key, offset, year_over_year, decimals, hidden, group_label, heatmap, width) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, c["label"], c["range_key"], c["offset"], int(c["year_over_year"]),
-                    c.get("decimals", "auto"),
+                    c.get("decimals", "auto"), int(c.get("hidden", False)), c.get("group_label", ""),
+                    int(c.get("heatmap", False)), c.get("width"),
                 )
                 for i, c in enumerate(columns)
             ],
@@ -2007,12 +2056,16 @@ class Index:
     def _write_table_rows(self, table_id: int, rows: list[dict]) -> None:
         self._conn.executemany(
             "INSERT INTO table_rows "
-            "(table_id, position, label, row_type, entity_ids, formula, formula_unit, bold, aggregation) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(table_id, position, label, row_type, entity_ids, formula, formula_unit, bold, aggregation, hidden, "
+            "show_label, accent, percent_of_total, hide_if_empty) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, r["label"], r["row_type"], json.dumps(r["entity_ids"]),
                     r["formula"], r.get("formula_unit", ""), int(r["bold"]), r.get("aggregation", "auto"),
+                    int(r.get("hidden", False)), int(r.get("show_label", False)), int(r.get("accent", False)),
+                    int(r.get("percent_of_total", False)),
+                    int(r.get("hide_if_empty", False)),
                 )
                 for i, r in enumerate(rows)
             ],
@@ -2088,6 +2141,7 @@ class Index:
                 {
                     "label": c["label"], "range_key": c["range_key"], "offset": c["offset"],
                     "year_over_year": bool(c["year_over_year"]), "decimals": c["decimals"],
+                    "hidden": bool(c["hidden"]), "group_label": c["group_label"], "heatmap": bool(c["heatmap"]),
                 }
                 for c in column_rows
             ]
@@ -2096,7 +2150,10 @@ class Index:
                     "label": r["label"], "row_type": r["row_type"],
                     "entity_ids": json.loads(r["entity_ids"]), "formula": r["formula"],
                     "formula_unit": r["formula_unit"], "bold": bool(r["bold"]),
-                    "aggregation": r["aggregation"],
+                    "aggregation": r["aggregation"], "hidden": bool(r["hidden"]),
+                    "show_label": bool(r["show_label"]), "accent": bool(r["accent"]),
+                    "percent_of_total": bool(r["percent_of_total"]),
+                    "hide_if_empty": bool(r["hide_if_empty"]),
                 }
                 for r in row_rows
             ]

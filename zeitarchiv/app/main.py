@@ -3887,9 +3887,35 @@ class _TableColumnBody(BaseModel):
     # (formatting.DECIMALS_LABELS, siehe _entity_config_form.html): "auto"
     # oder eine Ziffer als String, rein für die Anzeige in dieser Spalte.
     decimals: str = "auto"
+    # Ausgeblendet heißt: nicht in der Vorschau/Kachel gerendert, ABER
+    # weiterhin mitberechnet (siehe TableCompute.computeValues()) — eine
+    # ausgeblendete Vergleichsspalte (Versatz/Vorjahr) liefert ihre
+    # Abweichung so trotzdem an der Basisspalte.
+    hidden: bool = False
+    # Leer = keine übergreifende Kopfzeile. Zwei oder mehr direkt
+    # aufeinanderfolgende Spalten mit demselben (nicht-leeren) group_label
+    # bekommen in der Vorschau/Kachel eine gemeinsame, überspannende
+    # Kopfzeile darüber (z. B. "2025" über mehreren Monatsspalten).
+    group_label: str = ""
+    # Färbt die Zellen dieser Spalte nach ihrem Wert ein (heller = niedrig,
+    # kräftiger = hoch), relativ zu den anderen Zeilen DERSELBEN Spalte im
+    # selben Abschnitt — bewusst spaltenweise statt zeilenweise (war
+    # ursprünglich _TableRowBody.heatmap): eine Zeile enthält oft sehr
+    # unterschiedliche Größenordnungen nebeneinander (Tag vs. Jahr), ein
+    # Vergleich über die eigene Zeile hinweg wäre irreführend. Sinnvoll ist
+    # der Vergleich mehrerer Zeilen INNERHALB derselben Spalte.
+    heatmap: bool = False
+    # Manuell gezogene Spaltenbreite in Pixeln (siehe table_editor.html
+    # Ziehgriff am rechten Spaltenrand) — None/nicht gesetzt heißt automatische
+    # Breite (Standard-Tabellenlayout, richtet sich nach dem Inhalt).
+    width: int | None = None
 
 
 _TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum")
+# Zeilenbeschriftung/Abschnittsname — dieselbe Zahl wie das maxlength-Attribut
+# des Felds in table_editor.html, hier zusätzlich serverseitig durchgesetzt
+# (ein Request kann das clientseitige maxlength umgehen).
+MAX_TABLE_ROW_LABEL_LENGTH = 30
 
 
 class _TableRowBody(BaseModel):
@@ -3902,6 +3928,29 @@ class _TableRowBody(BaseModel):
     # Nur für row_type "entity"/"group" relevant — "auto" ist das bisherige,
     # implizite Verhalten (Zähler/Schalter -> Summe, sonst Durchschnitt).
     aggregation: str = "auto"
+    # Dieselbe Bedeutung wie bei _TableColumnBody.hidden — ausgeblendete
+    # Zeilen bleiben Teil der Buchstaben-Zuordnung (rowLetters()), damit eine
+    # Formel, die auf eine versteckte Hilfszeile verweist, nicht bricht. Gilt
+    # auch für row_type "separator" (rein optisch, keine Berechnung betroffen).
+    hidden: bool = False
+    # Nur für row_type "separator" relevant — ob der Abschnittsname (label)
+    # als Überschrift angezeigt wird. War früher ein einzelner globaler
+    # Schalter (_TableStyleBody.separator_labels), jetzt pro Trennlinie
+    # einstellbar statt für alle gleichzeitig.
+    show_label: bool = False
+    # Nur für row_type "formula" relevant — dieselbe optische Hervorhebung
+    # wie die frühere globale _TableStyleBody.formula_row_accent, jetzt pro
+    # Formelzeile einstellbar.
+    accent: bool = False
+    # Nur für row_type "entity"/"group" relevant — zeigt statt des absoluten
+    # Werts den prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen
+    # derselben Spalte (bis zur vorherigen Trennlinie).
+    percent_of_total: bool = False
+    # Nur für row_type "entity"/"group" relevant — blendet die Zeile aus,
+    # wenn sie in ALLEN sichtbaren Spalten entweder keinen Wert oder 0 hat
+    # (z. B. ein stillgelegtes Gerät), ohne dass man sie manuell über
+    # "hidden" ein-/ausschalten muss.
+    hide_if_empty: bool = False
 
 
 class _TableStyleBody(BaseModel):
@@ -3916,10 +3965,32 @@ class _TableStyleBody(BaseModel):
     header_accent: bool = False
     first_col_accent: bool = False
     first_col_bold: bool = False
+    sticky_first_col: bool = False
+    sticky_header: bool = False
+    comparison_columns: bool = False
+    show_deviation: bool = False
+    explicit_missing: bool = False
+    show_units: bool = True
+    align_units: bool = False
+    small_units: bool = False
+    align_numbers: bool = False
+    # Dieselbe Bedeutung wie _TableColumnBody.width, nur für die
+    # Beschriftungsspalte (die kein eigenes Spalten-Objekt hat) — None heißt
+    # automatische Breite (so breit wie der längste Zeilentext).
+    label_col_width: int | None = None
+    # Ausrichtung der Kopfzeile (Zeiträume) bzw. der Werte-Zellen — Standard
+    # bei beiden rechtsbündig (siehe table-compute.js styleClasses()).
+    header_align: str = "right"
+    value_align: str = "right"
+    # Alle Werte-Spalten gleich breit (width:1%-Trick im CSS) — betrifft
+    # bewusst nur die Werte-Spalten, nicht die Beschriftungsspalte (siehe
+    # table_editor.html tbl-style-equal-cols).
+    equal_value_cols: bool = False
 
 
 _TABLE_BORDER_OPTIONS = ("horizontal", "grid", "none")
 _TABLE_DENSITY_OPTIONS = ("comfortable", "compact")
+_TABLE_ALIGN_OPTIONS = ("left", "center", "right")
 
 
 class _SaveTableBody(BaseModel):
@@ -3970,19 +4041,36 @@ def _validate_table_body(body: _SaveTableBody) -> None:
             raise HTTPException(status_code=400, detail="Ungültiger Zeitraum in einer Spalte")
         if c.decimals not in DECIMALS_LABELS:
             raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Option in einer Spalte")
+        if c.width is not None and not (30 <= c.width <= 800):
+            raise HTTPException(status_code=400, detail="Ungültige Spaltenbreite")
+    if body.style.label_col_width is not None and not (30 <= body.style.label_col_width <= 800):
+        raise HTTPException(status_code=400, detail="Ungültige Spaltenbreite")
     for r in body.rows:
-        if r.row_type not in ("entity", "group", "formula", "separator"):
+        if r.row_type not in ("entity", "group", "formula", "separator", "summary"):
             raise HTTPException(status_code=400, detail="Ungültiger Zeilentyp")
+        if len(r.label) > MAX_TABLE_ROW_LABEL_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Eine Zeilenbeschriftung darf höchstens {MAX_TABLE_ROW_LABEL_LENGTH} Zeichen lang sein",
+            )
         if r.row_type in ("entity", "group") and not r.entity_ids:
             raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht mindestens eine Entität')
         if r.row_type == "formula" and not r.formula.strip():
             raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht eine Formel')
+        # summary: dieselben zwei Werte wie die Aggregation von Entität-/
+        # Gruppen-Zeilen (Summe/Durchschnitt), nur ohne "auto"/"min"/"max" —
+        # eine automatische Summenzeile ist immer eindeutig Summe oder
+        # Durchschnitt, nie kontextabhängig wie bei einer einzelnen Entität.
+        if r.row_type == "summary" and r.aggregation not in ("sum", "avg"):
+            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht Summe oder Durchschnitt')
         if r.aggregation not in _TABLE_ROW_AGGREGATIONS:
             raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" hat eine ungültige Aggregation')
     if body.style.borders not in _TABLE_BORDER_OPTIONS:
         raise HTTPException(status_code=400, detail="Ungültige Rahmen-Option")
     if body.style.density not in _TABLE_DENSITY_OPTIONS:
         raise HTTPException(status_code=400, detail="Ungültige Dichte-Option")
+    if body.style.header_align not in _TABLE_ALIGN_OPTIONS or body.style.value_align not in _TABLE_ALIGN_OPTIONS:
+        raise HTTPException(status_code=400, detail="Ungültige Ausrichtungs-Option")
 
 
 # Muss VOR "/tables/{table_id}" stehen — dieselbe Begründung wie bei

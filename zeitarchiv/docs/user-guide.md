@@ -573,7 +573,18 @@ einer bestehenden (Kachelmenü ⋮):
   automatisch auf den jeweiligen Zeitraum der Spalte auflösen (Einfüge-
   Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des aufgelösten
   Werts). **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch
-  auf denselben Zeitraum ein Jahr zuvor (schaltjahrsicher).
+  auf denselben Zeitraum ein Jahr zuvor (schaltjahrsicher). Steht neben einer
+  vergangenen Spalte (Vortag, Vormonat, Vorjahr …) eine Spalte mit Versatz 0
+  desselben Zeitraum-Typs, vergleicht die vergangene Spalte automatisch nur
+  den bislang vergangenen Teil ihres Zeitraums ("Gleicher Zeitpunkt"-
+  Vergleich) — ein noch laufender Tag wird so fair gegen "Vortag bis zur
+  aktuellen Uhrzeit" statt gegen den kompletten Vortag verglichen.
+- **Mehrstufige Kopfzeile:** Spalten mit derselben, nicht leeren
+  Gruppen-Beschriftung (z. B. "2025" über mehreren Monatsspalten) bekommen
+  automatisch eine gemeinsame, übergreifende Kopfzeile darüber.
+- Spalten und Zeilen lassen sich über das jeweilige Kärtchen duplizieren
+  (⧉) — Zeilen-Duplikate inklusive aller Optionen, Formel-Zeilen mit
+  automatisch mitkorrigierten Buchstaben-Referenzen.
 
 ### Aggregation und Formatierung
 
@@ -582,6 +593,21 @@ einer bestehenden (Kachelmenü ⋮):
   die echten Extremwerte der zugrunde liegenden Rohdaten, nicht den
   Durchschnitt der kleinsten verfügbaren Zeitscheibe.
 - **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
+- **% Anteil** (Zeilen-Menü "Optionen"): zeigt statt des absoluten Werts den
+  prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen derselben
+  Spalte seit der letzten Trennlinie.
+- **Bei 0 ausblenden** (Zeilen-Menü "Optionen"): blendet eine Entität-/
+  Gruppen-Zeile automatisch aus, sobald sie in allen sichtbaren Spalten
+  entweder keinen Wert oder 0 hat — etwa ein stillgelegtes Gerät, ohne sie
+  manuell aus- und wieder einblenden zu müssen.
+- **Summenzeile** (eigener Zeilentyp): Summe oder Durchschnitt aller
+  Entität-/Gruppen-Zeilen seit der letzten Trennlinie, aktualisiert sich
+  automatisch, wenn darüber Zeilen hinzukommen oder wegfallen.
+- **Farbskala** (Spalten-Option): färbt die Zellen einer Spalte nach ihrem
+  Wert relativ zu den anderen Entität-/Gruppen-Zeilen im selben Abschnitt
+  derselben Spalte ein — heller bei niedrigen, kräftiger bei hohen Werten.
+  Formel-, Summen- und Trennzeilen werden dabei weder eingefärbt noch für
+  die Skala berücksichtigt.
 
 ### Formeln
 
@@ -596,9 +622,30 @@ Einheit der ersten referenzierten Zeile.
 
 ### Darstellung
 
-Zebra-Streifen, Kopfzeile/erste Spalte hervorheben, Beschriftung fett,
-Rahmen (horizontal/Gitter/ohne) sowie Dichte (komfortabel/kompakt) sind rein
-optische Einstellungen und wirken sich nie auf die berechneten Werte aus.
+Rein optische Einstellungen, wirken sich nie auf die berechneten Werte aus:
+
+- **Hervorhebung:** Zebra-Streifen, erste Spalte hervorheben, Header
+  hervorheben, Beschriftung fett.
+- **Vergleich:** Vergleichsspalten (Vortag, Vormonat, Vorjahr …) optisch
+  absetzen, prozentuale Abweichung zur zugehörigen Vergleichsspalte
+  anzeigen.
+- **Zahlen / Einheiten:** Einheiten ein-/ausblenden, in einer festen Spalte
+  ausrichten oder kleiner darstellen, Dezimaltrennzeichen spaltenweise
+  ausrichten, fehlende Werte als „Keine Daten“ statt als Gedankenstrich
+  ausschreiben.
+- **Layout:** Rahmen (horizontal/Gitter/ohne), Dichte (komfortabel/
+  kompakt), Header-/Werte-Ausrichtung (linksbündig/zentriert/rechtsbündig,
+  Vorgabe jeweils rechtsbündig), alle Werte-Spalten gleich breit
+  ("Spalten gleichmäßig", die Beschriftungsspalte bleibt davon unberührt).
+  **Erste Spalte fixieren** und **Header fixieren** halten Beschriftungsspalte
+  bzw. Kopfzeile beim Scrollen sichtbar — Header fixieren begrenzt die
+  Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken.
+  Spaltenbreiten lassen sich per Ziehgriff am rechten Rand jeder Kopfzelle
+  anpassen (Doppelklick setzt eine Spalte auf automatische Breite zurück);
+  ohne manuelle Breite richtet sich jede Spalte nach ihrem Inhalt.
+
+Der Button **CSV** exportiert die aktuell sichtbaren Zeilen/Spalten (inkl.
+% Anteil-/Einheiten-Einstellungen) als Semikolon-getrennte Datei.
 
 Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
 Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.

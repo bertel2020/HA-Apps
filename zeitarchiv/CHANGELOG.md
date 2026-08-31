@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.70.0 - 2026-08-31
+
+### Neu
+
+- Zeilen-Menü "Optionen" für Vergleichstabellen: % Anteil an der Summe des
+  Abschnitts, Zeile bei 0/keinem Wert automatisch ausblenden, sowie ein
+  eigener Summenzeilen-Typ (Summe/Durchschnitt seit der letzten Trennlinie,
+  aktualisiert sich automatisch).
+- Farbskala je Spalte färbt Entität-/Gruppen-Zeilen relativ zu den anderen
+  Zeilen desselben Abschnitts ein; Formel- und Summenzeilen bleiben davon
+  unberührt.
+- Mehrstufige Kopfzeile: Spalten mit gleicher Gruppen-Beschriftung (z. B.
+  "2025" über mehreren Monatsspalten) bekommen automatisch eine
+  übergreifende Kopfzeile.
+- Spalten und Zeilen lassen sich einzeln duplizieren.
+- CSV-Export für Vergleichstabellen.
+- Entity-Link in der HA-Import-Trefferliste, wie in der Entitätenliste.
+- "Gleicher Zeitpunkt"-Vergleich: eine vergangene Vergleichsspalte (Vortag,
+  Vormonat, Vorjahr …) wird automatisch auf denselben, bislang verstrichenen
+  Zeitanteil gekappt, wenn eine Spalte desselben Zeitraum-Typs mit Versatz 0
+  danebensteht — ein noch laufender Tag vergleicht sich so fair gegen
+  "Vortag bis zur aktuellen Uhrzeit" statt gegen den ganzen Vortag.
+- Erste Spalte und Kopfzeile lassen sich beim Scrollen fixieren
+  ("Erste Spalte fixieren", "Header fixieren").
+- Spaltenbreiten (inkl. Beschriftungsspalte) lassen sich per Ziehgriff am
+  rechten Zellrand anpassen und werden gespeichert; ohne manuelle Breite
+  richtet sich eine Spalte weiterhin nach ihrem Inhalt.
+- Neue Layout-Optionen: Ausrichtung von Kopfzeile und Werte-Zellen
+  (linksbündig/zentriert/rechtsbündig) sowie "Spalten gleichmäßig" für
+  gleich breite Werte-Spalten, unabhängig von der Beschriftungsspalte.
+
+### Verbesserung
+
+- Die bisherigen Einzel-Chips einer Zeile (Fett, Überschrift zeigen,
+  Hervorheben, % Anteil, Bei 0 ausblenden) sind in ein gemeinsames
+  "Optionen"-Menü gewandert; der Menü-Button hebt sich hervor, sobald eine
+  der enthaltenen Optionen aktiv ist.
+- Alle Tooltips der Vergleichstabellen-Ansicht folgen jetzt einheitlich dem
+  App-weiten Tooltip-Standard statt der nativen Browser-Tooltips.
+- Spaltenüberschriften sind standardmäßig zentriert bzw. über die neue
+  Ausrichtungs-Option konfigurierbar.
+
+### Fehlerbehebung
+
+- Bei fixierter Kopfzeile UND fixierter erster Spalte blieb die Eck-Zelle
+  (Kopfzeile × Beschriftungsspalte) in Safari beim Scrollen nicht stehen —
+  `position:sticky` auf `<thead>`/`<tr>` wird dort nicht zuverlässig
+  unterstützt. Jetzt `position:sticky` auf jeder Kopfzelle einzeln, mit
+  gemessenem Versatz für eine zweite (Gruppen-)Kopfzeile.
+- "Header hervorheben" zusammen mit "Header fixieren" ergab einen weißen,
+  textlosen Header (beide CSS-Regeln hatten dieselbe Spezifität, die
+  spätere weiße Sticky-Hintergrundfarbe gewann).
+- Dashboard-Kacheln von Vergleichstabellen kürzten Zeilen/Spalten auf eine
+  von der Kachelgröße abhängige Obergrenze mit "+N weitere Zeile"-Hinweis,
+  obwohl die Kachel ohnehin einen eigenen Scrollbalken hat — zeigt jetzt
+  immer alle Zeilen/Spalten.
+
+### Dokumentation
+
+- Benutzerhandbuch und Frontend-Architektur beschreiben die neuen
+  Vergleichstabellen-Optionen, den "Gleicher Zeitpunkt"-Vergleich sowie die
+  Sticky-Header- und Gleichmäßig-Spalten-Lösung.
+
 ## 0.69.0 - 2026-08-31
 
 ### Neu

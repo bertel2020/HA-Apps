@@ -53,6 +53,15 @@
   .tbl-col-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
   .tbl-col-move button:hover{color:var(--accent-line);}
   .tbl-col-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
+  /* Sichtbarkeits-Toggle (Auge/Auge-durchgestrichen) — Spalte bleibt Teil
+     der Berechnung (siehe main.py _TableColumnBody.hidden), nur ausgeblendet
+     in Vorschau/Kachel. Dasselbe Muster für Zeilen (.tbl-row-hide unten). */
+  .tbl-col-hide{background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:0;line-height:1;display:flex;align-items:center;}
+  .tbl-col-hide:hover{color:var(--ink);}
+  .tbl-col-hide.active{color:var(--accent-line);}
+  .tbl-col-card-hidden{opacity:.55;}
+  .tbl-duplicate-btn{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(13px * var(--font-scale, 1));padding:0;line-height:1;}
+  .tbl-duplicate-btn:hover{color:var(--accent-line);}
   /* Eigener Ziehgriff statt der ganzen (Eingabefeld-dichten) Karte draggable
      zu machen — ein Drag-Start, der auf einem input/select landet, wird vom
      Browser als Textauswahl/Fokus behandelt statt als natives Drag, was sich
@@ -103,9 +112,15 @@
   }
   .tbl-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;}
   .tbl-row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  /* max-width auf die Breite des Entität-/Gruppen-Wertfelds (.tbl-value-picker,
+     260px) begrenzt — passend zum maxlength="30" auf dem Feld selbst, ein
+     30-Zeichen-Text braucht keine 300px mehr. Trifft dadurch automatisch auch
+     die Trennlinie: die hat keinen Wert-Picker davor, ihr Beschriftungsfeld
+     ("Abschnittsname") ist das einzige flex:1-Feld in der Zeile und bekommt
+     so dieselbe "Wert-Spalte"-Breite wie alle anderen Zeilentypen. */
   .tbl-row-top input[type=text]{
     font-family:inherit;font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
-    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:150px;max-width:300px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);flex:1;min-width:150px;max-width:260px;
   }
   /* "Fett" + Auf/Ab + Löschen als EIN Wrapper mit margin-left:auto statt
      mehrerer eigenständig rechtsbündiger Elemente — sonst würde der freie
@@ -117,18 +132,31 @@
      (kein "Fett", nur Auf/Ab/Löschen) rechtsbündig, weil der Wrapper selbst
      nie versteckt wird. */
   .tbl-row-right{display:flex;align-items:center;gap:8px;margin-left:auto;}
-  .tbl-row-top label.cbx{display:flex;align-items:center;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
   .tbl-row-remove{flex:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:calc(16px * var(--font-scale, 1));padding:0 2px;line-height:1;margin-top:4px;}
   .tbl-row-remove:hover{color:var(--danger);}
+  .tbl-row-hide{flex:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:0 2px;line-height:1;margin-top:4px;display:flex;align-items:center;}
+  .tbl-row-hide:hover{color:var(--ink);}
+  .tbl-row-hide.active{color:var(--accent-line);}
+  .tbl-row-card-hidden{opacity:.55;}
+  /* Typspezifische Optionen (Abschnittsüberschrift bei Trennlinie,
+     Hervorheben bei Formel) als Chip statt Checkbox — dieselbe .chip-Optik
+     wie in "Darstellung", nur kompakter für die dichte Zeilenkarte. Sitzt
+     links von den Pfeilen, siehe .tbl-row-right oben. */
+  .tbl-row-right .chip.tbl-row-chip{font-size:calc(11.5px * var(--font-scale, 1));padding:4px 10px;white-space:nowrap;}
+  .tbl-row-opts-popover{width:200px;}
+  .tbl-row-opts-popover .dd-picker-row{gap:8px;}
+  .tbl-row-opts-popover .dd-picker-row input[type=checkbox]{margin:0;flex:none;}
+  .tbl-row-opts-popover .dd-picker-row span{flex:1;}
   .tbl-row-move{display:flex;gap:2px;}
   .tbl-row-move button{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:2px 4px;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
   .tbl-row-move button:hover{color:var(--accent-line);}
   .tbl-row-move button:disabled{opacity:.3;cursor:default;color:var(--ink-faint);}
 
   /* Typ-Picker (Entität/Gruppe/Formel/Trennlinie) — feste Breite statt
-     Inhaltsbreite, ein Tick großzügiger als das längste Label ("Trennlinie ▾")
-     braucht, damit er nicht bei jedem Zeilentyp minimal in der Breite springt. */
-  .tbl-row-top .tbl-type-picker{flex:none;width:130px;}
+     Inhaltsbreite, ein Tick großzügiger als das längste Label ("Trennlinie ▾",
+     ~93px inkl. Padding bei Standard-Schriftgröße) braucht, damit er nicht
+     bei jedem Zeilentyp minimal in der Breite springt. */
+  .tbl-row-top .tbl-type-picker{flex:none;width:118px;}
   .tbl-row-top .tbl-type-picker > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;white-space:nowrap;box-sizing:border-box;}
   /* Entität-/Gruppen-Zeilen-Picker — dieselbe .dd-picker-Optik wie überall
      sonst in der App, aber mit Suchfeld + scrollbarer Liste (.tbl-group-popover,
@@ -143,12 +171,12 @@
   .tbl-row-top .tbl-value-picker{flex:none;width:260px;}
   .tbl-row-top .tbl-value-picker > button.btn,.tbl-row-top .tbl-group-btn{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;}
   /* Aggregation (Entität/Gruppe) — sitzt an derselben Stelle in der Zeile wie
-     die Einheit bei Formel-Zeilen (direkt vor der Beschriftung), etwas
-     breiter als deren 90px, da "Auto ▾" sonst zu knapp würde. Kurze
+     die Einheit bei Formel-Zeilen (direkt vor der Beschriftung). Kurze
      Button-Labels (Auto/Ø/Min/Max/Σ) statt ausgeschriebener Wörter, damit
      die Zeile nicht umbricht — volle Bezeichnung im Popover und als
-     title-Tooltip auf dem Button selbst. */
-  .tbl-row-top .tbl-agg-picker{flex:none;width:100px;}
+     title-Tooltip auf dem Button selbst. Breite knapp über dem längsten
+     Label ("Auto ▾", ~60px inkl. Padding). */
+  .tbl-row-top .tbl-agg-picker{flex:none;width:76px;}
   .tbl-row-top .tbl-agg-picker > button{width:100%;text-align:left;font-size:calc(12.5px * var(--font-scale, 1));padding:6px 9px;white-space:nowrap;box-sizing:border-box;}
   .tbl-formula-input{
     font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
@@ -159,10 +187,10 @@
      Logik wie beim Entität-/Gruppen-Picker. Die "verfügbar: A, B …"-Hilfe
      und die feste "Einheit"-Beschriftung leben deshalb nur noch als title-
      Tooltip statt als sichtbarer Text, sonst würde die Zeile umbrechen.
-     Formel bekommt dieselbe Breite wie der Werte-Picker (s.o.), Einheit
-     bleibt schmal (typische Einheiten wie kWh/°C/m³ brauchen wenig Platz). */
+     Formel bekommt dieselbe Breite wie der Werte-Picker (s.o.); das
+     Einheitenfeld entspricht exakt dem Aggregations-Picker daneben. */
   .tbl-row-top input.tbl-formula-input-inline{flex:none;width:260px;min-width:0;max-width:none;}
-  .tbl-row-top input.tbl-formula-unit-inline{flex:none;width:90px;min-width:0;max-width:none;}
+  .tbl-row-top input.tbl-formula-unit-inline{flex:none;width:76px;min-width:0;max-width:none;}
 
   /* Gruppen-Picker: Button + Popover, dasselbe Positionierungsmuster wie das
      Kalender-Widget (cal-wrap/calendar-popover) — position:relative am
@@ -204,18 +232,78 @@
      .tbl-label-col-Klasse statt :first-child, für den Fall, dass hier
      künftig doch einmal wieder eine Spalte davorstehen sollte. */
   .tbl-preview{overflow-x:auto;}
+  /* "Header fixieren" (style.sticky_header) braucht einen ECHTEN vertikal
+     scrollenden Container, gegen den th{position:sticky;top:0} überhaupt
+     etwas hat — ohne Höhenbegrenzung wächst .tbl-wrap immer exakt auf die
+     Höhe seines Inhalts (nichts läuft je über), wodurch "sticky" nie etwas
+     zu tun bekommt (dasselbe Prinzip wie .dtile-table-preview auf der
+     Dashboard-Kachel, die genau deshalb schon eine feste Höhe + overflow:auto
+     hat). Nur bei aktivem sticky_header gesetzt, damit eine normale Tabelle
+     weiterhin ihre volle Höhe zeigt statt unnötig einen inneren Scrollbalken
+     zu bekommen. */
+  .tbl-preview.tbl-preview-scroll{max-height:70vh;overflow-y:auto;}
   .tbl-preview td,.tbl-preview th{white-space:nowrap;}
   .tbl-preview th:not(.tbl-label-col){text-align:right;}
+  /* Standard bleibt rechtsbündig ohne Zusatzklasse (siehe
+     TableCompute.styleClasses) — höhere Spezifität (table.dt.<Klasse> statt
+     nur .tbl-preview <Klasse>) garantiert Vorrang unabhängig von der
+     Reihenfolge im Stylesheet. */
+  table.dt.tbl-style-header-align-left th:not(.tbl-label-col){text-align:left;}
+  table.dt.tbl-style-header-align-center th:not(.tbl-label-col){text-align:center;}
+  /* Ziehgriff am rechten Spaltenrand, nur im Bearbeiten-Modus (x-show
+     ="editing" im Markup) — braucht einen positionierten Vorfahren, th ist
+     das entweder schon über .tbl-label-col (sticky) oder bekommt es hier
+     explizit für die übrigen Kopfzellen. */
+  .tbl-preview th{position:relative;}
+  .tbl-col-resize-handle{
+    position:absolute;top:0;right:-4px;bottom:0;width:8px;cursor:col-resize;
+    z-index:4;user-select:none;
+  }
+  .tbl-col-resize-handle:hover{background:color-mix(in srgb, var(--accent-line) 55%, transparent);}
   .tbl-preview td.tbl-num{text-align:right;font-variant-numeric:tabular-nums;}
+  table.dt.tbl-style-value-align-left td.tbl-num{text-align:left;}
+  table.dt.tbl-style-value-align-left td.tbl-num .tbl-cell{justify-content:flex-start;}
+  table.dt.tbl-style-value-align-center td.tbl-num{text-align:center;}
+  table.dt.tbl-style-value-align-center td.tbl-num .tbl-cell{justify-content:center;}
+  /* "Spalten gleichmäßig" — table-layout:fixed richtet sich nach den
+     Zellbreiten der ERSTEN Zeile (Kopfzeile): Zellen MIT expliziter Breite
+     (die Beschriftungsspalte über labelColStyle(), sobald style.
+     label_col_width gesetzt ist) behalten genau diese Breite, alle übrigen
+     Kopfzellen ohne eigene Breite teilen sich den Rest zu GLEICHEN Teilen —
+     genau das gewünschte "nur Werte-Spalten"-Verhalten, ganz ohne
+     <colgroup>. Ein reines width:1%-Trick (frühere Version dieser Regel)
+     erreicht das NICHT zuverlässig, sobald sich Zahlenlängen zwischen den
+     Spalten stark unterscheiden (Tages- vs. Jahressumme) — die schmalste
+     Spalte bleibt dann trotzdem an ihren Mindest-Inhalt gebunden. Damit die
+     Beschriftungsspalte nicht plötzlich MIT gleich verteilt wird, sobald sie
+     noch keine eigene Breite hat, setzt toggleEqualValueCols() beim
+     Aktivieren einmalig eine gemessene Breite als label_col_width. */
+  /* width:100% ist hier notwendig, nicht nur kosmetisch: table-layout:fixed
+     verteilt freien Raum nur, wenn die Tabelle selbst über ihre reine
+     Inhaltsbreite hinaus wächst — ohne width:100% bliebe sie bei width:auto
+     genau so breit wie die Summe der Mindestbreiten, "gleichmäßig verteilt"
+     hätte dann nichts zu verteilen. */
+  table.dt.tbl-style-equal-cols{table-layout:fixed;width:100%;}
+  .tbl-cell{display:inline-flex;justify-content:flex-end;align-items:baseline;gap:.3em;white-space:nowrap;}
+  .tbl-cell-number{white-space:nowrap;}
+  .tbl-cell-deviation{display:block;margin-top:1px;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));font-weight:400;line-height:1.1;}
   .tbl-preview tr.tbl-bold td{font-weight:700;color:var(--ink);}
   .tbl-preview td.tbl-error{color:var(--danger);}
-  .tbl-preview td.tbl-label-col,.tbl-preview th.tbl-label-col{
-    position:sticky;left:0;background:var(--surface);z-index:1;
-  }
+  .tbl-preview td.tbl-label-col,.tbl-preview th.tbl-label-col{background:var(--surface);}
+  .tbl-preview td.tbl-label-col a{color:inherit;text-decoration:none;}
+  .tbl-preview td.tbl-label-col a:hover{color:var(--accent-line);text-decoration:underline;}
+  .tbl-group-header{text-align:center;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);border-bottom:1px solid var(--border);}
   table.dt.compact tr.tbl-separator-row td{
-    padding:10px 12px;border:0;background:transparent !important;box-shadow:none !important;
+    padding:4px 8px;border:0;background:transparent !important;box-shadow:none !important;
   }
-  .tbl-separator-line{display:block;width:100%;height:2px;border-radius:999px;background:var(--border-strong, var(--border));}
+  .tbl-separator-content{display:flex;align-items:center;gap:9px;width:100%;}
+  .tbl-separator-line{display:block;flex:1;height:1px;background:var(--border);}
+  .tbl-separator-label{color:var(--ink-muted);font-size:calc(11px * var(--font-scale, 1));font-weight:650;letter-spacing:.035em;text-transform:uppercase;white-space:nowrap;}
+  /* "Fett" (row.bold) wirkt bei Trennlinie auf den Abschnittsname-Text —
+     der ist als <span> in der Zelle verschachtelt und hat bereits ein
+     eigenes font-weight (650), das die vererbte Zellen-Regel oben
+     (tr.tbl-bold td) sonst nicht überschreiben würde. */
+  tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:800;color:var(--ink);}
 
   /* Buchstaben-Kürzel (A/B/C, dasselbe Rund-Badge wie .tbl-row-letter bei den
      Zeilen-Kärtchen oben) — bewusst AUSSERHALB von .tbl-wrap (eigenes
@@ -233,6 +321,15 @@
      (:style in der Vorlage) — kein Nachbauen von Padding/Rahmen/Schriftgröße
      nötig, funktioniert dadurch unter jeder Dichte-/Rahmen-/Zebra-Kombination
      und jeder Schriftgrößen-Skalierung gleichermaßen exakt. */
+  /* Eigene Karte statt frei auf der Seite schwebend — dieselbe Optik wie
+     .settings-section anderswo in der App (Fläche/Rahmen/Ecken/Schatten),
+     damit das eigentliche ERGEBNIS (die Tabelle) sich sichtbar von der
+     Bearbeitung darüber (Spalten/Zeilen/Darstellung, dort nur Listen ohne
+     eigene Fläche) absetzt. */
+  .tbl-preview-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;box-shadow:var(--shadow);
+  }
   .tbl-preview-row{display:flex;align-items:flex-start;gap:14px;}
   .tbl-letters-gutter{position:relative;flex:none;width:26px;}
   .tbl-letter-slot{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;}
@@ -245,16 +342,43 @@
   /* Darstellungs-Optionen (Konzept-Erweiterung "professionelles UI-Design")
      — dieselben Klassennamen wie auf der Dashboard-Kachel (entities.html),
      damit eine angeheftete Tabelle dort identisch aussieht. */
-  .tbl-style-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
-  /* Rahmen/Zeilenabstand sind eine feste Auswahl (nicht An/Aus wie die Chips
-     darüber) und bekommen deshalb eine eigene Zeile mit Beschriftung —
-     dasselbe .field-Muster wie Quelle/Status im Reports-Filter
-     (_reports_panel.html), statt unbeschriftet zwischen den Chips zu
-     schweben. */
-  .tbl-style-selects{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;}
-  .tbl-style-selects .field{margin:0;}
-  .tbl-style-zebra tr:nth-child(even) td{background:var(--surface-alt);}
-  .tbl-style-zebra.tbl-style-header-accent tr:nth-child(even) td{background:var(--surface-alt);}
+  /* Vier thematisch sortierte Spalten statt einer einzigen, frei umbrechenden
+     Chip-Wolke — bei vielen Optionen (12 Chips + 2 Rahmen/Zeilenabstand-
+     Picker) blies das unbeschriftet über 3 Zeilen auf und nahm zwischen
+     "Zeilen (Größen)" und der Vorschau spürbar Platz weg. Rahmen/
+     Zeilenabstand bekommen dieselbe Chip-Optik wie die An/Aus-Optionen
+     (volle Spaltenbreite statt eigener .field-Beschriftung) — die Spalten-
+     überschrift "Rahmen / Zeilenabstand" macht eine zusätzliche Beschriftung
+     pro Feld überflüssig, der aktuelle Wert steht ohnehin im Button-Text
+     ("Horizontal ▾"/"Kompakt ▾"). */
+  .tbl-style-groups{display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:18px;margin-bottom:16px;}
+  .tbl-style-group-label{
+    font-family:var(--font-mono);font-size:calc(9px * var(--font-scale, 1));font-weight:600;
+    text-transform:uppercase;letter-spacing:.04em;color:var(--ink-faint);margin:0;
+  }
+  .tbl-style-group-chips{display:flex;flex-direction:column;gap:6px;align-items:stretch;}
+  /* Kleiner als das globale .chip (13px/7px 13px) — dieselbe Verkleinerung
+     wie schon bei den typspezifischen Zeilen-Chips (.tbl-row-chip), hier nur
+     über den Container statt einer eigenen Klasse je Button, weil ALLE Chips
+     in diesem Bereich dieselbe Größe brauchen. */
+  .tbl-style-group-chips .chip{
+    font-size:calc(11.5px * var(--font-scale, 1));padding:4px 10px;text-align:left;white-space:normal;
+  }
+  .tbl-style-group-chips .dd-picker-wrap{width:100%;}
+  .tbl-style-group-chips .dd-picker-wrap > button{
+    width:100%;text-align:left;font-size:calc(11.5px * var(--font-scale, 1));padding:4px 10px;
+    border-radius:999px;
+  }
+  @media (max-width:820px){
+    .tbl-style-groups{grid-template-columns:repeat(2, minmax(0, 1fr));}
+  }
+  @media (max-width:480px){
+    .tbl-style-groups{grid-template-columns:1fr;}
+  }
+  /* Die Klasse wird nur jeder zweiten echten Datenzeile zugewiesen. Optische
+     Trennzeilen verschieben den Zebra-Rhythmus dadurch nicht mehr. */
+  .tbl-style-zebra tr.tbl-zebra-alt td{background:var(--surface-alt);}
+  .tbl-style-zebra.tbl-style-header-accent tr.tbl-zebra-alt td{background:var(--surface-alt);}
   .tbl-style-border-grid td,.tbl-style-border-grid th{border:1px solid var(--border);}
   /* table.dt.compact (die Tabelle trägt "dt compact" immer als Basis-Klasse,
      siehe unten) definiert in app.css bereits border-bottom/padding mit
@@ -268,8 +392,19 @@
      also spürbar UNTER dieses Grundmaß gehen, sonst unterscheidet sich die
      Option optisch kaum von "Komfortabel" (genau das war die Rückmeldung). */
   table.dt.compact.tbl-style-compact td,table.dt.compact.tbl-style-compact th{padding:0 8px;}
-  table.dt.compact.tbl-style-compact tr.tbl-separator-row td{padding:4px 8px;}
-  .tbl-style-header-accent tr:first-child th{background:var(--accent-line);color:var(--accent-contrast);}
+  table.dt.compact.tbl-style-compact tr.tbl-separator-row td{padding:2px 8px;}
+  /* tr.tbl-header-row statt tr:first-child — bei mehrstufigen Spaltenköpfen
+     (col.group_label) steht davor eine zusätzliche, nur bedingt sichtbare
+     Kopfzeile (siehe .tbl-group-header-Zeile oben im Markup); tr:first-child
+     hätte dann IMMER nur diese erste Zeile getroffen (auch wenn sie
+     unsichtbar ist) und die eigentliche Zeitraum-Kopfzeile darunter nie.
+     Die Klasse sitzt auf beiden Kopfzeilen, dadurch werden bei aktiven
+     Gruppen automatisch beide hervorgehoben, sonst nur die eine sichtbare. */
+  .tbl-style-header-accent tr.tbl-header-row th{background:var(--accent-line);color:var(--accent-contrast);}
+  /* Gruppen-Kopfzeile (col.group_label) einen Tick dunkler als die
+     Zeitraum-Kopfzeile darunter — sonst verschmelzen beide bei aktivem
+     "Kopfzeile hervorheben" zu einer ununterscheidbaren Fläche. */
+  .tbl-style-header-accent tr.tbl-group-header-row th{background:color-mix(in srgb, var(--accent-line) 80%, black);}
   /* Dezent statt vollflächig satt: sanft eingefärbte Fläche (color-mix aus
      Akzentfarbe + Oberfläche, funktioniert automatisch hell/dunkel, da
      beide Zutaten Theme-Variablen sind) — liest sich als "markierte Spalte",
@@ -288,10 +423,70 @@
      statt einer durchgängig gleichen Fläche — dieselbe tr:nth-child(even)-
      Zuordnung wie die normale Zebra-Regel oben, nur als etwas kräftigerer
      Farbton derselben Mischung statt eines optisch unverwandten Grautons. */
-  .tbl-style-first-col-accent.tbl-style-zebra tr:nth-child(even) td.tbl-label-col{
+  .tbl-style-first-col-accent.tbl-style-zebra tr.tbl-zebra-alt td.tbl-label-col{
     background:color-mix(in srgb, var(--accent-line) 24%, var(--surface)) !important;
   }
   .tbl-style-first-col-bold td.tbl-label-col{font-weight:700;}
+  /* War früher ein globaler style.formula_row_accent-Schalter (eine Klasse
+     auf der ganzen Tabelle), jetzt pro Zeile über row.accent — die Klasse
+     sitzt deshalb direkt auf der betroffenen <tr> statt auf der Tabelle. */
+  tr.tbl-formula-row.tbl-row-accent td{background:color-mix(in srgb, var(--accent-line) 7%, var(--surface)) !important;border-top:2px solid color-mix(in srgb, var(--accent-line) 35%, var(--border));}
+  /* max-width + Ellipsis NUR bei aktivem sticky_first_col: ohne Deckel wird
+     die fixierte Spalte so breit wie die längste Beschriftung in der ganzen
+     Tabelle (Standard-Tabellenlayout) — beim Scrollen "verschluckt" eine so
+     breite fixierte Spalte dann sichtbar einen Teil der direkt folgenden
+     Spalte (deren Kopf/Werte laufen unter die fixierte Spalte, sobald man
+     weiter scrollt, als die eigentliche Spaltenbreite hergibt). Ohne
+     Fixierung bleibt die volle Breite wie bisher, da dort kein Scroll-
+     Überlapp entsteht. */
+  .tbl-style-sticky-first-col th.tbl-label-col,.tbl-style-sticky-first-col td.tbl-label-col{
+    position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--border);
+  }
+  .tbl-style-sticky-first-col th.tbl-label-col{z-index:3;}
+  /* Analog zu "Erste Spalte fixieren" oben, nur für die Kopfzeile (vertikal
+     statt horizontal) — wirkt nur, wo die Tabelle selbst vertikal scrollt
+     (z. B. .dtile-table-preview auf der Dashboard-Kachel); in der vollen
+     Editor-Ansicht scrollt stattdessen die ganze Seite, dort bleibt die
+     Regel wirkungslos. th statt tr:first-child th, da in dieser Tabelle
+     ausschließlich die Kopfzeile th-Zellen enthält (alle anderen Zeilen
+     nutzen td) — .tbl-style-sticky-first-col th.tbl-label-col (2 Klassen)
+     bleibt dadurch weiterhin spezifischer für die Eck-Zelle und gewinnt
+     dort beim z-index, wenn beide Optionen gleichzeitig aktiv sind. */
+  /* Sticky auf dem GANZEN thead (nicht auf einzelnen th), seit es zwei
+     Kopfzeilen geben kann (Gruppen- + Zeitraum-Zeile, siehe .tbl-group-
+     header-row): mit position:sticky auf jeder th einzeln konkurrierten
+     beide Zeilen um dieselbe top:0-Position und überlappten sich beim
+     Scrollen, statt dass die zweite unter der ersten stehen bleibt. Ein
+     sticky thead hält seine Zeilen dagegen in ihrer normalen Reihenfolge
+     zusammen und fixiert sie als EINE Einheit. */
+  /* NICHT position:sticky auf thead/tr (Safari/WebKit unterstützt sticky
+     dort nicht zuverlässig — bleibt dann komplett unwirksam, auch für die
+     Eck-Zelle links oben, siehe Rückmeldung "Header bleibt bei erster Spalte
+     nicht stehen"), sondern auf jeder th einzeln — das ist die einzige
+     Variante, die in allen Browsern funktioniert. Bei zwei Kopfzeilen
+     (Gruppen- + Zeitraum-Zeile) braucht die zweite Zeile dafür ein top
+     GRÖSSER als 0 (Höhe der ersten Zeile), sonst überlappen sich beide beim
+     Scrollen (siehe frühere Version dieser Regel) — die Höhe variiert mit
+     Dichte/Schriftgröße und wird deshalb per JS gemessen und über die
+     Custom Property --tbl-group-header-h gesetzt (syncLetterPositions()). */
+  .tbl-style-sticky-header tr.tbl-header-row th{position:sticky;top:0;z-index:2;background:var(--surface);box-shadow:0 1px 0 var(--border);}
+  .tbl-style-sticky-header tr.tbl-header-row:not(.tbl-group-header-row) th{top:var(--tbl-group-header-h,0px);}
+  /* "Header hervorheben" + "Header fixieren" zusammen: dieselbe Spezifität
+     wie die beiden Regeln oben (.tbl-style-header-accent tr.tbl-header-row
+     th bzw. .tbl-style-sticky-header tr.tbl-header-row th, je 2 Klassen + 1
+     Typ) — ohne diese explizite Kombination gewinnt rein die spätere Regel
+     im Stylesheet (hier: die weiße Sticky-Hintergrundfarbe), die Akzentfarbe
+     verschwindet dann komplett und der (weiß bleibende) Text darauf wird
+     unlesbar. */
+  .tbl-style-sticky-header.tbl-style-header-accent tr.tbl-header-row th{background:var(--accent-line);}
+  .tbl-style-sticky-header.tbl-style-header-accent tr.tbl-group-header-row th{background:color-mix(in srgb, var(--accent-line) 80%, black);}
+  .tbl-style-comparison-columns:not(.tbl-style-header-accent) .tbl-comparison-col{color:var(--ink-muted);}
+  .tbl-style-comparison-columns.tbl-style-header-accent th.tbl-comparison-col{color:color-mix(in srgb, var(--accent-contrast) 72%, var(--accent-line));}
+  .tbl-style-align-units .tbl-cell-unit{display:inline-block;min-width:3.5em;text-align:left;color:var(--ink-muted);}
+  .tbl-style-small-units .tbl-cell-unit{font-size:.82em;color:var(--ink-muted);}
+  .tbl-style-align-numbers .tbl-cell-number{display:inline-grid;grid-template-columns:auto .45em 2.4em;align-items:baseline;text-align:right;}
+  .tbl-style-align-numbers .tbl-number-separator{text-align:center;}
+  .tbl-style-align-numbers .tbl-number-fraction{text-align:left;}
 </style>
 </head>
 <body>
@@ -303,9 +498,12 @@
     <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (tableId ? 'Tabelle bearbeiten' : 'Neue Tabelle') : (name || 'Neue Tabelle')"></h2>
-          {% if table_id %}
-          <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
-          {% endif %}
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="Aktuell berechnete Tabelle als CSV herunterladen" @click="exportCsv()">CSV</button>
+            {% if table_id %}
+            <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
+            {% endif %}
+          </div>
         </div>
         {% if table_id %}{% include "_dashboard_usage.html" %}{% endif %}
         <p class="sub" x-show="editing">Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum) — dieselbe Perioden-Logik wie bei Charts, nur tabellarisch statt grafisch. Zeigt beim Ansehen immer aktuelle Werte, kein eingefrorener Schnappschuss.</p>
@@ -316,14 +514,20 @@
             <p class="tbl-hint">Jede Spalte ist ein Zeitraum, frei benannt (z. B. "Heute", "Aug VJ", "2026") — Bezeichnung und tatsächliche Berechnung (Zeitraum-Typ/Versatz) sind getrennt. Ohne eigene Beschriftung wird der vorgeschlagene Name (grau) übernommen. Der Versatz steuert, welche Periode gemeint ist: 0 = aktuell, -1 = eine Periode zurück, -2 = zwei Perioden zurück usw. (nie positiv) — für "Vorjahresmonat" bei Zeitraum-Typ "Monat" z. B. -12, die Einheit wird direkt im Feld angezeigt. Per Ziehen oder über die Pfeile lassen sich die Spalten neu anordnen.</p>
             <div class="tbl-columns">
               <template x-for="(col, idx) in columns" :key="col.uid">
-                <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid">
+                <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid" :class="{'tbl-col-card-hidden': col.hidden}">
                   <div class="tbl-col-top">
-                    <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true"></span>
+                    <span class="drag-handle" data-tooltip="Ziehen zum Verschieben" aria-hidden="true"></span>
                     <span class="tbl-col-move">
-                      <button type="button" title="Spalte nach links" :disabled="idx === 0" @click="moveColumn(col.uid, -1)">←</button>
-                      <button type="button" title="Spalte nach rechts" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
+                      <button type="button" data-tooltip="Spalte nach links" :disabled="idx === 0" @click="moveColumn(col.uid, -1)">←</button>
+                      <button type="button" data-tooltip="Spalte nach rechts" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
                     </span>
-                    <button type="button" class="tbl-col-remove" title="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
+                    <button type="button" class="tbl-col-hide" :class="{active: col.hidden}"
+                            :data-tooltip="col.hidden ? 'Spalte einblenden' : 'Spalte ausblenden'" @click="col.hidden = !col.hidden">
+                      <svg x-show="!col.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <svg x-show="col.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    </button>
+                    <button type="button" class="tbl-duplicate-btn" data-tooltip="Spalte duplizieren" @click="duplicateColumn(col.uid)">⧉</button>
+                    <button type="button" class="tbl-col-remove" data-tooltip="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
                   </div>
                   <span class="tbl-field-label">Beschriftung</span>
                   <!-- position:fixed aus demselben Grund wie die beiden
@@ -333,7 +537,7 @@
                        .tbl-label-wrap oben im CSS. -->
                   <span class="tbl-label-wrap" x-data="{ open: false, top: 0, left: 0 }" @click.outside="open = false">
                     <input type="text" x-ref="input" :placeholder="suggestColumnLabel(col)" x-model="col.label">
-                    <button type="button" class="tbl-label-var-btn" title="Variable einfügen" aria-label="Variable einfügen"
+                    <button type="button" class="tbl-label-var-btn" data-tooltip="Variable einfügen" aria-label="Variable einfügen"
                             @click="open = !open; if (open) { const r = $el.getBoundingClientRect(); top = r.bottom + 6; left = r.left; }">{}</button>
                     <div class="dd-picker-popover dd-picker-popover-alpine tbl-var-popover" x-show="open" x-cloak
                          :style="`position:fixed;top:${top}px;left:${left}px;`">
@@ -345,6 +549,8 @@
                       </template>
                     </div>
                   </span>
+                  <span class="tbl-field-label">Gruppen-Beschriftung (optional)</span>
+                  <input type="text" placeholder="z. B. „2025“ — überspannt mehrere Spalten" maxlength="30" x-model="col.group_label">
                   <span class="tbl-field-label">Zeitraum-Typ</span>
                   <!-- x-data lokal statt col.xxx: .tbl-columns scrollt horizontal
                        (overflow-x:auto), was rechnerisch auch overflow-y:auto
@@ -370,6 +576,9 @@
                   <label class="cbx">
                     <input type="checkbox" x-model="col.year_over_year" @change="load()"> Vorjahresvergleich
                   </label>
+                  <label class="cbx" data-tooltip="Färbt die Zellen dieser Spalte nach ihrem Wert ein — z. B. welche Entität diesen Zeitraum am meisten verbraucht">
+                    <input type="checkbox" x-model="col.heatmap"> Farbskala
+                  </label>
                   <span class="tbl-field-label">Nachkommastellen</span>
                   <!-- position:fixed aus demselben Grund wie beim Zeitraum-Typ-
                        Picker oben (.tbl-columns scrollt horizontal, ein normal
@@ -388,7 +597,7 @@
                   </span>
                 </div>
               </template>
-              <button type="button" class="tbl-col-add" @click="addColumn()" title="Spalte hinzufügen">+</button>
+              <button type="button" class="tbl-col-add" @click="addColumn()" data-tooltip="Spalte hinzufügen">+</button>
             </div>
 
             <h3 class="tbl-h">Zeilen (Größen)</h3>
@@ -400,8 +609,8 @@
             </p>
             <div class="tbl-rows" id="tbl-rows">
               <template x-for="(row, idx) in rows" :key="row.uid">
-                <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid">
-                  <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true" style="margin-top:5px;"></span>
+                <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid" :class="{'tbl-row-card-hidden': row.hidden}">
+                  <span class="drag-handle" data-tooltip="Ziehen zum Verschieben" aria-hidden="true" style="margin-top:5px;"></span>
                   <div class="tbl-row-letter" x-text="row.row_type === 'separator' ? '—' : rowLetters[row.uid]"></div>
                   <div class="tbl-row-main">
                     <div class="tbl-row-top">
@@ -424,7 +633,7 @@
                                 @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
                                 x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
                         <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
-                                @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+                                @click.stop="clearSelection()" data-tooltip="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
                         <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="open" x-cloak>
                           <input type="search" x-ref="rowEntitySearch" x-model="search" placeholder="Suchen …">
                           <template x-for="opt in filtered()" :key="opt.entity_id">
@@ -463,7 +672,7 @@
 
                       <span class="dd-picker-wrap tbl-agg-picker" x-show="row.row_type === 'entity' || row.row_type === 'group'" @click.outside="row.aggPickerOpen = false">
                         <button type="button" class="btn" @click="row.aggPickerOpen = !row.aggPickerOpen"
-                                :title="AGG_TITLES[row.aggregation]" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
+                                :data-tooltip="AGG_TITLES[row.aggregation]" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
                         <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.aggPickerOpen" x-cloak>
                           <template x-for="[value, label] in AGG_OPTIONS" :key="value">
                             <div class="dd-picker-row" :class="{active: row.aggregation === value}"
@@ -472,21 +681,55 @@
                         </div>
                       </span>
 
+                      <span class="dd-picker-wrap tbl-agg-picker" x-show="row.row_type === 'summary'" @click.outside="row.aggPickerOpen = false">
+                        <button type="button" class="btn" @click="row.aggPickerOpen = !row.aggPickerOpen"
+                                data-tooltip="Summe oder Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
+                        <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.aggPickerOpen" x-cloak>
+                          <template x-for="[value, label] in SUMMARY_AGG_OPTIONS" :key="value">
+                            <div class="dd-picker-row" :class="{active: row.aggregation === value}"
+                                 @click="row.aggregation = value; row.aggPickerOpen = false; load()" x-text="label"></div>
+                          </template>
+                        </div>
+                      </span>
+
                       <input type="text" class="tbl-formula-input tbl-formula-input-inline" x-show="row.row_type === 'formula'"
                              placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
-                             :title="'Formel — verfügbar: ' + (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)')">
+                             :data-tooltip="'Formel — verfügbar: ' + (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)')">
                       <input type="text" class="tbl-formula-input tbl-formula-unit-inline" x-show="row.row_type === 'formula'"
-                             :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" title="Einheit">
+                             :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" data-tooltip="Einheit">
 
-                      <input type="text" x-show="row.row_type !== 'separator'" :placeholder="suggestRowLabel(row) || 'Beschriftung …'" x-model="row.label">
+                      <input type="text" :maxlength="MAX_ROW_LABEL_LENGTH"
+                             :placeholder="row.row_type === 'separator' ? 'Abschnittsname (optional) …' : (suggestRowLabel(row) || 'Beschriftung …')" x-model="row.label">
 
                       <div class="tbl-row-right">
-                        <label class="cbx" x-show="row.row_type !== 'separator'"><input type="checkbox" x-model="row.bold"> Fett</label>
+                        <!-- Ein Menü statt vieler einzelner Chips (Fett/Text/
+                             Hervorheben/% Anteil/Bei 0 ausblenden) — bei fast
+                             jedem Zeilentyp waren das zu viele Buttons auf
+                             einmal. Der Button selbst wird aktiv (Akzentfarbe),
+                             sobald MINDESTENS eine der enthaltenen Optionen an
+                             ist, damit man den aktiven Zustand nicht erst im
+                             Menü nachsehen muss. -->
+                        <span class="dd-picker-wrap" @click.outside="row.optsPickerOpen = false">
+                          <button type="button" class="chip tbl-row-chip" :class="{active: rowOptionsActive(row)}" @click="row.optsPickerOpen = !row.optsPickerOpen">Optionen ▾</button>
+                          <div class="dd-picker-popover dd-picker-popover-alpine tbl-row-opts-popover" x-show="row.optsPickerOpen" x-cloak>
+                            <label class="dd-picker-row"><input type="checkbox" x-model="row.bold"><span>Fett</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'separator'"><input type="checkbox" x-model="row.show_label"><span>Als Überschrift zeigen</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'formula'"><input type="checkbox" x-model="row.accent"><span>Hervorheben</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.percent_of_total"><span>% Anteil</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.hide_if_empty"><span>Bei 0 ausblenden</span></label>
+                          </div>
+                        </span>
                         <div class="tbl-row-move">
-                          <button type="button" title="Zeile nach oben" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
-                          <button type="button" title="Zeile nach unten" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
+                          <button type="button" data-tooltip="Zeile nach oben" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
+                          <button type="button" data-tooltip="Zeile nach unten" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
                         </div>
-                        <button type="button" class="tbl-row-remove" title="Zeile entfernen" @click="removeRow(row.uid)">×</button>
+                        <button type="button" class="tbl-row-hide" :class="{active: row.hidden}"
+                                :data-tooltip="row.hidden ? 'Zeile einblenden' : 'Zeile ausblenden'" @click="row.hidden = !row.hidden">
+                          <svg x-show="!row.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          <svg x-show="row.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                        <button type="button" class="tbl-duplicate-btn" data-tooltip="Zeile duplizieren" @click="duplicateRow(row.uid)">⧉</button>
+                        <button type="button" class="tbl-row-remove" data-tooltip="Zeile entfernen" @click="removeRow(row.uid)">×</button>
                       </div>
                     </div>
                   </div>
@@ -497,41 +740,82 @@
               <button type="button" class="btn" @click="addRow('entity')">+ Entität</button>
               <button type="button" class="btn" @click="addRow('group')">+ Gruppe</button>
               <button type="button" class="btn" @click="addRow('formula')">+ Formel</button>
+              <button type="button" class="btn" data-tooltip="Summe/Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie — aktualisiert sich automatisch, wenn darüber Zeilen hinzukommen oder wegfallen" @click="addRow('summary')">+ Summenzeile</button>
               <button type="button" class="btn" @click="addRow('separator')">+ Trennlinie</button>
             </div>
 
             <h3 class="tbl-h">Darstellung</h3>
             <p class="tbl-hint">Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).</p>
-            <div class="tbl-style-bar">
-              <button type="button" class="chip" :class="{active: style.zebra}" title="Abwechselnder Zeilenhintergrund, erleichtert das zeilenweise Lesen" @click="style.zebra = !style.zebra">Zebra-Streifen</button>
-              <button type="button" class="chip" :class="{active: style.header_accent}" title="Kopfzeile (Zeiträume) in der Akzentfarbe" @click="style.header_accent = !style.header_accent">Kopfzeile hervorheben</button>
-              <button type="button" class="chip" :class="{active: style.first_col_accent}" title="Erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt — berücksichtigt aktives Zebra-Muster" @click="style.first_col_accent = !style.first_col_accent">Erste Spalte hervorheben</button>
-              <button type="button" class="chip" :class="{active: style.first_col_bold}" title="Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung" @click="style.first_col_bold = !style.first_col_bold">Beschriftung fett</button>
-            </div>
-            <div class="tbl-style-selects">
-              <div class="field">
-                <label>Rahmen</label>
-                <span class="dd-picker-wrap" @click.outside="bordersPickerOpen = false">
-                  <button type="button" class="btn" @click="bordersPickerOpen = !bordersPickerOpen" x-text="BORDER_LABELS[style.borders] + ' ▾'"></button>
-                  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="bordersPickerOpen" x-cloak>
-                    <template x-for="[value, label] in BORDER_OPTIONS" :key="value">
-                      <div class="dd-picker-row" :class="{active: style.borders === value}"
-                           @click="style.borders = value; bordersPickerOpen = false" x-text="label"></div>
-                    </template>
-                  </div>
-                </span>
+            <div class="tbl-style-groups">
+              <div>
+                <p class="tbl-style-group-label">Hervorhebung</p>
+                <div class="tbl-style-group-chips">
+                  <button type="button" class="chip" :class="{active: style.zebra}" data-tooltip="Abwechselnder Zeilenhintergrund, erleichtert das zeilenweise Lesen" @click="style.zebra = !style.zebra">Zebra-Streifen</button>
+                  <button type="button" class="chip" :class="{active: style.first_col_accent}" data-tooltip="Erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt — berücksichtigt aktives Zebra-Muster" @click="style.first_col_accent = !style.first_col_accent">Erste Spalte hervorheben</button>
+                  <button type="button" class="chip" :class="{active: style.header_accent}" data-tooltip="Kopfzeile (Zeiträume) in der Akzentfarbe" @click="style.header_accent = !style.header_accent">Header hervorheben</button>
+                  <button type="button" class="chip" :class="{active: style.first_col_bold}" data-tooltip="Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung" @click="style.first_col_bold = !style.first_col_bold">Beschriftung fett</button>
+                </div>
               </div>
-              <div class="field">
-                <label>Zeilenabstand</label>
-                <span class="dd-picker-wrap" @click.outside="densityPickerOpen = false">
-                  <button type="button" class="btn" @click="densityPickerOpen = !densityPickerOpen" x-text="DENSITY_LABELS[style.density] + ' ▾'"></button>
-                  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="densityPickerOpen" x-cloak>
-                    <template x-for="[value, label] in DENSITY_OPTIONS" :key="value">
-                      <div class="dd-picker-row" :class="{active: style.density === value}"
-                           @click="style.density = value; densityPickerOpen = false" x-text="label"></div>
-                    </template>
-                  </div>
-                </span>
+              <div>
+                <p class="tbl-style-group-label">Vergleich</p>
+                <div class="tbl-style-group-chips">
+                  <button type="button" class="chip" :class="{active: style.comparison_columns}" data-tooltip="Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen" @click="style.comparison_columns = !style.comparison_columns">Vergleichsspalten absetzen</button>
+                  <button type="button" class="chip" :class="{active: style.show_deviation}" data-tooltip="Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte" @click="style.show_deviation = !style.show_deviation">Abweichung zum Vergleich</button>
+                </div>
+              </div>
+              <div>
+                <p class="tbl-style-group-label">Zahlen / Einheiten</p>
+                <div class="tbl-style-group-chips">
+                  <button type="button" class="chip" :class="{active: style.show_units}" data-tooltip="Einheiten wie kWh oder °C in Tabellenzellen ein- oder ausblenden" @click="style.show_units = !style.show_units">Einheiten anzeigen</button>
+                  <button type="button" class="chip" :class="{active: style.align_units}" data-tooltip="Einheiten innerhalb der Zahlenzellen in einer festen Spalte ausrichten" @click="style.align_units = !style.align_units">Einheiten ausrichten</button>
+                  <button type="button" class="chip" :class="{active: style.small_units}" data-tooltip="Einheiten kleiner und optisch zurückhaltender als den Zahlenwert darstellen" @click="style.small_units = !style.small_units">Einheiten kleiner</button>
+                  <button type="button" class="chip" :class="{active: style.align_numbers}" data-tooltip="Dezimaltrennzeichen und Nachkommastellen innerhalb jeder Spalte ausrichten" @click="style.align_numbers = !style.align_numbers">Dezimalstellen ausrichten</button>
+                  <button type="button" class="chip" :class="{active: style.explicit_missing}" data-tooltip="Fehlende Werte als „Keine Daten“ statt als Gedankenstrich anzeigen" @click="style.explicit_missing = !style.explicit_missing">Fehlende Werte ausschreiben</button>
+                </div>
+              </div>
+              <div>
+                <p class="tbl-style-group-label">Layout</p>
+                <div class="tbl-style-group-chips">
+                  <button type="button" class="chip" :class="{active: style.sticky_first_col}" data-tooltip="Beschriftungsspalte beim horizontalen Scrollen sichtbar halten" @click="style.sticky_first_col = !style.sticky_first_col">Erste Spalte fixieren</button>
+                  <button type="button" class="chip" :class="{active: style.sticky_header}" data-tooltip="Kopfzeile beim vertikalen Scrollen sichtbar halten — begrenzt die Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken" @click="style.sticky_header = !style.sticky_header">Header fixieren</button>
+                  <span class="dd-picker-wrap" @click.outside="bordersPickerOpen = false">
+                    <button type="button" class="btn" data-tooltip="Rahmen" @click="bordersPickerOpen = !bordersPickerOpen" x-text="'Rahmen: ' + BORDER_LABELS[style.borders] + ' ▾'"></button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="bordersPickerOpen" x-cloak>
+                      <template x-for="[value, label] in BORDER_OPTIONS" :key="value">
+                        <div class="dd-picker-row" :class="{active: style.borders === value}"
+                             @click="style.borders = value; bordersPickerOpen = false" x-text="label"></div>
+                      </template>
+                    </div>
+                  </span>
+                  <span class="dd-picker-wrap" @click.outside="densityPickerOpen = false">
+                    <button type="button" class="btn" data-tooltip="Zeilenabstand" @click="densityPickerOpen = !densityPickerOpen" x-text="'Dichte: ' + DENSITY_LABELS[style.density] + ' ▾'"></button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="densityPickerOpen" x-cloak>
+                      <template x-for="[value, label] in DENSITY_OPTIONS" :key="value">
+                        <div class="dd-picker-row" :class="{active: style.density === value}"
+                             @click="style.density = value; densityPickerOpen = false" x-text="label"></div>
+                      </template>
+                    </div>
+                  </span>
+                  <span class="dd-picker-wrap" @click.outside="headerAlignPickerOpen = false">
+                    <button type="button" class="btn" data-tooltip="Ausrichtung der Kopfzeile (Zeiträume)" @click="headerAlignPickerOpen = !headerAlignPickerOpen" x-text="'Header-Ausrichtung: ' + ALIGN_LABELS[style.header_align] + ' ▾'"></button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="headerAlignPickerOpen" x-cloak>
+                      <template x-for="[value, label] in ALIGN_OPTIONS" :key="value">
+                        <div class="dd-picker-row" :class="{active: style.header_align === value}"
+                             @click="style.header_align = value; headerAlignPickerOpen = false" x-text="label"></div>
+                      </template>
+                    </div>
+                  </span>
+                  <span class="dd-picker-wrap" @click.outside="valueAlignPickerOpen = false">
+                    <button type="button" class="btn" data-tooltip="Ausrichtung der Werte-Zellen" @click="valueAlignPickerOpen = !valueAlignPickerOpen" x-text="'Werte-Ausrichtung: ' + ALIGN_LABELS[style.value_align] + ' ▾'"></button>
+                    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="valueAlignPickerOpen" x-cloak>
+                      <template x-for="[value, label] in ALIGN_OPTIONS" :key="value">
+                        <div class="dd-picker-row" :class="{active: style.value_align === value}"
+                             @click="style.value_align = value; valueAlignPickerOpen = false" x-text="label"></div>
+                      </template>
+                    </div>
+                  </span>
+                  <button type="button" class="chip" :class="{active: style.equal_value_cols}" data-tooltip="Alle Werte-Spalten gleich breit (Beschriftungsspalte bleibt unverändert)" @click="toggleEqualValueCols()">Spalten gleichmäßig</button>
+                </div>
               </div>
             </div>
 
@@ -539,6 +823,7 @@
           </div>
         </template>
 
+        <div class="tbl-preview-card">
         <div class="tbl-preview-row">
           <!-- Nur beim Bearbeiten sichtbar, bewusst außerhalb von .tbl-wrap
                — siehe Kommentar bei .tbl-letters-gutter oben im CSS. Position
@@ -547,29 +832,69 @@
                syncLetterPositions()), nicht aus nachgebautem CSS. -->
           <div class="tbl-letters-gutter" x-cloak :style="`display:${editing ? 'block' : 'none'}; height:${gutterHeight}px`">
             <template x-for="(row, idx) in rows" :key="row.uid">
-              <div class="tbl-letter-slot" x-show="row.row_type !== 'separator'" :style="letterSlotStyle(row.uid)">
+              <div class="tbl-letter-slot" x-show="row.row_type !== 'separator' && rowVisible(row)" :style="letterSlotStyle(row.uid)">
                 <div class="tbl-row-letter" :class="{'tbl-row-letter-sm': style.density === 'compact'}" x-text="rowLetters[row.uid]"></div>
               </div>
             </template>
           </div>
-          <div class="tbl-wrap tbl-preview">
+          <div class="tbl-wrap tbl-preview" :class="{'tbl-preview-scroll': style.sticky_header}">
             <table class="dt compact" :class="TableCompute.styleClasses(style)" x-ref="previewTable">
-              <tr>
-                <th class="tbl-label-col">&nbsp;</th>
-                <template x-for="col in columns" :key="col.uid"><th x-text="renderedColumnLabel(col)"></th></template>
+              <!-- Nur für "Spalten gleichmäßig" (table-layout:fixed) relevant
+                   — <col>-Breiten sind bei fixed layout die einzige robuste,
+                   motorunabhängige Methode, NUR der Beschriftungsspalte eine
+                   Breite vorzugeben und den Rest zu gleichen Teilen
+                   aufzuteilen (Zellbreiten der "ersten Zeile" verhalten sich
+                   je nach Browser uneinheitlich, siehe Kommentar bei
+                   .tbl-style-equal-cols weiter oben). Bei normalem
+                   table-layout:auto bleibt eine <colgroup> ohne Wirkung,
+                   kann also immer gerendert werden. -->
+              <colgroup>
+                <col :style="style.label_col_width ? `width:${style.label_col_width}px` : ''">
+                <template x-for="col in columns.filter(c => !c.hidden)" :key="col.uid"><col></template>
+              </colgroup>
+              <thead>
+              <tr class="tbl-header-row tbl-group-header-row" x-show="hasColumnGroups()">
+                <th class="tbl-label-col" :style="labelColStyle()">&nbsp;</th>
+                <template x-for="(g, gi) in groupHeaderCells()" :key="gi">
+                  <th :colspan="g.span" class="tbl-group-header" x-text="g.label"></th>
+                </template>
               </tr>
+              <tr class="tbl-header-row">
+                <th class="tbl-label-col" :style="labelColStyle()">
+                  &nbsp;
+                  <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startLabelColResize($event)" @dblclick.stop.prevent="style.label_col_width = null" data-tooltip="Ziehen zum Verändern der Breite, Doppelklick für automatische Breite"></span>
+                </th>
+                <template x-for="col in columns" :key="col.uid">
+                  <th x-show="!col.hidden" :class="{'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col)">
+                    <span x-text="renderedColumnLabel(col)"></span>
+                    <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startColResize($event, col)" @dblclick.stop.prevent="col.width = null" data-tooltip="Ziehen zum Verändern der Breite, Doppelklick für automatische Breite"></span>
+                  </th>
+                </template>
+              </tr>
+              </thead>
+              <tbody>
               <template x-for="(row, idx) in rows" :key="row.uid">
-                <tr :data-row-uid="row.uid" :class="{'tbl-bold': row.bold && row.row_type !== 'separator', 'tbl-separator-row': row.row_type === 'separator'}">
-                  <td x-show="row.row_type !== 'separator'" class="tbl-label-col" x-text="resolvedRowLabel(row)"></td>
+                <tr x-show="rowVisible(row)" :data-row-uid="row.uid" :class="{'tbl-bold': row.bold, 'tbl-formula-row': row.row_type === 'formula', 'tbl-row-accent': row.row_type === 'formula' && row.accent, 'tbl-separator-row': row.row_type === 'separator', 'tbl-zebra-alt': isAlternateDataRow(row.uid)}">
+                  <td x-show="row.row_type !== 'separator'" class="tbl-label-col" :style="labelColStyle()">
+                    <a x-show="row.row_type === 'entity' && row.entity_ids.length === 1" :href="`${BASE}/entities/${encodeURIComponent(row.entity_ids[0] || '')}`" x-text="resolvedRowLabel(row)"></a>
+                    <span x-show="!(row.row_type === 'entity' && row.entity_ids.length === 1)" x-text="resolvedRowLabel(row)"></span>
+                  </td>
                   <template x-for="col in columns" :key="col.uid">
-                    <td x-show="row.row_type !== 'separator'" class="tbl-num" :class="{'tbl-error': cellError(row, col)}" x-text="cellText(row, col)"></td>
+                    <td x-show="row.row_type !== 'separator' && !col.hidden" class="tbl-num" :class="{'tbl-error': cellError(row, col), 'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col) + heatmapStyleFor(row, col)">
+                      <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="cellNumberParts(row, col).whole"></span><span class="tbl-number-separator" x-text="cellNumberParts(row, col).separator"></span><span class="tbl-number-fraction" x-text="cellNumberParts(row, col).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && cellUnit(row, col)" x-text="cellUnit(row, col)"></span></span>
+                      <span class="tbl-cell-deviation" x-show="style.show_deviation && !row.percent_of_total && deviationText(row, col)" :data-tooltip="deviationTitle(col)" x-text="deviationText(row, col)"></span>
+                    </td>
                   </template>
-                  <td x-show="row.row_type === 'separator'" :colspan="columns.length + 1"><span class="tbl-separator-line" aria-hidden="true"></span></td>
+                  <td x-show="row.row_type === 'separator'" :colspan="visibleColumnCount + 1">
+                    <span class="tbl-separator-content"><span class="tbl-separator-line" aria-hidden="true"></span><span class="tbl-separator-label" x-show="row.show_label && row.label.trim()" x-text="row.label.trim()"></span><span class="tbl-separator-line" x-show="row.show_label && row.label.trim()" aria-hidden="true"></span></span>
+                  </td>
                 </tr>
               </template>
-              <tr x-show="!rows.length || !columns.length"><td :colspan="columns.length + 1" style="text-align:center;color:var(--ink-faint);">Bitte mindestens eine Spalte und eine Zeile anlegen.</td></tr>
+              <tr x-show="!rows.length || !columns.length || !visibleColumnCount || !hasVisibleDataRow"><td :colspan="visibleColumnCount + 1" style="text-align:center;color:var(--ink-faint);">Bitte mindestens eine Spalte und eine Zeile anlegen.</td></tr>
+              </tbody>
             </table>
           </div>
+        </div>
         </div>
         <p class="tbl-hint" x-show="loading" style="margin-top:8px;">Lädt …</p>
 
@@ -595,7 +920,14 @@
     const INITIAL_COLUMNS = {{ columns | tojson }};
     const INITIAL_ROWS = {{ rows | tojson }};
     const INITIAL_STYLE = {{ style | tojson }};
-    const DEFAULT_STYLE = {zebra: false, borders: 'horizontal', density: 'comfortable', header_accent: false, first_col_accent: false, first_col_bold: false};
+    const DEFAULT_STYLE = {
+      zebra: false, borders: 'horizontal', density: 'comfortable', header_accent: false,
+      first_col_accent: false, first_col_bold: false,
+      sticky_first_col: false, sticky_header: false, comparison_columns: false,
+      show_deviation: false, explicit_missing: false, show_units: true, align_units: false,
+      small_units: false, align_numbers: false, label_col_width: null,
+      header_align: 'right', value_align: 'right', equal_value_cols: false,
+    };
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
     const ENTITY_LABEL_BY_ID = Object.fromEntries(ENTITY_OPTIONS.map(o => [o.entity_id, o.label]));
 
@@ -683,6 +1015,7 @@
       if (row.row_type === 'entity' && row.entity_ids.length === 1) {
         return ENTITY_LABEL_BY_ID[row.entity_ids[0]] || '';
       }
+      if (row.row_type === 'summary') return row.aggregation === 'avg' ? 'Durchschnitt' : 'Summe';
       return '';
     }
 
@@ -827,7 +1160,10 @@
     // IDs wie bei dd-picker.js würde bei mehreren gleichzeitig gerenderten
     // Zeilen kollidieren. row.typePickerOpen (analog zu row.pickerOpen beim
     // bestehenden Gruppen-Picker) hält den Zustand deshalb pro Zeile.
-    const ROW_TYPE_OPTIONS = [['entity', 'Entität'], ['group', 'Gruppe'], ['formula', 'Formel'], ['separator', 'Trennlinie']];
+    // Dieselbe Zahl wie main.py MAX_TABLE_ROW_LABEL_LENGTH (dort zusätzlich
+    // serverseitig durchgesetzt, ein Request kann das Feld-maxlength umgehen).
+    const MAX_ROW_LABEL_LENGTH = 30;
+    const ROW_TYPE_OPTIONS = [['entity', 'Entität'], ['group', 'Gruppe'], ['formula', 'Formel'], ['summary', 'Summenzeile'], ['separator', 'Trennlinie']];
     const ROW_TYPE_LABELS = Object.fromEntries(ROW_TYPE_OPTIONS);
     // Aggregation je Entität/Gruppen-Zeile — "auto" ist das bisherige,
     // implizite Verhalten (Zähler/Schalter -> Summe, sonst Durchschnitt),
@@ -835,6 +1171,10 @@
     // Button-Labels (siehe .tbl-agg-picker-Kommentar oben im CSS), volle
     // Bezeichnung im Popover UND als title-Tooltip auf dem Button.
     const AGG_OPTIONS = [['auto', 'Automatisch'], ['avg', 'Ø Durchschnitt'], ['min', 'Min'], ['max', 'Max'], ['sum', 'Σ Summe']];
+    // Summenzeile kennt nur Summe/Durchschnitt — "Automatisch"/"Min"/"Max"
+    // ergeben für eine Summenzeile keinen Sinn (die bezieht sich immer auf
+    // MEHRERE bereits aggregierte Zeilen, nicht auf einzelne Rohwerte).
+    const SUMMARY_AGG_OPTIONS = [['sum', 'Σ Summe'], ['avg', 'Ø Durchschnitt']];
     const AGG_SHORT_LABELS = {auto: 'Auto', avg: 'Ø', min: 'Min', max: 'Max', sum: 'Σ'};
     const AGG_TITLES = {
       auto: 'Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)',
@@ -844,6 +1184,8 @@
     const BORDER_LABELS = Object.fromEntries(BORDER_OPTIONS);
     const DENSITY_OPTIONS = [['comfortable', 'Komfortabel'], ['compact', 'Kompakt']];
     const DENSITY_LABELS = Object.fromEntries(DENSITY_OPTIONS);
+    const ALIGN_OPTIONS = [['left', 'Linksbündig'], ['center', 'Zentriert'], ['right', 'Rechtsbündig']];
+    const ALIGN_LABELS = Object.fromEntries(ALIGN_OPTIONS);
 
     function tableEditor() {
       return {
@@ -853,8 +1195,12 @@
         // ?edit=1 hierher, um direkt im Bearbeiten-Modus zu starten statt
         // erst über "Anpassen" umschalten zu müssen.
         editing: !TABLE_ID || new URLSearchParams(location.search).has('edit'),
-        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
-        rows: INITIAL_ROWS.map(r => ({formula_unit: '', aggregation: 'auto', ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, search: ''})),
+        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, hidden: false, group_label: '', heatmap: false, width: null, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
+        rows: INITIAL_ROWS.map(r => ({
+          formula_unit: '', aggregation: 'auto', hidden: false, show_label: false, accent: false,
+          percent_of_total: false, hide_if_empty: false,
+          ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
+        })),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
         windowStarts: {},  // col.uid -> tatsächlich aufgelöster Fensterbeginn (Sekunden) | null
@@ -864,9 +1210,14 @@
         _loadSeq: 0,
         bordersPickerOpen: false,
         densityPickerOpen: false,
+        headerAlignPickerOpen: false,
+        valueAlignPickerOpen: false,
         letterPositions: {},  // row.uid -> {top, height} in px, aus der echten Tabelle gemessen
         gutterHeight: 0,
 
+        // Buchstaben-Zuordnung bewusst über ALLE Zeilen (auch ausgeblendete)
+        // — sonst würde eine Formel, die auf eine versteckte Hilfszeile
+        // verweist, bei jedem Ausblenden ihre Referenz verlieren.
         get rowLetters() {
           const m = {};
           let dataIndex = 0;
@@ -876,8 +1227,174 @@
           return m;
         },
 
+        get visibleColumnCount() {
+          return this.columns.filter(c => !c.hidden).length;
+        },
+
+        // Der Menü-Button selbst wird aktiv, sobald irgendeine enthaltene
+        // Option an ist — sonst müsste man das Menü öffnen, um das zu sehen.
+        rowOptionsActive(row) {
+          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty);
+        },
+
+        // Manuelle Spaltenbreite (col.width/style.label_col_width, per
+        // Ziehgriff gesetzt) — leer/null heißt automatische Breite (Standard-
+        // Tabellenlayout, richtet sich nach dem Inhalt). Nur bei gesetzter
+        // Breite wird der Text abgeschnitten (Ellipsis) statt umzubrechen
+        // oder die Nachbarspalte zu verdrängen — ohne gesetzte Breite bleibt
+        // das bisherige Verhalten (voll, nichts abgeschnitten).
+        colWidthStyle(col) {
+          if (!col.width) return '';
+          return `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
+        },
+        labelColStyle() {
+          const w = this.style.label_col_width;
+          if (!w) return '';
+          return `width:${w}px;max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
+        },
+        // Ziehen am rechten Rand einer Spaltenkopfzelle — Doppelklick auf den
+        // Griff setzt col.width wieder auf null (automatische Breite) statt
+        // hier ein zweites Reset-Steuerelement zu brauchen.
+        startColResize(event, col) {
+          const th = event.currentTarget.closest('th');
+          const startX = event.clientX;
+          const startWidth = col.width || th.getBoundingClientRect().width;
+          const onMove = (e) => {
+            col.width = Math.max(40, Math.min(800, Math.round(startWidth + (e.clientX - startX))));
+          };
+          const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        },
+        startLabelColResize(event) {
+          const th = event.currentTarget.closest('th');
+          const startX = event.clientX;
+          const startWidth = this.style.label_col_width || th.getBoundingClientRect().width;
+          const onMove = (e) => {
+            this.style.label_col_width = Math.max(40, Math.min(800, Math.round(startWidth + (e.clientX - startX))));
+          };
+          const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        },
+        // "Spalten gleichmäßig" (style.equal_value_cols) braucht table-
+        // layout:fixed, das sich an den Zellbreiten der ersten Zeile
+        // orientiert — ohne eigene label_col_width würde die
+        // Beschriftungsspalte dann fälschlich MIT gleichmäßig aufgeteilt
+        // statt ihre bisherige (automatische) Breite zu behalten. Deshalb
+        // beim Einschalten einmalig die AKTUELLE, gerenderte Breite als
+        // label_col_width einfrieren — Doppelklick auf den Ziehgriff setzt
+        // sie bei Bedarf wieder auf automatisch zurück.
+        toggleEqualValueCols() {
+          if (!this.style.equal_value_cols && !this.style.label_col_width) {
+            // NICHT einfach "th.tbl-label-col" (erste Treffer wäre bei
+            // fehlenden Spaltengruppen die UNSICHTBARE Gruppen-Kopfzeile,
+            // x-show="hasColumnGroups()" lässt ihre Zelle mit Breite 0 im DOM
+            // stehen) — explizit die sichtbare Zeitraum-Kopfzeile.
+            const labelTh = this.$refs.previewTable?.querySelector('tr.tbl-header-row:not(.tbl-group-header-row) th.tbl-label-col');
+            if (labelTh) this.style.label_col_width = Math.round(labelTh.getBoundingClientRect().width);
+          }
+          this.style.equal_value_cols = !this.style.equal_value_cols;
+        },
+
+
+        // Mehrstufige Kopfzeile (col.group_label, z. B. "2025" über mehreren
+        // Monatsspalten) — nur sichtbare Spalten, aufeinanderfolgende Spalten
+        // mit demselben (nicht-leeren) group_label bekommen EINE gemeinsame,
+        // überspannende Zelle; eine leere group_label bleibt eine eigene
+        // 1-Spalten-Lücke, damit die zweite Kopfzeile darunter (Zeiträume)
+        // spaltengenau ausgerichtet bleibt.
+        groupHeaderCells() {
+          const visible = this.columns.filter(c => !c.hidden);
+          const cells = [];
+          let i = 0;
+          while (i < visible.length) {
+            const label = (visible[i].group_label || '').trim();
+            let span = 1;
+            while (label && i + span < visible.length && (visible[i + span].group_label || '').trim() === label) span++;
+            cells.push({label, span});
+            i += span;
+          }
+          return cells;
+        },
+        hasColumnGroups() {
+          return this.columns.some(c => !c.hidden && (c.group_label || '').trim());
+        },
+
+        // CSV-Export der aktuell berechneten (nicht der rohen) Tabelle —
+        // dieselben sichtbaren Spalten/Zeilen wie die Vorschau, inkl.
+        // Anteils-/Summenzeilen-Transformation und Dezimal-/Einheiten-
+        // Einstellungen. Semikolon statt Komma als Trennzeichen, da das
+        // deutsche Dezimaltrennzeichen (siehe NumberFormat) sonst mit dem
+        // CSV-Trennzeichen kollidieren würde — Excel (de) erkennt Semikolon-
+        // CSVs automatisch.
+        exportCsv() {
+          const cols = this.columns.filter(c => !c.hidden);
+          const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
+          const lines = [];
+          lines.push(['', ...cols.map(c => csvEscape(this.renderedColumnLabel(c)))].join(';'));
+          this.rows.forEach(row => {
+            if (row.row_type === 'separator' || !this.rowVisible(row)) return;
+            const cells = cols.map(col => {
+              const parts = this.cellNumberParts(row, col);
+              const unit = this.cellUnit(row, col);
+              const number = `${parts.whole}${parts.separator}${parts.fraction}`;
+              return csvEscape(unit ? `${number} ${unit}` : number);
+            });
+            lines.push([csvEscape(this.resolvedRowLabel(row)), ...cells].join(';'));
+          });
+          const blob = new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${(this.name || 'tabelle').trim() || 'tabelle'}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        },
+
+        get hasVisibleDataRow() {
+          return this.rows.some(r => r.row_type !== 'separator' && this.rowVisible(r));
+        },
+
+        // Zebra-Parität nur über inhaltliche, SICHTBARE Zeilen bestimmen:
+        // eine Trennlinie ist reine Gliederung und darf den Streifenwechsel
+        // nicht verschieben, eine ausgeblendete (manuell oder automatisch
+        // wegen hide_if_empty) Zeile wird gar nicht gerendert und darf ihn
+        // ebenfalls nicht verschieben.
+        isAlternateDataRow(rowUid) {
+          let dataIndex = 0;
+          for (const row of this.rows) {
+            if (row.row_type === 'separator' || !this.rowVisible(row)) continue;
+            if (row.uid === rowUid) return dataIndex % 2 === 1;
+            dataIndex += 1;
+          }
+          return false;
+        },
+
         addColumn() {
-          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false, decimals: 'auto'});
+          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false, decimals: 'auto', hidden: false, group_label: '', heatmap: false, width: null});
+        },
+        // Kopie mit neuer uid direkt nach dem Original — dieselbe Idee wie
+        // "Tabelle duplizieren" auf der Übersichtsseite, nur für eine
+        // einzelne Spalte/Zeile statt der ganzen Tabelle.
+        duplicateColumn(colUid) {
+          const index = this.columns.findIndex(c => c.uid === colUid);
+          if (index < 0) return;
+          this.columns.splice(index + 1, 0, {...this.columns[index], uid: uid()});
+        },
+        duplicateRow(rowUid) {
+          const index = this.rows.findIndex(r => r.uid === rowUid);
+          if (index < 0) return;
+          this.rows.splice(index + 1, 0, {...this.rows[index], uid: uid()});
+          this.load();
         },
         // Verschiebt eine Spalte um eine Position nach links (-1) oder rechts
         // (+1) — dieselbe Splice-Logik wie moveRow() unten, als Alternative
@@ -896,7 +1413,12 @@
           this.load();
         },
         addRow(type) {
-          this.rows.push({uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '', aggregation: 'auto', bold: false, pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, search: ''});
+          this.rows.push({
+            uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '',
+            aggregation: type === 'summary' ? 'sum' : 'auto', bold: false, hidden: false, show_label: false,
+            accent: false, percent_of_total: false, hide_if_empty: false,
+            pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
+          });
           this.load();
         },
         setRowType(row, type) {
@@ -908,6 +1430,12 @@
             row.formula = '';
             row.formula_unit = '';
             row.bold = false;
+          }
+          if (type === 'summary') {
+            row.entity_ids = [];
+            row.formula = '';
+            row.formula_unit = '';
+            if (row.aggregation !== 'sum' && row.aggregation !== 'avg') row.aggregation = 'sum';
           }
           this.load();
         },
@@ -985,18 +1513,126 @@
         // sonst der Vorschlag (friendly_name der Entität), sonst zuletzt
         // "(ohne Namen)". Eine Methode statt zweier getrennter Stellen, damit
         // Vorschau-Tabelle und save() garantiert denselben Namen verwenden.
+        // Sowohl die eigene Beschriftung (bei einer VOR MAX_ROW_LABEL_LENGTH
+        // gespeicherten Tabelle länger als das jetzige maxlength auf dem
+        // Feld) als auch der Vorschlag (1:1 der Entitäts-friendly_name, nie
+        // durch maxlength begrenzt) werden hier gekappt — sonst würde eine
+        // unangetastete alte Zeile beim nächsten Speichern an
+        // MAX_TABLE_ROW_LABEL_LENGTH (main.py) scheitern, obwohl der Nutzer
+        // an genau dieser Zeile nichts geändert hat.
         resolvedRowLabel(row) {
-          if (row.row_type === 'separator') return '';
-          return row.label.trim() || suggestRowLabel(row) || '(ohne Namen)';
+          const cap = s => s.length > MAX_ROW_LABEL_LENGTH ? s.slice(0, MAX_ROW_LABEL_LENGTH - 1) + '…' : s;
+          if (row.row_type === 'separator') return cap(row.label.trim());
+          const own = row.label.trim();
+          if (own) return cap(own);
+          const suggested = suggestRowLabel(row);
+          return suggested ? cap(suggested) : '(ohne Namen)';
         },
 
-        cellText(row, col) {
+        // Alle Entität-/Gruppen-Zellen DERSELBEN Spalte im selben Abschnitt
+        // (zwischen zwei Trennlinien) wie row — Grundlage für row.percent_of_total
+        // (TableCompute.percentOfTotalCell rechnet nur noch, sucht sich die
+        // Mitglieder aber nicht selbst, siehe Kommentar dort).
+        sectionMemberCells(row, col) {
+          const idx = this.rows.findIndex(r => r.uid === row.uid);
+          if (idx < 0) return [];
+          let start = 0;
+          for (let j = idx - 1; j >= 0; j--) { if (this.rows[j].row_type === 'separator') { start = j + 1; break; } }
+          let end = this.rows.length;
+          for (let j = idx + 1; j < this.rows.length; j++) { if (this.rows[j].row_type === 'separator') { end = j; break; } }
+          const cells = [];
+          for (let j = start; j < end; j++) {
+            const r = this.rows[j];
+            if (r.row_type !== 'entity' && r.row_type !== 'group') continue;
+            cells.push(this.values[col.uid] && this.values[col.uid][r.uid]);
+          }
+          return cells;
+        },
+        // Einziger Ort, an dem row.percent_of_total den rohen Zellwert durch
+        // den Anteilswert ersetzt — cellNumberParts/cellUnit lesen beide von
+        // hier, damit Zahl und Einheit (bzw. "%") nie auseinanderlaufen.
+        displayCell(row, col) {
           const cell = this.values[col.uid] && this.values[col.uid][row.uid];
-          return TableCompute.cellText(cell, col.decimals);
+          if (row.percent_of_total) return TableCompute.percentOfTotalCell(cell, this.sectionMemberCells(row, col));
+          return cell;
+        },
+        cellNumberParts(row, col) {
+          const cell = this.displayCell(row, col);
+          // Anteil bewusst immer mit fester 1 Nachkommastelle statt der
+          // spaltenweiten Einstellung — "23,4 %" ist unabhängig davon
+          // sinnvoll lesbar, wie die Spalte sonst gerundet wird.
+          return TableCompute.cellNumberParts(cell, row.percent_of_total ? '1' : col.decimals, this.style.explicit_missing);
+        },
+        cellUnit(row, col) {
+          return TableCompute.cellUnit(this.displayCell(row, col));
         },
         cellError(row, col) {
           const cell = this.values[col.uid] && this.values[col.uid][row.uid];
           return !!(cell && cell.error);
+        },
+        // Minimum/Maximum DERSELBEN Spalte über alle Entität-/Gruppen-Zeilen
+        // im selben Abschnitt (zwischen zwei Trennlinien) — bewusst
+        // spaltenweise statt zeilenweise: eine Zeile enthält hier oft sehr
+        // unterschiedliche Größenordnungen nebeneinander (Tag vs. Jahr
+        // desselben Werts), ein Vergleich über die eigene Zeile hinweg wäre
+        // daher irreführend ("Jahr" sticht immer heraus, nur weil es ein
+        // längerer Zeitraum ist). Sinnvoll ist stattdessen der Vergleich
+        // MEHRERER Zeilen INNERHALB derselben Spalte (z. B. welches Gerät
+        // verbraucht diesen Monat am meisten). Bewusst NUR Entität-/
+        // Gruppen-Zeilen (nicht Formel/Summenzeile): eine Summenzeile ist
+        // fast immer das Maximum ihres Abschnitts, rein weil sie andere
+        // Zeilen aufaddiert — würde sie mitzählen, würde sie die Skala
+        // verzerren UND selbst immer "heiß" erscheinen, ohne dass das
+        // etwas über tatsächliches Verbrauchsverhalten aussagt.
+        columnHeatmapRange(row, col) {
+          const idx = this.rows.findIndex(r => r.uid === row.uid);
+          if (idx < 0) return null;
+          let start = 0;
+          for (let j = idx - 1; j >= 0; j--) { if (this.rows[j].row_type === 'separator') { start = j + 1; break; } }
+          let end = this.rows.length;
+          for (let j = idx + 1; j < this.rows.length; j++) { if (this.rows[j].row_type === 'separator') { end = j; break; } }
+          const vals = [];
+          for (let j = start; j < end; j++) {
+            if (this.rows[j].row_type !== 'entity' && this.rows[j].row_type !== 'group') continue;
+            const cell = this.values[col.uid] && this.values[col.uid][this.rows[j].uid];
+            if (cell && !cell.error && cell.value != null) vals.push(cell.value);
+          }
+          if (!vals.length) return null;
+          return {min: Math.min(...vals), max: Math.max(...vals)};
+        },
+        heatmapStyleFor(row, col) {
+          if (!col.heatmap || (row.row_type !== 'entity' && row.row_type !== 'group')) return '';
+          const cell = this.values[col.uid] && this.values[col.uid][row.uid];
+          return TableCompute.heatmapStyle(cell, this.columnHeatmapRange(row, col));
+        },
+        // row.hide_if_empty: automatisch ausblenden, wenn in JEDER sichtbaren
+        // Spalte entweder kein Wert oder 0 steht (z. B. ein stillgelegtes
+        // Gerät) — zusätzlich zum manuellen row.hidden-Toggle, nicht anstelle
+        // davon (beide zusammen in rowVisible() unten geprüft).
+        rowIsEmpty(row) {
+          if (!row.hide_if_empty) return false;
+          return this.columns.filter(c => !c.hidden).every(c => {
+            const cell = this.values[c.uid] && this.values[c.uid][row.uid];
+            return !cell || cell.value == null || cell.value === 0;
+          });
+        },
+        rowVisible(row) {
+          return !row.hidden && !this.rowIsEmpty(row);
+        },
+        isComparisonColumn(col) { return TableCompute.isComparisonColumn(col); },
+        deviationText(row, col) {
+          const baseIndex = this.columns.findIndex(candidate => candidate.uid === col.uid);
+          const comparisonIndex = TableCompute.comparisonIndexForBase(this.columns, baseIndex);
+          if (comparisonIndex < 0) return '';
+          const baseCell = this.values[col.uid] && this.values[col.uid][row.uid];
+          const comparisonCol = this.columns[comparisonIndex];
+          const comparisonCell = this.values[comparisonCol.uid] && this.values[comparisonCol.uid][row.uid];
+          return TableCompute.deviationText(baseCell, comparisonCell);
+        },
+        deviationTitle(col) {
+          const baseIndex = this.columns.findIndex(candidate => candidate.uid === col.uid);
+          const comparisonIndex = TableCompute.comparisonIndexForBase(this.columns, baseIndex);
+          return comparisonIndex < 0 ? '' : `Gegenüber ${this.renderedColumnLabel(this.columns[comparisonIndex])}`;
         },
 
         // Rechenkern in static/js/table-compute.js (TableCompute.computeValues) —
@@ -1048,15 +1684,24 @@
             name: this.name.trim(),
             columns: this.columns.map(c => ({
               label: c.label.trim() || suggestColumnLabel(c), range_key: c.range_key, offset: c.offset || 0,
-              year_over_year: !!c.year_over_year, decimals: c.decimals || 'auto',
+              year_over_year: !!c.year_over_year, decimals: c.decimals || 'auto', hidden: !!c.hidden,
+              group_label: (c.group_label || '').trim(), heatmap: !!c.heatmap,
+              width: c.width || null,
             })),
             rows: this.rows.map(r => ({
               label: this.resolvedRowLabel(r), row_type: r.row_type,
-              entity_ids: r.row_type === 'separator' ? [] : r.entity_ids,
-              formula: r.row_type === 'separator' ? '' : r.formula,
+              entity_ids: (r.row_type === 'separator' || r.row_type === 'summary') ? [] : r.entity_ids,
+              formula: (r.row_type === 'separator' || r.row_type === 'summary') ? '' : r.formula,
               formula_unit: r.row_type === 'formula' ? (r.formula_unit || '').trim() : '',
-              aggregation: (r.row_type === 'entity' || r.row_type === 'group') ? (r.aggregation || 'auto') : 'auto',
-              bold: r.row_type === 'separator' ? false : !!r.bold,
+              aggregation: r.row_type === 'summary'
+                ? (r.aggregation === 'avg' ? 'avg' : 'sum')
+                : ((r.row_type === 'entity' || r.row_type === 'group') ? (r.aggregation || 'auto') : 'auto'),
+              bold: !!r.bold,
+              hidden: !!r.hidden,
+              show_label: r.row_type === 'separator' ? !!r.show_label : false,
+              accent: r.row_type === 'formula' ? !!r.accent : false,
+              percent_of_total: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.percent_of_total : false,
+              hide_if_empty: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.hide_if_empty : false,
             })),
             style: this.style,
           };
@@ -1112,11 +1757,22 @@
           const tableRect = table.getBoundingClientRect();
           const positions = {};
           table.querySelectorAll('tr[data-row-uid]').forEach(tr => {
+            // Ausgeblendete Zeilen (x-show="!row.hidden") stehen weiter im
+            // DOM (display:none), liefern aber ein Nullrechteck — ohne
+            // diesen Filter würde ihr Badge fälschlich oben an der Tabelle
+            // "kleben" statt (über letterSlotStyle()) unsichtbar zu bleiben.
+            if (tr.offsetParent === null) return;
             const r = tr.getBoundingClientRect();
             positions[tr.dataset.rowUid] = {top: r.top - tableRect.top, height: r.height};
           });
           this.letterPositions = positions;
           this.gutterHeight = tableRect.height;
+          // Höhe der Gruppen-Kopfzeile für die zweite (Zeitraum-)Kopfzeile
+          // bei "Header fixieren" — siehe Kommentar bei
+          // .tbl-style-sticky-header tr.tbl-header-row th oben.
+          const groupRow = table.querySelector('tr.tbl-group-header-row');
+          const groupH = (groupRow && groupRow.offsetParent !== null) ? groupRow.getBoundingClientRect().height : 0;
+          table.style.setProperty('--tbl-group-header-h', groupH + 'px');
         },
 
         init() {

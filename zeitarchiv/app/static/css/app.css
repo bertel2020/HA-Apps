@@ -556,6 +556,10 @@ td.mono{font-family:var(--font-mono);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
 [data-tooltip]{cursor:help;position:relative;}
+/* Ein Button bleibt klickbar (Zeigefinger), auch wenn er zusätzlich einen
+   Tooltip trägt — sonst würde die generische cursor:help-Regel oben einen
+   eindeutig interaktiven Button fälschlich als "nur informativ" ausweisen. */
+button[data-tooltip]{cursor:pointer;}
 [data-tooltip]::after{
   content:attr(data-tooltip);position:absolute;left:0;bottom:calc(100% + 6px);
   background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;

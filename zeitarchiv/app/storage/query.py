@@ -96,7 +96,8 @@ def _shift_year(dt: datetime, years: int) -> datetime:
 
 
 def _window(
-    range_key: str, now_local: datetime, offset: int = 0, continuous: bool = False
+    range_key: str, now_local: datetime, offset: int = 0, continuous: bool = False,
+    elapsed: timedelta | None = None,
 ) -> tuple[datetime, datetime, datetime]:
     """Berechnet [Anfang, Ende) für einen Zeitraum, sowie das ungekappte
     natürliche Periodenende (drittes Rückgabeelement).
@@ -119,9 +120,21 @@ def _window(
     (z. B. Woche bis Sonntag), nicht nur bis "jetzt". Bei continuous ist es
     identisch zum gedeckelten Ende, da ein rollierendes Fenster keine
     Kalendergrenze hat, die es überschreiten könnte.
-    """
+
+    elapsed: für den "Gleicher Zeitpunkt"-Vergleich einer Vergleichstabelle
+    (Konzept-Erweiterung) — eine bereits VERGANGENE Periode (offset<0) wird
+    normalerweise bis zu ihrem eigenen natürlichen Ende gefüllt (sie liegt ja
+    schon ganz in der Vergangenheit, "jetzt" deckelt sie nicht). elapsed
+    deckelt sie stattdessen auf denselben Abstand vom Periodenanfang wie die
+    laufende Periode gerade hat (z. B. "gestern bis 14 Uhr" statt "gestern
+    ganz"), damit ein Vergleich mit der noch laufenden aktuellen Periode fair
+    bleibt. None = bisheriges Verhalten (Deckel bei "jetzt")."""
     offset = min(offset, 0)
     midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def _cap(start: datetime, natural_end: datetime) -> datetime:
+        limit = start + elapsed if elapsed is not None else now_local
+        return min(natural_end, limit)
 
     if range_key == "hour":
         if continuous:
@@ -129,7 +142,7 @@ def _window(
             return anchor - timedelta(hours=1), anchor, anchor
         hour_start = now_local.replace(minute=0, second=0, microsecond=0) + timedelta(hours=offset)
         natural_end = hour_start + timedelta(hours=1)
-        return hour_start, min(natural_end, now_local), natural_end
+        return hour_start, _cap(hour_start, natural_end), natural_end
 
     if range_key == "day":
         if continuous:
@@ -137,7 +150,7 @@ def _window(
             return anchor - timedelta(days=1), anchor, anchor
         start = midnight + timedelta(days=offset)
         natural_end = start + timedelta(days=1)
-        return start, min(natural_end, now_local), natural_end
+        return start, _cap(start, natural_end), natural_end
 
     if range_key == "week":
         if continuous:
@@ -146,7 +159,7 @@ def _window(
         # Kalenderwoche Montag–Sonntag (ISO), nicht die rollierenden letzten 7 Tage.
         week_start = midnight - timedelta(days=midnight.weekday()) + timedelta(days=7 * offset)
         natural_end = week_start + timedelta(days=7)
-        return week_start, min(natural_end, now_local), natural_end
+        return week_start, _cap(week_start, natural_end), natural_end
 
     if range_key == "month":
         if continuous:
@@ -161,7 +174,7 @@ def _window(
         start = midnight.replace(year=year, month=month, day=1)
         end_year, end_month = (year + 1, 1) if month == 12 else (year, month + 1)
         natural_end = start.replace(year=end_year, month=end_month)
-        return start, min(natural_end, now_local), natural_end
+        return start, _cap(start, natural_end), natural_end
 
     if range_key == "year":
         if continuous:
@@ -170,7 +183,7 @@ def _window(
         year = now_local.year + offset
         start = midnight.replace(year=year, month=1, day=1)
         natural_end = start.replace(year=year + 1)
-        return start, min(natural_end, now_local), natural_end
+        return start, _cap(start, natural_end), natural_end
 
     if range_key == "decade":
         if continuous:
@@ -179,7 +192,7 @@ def _window(
         decade_start_year = (now_local.year // 10) * 10 + 10 * offset
         start = midnight.replace(year=decade_start_year, month=1, day=1)
         natural_end = start.replace(year=decade_start_year + 10)
-        return start, min(natural_end, now_local), natural_end
+        return start, _cap(start, natural_end), natural_end
 
     raise ValueError(f"Unbekannter Zeitraum: {range_key}")
 
@@ -578,6 +591,7 @@ def query_series(
     year_over_year: bool = False,
     chart_type: str | None = None,
     read_cache: QueryReadCache | None = None,
+    same_elapsed: bool = False,
 ) -> dict:
     if range_key not in RANGE_KEYS:
         raise ValueError(f"Unbekannter Zeitraum: {range_key}")
@@ -589,7 +603,18 @@ def query_series(
     aggregation_type = entity["aggregation_type"]
     resolved_chart_type = _resolved_chart_type(aggregation_type, chart_type)
     now_local = now.astimezone(tz)
-    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
+    # "Gleicher Zeitpunkt"-Vergleich (Vergleichstabelle, Konzept-Erweiterung):
+    # eine VERGANGENE Periode (offset<0) auf denselben Abstand vom eigenen
+    # Anfang kappen wie die laufende Periode gerade hat — sonst vergleicht
+    # z. B. "Tag" (bisher gelaufen) unfair gegen "Vortag" (ganz). Nur für
+    # offset<0 ohne year_over_year: eine year_over_year-Spalte bekommt das
+    # bereits automatisch, da sie dieselbe (für offset=0 schon gedeckelte)
+    # Fensterberechnung nur um ein Jahr zurückschiebt (siehe unten).
+    elapsed = None
+    if same_elapsed and offset < 0 and not year_over_year:
+        current_start, _current_end, _current_natural = _window(range_key, now_local, 0, continuous)
+        elapsed = now_local - current_start
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous, elapsed=elapsed)
     if year_over_year:
         # Vorjahresvergleich verschiebt nur das Fenster um ein Jahr zurück, NICHT
         # now_local — der Rollup/Live-Split (Datei-Modulgrenze in diesem Modul,

@@ -81,12 +81,89 @@ window.TableCompute = (() => {
   // main.py) — rein optisch, fließt nirgends in eine Berechnung ein. Ohne
   // Angabe (ältere, vor dieser Funktion gespeicherte Tabellen) unverändert
   // NumberFormat.fmt()s Default (bis zu 4 signifikante Stellen).
-  function cellText(cell, decimals) {
-    if (!cell) return '–';
+  function cellValueText(cell, decimals, explicitMissing = false) {
+    if (!cell) return explicitMissing ? 'Keine Daten' : '–';
     if (cell.error) return 'Fehler';
-    if (cell.value == null) return '–';
+    if (cell.value == null) return explicitMissing ? 'Keine Daten' : '–';
     const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10) : null;
-    return fmtNum(cell.value, decimalsInt) + (cell.unit ? ' ' + cell.unit : '');
+    return fmtNum(cell.value, decimalsInt);
+  }
+
+  function cellUnit(cell) {
+    return cell && !cell.error && cell.value != null ? (cell.unit || '') : '';
+  }
+
+  function cellNumberParts(cell, decimals, explicitMissing = false) {
+    const text = cellValueText(cell, decimals, explicitMissing);
+    if (!cell || cell.error || cell.value == null) return {whole: text, separator: '', fraction: ''};
+    const separator = (window.NumberFormat && window.NumberFormat.DECIMAL_SEP) || ',';
+    const pos = text.lastIndexOf(separator);
+    if (pos < 0) return {whole: text, separator: '', fraction: ''};
+    return {whole: text.slice(0, pos), separator, fraction: text.slice(pos + separator.length)};
+  }
+
+  function cellText(cell, decimals, options = {}) {
+    const value = cellValueText(cell, decimals, !!options.explicitMissing);
+    const unit = options.showUnits === false ? '' : cellUnit(cell);
+    return value + (unit ? ' ' + unit : '');
+  }
+
+  function isComparisonColumn(col) {
+    return !!(col && ((col.offset || 0) < 0 || col.year_over_year));
+  }
+
+  // Zugehörige Vergleichsspalte für Tag/Monat/Jahr: gleicher Zeitraum,
+  // aber mit Versatz oder Vorjahresmodus. Bewusst nur vorwärts suchen,
+  // damit die Tabellenreihenfolge die visuelle Paarung bestimmt und die
+  // Abweichung unter dem aktuellen statt unter dem historischen Wert steht.
+  function comparisonIndexForBase(columns, baseIndex) {
+    const base = columns[baseIndex];
+    if (!base || isComparisonColumn(base)) return -1;
+    for (let i = baseIndex + 1; i < columns.length; i++) {
+      const candidate = columns[i];
+      if (candidate.range_key === base.range_key && isComparisonColumn(candidate)) return i;
+    }
+    return -1;
+  }
+
+  function deviationText(baseCell, comparisonCell) {
+    if (!baseCell || !comparisonCell || baseCell.error || comparisonCell.error ||
+        baseCell.value == null || comparisonCell.value == null || comparisonCell.value === 0) return '';
+    const percent = (baseCell.value - comparisonCell.value) / Math.abs(comparisonCell.value) * 100;
+    if (!Number.isFinite(percent)) return '';
+    const rounded = Math.abs(percent) >= 10 ? Math.round(percent) : Math.round(percent * 10) / 10;
+    return `${rounded > 0 ? '+' : ''}${fmtNum(rounded, Number.isInteger(rounded) ? 0 : 1)} %`;
+  }
+
+  // row.percent_of_total: zeigt statt des absoluten Zellwerts den Anteil an
+  // der Summe aller Entität-/Gruppen-Zeilen DERSELBEN Spalte im selben
+  // Abschnitt (zwischen zwei Trennlinien bzw. Tabellenanfang/-ende) — anders
+  // als bei der Summenzeile (nur Zeilen OBERHALB) hier bewusst der GANZE
+  // Abschnitt, weil ein Anteil sich auf alle Geschwister-Zeilen bezieht, nicht
+  // nur auf vorherige. memberCells kommt vorberechnet vom Aufrufer (uid- bzw.
+  // index-basiert je nach Kontext, siehe sectionMemberCells() in
+  // table_editor.html bzw. dashboard-tiles.js), damit dieser gemeinsame Kern
+  // nicht selbst durchs rows-Array laufen muss.
+  function percentOfTotalCell(cell, memberCells) {
+    if (!cell || cell.error || cell.value == null) return cell;
+    const total = memberCells.reduce((a, c) => a + (c && c.value != null ? c.value : 0), 0);
+    if (!total) return {value: null, unit: '%'};
+    return {value: (cell.value / total) * 100, unit: '%'};
+  }
+
+  // row.heatmap: Zellhintergrund nach Wert innerhalb der eigenen Zeile
+  // (heller = niedrig, kräftiger = hoch) — range kommt vom Aufrufer
+  // (Minimum/Maximum der sichtbaren Zellen DERSELBEN Zeile, siehe
+  // rowHeatmapRange() in table_editor.html). --accent-bar (die zweite
+  // Akzentfarbe, sonst für Balkendiagramme) statt --accent-line, damit eine
+  // "heiße" Zelle nicht wie ein aktiver An/Aus-Chip (dort --accent-line)
+  // aussieht. Deckelung bei 60%, damit der Zahlentext bei einem Maximalwert
+  // noch lesbar bleibt.
+  function heatmapStyle(cell, range) {
+    if (!cell || cell.error || cell.value == null || !range || range.max === range.min) return '';
+    const t = (cell.value - range.min) / (range.max - range.min);
+    const pct = Math.round(Math.max(0, Math.min(1, t)) * 60);
+    return `background:color-mix(in srgb, var(--accent-bar) ${pct}%, var(--surface));`;
   }
 
   // Buchstaben-Kürzel je Datenzeile (A, B, C, … Z, dann wieder von vorn) —
@@ -177,6 +254,15 @@ window.TableCompute = (() => {
               range_key: col.range_key,
               offset: col.offset || 0,
               year_over_year: !!col.year_over_year,
+              // "Gleicher Zeitpunkt"-Vergleich: eine Vergleichsspalte (Versatz<0)
+              // wird auf denselben Abstand vom Periodenanfang gekappt wie die
+              // noch laufende aktuelle Periode — aber NUR, wenn diese Tabelle
+              // überhaupt eine laufende Basis-Spalte (Versatz 0, kein
+              // Vorjahresvergleich) mit demselben Zeitraum-Typ enthält. Ohne
+              // Basis-Spalte bleibt die Vergleichsspalte unverändert vollständig
+              // (z. B. eine reine "Vormonat"-Spalte ohne "Monat" daneben).
+              same_elapsed: (col.offset || 0) < 0 && !col.year_over_year
+                && columns.some(c => c.range_key === col.range_key && (c.offset || 0) === 0 && !c.year_over_year),
             })),
           }),
         });
@@ -193,7 +279,7 @@ window.TableCompute = (() => {
       const byEntity = {};
       (data.series || []).forEach(s => { byEntity[s.entity_id] = s; });
       rows.forEach((row, ri) => {
-        if (row.row_type === 'formula' || row.row_type === 'separator') return;
+        if (row.row_type === 'formula' || row.row_type === 'separator' || row.row_type === 'summary') return;
         const members = row.entity_ids.map(id => byEntity[id]).filter(Boolean);
         if (!members.length) { values[ci][ri] = null; return; }
         const aggregation = row.aggregation || 'auto';
@@ -219,20 +305,42 @@ window.TableCompute = (() => {
 
     columns.forEach((col, ci) => {
       rows.forEach((row, ri) => {
-        if (row.row_type !== 'formula') return;
-        const scope = {};
-        const unitScope = {};
-        for (let j = 0; j < ri; j++) {
-          if (!letters[j]) continue;
-          const cell = values[ci][j];
-          scope[letters[j]] = cell ? cell.value : null;
-          unitScope[letters[j]] = cell ? (cell.unit || '') : '';
-        }
-        const unit = (row.formula_unit || '').trim() || inheritedFormulaUnit(row.formula, unitScope);
-        try {
-          values[ci][ri] = {value: evalFormula(row.formula, scope), unit};
-        } catch (e) {
-          values[ci][ri] = {value: null, unit, error: true};
+        if (row.row_type === 'formula') {
+          const scope = {};
+          const unitScope = {};
+          for (let j = 0; j < ri; j++) {
+            if (!letters[j]) continue;
+            const cell = values[ci][j];
+            scope[letters[j]] = cell ? cell.value : null;
+            unitScope[letters[j]] = cell ? (cell.unit || '') : '';
+          }
+          const unit = (row.formula_unit || '').trim() || inheritedFormulaUnit(row.formula, unitScope);
+          try {
+            values[ci][ri] = {value: evalFormula(row.formula, scope), unit};
+          } catch (e) {
+            values[ci][ri] = {value: null, unit, error: true};
+          }
+        } else if (row.row_type === 'summary') {
+          // Summe/Durchschnitt aller Entität-/Gruppen-Zeilen SEIT DER LETZTEN
+          // TRENNLINIE (nicht ab Tabellenanfang) — dieselbe Abschnitts-Logik
+          // wie sectionMemberCells() in table_editor.html, hier nur über den
+          // Index statt uid. Absichtlich ohne Formel-/andere Summenzeilen,
+          // sonst würde ein bereits aufsummierter Wert doppelt gezählt.
+          let sectionStart = 0;
+          for (let j = ri - 1; j >= 0; j--) {
+            if (rows[j].row_type === 'separator') { sectionStart = j + 1; break; }
+          }
+          const memberCells = [];
+          for (let j = sectionStart; j < ri; j++) {
+            if (rows[j].row_type !== 'entity' && rows[j].row_type !== 'group') continue;
+            const cell = values[ci][j];
+            if (cell && cell.value != null) memberCells.push(cell);
+          }
+          if (!memberCells.length) { values[ci][ri] = null; return; }
+          const total = memberCells.reduce((a, c) => a + c.value, 0);
+          const value = row.aggregation === 'avg' ? total / memberCells.length : total;
+          const units = [...new Set(memberCells.map(c => c.unit || ''))];
+          values[ci][ri] = {value, unit: units.length === 1 ? units[0] : ''};
         }
       });
     });
@@ -320,11 +428,25 @@ window.TableCompute = (() => {
     if (style.header_accent) classes.push('tbl-style-header-accent');
     if (style.first_col_accent) classes.push('tbl-style-first-col-accent');
     if (style.first_col_bold) classes.push('tbl-style-first-col-bold');
+    if (style.sticky_first_col) classes.push('tbl-style-sticky-first-col');
+    if (style.sticky_header) classes.push('tbl-style-sticky-header');
+    if (style.comparison_columns) classes.push('tbl-style-comparison-columns');
+    if (style.align_units) classes.push('tbl-style-align-units');
+    if (style.small_units) classes.push('tbl-style-small-units');
+    if (style.align_numbers) classes.push('tbl-style-align-numbers');
+    // Nur bei Abweichung vom Standard eine Klasse — Standard ist bei beiden
+    // rechtsbündig (dieselbe Regel wie bisher fest im CSS), spart in den
+    // meisten Fällen die Klasse.
+    if (style.header_align && style.header_align !== 'right') classes.push(`tbl-style-header-align-${style.header_align}`);
+    if (style.value_align && style.value_align !== 'right') classes.push(`tbl-style-value-align-${style.value_align}`);
+    if (style.equal_value_cols) classes.push('tbl-style-equal-cols');
     return classes.join(' ');
   }
 
   return {
-    evalFormula, inheritedFormulaUnit, fmtNum, cellText, rowLetters, computeValues, styleClasses,
+    evalFormula, inheritedFormulaUnit, fmtNum, cellValueText, cellUnit, cellNumberParts, cellText,
+    isComparisonColumn, comparisonIndexForBase, deviationText, percentOfTotalCell, heatmapStyle,
+    rowLetters, computeValues, styleClasses,
     resolveLabel, LABEL_VARIABLES,
   };
 })();

@@ -56,6 +56,9 @@ class TableQueryColumn(BaseModel):
     range_key: str
     offset: int = 0
     year_over_year: bool = False
+    # "Gleicher Zeitpunkt"-Vergleich (Konzept-Erweiterung Vergleichstabelle):
+    # nur sinnvoll/wirksam für offset<0 — siehe query.query_series().
+    same_elapsed: bool = False
 
 
 class TableQueryRequest(BaseModel):
@@ -325,6 +328,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     offset=column.offset,
                     year_over_year=column.year_over_year,
                     read_cache=read_cache,
+                    same_elapsed=column.same_elapsed,
                 )
                 series.append({
                     "entity_id": entity_id,

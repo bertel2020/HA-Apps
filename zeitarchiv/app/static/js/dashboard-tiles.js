@@ -706,26 +706,30 @@
   const fmtCompactNumber = NumberFormat.fmt;
 
   // Kompakte Vorschau einer Vergleichstabelle-Kachel — dieselbe Rechenlogik
-  // wie der volle Editor (static/js/table-compute.js), nur reduziert
-  // dargestellt: höchstens TABLE_TILE_MAX_ROWS/-COLS, ein "+N" statt der
-  // übrigen (die Kachel ist zu klein für eine komplette Tabelle mit vielen
-  // Zeilen/Spalten). Style-Optionen (Zebra/Rahmen/Dichte/Kopfzeile, siehe
-  // TableCompute.styleClasses) wirken hier genauso wie in der vollen Ansicht.
-  const TABLE_TILE_MAX_ROWS_PER_GRID_ROW = 5;
-  const TABLE_TILE_MAX_COLS_PER_GRID_COL = 3;
-
+  // wie der volle Editor (static/js/table-compute.js). Zeigt IMMER alle
+  // Zeilen/Spalten (kein "+N weitere" mehr) — .dtile-table-preview hat
+  // ohnehin schon einen eigenen Scrollbalken (overflow:auto, siehe CSS),
+  // ein zusätzliches Abschneiden mit Verweis auf ausgeblendete Zeilen war
+  // deshalb nur eine zweite, redundante Begrenzung obendrauf. Style-Optionen
+  // (Zebra/Rahmen/Dichte/Kopfzeile, siehe TableCompute.styleClasses) wirken
+  // hier genauso wie in der vollen Ansicht.
   async function renderTableTile(el) {
-    const columns = JSON.parse(el.dataset.columns || '[]');
-    const rows = JSON.parse(el.dataset.rows || '[]');
+    // Ausgeblendete Spalten/Zeilen (Tabelleneditor, col.hidden/row.hidden)
+    // fliegen hier raus — dieselbe Regel wie in table_editor.html: nicht
+    // gerendert, aber weiterhin Teil der Berechnung (computeValues()
+    // bekommt hier ohnehin nur den bereits gekürzten Ausschnitt, siehe
+    // TableCompute.computeValues()-Kommentar dort zur Formel-Buchstaben-
+    // Einschränkung auf die Kachel).
+    const visibleCols = JSON.parse(el.dataset.columns || '[]').filter(c => !c.hidden);
+    const visibleRows = JSON.parse(el.dataset.rows || '[]').filter(r => !r.hidden);
     const style = JSON.parse(el.dataset.style || '{}');
     const previewEl = el.querySelector('.dtile-table-preview');
     if (!previewEl) return;
 
-    const tile = el.closest('.dtile');
-    const gridCols = Math.max(1, Math.min(3, parseInt(tile.dataset.gridCols || '1', 10)));
-    const gridRows = Math.max(1, Math.min(3, parseInt(tile.dataset.gridRows || '1', 10)));
-    const visibleCols = columns.slice(0, TABLE_TILE_MAX_COLS_PER_GRID_COL * gridCols);
-    const visibleRows = rows.slice(0, TABLE_TILE_MAX_ROWS_PER_GRID_ROW * gridRows);
+    if (!visibleCols.length || !visibleRows.length) {
+      previewEl.innerHTML = '<div class="dtile-loading">Keine sichtbaren Zeilen/Spalten</div>';
+      return;
+    }
     const base = el.closest('#dashboard-grid')?.dataset.base || '.';
     let values, windowStarts;
     try {
@@ -735,34 +739,174 @@
       return;
     }
 
+    // Abschnitts-Mitglieder (Entität-/Gruppen-Zeilen zwischen zwei Trennlinien
+    // derselben Spalte) — Traversal-Gegenstück zu sectionMemberCells() in
+    // table_editor.html, hier index- statt uid-basiert (dieselbe Datenform
+    // wie computeValues()). Die eigentliche Anteilsrechnung bleibt in
+    // TableCompute.percentOfTotalCell(), damit beide Seiten denselben
+    // Rechenkern nutzen.
+    function sectionMemberCells(ci, ri) {
+      let start = 0;
+      for (let j = ri - 1; j >= 0; j--) { if (visibleRows[j].row_type === 'separator') { start = j + 1; break; } }
+      let end = visibleRows.length;
+      for (let j = ri + 1; j < visibleRows.length; j++) { if (visibleRows[j].row_type === 'separator') { end = j; break; } }
+      const cells = [];
+      for (let j = start; j < end; j++) {
+        if (visibleRows[j].row_type !== 'entity' && visibleRows[j].row_type !== 'group') continue;
+        cells.push(values[ci] && values[ci][j]);
+      }
+      return cells;
+    }
+    // Spaltenweise statt zeilenweise — dieselbe Umstellung wie
+    // columnHeatmapRange() in table_editor.html (siehe Kommentar dort):
+    // eine Zeile enthält hier oft sehr unterschiedliche Größenordnungen
+    // (Tag vs. Jahr), der sinnvolle Vergleich ist zwischen mehreren Zeilen
+    // DERSELBEN Spalte, nicht innerhalb einer Zeile über alle Spalten. Nur
+    // Entität-/Gruppen-Zeilen zählen als Vergleichspartner — eine Summen-/
+    // Formelzeile ist fast immer das Maximum ihres Abschnitts und würde die
+    // Skala sonst allein durch ihre Natur verzerren.
+    function columnHeatmapRange(ci, ri) {
+      let start = 0;
+      for (let j = ri - 1; j >= 0; j--) { if (visibleRows[j].row_type === 'separator') { start = j + 1; break; } }
+      let end = visibleRows.length;
+      for (let j = ri + 1; j < visibleRows.length; j++) { if (visibleRows[j].row_type === 'separator') { end = j; break; } }
+      const vals = [];
+      for (let j = start; j < end; j++) {
+        if (visibleRows[j].row_type !== 'entity' && visibleRows[j].row_type !== 'group') continue;
+        const cell = values[ci] && values[ci][j];
+        if (cell && !cell.error && cell.value != null) vals.push(cell.value);
+      }
+      if (!vals.length) return null;
+      return {min: Math.min(...vals), max: Math.max(...vals)};
+    }
+    // row.hide_if_empty: keine Zeile im Slice-Limit "verschwenden", die am
+    // Ende doch nicht gerendert wird — deshalb hier VOR dem Bauen geprüft,
+    // nicht erst beim Rendern selbst übersprungen.
+    function isRowEmpty(row, ri) {
+      if (!row.hide_if_empty) return false;
+      return visibleCols.every((c, ci) => {
+        const cell = values[ci] && values[ci][ri];
+        return !cell || cell.value == null || cell.value === 0;
+      });
+    }
+
+    // Manuelle Spaltenbreite (col.width/style.label_col_width, in
+    // table_editor.html per Ziehgriff gesetzt). min-width direkt auf th/td
+    // reicht bei HTML-Tabellen NICHT: Der Auto-Layout-Algorithmus darf diese
+    // Werte bei zu wenig Platz trotzdem neu verteilen. Sobald mindestens eine
+    // gespeicherte Breite existiert, bekommt die Kachel deshalb zusätzlich
+    // ein echtes <colgroup> und eine feste Tabellen-Mindestbreite aus der
+    // Summe aller Spalten. Nicht manuell gesetzte Spalten erhalten nur in
+    // diesem gemischten Layout einen vernünftigen Fallback; Tabellen ganz
+    // ohne gespeicherte Breiten bleiben beim bisherigen Auto-Layout.
+    const colWidthAttr = (w) => w ? ` style="width:${w}px;min-width:${w}px;max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"` : '';
+    const labelWidthAttr = colWidthAttr(style.label_col_width);
+
+    const savedWidth = (w) => {
+      const n = Number(w);
+      return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    };
+    const savedLabelWidth = savedWidth(style.label_col_width);
+    const savedValueWidths = visibleCols.map(c => savedWidth(c.width));
+    const hasSavedWidths = savedLabelWidth != null || savedValueWidths.some(w => w != null);
+    // "Spalten gleichmäßig" setzte bisher auf der Kachel zwingend width:100%
+    // und war damit ein zweiter, unabhängiger Stauch-Pfad. Auch ohne alte
+    // gespeicherte Einzelbreiten braucht diese Option deshalb das feste,
+    // scrollbar breite Layout.
+    const needsColumnLayout = hasSavedWidths || !!style.equal_value_cols;
+    const longestRowLabel = visibleRows.reduce((n, row) => Math.max(n, String(row.label || '').length), 0);
+    const autoLabelWidth = Math.max(120, Math.min(320, longestRowLabel * 8 + 24));
+    const autoValueWidth = 120;
+    const layoutWidths = needsColumnLayout
+      ? [savedLabelWidth || autoLabelWidth, ...savedValueWidths.map(w => w || autoValueWidth)]
+      : [];
+    const savedTableWidth = layoutWidths.reduce((sum, width) => sum + width, 0);
+    const tableWidthAttr = needsColumnLayout
+      ? ` style="width:max(100%,${savedTableWidth}px);min-width:${savedTableWidth}px;table-layout:fixed;"`
+      : '';
+    const colgroup = needsColumnLayout
+      ? `<colgroup>${layoutWidths.map(width => `<col style="width:${width}px">`).join('')}</colgroup>`
+      : '';
+
     const styleClasses = TableCompute.styleClasses(style);
-    let html = `<table class="dt compact dtile-mini-table ${styleClasses}"><tr><th>&nbsp;</th>`;
+    let html = `<table class="dt compact dtile-mini-table ${styleClasses}"${tableWidthAttr}>${colgroup}<thead>`;
+    // Mehrstufige Kopfzeile (col.group_label) — dieselbe Lauflängen-Logik wie
+    // groupHeaderCells() in table_editor.html, hier direkt auf visibleCols
+    // (die Kachel kürzt Spalten ohnehin schon aufs Sichtbare).
+    if (visibleCols.some(c => (c.group_label || '').trim())) {
+      html += `<tr class="tbl-header-row tbl-group-header-row"><th${labelWidthAttr}>&nbsp;</th>`;
+      let gi = 0;
+      while (gi < visibleCols.length) {
+        const label = (visibleCols[gi].group_label || '').trim();
+        let span = 1;
+        while (label && gi + span < visibleCols.length && (visibleCols[gi + span].group_label || '').trim() === label) span++;
+        html += `<th colspan="${span}" class="tbl-group-header">${escapeHtml(label)}</th>`;
+        gi += span;
+      }
+      html += '</tr>';
+    }
+    html += `<tr class="tbl-header-row"><th${labelWidthAttr}>&nbsp;</th>`;
     // Beschriftungs-Platzhalter (z. B. "{jahr}") wurden beim Speichern bewusst
     // NICHT aufgelöst (siehe table_editor.html save()) — sonst würde eine so
     // beschriftete Spalte hier ewig denselben, beim Speichern eingefrorenen
     // Wert zeigen statt sich mit der Zeit automatisch zu aktualisieren.
-    visibleCols.forEach((c, ci) => { html += `<th>${escapeHtml(TableCompute.resolveLabel(c.label, windowStarts[ci]))}</th>`; });
-    if (columns.length > visibleCols.length) html += '<th>…</th>';
-    html += '</tr>';
+    visibleCols.forEach((c, ci) => {
+      const comparisonClass = TableCompute.isComparisonColumn(c) ? ' class="tbl-comparison-col"' : '';
+      html += `<th${comparisonClass}${colWidthAttr(c.width)}>${escapeHtml(TableCompute.resolveLabel(c.label, windowStarts[ci]))}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    let dataRowIndex = 0;
     visibleRows.forEach((row, ri) => {
       if (row.row_type === 'separator') {
-        const span = visibleCols.length + 1 + (columns.length > visibleCols.length ? 1 : 0);
-        html += `<tr class="tbl-separator-row"><td colspan="${span}"><span class="tbl-separator-line" aria-hidden="true"></span></td></tr>`;
+        const span = visibleCols.length + 1;
+        const sectionLabel = row.show_label && row.label ? escapeHtml(row.label) : '';
+        const sepClasses = `tbl-separator-row${row.bold ? ' tbl-bold' : ''}`;
+        html += `<tr class="${sepClasses}"><td colspan="${span}"><span class="tbl-separator-content"><span class="tbl-separator-line" aria-hidden="true"></span>${sectionLabel ? `<span class="tbl-separator-label">${sectionLabel}</span><span class="tbl-separator-line" aria-hidden="true"></span>` : ''}</span></td></tr>`;
         return;
       }
-      html += `<tr${row.bold ? ' class="tbl-bold"' : ''}><td>${escapeHtml(row.label)}</td>`;
+      if (isRowEmpty(row, ri)) return;
+      const rowClasses = [];
+      if (row.bold) rowClasses.push('tbl-bold');
+      if (row.row_type === 'formula') rowClasses.push('tbl-formula-row');
+      if (row.row_type === 'formula' && row.accent) rowClasses.push('tbl-row-accent');
+      if (dataRowIndex % 2 === 1) rowClasses.push('tbl-zebra-alt');
+      dataRowIndex += 1;
+      html += `<tr${rowClasses.length ? ` class="${rowClasses.join(' ')}"` : ''}><td${labelWidthAttr}>${escapeHtml(row.label)}</td>`;
       visibleCols.forEach((col, ci) => {
-        const cell = values[ci] && values[ci][ri];
-        html += `<td class="tbl-num">${escapeHtml(TableCompute.cellText(cell, col.decimals))}</td>`;
+        let cell = values[ci] && values[ci][ri];
+        if (row.percent_of_total) cell = TableCompute.percentOfTotalCell(cell, sectionMemberCells(ci, ri));
+        const cellClasses = ['tbl-num'];
+        if (cell && cell.error) cellClasses.push('tbl-error');
+        if (TableCompute.isComparisonColumn(col)) cellClasses.push('tbl-comparison-col');
+        const decimals = row.percent_of_total ? '1' : col.decimals;
+        const numberParts = TableCompute.cellNumberParts(cell, decimals, !!style.explicit_missing);
+        const unit = style.show_units === false ? '' : TableCompute.cellUnit(cell);
+        const comparisonIndex = TableCompute.comparisonIndexForBase(visibleCols, ci);
+        const deviation = style.show_deviation && !row.percent_of_total && comparisonIndex >= 0
+          ? TableCompute.deviationText(cell, values[comparisonIndex] && values[comparisonIndex][ri]) : '';
+        const deviationTitle = comparisonIndex >= 0
+          ? `Gegenüber ${TableCompute.resolveLabel(visibleCols[comparisonIndex].label, windowStarts[comparisonIndex])}` : '';
+        const widthCss = col.width ? `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` : '';
+        const heatmapCss = (col.heatmap && (row.row_type === 'entity' || row.row_type === 'group'))
+          ? TableCompute.heatmapStyle(values[ci] && values[ci][ri], columnHeatmapRange(ci, ri)) : '';
+        const cellStyleAttr = (widthCss || heatmapCss) ? ` style="${widthCss}${heatmapCss}"` : '';
+        html += `<td class="${cellClasses.join(' ')}"${cellStyleAttr}><span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole">${escapeHtml(numberParts.whole)}</span><span class="tbl-number-separator">${escapeHtml(numberParts.separator)}</span><span class="tbl-number-fraction">${escapeHtml(numberParts.fraction)}</span></span>${unit ? `<span class="tbl-cell-unit">${escapeHtml(unit)}</span>` : ''}</span>${deviation ? `<span class="tbl-cell-deviation" title="${escapeHtml(deviationTitle)}">${escapeHtml(deviation)}</span>` : ''}</td>`;
       });
-      if (columns.length > visibleCols.length) html += '<td>…</td>';
       html += '</tr>';
     });
-    if (rows.length > visibleRows.length) {
-      html += `<tr><td colspan="${visibleCols.length + 2}" class="dtile-table-more">+${rows.length - visibleRows.length} weitere Zeile${rows.length - visibleRows.length !== 1 ? 'n' : ''}</td></tr>`;
-    }
-    html += '</table>';
+    html += '</tbody></table>';
     previewEl.innerHTML = html;
+    // Höhe der Gruppen-Kopfzeile für "Header fixieren" bei zweistufigem
+    // Kopf — dieselbe --tbl-group-header-h-Custom-Property wie in
+    // table_editor.html (siehe dortiger Kommentar bei .tbl-style-sticky-
+    // header tr.tbl-header-row th: sticky auf thead/tr funktioniert in
+    // Safari nicht, deshalb pro th einzeln mit gemessenem top-Versatz).
+    const tableEl = previewEl.querySelector('table');
+    if (tableEl) {
+      const groupRow = tableEl.querySelector('tr.tbl-group-header-row');
+      const groupH = (groupRow && groupRow.offsetParent !== null) ? groupRow.getBoundingClientRect().height : 0;
+      tableEl.style.setProperty('--tbl-group-header-h', groupH + 'px');
+    }
   }
 
   function escapeHtml(s) {

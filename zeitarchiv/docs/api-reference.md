@@ -99,7 +99,7 @@ Lädt alle Zeiträume einer Vergleichstabelle in einer gemeinsamen Anfrage
   "entity_ids": ["sensor.ertrag", "sensor.verbrauch"],
   "columns": [
     {"range_key": "day", "offset": 0, "year_over_year": false},
-    {"range_key": "day", "offset": -1, "year_over_year": false}
+    {"range_key": "day", "offset": -1, "year_over_year": false, "same_elapsed": true}
   ]
 }
 ```
@@ -109,6 +109,13 @@ Metadaten sowie `aggregates` mit `auto`, `avg`, `min`, `max` und `sum`.
 Vollständige Punktreihen werden nicht übertragen. Ein request-lokaler
 Lese-Cache verwendet Quelldateien über alle Spalten wieder; Gruppen und
 Formelzeilen berechnet anschließend `table-compute.js` im Browser.
+
+`same_elapsed` (bool, Vorgabe `false`) kappt bei einer vergangenen Spalte
+(Versatz < 0) deren Zeitfenster auf dieselbe verstrichene Dauer wie eine
+gleichzeitig abgefragte Spalte desselben Zeitraum-Typs mit Versatz 0 — der
+"Gleiche Zeitpunkt"-Vergleich (z. B. "Vortag bis 14 Uhr" statt ganzer
+Vortag, wenn der aktuelle Tag noch läuft). `table-compute.js` setzt das Flag
+automatisch, `table_editor.html` braucht dafür keine eigene Option.
 
 ## Fehlerformate
 

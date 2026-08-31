@@ -242,29 +242,95 @@
   }
 
   .dtile-table-preview{height:auto;min-height:160px;flex:1;overflow:auto;}
-  .dtile-mini-table{width:100%;font-size:calc(11px * var(--font-scale, 1));}
+  /* Nicht auf die Kachelbreite zusammenpressen: gespeicherte Pixelbreiten
+     dürfen die Tabelle breiter als den Preview-Container machen; dessen
+     overflow:auto stellt dann den horizontalen Scrollbalken bereit. Die
+     höhere Spezifität überschreibt table.dt{width:100%} aus app.css. */
+  table.dt.dtile-mini-table{width:auto;min-width:100%;}
   .dtile-mini-table th,.dtile-mini-table td{padding:4px 8px;white-space:nowrap;}
   .dtile-mini-table th:not(:first-child){text-align:right;}
+  .dtile-mini-table.tbl-style-header-align-left th:not(:first-child){text-align:left;}
+  .dtile-mini-table.tbl-style-header-align-center th:not(:first-child){text-align:center;}
   .dtile-mini-table td.tbl-num{text-align:right;font-variant-numeric:tabular-nums;}
+  .dtile-mini-table.tbl-style-value-align-left td.tbl-num{text-align:left;}
+  .dtile-mini-table.tbl-style-value-align-left td.tbl-num .tbl-cell{justify-content:flex-start;}
+  .dtile-mini-table.tbl-style-value-align-center td.tbl-num{text-align:center;}
+  .dtile-mini-table.tbl-style-value-align-center td.tbl-num .tbl-cell{justify-content:center;}
+  /* table-layout:fixed richtet sich nach der ersten Zeile (Kopfzeile) —
+     dieselbe Regel wie table_editor.html, siehe dortiger Kommentar bei
+     .tbl-style-equal-cols. Die Beschriftungsspalte bekommt ihre Breite über
+     labelWidthAttr() (style.label_col_width), das dashboard-tiles.js beim
+     Rendern der Kachel setzt — dieselbe gespeicherte Breite wie im Editor. */
+  table.dt.dtile-mini-table.tbl-style-equal-cols{table-layout:fixed;width:100%;}
+  .tbl-cell{display:inline-flex;justify-content:flex-end;align-items:baseline;gap:.3em;white-space:nowrap;}
+  .tbl-cell-number{white-space:nowrap;}
+  .tbl-cell-deviation{display:block;margin-top:1px;color:var(--ink-faint);font-size:calc(9.5px * var(--font-scale, 1));font-weight:400;line-height:1.1;}
   .dtile-mini-table tr.tbl-bold td{font-weight:700;color:var(--ink);}
-  .dtile-mini-table tr.tbl-separator-row td{padding:7px 6px;border:0;background:transparent !important;box-shadow:none !important;}
-  .tbl-separator-line{display:block;width:100%;height:2px;border-radius:999px;background:var(--border-strong, var(--border));}
+  .dtile-mini-table tr.tbl-separator-row td{padding:4px 6px;border:0;background:transparent !important;box-shadow:none !important;}
+  .tbl-separator-content{display:flex;align-items:center;gap:8px;width:100%;}
+  .tbl-separator-line{display:block;flex:1;height:1px;background:var(--border);}
+  .tbl-separator-label{color:var(--ink-muted);font-size:calc(9.5px * var(--font-scale, 1));font-weight:650;letter-spacing:.035em;text-transform:uppercase;white-space:nowrap;}
+  tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:800;color:var(--ink);}
+  .tbl-group-header{text-align:center;font-size:calc(9.5px * var(--font-scale, 1));color:var(--ink-muted);border-bottom:1px solid var(--border);}
   .dtile-table-more{text-align:center!important;color:var(--ink-faint);font-style:italic;}
-  .tbl-style-zebra tr:nth-child(even) td{background:var(--surface-alt);}
+  .tbl-style-zebra tr.tbl-zebra-alt td{background:var(--surface-alt);}
   .tbl-style-border-grid td,.tbl-style-border-grid th{border:1px solid var(--border);}
   .tbl-style-border-none td,.tbl-style-border-none th{border-bottom:none;}
   /* padding:0 (statt 2px) vertikal — spürbar unter dem Komfortabel-Grundmaß
      (.dtile-mini-table th/td oben: 4px 8px), sonst kaum sichtbarer
      Unterschied zwischen den beiden Dichte-Optionen. */
   .tbl-style-compact td,.tbl-style-compact th{padding:0 6px;}
-  .tbl-style-compact tr.tbl-separator-row td{padding:3px 6px;}
-  .tbl-style-header-accent tr:first-child th{background:var(--accent-line);color:var(--accent-contrast);}
+  .tbl-style-compact tr.tbl-separator-row td{padding:2px 6px;}
+  /* tr.tbl-header-row statt tr:first-child — bei mehrstufigen Spaltenköpfen
+     (col.group_label) steht eine zusätzliche Kopfzeile davor, siehe
+     dieselbe Umstellung in table_editor.html. */
+  .tbl-style-header-accent tr.tbl-header-row th{background:var(--accent-line);color:var(--accent-contrast);}
+  .tbl-style-header-accent tr.tbl-group-header-row th{background:color-mix(in srgb, var(--accent-line) 80%, black);}
   .tbl-style-first-col-accent td:first-child{
     background:color-mix(in srgb, var(--accent-line) 13%, var(--surface)) !important;
     color:var(--accent-line) !important;
   }
-  .tbl-style-first-col-accent.tbl-style-zebra tr:nth-child(even) td:first-child{background:color-mix(in srgb, var(--accent-line) 24%, var(--surface)) !important;}
+  .tbl-style-first-col-accent.tbl-style-zebra tr.tbl-zebra-alt td:first-child{background:color-mix(in srgb, var(--accent-line) 24%, var(--surface)) !important;}
   .tbl-style-first-col-bold td:first-child{font-weight:700;}
+  /* War früher ein globaler style.formula_row_accent-Schalter, jetzt pro
+     Formelzeile über row.accent — siehe dieselbe Umstellung in
+     table_editor.html. */
+  tr.tbl-formula-row.tbl-row-accent td{background:color-mix(in srgb, var(--accent-line) 7%, var(--surface)) !important;border-top:2px solid color-mix(in srgb, var(--accent-line) 35%, var(--border));}
+  /* background hier explizit statt sich auf Zebra/Erste-Spalte-hervorheben
+     zu verlassen — eine SICHTBAR fixierte Spalte muss immer blickdicht
+     sein (Zeilen ohne diese anderen Optionen hatten sonst gar keinen
+     Hintergrund und darunter wegscrollender Text schimmerte durch). */
+  .tbl-style-sticky-first-col th:first-child,.tbl-style-sticky-first-col td:first-child{position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--border);background:var(--surface);}
+  .tbl-style-sticky-first-col th:first-child{z-index:3;}
+  /* Sticky auf dem GANZEN thead statt auf einzelnen th, siehe dieselbe
+     Umstellung in table_editor.html: zwei Kopfzeilen (Gruppen- + Zeitraum-
+     Zeile) würden sonst beide um dieselbe top:0-Position konkurrieren und
+     sich beim Scrollen überlappen. */
+  /* Nicht auf thead/tr (Safari unterstützt sticky dort nicht zuverlässig),
+     siehe ausführlicher Kommentar in table_editor.html bei derselben Regel. */
+  .tbl-style-sticky-header tr.tbl-header-row th{position:sticky;top:0;z-index:2;background:var(--surface);box-shadow:0 1px 0 var(--border);}
+  /* Bei border-collapse:collapse bleibt der echte th-Rahmen beim Verschieben
+     an seiner ursprünglichen Tabellenposition und erscheint als Strich
+     mitten im Sticky-Header. Deshalb dort nur den kollabierten Rahmen
+     entfernen; der box-shadow aus der Regel darüber bewegt sich korrekt mit
+     der Zelle und bleibt als einzelne 1-px-Unterkante sichtbar. */
+  table.dt.dtile-mini-table.tbl-style-sticky-header tr.tbl-header-row th{border-bottom:0;}
+  .tbl-style-sticky-header.tbl-style-header-accent tr.tbl-header-row th{background:var(--accent-line);}
+  .tbl-style-sticky-header.tbl-style-header-accent tr.tbl-group-header-row th{background:color-mix(in srgb, var(--accent-line) 80%, black);}
+  .tbl-style-sticky-header tr.tbl-header-row:not(.tbl-group-header-row) th{top:var(--tbl-group-header-h,0px);}
+  /* Schnittzelle von fixiertem Header und fixierter erster Spalte muss über
+     BEIDEN Sticky-Ebenen liegen. Die spätere Header-Regel ist spezifischer
+     als `.tbl-style-sticky-first-col th:first-child` und setzte deren
+     z-index:3 sonst wieder auf 2 zurück. Dann übermalte beim vertikalen
+     Scrollen die erste Datenzelle die linke obere Headerzelle. */
+  .tbl-style-sticky-header.tbl-style-sticky-first-col tr.tbl-header-row th:first-child{z-index:4;}
+  .tbl-style-comparison-columns:not(.tbl-style-header-accent) .tbl-comparison-col{color:var(--ink-muted);}
+  .tbl-style-comparison-columns.tbl-style-header-accent th.tbl-comparison-col{color:color-mix(in srgb, var(--accent-contrast) 72%, var(--accent-line));}
+  .tbl-style-align-units .tbl-cell-unit{display:inline-block;min-width:3.5em;text-align:left;color:var(--ink-muted);}
+  .tbl-style-small-units .tbl-cell-unit{font-size:.82em;color:var(--ink-muted);}
+  .tbl-style-align-numbers .tbl-cell-number{display:inline-grid;grid-template-columns:auto .45em 2.4em;align-items:baseline;text-align:right;}
+  .tbl-style-align-numbers .tbl-number-separator{text-align:center;}
+  .tbl-style-align-numbers .tbl-number-fraction{text-align:left;}
   @media (max-width:820px){
     .dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
     .dtile[data-grid-cols="3"]{grid-column:span 2;}

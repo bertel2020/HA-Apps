@@ -185,7 +185,8 @@
      Art = Spalte 5 (1 Checkbox, 2 Entität, 4 Einheit, 6 Verfügbar). */
   .ha-import-table th:nth-child(3),.ha-import-table td:nth-child(3),
   .ha-import-table th:nth-child(5),.ha-import-table td:nth-child(5){text-align:center;}
-  .ha-entity-cell{display:block;min-width:0;}
+  .ha-entity-cell{display:block;min-width:0;color:inherit;text-decoration:none;}
+  .ha-entity-cell:hover .ent-name{color:var(--accent-line);}
   .ha-entity-cell .ent-name,.ha-entity-cell .ent-id{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ha-entity-tooltip code{white-space:normal;overflow-wrap:anywhere;}
 

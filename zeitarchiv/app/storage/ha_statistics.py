@@ -8,8 +8,9 @@ Ergänzt ha_import.py (Rohhistorie), das HA standardmäßig nur ~10 Tage
 vorhält: die Statistik-Tabelle bereinigt HA per Voreinstellung NIE
 automatisch (anders als Rohzustände/die 5-Minuten-Kurzzeitstatistik),
 deckt also auch deutlich ältere Zeiträume ab — dafür nur als Stunden-
-bzw. Tages-Aggregat (Mittelwert oder fortlaufende Summe je Fenster),
-nicht als Einzelmesswert. Nur Entitäten mit HA-`state_class` (i. d. R.
+bzw. Tages-Aggregat (Mittelwert oder Zählerstand am Fensterende je
+Fenster), nicht als Einzelmesswert. Nur Entitäten mit HA-`state_class`
+(i. d. R.
 `sensor.*`) haben überhaupt Statistiken; binäre Domains (SWITCH_DOMAINS
 in ha_import.py) so gut wie nie.
 
@@ -209,17 +210,19 @@ def fetch_statistic_meta(entity_ids: list[str]) -> dict[str, StatisticMeta]:
 
 def _statistic_value(entry: dict) -> float | None:
     """Ein Statistik-Fenster (Stunde/Tag) liefert je nach state_class
-    entweder mean (measurement, z. B. Temperatur) oder sum (total/
-    total_increasing, z. B. fortlaufender Energiezähler) — nie beides
-    sinnvoll gleichzeitig. mean hat Vorrang, weil ein vorhandenes sum bei
-    measurement-Entitäten (falls HA es doch mitliefert) hier nichts
-    Sinnvolles bedeutet."""
+    entweder mean (measurement, z. B. Temperatur) oder state (total/
+    total_increasing, z. B. Zählerstand am Fensterende) — nie beides
+    sinnvoll gleichzeitig. state hat Vorrang, weil ein vorhandenes mean bei
+    total/total_increasing-Entitäten (falls HA es doch mitliefert) hier
+    nichts Sinnvolles bedeutet. sum (die um Zählerresets bereinigte
+    fortlaufende Summe) wird bewusst nicht mehr verwendet — state ist der
+    tatsächliche Rohzählerstand."""
+    state = entry.get("state")
+    if isinstance(state, (int, float)) and math.isfinite(state):
+        return round(float(state), 3)
     mean = entry.get("mean")
     if isinstance(mean, (int, float)) and math.isfinite(mean):
         return round(float(mean), 3)
-    total = entry.get("sum")
-    if isinstance(total, (int, float)) and math.isfinite(total):
-        return round(float(total), 3)
     return None
 
 
@@ -274,7 +277,7 @@ def fetch_statistics_rows(
             "end_time": _iso(window_end),
             "statistic_ids": [entity_id],
             "period": period,
-            "types": ["mean", "sum"],
+            "types": ["mean", "state"],
         }])
         response = responses[0]
         if not response.get("success"):
@@ -296,17 +299,17 @@ def fetch_statistics_rows(
                     "reason": "Statistik-Zeitstempel fehlt oder ist ungültig",
                     "start": entry.get("start"),
                     "mean": entry.get("mean"),
-                    "sum": entry.get("sum"),
+                    "state": entry.get("state"),
                 })
                 continue
             value = _statistic_value(entry)
             if value is None:
                 result.skipped += 1
                 result.discarded.append({
-                    "reason": "Statistik enthält weder Mittelwert noch Summe",
+                    "reason": "Statistik enthält weder Mittelwert noch Zählerstand",
                     "start": entry.get("start"),
                     "mean": entry.get("mean"),
-                    "sum": entry.get("sum"),
+                    "state": entry.get("state"),
                 })
                 continue
             if ts in seen_timestamps:
@@ -351,7 +354,7 @@ def fetch_statistics_availability(
                 "end_time": _iso(window_end),
                 "statistic_ids": batch,
                 "period": period,
-                "types": ["mean", "sum"],
+                "types": ["mean", "state"],
             }])
             response = responses[0]
             if not response.get("success"):
