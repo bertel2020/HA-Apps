@@ -51,6 +51,12 @@ _NAME_UNIQUE_TABLES = {
 # (siehe .chart-card h3 / .dash-card h3 in charts/tables/dashboards.html).
 MAX_SAVED_NAME_LENGTH = 50
 
+# Obergrenze für den app-eigenen Anzeigenamen einer Entität (custom_name) —
+# kurz gehalten, damit er überall dort noch lesbar bleibt, wo sonst der
+# HA-friendly_name steht: Entitätenliste, Dropdowns/Picker, Kachel- und
+# Legendenbeschriftungen.
+MAX_CUSTOM_NAME_LENGTH = 40
+
 
 class InvalidNameError(ValueError):
     """Oberklasse für abgelehnte Dashboard-/Chart-/Tabellennamen."""
@@ -120,7 +126,9 @@ def should_accept_value(
 # sind vollständige SQL-Ausdrücke (kein Freitext), deshalb auch "entity_id" hier
 # als COALESCE-Ausdruck: die Tabelle zeigt primär den Anzeigenamen an, also soll
 # die Sortierung "Entität" auch danach gehen, nicht nach der rohen entity_id.
-_DISPLAY_NAME_EXPR = "COALESCE(entities.friendly_name, entities.entity_id) COLLATE NOCASE"
+_DISPLAY_NAME_EXPR = (
+    "COALESCE(entities.custom_name, entities.friendly_name, entities.entity_id) COLLATE NOCASE"
+)
 SORTABLE_COLUMNS = {
     "entity_id": _DISPLAY_NAME_EXPR,
     "friendly_name": _DISPLAY_NAME_EXPR,
@@ -157,6 +165,8 @@ CREATE TABLE IF NOT EXISTS entities (
     unit TEXT,
     state_class TEXT,
     friendly_name TEXT,
+    custom_name TEXT,
+    hourly_rollup INTEGER NOT NULL DEFAULT 0,
     first_ts REAL,
     last_ts REAL,
     last_value REAL,
@@ -514,6 +524,24 @@ class Index:
             # mehr aus, bis sie über "Auf Standard zurücksetzen" wieder auf
             # '{}' zurückgesetzt werden.
             self._conn.execute("ALTER TABLE entities ADD COLUMN chart_options TEXT NOT NULL DEFAULT '{}'")
+        if "custom_name" not in columns:
+            # App-eigener Anzeigename je Entität (Konzept-Erweiterung, unabhängig
+            # von HA): überschreibt friendly_name nur in der Darstellung, NICHT
+            # in der Datenbank/HA selbst. HA-Syncs (get_or_create_entity) fassen
+            # diese Spalte nie an, ein gesetzter Wert übersteht also jeden
+            # Reimport unverändert. NULL/leer bedeutet "kein Override" — dann
+            # gilt weiterhin friendly_name, siehe _DISPLAY_NAME_EXPR.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN custom_name TEXT")
+        if "hourly_rollup" not in columns:
+            # Zähler-Entitäten, die im Energiedashboard als Rolle (Netzbezug,
+            # Einspeisung, Erzeuger, Verbraucher, Speicher) zugeordnet sind,
+            # bekommen zusätzlich zur normalen Tages-Rollup-Stufe (FINE_LEVEL
+            # in rollup.py) eine feinere Stunden-Rollup-Stufe persistiert —
+            # Grundlage für die wochentagsweise Aggregation im Tageslastprofil
+            # über Monats-/Jahreszeiträume. Wird beim Speichern der
+            # Energiedashboard-Konfiguration automatisch gesetzt/entfernt
+            # (siehe energiedashboard_routes.py), nicht manuell editierbar.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN hourly_rollup INTEGER NOT NULL DEFAULT 0")
 
         dp_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(deleted_points)")}
         if "id" not in dp_columns:
@@ -1041,6 +1069,7 @@ class Index:
         gap_threshold: str | None = None,
         outlier_threshold: str | None = None,
         display_mode: str | None = None,
+        custom_name: str | None = None,
     ) -> None:
         """Ändert Auflösung, Aufbewahrung, Nachkommastellen und/oder die Lücken-/
         Ausreißer-Schwellwerte einer Entität (Konzept Abschnitt 03/04). Alle
@@ -1070,6 +1099,12 @@ class Index:
         if display_mode is not None:
             updates.append("display_mode = ?")
             params.append(display_mode)
+        if custom_name is not None:
+            # Leerstring löscht den Override bewusst (zurück auf friendly_name/
+            # entity_id), anders als bei den übrigen Feldern oben gibt es hier
+            # keinen "leer aber gültig"-Wert.
+            updates.append("custom_name = ?")
+            params.append(custom_name or None)
         if not updates:
             return
         updates.append("updated_at = ?")
@@ -1159,9 +1194,11 @@ class Index:
         conditions: list[str] = []
         params: list[str] = []
         if search:
-            conditions.append("(entities.entity_id LIKE ? OR entities.friendly_name LIKE ?)")
+            conditions.append(
+                "(entities.entity_id LIKE ? OR entities.friendly_name LIKE ? OR entities.custom_name LIKE ?)"
+            )
             like = f"%{search}%"
-            params += [like, like]
+            params += [like, like, like]
         if types:
             placeholders = ", ".join("?" for _ in types)
             conditions.append(f"entities.aggregation_type IN ({placeholders})")
@@ -1249,6 +1286,25 @@ class Index:
                 "UPDATE entities SET is_favorite = ?, updated_at = ? WHERE entity_id = ?",
                 (int(favorite), time.time(), entity_id),
             )
+
+    def set_entity_hourly_rollup(self, entity_id: str, enabled: bool) -> None:
+        """Setzt/löscht das hourly_rollup-Flag (siehe Schema-Kommentar) — von
+        energiedashboard_routes.py beim Speichern der Rollen-Konfiguration
+        aufgerufen, nie direkt vom Nutzer."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE entities SET hourly_rollup = ?, updated_at = ? WHERE entity_id = ?",
+                (int(enabled), time.time(), entity_id),
+            )
+
+    def list_hourly_rollup_entity_ids(self) -> list[str]:
+        """Alle Entitäten mit gesetztem hourly_rollup-Flag — Grundlage für den
+        rückwirkenden Backfill bereits archivierter Monate."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT entity_id FROM entities WHERE hourly_rollup = 1"
+            ).fetchall()
+            return [row["entity_id"] for row in rows]
 
     def set_entity_chart_options(self, entity_id: str, options: dict) -> None:
         """Speichert den vollständigen Chart-Optionen-Stand einer Entität
@@ -2378,6 +2434,15 @@ class Index:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def get_latest_stats_snapshot_ts(self) -> float | None:
+        """Zeitpunkt des letzten Statistik-Schnappschusses — für die
+        Hintergrundprozesse-Übersicht (Einstellungen → Diagnose), sonst gibt
+        es außer record_stats_snapshot_if_stale() keinen Konsumenten, der nur
+        DIESEN einen Wert statt der ganzen Verlaufsliste braucht."""
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT MAX(ts) AS latest FROM stats_snapshots").fetchone()
+            return row["latest"] if row else None
+
     _DUPLICATE_SNAPSHOT_KEY = "duplicate_snapshot_cache"
 
     def is_duplicate_snapshot_stale(self, min_interval_seconds: float = 3600) -> bool:
@@ -2408,6 +2473,52 @@ class Index:
             return json.loads(raw)
         except json.JSONDecodeError:
             return None
+
+    _HEATMAP_WEEKDAY_CACHE_KEY = "energiedashboard_heatmap_weekday_cache"
+
+    def is_heatmap_weekday_stale(self, range_key: str, min_interval_seconds: float = 86400) -> bool:
+        """Ob das im Wartungsplaner zwischengespeicherte wochentagsweise
+        Tageslastprofil (Energiedashboard, Monat/Jahr) neu berechnet werden
+        sollte — Analogon zu is_duplicate_snapshot_stale(), aber "month" und
+        "year" unabhängig voneinander in einem gemeinsamen JSON-Blob, weil
+        beide getrennt veralten bzw. invalidiert werden."""
+        raw = self.get_setting(self._HEATMAP_WEEKDAY_CACHE_KEY)
+        if raw is None:
+            return True
+        try:
+            entry = json.loads(raw).get(range_key)
+        except (json.JSONDecodeError, AttributeError):
+            return True
+        if entry is None:
+            return True
+        checked_at = entry.get("checked_at")
+        return checked_at is None or time.time() - checked_at >= min_interval_seconds
+
+    def set_heatmap_weekday_snapshot(self, range_key: str, grid: dict) -> None:
+        try:
+            data = json.loads(self.get_setting(self._HEATMAP_WEEKDAY_CACHE_KEY) or "{}")
+        except json.JSONDecodeError:
+            data = {}
+        data[range_key] = {"checked_at": time.time(), "grid": grid}
+        self.set_setting(self._HEATMAP_WEEKDAY_CACHE_KEY, json.dumps(data))
+
+    def get_heatmap_weekday_snapshot(self, range_key: str) -> dict | None:
+        """{"checked_at": ..., "grid": {...}} des letzten Wartungsplaner-Laufs
+        für range_key, oder None vor dem ersten Lauf/nach einer Invalidierung."""
+        raw = self.get_setting(self._HEATMAP_WEEKDAY_CACHE_KEY)
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw).get(range_key)
+        except (json.JSONDecodeError, AttributeError):
+            return None
+
+    def invalidate_heatmap_weekday_snapshots(self) -> None:
+        """Verwirft den kompletten Cache (beide range_keys) — bei jeder
+        Änderung der Energiedashboard-Rollenzuordnung aufgerufen (siehe
+        energiedashboard_routes.sync_hourly_rollup_flags()), damit eine
+        geänderte Konfiguration nicht bis zu 24h lang eine veraltete Ansicht zeigt."""
+        self.set_setting(self._HEATMAP_WEEKDAY_CACHE_KEY, "{}")
 
     _CLEANUP_ALLTIME_STATS_PREFIX = "cleanup_alltime_stats:"
 
@@ -2470,6 +2581,14 @@ class Index:
                 (since_ts,),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def get_latest_memory_snapshot_ts(self) -> float | None:
+        """Zeitpunkt des letzten RAM-Schnappschusses — Gegenstück zu
+        get_latest_stats_snapshot_ts(), für dieselbe Hintergrundprozesse-
+        Übersicht."""
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT MAX(ts) AS latest FROM memory_snapshots").fetchone()
+            return row["latest"] if row else None
 
     def get_stats_by_type(self) -> list[dict]:
         with self._lock, self._conn:
@@ -2636,7 +2755,9 @@ class Index:
         with self._lock, self._conn:
             rows = self._conn.execute(
                 """
-                SELECT d.entity_id AS entity_id, e.friendly_name AS friendly_name, COUNT(*) AS n
+                SELECT d.entity_id AS entity_id,
+                       COALESCE(e.custom_name, e.friendly_name) AS friendly_name,
+                       COUNT(*) AS n
                 FROM deleted_points d
                 LEFT JOIN entities e ON e.entity_id = d.entity_id
                 GROUP BY d.entity_id
@@ -2658,7 +2779,8 @@ class Index:
         pattern = f"%{search}%"
         where = """
             WHERE (? = '' OR lower(d.entity_id) LIKE ?
-                   OR lower(COALESCE(e.friendly_name, '')) LIKE ?)
+                   OR lower(COALESCE(e.friendly_name, '')) LIKE ?
+                   OR lower(COALESCE(e.custom_name, '')) LIKE ?)
         """
         page_size = max(10, min(int(page_size), 200))
         with self._lock, self._conn:
@@ -2669,7 +2791,7 @@ class Index:
                 LEFT JOIN entities e ON e.entity_id = d.entity_id
                 {where}
                 """,
-                (search, pattern, pattern),
+                (search, pattern, pattern, pattern),
             ).fetchone()["n"]
             total_pages = max(1, -(-total // page_size))
             page = max(1, min(int(page), total_pages))
@@ -2677,14 +2799,14 @@ class Index:
             rows = self._conn.execute(
                 f"""
                 SELECT d.id, d.entity_id, d.ts, d.deleted_at,
-                       e.friendly_name, e.unit
+                       COALESCE(e.custom_name, e.friendly_name) AS friendly_name, e.unit
                 FROM deleted_points d
                 LEFT JOIN entities e ON e.entity_id = d.entity_id
                 {where}
                 ORDER BY d.deleted_at DESC, d.id DESC
                 LIMIT ? OFFSET ?
                 """,
-                (search, pattern, pattern, page_size, offset),
+                (search, pattern, pattern, pattern, page_size, offset),
             ).fetchall()
         return {
             "rows": [dict(row) for row in rows],

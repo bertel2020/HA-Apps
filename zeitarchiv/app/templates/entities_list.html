@@ -93,10 +93,16 @@
      ungenutzter Raum in der Zelle, was unkritisch ist; wichtig ist nur die
      Untergrenze, damit Name/ID nie schmaler abgeschnitten werden als die
      Spalte tatsächlich ist. */
+  /* display:flex statt block: die Kürzung (Ellipsis) sitzt jetzt auf dem
+     inneren .name-text, damit das Tag-Icon (custom_name-Override, siehe
+     _icons.html) als Flex-Geschwister außerhalb von dessen overflow:hidden
+     bleibt — sonst würde .name selbst den eigenen data-tooltip des Icons
+     mit abschneiden (::after ist ein Nachfahre-Element, overflow:hidden
+     clippt unabhängig davon, worauf es positioniert ist). */
   td.entity .name{
-    display:block;max-width:302px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
-    overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:baseline;max-width:302px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
   }
+  td.entity .name-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
   td.entity .id{
     display:block;max-width:302px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
     overflow:hidden;text-overflow:ellipsis;cursor:help;

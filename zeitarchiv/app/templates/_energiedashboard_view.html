@@ -416,7 +416,7 @@
 
     {% if config.show_tageslastprofil %}
     <div class="edash-card edash-span3" x-show="heatmap.rows && heatmap.rows.length">
-      <div class="edash-card-head"><div class="edash-card-title">Tageslastprofil</div></div>
+      <div class="edash-card-head"><div class="edash-card-title">Tageslastprofil<span class="n" x-text="heatmapNote()"></span></div></div>
       <div class="edash-heatmap-wrap" x-ref="heatmapEl"></div>
     </div>
     {% endif %}

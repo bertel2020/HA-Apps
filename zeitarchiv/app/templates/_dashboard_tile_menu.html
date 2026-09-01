@@ -48,6 +48,7 @@
                          @click="select(opt.entity_id); $nextTick(() => $refs.entityForm.requestSubmit())"
                          @mouseenter="scheduleHover(opt, $event.currentTarget)" @mouseleave="clearHover()">
                       <span x-text="opt.label"></span>
+                      <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
                     </div>
                   </template>
                 </div>
@@ -55,11 +56,18 @@
               <template x-teleport="body">
                 <div class="entity-tooltip entity-tooltip-floating"
                      :style="`display:${hoverTip ? 'block' : 'none'}; top:${hoverPos.top}px; left:${hoverPos.left}px; transform:translateY(-100%);`">
-                  <strong x-text="hoverTip && hoverTip.label"></strong>
+                  <strong x-text="hoverTip && (hoverTip.ha_name || hoverTip.label)"></strong>
                   <code x-text="hoverTip && hoverTip.entity_id"></code>
                 </div>
               </template>
             </form>
+          </div>
+        </div>
+
+        <div class="dtile-settings-section">
+          <div class="dtile-title-field">
+            <span class="menu-row-label">Titel</span>
+            <input type="text" class="dtile-title-input" value="{{ tile.custom_title }}" placeholder="{{ tile.name }}">
           </div>
         </div>
 
@@ -113,13 +121,6 @@
                     data-decimals="{{ value }}"
                     title="{{ 'Automatisch' if value == 'auto' else (value ~ ' Nachkommastelle' ~ ('n' if value != '1' else '')) }}">{{ label }}</button>
             {% endfor %}
-          </div>
-        </div>
-
-        <div class="dtile-settings-section">
-          <div class="dtile-title-field">
-            <span class="menu-row-label">Titel</span>
-            <input type="text" class="dtile-title-input" value="{{ tile.custom_title }}" placeholder="{{ tile.name }}">
           </div>
         </div>
 

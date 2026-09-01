@@ -1,3 +1,4 @@
+{% from "_icons.html" import custom_name_icon %}
 <!-- Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene Punkte", erweitert
      um Vergleichstabellen UND um mehrere unabhängige Dashboards) — eigenes
      Fragment statt inline in entities.html/dashboard_detail.html, weil
@@ -148,7 +149,7 @@
                     x-show='!search || {{ (e.label ~ " " ~ e.entity_id) | lower | tojson }}.includes(search.toLowerCase())'
                     hx-post="{{ href_base }}dashboard/pin-entity/{{ e.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
                     hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
-              {{ e.label }}
+              {{ e.label }}{% if e.is_custom %}{{ custom_name_icon() }}{% endif %}
             </button>
             {% endfor %}
           </div>

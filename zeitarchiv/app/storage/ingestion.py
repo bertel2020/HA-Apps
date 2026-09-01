@@ -35,6 +35,11 @@ class IngestEvent:
     friendly_name: str | None = None
 
 
+def _entity_hourly_rollup(index: Index, entity_id: str) -> bool:
+    row = index.get_entity(entity_id)
+    return bool(row["hourly_rollup"]) if row else False
+
+
 def legacy_event_id(event: dict) -> str:
     """Deterministische Übergangs-ID für alte Integrationen ohne event_id."""
     canonical = json.dumps(event, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -215,7 +220,8 @@ class IngestionService:
             event.unit,
             event.friendly_name,
             on_type_change=lambda _old, new: rollup.rebuild_entity_rollups(
-                self._data_dir, event.entity_id, new, self._tz
+                self._data_dir, event.entity_id, new, self._tz,
+                hourly_rollup=_entity_hourly_rollup(self._index, event.entity_id),
             ),
         )
         claim = self._index.claim_ingest_event(event.event_id, event.entity_id, event.ts)

@@ -58,7 +58,8 @@ function entityPicker(options, initialEntityId, onSelectFn) {
     },
     hoverSelf(el) {
       if (!this.entityId) return;
-      this.scheduleHover({ label: this.label(this.entityId), entity_id: this.entityId }, el);
+      const o = this.options.find((o) => o.entity_id === this.entityId);
+      this.scheduleHover(o || { label: this.label(this.entityId), entity_id: this.entityId }, el);
     },
     clearHover() {
       this._clearHoverTimer();

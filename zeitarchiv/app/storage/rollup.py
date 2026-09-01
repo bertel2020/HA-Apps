@@ -338,12 +338,20 @@ def append_completed_month(
     year: int,
     month: int,
     tz: ZoneInfo,
+    hourly_rollup: bool = False,
 ) -> None:
     """Wird direkt nach dem Archivieren eines Monats aufgerufen (siehe rotate.py).
 
-    Schreibt die feine Rollup-Stufe (Tag bzw. Stunde) UND die Monats-Stufe fort.
-    Für Zähler-Entitäten prüft es zusätzlich, ob damit ein vollständiges,
-    vergangenes Kalenderjahr erreicht ist, und schreibt dann jahr.parquet fort.
+    Schreibt die feine Rollup-Stufe (Tag bzw. Stunde) UND die Monats-Stufe
+    fort. Für Zähler-Entitäten prüft es zusätzlich, ob damit ein
+    vollständiges, vergangenes Kalenderjahr erreicht ist, und schreibt dann
+    jahr.parquet fort.
+
+    hourly_rollup=True schreibt für Zähler-Entitäten ZUSÄTZLICH zur normalen
+    Tages-Stufe eine feinere Stunden-Stufe fort (additiv, ersetzt sie nicht —
+    bestehende Leser wie query.py/retention.py erwarten weiterhin tag.parquet
+    unverändert). Grundlage für die wochentagsweise Aggregation im
+    Tageslastprofil bei Energiedashboard-Rollen (siehe energiedashboard_routes.py).
     """
     level = FINE_LEVEL[aggregation_type]
     rows_raw = sorted(zip(month_table.column("ts").to_pylist(), month_table.column("value").to_pylist()))
@@ -367,6 +375,17 @@ def append_completed_month(
             _fine_rows_to_table(fine_rows, aggregation_type),
             _month_str(year, month),
         )
+
+    if aggregation_type == "counter" and hourly_rollup and level != "stunde":
+        hourly_rows, _ = compute_fine_rollup(
+            rows_raw, aggregation_type, "stunde", tz, boundary_value, month_end.timestamp()
+        )
+        if hourly_rows:
+            _append_table(
+                rollup_path(data_dir, entity_id, "stunde"),
+                _fine_rows_to_table(hourly_rows, aggregation_type),
+                _month_str(year, month),
+            )
 
     month_row = _aggregate_fine_to_month(fine_rows, aggregation_type, month_start.timestamp())
     _append_table(
@@ -475,19 +494,25 @@ def _remove_row_for_year(path: Path, tz: ZoneInfo, year: int) -> None:
     pq.write_table(table.filter(keep_mask), path, compression="zstd")
 
 
-def remove_month(data_dir: Path, entity_id: str, aggregation_type: str, year: int, month: int, tz: ZoneInfo) -> None:
+def remove_month(
+    data_dir: Path, entity_id: str, aggregation_type: str, year: int, month: int, tz: ZoneInfo,
+    hourly_rollup: bool = False,
+) -> None:
     """Entfernt alle Rollup-Zeilen eines Monats ohne Ersatz — für den seltenen
     Fall, dass nach einem Archiv-Purge (cleanup.py) kein Rohwert des Monats
     mehr übrig ist (der komplette Monat war weich gelöscht)."""
     level = FINE_LEVEL[aggregation_type]
     _remove_rows_for_month(rollup_path(data_dir, entity_id, level), tz, year, month)
+    if aggregation_type == "counter" and hourly_rollup and level != "stunde":
+        _remove_rows_for_month(rollup_path(data_dir, entity_id, "stunde"), tz, year, month)
     _remove_rows_for_month(rollup_path(data_dir, entity_id, "monat"), tz, year, month)
     if aggregation_type == "counter":
         _remove_row_for_year(rollup_path(data_dir, entity_id, "jahr"), tz, year)
 
 
 def replace_month(
-    data_dir: Path, entity_id: str, aggregation_type: str, month_table: pa.Table, year: int, month: int, tz: ZoneInfo
+    data_dir: Path, entity_id: str, aggregation_type: str, month_table: pa.Table, year: int, month: int, tz: ZoneInfo,
+    hourly_rollup: bool = False,
 ) -> None:
     """Ersetzt die Rollup-Zeilen eines bereits archivierten Monats durch frisch
     aus month_table berechnete — für den nachträglichen Archiv-Purge
@@ -497,8 +522,10 @@ def replace_month(
     ersetzen — siehe _append_table), berechnet danach exakt wie beim ersten
     Archivieren neu, inklusive eines bereits vorhandenen Jahres-Werts bei
     Zähler-Entitäten."""
-    remove_month(data_dir, entity_id, aggregation_type, year, month, tz)
-    append_completed_month(data_dir, entity_id, aggregation_type, month_table, year, month, tz)
+    remove_month(data_dir, entity_id, aggregation_type, year, month, tz, hourly_rollup=hourly_rollup)
+    append_completed_month(
+        data_dir, entity_id, aggregation_type, month_table, year, month, tz, hourly_rollup=hourly_rollup
+    )
 
 
 def rebuild_entity_rollups(
@@ -506,6 +533,7 @@ def rebuild_entity_rollups(
     entity_id: str,
     aggregation_type: str,
     tz: ZoneInfo,
+    hourly_rollup: bool = False,
 ) -> None:
     """Baut alle abgeschlossenen Rollups aus unveränderten Roharchiven neu.
 
@@ -513,6 +541,11 @@ def rebuild_entity_rollups(
     erzeugt. Erst nach erfolgreicher Berechnung wird auf demselben Dateisystem
     per Rename umgeschaltet; Fehler lassen den bisherigen Stand unangetastet.
     Der Aufrufer hält dabei die Entitätssperre.
+
+    hourly_rollup=True baut zusätzlich die feinere Stunden-Rollup-Stufe für
+    Zähler-Entitäten auf — derselbe Mechanismus dient auch als rückwirkender
+    Backfill, wenn eine Entität nachträglich einer Energiedashboard-Rolle
+    zugeordnet wird (siehe energiedashboard_routes.py).
     """
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     (data_dir / "rollup").mkdir(parents=True, exist_ok=True)
@@ -551,6 +584,7 @@ def rebuild_entity_rollups(
                 year,
                 month,
                 tz,
+                hourly_rollup=hourly_rollup,
             )
 
         replacement_dir.mkdir(parents=True, exist_ok=True)

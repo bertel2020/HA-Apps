@@ -51,7 +51,10 @@ def rotate_month_file(
 
     entity_row = index.get_entity(entity_id)
     aggregation_type = entity_row["aggregation_type"] if entity_row else "standard"
-    rollup.append_completed_month(data_dir, entity_id, aggregation_type, table, year, month, tz)
+    hourly_rollup = bool(entity_row["hourly_rollup"]) if entity_row else False
+    rollup.append_completed_month(
+        data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
+    )
 
 
 def rotate_if_needed(data_dir: Path, entity_id: str, current_ts: float, index: Index, tz: ZoneInfo) -> None:

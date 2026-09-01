@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .formatting import decimals_to_int
+from .formatting import decimals_to_int, entity_display_name
 from .limits import MAX_MULTI_QUERY_ENTITIES, MAX_WRITE_EVENTS
 from .logging_setup import log_rate_limited
 from .route_support import storage_locked
@@ -407,7 +407,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 )
             entry = {
                 "entity_id": entity_id,
-                "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                "friendly_name": entity_display_name(
+                    entity_id,
+                    entity["friendly_name"] if entity else None,
+                    entity["custom_name"] if entity else None,
+                ),
                 "unit": (entity["unit"] if entity else None) or "",
                 "decimals": decimals_to_int(entity["decimals"]) if entity else None,
                 "display_mode": (entity["display_mode"] if entity else None) or "onoff",
@@ -475,7 +479,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 )
                 series.append({
                     "entity_id": entity_id,
-                    "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                    "friendly_name": entity_display_name(
+                        entity_id,
+                        entity["friendly_name"] if entity else None,
+                        entity["custom_name"] if entity else None,
+                    ),
                     "unit": (entity["unit"] if entity else None) or "",
                     "decimals": decimals_to_int(entity["decimals"]) if entity else None,
                     "display_mode": (entity["display_mode"] if entity else None) or "onoff",

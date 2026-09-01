@@ -29,12 +29,18 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from .api_routes import _table_aggregates
+from .formatting import entity_display_name
 from .storage import cleanup as cleanup_mod
 from .storage import query as query_mod
+from .storage import rollup as rollup_mod
 from .storage.index import Index
 
 SETTING_ENABLED = "energiedashboard_enabled"
 SETTING_CONFIG = "energiedashboard_config"
+# Zähler-Entitäten, die als Energiedashboard-Rolle konfiguriert sind, warten
+# hier auf ihren rückwirkenden Rollup-Backfill (bereits archivierte Monate),
+# bevor _wartungsplaner sie einzeln nachträgt — siehe process_pending_hourly_backfill().
+SETTING_HOURLY_BACKFILL_PENDING = "energiedashboard_hourly_backfill_pending"
 
 RANGE_LABELS = {"hour": "Stunde", "day": "Tag", "month": "Monat", "year": "Jahr"}
 RANGE_KEYS = tuple(RANGE_LABELS)
@@ -123,6 +129,99 @@ def _save_config(index: Index, config: dict) -> None:
     index.set_setting(SETTING_CONFIG, json.dumps(config, ensure_ascii=False))
 
 
+def sync_hourly_rollup_flags(index: Index, role_entity_ids: list[str]) -> None:
+    """Setzt/löscht entities.hourly_rollup passend zu den aktuell als
+    Energiedashboard-Rolle zugeordneten Zähler-Entitäten (Netzbezug,
+    Einspeisung, Erzeuger, Verbraucher, Speicher laden/entladen — siehe
+    _config_entity_roles()). Nur Zähler sind betroffen: Standard/Schalter
+    bekommen über FINE_LEVEL ohnehin bereits stündliche Rollups.
+
+    Neu geflaggte Entitäten werden zusätzlich in eine Warteschlange
+    eingereiht (process_pending_hourly_backfill holt sie im Wartungsplaner
+    ab) — ohne das würden nur ab jetzt archivierte Monate die neue
+    Stunden-Stufe bekommen, bereits archivierte Monate blieben ohne
+    Wochentags-Auswertung. Wird eine Rolle wieder entfernt, bleibt bereits
+    geschriebene Stunden-Rollup-Daten unangetastet liegen (kein Rückbau) —
+    seltener Fall, der Speicherplatz-Nachteil ist vernachlässigbar."""
+    role_counters = set()
+    for entity_id in set(role_entity_ids):
+        row = index.get_entity(entity_id)
+        if row is not None and row["aggregation_type"] == "counter":
+            role_counters.add(entity_id)
+
+    currently_flagged = set(index.list_hourly_rollup_entity_ids())
+    newly_flagged = role_counters - currently_flagged
+    no_longer_role = currently_flagged - role_counters
+
+    for entity_id in newly_flagged:
+        index.set_entity_hourly_rollup(entity_id, True)
+    for entity_id in no_longer_role:
+        index.set_entity_hourly_rollup(entity_id, False)
+
+    if newly_flagged:
+        try:
+            pending = set(json.loads(index.get_setting(SETTING_HOURLY_BACKFILL_PENDING, "[]")))
+        except (TypeError, ValueError):
+            pending = set()
+        pending |= newly_flagged
+        index.set_setting(SETTING_HOURLY_BACKFILL_PENDING, json.dumps(sorted(pending)))
+
+
+def sync_hourly_rollup_flags_for_current_config(service: "EnergieDashboardService") -> None:
+    """Öffentlicher Wrapper für main.py (Startup-Hook): synchronisiert
+    entities.hourly_rollup für die AKTUELL gespeicherte Konfiguration einmalig
+    beim Serverstart — sonst müsste jede Installation, deren Konfiguration
+    bereits vor Einführung dieses Features gespeichert wurde, das
+    Setup-Formular einmal manuell erneut speichern, damit der rückwirkende
+    Backfill für ihre bestehenden Rollen überhaupt startet (siehe
+    sync_hourly_rollup_flags(), sonst nur bei jedem Speichern aufgerufen)."""
+    index = service.deps.index
+    config = _load_config(index)
+    if not _is_configured(config):
+        return
+    sync_hourly_rollup_flags(index, [eid for eid, _ in service._config_entity_roles(config)])
+
+
+def process_pending_hourly_backfill(data_dir: Path, index: Index, tz: ZoneInfo, coordinator) -> None:
+    """Baut für höchstens EINE wartende Entität (siehe sync_hourly_rollup_flags())
+    die Stunden-Rollup-Stufe rückwirkend aus den bereits archivierten Monaten
+    auf — je Wartungslauf (main.py, alle 30s) bewusst nur eine, damit ein
+    einzelner Tick auch bei einer Entität mit langer Historie nicht spürbar
+    blockiert; die Warteschlange leert sich über mehrere Läufe von selbst."""
+    try:
+        pending = json.loads(index.get_setting(SETTING_HOURLY_BACKFILL_PENDING, "[]"))
+    except (TypeError, ValueError):
+        pending = []
+    if not isinstance(pending, list) or not pending:
+        return
+    entity_id, *remaining = pending
+    index.set_setting(SETTING_HOURLY_BACKFILL_PENDING, json.dumps(remaining))
+    with coordinator.entity(entity_id):
+        entity = index.get_entity(entity_id)
+        if entity is None or not entity["hourly_rollup"]:
+            return  # Rolle wurde zwischenzeitlich wieder entfernt
+        rollup_mod.rebuild_entity_rollups(data_dir, entity_id, "counter", tz, hourly_rollup=True)
+
+
+def refresh_heatmap_weekday_cache_if_stale(service: "EnergieDashboardService") -> None:
+    """Berechnet das wochentagsweise gruppierte Tageslastprofil (Monat/Jahr,
+    jeweils offset=0 — der einzige Stand, den der Wartungsplaner vorhält)
+    höchstens einmal täglich im Hintergrund vor (compute_heatmap_weekday()),
+    damit eine Jahresansicht nicht bei jedem Seitenaufruf über alle
+    Rollen-Entitäten neu rechnet. Wird beim Speichern der Konfiguration
+    invalidiert (siehe die Setup-Save-Route), damit eine geänderte
+    Rollenzuordnung nicht bis zu 24h lang eine veraltete Ansicht zeigt."""
+    index = service.deps.index
+    config = _load_config(index)
+    if not _is_configured(config):
+        return
+    for range_key in ("month", "year"):
+        if not index.is_heatmap_weekday_stale(range_key):
+            continue
+        grid = service.compute_heatmap_weekday(config, range_key, 0)
+        index.set_heatmap_weekday_snapshot(range_key, grid)
+
+
 def _is_enabled(index: Index) -> bool:
     return index.get_setting(SETTING_ENABLED, "0") == "1"
 
@@ -181,7 +280,12 @@ class EnergieDashboardService:
 
     def _entity_options(self) -> list[dict]:
         return [
-            {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+            {
+                "entity_id": row["entity_id"],
+                "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+                "ha_name": row["friendly_name"] or row["entity_id"],
+                "is_custom": bool(row["custom_name"]),
+            }
             for row in self.deps.index.list_entities()
         ]
 
@@ -331,9 +435,9 @@ class EnergieDashboardService:
         if given_name:
             return given_name
         entity = self.deps.index.get_entity(entity_id)
-        if entity is not None and entity["friendly_name"]:
-            return entity["friendly_name"]
-        return entity_id
+        if entity is None:
+            return entity_id
+        return entity_display_name(entity_id, entity["friendly_name"], entity["custom_name"])
 
     def _config_entity_roles(self, config: dict) -> list[tuple[str, str]]:
         """Alle konfigurierten (entity_id, Rollen-Label)-Paare — Grundlage für
@@ -419,11 +523,19 @@ class EnergieDashboardService:
 
     def compute_flow(
         self, config: dict, range_key: str, offset: int, continuous: bool = False, skip_quality: bool = False,
+        read_cache: query_mod.QueryReadCache | None = None,
     ) -> dict:
+        """read_cache optional von außen durchgereicht (main.py/hier unten:
+        mehrere compute_flow()-Aufrufe desselben Requests teilen sich dann
+        einen Cache, statt sich überlappende Hot-Buffer-Dateien mehrfach
+        unabhängig voneinander neu einzulesen — QueryReadCache selbst bleibt
+        request-lokal, siehe dessen Docstring in query.py, wird hier nur
+        NICHT mehr implizit pro Aufruf neu erzeugt)."""
         if range_key not in RANGE_KEYS:
             raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
         now = datetime.now(self.deps.tz)
-        read_cache = query_mod.QueryReadCache()
+        if read_cache is None:
+            read_cache = query_mod.QueryReadCache()
         window_start, window_end, _period_end = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
             range_key, now.astimezone(self.deps.tz), offset, continuous,
         )
@@ -1159,7 +1271,9 @@ class EnergieDashboardService:
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
         }
 
-    def compute_heatmap(self, config: dict, days: int = HEATMAP_DAYS) -> dict:
+    def compute_heatmap(
+        self, config: dict, days: int = HEATMAP_DAYS, read_cache: query_mod.QueryReadCache | None = None,
+    ) -> dict:
         """Tageslastprofil: Verbrauch je Stunde für die letzten `days` Tage.
         Kein zweiter Datenpfad — nutzt dieselbe (kumulierte) "Verbrauch"-
         Sparkline wie die KPI-Kachel je Tag und rechnet sie durch
@@ -1168,11 +1282,18 @@ class EnergieDashboardService:
         (offset=0) liefert dabei naturgemäß nur Stunden bis "jetzt" — auf 24
         Einträge mit None für die noch bevorstehenden Stunden aufgefüllt,
         damit jede Zeile gleich viele Zellen hat (Frontend blendet None-
-        Zellen nur aus, statt die Zeile zu verkürzen)."""
+        Zellen nur aus, statt die Zeile zu verkürzen).
+
+        read_cache optional durchgereicht — die HEATMAP_DAYS-vielen
+        compute_flow()-Aufrufe hier fragen dieselben Rollen-Entitäten für oft
+        benachbarte (häufig sogar in derselben Monatsdatei liegende) Tage ab;
+        ein gemeinsamer Cache erspart das mehrfache Neueinlesen."""
+        if read_cache is None:
+            read_cache = query_mod.QueryReadCache()
         rows: list[dict] = []
         max_value = 0.0
         for offset in range(0, -days, -1):
-            flow = self.compute_flow(config, "day", offset, skip_quality=True)
+            flow = self.compute_flow(config, "day", offset, skip_quality=True, read_cache=read_cache)
             cumulative = flow["kpi_series"]["verbrauch"]
             hourly: list[float | None] = []
             previous = 0.0
@@ -1186,6 +1307,91 @@ class EnergieDashboardService:
             day_local = datetime.fromtimestamp(flow["window_start_ts"], self.deps.tz)
             rows.append({"label": _WEEKDAY_LABELS[day_local.weekday()], "hours": hourly})
         rows.reverse()  # älteste Tag zuerst
+        return {"rows": rows, "max_value": round(max_value, 3)}
+
+    def compute_heatmap_weekday(
+        self, config: dict, range_key: str, offset: int = 0,
+        read_cache: query_mod.QueryReadCache | None = None,
+    ) -> dict:
+        """Tageslastprofil bei Monat/Jahr: Verbrauch je Wochentag/Stunde, über
+        alle im Zeitraum liegenden Kalendertage gemittelt (Mo-So statt sieben
+        konkreter Kalendertage wie bei compute_heatmap()) — Grundlage für den
+        Wochentags-Modus des Tageslastprofils.
+
+        Baut dieselbe Verbrauch-Formel wie compute_flow() nach (Verbraucher-
+        Summe + geklemmte Grundlast), aber aus Stunden-Buckets über den
+        GESAMTEN Zeitraum (query_hourly_counter_series(), gespeist aus der
+        zusätzlichen stunde.parquet-Stufe, siehe entities.hourly_rollup) statt
+        über HEATMAP_DAYS einzelne compute_flow()-Aufrufe je Kalendertag wie
+        compute_heatmap() — nur so lässt sich nach Wochentag UND Stunde
+        gruppieren, nicht nur nach Kalendertag, und bleibt bei einer
+        Jahresansicht trotzdem mit wenigen Parquet-Lesevorgängen günstig statt
+        365 Einzel-Tagesabfragen."""
+        if range_key not in ("month", "year"):
+            raise HTTPException(status_code=400, detail="Nur 'month' oder 'year' unterstützt")
+        if read_cache is None:
+            read_cache = query_mod.QueryReadCache()
+        now = datetime.now(self.deps.tz)
+        window_start, window_end, _period_end = query_mod._window(range_key, now, offset)  # noqa: SLF001 — siehe Modul-Docstring
+
+        def hourly(entity_id: str | None) -> dict[float, float]:
+            if not entity_id:
+                return {}
+            entity = self.deps.index.get_entity(entity_id)
+            if entity is None or entity["aggregation_type"] != "counter":
+                # Fehlkonfigurierte Nicht-Zähler-Rolle — wird bereits an
+                # anderer Stelle (_check_entity_metadata) als Einrichtungsfehler
+                # gemeldet, hier einfach ignorieren statt falsche Zähler-
+                # Delta-Logik auf Rohwerte anzuwenden.
+                return {}
+            return query_mod.query_hourly_counter_series(
+                self.deps.data_dir, self.deps.index, entity_id, window_start, window_end,
+                self.deps.tz, now, read_cache,
+            )
+
+        speicher = config.get("speicher") or {}
+        netzbezug_series = hourly(config.get("netzbezug"))
+        erzeuger_series_list = [
+            hourly(erz.get("entity_id")) for erz in (config.get("erzeuger") or []) if erz.get("entity_id")
+        ]
+        speicher_entladen_series = hourly(speicher.get("entladen_entity_id"))
+        speicher_laden_series = hourly(speicher.get("laden_entity_id"))
+        verbraucher_series_list = [
+            hourly(verbraucher.get("entity_id"))
+            for verbraucher in (config.get("verbraucher") or [])
+            if verbraucher.get("entity_id")
+        ]
+        einspeisung_series = hourly(config.get("einspeisung"))
+
+        erzeugung_series = self._series_merge(*erzeuger_series_list) if erzeuger_series_list else {}
+        verbraucher_total_series = self._series_merge(*verbraucher_series_list) if verbraucher_series_list else {}
+        bus_in_series = self._series_merge(netzbezug_series, erzeugung_series, speicher_entladen_series)
+        grundlast_series = self._series_merge(
+            bus_in_series, verbraucher_total_series, einspeisung_series, speicher_laden_series,
+            factors=[1.0, -1.0, -1.0, -1.0],
+        )
+        grundlast_clamped = {ts: max(v, 0.0) for ts, v in grundlast_series.items()}
+        verbrauch_series = self._series_merge(verbraucher_total_series, grundlast_clamped)
+
+        buckets: dict[tuple[int, int], list[float]] = {}
+        for ts, value in verbrauch_series.items():
+            local = datetime.fromtimestamp(ts, self.deps.tz)
+            buckets.setdefault((local.weekday(), local.hour), []).append(value)
+
+        max_value = 0.0
+        rows: list[dict] = []
+        for weekday in range(7):
+            hours: list[float | None] = []
+            for hour in range(24):
+                values = buckets.get((weekday, hour))
+                if not values:
+                    hours.append(None)
+                    continue
+                avg = round(sum(values) / len(values), 3)
+                hours.append(avg)
+                max_value = max(max_value, avg)
+            rows.append({"label": _WEEKDAY_LABELS[weekday], "hours": hours})
+
         return {"rows": rows, "max_value": round(max_value, 3)}
 
     def _page_context(self, request: Request) -> dict:
@@ -1341,6 +1547,8 @@ class EnergieDashboardService:
                 "show_bilanz_datenqualitaet": show_bilanz_datenqualitaet == "on",
             }
             _save_config(deps.index, config)
+            sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])
+            deps.index.invalidate_heatmap_weekday_snapshots()
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_view.html",
                 {"configured": _is_configured(config), "config": config},
@@ -1351,7 +1559,13 @@ class EnergieDashboardService:
             config = _load_config(deps.index)
             if not _is_configured(config):
                 raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
-            current = self.compute_flow(config, range, offset)
+            # Ein Cache für alle drei compute_flow()-Aufrufe dieses Requests
+            # (aktuell/rollierend-aktuell/rollierend-vorherig) — deren
+            # Fenster überlappen oder grenzen direkt aneinander an, ohne
+            # geteilten Cache läse jeder Aufruf dieselben Hot-Buffer-Dateien
+            # unabhängig neu ein.
+            read_cache = query_mod.QueryReadCache()
+            current = self.compute_flow(config, range, offset, read_cache=read_cache)
             # Perioden-Vergleich immer rollierend statt kalendarisch: zwei
             # rollierende Fenster fester Länge (continuous=True), direkt
             # aneinander anschließend — unabhängig davon, ob die betrachtete
@@ -1361,17 +1575,30 @@ class EnergieDashboardService:
             # Zeitabschnitt des Vortags) auf dünn archivierte Zeiträume
             # treffen und leer bleiben kann — ein rollierendes Fenster endet
             # dagegen immer direkt an der Grenze zum jeweils anderen Fenster.
-            rolling_current = self.compute_flow(config, range, offset, continuous=True)
-            rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True)
+            rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
+            rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
             current["kpi_compare"] = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
             current["compare_label"] = COMPARE_LABELS[range]
             return current
 
         @router.get("/energiedashboard/heatmap")
-        def energiedashboard_heatmap() -> dict:
+        def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)
             if not _is_configured(config):
                 raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+            # Tag/Woche: unverändert sieben konkrete Kalendertage (Kachel ist
+            # hier bewusst vom Zeitraum-Umschalter entkoppelt). Monat/Jahr:
+            # Wochentags-Mittel über den gesamten gewählten Zeitraum, siehe
+            # compute_heatmap_weekday(). offset=0 kommt dabei nach Möglichkeit
+            # aus dem täglich im Hintergrund berechneten Cache (siehe
+            # refresh_heatmap_weekday_cache_if_stale()) statt bei jedem
+            # Seitenaufruf neu über alle Rollen-Entitäten zu rechnen.
+            if range in ("month", "year"):
+                if offset == 0:
+                    cached = deps.index.get_heatmap_weekday_snapshot(range)
+                    if cached is not None:
+                        return cached["grid"]
+                return self.compute_heatmap_weekday(config, range, offset)
             return self.compute_heatmap(config)
 
         return router

@@ -242,12 +242,19 @@
   }
 
   .dtile-table-preview{height:auto;min-height:160px;flex:1;overflow:auto;}
-  /* Nicht auf die Kachelbreite zusammenpressen: gespeicherte Pixelbreiten
-     dürfen die Tabelle breiter als den Preview-Container machen; dessen
-     overflow:auto stellt dann den horizontalen Scrollbalken bereit. Die
-     höhere Spezifität überschreibt table.dt{width:100%} aus app.css. */
-  table.dt.dtile-mini-table{width:auto;min-width:100%;}
-  .dtile-mini-table th,.dtile-mini-table td{padding:4px 8px;white-space:nowrap;}
+  /* Ohne gespeicherte Spaltenbreiten/"Spalten gleichmäßig" (kein <colgroup>,
+     siehe renderTableTile() in dashboard-tiles.js) bleibt die Tabelle
+     width:100% mit table-layout:auto — der Browser staucht die Spalten dann
+     selbst auf die Kachelbreite und bricht Zellinhalte bei Bedarf um, statt
+     Text hart abzuschneiden. Nur wenn EIN Wert wirklich nicht mehr umbrechen
+     kann (colWidthAttr/widthCss setzen dann inline white-space:nowrap für
+     genau diese Zelle), bleibt der overflow:auto-Scrollbalken die einzige
+     Ausweichmöglichkeit. Bei gespeicherten Breiten ODER "gleichmäßig"
+     überschreibt das inline table-layout:fixed (höhere Spezifität) diese
+     Basisregel — die Tabelle darf dann breiter als die Kachel werden, siehe
+     tableWidthAttr/colgroup dort. */
+  table.dt.dtile-mini-table{width:100%;table-layout:auto;}
+  .dtile-mini-table th,.dtile-mini-table td{padding:4px 8px;white-space:normal;word-break:break-word;}
   .dtile-mini-table th:not(:first-child){text-align:right;}
   .dtile-mini-table.tbl-style-header-align-left th:not(:first-child){text-align:left;}
   .dtile-mini-table.tbl-style-header-align-center th:not(:first-child){text-align:center;}

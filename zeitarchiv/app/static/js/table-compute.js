@@ -396,7 +396,9 @@ window.TableCompute = (() => {
       monat_kurz: MONTH_NAMES_SHORT[d.getMonth()],
       monat_nr: String(d.getMonth() + 1).padStart(2, '0'),
       woche: String(isoWeekNumber(d)),
-      tag: String(d.getDate()),
+      // Zweistellig wie monat_nr (01 statt 1) — konsistent mit dem
+      // "DD.MM."-Format, in dem Tag/Monat sonst überall in der App erscheinen.
+      tag: String(d.getDate()).padStart(2, '0'),
       dekade: `${Math.floor(d.getFullYear() / 10) * 10}er`,
     };
     return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[token]);

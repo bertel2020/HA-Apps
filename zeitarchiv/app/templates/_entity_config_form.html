@@ -1,4 +1,11 @@
 <div class="field">
+  <label>App-Anzeigename</label>
+  <input type="text" name="custom_name" value="{{ custom_name }}" maxlength="{{ custom_name_max_length }}"
+         placeholder="{{ friendly_name or entity_id }}"
+         hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
+  <p class="hint">Überschreibt nur die Anzeige in dieser App (Listen, Dropdowns, Diagramme) — der HA-eigene Name bleibt unverändert. Leer lassen, um wieder den HA-Namen zu verwenden. Höchstens {{ custom_name_max_length }} Zeichen.</p>
+</div>
+<div class="field">
   <label>Auflösung</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="resolution-btn" onclick="toggleDDPicker('resolution')">{% for k, l in resolution_options %}{% if k == resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>

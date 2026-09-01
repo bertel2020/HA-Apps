@@ -144,7 +144,7 @@
     <thead><tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Entitäten</th><th>Zeilen</th><th>Monate</th><th>Freigegeben</th></tr></thead>
     <tbody>
     {% for job in retention_jobs %}
-    <tr title="{{ job.error or '' }}">
+    <tr{% if job.error %} class="job-row-error" data-error="{{ job.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% endif %}>
       <td data-sort="{{ job.created_at_ts }}">{{ job.created_at }}</td>
       <td>{{ job.trigger }}</td>
       <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>

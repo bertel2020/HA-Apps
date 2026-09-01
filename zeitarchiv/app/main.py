@@ -52,6 +52,7 @@ from .formatting import (
     RETENTION_LABELS,
     VALUE_FILTER_LABELS,
     decimals_to_int,
+    entity_display_name,
     format_int,
     format_resolution,
     format_retention,
@@ -96,6 +97,7 @@ from .storage import query as query_mod
 from .storage.index import (
     DEFAULT_RESOLUTION,
     DEFAULT_RETENTION,
+    MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
     DuplicateNameError,
     Index,
@@ -115,12 +117,19 @@ from .index_optimization import (
 )
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
+    SETTING_HOURLY_BACKFILL_PENDING,
     EnergieDashboardDependencies,
     EnergieDashboardService,
     energiedashboard_role_count,
     is_energiedashboard_configured,
+    process_pending_hourly_backfill,
+    refresh_heatmap_weekday_cache_if_stale,
+    sync_hourly_rollup_flags_for_current_config,
 )
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
+from . import notices as notices_mod
+from . import version_check
+from .notices import collect_notices
 
 logger = logging.getLogger(__name__)
 trace_logger = logging.getLogger("zeitarchiv.trace")
@@ -294,10 +303,22 @@ def _app_root_context(request: Request) -> dict:
     return {"app_root": app_root}
 
 
+def _notices_context(request: Request) -> dict:
+    """Für das Hinweis-Center (Glocken-Icon) in _topnav.html — läuft wie
+    _app_root_context automatisch für JEDE TemplateResponse mit, statt dass
+    jede der ~10 Seiten, die _topnav.html einbinden, die Hinweisliste selbst
+    in ihren Kontext aufnehmen müsste. collect_notices() fragt bewusst nur
+    günstige Werte ab (PRAGMA-Stats, LIMIT-1-Queries), siehe notices.py."""
+    return {
+        "notices": collect_notices(index, DATA_DIR / "index.sqlite"),
+        "snooze_labels": notices_mod.SNOOZE_LABELS,
+    }
+
+
 app = FastAPI(title="Zeitarchiv")
 templates = Jinja2Templates(
     directory=str(APP_DIR / "templates"),
-    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context],
+    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context],
 )
 
 
@@ -1110,6 +1131,87 @@ def _settings_verbindung_context(saved: bool = False) -> dict:
     }
 
 
+def _settings_background_processes_context() -> dict:
+    """Letzter Lauf + Status je Wartungsplaner-Hintergrundaufgabe (Einstellungen
+    → Diagnose, Abschnitt "Hintergrundprozesse") — bisher nur in den
+    Server-Logs sichtbar (siehe _maintenance_scheduler_loop()). Rein lesend,
+    löst selbst nichts aus; der Wartungsplaner läuft unabhängig alle 30s
+    weiter, unabhängig davon, ob diese Seite gerade geöffnet ist."""
+    now = time.time()
+
+    def row(name: str, hint: str, ts: float | None, *, error: bool = False) -> dict:
+        if error:
+            pill_class, pill_label = "error", "Fehler"
+        elif ts is None:
+            pill_class, pill_label = "none", "–"
+        else:
+            pill_class, pill_label = "ok", "OK"
+        last_run = f"vor {format_uptime(now - ts)}" if ts is not None else "noch nie gelaufen"
+        return {"name": name, "hint": hint, "last_run": last_run, "pill_class": pill_class, "pill_label": pill_label}
+
+    duplicate_snapshot = index.get_duplicate_snapshot()
+    version_state = version_check.get_cached_state(index)
+    reconcile = _storage_reconcile_last or {}
+    reconcile_ts = reconcile.get("checked_at") or reconcile.get("started_at")
+
+    rows = [
+        row(
+            "Statistik-Snapshot", "Kennzahlen-Schnappschuss für die Statistik-Seite · stündlich",
+            index.get_latest_stats_snapshot_ts(),
+        ),
+        row(
+            "Arbeitsspeicher-Snapshot", "RAM-Verlauf für die Statistik-Seite · stündlich",
+            index.get_latest_memory_snapshot_ts(),
+        ),
+        row(
+            "Aufbewahrung-Übersicht", "Vorschau der von der Frist betroffenen Zeilen · bei Bedarf",
+            _load_retention_overview().get("generated_at"),
+        ),
+        row(
+            "Löschvorschau", "Vorschau für weich gelöschte, noch nicht entfernte Werte · bei Bedarf",
+            _load_purge_preview().get("generated_at"),
+        ),
+        row(
+            "Duplikat-Erkennung", "Zählt doppelte Zeitstempel je Entität vor · stündlich",
+            duplicate_snapshot.get("checked_at") if duplicate_snapshot else None,
+        ),
+        row(
+            "Versionsprüfung", "Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich",
+            version_state.get("checked_at") if version_state else None,
+        ),
+        row(
+            "Speicherindex-Abgleich", "Gleicht Zeilenzahl/Größe je Entität mit den Dateien ab · nach Neustart",
+            reconcile_ts, error=bool(reconcile.get("errors")),
+        ),
+    ]
+
+    if is_energiedashboard_configured(index):
+        try:
+            pending = json.loads(index.get_setting(SETTING_HOURLY_BACKFILL_PENDING, "[]"))
+        except (TypeError, ValueError):
+            pending = []
+        pending_count = len(pending) if isinstance(pending, list) else 0
+        rows.append({
+            "name": "Energiedashboard · Stunden-Rollup-Backfill",
+            "hint": "Baut die feinere Auflösung für neu zugeordnete Zähler-Rollen rückwirkend auf · 1 Entität/30s",
+            "last_run": "Warteschlange leer" if not pending_count else "–",
+            "pill_class": "pending" if pending_count else "ok",
+            "pill_label": f"{pending_count} ausstehend" if pending_count else "OK",
+        })
+
+        heatmap_snapshots = [
+            index.get_heatmap_weekday_snapshot("month"), index.get_heatmap_weekday_snapshot("year"),
+        ]
+        heatmap_ts_values = [s["checked_at"] for s in heatmap_snapshots if s and s.get("checked_at") is not None]
+        rows.append(row(
+            "Energiedashboard · Tageslastprofil-Cache",
+            "Berechnet die Wochentags-Ansicht für Monat/Jahr im Voraus · täglich",
+            min(heatmap_ts_values) if heatmap_ts_values else None,
+        ))
+
+    return {"background_processes": rows}
+
+
 def _debug_tools_context() -> dict:
     """Zustand der beiden Debugging-Werkzeuge (Konzept "Debugging: nächsten
     Schreibvorgang aufzeichnen" / "Entity-Trace") — eigene Funktion statt Teil
@@ -1144,7 +1246,12 @@ def _debug_tools_context() -> dict:
             max(1, round((trace_expires_at - now) / 60)) if trace_active else None
         ),
         "entity_options": [
-            {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+            {
+                "entity_id": row["entity_id"],
+                "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+                "ha_name": row["friendly_name"] or row["entity_id"],
+                "is_custom": bool(row["custom_name"]),
+            }
             for row in index.list_entities()
         ],
     }
@@ -1161,6 +1268,24 @@ def _settings_logging_context(saved: bool = False) -> dict:
     }
 
 
+def _settings_notices_context() -> dict:
+    muted = [
+        {
+            **entry,
+            "muted_at_text": (
+                f"{format_timestamp(entry['muted_at'], TZ)} {format_time(entry['muted_at'], TZ)}"
+                if entry["muted_at"] else "—"
+            ),
+            "until_text": (
+                f"{format_timestamp(entry['until'], TZ)} {format_time(entry['until'], TZ)}"
+                if entry["until"] else None
+            ),
+        }
+        for entry in notices_mod.list_muted_notices(index)
+    ]
+    return {"muted_notices": muted}
+
+
 @app.get("/settings", response_class=HTMLResponse)
 def settings_view(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
@@ -1171,6 +1296,8 @@ def settings_view(request: Request) -> HTMLResponse:
             "timezone": str(TZ),
             "data_dir": str(DATA_DIR),
             "uptime": format_uptime(time.time() - _SERVER_STARTED_AT),
+            "latest_version": version_check.latest_known_version(index),
+            "update_available": version_check.update_available(index, APP_VERSION),
             **_settings_verbindung_context(),
             **_settings_darstellung_context(),
             **_settings_archivierung_context(),
@@ -1178,9 +1305,46 @@ def settings_view(request: Request) -> HTMLResponse:
             **_settings_storage_index_context(),
             **_settings_purge_context(),
             **_settings_retention_context(),
-            **_settings_logging_context(),
+            **_debug_tools_context(),
+            **_settings_notices_context(),
+            **_settings_background_processes_context(),
         },
     )
+
+
+@app.post("/notices/{notice_id}/mute")
+async def mute_notice_route(request: Request, notice_id: str) -> dict:
+    """Stummschaltung nur für info/warn — main.py vertraut dabei nicht dem
+    Client, sondern schlägt Titel/Text/Severity server-seitig in den gerade
+    aktiven Meldungen nach (build_notices()), bevor irgendwas gespeichert
+    wird. Ein Fehler (severity "error") lässt sich so nie stumm schalten,
+    selbst bei einem manipulierten Request. Die Dauer kommt aus einer festen
+    Preset-Liste (SNOOZE_PRESETS) statt einem frei wählbaren Datum —
+    "forever" (None) eingeschlossen, bleibt trotzdem sicher, siehe
+    Kommentar dort (Fingerprint statt Ablaufdatum)."""
+    notice = next(
+        (n for n in notices_mod.build_notices(index, DATA_DIR / "index.sqlite") if n["id"] == notice_id),
+        None,
+    )
+    if notice is None:
+        raise HTTPException(status_code=404, detail="Meldung nicht gefunden oder nicht mehr aktiv")
+    if notice["severity"] not in notices_mod.MUTABLE_SEVERITIES:
+        raise HTTPException(status_code=400, detail="Diese Meldung lässt sich nicht stumm schalten")
+    form = await request.form()
+    duration = form.get("duration")
+    if duration not in notices_mod.SNOOZE_PRESETS:
+        raise HTTPException(status_code=400, detail="Ungültige Dauer")
+    seconds = notices_mod.SNOOZE_PRESETS[duration]
+    until = time.time() + seconds if seconds is not None else None
+    notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
+    remaining = collect_notices(index, DATA_DIR / "index.sqlite")
+    return {"success": True, "remaining_count": len(remaining)}
+
+
+@app.post("/notices/{notice_id}/unmute")
+def unmute_notice_route(notice_id: str) -> dict:
+    notices_mod.unmute_notice(index, notice_id)
+    return {"success": True}
 
 
 @app.get("/settings/ram", response_class=HTMLResponse)
@@ -1201,6 +1365,7 @@ def logs_view(request: Request) -> HTMLResponse:
         "logs.html",
         {
             "log_filter_options": [("all", "Alle"), *LOG_LEVEL_LABELS.items()],
+            **_settings_logging_context(),
         },
     )
 
@@ -1870,6 +2035,9 @@ def _maintenance_scheduler_loop() -> None:
             _refresh_retention_overview_if_stale()
             _refresh_purge_preview_if_stale()
             _refresh_duplicate_snapshot_if_stale()
+            version_check.refresh_if_stale(index)
+            process_pending_hourly_backfill(DATA_DIR, index, TZ, storage_coordinator)
+            refresh_heatmap_weekday_cache_if_stale(_energiedashboard_service)
             _run_backup_schedule_if_due(datetime.now(TZ))
             _run_retention_enforcement_if_due(datetime.now(TZ))
         except Exception:
@@ -1883,6 +2051,11 @@ def _maintenance_scheduler_loop() -> None:
 @app.on_event("startup")
 def _start_maintenance_scheduler() -> None:
     global _maintenance_scheduler_thread, _storage_reconcile_thread
+    # Einmalig beim Start: entities.hourly_rollup für eine bereits VOR diesem
+    # Feature gespeicherte Energiedashboard-Konfiguration nachziehen, sonst
+    # bräuchte jede bestehende Installation ein manuelles erneutes Speichern
+    # des Setup-Formulars, damit der rückwirkende Backfill überhaupt anläuft.
+    sync_hourly_rollup_flags_for_current_config(_energiedashboard_service)
     if not _requires_synchronous_reconciliation and (
         _storage_reconcile_thread is None or not _storage_reconcile_thread.is_alive()
     ):
@@ -1975,7 +2148,6 @@ def _backup_context(
         running = _backup_progress.running
         done = _backup_progress.done
         total = _backup_progress.total
-        current_error = _backup_progress.error
     percent = int(done / total * 100) if total else 0
     jobs = []
     status_labels = {
@@ -2046,7 +2218,6 @@ def _backup_context(
         "total": total,
         "percent": percent,
         "backup_message": message,
-        "backup_error": current_error,
         "backup_warnings": warnings,
         **_backup_list_context(sort, direction, page, page_size),
         "backup_jobs": jobs,
@@ -2547,7 +2718,6 @@ def statistik_view(request: Request) -> HTMLResponse:
             "duplicates_total": format_int(sum(row['count'] for row in duplicate_rows)),
             "storage_breakdown": storage_breakdown,
             "storage_total_size": format_size(storage_total_bytes),
-            "generated_at": f"{format_timestamp(now.timestamp(), TZ)} {format_time(now.timestamp(), TZ)}",
         },
     )
 
@@ -2667,6 +2837,8 @@ def _export_table_response(
         {
             "entity_id": row["entity_id"],
             "friendly_name": row["friendly_name"],
+            "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+            "has_custom_name": bool(row["custom_name"]),
             "aggregation_type": row["aggregation_type"],
             "type_label": format_type(row["aggregation_type"]),
             "unit": row["unit"],
@@ -2819,6 +2991,8 @@ def _entities_table_response(
         {
             "entity_id": row["entity_id"],
             "friendly_name": row["friendly_name"],
+            "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+            "has_custom_name": bool(row["custom_name"]),
             "aggregation_type": row["aggregation_type"],
             "type_label": format_type(row["aggregation_type"]),
             "resolution_label": format_resolution(row["resolution"]),
@@ -2941,6 +3115,8 @@ def _entity_config_context(entity) -> dict:
     return {
         "entity_id": entity_id,
         "friendly_name": entity["friendly_name"],
+        "custom_name": entity["custom_name"] or "",
+        "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
         "unit": entity["unit"] or "—",
@@ -2993,6 +3169,14 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     gap_threshold = form.get("gap_threshold")
     outlier_threshold = form.get("outlier_threshold")
     display_mode = form.get("display_mode")
+    custom_name = form.get("custom_name")
+    if custom_name is not None:
+        custom_name = custom_name.strip()
+        if len(custom_name) > MAX_CUSTOM_NAME_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Der Anzeigename darf höchstens {MAX_CUSTOM_NAME_LENGTH} Zeichen lang sein",
+            )
     if resolution is not None and resolution not in RESOLUTION_LABELS:
         raise HTTPException(status_code=400, detail="Ungültige Auflösung")
     if retention is not None and retention not in RETENTION_LABELS:
@@ -3018,6 +3202,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 gap_threshold=str(gap_threshold) if gap_threshold is not None else None,
                 outlier_threshold=str(outlier_threshold) if outlier_threshold is not None else None,
                 display_mode=str(display_mode) if display_mode is not None else None,
+                custom_name=custom_name if custom_name is not None else None,
             )
             if retention is not None:
                 _invalidate_retention_overview()
@@ -3523,7 +3708,7 @@ def _dashboard_tiles_context(
                 staleness = "fresh"
             tiles.append({
                 "kind": "entity", "entity_id": e["entity_id"],
-                "name": p["title"] or e["friendly_name"] or e["entity_id"],
+                "name": p["title"] or entity_display_name(e["entity_id"], e["friendly_name"], e["custom_name"]),
                 # Roher Override fürs Titel-Eingabefeld im Kachelmenü — anders
                 # als "name" oben (mit friendly_name-Fallback) soll das Feld
                 # leer bleiben, solange kein eigener Titel gesetzt ist.
@@ -3544,7 +3729,12 @@ def _dashboard_tiles_context(
     dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
     dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
     all_entities = [
-        {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+        {
+            "entity_id": row["entity_id"],
+            "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+            "ha_name": row["friendly_name"] or row["entity_id"],
+            "is_custom": bool(row["custom_name"]),
+        }
         for row in index.list_entities()
     ]
     return {
@@ -4127,7 +4317,12 @@ def tables_list(request: Request) -> HTMLResponse:
 
 def _table_editor_context(table: dict | None) -> dict:
     entity_options = [
-        {"entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"]}
+        {
+            "entity_id": row["entity_id"],
+            "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+            "ha_name": row["friendly_name"] or row["entity_id"],
+            "is_custom": bool(row["custom_name"]),
+        }
         for row in index.list_entities()
     ]
     return {
@@ -4302,6 +4497,7 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
         {
             "entity_id": entity_id,
             "friendly_name": entity["friendly_name"],
+            "custom_name": entity["custom_name"] or "",
             "aggregation_type": entity["aggregation_type"],
             "type_label": format_type(entity["aggregation_type"]),
             "unit": entity["unit"],
@@ -4334,6 +4530,7 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
         {
             "entity_id": entity_id,
             "friendly_name": entity["friendly_name"],
+            "custom_name": entity["custom_name"] or "",
             "base": "../..",
             "first_date": first_date,
             "last_date": last_date,

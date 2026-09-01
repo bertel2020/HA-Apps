@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.73.0 - 2026-09-02
+
+### Neu
+
+- **App-eigener Anzeigename** je Entität (bis 40 Zeichen, unabhängig von
+  Home Assistants eigenem `friendly_name`) — ein Tag-Symbol markiert ihn
+  überall in der Oberfläche, wo er aktiv ist.
+- **Meldungen-Center** (Glocke in der Kopfzeile): Systemmeldungen wie eine
+  empfohlene Index-Optimierung, fehlgeschlagene Backup-/Aufbewahrungsläufe
+  oder ein verfügbares Update lassen sich für 1 Stunde, 1 Tag, 7 Tage,
+  30 Tage oder dauerhaft stummschalten. Fehlermeldungen bleiben immer
+  sichtbar.
+- **Versionsprüfung**: einmal täglich im Hintergrund gegen das öffentliche
+  Repository, zeigt unter „Über Zeitarchiv" einen Hinweis, sobald eine
+  neuere Version verfügbar ist.
+- **Tageslastprofil** (Energiedashboard) zeigt bei Monat/Jahr jetzt den nach
+  Wochentag gemittelten Verbrauch (Mo–So) statt weiterhin nur der letzten
+  7 Kalendertage — sichtbar wird, an welchen Wochentagen typischerweise mehr
+  verbraucht wird. Zähler-Rollen bekommen dafür zusätzlich eine feinere,
+  stündliche Verdichtung, die auch rückwirkend für bereits archivierte
+  Monate nachgebaut wird.
+- Neuer Abschnitt **Hintergrundprozesse** unter Einstellungen → Diagnose:
+  letzter Lauf und Status jeder Wartungsplaner-Aufgabe, bisher nur in den
+  Server-Logs sichtbar.
+- Dashboard-Kacheln aktualisieren sich automatisch alle 60 Sekunden, solange
+  die Seite sichtbar ist.
+
+### Verbesserung
+
+- Fehlgeschlagene Backup-/Aufbewahrungs-Jobs zeigen den Fehlergrund jetzt in
+  einem Popup statt in einem systemeigenen Tooltip; die Zeile selbst ist
+  dafür klickbar.
+- Irreführender Hinweistext zur externen Backup-Sicherung korrigiert.
+- Mehrfache Abfragen innerhalb eines Energiedashboard-Seitenaufrufs teilen
+  sich jetzt einen gemeinsamen Lesecache statt sich überlappende
+  Rohdaten-Dateien wiederholt einzeln einzulesen.
+
+### Dokumentation
+
+- Benutzerhandbuch ergänzt um App-eigenen Anzeigenamen, Meldungen-Center,
+  Versionsprüfung, Hintergrundprozesse-Übersicht und das erweiterte
+  Tageslastprofil; veralteter Verweis auf eine eigene
+  „Protokollierung"-Einstellungssektion entfernt (liegt jetzt direkt auf der
+  Protokoll-Seite).
+
 ## 0.72.0 - 2026-09-01
 
 ### Neu

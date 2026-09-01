@@ -1,3 +1,4 @@
+{% from "_icons.html" import custom_name_icon %}
 <div class="tbl-wrap">
   {% if rows %}
   {# Mindestbreite = Summe der TATSÄCHLICH sichtbaren Spalten (Fav+Entität
@@ -47,8 +48,8 @@
       </td>
       <td class="entity col-entity">
         <a href="entities/{{ row.entity_id }}" class="entity-tooltip-host">
-          {% if row.friendly_name %}
-            <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+          {% if row.display_name != row.entity_id %}
+            <span class="name"><span class="name-text">{{ row.display_name }}</span>{% if row.has_custom_name %}{{ custom_name_icon() }}{% endif %}</span><span class="id">{{ row.entity_id }}</span>
           {% else %}
             <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
           {% endif %}

@@ -197,9 +197,98 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 .topnav-burger .topnav-icon{width:20px;height:20px;}
 .topnav-drawer-backdrop{display:none;}
 
+/* Hinweis-Center (Glocken-Icon) — sitzt bewusst AUSSERHALB von .topnav-links
+   (die auf schmalen Bildschirmen komplett verschwindet, siehe Media Query
+   unten), damit es auch mobil neben dem Hamburger sichtbar bleibt. */
+.topnav-notice{position:relative; height:100%; display:flex; align-items:center; flex-shrink:0;}
+.notice-btn{
+  position:relative; display:flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:9px; background:none; border:0; cursor:pointer; color:var(--ink-muted);
+}
+.notice-btn:hover{background:var(--surface-alt); color:var(--ink);}
+.notice-btn.is-open{background:var(--accent-line-soft); color:var(--accent-line);}
+.notice-btn svg{width:19px; height:19px;}
+.notice-badge{
+  position:absolute; top:2px; right:2px; min-width:15px; height:15px; padding:0 3px;
+  border-radius:999px; background:var(--danger); color:var(--danger-contrast);
+  font-family:var(--font-mono); font-size:9.5px; font-weight:600;
+  display:flex; align-items:center; justify-content:center; line-height:1;
+  border:2px solid var(--surface);
+}
+.notice-panel{
+  position:absolute; top:calc(100% + 6px); right:0; width:340px; max-width:calc(100vw - 32px);
+  background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow);
+  z-index:20; overflow:hidden;
+}
+.notice-panel-head{
+  display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  padding:12px 14px 10px; border-bottom:1px solid var(--border);
+}
+.notice-panel-head h3{margin:0; font-size:calc(13.5px * var(--font-scale, 1)); font-weight:600; color:var(--ink);}
+.notice-panel-title-link{color:inherit; text-decoration:none;}
+.notice-panel-title-link:hover{color:var(--accent-line); text-decoration:underline;}
+.notice-panel-head span{font-family:var(--font-mono); font-size:calc(11px * var(--font-scale, 1)); color:var(--ink-faint);}
+.notice-list{list-style:none; margin:0; padding:6px; max-height:min(60vh,420px); overflow-y:auto;}
+/* .notice-row ist das <li> (Layout-Wrapper), .notice-row-link das eigentliche
+   <a> — getrennt, damit der 🔕-Mute-Button als Geschwister danebensitzen
+   kann, statt selbst ein Klick-Ziel INNERHALB des Zeilen-Links zu sein (ein
+   <button> in einem <a> verschachtelt zu klicken navigiert sonst mit). */
+.notice-row{display:flex; align-items:stretch; border-radius:7px;}
+.notice-row:hover{background:var(--surface-alt);}
+.notice-row-link{display:flex; gap:10px; align-items:flex-start; flex:1; min-width:0; padding:9px 8px; text-decoration:none; color:inherit;}
+.notice-dot{flex-shrink:0; width:8px; height:8px; border-radius:999px; margin-top:6px;}
+.notice-dot.info{background:var(--ink-faint);}
+.notice-dot.warn{background:var(--accent-bar);}
+.notice-dot.error{background:var(--danger);}
+.notice-body{min-width:0; flex:1; display:flex; flex-direction:column; gap:2px;}
+.notice-row-title{font-size:calc(13px * var(--font-scale, 1)); font-weight:600; color:var(--ink);}
+.notice-row-detail{font-size:calc(11.5px * var(--font-scale, 1)); color:var(--ink-muted); line-height:1.4;}
+.notice-row-meta{margin-top:3px; font-family:var(--font-mono); font-size:calc(10.5px * var(--font-scale, 1)); color:var(--ink-faint);}
+.notice-chevron{flex-shrink:0; margin-top:6px; color:var(--ink-faint);}
+.notice-row:hover .notice-chevron{color:var(--accent-line);}
+/* Gedämpft statt komplett unsichtbar bis zum Hover — sonst gäbe es auf
+   Touch-Geräten (kein :hover) gar keine Möglichkeit, den Button überhaupt
+   zu sehen. Volle Deckkraft bei Hover/Fokus der Zeile. */
+.notice-mute-btn{
+  flex-shrink:0; align-self:center; width:26px; height:26px; margin-right:6px; padding:0;
+  border:0; border-radius:6px; background:none; color:var(--ink-faint); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  opacity:.45; transition:opacity .1s;
+}
+.notice-row:hover .notice-mute-btn,.notice-mute-btn:focus-visible{opacity:1;}
+.notice-mute-btn:hover{background:var(--surface); color:var(--ink);}
+.notice-mute-btn svg{width:14px; height:14px;}
+/* Dauer-Auswahl ersetzt Link+Mute-Button INNERHALB derselben Zeile, statt
+   eines zusätzlichen schwebenden Popovers (siehe Kommentar im Template) —
+   .notice-row.is-snoozing blendet die beiden aus, .notice-snooze-options
+   übernimmt sichtbar dieselbe Zeilenhöhe. */
+.notice-row.is-snoozing .notice-row-link,.notice-row.is-snoozing .notice-mute-btn{display:none;}
+/* [hidden] muss explizit gegen das eigene display:flex unten gewinnen — eine
+   Autoren-Regel schlägt sonst immer die UA-Standardregel [hidden]{display:
+   none}, unabhängig von der Reihenfolge im Stylesheet (Kaskaden-Herkunft
+   sticht Spezifität). Ohne das blieb die Dauer-Auswahl von Anfang an
+   sichtbar statt erst nach dem Öffnen. */
+.notice-snooze-options[hidden]{display:none;}
+.notice-snooze-options{display:flex; align-items:center; gap:8px; padding:9px 8px; width:100%;}
+.notice-snooze-label{flex-shrink:0; font-size:calc(11.5px * var(--font-scale, 1)); color:var(--ink-muted);}
+.notice-snooze-buttons{display:flex; flex-wrap:wrap; gap:5px; flex:1;}
+.notice-snooze-buttons button{
+  padding:4px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface);
+  color:var(--ink); font-size:calc(11.5px * var(--font-scale, 1)); font-family:inherit; cursor:pointer;
+}
+.notice-snooze-buttons button:hover{border-color:var(--accent-line); color:var(--accent-line);}
+.notice-snooze-cancel{
+  flex-shrink:0; width:22px; height:22px; padding:0; border:0; border-radius:6px; background:none;
+  color:var(--ink-faint); cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.notice-snooze-cancel:hover{background:var(--surface-alt); color:var(--ink);}
+.notice-empty{padding:30px 14px; text-align:center; color:var(--ink-faint); font-size:calc(12px * var(--font-scale, 1));}
+.notice-empty svg{width:24px; height:24px; margin-bottom:8px; opacity:.55;}
+
 @media (max-width:820px){
   .topnav-links{display:none;}
   .topnav-burger{display:flex;}
+  .topnav-notice{margin-left:auto;}
 }
 
 /* Mobiles Menü: Hamburger öffnet ein Slide-in-Drawer von rechts statt des
@@ -286,7 +375,12 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 /* Leeren-Icon INNERHALB des Auslöser-Buttons (statt als eigener Button
    daneben) — dd-picker-btn-clearable reserviert dafür Platz am rechten Rand. */
 .dd-picker-btn-clearable{padding-right:34px!important;}
-.dd-picker-clear{
+/* button.dd-picker-clear (statt nur .dd-picker-clear) — höhere Spezifität als
+   [data-tooltip]{position:relative} weiter unten in dieser Datei, das sonst
+   dieses position:absolute überschreibt (der Button trägt data-tooltip für
+   seinen eigenen "Auswahl leeren"-Hinweis) und ihn aus der rechten oberen
+   Ecke des Auslöser-Buttons heraus verschiebt. */
+button.dd-picker-clear{
   position:absolute;top:50%;right:6px;transform:translateY(-50%);
   width:22px;height:22px;padding:0;border:0;border-radius:50%;background:none;
   display:flex;align-items:center;justify-content:center;
@@ -535,6 +629,13 @@ table.dt td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--i
 table.dt tr:last-child td{border-bottom:none;}
 table.dt tbody tr:hover td{background:var(--surface-alt);}
 table.dt tr.flag td{background:var(--danger-soft);color:var(--ink);}
+/* Fehlgeschlagene Backup-/Retention-Jobs (backup.html, settings.html) —
+   Zeile ist klickbar statt eines nativen title-Tooltips, zeigt den
+   Fehlertext stattdessen im App-Popup (siehe showJobError() in
+   confirm-dialog.js). */
+table.dt tr.job-row-error{cursor:pointer;}
+table.dt tr.job-row-error:hover td{background:var(--danger-soft);}
+table.dt tr.job-row-error:focus-visible td{outline:2px solid var(--accent-line);outline-offset:-2px;}
 table.dt.compact th{padding:4px 14px;}
 table.dt.compact td{padding:2px 14px;}
 .table-resize-enabled{position:relative;}
@@ -602,6 +703,14 @@ button[data-tooltip]{cursor:pointer;}
    Tastaturfokus zeigt die Information sofort; das Verschwinden bleibt instant. */
 .entity-tooltip-host:hover>.entity-tooltip{visibility:visible;transition-delay:.6s;}
 .entity-tooltip-host:focus-within>.entity-tooltip{visibility:visible;}
+/* Ein custom-name-icon (Tag-Symbol, siehe _icons.html) kann innerhalb eines
+   .entity-tooltip-host liegen (Entitätenliste/Export-Tabelle) — dessen
+   data-tooltip hat sonst denselben z-index-Nachteil wie jeder andere
+   [data-tooltip]::after (30) gegenüber .entity-tooltip (40) und würde beim
+   gezielten Hover auf das Icon komplett darunter verschwinden. Der :has()-
+   Selektor blendet den Zeilen-Tooltip nur dann aus, wenn genau das Icon
+   gehovert wird — beim Rest der Zeile bleibt er wie gewohnt sichtbar. */
+.entity-tooltip-host:has(.custom-name-icon:hover)>.entity-tooltip{visibility:hidden!important;}
 /* Hosts mit dynamisch befülltem Tooltip (z. B. die HA-Entität-Zuordnung im
    Symcon-Import, deren Inhalt erst nach Auswahl per JS gesetzt wird) sollen
    vor der ersten Auswahl keine leere Sprechblase zeigen. */
@@ -626,6 +735,18 @@ button[data-tooltip]{cursor:pointer;}
 .entity-tooltip strong,.entity-tooltip code{display:block;white-space:nowrap;line-height:1.4;}
 .entity-tooltip strong{font-family:var(--font-display);font-size:calc(11.5px * var(--font-scale, 1));font-weight:700;}
 .entity-tooltip code{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:inherit;}
+/* Markiert einen app-eigenen Anzeigenamen (custom_name-Override), der vom
+   HA-friendly_name abweicht — überall dort, wo der Name allein noch nicht
+   erkennen lässt, dass hier jemand manuell umbenannt hat (Entitätenliste,
+   Dropdown-Zeilen, Kachel-/Legendenbeschriftungen, Detailseiten-Titel). Ein
+   kleines Tag-Symbol statt Text, damit es in dichten Listen nicht umbricht;
+   der eigentliche Hinweistext steckt im data-tooltip. .custom-name-icon
+   trägt das data-tooltip-Attribut deshalb als <span>, nicht direkt auf dem
+   <svg> — generierter [data-tooltip]::after-Inhalt wird auf SVG-Elementen
+   in gängigen Browsern nicht zuverlässig gemalt (Computed Style stimmt,
+   es erscheint aber nichts), auf einem normalen HTML-Element dagegen schon. */
+.custom-name-icon{display:inline-flex;align-items:center;flex-shrink:0;color:var(--accent-line);vertical-align:-2px;margin-left:5px;}
+.custom-name-icon svg{display:block;}
 .empty{padding:32px;text-align:center;color:var(--ink-faint);}
 
 /* Eyebrow-Überschrift für Vorschau-/Status-Fragmente (Import-Assistent,

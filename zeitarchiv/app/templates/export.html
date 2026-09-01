@@ -30,10 +30,15 @@
   .export-dt td.actions{text-align:right;}
 
   /* Name und ID werden in der Zelle gekürzt; der gemeinsame zweizeilige
-     Entitäten-Tooltip sitzt direkt auf der nicht geclippten Tabellenzelle. */
-  td.entity .name{display:block;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+     Entitäten-Tooltip sitzt direkt auf der nicht geclippten Tabellenzelle.
+     .name ist display:flex statt block: die Kürzung sitzt auf dem inneren
+     .name-text, damit das Tag-Icon (custom_name-Override, siehe _icons.html)
+     als Flex-Geschwister außerhalb von dessen overflow:hidden bleibt — sonst
+     würde .name selbst den eigenen data-tooltip des Icons mit abschneiden. */
+  td.entity .name{display:flex;align-items:baseline;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+  td.entity .name-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
   td.entity .id{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  td.entity .name.mono{font-family:var(--font-mono);font-weight:600;}
+  td.entity .name.mono{display:block;font-family:var(--font-mono);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
   td.actions a.btn{white-space:nowrap;}
   .empty-note{color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));padding:24px 0;}

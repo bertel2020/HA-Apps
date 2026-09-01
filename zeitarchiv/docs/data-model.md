@@ -77,6 +77,23 @@ eine `device_class` ändert) löst `rollup.rebuild_entity_rollups()` aus —
 komplette Neuberechnung aus dem Archiv, da die Bucket-Größen nicht kompatibel
 sind.
 
+**Zusätzliche Stunden-Stufe für Energiedashboard-Zählerrollen.** Ist eine
+`counter`-Entität als Energiedashboard-Rolle zugeordnet (`entities
+.hourly_rollup`, automatisch beim Speichern der Energiedashboard-Konfiguration
+gesetzt/gelöscht, siehe `energiedashboard_routes.sync_hourly_rollup_flags()`),
+schreibt `rollup.append_completed_month()` **additiv** zusätzlich zu
+`tag.parquet` auch `stunde.parquet` fort — `tag.parquet` bleibt für diese
+Entitäten unverändert bestehen, kein bestehender Lesepfad (Wochen-/Monats-
+Balkendiagramm, Aufbewahrung) muss davon wissen. Grundlage für die
+wochentagsweise Aggregation des Tageslastprofils (Energiedashboard) über
+Monats-/Jahreszeiträume (`query.query_hourly_counter_series()`). Neu
+geflaggte Entitäten bekommen ihre bereits archivierten Monate rückwirkend
+nachgebaut: eine Warteschlange (Setting
+`energiedashboard_hourly_backfill_pending`) wird vom Wartungsplaner mit einer
+Entität je 30-Sekunden-Tick abgearbeitet
+(`energiedashboard_routes.process_pending_hourly_backfill()`, nutzt
+`rollup.rebuild_entity_rollups(..., hourly_rollup=True)`).
+
 ## Soft-Delete und Purge
 
 Bereinigung (Ausreißer/Lücken/Duplikate/Wiederholungen markieren) ist

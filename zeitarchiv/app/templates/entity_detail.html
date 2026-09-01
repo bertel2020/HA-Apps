@@ -113,15 +113,17 @@
 </style>
 </head>
 <body>
+  {% from "_icons.html" import custom_name_icon %}
   {% include "_topnav.html" %}
+  {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page" x-data="entityChart()">
     <div class="h1-row">
-      <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
+      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
               title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
-      {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ base }}/entities">&larr; zurück zu Entitäten</a>
     </p>
 
@@ -283,7 +285,7 @@
       <div class="chart-legend" x-show="points.length && chartStats && legendStyle === 'chips'">
         <span class="chart-legend-item static">
           <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
-          <span class="name">{{ friendly_name or entity_id }}</span>
+          <span class="name">{{ display_name }}</span>
           <span class="values">
             <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="entityStat.last"></strong></span>
             <span x-show="legendMetrics.includes('min')">Min <strong x-text="entityStat.min"></strong></span>
@@ -310,7 +312,7 @@
               <td class="legend-name-col">
                 <span class="legend-name-cell">
                   <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
-                  <span>{{ friendly_name or entity_id }}</span>
+                  <span>{{ display_name }}</span>
                 </span>
               </td>
               <td x-show="legendMetrics.includes('last')" x-text="entityStat.last"></td>
@@ -360,7 +362,7 @@
     // Sprach-Setting nur hier greifen muss.
     const LOCALE = 'de-DE';
     const ENTITY_ID = {{ entity_id | tojson }};
-    const DISPLAY_NAME = {{ (friendly_name or entity_id) | tojson }};
+    const DISPLAY_NAME = {{ display_name | tojson }};
     const BASE = {{ base | tojson }};
     const UNIT = {{ (unit or '') | tojson }};
     // null = "Automatisch" (Konzept Abschnitt 03) — sonst feste Anzahl Nachkommastellen.
@@ -1013,14 +1015,17 @@
               name: DURATION_DISPLAY ? 'Dauer' : (UNIT || undefined),
               nameLocation: 'end',
               nameTextStyle: {align: 'left'},
-              // Dieselbe Fest/Dynamisch-Logik wie im (Mehrentitäten-)Chart-Editor
-              // (chart_editor.html, dort für mehrere Achsen verallgemeinert) —
               // "fest" bindet die Achse an 0, "dynamisch" lässt ECharts frei auf
               // den tatsächlichen Datenbereich skalieren (scale:true, sonst
-              // erzwingt eine value-Achse per Default immer die Einbindung der Null).
-              min: this.dynamicYAxis ? undefined : value => Math.min(0, value.min),
-              max: this.dynamicYAxis ? undefined : value => Math.max(0, value.max),
-              scale: this.dynamicYAxis,
+              // erzwingt eine value-Achse per Default immer die Einbindung der
+              // Null). Bei Balken NIE dynamisch, selbst wenn eingeschaltet: ein
+              // Balken zeichnet immer von der Null-Basislinie zum Wert — liegt
+              // die auto-skalierte Achse nicht bei 0 (z. B. min knapp unter dem
+              // kleinsten Balkenwert), ragt der Balken optisch über den unteren
+              // Achsenrand hinaus, statt sauber auf der x-Achse zu stehen.
+              min: (this.dynamicYAxis && this.chartType !== 'bar') ? undefined : value => Math.min(0, value.min),
+              max: (this.dynamicYAxis && this.chartType !== 'bar') ? undefined : value => Math.max(0, value.max),
+              scale: this.dynamicYAxis && this.chartType !== 'bar',
               axisLabel: {formatter: v => UNIT ? `${fmtValue(v)} ${UNIT}` : fmtValue(v)},
             },
             tooltip: {

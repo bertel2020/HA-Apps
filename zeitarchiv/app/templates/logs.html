@@ -8,6 +8,17 @@
 <link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
+  /* Bewusst flacher/kompakter als eine reguläre .settings-section (kein
+     Schatten, weniger Innenabstand, gedämpfter Hintergrund) — sichtbar
+     zweitrangig gegenüber dem eigentlichen Log-Werkzeug darunter, aber klar
+     als eigener Einstellungsbereich abgesetzt, kein Teil von dessen
+     Werkzeugleiste. */
+  .log-settings-panel{margin-bottom:16px;}
+  .log-settings-section{
+    padding:14px 18px;box-shadow:none;background:var(--surface-alt);
+  }
+  .log-settings-section .settings-subsection-title{margin:0 0 8px;}
+  .log-settings-section .settings-compact-row{padding:8px 0;}
   .log-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
   .log-toolbar input[type="search"]{flex:1;min-width:190px;}
   .log-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:8px 0;color:var(--ink-faint);font-size:calc(12px * var(--font-scale,1));}
@@ -25,7 +36,22 @@
   {% include "_topnav.html" %}
   <div class="page">
     <h1>Protokoll</h1>
-    <p class="sub">Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll. &middot; <a href="settings#protokollierung">Protokollierung einstellen →</a></p>
+    <p class="sub">Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll.</p>
+
+    {# Direkt hier statt nur verlinkt (früher "Protokollierung einstellen →"
+       zu settings#protokollierung) — wer sich das Protokoll ansieht, will die
+       Stufe oft im selben Moment anpassen. Eigene, sichtbar kleinere Karte
+       ÜBER dem Log-Werkzeug (statt derselben .settings-panel-Karte), damit
+       klar bleibt: das hier sind zwei Einstellungen, keine dritte
+       Werkzeugleiste des Viewers darunter. #}
+    <div class="settings-panel log-settings-panel">
+      <section class="settings-section log-settings-section">
+        <h2 class="settings-subsection-title">Protokollierung</h2>
+        <div id="logging-settings">
+          {% include "_settings_logging_form.html" %}
+        </div>
+      </section>
+    </div>
 
     <div class="settings-panel">
         <section>
@@ -57,6 +83,7 @@
     </div>
   </div>
 
+  <script src="static/vendor/htmx.min.js"></script>
   <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script>
     (() => {

@@ -68,6 +68,17 @@
   // auftaucht — dieselbe Idee wie legendHiddenIds in chart_editor.html.
   const legendHidden = new Map();
   let observer = null;
+  // Bereits einmal gerenderte Kacheln (siehe observer-Callback in setup())
+  // — Grundlage für den periodischen Auto-Refresh unten, damit der nicht
+  // Kacheln anfasst, die noch nie geladen wurden (Platzhalter außerhalb des
+  // Sichtbereichs beim ersten Laden der Seite).
+  const renderedTiles = new Set();
+  let refreshTimer = null;
+  // 60s — schneller als sinnvoll wäre unnötige Serverlast für Daten, die sich
+  // i. d. R. erst nach mehreren Minuten sichtbar ändern; deutlich langsamer
+  // ließe "manuell aktualisieren" wirken, obwohl es das gar nicht mehr
+  // bräuchte. Nur während der Tab sichtbar ist (siehe setupAutoRefresh).
+  const DASHBOARD_REFRESH_INTERVAL_MS = 60000;
 
   // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
   // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
@@ -404,17 +415,25 @@
     });
     const yAxis = units.map((u, i) => {
       const decimals = unitDecimals.get(u);
+      // Balken zeichnen immer von der Null-Basislinie zum Wert — liegt eine
+      // auto-skalierte Achse (scale:true, min/max undefined) nicht bei 0,
+      // ragt der Balken optisch über den unteren Achsenrand hinaus statt
+      // sauber auf der x-Achse zu stehen. "Dynamische Y-Achse" gilt deshalb
+      // nur für Achsen, auf denen ausschließlich Linien-Serien liegen —
+      // je Achse geprüft, da eine Kachel mehrere Einheiten/Achsen mischen kann.
+      const axisHasBar = series.some(s => s.unit === u && s.chart_type === 'bar');
+      const axisDynamic = dynamicYAxis && !axisHasBar;
       return {
         type: 'value',
         position: i % 2 === 0 ? 'left' : 'right',
         offset: Math.floor(i / 2) * 46,
-        min: dynamicYAxis ? undefined : value => Math.min(0, value.min),
-        max: dynamicYAxis ? undefined : value => Math.max(0, value.max),
+        min: axisDynamic ? undefined : value => Math.min(0, value.min),
+        max: axisDynamic ? undefined : value => Math.max(0, value.max),
         // Siehe chart_editor.html: ohne scale:true erzwingt ECharts bei einer
         // value-Achse per Default immer die Einbindung der Null, auch bei
         // undefined min/max — "Dynamische Y-Achse" hätte sonst keine
         // sichtbare Wirkung.
-        scale: dynamicYAxis,
+        scale: axisDynamic,
         axisLabel: {fontSize: scaledFont(10), color: inkFaint, formatter: v => fmtCompactNumber(v, decimals)},
         axisLine: {show: false},
         axisTick: {show: false},
@@ -808,17 +827,55 @@
     };
     const savedLabelWidth = savedWidth(style.label_col_width);
     const savedValueWidths = visibleCols.map(c => savedWidth(c.width));
-    const hasSavedWidths = savedLabelWidth != null || savedValueWidths.some(w => w != null);
+    // Nur gespeicherte WERT-Spaltenbreiten (oder "Spalten gleichmäßig")
+    // erzwingen das feste <colgroup>-Layout unten — eine gespeicherte
+    // Label-Spaltenbreite allein braucht das nicht: labelWidthAttr (s. u.)
+    // setzt sie per Inline-Style direkt auf th/td, unabhängig vom
+    // table-layout-Modus. Sonst zwang eine irgendwann mal per Ziehgriff
+    // gesetzte Label-Breite ALLE Wertespalten unnötig auf die feste
+    // 120px-Pauschalbreite (autoValueWidth) — sichtbar als deutlich zu
+    // breite, nicht mehr auf die Kachel schrumpfende Tabelle.
+    const hasSavedValueWidths = savedValueWidths.some(w => w != null);
     // "Spalten gleichmäßig" setzte bisher auf der Kachel zwingend width:100%
     // und war damit ein zweiter, unabhängiger Stauch-Pfad. Auch ohne alte
     // gespeicherte Einzelbreiten braucht diese Option deshalb das feste,
     // scrollbar breite Layout.
-    const needsColumnLayout = hasSavedWidths || !!style.equal_value_cols;
+    const needsColumnLayout = hasSavedValueWidths || !!style.equal_value_cols;
     const longestRowLabel = visibleRows.reduce((n, row) => Math.max(n, String(row.label || '').length), 0);
     const autoLabelWidth = Math.max(120, Math.min(320, longestRowLabel * 8 + 24));
-    const autoValueWidth = 120;
+    // "Spalten gleichmäßig": alle Wertespalten gleich breit, bemessen an der
+    // Spalte, deren Inhalt am meisten Platz braucht — nicht an einer festen
+    // Pauschalbreite (die quetschte breitere Inhalte vorher mit ab). Dieselbe
+    // Zeichen-basierte Heuristik wie autoLabelWidth oben, hier über den
+    // tatsächlich formatierten Zellentext (Zahl + Einheit) jeder Spalte.
+    const equalValueWidth = (() => {
+      if (!style.equal_value_cols) return null;
+      let longestCellText = 0;
+      visibleCols.forEach((col, ci) => {
+        longestCellText = Math.max(longestCellText, TableCompute.resolveLabel(col.label, windowStarts[ci]).length);
+        visibleRows.forEach((row, ri) => {
+          if (row.row_type === 'separator' || isRowEmpty(row, ri)) return;
+          let cell = values[ci] && values[ci][ri];
+          if (row.percent_of_total) cell = TableCompute.percentOfTotalCell(cell, sectionMemberCells(ci, ri));
+          const decimals = row.percent_of_total ? '1' : col.decimals;
+          const numberParts = TableCompute.cellNumberParts(cell, decimals, !!style.explicit_missing);
+          const unit = style.show_units === false ? '' : TableCompute.cellUnit(cell);
+          const text = `${numberParts.whole}${numberParts.separator}${numberParts.fraction}${unit ? ` ${unit}` : ''}`;
+          longestCellText = Math.max(longestCellText, text.length);
+        });
+      });
+      return Math.max(70, Math.min(260, longestCellText * 8 + 32));
+    })();
+    const autoValueWidth = equalValueWidth || 120;
+    // Bei "gleichmäßig" gilt equalValueWidth für JEDE Wertespalte, auch wenn
+    // einzelne Spalten zusätzlich noch eine individuell gezogene Breite
+    // gespeichert haben (table_editor.html) — sonst wären die Spalten trotz
+    // aktivierter Option nicht wirklich alle gleich breit.
     const layoutWidths = needsColumnLayout
-      ? [savedLabelWidth || autoLabelWidth, ...savedValueWidths.map(w => w || autoValueWidth)]
+      ? [
+          savedLabelWidth || autoLabelWidth,
+          ...savedValueWidths.map(w => equalValueWidth || w || autoValueWidth),
+        ]
       : [];
     const savedTableWidth = layoutWidths.reduce((sum, width) => sum + width, 0);
     const tableWidthAttr = needsColumnLayout
@@ -1019,6 +1076,7 @@
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const el = entry.target;
+          renderedTiles.add(el);
           if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
           else if (el.dataset.columns != null) renderTableTile(el);
           else renderTile(el);
@@ -1033,6 +1091,28 @@
     setupSizePickers();
     setupDragAndDrop();
     setupLegendToggles();
+    setupAutoRefresh();
+  }
+
+  // Lädt bereits sichtbar gewesene Kacheln periodisch neu, solange der Tab
+  // sichtbar ist — vorher blieb ein offen gelassenes Dashboard beliebig lange
+  // auf dem Stand des letzten manuellen Reloads stehen (Konzept-Diskussion
+  // "Seitenrefresh"). setInterval statt requestAnimationFrame-Loop: die Werte
+  // ändern sich höchstens im Minutentakt, ein exakteres Timing bringt nichts.
+  // Läuft auch im Hintergrund weiter (der Browser drosselt Intervalle
+  // inaktiver Tabs ohnehin selbst), die visibilityState-Prüfung im Tick
+  // spart zusätzlich die Server-Anfragen selbst, nicht nur deren Timing.
+  function setupAutoRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      renderedTiles.forEach(el => {
+        if (!el.isConnected) { renderedTiles.delete(el); return; }
+        if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
+        else if (el.dataset.columns != null) renderTableTile(el);
+        else renderTile(el);
+      });
+    }, DASHBOARD_REFRESH_INTERVAL_MS);
   }
 
   function setupSizePickers() {

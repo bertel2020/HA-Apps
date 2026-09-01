@@ -6,6 +6,14 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
+def entity_display_name(entity_id: str, friendly_name: str | None, custom_name: str | None = None) -> str:
+    """App-eigener Anzeigename: custom_name (falls gesetzt) > HA friendly_name >
+    entity_id. Der HA friendly_name und die entity_id selbst bleiben unverändert
+    abrufbar (z. B. für Tooltips) — diese Funktion bestimmt nur, was in Listen,
+    Dropdowns und Kachel-/Legendenbeschriftungen als Name erscheint."""
+    return custom_name or friendly_name or entity_id
+
+
 def format_size(size_bytes: int) -> str:
     if size_bytes <= 0:
         return "0 B"

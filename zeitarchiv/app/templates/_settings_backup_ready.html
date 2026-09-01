@@ -1,12 +1,21 @@
 <div id="backup-status">
   {% if backup_message %}
-  <p style="margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);">
-    {{ backup_message }}
-  </p>
+  {# Als Popup statt eines Banners ganz oben auf der Seite — backup_message
+     wird von ganz unterschiedlichen, über die Seite verstreuten Aktionen
+     befüllt (Import-Prüfung hier oben, aber auch Rollback-Löschen weiter
+     unten), landete als Banner aber immer an derselben Stelle, oft weit weg
+     von der Aktion, die man gerade ausgelöst hat. Ein Popup ist garantiert
+     sichtbar, unabhängig von der Scroll-Position. #}
+  <script>window.appAlert({{ backup_message | tojson }});</script>
   {% endif %}
-  {% if backup_error %}
-  <p style="margin:0 0 12px;color:var(--danger);">Letzter Lauf fehlgeschlagen: {{ backup_error }}</p>
-  {% endif %}
+  {# backup_error (dauerhafter "letzter Lauf fehlgeschlagen"-Zustand, kein
+     einmaliges Aktionsergebnis wie backup_message) bewusst nicht mehr als
+     eigenes Banner hier — dieselbe Information steht schon im globalen
+     Meldungs-Center (Glocke) UND direkt in der fehlgeschlagenen Zeile im
+     Ausführungsverlauf unten (anklickbar für den Fehlergrund). Ein Popup
+     dafür würde bei jedem Seitenaufruf erneut unterbrechen, solange der
+     Zustand anhält — unpassend für einen andauernden statt einmaligen
+     Zustand. #}
   <div style="margin:0 0 14px;">
     <strong style="display:block;margin-bottom:7px;">Vorhandenes Backup importieren</strong>
     <form hx-post="backup/import" hx-encoding="multipart/form-data"
@@ -37,7 +46,7 @@
       <thead><tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Dauer</th><th>Größe</th></tr></thead>
       <tbody>
       {% for job in backup_jobs %}
-      <tr title="{{ job.error or '' }}">
+      <tr{% if job.error %} class="job-row-error" data-error="{{ job.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% endif %}>
         <td data-sort="{{ job.created_at_ts }}">{{ job.created_at }}</td>
         <td>{{ job.trigger }}</td>
         <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>

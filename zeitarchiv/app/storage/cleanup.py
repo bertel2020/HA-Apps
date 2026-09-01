@@ -527,7 +527,11 @@ def count_duplicate_rows_by_entity(
         )
         count = len(duplicate_rows_to_delete(rows))
         if count:
-            results.append({"entity_id": entity_id, "friendly_name": entity["friendly_name"], "count": count})
+            results.append({
+                "entity_id": entity_id,
+                "friendly_name": entity["custom_name"] or entity["friendly_name"],
+                "count": count,
+            })
     results.sort(key=lambda r: r["count"], reverse=True)
     return results
 
@@ -793,6 +797,7 @@ def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
         aggregation_type = entity["aggregation_type"]
+        hourly_rollup = bool(entity["hourly_rollup"])
         deleted = index.get_deleted_counts_for_entity(entity_id)
         if not deleted:
             continue
@@ -824,14 +829,19 @@ def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
                 tmp_path = path.with_suffix(".tmp")
                 pq.write_table(kept_table, tmp_path, compression="zstd")
                 tmp_path.replace(path)
-                rollup.replace_month(data_dir, entity_id, aggregation_type, kept_table, year, month, tz)
+                rollup.replace_month(
+                    data_dir, entity_id, aggregation_type, kept_table, year, month, tz,
+                    hourly_rollup=hourly_rollup,
+                )
                 new_size = path.stat().st_size
             else:
                 # Jeder Rohwert dieses Monats war weich gelöscht — Archivdatei
                 # und zugehörige Rollup-Zeilen komplett entfernen statt eine
                 # leere Parquet-Datei/eine Monats-Zeile ohne Grundlage zu behalten.
                 path.unlink()
-                rollup.remove_month(data_dir, entity_id, aggregation_type, year, month, tz)
+                rollup.remove_month(
+                    data_dir, entity_id, aggregation_type, year, month, tz, hourly_rollup=hourly_rollup
+                )
                 new_size = 0
                 entity_had_emptied_month = True
 
@@ -865,7 +875,7 @@ def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
 
 def _rewrite_archive_month(
     data_dir: Path, index: Index, entity_id: str, aggregation_type: str, rows: list[tuple[float, float]],
-    year: int, month: int, tz: ZoneInfo,
+    year: int, month: int, tz: ZoneInfo, hourly_rollup: bool = False,
 ) -> None:
     """Schreibt einen archivierten Monat komplett neu aus `rows` (bereits
     sortiert, inkl. der Änderung) und berechnet die Rollup-Zeilen dieses
@@ -880,7 +890,9 @@ def _rewrite_archive_month(
     tmp_path = archive_path.with_suffix(".tmp")
     pq.write_table(table, tmp_path, compression="zstd")
     tmp_path.replace(archive_path)
-    rollup.replace_month(data_dir, entity_id, aggregation_type, table, year, month, tz)
+    rollup.replace_month(
+        data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
+    )
     new_size = archive_path.stat().st_size
     index.add_size_bytes(entity_id, new_size - old_size)
 
@@ -916,7 +928,8 @@ def add_raw_value(
         rows.append((ts, value))
         rows.sort()
         _rewrite_archive_month(
-            data_dir, index, entity_id, entity["aggregation_type"], rows, ts_dt.year, ts_dt.month, tz
+            data_dir, index, entity_id, entity["aggregation_type"], rows, ts_dt.year, ts_dt.month, tz,
+            hourly_rollup=bool(entity["hourly_rollup"]),
         )
 
     index.add_row_count(entity_id, 1)
@@ -975,7 +988,8 @@ def correct_raw_value(
         if not changed:
             return False
         _rewrite_archive_month(
-            data_dir, index, entity_id, entity["aggregation_type"], new_rows, ts_dt.year, ts_dt.month, tz
+            data_dir, index, entity_id, entity["aggregation_type"], new_rows, ts_dt.year, ts_dt.month, tz,
+            hourly_rollup=bool(entity["hourly_rollup"]),
         )
 
     return True

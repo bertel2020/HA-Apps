@@ -547,6 +547,7 @@ def _recover_current_archive(
     label: str,
     month_rows: list[tuple[float, float]],
     tz: ZoneInfo,
+    hourly_rollup: bool = False,
 ) -> int:
     """Repariert eine unzulässige Archivdatei des laufenden Monats.
 
@@ -566,7 +567,7 @@ def _recover_current_archive(
     old_size = archive_path.stat().st_size
     archive_path.unlink()
     index.add_size_bytes(entity_id, -old_size)
-    rollup.remove_month(data_dir, entity_id, aggregation_type, year, month, tz)
+    rollup.remove_month(data_dir, entity_id, aggregation_type, year, month, tz, hourly_rollup=hourly_rollup)
     return len(recovered)
 
 
@@ -730,6 +731,7 @@ def import_rows(
     if entity is None:
         raise ValueError(f"Unbekannte Entität: {entity_id}")
     aggregation_type = entity["aggregation_type"]
+    hourly_rollup = bool(entity["hourly_rollup"])
 
     by_month = _group_by_month(rows, tz)
     to_import, to_merge, to_update, to_skip = _classify_months(
@@ -757,7 +759,9 @@ def import_rows(
         archive_path = archive_dir / f"{label}.parquet"
         pq.write_table(table, archive_path, compression="zstd")
         index.add_size_bytes(entity_id, archive_path.stat().st_size)
-        rollup.append_completed_month(data_dir, entity_id, aggregation_type, table, year, month, tz)
+        rollup.append_completed_month(
+            data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
+        )
 
         result.imported_months.append(label)
         result.rows_imported += len(month_rows)
@@ -773,7 +777,7 @@ def import_rows(
         if (archive_dir / f"{label}.parquet").exists():
             result.rows_recovered += _recover_current_archive(
                 data_dir, index, entity_id, aggregation_type,
-                year, month, label, month_rows, tz,
+                year, month, label, month_rows, tz, hourly_rollup=hourly_rollup,
             )
             result.repaired_current_months.append(label)
         new_rows = _new_rows_for_merge(data_dir, entity_id, month_rows, tz)
@@ -824,7 +828,7 @@ def import_rows(
         # Ein ergänzter Zählerwert kann auch den Referenzwert des Folgemonats
         # verändern. Deshalb alle Rollups der Entität atomar aus den nun
         # vollständigen Roharchiven neu aufbauen, nicht nur den einen Monat.
-        rollup.rebuild_entity_rollups(data_dir, entity_id, aggregation_type, tz)
+        rollup.rebuild_entity_rollups(data_dir, entity_id, aggregation_type, tz, hourly_rollup=hourly_rollup)
 
     if written_rows:
         _backfill_index_stats(index, entity_id, written_rows)

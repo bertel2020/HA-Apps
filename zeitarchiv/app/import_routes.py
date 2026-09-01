@@ -34,6 +34,7 @@ from starlette.background import BackgroundTask
 import pyarrow.parquet as pq
 
 from .formatting import (
+    entity_display_name,
     format_int,
     format_size,
     format_time,
@@ -392,7 +393,11 @@ class ImportService:
         with self._scan_cache.lock:
             variables = self._scan_cache.variables or []
         entity_options = [
-            (row["entity_id"], row["friendly_name"] or row["entity_id"], row["unit"] or "")
+            (
+                row["entity_id"],
+                entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+                row["unit"] or "",
+            )
             for row in self.deps.index.list_entities()
         ]
         names = self._load_symcon_names()
@@ -591,7 +596,7 @@ class ImportService:
                         available_label = f"Keine {kind} im gewählten Zeitraum"
             entities.append({
                 "entity_id": entity_id,
-                "friendly_name": row["friendly_name"] or entity_id,
+                "friendly_name": entity_display_name(entity_id, row["friendly_name"], row["custom_name"]),
                 "unit": row["unit"],
                 "aggregation_type": row["aggregation_type"],
                 "type_label": format_type(row["aggregation_type"]),
@@ -865,7 +870,11 @@ class ImportService:
         entity_id: str = "",
     ) -> dict:
         entity_options = [
-            (row["entity_id"], row["friendly_name"] or row["entity_id"], row["unit"] or "")
+            (
+                row["entity_id"],
+                entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+                row["unit"] or "",
+            )
             for row in self.deps.index.list_entities()
         ]
         base = {
@@ -2293,7 +2302,11 @@ class ImportService:
                             continue
                         result.append({
                             "entity_id": entity_id,
-                            "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                            "friendly_name": entity_display_name(
+                                entity_id,
+                                entity["friendly_name"] if entity else None,
+                                entity["custom_name"] if entity else None,
+                            ),
                             "available_label": self._ha_available_label(history, history_source),
                             "plan": plan,
                             "full_summary": (
@@ -2481,7 +2494,11 @@ class ImportService:
                                 continue
                             run_items.append({
                                 "entity_id": entity_id,
-                                "friendly_name": (entity["friendly_name"] if entity else None) or entity_id,
+                                "friendly_name": entity_display_name(
+                                    entity_id,
+                                    entity["friendly_name"] if entity else None,
+                                    entity["custom_name"] if entity else None,
+                                ),
                                 "available_label": self._ha_available_label(history, history_source),
                                 "result": result,
                                 "full_summary": (

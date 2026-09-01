@@ -67,7 +67,7 @@
 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
 {%- endmacro %}
 
-<div class="topnav" x-data="{ systemOpen: false, dashboardsOpen: false, drawerOpen: false, drawerSystemOpen: {{ 'true' if nav_system else 'false' }}, drawerDashboardsOpen: {{ 'true' if nav_dashboards else 'false' }} }">
+<div class="topnav" x-data="{ systemOpen: false, dashboardsOpen: false, noticesOpen: false, drawerOpen: false, drawerSystemOpen: {{ 'true' if nav_system else 'false' }}, drawerDashboardsOpen: {{ 'true' if nav_dashboards else 'false' }} }">
   <div class="topnav-bar">
     <a class="topnav-brand" href="{{ app_root }}/">
       <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
@@ -122,6 +122,119 @@
         </div>
       </div>
     </nav>
+
+    {# Meldungs-Center: aus jeder gerenderten Seite gefüllt (siehe
+       _notices_context in main.py, context_processors), deshalb hier immer
+       verfügbar, egal welche Seite _topnav.html einbindet. Kein eigener
+       Dismiss-/Gelesen-Zustand — die Liste ist direkt aus dem aktuellen
+       Systemzustand abgeleitet und leert sich von selbst, sobald die
+       jeweilige Ursache behoben ist (Index optimiert, nächstes Backup
+       erfolgreich, …). #}
+    <div class="topnav-notice" @click.outside="noticesOpen = false">
+      <button type="button" class="notice-btn{{ ' is-open' if noticesOpen }}" @click="noticesOpen = !noticesOpen"
+              :aria-expanded="noticesOpen.toString()" aria-haspopup="true" aria-label="Meldungen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        {% if notices %}<span class="notice-badge">{{ notices | length if notices | length <= 9 else '9+' }}</span>{% endif %}
+      </button>
+      <div class="notice-panel" x-show="noticesOpen" x-cloak>
+        <div class="notice-panel-head">
+          <h3><a class="notice-panel-title-link" href="{{ app_root }}/settings#meldungen">Meldungen</a></h3>
+          <span>{{ notices | length ~ ' offen' if notices else 'Alles erledigt' }}</span>
+        </div>
+        <ul class="notice-list"{% if not notices %} hidden{% endif %}>
+          {% for notice in notices %}
+          <li class="notice-row" data-notice-id="{{ notice.id }}">
+            <a class="notice-row-link" href="{{ app_root }}{{ notice.link }}">
+              <span class="notice-dot {{ notice.severity }}"></span>
+              <span class="notice-body">
+                <span class="notice-row-title">{{ notice.title }}</span>
+                <span class="notice-row-detail">{{ notice.detail }}</span>
+                <span class="notice-row-meta">{{ notice.meta }}</span>
+              </span>
+              <svg class="notice-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9,6 15,12 9,18"/></svg>
+            </a>
+            {% if notice.mutable %}
+            <button type="button" class="notice-mute-btn" data-tooltip="Stumm schalten"
+                    aria-label="Stumm schalten" onclick="toggleSnoozeOptions(event)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+            {# Ersetzt Link+Mute-Button INNERHALB derselben Zeile (siehe
+               is-snoozing-Klasse auf .notice-row), statt eines zusätzlichen
+               schwebenden Popovers — .notice-list hat overflow-y:auto und
+               würde ein frei positioniertes Popover genauso abschneiden wie
+               vorher schon den Tooltip (siehe :has()-Fix weiter oben in
+               app.css). Inline vermeidet das Problem von vornherein. #}
+            <div class="notice-snooze-options" hidden>
+              <span class="notice-snooze-label">Stumm schalten für</span>
+              <span class="notice-snooze-buttons">
+                {% for key in ['1h', '1d', '7d', '30d', 'forever'] %}
+                <button type="button" data-duration="{{ key }}" onclick="muteNotice(event)">{{ snooze_labels[key] }}</button>
+                {% endfor %}
+              </span>
+              <button type="button" class="notice-snooze-cancel" aria-label="Abbrechen" onclick="toggleSnoozeOptions(event)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+              </button>
+            </div>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="notice-empty"{% if notices %} hidden{% endif %}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <div>Keine offenen Meldungen.</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Öffnet/schließt die Dauer-Auswahl INNERHALB derselben Zeile (statt
+      // eines zusätzlichen schwebenden Popovers, siehe Kommentar im
+      // Template) — blendet Link+Mute-Button aus, Dauer-Buttons ein.
+      function toggleSnoozeOptions(evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const li = evt.currentTarget.closest('.notice-row');
+        if (!li) return;
+        const options = li.querySelector('.notice-snooze-options');
+        const opening = li.classList.toggle('is-snoozing');
+        if (options) options.hidden = !opening;
+      }
+
+      // Mute-Aktion aktualisiert nur den DOM direkt (Badge/Zähler/Zeile),
+      // statt das ganze Meldungs-Fragment per htmx neu zu rendern — das
+      // Panel hängt an Alpines noticesOpen (siehe x-data oben), ein
+      // outerHTML-Swap würde diese Bindung ohne zusätzlichen
+      // Alpine.initTree()-Aufruf verlieren. Gleiches Muster wie
+      // toggleFavorite() in favorite-toggle.js.
+      async function muteNotice(evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const li = evt.currentTarget.closest('.notice-row');
+        const noticeId = li ? li.dataset.noticeId : null;
+        const duration = evt.currentTarget.dataset.duration;
+        if (!noticeId || !duration) return;
+        try {
+          const body = new URLSearchParams({duration});
+          const res = await fetch('{{ app_root }}/notices/' + encodeURIComponent(noticeId) + '/mute', {method: 'POST', body});
+          if (!res.ok) return;
+          const data = await res.json();
+          if (li) li.remove();
+          document.querySelectorAll('.notice-badge').forEach((badge) => {
+            if (data.remaining_count > 0) badge.textContent = data.remaining_count > 9 ? '9+' : String(data.remaining_count);
+            else badge.remove();
+          });
+          document.querySelectorAll('.notice-panel-head span').forEach((el) => {
+            el.textContent = data.remaining_count > 0 ? data.remaining_count + ' offen' : 'Alles erledigt';
+          });
+          if (data.remaining_count === 0) {
+            document.querySelectorAll('.notice-list').forEach((el) => { el.hidden = true; });
+            document.querySelectorAll('.notice-empty').forEach((el) => { el.hidden = false; });
+          }
+        } catch (e) {
+          // Netzwerkfehler: Zeile bleibt stehen, kein stiller falscher Erfolg.
+        }
+      }
+    </script>
 
     <button type="button" class="topnav-burger" @click="drawerOpen = true" aria-label="Menü öffnen">
       {{ nav_icon('menu') }}

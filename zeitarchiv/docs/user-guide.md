@@ -66,6 +66,14 @@ darunter das **Standard-Dashboard** — dieselbe Kachel-Ansicht wie unter
 oder löschbar. Es lässt sich wie jedes andere Dashboard mit Kacheln
 bestücken, umsortieren und fixieren (siehe unten).
 
+Die Glocke in der Kopfzeile (auf jeder Seite sichtbar) zeigt aktuelle
+Systemmeldungen — z. B. eine empfohlene Index-Optimierung, einen
+fehlgeschlagenen Backup- oder Aufbewahrungslauf, oder ein verfügbares
+Update. Nicht-kritische Meldungen (Info/Warnung) lassen sich einzeln für
+1 Stunde, 1 Tag, 7 Tage, 30 Tage oder dauerhaft stummschalten; Fehler nie.
+Bereits stummgeschaltete Meldungen bleiben unter **Einstellungen →
+Meldungen** einsehbar und lassen sich dort vorzeitig wieder aktivieren.
+
 ## Übersichten durchsuchen und sortieren
 
 Die drei Übersichten **Dashboards**, **Charts** und **Tabellen** funktionieren
@@ -248,6 +256,7 @@ Verlaufsansicht) erreichbar:
 
 | Feld | Bedeutung |
 | --- | --- |
+| App-eigener Anzeigename | Optional, bis 40 Zeichen — überschreibt nur die Darstellung in Zeitarchiv, nie Home Assistants eigenen `friendly_name` oder die Entitäts-ID selbst. Ein Tag-Symbol markiert überall, wo er aktiv ist; leer lassen setzt den Standardnamen zurück |
 | Auflösung | Mindestabstand zwischen zwei gespeicherten Werten (z. B. "alle 5 Minuten"); engmaschigere Quellwerte werden entsprechend verdichtet |
 | Aufbewahrung | Wie lange Werte behalten werden, bevor eine aktivierte automatische Löschung greift (**Unbegrenzt** möglich) |
 | Nachkommastellen | „Automatisch“ zeigt bis zu drei Stellen und entfernt Nullen am Ende (z. B. 4 statt 4,000); eine feste Anzahl (0–3) rundet auf genau diese Stellen und ergänzt bei Bedarf Nullen (z. B. 4,00 bei 2 Stellen) |
@@ -671,7 +680,10 @@ Speicher-Ladezustand und Speicher-Wirkungsgrad — ein Klick auf einen Ring
 im Kopfbereich fassen Kosten- und CO₂-Bilanz (mit eigenem Festpreis-Feld, wenn
 keine passende Entität vorhanden ist), die PV-Ertragsprognose sowie einen
 Datenqualitäts-Check (Bilanzplausibilität, veraltete Sensorwerte) zusammen.
-Ein Tageslastprofil zeigt den stündlichen Verbrauch der letzten 7 Tage.
+Ein Tageslastprofil zeigt bei Tag/Stunde den stündlichen Verbrauch der
+letzten 7 Kalendertage; bei Monat/Jahr stattdessen den nach Wochentag
+gemittelten Verbrauch (Mo–So) über den gewählten Zeitraum, sodass erkennbar
+wird, an welchen Wochentagen typischerweise mehr verbraucht wird.
 
 ### Benötigte und sinnvolle Entitäten
 
@@ -936,14 +948,18 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 | **Rotation** | Zeigt Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat |
 | **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung) oben) |
 | **Aufbewahrung** | Vorschau fälliger Löschungen, Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag), Lauf-Historie |
+| **Meldungen** | Übersicht stummgeschalteter Systemmeldungen (Glocke in der Kopfzeile) mit verbleibender Dauer; einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start |
-| **Protokollierung** | Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung sowie Logansicht mit lokalem Live-Puffer oder Supervisor-Historie. Erfolgreiche interne Polls bleiben ruhig; langsame und fehlgeschlagene Anfragen weiterhin sichtbar. |
-| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit |
-| **Über Zeitarchiv** | Version, Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
+| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
+| **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
 
 Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
 sofort — die Zeitarchiv-Integration muss danach mit dem neuen Token
 aktualisiert werden, sonst schlagen weitere Schreibversuche fehl.
+
+Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung und die Logansicht selbst
+sind keine Einstellungen-Sektion mehr, sondern liegen direkt auf der Seite
+**Protokoll** (Home-Assistant-Seitenleiste bzw. Menü).
 
 Für den Normalbetrieb sind `warning` und HTTP **Nur fehlgeschlagene Anfragen**
 die empfohlenen Einstellungen. `debug` und der Entity-Trace sind zeitlich

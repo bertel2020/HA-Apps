@@ -77,6 +77,15 @@
     return promise.then((result) => { cancelBtn.style.display = ''; return result; });
   };
 
+  // Fehlgeschlagene Backup-/Retention-Jobs (backup.html, settings.html):
+  // Zeile ist per data-error klickbar statt eines nativen title-Tooltips
+  // (passte optisch nicht zur restlichen App und war auf Touch-Geräten
+  // ohnehin nie erreichbar) — zeigt den vollen Fehlertext im selben
+  // App-Popup wie appAlert().
+  window.showJobError = function (tr) {
+    window.appAlert(tr.dataset.error, {danger: true});
+  };
+
   document.body.addEventListener('htmx:confirm', function (evt) {
     if (!evt.detail.question) return; // kein hx-confirm auf diesem Element
     evt.preventDefault();

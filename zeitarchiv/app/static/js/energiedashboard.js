@@ -248,10 +248,6 @@
         }
         currentRenderChart = (data) => this.renderChart(data);
         this.load();
-        // Unabhängig von Tag/Monat/Jahr-Auswahl — die Heatmap zeigt immer
-        // die letzten 7 Tage, muss also nicht bei jedem setRange()/goBack()
-        // neu geladen werden.
-        this.loadHeatmap();
         if (!resizeListenerAdded) {
           resizeListenerAdded = true;
           window.addEventListener('resize', () => {
@@ -482,11 +478,22 @@
         } finally {
           this.loading = false;
         }
+        // Eigener, unabhängiger Fetch (eigenes try/catch unten) — ein
+        // Fehlschlag hier soll die restliche Seite nicht als loadError
+        // markieren, die Karte blendet sich per x-show einfach aus.
+        this.loadHeatmap();
       },
 
+      // Bei Tag/Stunde unverändert die letzten 7 Kalendertage (vom Zeitraum-
+      // Umschalter entkoppelt), bei Monat/Jahr wochentagsweise gemittelt über
+      // den aktuell gewählten Zeitraum — siehe compute_heatmap_weekday() in
+      // energiedashboard_routes.py. range/offset kommen aus demselben
+      // Zustand wie load(), deshalb hier nicht als Parameter, sondern direkt
+      // aus this gelesen.
       async loadHeatmap() {
         try {
-          const res = await fetch('energiedashboard/heatmap');
+          const params = new URLSearchParams({range: this.range, offset: String(this.offset)});
+          const res = await fetch(`energiedashboard/heatmap?${params}`);
           if (!res.ok) return;
           this.heatmap = await res.json();
           // Die Karte hängt an x-show="heatmap.rows.length" (startet leer,
@@ -500,6 +507,16 @@
           // einfach aus (heatmap.rows bleibt leer), keine eigene Fehleranzeige
           // nötig für eine zusätzliche, nicht zentrale Kachel.
         }
+      },
+
+      // Kurzhinweis neben dem Kachel-Titel: bei Monat/Jahr sind die Zeilen
+      // wochentagsweise gemittelt statt konkrete Kalendertage — ohne diesen
+      // Hinweis wäre der Bedeutungswechsel der Zeilen nicht ersichtlich.
+      // periodText kommt aus load() (derselbe range/offset), deshalb hier
+      // ohne eigene Datumsformatierung wiederverwendet.
+      heatmapNote() {
+        if (this.range === 'month' || this.range === 'year') return `Ø je Wochentag · ${this.periodText}`;
+        return 'letzte 7 Tage';
       },
 
       // Als ECharts-heatmap-Serie statt eigenem HTML/CSS-Grid gerendert —

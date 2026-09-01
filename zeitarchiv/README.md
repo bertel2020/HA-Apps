@@ -134,14 +134,21 @@ mit Stunde-/Tag-/Monat-/Jahr-Navigation:
 - **Kosten und CO₂:** Bilanz aus Strompreis- bzw. CO₂-Entität oder einem
   eigenen Festpreis, falls keine passende Entität vorhanden ist.
 - **PV-Ertragsprognose** und ein **Tageslastprofil** (stündlicher Verbrauch
-  der letzten 7 Tage).
+  der letzten 7 Tage; bei Monat/Jahr stattdessen nach Wochentag gemittelt).
 - **Datenqualitäts-Check:** prüft die Energiebilanz auf Plausibilität und
   meldet veraltete Sensorwerte, statt sie unbemerkt zu glätten.
 
 **Entitäten und Verläufe.** Jede archivierte Entität besitzt eine eigene
 Verlaufsansicht mit Zeitraum-Navigation von Stunde bis Dekade, Vergleich mit
 Vorperiode oder Vorjahr sowie individuell einstellbarer Auflösung,
-Aufbewahrung und Rundung.
+Aufbewahrung und Rundung. Ein optionaler, rein app-interner Anzeigename
+überschreibt bei Bedarf Home Assistants eigenen Namen nur in der
+Darstellung.
+
+**Meldungen.** Die Glocke in der Kopfzeile bündelt Systemhinweise —
+empfohlene Wartung, fehlgeschlagene Backup-/Aufbewahrungsläufe, verfügbare
+Updates. Einzelne Meldungen lassen sich befristet oder dauerhaft
+stummschalten; echte Fehler nie.
 
 **Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
 unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren

@@ -239,15 +239,17 @@
        calendar-picker.js). Kein größeres entityChart()-artiges Objekt nötig:
        die eigentliche Navigation läuft weiterhin über htmx-Formularfelder,
        nicht über Alpine-Reaktivität. -->
+  {% from "_icons.html" import custom_name_icon %}
   {% include "_topnav.html" %}
+  {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page" x-data="{ range: 'day', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
     <div class="h1-row">
-      <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
+      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
               title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
-      {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
 

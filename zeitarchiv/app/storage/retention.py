@@ -174,7 +174,14 @@ def enforce_retention_for_entity(
 
     entity = index.get_entity(entity_id)
     aggregation_type = entity["aggregation_type"] if entity else "standard"
-    _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, _FINE_LEVEL[aggregation_type]), tz, deleted_months)
+    fine_level = _FINE_LEVEL[aggregation_type]
+    _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, fine_level), tz, deleted_months)
+    if aggregation_type == "counter" and entity and entity["hourly_rollup"] and fine_level != "stunde":
+        # Zusätzliche Stunden-Stufe (additiv neben tag.parquet geschrieben,
+        # siehe rollup.append_completed_month) muss beim Ablauf der
+        # Aufbewahrungsfrist ebenfalls bereinigt werden, sonst würde sie
+        # unbegrenzt weiterwachsen.
+        _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, "stunde"), tz, deleted_months)
     _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, "monat"), tz, deleted_months)
     _prune_year_rollup(data_dir, entity_id, tz, deleted_months)
     months_deleted = len(deleted_months)

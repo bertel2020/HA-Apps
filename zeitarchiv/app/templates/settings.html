@@ -42,9 +42,39 @@
   .about-app-name{font-family:var(--font-display);font-size:calc(20px * var(--font-scale,1));font-weight:700;color:var(--ink);}
   .about-version-badge{
     font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale,1));font-weight:600;
-    color:var(--accent-line);background:var(--accent-line-soft);padding:2px 9px;border-radius:999px;
+    color:var(--ink-muted);background:var(--surface);border:1px solid var(--border);padding:2px 9px;border-radius:999px;
   }
   .about-tagline{margin:0;color:var(--ink-muted);font-size:calc(13.5px * var(--font-scale,1));line-height:1.55;max-width:640px;}
+  /* Neutral (grau) für "Aktuell" — reine Bestätigung, kein Handlungsbedarf.
+     .is-update nutzt --accent-bar (Orange) statt --accent-line (der schon
+     die Marken-/Link-Farbe der App ist) als eigenständiges, auffälligeres
+     Signal "hier gibt es etwas zu tun" — dieselbe Farbe wie die Index-
+     Optimierung-Meldung im Meldungs-Center, damit beide "empfehlende"
+     Signale konsistent aussehen. */
+  .about-update-chip{
+    font-size:calc(11.5px * var(--font-scale,1));font-weight:600;padding:2px 9px;border-radius:999px;
+    color:var(--ink-faint);background:var(--surface);border:1px solid var(--border);
+    text-decoration:none;
+  }
+  a.about-update-chip.is-update{color:var(--accent-bar);background:var(--accent-bar-soft);border-color:transparent;}
+  a.about-update-chip.is-update:hover{text-decoration:underline;}
+  /* Hintergrundprozesse (Diagnose): eine Zeile je Wartungsplaner-Aufgabe,
+     dieselbe .settings-compact-row wie "Prozess" darüber, nur mit einem
+     zusätzlichen Status-Pill rechts neben dem Zeitstempel. "OK"/"–" bleiben
+     bewusst gedeckt (var(--surface-alt), wie about-update-chip's Neutral-
+     Zustand) — nur "ausstehend"/"Fehler" bekommen eine auffällige Farbe,
+     dieselbe Konvention wie überall sonst in der App (Akzentfarbe ist kein
+     "es läuft alles"-Signal, sondern "hier gibt es etwas zu sehen"). */
+  .bgproc-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .bgproc-row:last-of-type{border-bottom:none;}
+  .bgproc-name{font-size:calc(13px * var(--font-scale,1));color:var(--ink);}
+  .bgproc-hint{font-size:calc(11.5px * var(--font-scale,1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+  .bgproc-right{display:flex;align-items:center;gap:10px;flex:none;}
+  .bgproc-lastrun{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale,1));color:var(--ink-muted);white-space:nowrap;}
+  .bgproc-pill{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale,1));font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;color:var(--ink-faint);background:var(--surface-alt);border:1px solid var(--border);}
+  .bgproc-pill.ok{color:var(--ink-muted);}
+  .bgproc-pill.pending{color:var(--accent-bar);background:var(--accent-bar-soft);border-color:transparent;}
+  .bgproc-pill.error{color:var(--danger);background:var(--danger-soft);border-color:transparent;}
   /* auto-fit statt einer festen Spaltenzahl — bleibt bei nur zwei Einträgen
      (Zeitzone/Datenverzeichnis) zweispaltig auf breiten Bildschirmen und
      fällt auf schmalen von selbst einspaltig, ohne eigene @media-Regel. */
@@ -132,18 +162,35 @@
           </div>
         </section>
 
+        <section id="meldungen" class="settings-section">
+          <h2 class="settings-section-title">Meldungen</h2>
+          <p class="settings-section-description">Stummgeschaltete Meldungen aus dem Meldungs-Center (Glocken-Icon oben) &mdash; nur Empfehlungen lassen sich stumm schalten, keine Fehler.</p>
+          {% if muted_notices %}
+          <div class="settings-compact-list" id="muted-notices-list">
+            {% for entry in muted_notices %}
+            <div class="settings-compact-row" data-notice-id="{{ entry.id }}">
+              <div class="settings-compact-row-text">
+                <span class="settings-compact-label">{{ entry.title }}</span>
+                <div class="settings-compact-hint">{{ entry.detail }}</div>
+                <div class="settings-compact-hint">
+                  Stummgeschaltet seit {{ entry.muted_at_text }}
+                  {% if entry.until_text %} &middot; läuft ab {{ entry.until_text }} aus{% endif %}
+                  {% if entry.meta %} &middot; {{ entry.meta }}{% endif %}
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm" onclick="unmuteNotice(event)">Zurückholen</button>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty">Keine stummgeschalteten Meldungen.</div>
+          {% endif %}
+        </section>
+
         <section id="verbindung" class="settings-section">
           <h2 class="settings-section-title">Verbindung</h2>
           <div id="verbindung-form">
             {% include "_settings_verbindung_form.html" %}
-          </div>
-        </section>
-
-        <section id="protokollierung" class="settings-section">
-          <h2 class="settings-section-title">Protokollierung</h2>
-          <p class="settings-section-description">Loglevel der App und Protokollierung von HTTP-Anfragen steuern.</p>
-          <div id="logging-settings">
-            {% include "_settings_logging_form.html" %}
           </div>
         </section>
 
@@ -175,6 +222,24 @@
               </div>
             </div>
           </div>
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Hintergrundprozesse</h3>
+            <p class="hint">Was der Wartungsplaner alle 30 Sekunden im Hintergrund prüft/berechnet, mit letztem Lauf und Status.</p>
+            <div>
+              {% for proc in background_processes %}
+              <div class="bgproc-row">
+                <div>
+                  <div class="bgproc-name">{{ proc.name }}</div>
+                  <div class="bgproc-hint">{{ proc.hint }}</div>
+                </div>
+                <div class="bgproc-right">
+                  <span class="bgproc-lastrun">{{ proc.last_run }}</span>
+                  <span class="bgproc-pill {{ proc.pill_class }}">{{ proc.pill_label }}</span>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
         </section>
 
         <section id="ueber" class="settings-section">
@@ -196,6 +261,13 @@
               <div class="about-card-heading">
                 <span class="about-app-name">Zeitarchiv</span>
                 <span class="about-version-badge">v{{ app_version }}</span>
+                {% if update_available %}
+                <a class="about-update-chip is-update" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">
+                  Update auf v{{ latest_version }} verfügbar
+                </a>
+                {% elif latest_version %}
+                <span class="about-update-chip">Aktuell</span>
+                {% endif %}
               </div>
               <p class="about-tagline">Home-Assistant-App zur langfristigen Archivierung und Auswertung von Entitäts-Zeitreihen &mdash; platzsparende Parquet+zstd-Speicherung, Charts, Tabellen, Import/Export und sichere Datenpflege.</p>
             </div>
@@ -234,6 +306,24 @@
   <script src="static/js/entity-picker.js?v={{ js_v }}"></script>
   <script src="static/js/sortable-table.js?v={{ js_v }}"></script>
   <script>
+    async function unmuteNotice(evt) {
+      const btn = evt.currentTarget;
+      const row = btn.closest('.settings-compact-row');
+      const noticeId = row ? row.dataset.noticeId : null;
+      if (!noticeId) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch('notices/' + encodeURIComponent(noticeId) + '/unmute', {method: 'POST'});
+        if (!res.ok) { btn.disabled = false; return; }
+        if (row) row.remove();
+        const list = document.getElementById('muted-notices-list');
+        if (list && !list.querySelector('.settings-compact-row')) {
+          list.outerHTML = '<div class="empty">Keine stummgeschalteten Meldungen.</div>';
+        }
+      } catch (e) {
+        btn.disabled = false;
+      }
+    }
     function toggleTokenVisibility(btn) {
       const el = document.getElementById('token-value');
       const masked = el.dataset.masked === 'true';

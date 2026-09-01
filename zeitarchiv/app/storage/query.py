@@ -436,6 +436,53 @@ def _query_completed_plus_live_fine(
     return sorted(completed + live, key=lambda r: r.bucket_start)
 
 
+def query_hourly_counter_series(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    window_start: datetime,
+    window_end: datetime,
+    tz: ZoneInfo,
+    now_local: datetime,
+    read_cache: QueryReadCache | None = None,
+) -> dict[float, float]:
+    """(Bucket-Zeitstempel -> Stunden-Delta) einer Zähler-Entität über ein
+    beliebig langes Fenster (mehrere Monate/ein Jahr), aus der zusätzlichen
+    Stunden-Rollup-Stufe (rollup/<entity>/stunde.parquet, siehe
+    rollup.append_completed_month hourly_rollup) für abgeschlossene Monate +
+    live aus dem Hot Buffer für den laufenden Monat — dieselbe
+    Rollup/Live-Aufteilung wie _query_completed_plus_live_fine(), aber fest
+    auf Stunden-Buckets und ohne dessen Beschränkung auf ein Fenster
+    innerhalb des laufenden/vorherigen Monats.
+
+    Nur für Zähler mit gesetztem entities.hourly_rollup sinnvoll — ohne
+    Rollup-Datei liefert der abgeschlossene Teil einfach nichts (kein
+    Fehler), Aufrufer (energiedashboard_routes.py) filtert die Rolle
+    entsprechend vorher."""
+    current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    completed_end = min(window_end, current_month_start)
+    completed = _read_rollup_rows(
+        data_dir, entity_id, "stunde", window_start.timestamp(), completed_end.timestamp()
+    )
+
+    live_start = max(window_start, current_month_start)
+    live: list[rollup.FineRow] = []
+    if live_start < window_end:
+        rows = _read_hot_rows_filtered(
+            data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
+            read_cache,
+        )
+        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+        key_fn = rollup.named_bucket_key(tz, "stunde")
+        next_fn = rollup.named_bucket_next(tz, "stunde")
+        live, _ = rollup.compute_fine_rollup_with_key(
+            rows, "counter", key_fn, boundary, window_end.timestamp(), bucket_next_fn=next_fn
+        )
+
+    return {row.bucket_start: (row.value or 0.0) for row in completed + live}
+
+
 def _month_live_row(
     data_dir: Path,
     index: Index,
