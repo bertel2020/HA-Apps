@@ -55,17 +55,6 @@ def build_notices(index, index_path: Path) -> list[dict]:
     vertrauen). Für die Anzeige in der Topnav siehe collect_notices()."""
     notices: list[dict] = []
 
-    # TODO DEMO — wieder entfernen. Nur zum Anschauen der "info"-Severity im
-    # Meldungs-Center eingefügt, es gibt dafür noch keine echte Quelle.
-    notices.append({
-        "id": "demo.info_example",
-        "severity": "info",
-        "title": "Beispiel: Info-Meldung",
-        "detail": "So sieht eine rein informative Meldung aus (severity=info) — nur zur Ansicht, keine echte Quelle.",
-        "meta": "Demo",
-        "link": "/settings",
-    })
-
     latest_version = version_check.latest_known_version(index)
     if latest_version and version_check.update_available(index, APP_VERSION):
         notices.append({
