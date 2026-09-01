@@ -51,6 +51,23 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Wiederherstellung und Zeitplan |
 | **Abgesichert** | Läuft hinter Home Assistants eigenem Login, Schreibzugriff strikt vom Rest der Oberfläche getrennt |
 
+## Screenshots
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/energiedashboard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/energiedashboard-light.png">
+    <img src="docs/img/energiedashboard-light.png" alt="Energiedashboard: Sankey-Energiefluss über einen Monat" width="100%">
+  </picture>
+  <br><sub>Energiedashboard — Energiefluss als Sankey-Diagramm</sub>
+</p>
+
+<p align="center">
+  <img src="docs/img/dashboard-energie.png" alt="Ein Dashboard mit Vergleichstabelle und Charts" width="49%">
+  <img src="docs/img/meldungen.png" alt="Meldungs-Center in der Kopfzeile" width="49%">
+  <br><sub>Frei kombinierbares Dashboard &nbsp;·&nbsp; Meldungs-Center</sub>
+</p>
+
 ## Zusammenspiel
 
 ```text

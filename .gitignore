@@ -18,3 +18,4 @@ htmlcov/
 */docker-compose.dev.yml
 *.log
 data/
+*/screenshots/
