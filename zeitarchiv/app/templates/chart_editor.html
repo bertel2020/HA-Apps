@@ -85,7 +85,7 @@
   {% include "_topnav.html" %}
   <div class="page" x-data="chartEditor()">
     <h1>Charts</h1>
-    <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ base }}/charts">&larr; Zurück</a></p>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ base }}/charts">&larr; zurück zu Charts</a></p>
 
     <div class="settings-panel">
         <div class="chart-title-row">
@@ -372,6 +372,7 @@
   <script src="{{ base }}/static/vendor/echarts.min.js"></script>
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
     // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
     // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen

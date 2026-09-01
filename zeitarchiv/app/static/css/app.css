@@ -3,6 +3,7 @@
   --ink:#131C17; --ink-muted:#4B584E; --ink-faint:#8A9484;
   --accent-line:#0C6B5D; --accent-bar:#B15E1B; --accent-line-soft:#E1F1EC; --accent-bar-soft:#F7E8D6;
   --accent-contrast:#FFFFFF; --danger:#A23B36; --danger-soft:#F4DEDB; --danger-contrast:#FFFFFF;
+  --positive:#2E7D46;
   --chart-line:#0C6B5D; --chart-bar:#B15E1B;
   --chart-1:#0C6B5D; --chart-2:#B15E1B; --chart-3:#3B6FA0; --chart-4:#8B5FBF;
   --chart-5:#C4472B; --chart-6:#4C8C4A; --chart-7:#B0932A; --chart-8:#5C6B73;
@@ -15,6 +16,7 @@
     --ink:#E8ECE4; --ink-muted:#9FAC9B; --ink-faint:#66756A;
     --accent-line:#4FC3AE; --accent-bar:#E2A15E; --accent-line-soft:#173430; --accent-bar-soft:#3A2A18;
     --accent-contrast:#0E1512; --danger:#E28A85; --danger-soft:#3A201E; --danger-contrast:#0E1512;
+    --positive:#6FCB88;
     --shadow:0 1px 2px rgba(0,0,0,.35);
   }
 }
@@ -23,6 +25,7 @@
   --ink:#E8ECE4; --ink-muted:#9FAC9B; --ink-faint:#66756A;
   --accent-line:#4FC3AE; --accent-bar:#E2A15E; --accent-line-soft:#173430; --accent-bar-soft:#3A2A18;
   --accent-contrast:#0E1512; --danger:#E28A85; --danger-soft:#3A201E; --danger-contrast:#0E1512;
+  --positive:#6FCB88;
   --shadow:0 1px 2px rgba(0,0,0,.35);
 }
 
@@ -34,6 +37,7 @@
   --ink:#202020; --ink-muted:#5E5E5E; --ink-faint:#7A7A7A;
   --accent-line:#006787; --accent-bar:#C94E00; --accent-line-soft:#DFF3FC; --accent-bar-soft:#FFF0E4;
   --accent-contrast:#FFFFFF; --danger:#B30532; --danger-soft:#FFF0EF; --danger-contrast:#FFFFFF;
+  --positive:#2E7D32;
   --chart-line:#009AC7; --chart-bar:#C94E00;
   --chart-1:#009AC7; --chart-2:#C94E00; --chart-3:#00883C; --chart-4:#8A5FC7;
   --chart-5:#DC3146; --chart-6:#18BCF2; --chart-7:#B77A00; --chart-8:#5E5E5E;
@@ -46,6 +50,7 @@
     --ink:#F3F3F3; --ink-muted:#CCCCCC; --ink-faint:#989898;
     --accent-line:#37C8FD; --accent-bar:#FF9342; --accent-line-soft:#002E3E; --accent-bar-soft:#5E1C00;
     --accent-contrast:#141414; --danger:#FD8F90; --danger-soft:#3E0913; --danger-contrast:#141414;
+    --positive:#66BB6A;
     --chart-line:#37C8FD; --chart-bar:#FF9342;
     --chart-1:#37C8FD; --chart-2:#FF9342; --chart-3:#5DC36F; --chart-4:#B99AF0;
     --chart-5:#FD8F90; --chart-6:#7BD4FB; --chart-7:#FFD166; --chart-8:#B1B1B1;
@@ -57,6 +62,7 @@
   --ink:#F3F3F3; --ink-muted:#CCCCCC; --ink-faint:#989898;
   --accent-line:#37C8FD; --accent-bar:#FF9342; --accent-line-soft:#002E3E; --accent-bar-soft:#5E1C00;
   --accent-contrast:#141414; --danger:#FD8F90; --danger-soft:#3E0913; --danger-contrast:#141414;
+  --positive:#66BB6A;
   --chart-line:#37C8FD; --chart-bar:#FF9342;
   --chart-1:#37C8FD; --chart-2:#FF9342; --chart-3:#5DC36F; --chart-4:#B99AF0;
   --chart-5:#FD8F90; --chart-6:#7BD4FB; --chart-7:#FFD166; --chart-8:#B1B1B1;
@@ -72,6 +78,7 @@
   --ink:#172033; --ink-muted:#566176; --ink-faint:#7B8598;
   --accent-line:#3157C8; --accent-bar:#0E7C86; --accent-line-soft:#E9EEFF; --accent-bar-soft:#E4F5F5;
   --accent-contrast:#FFFFFF; --danger:#C83737; --danger-soft:#FCE8E8; --danger-contrast:#FFFFFF;
+  --positive:#1F8A54;
   --warning:#A96700; --warning-soft:#FFF4D6;
   --chart-line:#3157C8; --chart-bar:#0E7C86;
   --chart-1:#3157C8; --chart-2:#0E7C86; --chart-3:#B85C00; --chart-4:#7646B8;
@@ -85,6 +92,7 @@
     --ink:#F3F6FB; --ink-muted:#B3BDCC; --ink-faint:#7F8A9D;
     --accent-line:#7EA1FF; --accent-bar:#4FB7B7; --accent-line-soft:#233463; --accent-bar-soft:#143B3E;
     --accent-contrast:#0F1218; --danger:#F07A7A; --danger-soft:#401F25; --danger-contrast:#0F1218;
+    --positive:#5FCB89;
     --warning:#E6A15A; --warning-soft:#3C2C18;
     --chart-line:#7EA1FF; --chart-bar:#4FB7B7;
     --chart-1:#7EA1FF; --chart-2:#4FB7B7; --chart-3:#E6A15A; --chart-4:#B994E8;
@@ -97,6 +105,7 @@
   --ink:#F3F6FB; --ink-muted:#B3BDCC; --ink-faint:#7F8A9D;
   --accent-line:#7EA1FF; --accent-bar:#4FB7B7; --accent-line-soft:#233463; --accent-bar-soft:#143B3E;
   --accent-contrast:#0F1218; --danger:#F07A7A; --danger-soft:#401F25; --danger-contrast:#0F1218;
+  --positive:#5FCB89;
   --warning:#E6A15A; --warning-soft:#3C2C18;
   --chart-line:#7EA1FF; --chart-bar:#4FB7B7;
   --chart-1:#7EA1FF; --chart-2:#4FB7B7; --chart-3:#E6A15A; --chart-4:#B994E8;
@@ -231,6 +240,7 @@ a.stat:hover .label{color:var(--accent-line);}
 .sparkline{display:block;width:100%;height:22px;margin-top:6px;overflow:visible;}
 .sparkline path.area{fill:var(--accent-line-soft);stroke:none;}
 .sparkline path.line{fill:none;stroke:var(--chart-line);stroke-width:1.5;vector-effect:non-scaling-stroke;}
+.sparkline circle.sparkline-dot{fill:var(--chart-line);stroke:var(--surface);stroke-width:0.75;vector-effect:non-scaling-stroke;}
 
 /* Toolbar / Filter-Chips / Suche */
 #controls,.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
@@ -560,6 +570,11 @@ td.mono{font-family:var(--font-mono);}
    Tooltip trägt — sonst würde die generische cursor:help-Regel oben einen
    eindeutig interaktiven Button fälschlich als "nur informativ" ausweisen. */
 button[data-tooltip]{cursor:pointer;}
+/* Opt-in für mehrzeilige Tooltips (z. B. Erzeuger-Aufschlüsselung) — echte
+   \n im data-tooltip-Wert werden mit white-space:normal (Basisregel unten)
+   sonst zu einem Leerzeichen zusammengefallen; pre-line respektiert sie als
+   Zeilenumbruch, ohne wie pre auch Mehrfach-Leerzeichen zu erhalten. */
+.tooltip-lines[data-tooltip]::after{white-space:pre-line;}
 [data-tooltip]::after{
   content:attr(data-tooltip);position:absolute;left:0;bottom:calc(100% + 6px);
   background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;

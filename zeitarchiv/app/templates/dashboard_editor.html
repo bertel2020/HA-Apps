@@ -27,7 +27,7 @@
   {% include "_topnav.html" %}
   <div class="page" x-data="dashboardEditor()">
     <h1>Dashboards</h1>
-    <p class="sub">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ base }}/dashboards">&larr; Zurück</a></p>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ base }}/dashboards">&larr; zurück zu Dashboards</a></p>
 
     <div class="settings-panel">
       <div class="dash-editor-title-row">
@@ -87,6 +87,7 @@
   </div>
 
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
     const DASHBOARD_ID = {{ dashboard.id | tojson if dashboard else 'null' }};

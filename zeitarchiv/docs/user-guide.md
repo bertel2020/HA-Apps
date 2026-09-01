@@ -18,6 +18,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Datenhandling](#datenhandling)
 - [Charts](#charts)
 - [Vergleichstabellen](#vergleichstabellen)
+- [Energiedashboard](#energiedashboard)
 - [Statistik](#statistik)
 - [Import und Export](#import-und-export)
 - [Backup / Restore](#backup--restore)
@@ -651,6 +652,26 @@ Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
 Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
 Unter **Verwendet in** sind die Dashboards, auf denen die Tabelle als Kachel
 liegt, direkt erreichbar.
+
+## Energiedashboard
+
+Eigenständige Ansicht (kein Eintrag im normalen Dashboard-System), die den
+Energiefluss eines Haushalts als Sankey-Diagramm zeigt. Sie wird über eine
+feste Kachel oben auf der Dashboard-Übersicht ein- und ausgeschaltet und ist
+danach auch im Menü **Dashboards** erreichbar. Beim ersten Aktivieren fragt
+ein Rollen-Formular die vorhandenen Entitäten ab: Netzbezug (Pflicht),
+Einspeisung, beliebig viele Erzeuger, optional ein Speicher (Laden/Entladen/
+SOC) sowie Verbraucher.
+
+Navigation läuft wie bei Charts über Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
+Neben dem Sankey-Fluss und den KPI-Kacheln (Erzeugung, Verbrauch, Netzbezug,
+Speicher, Einspeisung) zeigen vier Ringe Autarkie, Eigenverbrauch,
+Speicher-Ladezustand und Speicher-Wirkungsgrad — ein Klick auf einen Ring
+öffnet den jeweiligen Monatstrend der letzten drei Jahre. Optionale Badges
+im Kopfbereich fassen Kosten- und CO₂-Bilanz (mit eigenem Festpreis-Feld, wenn
+keine passende Entität vorhanden ist), die PV-Ertragsprognose sowie einen
+Datenqualitäts-Check (Bilanzplausibilität, veraltete Sensorwerte) zusammen.
+Ein Tageslastprofil zeigt den stündlichen Verbrauch der letzten 7 Tage.
 
 ## Statistik
 

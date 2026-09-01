@@ -52,7 +52,7 @@
   {% include "_topnav.html" %}
   <div class="page">
     <h1{% if not friendly_name %} class="raw"{% endif %}>{{ friendly_name or entity_id }}</h1>
-    <p class="sub">
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
@@ -110,6 +110,7 @@
   <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
     const ENTITY_ID = {{ entity_id | tojson }};

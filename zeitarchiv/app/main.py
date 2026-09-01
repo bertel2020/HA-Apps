@@ -114,6 +114,12 @@ from .index_optimization import (
     optimize_index,
 )
 from .report_routes import ReportDependencies, ReportService
+from .energiedashboard_routes import (
+    EnergieDashboardDependencies,
+    EnergieDashboardService,
+    energiedashboard_role_count,
+    is_energiedashboard_configured,
+)
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 
 logger = logging.getLogger(__name__)
@@ -257,8 +263,16 @@ def _nav_dashboards_context(request: Request) -> dict:
     jede der ~10 Seiten, die _topnav.html einbinden, die Dashboard-Liste
     selbst in ihren Kontext aufnehmen müsste. list_dashboards() ist eine
     einfache, indexierte SELECT-Abfrage ohne Joins — auch bei vielen
-    Dashboards auf jeder Seite unproblematisch."""
-    return {"nav_dashboards_list": index.list_dashboards()}
+    Dashboards auf jeder Seite unproblematisch.
+
+    nav_energiedashboard_enabled kommt aus derselben settings-Tabelle wie das
+    Energiedashboard selbst (energiedashboard_routes.py) — das Energiedashboard
+    ist bewusst KEIN Eintrag in nav_dashboards_list (keine Zeile in
+    dashboards), sondern ein fester, eigener Menüpunkt oberhalb der Liste."""
+    return {
+        "nav_dashboards_list": index.list_dashboards(),
+        "nav_energiedashboard_enabled": index.get_setting("energiedashboard_enabled", "0") == "1",
+    }
 
 
 def _app_root_context(request: Request) -> dict:
@@ -487,6 +501,15 @@ _report_service = ReportService(ReportDependencies(
 ))
 _reports_context = _report_service.context
 app.include_router(_report_service.router())
+
+_energiedashboard_service = EnergieDashboardService(EnergieDashboardDependencies(
+    data_dir=DATA_DIR,
+    index=index,
+    tz=TZ,
+    templates=templates,
+    app_root_context=_app_root_context,
+))
+app.include_router(_energiedashboard_service.router())
 
 
 @app.exception_handler(cleanup.ResultLimitExceeded)
@@ -3739,7 +3762,15 @@ def dashboards_list(request: Request) -> HTMLResponse:
     dashboards = index.list_dashboards()
     pin_counts = {d["id"]: index.count_dashboard_pins(d["id"]) for d in dashboards}
     return templates.TemplateResponse(
-        request, "dashboards.html", {"dashboards": dashboards, "pin_counts": pin_counts}
+        request, "dashboards.html", {
+            "dashboards": dashboards,
+            "pin_counts": pin_counts,
+            # Für die feste Energiedashboard-Kachel (kein echtes Dashboard,
+            # siehe energiedashboard_routes.py) — "enabled" kommt bereits
+            # global aus _nav_dashboards_context, "configured" nur hier.
+            "energiedashboard_configured": is_energiedashboard_configured(index),
+            "energiedashboard_role_count": energiedashboard_role_count(index),
+        }
     )
 
 

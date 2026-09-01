@@ -493,7 +493,7 @@
   {% include "_topnav.html" %}
   <div class="page" x-data="tableEditor()">
     <h1>Tabellen</h1>
-    <p class="sub">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen — Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum). &middot; <a href="{{ base }}/tables">&larr; Zurück</a></p>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen. &middot; <a href="{{ base }}/tables">&larr; zurück zu Tabellen</a></p>
 
     <div class="settings-panel">
         <div class="chart-title-row">
@@ -913,6 +913,7 @@
   <script src="{{ base }}/static/js/entity-picker.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
     const TABLE_ID = {{ table_id | tojson }};

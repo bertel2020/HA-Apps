@@ -18,6 +18,7 @@
 {% set _rel = _path[(app_root|length):] if app_root and _path.startswith(app_root) else _path %}
 {% set nav_home = _rel in ('/', '') %}
 {% set nav_dashboards = _rel.startswith('/dashboards') %}
+{% set nav_energiedashboard = _rel.startswith('/energiedashboard') %}
 {% set nav_entities = _rel.startswith('/entities') %}
 {% set nav_charts = _rel.startswith('/charts') %}
 {% set nav_tables = _rel.startswith('/tables') %}
@@ -58,6 +59,8 @@
 <line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>
 {%- elif name == 'x' -%}
 <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+{%- elif name == 'energiedashboard' -%}
+<polyline points="13,2 4,14 11,14 9,22 20,10 12,10 13,2"/>
 {%- endif %}</svg>
 {%- endmacro %}
 {% macro nav_chevron() -%}
@@ -89,6 +92,9 @@
         </button>
         <div class="topnav-menu topnav-menu-dashboards" x-show="dashboardsOpen" x-cloak @click="dashboardsOpen = false">
           <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Alle Dashboards</a>
+          {% if nav_energiedashboard_enabled %}
+          <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}Energiedashboard</a>
+          {% endif %}
           {% if nav_dashboards_list %}
           <div class="topnav-menu-divider"></div>
           {% for d in nav_dashboards_list %}
@@ -136,6 +142,9 @@
       </button>
       <div class="topnav-drawer-sub" x-show="drawerDashboardsOpen">
         <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">Alle Dashboards</a>
+        {% if nav_energiedashboard_enabled %}
+        <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}Energiedashboard</a>
+        {% endif %}
         {% for d in nav_dashboards_list %}
         {% set d_path = '/dashboards/' ~ d.id|string %}
         <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ d.name }}</a>

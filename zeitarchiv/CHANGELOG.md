@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.71.0 - 2026-09-01
+
+### Neu
+
+- **Energiedashboard**: neue, eigenständige Sankey-Energiefluss-Seite
+  (aktivierbar über eine Kachel auf der Dashboard-Übersicht) mit
+  Stunde-/Tag-/Monat-/Jahr-Navigation. Rollen-Setup für Netzbezug,
+  Einspeisung, beliebig viele Erzeuger, einen Speicher und Verbraucher.
+  KPI-Kacheln sowie Autarkie-, Eigenverbrauchs-, Speicher-SOC- und
+  Wirkungsgrad-Ringe mit anklickbarem Monatstrend über die letzten drei
+  Jahre; Kosten- und CO₂-Bilanz (mit optionalem Festpreis-Fallback ohne
+  passende Entität), PV-Ertragsprognose, Datenqualitäts-Check
+  (Bilanzprüfung, veraltete Werte) und ein Tageslastprofil der letzten
+  7 Tage.
+- Demo-Daten-Generator: 13 neue Entitäten für ein Balkonkraftwerk mit
+  2-kWh-Speicher (PV-Leistung, Lade-/Entladeleistung, SoC, Speicherstand,
+  Ertrags-/Lade-/Entlade-Zähler mit Tages-Reset-Variante, Online-Status)
+  sowie eine Netz-CO2-Intensität und eine PV-Ertragsprognose für die
+  Dachanlage — mindert, wie ein reales Zweitsystem, den simulierten
+  Netzbezug unabhängig von der bestehenden Dachanlage. Neue eigenständige
+  Aktion `--clear {values,entities}` zum gezielten Löschen aller
+  Demo-Entitäten (Werte oder komplett inkl. Konfiguration).
+
+### Verbesserung
+
+- „Zurück"-Links in Chart-, Dashboard-, Tabellen- und
+  Report-Detailansichten nennen jetzt das Ziel (z. B. „zurück zu
+  Charts") statt eines generischen „Zurück".
+
+### Dokumentation
+
+- Benutzerhandbuch und README beschreiben das neue Energiedashboard.
+
 ## 0.70.0 - 2026-08-31
 
 ### Neu

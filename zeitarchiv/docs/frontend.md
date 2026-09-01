@@ -163,3 +163,12 @@ unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
   Ausführungsverläufe, Duplikate je Entität, Symcon-Zuordnungsbericht),
   inklusive automatischer Seitenumbrüche bei vielen Zeilen — neue Tabellen
   dieser Art sollten dieses Modul statt einer eigenen Sortierlogik nutzen.
+- **Badge + Popup** (Energiedashboard): eine kompakte, farbige Kennzahl im
+  Kartenkopf (`@click="$refs.xDialog.showModal()"`) öffnet ein natives
+  `<dialog class="detail-dialog">` mit Details — spart Platz gegenüber einer
+  dauerhaft sichtbaren Karte. Schließt über den Standard-Button sowie per
+  Klick außerhalb (`@click="if ($event.target === $el) $el.close()"` auf dem
+  `<dialog>` selbst). Mehrzeilige `[data-tooltip]`-Inhalte brauchen die
+  Opt-in-Klasse `.tooltip-lines` (`white-space:pre-line`) plus echte `\n` im
+  Attributwert — die App-weite Basisregel rendert sonst `white-space:normal`
+  und Zeilenumbrüche fallen zu Leerzeichen zusammen.

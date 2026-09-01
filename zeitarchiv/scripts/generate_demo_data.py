@@ -3,7 +3,8 @@
 
 Legt eine Handvoll typischer Haushalts-Entitäten (Innen-/Außentemperatur,
 Luftfeuchte, Wind, Regensensor, Gesamtwirkleistung, einzelne Verbraucher
-inkl. Wallbox, PV, Strom-/Wasserzähler, Präsenz) direkt im Zeitarchiv-
+inkl. Wallbox, PV, Balkonkraftwerk mit Speicher, Strom-/Wasserzähler,
+Präsenz) direkt im Zeitarchiv-
 Speicherformat an — über denselben Import-Kern, den
 auch der CSV-/Symcon-Import in der App selbst verwendet
 (app/storage/symcon_import.py), nicht über eigene Datei-Formate. Kein
@@ -46,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pyarrow.parquet as pq  # noqa: E402
 
 from app.storage import hotbuffer, reconcile  # noqa: E402
-from app.storage.entity_removal import delete_all_values  # noqa: E402
+from app.storage.entity_removal import delete_all_values, delete_entity  # noqa: E402
 from app.storage.index import Index  # noqa: E402
 from app.storage.paths import entity_dir, storage_area_dir  # noqa: E402
 from app.storage.symcon_import import import_rows  # noqa: E402
@@ -112,10 +113,42 @@ DEMO_ENTITIES = [
                "sensor", "measurement", "W"),
     DemoEntity("sensor.demo_pv_ertrag", "Demo PV-Ertrag",
                "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_pv_prognose_rest_heute", "Demo PV-Prognose Rest Heute",
+               "sensor", "measurement", "kWh"),
+    DemoEntity("sensor.demo_pv_prognose_morgen", "Demo PV-Prognose Morgen",
+               "sensor", "measurement", "kWh"),
+    DemoEntity("sensor.demo_co2_intensitaet", "Demo CO2-Intensität Netz",
+               "sensor", "measurement", "g/kWh"),
     DemoEntity("sensor.demo_stromzaehler_bezug", "Demo Stromzähler Bezug",
                "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_stromzaehler_einspeisung", "Demo Stromzähler Einspeisung",
                "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_pv_leistung", "Demo Balkonkraftwerk PV-Leistung",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_balkonkraftwerk_ladeleistung", "Demo Balkonkraftwerk Ladeleistung",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_balkonkraftwerk_entladeleistung", "Demo Balkonkraftwerk Entladeleistung",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_balkonkraftwerk_speicher_soc", "Demo Balkonkraftwerk Speicher SoC",
+               "sensor", "measurement", "%"),
+    DemoEntity("sensor.demo_balkonkraftwerk_speicher_stand", "Demo Balkonkraftwerk Speicherstand",
+               "sensor", "measurement", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_hausabgabe", "Demo Balkonkraftwerk Hausabgabe",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_balkonkraftwerk_ertrag_heute", "Demo Balkonkraftwerk Ertrag Heute",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_ertrag_gesamt", "Demo Balkonkraftwerk Ertrag Gesamt",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_geladen_heute", "Demo Balkonkraftwerk Geladen Heute",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_geladen_gesamt", "Demo Balkonkraftwerk Geladen Gesamt",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_entladen_heute", "Demo Balkonkraftwerk Entladen Heute",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_balkonkraftwerk_entladen_gesamt", "Demo Balkonkraftwerk Entladen Gesamt",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("binary_sensor.demo_balkonkraftwerk_online", "Demo Balkonkraftwerk Online",
+               "binary_sensor", None, None),
     DemoEntity("sensor.demo_wasserzaehler", "Demo Wasserzähler",
                "sensor", "total_increasing", "m³"),
     DemoEntity("binary_sensor.demo_praesenz_wohnzimmer", "Demo Präsenz Wohnzimmer",
@@ -365,6 +398,13 @@ def gen_wind(dt: datetime, weather: WeatherContext, rng: random.Random) -> float
     return round(max(0.0, value), 1)
 
 
+PV_PEAK_W = 5200.0
+# ∫₀¹ sin(πx) dx — die analytische Fläche unter der Glockenkurvenform aus
+# gen_pv_power(), zur Tagesertrags-SCHÄTZUNG in pv_forecast_kwh() genutzt,
+# ohne die Kurve minutenweise nachsimulieren zu müssen.
+PV_SHAPE_INTEGRAL = 2 / math.pi
+
+
 def gen_pv_power(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
     day_of_year = dt.timetuple().tm_yday
     daylight = _daylight_hours(day_of_year)
@@ -374,8 +414,63 @@ def gen_pv_power(dt: datetime, weather: WeatherContext, rng: random.Random) -> f
         return 0.0
     position = (hour - sunrise) / (sunset - sunrise)
     shape = math.sin(math.pi * position)
-    value = 5200 * shape * weather.cloud_factor(dt) + rng.uniform(-40, 40)
+    value = PV_PEAK_W * shape * weather.cloud_factor(dt) + rng.uniform(-40, 40)
     return round(max(0.0, value), 1)
+
+
+def pv_forecast_kwh(day_of_year: int, cloud_estimate: float) -> float:
+    """Grobe Tagesertrags-Schätzung der Dachanlage aus einer (ggf.
+    fehlerbehafteten) Bewölkungs-Schätzung — dieselbe Glockenkurvenform wie
+    gen_pv_power(), aber über den ganzen Tag integriert statt an einem
+    einzelnen Zeitpunkt ausgewertet, für die Prognose-Sensoren."""
+    daylight = _daylight_hours(day_of_year)
+    return round(max(0.0, PV_PEAK_W * PV_SHAPE_INTEGRAL * cloud_estimate * daylight / 1000), 3)
+
+
+def gen_co2_intensity(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
+    """Angelehnt an reale CO2-Signal-/ElectricityMap-Sensoren: Grundlast-
+    Niveau nachts, Einbruch mittags durch PV-Einspeisung ins Netz, leichter
+    Anstieg zur Abendspitze; an sonnigen/windigen Tagen (mehr Erneuerbare im
+    Netzmix, dieselbe WeatherContext wie bei den PV-/Wind-Sensoren) zusätzlich
+    niedriger als an trüben, windstillen Tagen."""
+    hour = dt.hour + dt.minute / 60
+    base = 340.0
+    midday_dip = -70.0 * math.exp(-((hour - 13) ** 2) / (2 * 3.0 ** 2))
+    evening_peak = 45.0 * math.exp(-((hour - 19) ** 2) / (2 * 2.0 ** 2))
+    renewables_effect = -55.0 * (weather.cloud_factor(dt) - 0.5) - 1.3 * (weather.wind_base(dt) - 10.0)
+    value = base + midday_dip + evening_peak + renewables_effect + rng.uniform(-12, 12)
+    return round(max(80.0, min(650.0, value)), 1)
+
+
+# --- Balkonkraftwerk mit Speicher --------------------------------------------
+#
+# Eigenständiges Zweitsystem neben der großen Dachanlage (sensor.demo_pv_*):
+# kleinere Modulleistung mit fester Wechselrichter-Kappung (reale Steckersolar-
+# Geräte drosseln auf einen festen Ausgangswert, unabhängig davon wie viel die
+# Module bei voller Sonne tatsächlich liefern könnten) und ein kleiner Speicher
+# davor, der tagsüber priorisiert geladen wird und nachts mit konstanter
+# Leistung entlädt statt den Übertag erzeugten Strom ungenutzt einzuspeisen.
+BALKON_CAPACITY_KWH = 2.0
+BALKON_MODULE_PEAK_W = 950.0  # vor Wechselrichter-Kappung, daher > Nennleistung
+BALKON_INVERTER_CAP_W = 800.0
+BALKON_DISCHARGE_TARGET_W = 220.0
+BALKON_MIN_SOC = 0.05
+
+
+def gen_balkon_pv_power(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
+    """Wie gen_pv_power(), aber mit eigenem (etwas morgenärmerem, auf Südwest-
+    Ausrichtung hindeutendem) Tagesfenster und fester Wechselrichter-Kappung
+    bei BALKON_INVERTER_CAP_W statt der Modul-Rohleistung."""
+    day_of_year = dt.timetuple().tm_yday
+    daylight = _daylight_hours(day_of_year)
+    sunrise, sunset = 12.0 - daylight / 2 + 0.6, 12.0 + daylight / 2
+    hour = dt.hour + dt.minute / 60
+    if hour <= sunrise or hour >= sunset:
+        return 0.0
+    position = (hour - sunrise) / (sunset - sunrise)
+    shape = math.sin(math.pi * position) ** 1.2
+    raw = BALKON_MODULE_PEAK_W * shape * weather.cloud_factor(dt) + rng.uniform(-15, 15)
+    return round(max(0.0, min(BALKON_INVERTER_CAP_W, raw)), 1)
 
 
 def simulate_household(
@@ -385,6 +480,9 @@ def simulate_household(
     counter_seed: dict[str, float] | None = None,
     appliance_seed: dict[str, float] | None = None,
     rain_seed: float = 0.0,
+    balkon_seed: dict[str, float] | None = None,
+    balkon_heute_seed: tuple[str | None, dict[str, float]] | None = None,
+    balkon_online_seed: float = 0.0,
 ) -> dict[str, list[Row]]:
     """Ein einziger Durchlauf durch den gesamten Zeitraum, der alle
     Leistungs-/Zähler-Entitäten konsistent zueinander erzeugt: die
@@ -404,9 +502,17 @@ def simulate_household(
         "waschmaschine_energie": [], "spuelmaschine_energie": [], "trockner_energie": [], "wallbox_energie": [],
         "waschmaschine_an": [], "spuelmaschine_an": [], "trockner_an": [], "regensensor": [],
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
+        "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
+        "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
+        "balkon_soc_pct": [], "balkon_speicher_stand": [], "balkon_hausabgabe": [],
+        "balkon_ertrag_heute": [], "balkon_ertrag_gesamt": [],
+        "balkon_geladen_heute": [], "balkon_geladen_gesamt": [],
+        "balkon_entladen_heute": [], "balkon_entladen_gesamt": [], "balkon_online": [],
     }
     counter_seed = counter_seed or {}
     appliance_seed = appliance_seed or {}
+    balkon_seed = balkon_seed or {}
+    balkon_heute_seed_day, balkon_heute_seed_values = balkon_heute_seed or (None, {})
     step_hours = CONTINUOUS_STEP_MINUTES / 60
     pv_ertrag_total = counter_seed.get("pv_ertrag", rng.uniform(3000, 15000))
     bezug_total = counter_seed.get("bezug", rng.uniform(6000, 20000))
@@ -421,6 +527,37 @@ def simulate_household(
         "trockner": appliance_seed.get("trockner", 0.0),
     }
     rain_state = rain_seed
+
+    balkon_soc_kwh = balkon_seed.get("soc_kwh", rng.uniform(0.3, 1.6))
+    balkon_ertrag_gesamt_total = balkon_seed.get("ertrag_gesamt", rng.uniform(50, 800))
+    balkon_geladen_gesamt_total = balkon_seed.get("geladen_gesamt", rng.uniform(60, 900))
+    balkon_entladen_gesamt_total = balkon_seed.get("entladen_gesamt", rng.uniform(50, 850))
+    # Tages-Reset-Zähler knüpfen nur an, wenn der letzte Lauf am selben
+    # Kalendertag endete — sonst startet der neue Tag ohnehin bei 0.
+    balkon_day = start.date().isoformat()
+    if balkon_heute_seed_day == balkon_day:
+        balkon_ertrag_heute_total = balkon_heute_seed_values.get("ertrag_heute", 0.0)
+        balkon_geladen_heute_total = balkon_heute_seed_values.get("geladen_heute", 0.0)
+        balkon_entladen_heute_total = balkon_heute_seed_values.get("entladen_heute", 0.0)
+    else:
+        balkon_ertrag_heute_total = 0.0
+        balkon_geladen_heute_total = 0.0
+        balkon_entladen_heute_total = 0.0
+    balkon_online_state = balkon_online_seed
+
+    # PV-Prognose: pro Kalendertag einmal geschätzt statt bei jedem Schritt
+    # neu — reale Forecast-Sensoren aktualisieren sich auch nur wenige Male
+    # am Tag. pv_forecast_next_total (am Vortag für "morgen" geschätzt) wird
+    # beim Tageswechsel zu pv_forecast_today_total — die Prognose von gestern
+    # für heute ist ja bereits die Prognose, die heute gilt, ohne dass "heute
+    # Morgen" nochmal neu geschätzt werden müsste. Bewusst nicht über
+    # --append hinweg fortgeführt (siehe docs/demo-data.md, Grenzen): anders
+    # als bei Zählern ist ein "Reset" auf einen frischen Tageswert für einen
+    # reinen measurement-Sensor unkritisch.
+    pv_forecast_today_total = None
+    pv_forecast_next_total = None
+    pv_forecast_day = None
+    pv_actual_today_kwh = 0.0
 
     for index, dt in enumerate(_time_range(start, end, CONTINUOUS_STEP_MINUTES)):
         ts = dt.timestamp()
@@ -449,6 +586,77 @@ def simulate_household(
         series["load_power"].append((ts, round(load_w, 1)))
         series["pv_power"].append((ts, pv_w))
 
+        series["co2_intensitaet"].append((ts, gen_co2_intensity(dt, weather, rng)))
+
+        day_key = dt.date().isoformat()
+        if day_key != pv_forecast_day:
+            pv_forecast_day = day_key
+            pv_actual_today_kwh = 0.0
+            today_cloud = weather.cloud_factor(dt)
+            if pv_forecast_next_total is not None:
+                pv_forecast_today_total = pv_forecast_next_total
+            else:
+                today_estimate = max(0.1, min(1.0, today_cloud * rng.uniform(0.85, 1.15)))
+                pv_forecast_today_total = pv_forecast_kwh(dt.timetuple().tm_yday, today_estimate)
+            tomorrow_ar = max(0.15, min(1.0, 0.7 * today_cloud + 0.3 * rng.uniform(0.15, 1.0)))
+            tomorrow_estimate = max(0.1, min(1.0, tomorrow_ar * rng.uniform(0.8, 1.2)))
+            tomorrow_doy = (dt + timedelta(days=1)).timetuple().tm_yday
+            pv_forecast_next_total = pv_forecast_kwh(tomorrow_doy, tomorrow_estimate)
+        pv_actual_today_kwh += (pv_w / 1000) * step_hours
+        pv_rest_heute = round(max(0.0, pv_forecast_today_total - pv_actual_today_kwh), 3)
+
+        balkon_pv_w = gen_balkon_pv_power(dt, weather, rng)
+        if day_key != balkon_day:
+            balkon_day = day_key
+            balkon_ertrag_heute_total = 0.0
+            balkon_geladen_heute_total = 0.0
+            balkon_entladen_heute_total = 0.0
+
+        charge_kwh = 0.0
+        discharge_kwh = 0.0
+        if balkon_pv_w > 0:
+            capacity_left_kwh = max(0.0, BALKON_CAPACITY_KWH - balkon_soc_kwh)
+            charge_kwh = min((balkon_pv_w / 1000) * step_hours, capacity_left_kwh)
+            balkon_charge_w = charge_kwh / step_hours
+            balkon_soc_kwh += charge_kwh
+            balkon_discharge_w = 0.0
+            # Überschuss, sobald der Speicher voll ist, geht direkt raus statt
+            # verworfen zu werden — wie bei einem realen Gerät ohne Abregelung.
+            balkon_hausabgabe_w = balkon_pv_w - balkon_charge_w
+        else:
+            balkon_charge_w = 0.0
+            min_kwh = BALKON_CAPACITY_KWH * BALKON_MIN_SOC
+            if balkon_soc_kwh > min_kwh:
+                target_w = max(0.0, BALKON_DISCHARGE_TARGET_W + rng.uniform(-8, 8))
+                max_w_from_capacity = (balkon_soc_kwh - min_kwh) / step_hours * 1000
+                balkon_discharge_w = min(target_w, max_w_from_capacity)
+                discharge_kwh = (balkon_discharge_w / 1000) * step_hours
+                balkon_soc_kwh -= discharge_kwh
+            else:
+                balkon_discharge_w = 0.0
+            balkon_hausabgabe_w = balkon_discharge_w
+
+        balkon_ertrag_kwh = (balkon_pv_w / 1000) * step_hours
+        balkon_ertrag_gesamt_total += balkon_ertrag_kwh
+        balkon_ertrag_heute_total += balkon_ertrag_kwh
+        balkon_geladen_gesamt_total += charge_kwh
+        balkon_geladen_heute_total += charge_kwh
+        balkon_entladen_gesamt_total += discharge_kwh
+        balkon_entladen_heute_total += discharge_kwh
+        balkon_soc_pct = round(balkon_soc_kwh / BALKON_CAPACITY_KWH * 100, 1)
+
+        series["balkon_pv"].append((ts, round(balkon_pv_w, 1)))
+        series["balkon_ladeleistung"].append((ts, round(balkon_charge_w, 1)))
+        series["balkon_entladeleistung"].append((ts, round(balkon_discharge_w, 1)))
+        series["balkon_hausabgabe"].append((ts, round(balkon_hausabgabe_w, 1)))
+        series["balkon_soc_pct"].append((ts, balkon_soc_pct))
+        series["balkon_speicher_stand"].append((ts, round(balkon_soc_kwh, 3)))
+
+        balkon_online_now = 1.0 if (balkon_pv_w > 0 or balkon_discharge_w > 0) else 0.0
+        if balkon_online_now != balkon_online_state:
+            balkon_online_state = balkon_online_now
+            series["balkon_online"].append((ts, balkon_online_now))
+
         # Bool-Sensoren als reine Übergänge (wie ein reales binary_sensor,
         # das nur bei Zustandswechsel meldet) statt eines Werts pro Schritt.
         for key, watts in (("waschmaschine", waschmaschine_w), ("spuelmaschine", spuelmaschine_w), ("trockner", trockner_w)):
@@ -462,7 +670,9 @@ def simulate_household(
             series["regensensor"].append((ts, rain_now))
 
         pv_ertrag_total += (pv_w / 1000) * step_hours
-        grid_flow_w = load_w - pv_w  # positiv: Bezug vom Netz, negativ: Einspeisung
+        # Balkonkraftwerk-Hausabgabe mindert wie im echten Netzanschluss den
+        # Bezug, ohne eigenen Zähler/eigene Einspeisevergütung zu haben.
+        grid_flow_w = load_w - pv_w - balkon_hausabgabe_w  # positiv: Bezug vom Netz, negativ: Einspeisung
         if grid_flow_w > 0:
             bezug_total += (grid_flow_w / 1000) * step_hours
         else:
@@ -480,6 +690,14 @@ def simulate_household(
             series["spuelmaschine_energie"].append((ts, round(spuelmaschine_energie_total, 3)))
             series["trockner_energie"].append((ts, round(trockner_energie_total, 3)))
             series["wallbox_energie"].append((ts, round(wallbox_energie_total, 3)))
+            series["balkon_ertrag_gesamt"].append((ts, round(balkon_ertrag_gesamt_total, 3)))
+            series["balkon_ertrag_heute"].append((ts, round(balkon_ertrag_heute_total, 3)))
+            series["balkon_geladen_gesamt"].append((ts, round(balkon_geladen_gesamt_total, 3)))
+            series["balkon_geladen_heute"].append((ts, round(balkon_geladen_heute_total, 3)))
+            series["balkon_entladen_gesamt"].append((ts, round(balkon_entladen_gesamt_total, 3)))
+            series["balkon_entladen_heute"].append((ts, round(balkon_entladen_heute_total, 3)))
+            series["pv_prognose_rest_heute"].append((ts, pv_rest_heute))
+            series["pv_prognose_morgen"].append((ts, round(pv_forecast_next_total, 3)))
 
     return series
 
@@ -621,6 +839,42 @@ def _read_last_value(data_dir: Path, entity_id: str) -> float | None:
     return point[1] if point is not None else None
 
 
+BALKON_COUNTER_SEED_ENTITY_KEYS = {
+    "sensor.demo_balkonkraftwerk_speicher_stand": "soc_kwh",
+    "sensor.demo_balkonkraftwerk_ertrag_gesamt": "ertrag_gesamt",
+    "sensor.demo_balkonkraftwerk_geladen_gesamt": "geladen_gesamt",
+    "sensor.demo_balkonkraftwerk_entladen_gesamt": "entladen_gesamt",
+}
+
+
+def _read_balkon_counter_seed(data_dir: Path) -> dict[str, float]:
+    seed: dict[str, float] = {}
+    for entity_id, key in BALKON_COUNTER_SEED_ENTITY_KEYS.items():
+        point = _last_actual_point(data_dir, entity_id)
+        if point is not None:
+            seed[key] = point[1]
+    return seed
+
+
+def _read_balkon_heute_seed(data_dir: Path, tz: ZoneInfo) -> tuple[str | None, dict[str, float]]:
+    """Tag der letzten Aufzeichnung plus die drei "_heute"-Zählerstände zu
+    diesem Zeitpunkt — nur bei gleichem Kalendertag beim Fortsetzen relevant,
+    siehe Kommentar zu balkon_day in simulate_household()."""
+    anchor = _last_actual_point(data_dir, "sensor.demo_balkonkraftwerk_ertrag_heute")
+    if anchor is None:
+        return None, {}
+    day = datetime.fromtimestamp(anchor[0], tz).date().isoformat()
+    values: dict[str, float] = {"ertrag_heute": anchor[1]}
+    for entity_id, key in (
+        ("sensor.demo_balkonkraftwerk_geladen_heute", "geladen_heute"),
+        ("sensor.demo_balkonkraftwerk_entladen_heute", "entladen_heute"),
+    ):
+        point = _last_actual_point(data_dir, entity_id)
+        if point is not None:
+            values[key] = point[1]
+    return day, values
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-dir", type=Path, required=True, help="Zeitarchiv-Datenverzeichnis (wird bei Bedarf angelegt)")
@@ -629,15 +883,47 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42, help="Zufalls-Seed für reproduzierbare Läufe (Standard: 42)")
     parser.add_argument("--clean", action="store_true", help="Werte vorhandener demo_*-Entitäten im Zielverzeichnis zuerst bereinigen (Entitäten selbst bleiben bestehen)")
     parser.add_argument("--append", action="store_true", help="Statt die komplette Historie neu zu würfeln: nur die Werte seit dem letzten Lauf ergänzen (--months wird dabei ignoriert) — macht aus der Demo-Instanz ein 'lebendes' System, z. B. per Cron. Ohne vorhandene Demo-Daten wird automatisch auf eine normale Vollerzeugung zurückgefallen")
+    parser.add_argument(
+        "--clear", nargs="?", choices=["values", "entities"], const="entities", default=None,
+        help=(
+            "Eigenständige Aktion statt Erzeugen: löscht vorhandene demo_*-"
+            "Entitäten und beendet sich danach, OHNE etwas neu zu erzeugen "
+            "(anders als --clean, das Werte bereinigt UND direkt anschließend "
+            "die Historie neu würfelt). 'values' entfernt nur die Werte "
+            "(Entität/Konfiguration bleibt bestehen, wie der Bereinigungs-"
+            "schritt von --clean für sich allein). 'entities' entfernt die "
+            "demo_*-Entitäten vollständig inkl. Konfiguration — Dashboards/"
+            "Referenzen auf diese Entity-IDs zeigen danach ins Leere. Ohne "
+            "Wert (nur '--clear') gilt ebenfalls 'entities'. Schließt sich "
+            "mit --clean/--append/--months aus."
+        ),
+    )
     args = parser.parse_args()
     if args.append and args.clean:
         parser.error("--append und --clean schließen sich gegenseitig aus.")
+    if args.clear and (args.clean or args.append):
+        parser.error("--clear schließt sich mit --clean und --append gegenseitig aus.")
 
     tz = ZoneInfo(args.tz)
+    index = Index(args.data_dir / "index.sqlite")
+
+    if args.clear:
+        existing = {e["entity_id"] for e in index.list_entities()}
+        wanted = {e.entity_id for e in DEMO_ENTITIES}
+        targets = existing & wanted
+        if args.clear == "values":
+            for entity_id in targets:
+                delete_all_values(args.data_dir, index, entity_id)
+            print(f"{len(targets)} vorhandene Demo-Entität(en) geleert (nur Werte entfernt, "
+                  "Konfiguration bleibt bestehen).")
+        else:
+            for entity_id in targets:
+                delete_entity(args.data_dir, index, entity_id)
+            print(f"{len(targets)} vorhandene Demo-Entität(en) vollständig entfernt (inkl. Konfiguration).")
+        return
+
     rng = random.Random(args.seed)
     now = datetime.now(tz)
-
-    index = Index(args.data_dir / "index.sqlite")
 
     if args.clean:
         existing = {e["entity_id"] for e in index.list_entities()}
@@ -656,6 +942,9 @@ def main() -> None:
     rain_seed = 0.0
     water_seed: float | None = None
     presence_seed: float | None = None
+    balkon_seed: dict[str, float] = {}
+    balkon_heute_seed: tuple[str | None, dict[str, float]] = (None, {})
+    balkon_online_seed = 0.0
 
     if args.append:
         anchor = index.get_entity(APPEND_ANCHOR_ENTITY_ID)
@@ -677,6 +966,9 @@ def main() -> None:
             rain_seed = _read_last_value(args.data_dir, "binary_sensor.demo_regensensor") or 0.0
             water_seed = _read_last_value(args.data_dir, "sensor.demo_wasserzaehler")
             presence_seed = _read_last_value(args.data_dir, "binary_sensor.demo_praesenz_wohnzimmer")
+            balkon_seed = _read_balkon_counter_seed(args.data_dir)
+            balkon_heute_seed = _read_balkon_heute_seed(args.data_dir, tz)
+            balkon_online_seed = _read_last_value(args.data_dir, "binary_sensor.demo_balkonkraftwerk_online") or 0.0
             print(f"Ergänze Demo-Daten ab {start.isoformat()} bis {now.isoformat()}.")
     else:
         start = now - timedelta(days=args.months * 30)
@@ -687,6 +979,8 @@ def main() -> None:
     household = simulate_household(
         start, now, tz, rng, weather, schedules, rain_schedule,
         counter_seed=counter_seed, appliance_seed=appliance_seed, rain_seed=rain_seed,
+        balkon_seed=balkon_seed, balkon_heute_seed=balkon_heute_seed,
+        balkon_online_seed=balkon_online_seed,
     )
 
     rows_by_key = {
@@ -710,8 +1004,24 @@ def main() -> None:
         "sensor.demo_wallbox_energie": household["wallbox_energie"],
         "sensor.demo_pv_leistung": household["pv_power"],
         "sensor.demo_pv_ertrag": household["pv_ertrag"],
+        "sensor.demo_pv_prognose_rest_heute": household["pv_prognose_rest_heute"],
+        "sensor.demo_pv_prognose_morgen": household["pv_prognose_morgen"],
+        "sensor.demo_co2_intensitaet": household["co2_intensitaet"],
         "sensor.demo_stromzaehler_bezug": household["stromzaehler_bezug"],
         "sensor.demo_stromzaehler_einspeisung": household["stromzaehler_einspeisung"],
+        "sensor.demo_balkonkraftwerk_pv_leistung": household["balkon_pv"],
+        "sensor.demo_balkonkraftwerk_ladeleistung": household["balkon_ladeleistung"],
+        "sensor.demo_balkonkraftwerk_entladeleistung": household["balkon_entladeleistung"],
+        "sensor.demo_balkonkraftwerk_speicher_soc": household["balkon_soc_pct"],
+        "sensor.demo_balkonkraftwerk_speicher_stand": household["balkon_speicher_stand"],
+        "sensor.demo_balkonkraftwerk_hausabgabe": household["balkon_hausabgabe"],
+        "sensor.demo_balkonkraftwerk_ertrag_heute": household["balkon_ertrag_heute"],
+        "sensor.demo_balkonkraftwerk_ertrag_gesamt": household["balkon_ertrag_gesamt"],
+        "sensor.demo_balkonkraftwerk_geladen_heute": household["balkon_geladen_heute"],
+        "sensor.demo_balkonkraftwerk_geladen_gesamt": household["balkon_geladen_gesamt"],
+        "sensor.demo_balkonkraftwerk_entladen_heute": household["balkon_entladen_heute"],
+        "sensor.demo_balkonkraftwerk_entladen_gesamt": household["balkon_entladen_gesamt"],
+        "binary_sensor.demo_balkonkraftwerk_online": household["balkon_online"],
         "sensor.demo_wasserzaehler": gen_water_counter(start, now, rng, start_total=water_seed),
         "binary_sensor.demo_praesenz_wohnzimmer": gen_presence(start, now, rng, start_state=presence_seed),
         "binary_sensor.demo_regensensor": household["regensensor"],

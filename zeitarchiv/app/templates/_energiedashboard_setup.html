@@ -1,0 +1,274 @@
+{% macro entity_field(name, initial_expr, onselect_expr='') %}
+<span class="dd-picker-wrap" x-data='entityPicker(entityOptions, {{ initial_expr }}{{ (", " ~ onselect_expr) if onselect_expr }})' @click.outside="open = false">
+  <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
+          @click="toggleOpen($refs.search)"
+          x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
+  <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
+          @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
+    <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen …">
+    <template x-for="opt in filtered()" :key="opt.entity_id">
+      <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
+        <span x-text="opt.label"></span>
+      </div>
+    </template>
+  </div>
+  <input type="hidden" name="{{ name }}" :value="entityId">
+  {# caller() nur vorhanden, wenn per {% call entity_field(...) %}...{% endcall %}
+     aufgerufen (z. B. Kosten-Fallback-Eingabefeld) — dadurch landet der
+     zusätzliche Inhalt IM selben x-data-Scope wie der Picker und kann per
+     x-show="!entityId" auf entityId reagieren. Normale {{ entity_field(...) }}
+     -Aufrufe ohne call-Block bleiben unverändert (caller ist dann undefined). #}
+  {% if caller is defined %}{{ caller() }}{% endif %}
+</span>
+{% endmacro %}
+
+{# Dezimalfeld mit lokalisierter Vorbefüllung: der gespeicherte Rohwert kommt
+   als Python-Float direkt aus der Config und würde per einfachem
+   value="{{ '' }}" mit Punkt-Dezimaltrennzeichen gerendert (Jinja kennt kein
+   Locale). NumberFormat.fmt() ist bereits die einzige Stelle im Frontend, die
+   Zahlenformat kennt (aktuell de-DE, siehe number-format.js) — eine künftige
+   Sprachumschaltung muss dafür nur dort ansetzen, nicht hier zusätzlich.
+   extra_attrs: rohe zusätzliche Attribute (z. B. x-show), nur für den
+   Kosten-Fallback gebraucht — leer bei den übrigen Aufrufen (Speicher). #}
+{% macro number_field(name, raw_value, placeholder, extra_attrs='') %}
+<input type="text" inputmode="decimal" name="{{ name }}" placeholder="{{ placeholder }}"
+       class="edash-fixed-price-input" {{ extra_attrs | safe }}
+       x-init="const v = {{ raw_value | tojson }}; if (v !== null) $el.value = NumberFormat.fmt(v)">
+{% endmacro %}
+
+<div x-data='{
+  entityOptions: {{ entity_options | tojson }},
+  // _key: stabile, von der Array-Position UNABHÄNGIGE Kennung je Zeile —
+  // :key="idx" (die alte Variante) verwechselte Alpine beim Umsortieren:
+  // dieselbe DOM-Position (idx) blieb bestehen, nur die einfachen
+  // x-model-Bindungen (Name) zogen mit dem neuen Zeileninhalt um, der
+  // VERSCHACHTELTE entityPicker(...) darunter behielt aber seinen einmalig
+  // beim Mounten gelesenen Anfangswert bei — genau das beobachtete
+  // "Verschieben bewegt nur das Namensfeld". Mit row._key als Schlüssel
+  // erkennt Alpine die Zeile als tatsächlich verschoben und baut den
+  // kompletten DOM-Knoten (inkl. entityPicker) neu auf.
+  erzeuger: ({{ (config.erzeuger or []) | tojson }}).map((row, i) => ({...row, _key: "e" + i})),
+  verbraucher: ({{ (config.verbraucher or []) | tojson }}).map((row, i) => ({...row, _key: "v" + i})),
+  nameFor(id) {
+    const o = this.entityOptions.find(o => o.entity_id === id);
+    return o ? o.label : id;
+  },
+  dragList: null,
+  dragIdx: null,
+  dragOverIdx: null,
+  dragStart(list, idx) { this.dragList = list; this.dragIdx = idx; },
+  dragOver(list, idx) { if (this.dragList === list) this.dragOverIdx = idx; },
+  dragDrop(list, idx) {
+    if (this.dragList === list && this.dragIdx !== null && this.dragIdx !== idx) {
+      list.splice(idx, 0, list.splice(this.dragIdx, 1)[0]);
+    }
+    this.dragList = null; this.dragIdx = null; this.dragOverIdx = null;
+  },
+  dragEnd() { this.dragList = null; this.dragIdx = null; this.dragOverIdx = null; },
+}' class="settings-panel">
+  <div class="edash-title-row">
+    <h1>Energiedashboard</h1>
+  </div>
+  <p class="sub">Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.</p>
+  <form hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
+
+    <section class="settings-section">
+      <h2 class="settings-section-title">Allgemein</h2>
+      <p class="settings-section-description">Grundeinstellungen für das Energiedashboard.</p>
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>Name des zentralen Knotens</label>
+          <input type="text" name="hub_name" value="{{ config.hub_name or '' }}" placeholder="Haus">
+          <p class="hint">Beschriftung des Sammelknotens in der Sankey-Mitte.</p>
+        </div>
+      </div>
+      <div class="field">
+        <label>Sichtbare Kacheln</label>
+        <div class="edash-toggle-list">
+          <label class="edash-toggle-row">
+            <input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}>
+            <span>Autarkie &amp; Speicher</span>
+          </label>
+          <label class="edash-toggle-row">
+            <input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}>
+            <span>Verbraucheranteile</span>
+          </label>
+          <label class="edash-toggle-row">
+            <input type="checkbox" name="show_kostenanalyse" {% if config.show_kostenanalyse %}checked{% endif %}>
+            <span>Kostenanalyse</span>
+          </label>
+          <label class="edash-toggle-row">
+            <input type="checkbox" name="show_co2" {% if config.show_co2 %}checked{% endif %}>
+            <span>CO2-Bilanz</span>
+          </label>
+          <label class="edash-toggle-row">
+            <input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}>
+            <span>Tageslastprofil</span>
+          </label>
+          <label class="edash-toggle-row">
+            <input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}>
+            <span>Bilanz &amp; Datenqualität</span>
+          </label>
+        </div>
+        <p class="hint">Energiefluss ist immer sichtbar. Alle anderen Kacheln lassen sich hier einzeln ausblenden.</p>
+      </div>
+    </section>
+
+    <section class="settings-section edash-section-netz">
+      <h2 class="settings-section-title">Netz</h2>
+      <p class="settings-section-description">Netzbezug ist die einzige Pflicht-Rolle. Alles andere bleibt leer, bis passende Sensoren zugeordnet sind.</p>
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>Netzbezug *</label>
+          {{ entity_field('netzbezug', (config.netzbezug or '') | tojson) }}
+        </div>
+        <div class="field">
+          <label>Einspeisung</label>
+          {{ entity_field('einspeisung', (config.einspeisung or '') | tojson) }}
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section edash-section-erzeuger">
+      <h2 class="settings-section-title">Erzeuger</h2>
+      <p class="settings-section-description">Beliebig viele Erzeuger, z. B. Dach-PV und ein zusätzliches Balkonkraftwerk.</p>
+      <div class="edash-list-head" x-show="erzeuger.length"><span>Name</span><span>Entität</span></div>
+      <template x-for="(row, idx) in erzeuger" :key="row._key">
+        <div class="edash-list-row" :class="{'is-drag-over': dragList === erzeuger && dragOverIdx === idx && dragIdx !== idx}"
+             @dragover.prevent="dragOver(erzeuger, idx)" @drop.prevent="dragDrop(erzeuger, idx)">
+          <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren"
+                @dragstart="dragStart(erzeuger, idx)" @dragend="dragEnd()">⠿</span>
+          <input type="text" name="erzeuger_name" x-model="row.name" placeholder="Name">
+          {{ entity_field('erzeuger_entity_id', 'row.entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
+          <button type="button" class="edash-list-remove" @click="erzeuger.splice(idx, 1)" title="Entfernen">✕</button>
+        </div>
+      </template>
+      <button type="button" class="edash-setup-add" @click="erzeuger.push({entity_id: '', name: '', _key: 'e' + Date.now() + Math.random()})">+ Erzeuger hinzufügen</button>
+    </section>
+
+    <section class="settings-section edash-section-speicher">
+      <h2 class="settings-section-title">Speicher</h2>
+      <p class="settings-section-description">Optional — nur ausfüllen, wenn ein Batteriespeicher vorhanden ist.</p>
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" name="speicher_name" value="{{ config.speicher.name if config.speicher else '' }}" placeholder="z. B. Hausspeicher">
+          <p class="hint">Beschriftung der beiden Speicher-Knoten im Sankey.</p>
+        </div>
+        <div class="field">
+          <label>Entladung</label>
+          {{ entity_field('speicher_entladen_entity_id', (config.speicher.entladen_entity_id if config.speicher else '') | tojson) }}
+          <p class="hint">Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).</p>
+        </div>
+        <div class="field">
+          <label>Ladung</label>
+          {{ entity_field('speicher_laden_entity_id', (config.speicher.laden_entity_id if config.speicher else '') | tojson) }}
+          <p class="hint">Zähler „in den Speicher geladene Energie" (kWh, steigend).</p>
+        </div>
+        <div class="field">
+          <label>Ladezustand</label>
+          {{ entity_field('speicher_soc_entity_id', (config.speicher.soc_entity_id if config.speicher else '') | tojson) }}
+          <p class="hint">Aktueller Füllstand in % (SOC).</p>
+        </div>
+        <div class="field">
+          <label>Kapazität (kWh)</label>
+          {{ number_field('speicher_capacity_kwh', config.speicher.capacity_kwh if config.speicher and config.speicher.capacity_kwh is not none else none, 'z. B. 10') }}
+          <p class="hint">Nutzbare Gesamtkapazität. Nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt wird.</p>
+        </div>
+      </div>
+      {# Kein manuelles Wirkungsgrad-Feld mehr — die App berechnet ihn selbst
+         aus Entladung/Ladung über die gesamte bisherige Historie (siehe
+         speicher_efficiency in compute_flow, energiedashboard_routes.py)
+         und zeigt ihn schreibgeschützt in der Speicher-Kachel an. #}
+    </section>
+
+    <section class="settings-section edash-section-verbraucher">
+      <h2 class="settings-section-title">Verbraucher</h2>
+      <p class="settings-section-description">Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe.</p>
+      <div class="edash-list-head" x-show="verbraucher.length"><span>Name</span><span>Entität</span></div>
+      <template x-for="(row, idx) in verbraucher" :key="row._key">
+        <div class="edash-list-row" :class="{'is-drag-over': dragList === verbraucher && dragOverIdx === idx && dragIdx !== idx}"
+             @dragover.prevent="dragOver(verbraucher, idx)" @drop.prevent="dragDrop(verbraucher, idx)">
+          <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren"
+                @dragstart="dragStart(verbraucher, idx)" @dragend="dragEnd()">⠿</span>
+          <input type="text" name="verbraucher_name" x-model="row.name" placeholder="Name">
+          {{ entity_field('verbraucher_entity_id', 'row.entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
+          <button type="button" class="edash-list-remove" @click="verbraucher.splice(idx, 1)" title="Entfernen">✕</button>
+        </div>
+      </template>
+      <button type="button" class="edash-setup-add" @click="verbraucher.push({entity_id: '', name: '', _key: 'v' + Date.now() + Math.random()})">+ Verbraucher hinzufügen</button>
+      <p class="hint">Der Rest (Netzbezug + Erzeuger − Verbraucher − Einspeisung − Speicherladung) erscheint automatisch als „Grundlast" — kein eigener Sensor nötig.</p>
+    </section>
+
+    <section class="settings-section">
+      <h2 class="settings-section-title">Kosten</h2>
+      <p class="settings-section-description">Optional — Preis-Sensoren für Netzbezug und Einspeisung. Bucket-genau verrechnet, funktioniert also auch mit variablen/dynamischen Tarifen. Ohne passende Preis-Entität kann ersatzweise ein fester Preis in Cent je kWh eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
+      {# Preis-Entitäten liefern €/kWh und werden genau so gespeichert; der
+         feste Preis wird bewusst in Cent/kWh EINGEGEBEN (z. B. "29" statt
+         "0,29"), aber ebenfalls als €/kWh gespeichert — dieselbe Einheit wie
+         die Entitäten, konsistent mit bereits vorhandenen Configs. Deshalb
+         hier beim Anzeigen ×100 (Euro -> Cent) und beim Speichern ÷100
+         (siehe energiedashboard_setup_save in energiedashboard_routes.py). #}
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>Netzbezug-Preis</label>
+          {% call entity_field('preis_netzbezug', (config.kosten.preis_netzbezug if config.kosten else '') | tojson) %}
+            {% set v = config.kosten.get('preis_netzbezug_fixed') if config.kosten else none %}
+            {{ number_field('preis_netzbezug_fixed', (v * 100) if v is not none else none, 'Cent/kWh, z. B. 29', 'x-show="!entityId"') }}
+          {% endcall %}
+          <p class="hint">Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.</p>
+        </div>
+        <div class="field">
+          <label>Einspeisevergütung</label>
+          {% call entity_field('preis_einspeisung', (config.kosten.preis_einspeisung if config.kosten else '') | tojson) %}
+            {% set v = config.kosten.get('preis_einspeisung_fixed') if config.kosten else none %}
+            {{ number_field('preis_einspeisung_fixed', (v * 100) if v is not none else none, 'Cent/kWh, z. B. 8', 'x-show="!entityId"') }}
+          {% endcall %}
+          <p class="hint">Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.</p>
+        </div>
+      </div>
+      {# Kein eigenes "PV-Eigenverbrauch-Preis"-Feld mehr — der Wert des
+         selbst verbrauchten PV-Stroms (Kachel "Vermiedene Kosten") wird aus
+         dem Netzbezug-Preis oben abgeleitet (dieselbe kWh × Netzbezug-Preis
+         statt eines zweiten, meist identischen Preisfelds), siehe
+         "vermiedene_kosten" in compute_flow (energiedashboard_routes.py). #}
+    </section>
+
+    <section class="settings-section">
+      <h2 class="settings-section-title">PV-Prognose</h2>
+      <p class="settings-section-description">Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast. Anders als bei Kosten/CO2 gibt es hier keinen festen Ersatzwert (eine Prognose lässt sich nicht sinnvoll als fixe Zahl eintragen) — nur Entitäten.</p>
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>Prognose Rest heute</label>
+          {{ entity_field('prognose_rest_heute_entity_id', (config.prognose.rest_heute_entity_id if config.prognose else '') | tojson) }}
+          <p class="hint">kWh, die für den Rest des heutigen Tages noch erwartet werden (z. B. Forecast.Solar "Geschätzte Energieerzeugung – Resttag").</p>
+        </div>
+        <div class="field">
+          <label>Prognose morgen</label>
+          {{ entity_field('prognose_morgen_entity_id', (config.prognose.morgen_entity_id if config.prognose else '') | tojson) }}
+          <p class="hint">kWh, die für morgen insgesamt erwartet werden.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h2 class="settings-section-title">CO₂</h2>
+      <p class="settings-section-description">Optional — CO2-Intensität des bezogenen Netzstroms (g/kWh), z. B. über eine Electricity-Maps-/CO2-Signal-Entität. PV und Speicher gelten als emissionsfrei, brauchen also keinen eigenen Faktor. Ohne passende Entität kann ersatzweise ein fester Wert eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>Netzbezug CO2-Intensität</label>
+          {% call entity_field('co2_faktor_netzbezug_entity', (config.co2.faktor_netzbezug_entity if config.co2 else '') | tojson) %}
+            {{ number_field('co2_faktor_netzbezug_fixed', config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none, 'g/kWh, z. B. 380', 'x-show="!entityId"') }}
+          {% endcall %}
+          <p class="hint">g CO2/kWh, wird mit dem bezogenen Strom verrechnet — ergibt CO2-Ausstoß und, auf den PV-Eigenverbrauch angewendet, vermiedenes CO2.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="actionbar" style="justify-content:flex-end;">
+      <a class="btn" href="energiedashboard">Abbrechen</a>
+      <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">Speichern</button>
+    </div>
+  </form>
+</div>

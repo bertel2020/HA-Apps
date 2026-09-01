@@ -30,7 +30,7 @@
 {% include "_topnav.html" %}
 <div class="page">
   <h1>Indexdetails</h1>
-  <p class="sub"><a href="../statistik">&larr; Zurück zur Statistik</a></p>
+  <p class="sub" data-dynamic-back data-app-root="{{ app_root }}"><a href="../statistik">&larr; Zurück zur Statistik</a></p>
   <div class="settings-panel">
     <p class="index-intro">Der Index ist die SQLite-Datei <code>index.sqlite</code>. Er enthält Metadaten, Konfiguration und Betriebsverläufe, aber nicht die eigentlichen Messreihen: Rohwerte liegen im Hot Buffer und Archiv, Aggregate in den Rollups.</p>
     <div class="stat-row">
@@ -82,6 +82,7 @@
 </div>
 <script src="../static/js/sortable-table.js?v={{ js_v }}"></script>
 <script src="../static/js/confirm-dialog.js?v={{ js_v }}"></script>
+<script src="../static/js/dynamic-back-link.js?v={{ js_v }}"></script>
 <script>
   // Bestätigung im App-Look statt des nativen confirm()-Dialogs (dieselbe
   // appConfirm()-Mechanik wie beim Löschen von Charts/Tabellen). form.submit()

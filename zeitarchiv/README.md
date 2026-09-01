@@ -138,6 +138,12 @@ oder als zunächst rückgängig machbare Soft-Delete-Markierung entfernen.
 Physisch entfernt werden markierte Werte erst durch einen separaten,
 endgültigen Schritt.
 
+**Energiedashboard.** Eigenständige, optional aktivierbare Sankey-Ansicht des
+Energieflusses (Netzbezug, Erzeugung, Speicher, Verbraucher) mit
+Stunde-/Tag-/Monat-/Jahr-Navigation, Autarkie-/Eigenverbrauchs-/SOC-/
+Wirkungsgrad-Trends, Kosten- und CO₂-Bilanz, PV-Ertragsprognose und
+Datenqualitäts-Check.
+
 **Statistik.** Zeigt Bestand, Speicherbedarf und Wachstum; der SQLite-Index
 kann bei Bedarf kontrolliert optimiert werden.
 

@@ -246,7 +246,7 @@
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
               title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
-    <p class="sub">
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if friendly_name %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
@@ -341,6 +341,7 @@
   <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
     const ENTITY_ID = {{ entity_id | tojson }};
