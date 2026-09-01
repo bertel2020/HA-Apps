@@ -30,6 +30,10 @@
     <div class="settings-panel">
         <section>
           <div class="log-toolbar">
+            <select id="log-source-mode" class="btn" aria-label="Logquelle wählen">
+              <option value="local">Live</option>
+              <option value="supervisor">Supervisor-Historie</option>
+            </select>
             <span class="dd-picker-wrap">
               <button type="button" class="btn" id="log-filter-btn" onclick="toggleDDPicker('log-filter')" aria-label="Loglevel filtern">Level: {{ log_filter_options[0][1] }} ▾</button>
               <input type="hidden" id="log-filter-input" value="{{ log_filter_options[0][0] }}">
@@ -41,7 +45,7 @@
             </span>
             <input id="log-search" class="search" type="search" placeholder="Protokoll durchsuchen …" aria-label="Protokoll durchsuchen">
             <button type="button" class="btn" id="log-refresh">Jetzt aktualisieren</button>
-            <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> Automatisch</label>
+            <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> Automatisch (15 s)</label>
             <a class="btn" id="log-download" href="logs/download">Herunterladen</a>
           </div>
           <div class="log-meta">
@@ -59,6 +63,7 @@
       const output = document.getElementById('log-output');
       const source = document.getElementById('log-source');
       const status = document.getElementById('log-status');
+      const sourceMode = document.getElementById('log-source-mode');
       const level = document.getElementById('log-filter-input');
       const search = document.getElementById('log-search');
       const auto = document.getElementById('log-auto');
@@ -67,7 +72,7 @@
       let searchTimer = null;
 
       function params() {
-        const query = new URLSearchParams({level: level.value, search: search.value});
+        const query = new URLSearchParams({level: level.value, search: search.value, source: sourceMode.value});
         return query;
       }
 
@@ -93,12 +98,13 @@
       }
 
       document.getElementById('log-refresh').addEventListener('click', refreshLogs);
+      sourceMode.addEventListener('change', refreshLogs);
       level.addEventListener('change', refreshLogs);
       search.addEventListener('input', () => {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(refreshLogs, 250);
       });
-      setInterval(() => { if (auto.checked) refreshLogs(); }, 5000);
+      setInterval(() => { if (auto.checked) refreshLogs(); }, 15000);
       refreshLogs();
     })();
   </script>

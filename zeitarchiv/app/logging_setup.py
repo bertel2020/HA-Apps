@@ -12,6 +12,7 @@ import logging
 import re
 import sys
 import threading
+import time
 from collections import deque
 from datetime import datetime
 
@@ -47,19 +48,62 @@ _SECRET_RE = re.compile(
 _QUERY_SECRET_RE = re.compile(
     r"(?i)([?&](?:api[_-]?token|token|password|secret)=)[^&#\s]+"
 )
+_JSON_SECRET_RE = re.compile(
+    r'''(?ix)
+    (["'](?:api[_-]?token|token|password|secret)["']\s*:\s*)
+    (?:"[^"]*"|'[^']*'|[^,}\]\s]+)
+    '''
+)
+
+# Erfolgreiche technische Polls sollen auch im Modus "Alle Anfragen" nicht
+# das Protokoll mit seinen eigenen Aktualisierungen füllen. Fehler bleiben
+# weiterhin sichtbar.
+_QUIET_SUCCESS_PATHS = {
+    "/api/health",
+    "/api/logs",
+    "/settings/logging/debug",
+}
+SLOW_REQUEST_MS = 2_000.0
 
 
 def redact_log_text(value: object) -> str:
     """Entfernt ANSI-Steuerzeichen und typische Geheimnisse aus Logtext."""
     text = _ANSI_RE.sub("", str(value))
     text = _BEARER_RE.sub(r"\1[REDACTED]", text)
+    text = _JSON_SECRET_RE.sub(r'\1"[REDACTED]"', text)
     text = _SECRET_RE.sub(r"\1[REDACTED]", text)
     return _QUERY_SECRET_RE.sub(r"\1[REDACTED]", text)
 
 
+def _iso_timestamp(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp).astimezone().isoformat(timespec="milliseconds")
+
+
 class _RedactingFormatter(logging.Formatter):
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        return _iso_timestamp(record.created)
+
     def format(self, record: logging.LogRecord) -> str:
         return redact_log_text(super().format(record))
+
+
+class _RedactingProxyFormatter(logging.Formatter):
+    """Maskiert auch Ausgaben bereits vorhandener Fremdlogger-Formatter."""
+
+    def __init__(self, wrapped: logging.Formatter | None) -> None:
+        super().__init__()
+        self._wrapped = wrapped or logging.Formatter("%(message)s")
+
+    def format(self, record: logging.LogRecord) -> str:
+        return redact_log_text(self._wrapped.format(record))
+
+
+def _ensure_redacting_formatter(handler: logging.Handler) -> None:
+    if getattr(handler, "_zeitarchiv_redacting_formatter", False):
+        return
+    if not isinstance(handler.formatter, _RedactingFormatter):
+        handler.setFormatter(_RedactingProxyFormatter(handler.formatter))
+    handler._zeitarchiv_redacting_formatter = True  # type: ignore[attr-defined]
 
 
 class RingLogHandler(logging.Handler):
@@ -94,7 +138,7 @@ class RingLogHandler(logging.Handler):
         for entry in entries:
             if threshold and entry["levelno"] < threshold:
                 continue
-            timestamp = datetime.fromtimestamp(entry["ts"]).astimezone().strftime("%d.%m.%Y %H:%M:%S")
+            timestamp = _iso_timestamp(entry["ts"])
             logger_name = entry["logger"].removeprefix("app.").removeprefix("zeitarchiv.")
             line = f"{timestamp}  {entry['level'].upper():<8} {logger_name:<18} {entry['message']}"
             if needle and needle not in line.casefold():
@@ -107,9 +151,11 @@ _RING_HANDLER = RingLogHandler()
 _CONSOLE_HANDLER = logging.StreamHandler(sys.stdout)
 _CONSOLE_HANDLER.setLevel(logging.DEBUG)
 _CONSOLE_HANDLER.setFormatter(
-    _RedactingFormatter("%(asctime)s  %(levelname)-8s %(name)s  %(message)s", "%Y-%m-%d %H:%M:%S")
+    _RedactingFormatter("%(asctime)s  %(levelname)-8s %(name)s  %(message)s")
 )
 _ACCESS_MODE = DEFAULT_ACCESS_LOG_MODE
+_RATE_LIMIT_LOCK = threading.Lock()
+_RATE_LIMIT_STATE: dict[str, dict[str, float | int]] = {}
 
 
 def configure_logging(level: str, access_mode: str) -> None:
@@ -154,6 +200,18 @@ def configure_logging(level: str, access_mode: str) -> None:
     uvicorn_error = logging.getLogger("uvicorn.error")
     if _RING_HANDLER not in uvicorn_error.handlers:
         uvicorn_error.addHandler(_RING_HANDLER)
+    # Fremdlogger besitzen teils eigene Console-Handler. Deren Originalformat
+    # bleibt erhalten, wird aber vor stdout/stderr ebenfalls redigiert; eine
+    # reine Nachbearbeitung in der Logseite wäre zu spät, weil der Supervisor
+    # die ursprüngliche Ausgabe bereits dauerhaft aufgenommen hätte.
+    for foreign_logger in (
+        logging.getLogger(),
+        logging.getLogger("uvicorn"),
+        uvicorn_error,
+        logging.getLogger("fastapi"),
+    ):
+        for handler in foreign_logger.handlers:
+            _ensure_redacting_formatter(handler)
     _ACCESS_MODE = access_mode
 
 
@@ -161,18 +219,65 @@ def current_access_mode() -> str:
     return _ACCESS_MODE
 
 
-def log_http_request(method: str, path: str, status: int, duration_ms: float) -> None:
+def log_rate_limited(
+    log: logging.Logger,
+    level: int,
+    key: str,
+    message: str,
+    *args: object,
+    interval_seconds: float = 300.0,
+) -> bool:
+    """Loggt eine repetitive Meldung höchstens einmal je Intervall.
+
+    Beim nächsten sichtbaren Eintrag wird die Zahl der zwischenzeitlich
+    unterdrückten Wiederholungen angehängt. Der Rückgabewert sagt, ob die
+    Meldung tatsächlich ausgegeben wurde.
+    """
+    now = time.monotonic()
+    suppressed = 0
+    with _RATE_LIMIT_LOCK:
+        state = _RATE_LIMIT_STATE.get(key)
+        if state is not None and now - float(state["last_logged"]) < interval_seconds:
+            state["suppressed"] = int(state["suppressed"]) + 1
+            return False
+        if state is not None:
+            suppressed = int(state["suppressed"])
+        _RATE_LIMIT_STATE[key] = {"last_logged": now, "suppressed": 0}
+    if suppressed:
+        message += " · unterdrueckte_wiederholungen=%d"
+        args = (*args, suppressed)
+    log.log(level, message, *args)
+    return True
+
+
+def log_http_request(
+    method: str,
+    path: str,
+    status: int,
+    duration_ms: float,
+    *,
+    request_id: str | None = None,
+) -> None:
     mode = _ACCESS_MODE
+    request_field = request_id or "-"
+    if status < 400 and path in _QUIET_SUCCESS_PATHS:
+        return
+    if status < 400 and duration_ms >= SLOW_REQUEST_MS:
+        logging.getLogger("app.http").warning(
+            "Langsame HTTP-Anfrage · event=http_slow request_id=%s method=%s path=%s status=%d duration_ms=%.1f",
+            request_field, method, path, status, duration_ms,
+        )
+        return
     if mode == "off" or (mode == "errors" and status < 400):
         return
     log = logging.getLogger("zeitarchiv.access")
-    message = "%s %s -> %d · %.1f ms"
+    message = "%s %s -> %d · %.1f ms · event=http_request request_id=%s"
     if status >= 500:
-        log.error(message, method, path, status, duration_ms)
+        log.error(message, method, path, status, duration_ms, request_field)
     elif status >= 400:
-        log.warning(message, method, path, status, duration_ms)
+        log.warning(message, method, path, status, duration_ms, request_field)
     else:
-        log.info(message, method, path, status, duration_ms)
+        log.info(message, method, path, status, duration_ms, request_field)
 
 
 def local_log_lines(*, level: str = "all", search: str = "", limit: int = 500) -> list[str]:

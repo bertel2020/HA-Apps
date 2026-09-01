@@ -124,6 +124,10 @@ from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, s
 
 logger = logging.getLogger(__name__)
 trace_logger = logging.getLogger("zeitarchiv.trace")
+# Bereits frühe Bootstrap-Fehler (insbesondere eine ungültige Zeitzone) sollen
+# den redigierten Handler/Ringpuffer erreichen. Nach Öffnen des Index wird
+# unten mit den gespeicherten Nutzerwerten erneut idempotent konfiguriert.
+configure_logging(DEFAULT_LOG_LEVEL, DEFAULT_ACCESS_LOG_MODE)
 
 EntityId = Annotated[
     str,
@@ -300,6 +304,8 @@ templates = Jinja2Templates(
 @app.middleware("http")
 async def _request_logging(request: Request, call_next):
     started = time.perf_counter()
+    request_id = secrets.token_hex(6)
+    request.state.request_id = request_id
     try:
         response = await call_next(request)
     except Exception:
@@ -308,13 +314,16 @@ async def _request_logging(request: Request, call_next):
             request.url.path,
             500,
             (time.perf_counter() - started) * 1000,
+            request_id=request_id,
         )
         raise
+    response.headers["X-Request-ID"] = request_id
     log_http_request(
         request.method,
         request.url.path,
         response.status_code,
         (time.perf_counter() - started) * 1000,
+        request_id=request_id,
     )
     return response
 
@@ -397,10 +406,16 @@ configure_logging(
 )
 _interrupted_backup_jobs = index.recover_interrupted_backup_jobs()
 if _interrupted_backup_jobs:
-    logger.warning("%d unterbrochene Backup-Jobs erkannt", _interrupted_backup_jobs)
+    logger.warning(
+        "Unterbrochene Backup-Jobs erkannt · event=backup_jobs_interrupted jobs=%d",
+        _interrupted_backup_jobs,
+    )
 _interrupted_retention_jobs = index.recover_interrupted_retention_jobs()
 if _interrupted_retention_jobs:
-    logger.warning("%d unterbrochene Retention-Jobs erkannt", _interrupted_retention_jobs)
+    logger.warning(
+        "Unterbrochene Retention-Jobs erkannt · event=retention_jobs_interrupted jobs=%d",
+        _interrupted_retention_jobs,
+    )
 # Bestehende Installationen hatten nur diesen erfolgreichen Last-run-Wert.
 # Einmalig in die neue, semantisch eindeutige Einstellung übernehmen.
 if not index.get_setting("retention_last_success"):
@@ -421,15 +436,21 @@ def _run_storage_reconciliation(
     _storage_reconcile_last = report
     if report["mismatches"]:
         logger.warning(
-            "Speicherindex %s · Abweichungen=%d · Fehler=%d",
+            "Speicherindex %s · event=storage_reconcile_completed mismatches=%d errors=%d",
             "repariert" if report["repaired"] else "geprüft",
             len(report["mismatches"]),
             len(report["errors"]),
         )
     elif report["errors"]:
-        logger.error("Speicherindex-Prüfung mit %d Fehlern beendet", len(report["errors"]))
+        logger.error(
+            "Speicherindex-Prüfung beendet · event=storage_reconcile_failed errors=%d",
+            len(report["errors"]),
+        )
     else:
-        logger.info("Speicherindex konsistent · Entitäten=%d", report["entities_checked"])
+        logger.info(
+            "Speicherindex konsistent · event=storage_reconcile_completed entities=%d",
+            report["entities_checked"],
+        )
     return report
 
 
@@ -445,19 +466,17 @@ _storage_reconcile_completed = False
 ensure_api_token(index, development_token=os.environ.get("ZEITARCHIV_API_TOKEN"))
 ingestion_service = IngestionService(DATA_DIR, index, TZ, storage_coordinator)
 _recovered_ingest_events = ingestion_service.recover_pending()
-if _recovered_ingest_events:
-    logger.info(
-        "%d unvollständig abgeschlossene Zeitarchiv-Events wiederhergestellt",
-        _recovered_ingest_events,
-    )
 _requires_synchronous_reconciliation = bool(_restore_startup_result) or not _previous_shutdown_clean
 if _requires_synchronous_reconciliation:
     with storage_coordinator.exclusive():
         _run_storage_reconciliation(repair=True)
 else:
-    logger.info("Speicherindex-Abgleich wird nach dem Start im Hintergrund ausgeführt")
+    logger.info(
+        "Speicherindex-Abgleich wird nach dem Start im Hintergrund ausgeführt · "
+        "event=storage_reconcile_scheduled"
+    )
 logger.info(
-    "Zeitarchiv gestartet · Datenverzeichnis=%s · Loglevel=%s · HTTP-Protokoll=%s",
+    "Zeitarchiv gestartet · event=application_started data_dir=%s log_level=%s access_log=%s",
     DATA_DIR,
     index.get_setting("log_level", DEFAULT_LOG_LEVEL),
     index.get_setting("access_log_mode", DEFAULT_ACCESS_LOG_MODE),
@@ -590,7 +609,9 @@ def _begin_retention_job(trigger: str, scheduled_for: float | None = None) -> in
 
 
 def _finish_retention_job(job_id: int, *, now: datetime | None = None) -> dict:
-    index.update_retention_job(job_id, status="running", started_at=time.time())
+    started_at = time.time()
+    index.update_retention_job(job_id, status="running", started_at=started_at)
+    logger.info("Retention gestartet · event=retention_started job_id=%d", job_id)
     try:
         with storage_coordinator.exclusive():
             totals = retention_mod.enforce_retention_all(DATA_DIR, index, TZ, now=now)
@@ -611,17 +632,26 @@ def _finish_retention_job(job_id: int, *, now: datetime | None = None) -> dict:
         except Exception:
             # Die Löschung war erfolgreich; ein Fehler der rein informativen
             # Folgevorschau darf den Job nicht nachträglich als Fehler markieren.
-            logger.exception("Retention-Übersicht konnte nach dem Lauf nicht aktualisiert werden")
+            logger.exception(
+                "Retention-Übersicht konnte nicht aktualisiert werden · "
+                "event=retention_followup_failed job_id=%d",
+                job_id,
+            )
         logger.info(
-            "Retention erfolgreich · Job=%d · Zeilen=%d · Monate=%d · Speicher=%s",
+            "Retention erfolgreich · event=retention_completed job_id=%d rows_deleted=%d "
+            "months_deleted=%d bytes_freed=%d duration_s=%.1f",
             job_id,
             totals["rows_deleted"],
             totals["months_deleted"],
-            format_size(totals["bytes_freed"]),
+            totals["bytes_freed"],
+            max(0.0, finished_at - started_at),
         )
         return {"status": "success", "totals": totals}
     except Exception as exc:
-        logger.exception("Retention konnte nicht ausgeführt werden")
+        logger.exception(
+            "Retention fehlgeschlagen · event=retention_failed job_id=%d phase=enforce",
+            job_id,
+        )
         finished_at = time.time()
         error = str(exc)[:2000] or exc.__class__.__name__
         index.update_retention_job(
@@ -1086,15 +1116,18 @@ def _debug_tools_context() -> dict:
     von _settings_logging_context(), damit das per htmx per Polling
     nachgeladene Fragment (settings/logging/debug) nur diesen kleinen
     Ausschnitt neu rendert, nicht die ganze Protokollierung-Sektion."""
+    now = time.time()
     with _write_capture_lock:
+        api_routes.expire_write_capture(_write_capture, now)
         capture_armed = _write_capture["armed"]
         captured_at = _write_capture["captured_at"]
+        capture_expires_at = _write_capture["expires_at"]
         payload = _write_capture["payload"]
     with _entity_trace_lock:
+        api_routes.expire_entity_trace(_entity_trace, now)
         trace_entity_id = _entity_trace["entity_id"]
         trace_expires_at = _entity_trace["expires_at"]
 
-    now = time.time()
     trace_active = bool(trace_entity_id) and (trace_expires_at or 0) > now
     return {
         "capture_armed": capture_armed,
@@ -1103,6 +1136,9 @@ def _debug_tools_context() -> dict:
         ),
         "capture_event_count": len(payload["events"]) if payload else None,
         "capture_payload_json": json.dumps(payload, indent=2, ensure_ascii=False) if payload else None,
+        "capture_expires_in_minutes": (
+            max(1, round((capture_expires_at - now) / 60)) if capture_expires_at else None
+        ),
         "trace_entity_id": trace_entity_id if trace_active else None,
         "trace_expires_in_minutes": (
             max(1, round((trace_expires_at - now) / 60)) if trace_active else None
@@ -1169,21 +1205,26 @@ def logs_view(request: Request) -> HTMLResponse:
     )
 
 
-def _validate_log_request(level: str, search: str, limit: int) -> tuple[str, str, int]:
+def _validate_log_request(
+    level: str, search: str, limit: int, source: str = "local"
+) -> tuple[str, str, int, str]:
     if level != "all" and level not in LOG_LEVEL_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Logfilter")
-    return level, search[:200], max(50, min(limit, 5_000))
+    if source not in {"local", "supervisor"}:
+        raise HTTPException(status_code=400, detail="Ungültige Logquelle")
+    return level, search[:200], max(50, min(limit, 5_000)), source
 
 
 @app.get("/api/logs")
 async def api_logs(
     level: str = "all",
     search: str = "",
+    source: str = "local",
     limit: int = Query(default=500, ge=50, le=2_000),
 ) -> dict:
-    level, search, limit = _validate_log_request(level, search, limit)
+    level, search, limit, source = _validate_log_request(level, search, limit, source)
     result = await run_in_threadpool(
-        lambda: load_log_lines(level=level, search=search, limit=limit)
+        lambda: load_log_lines(level=level, search=search, limit=limit, source=source)
     )
     return {
         **result,
@@ -1193,10 +1234,12 @@ async def api_logs(
 
 
 @app.get("/logs/download", response_class=PlainTextResponse)
-async def logs_download(level: str = "all", search: str = "") -> PlainTextResponse:
-    level, search, _ = _validate_log_request(level, search, 5_000)
+async def logs_download(
+    level: str = "all", search: str = "", source: str = "local"
+) -> PlainTextResponse:
+    level, search, _, source = _validate_log_request(level, search, 5_000, source)
     result = await run_in_threadpool(
-        lambda: load_log_lines(level=level, search=search, limit=5_000)
+        lambda: load_log_lines(level=level, search=search, limit=5_000, source=source)
     )
     content = "\n".join(result["lines"])
     if content:
@@ -1297,7 +1340,12 @@ async def settings_logging(request: Request) -> HTMLResponse:
     index.set_setting("log_level", level)
     index.set_setting("access_log_mode", access_mode)
     configure_logging(level, access_mode)
-    logger.info("Protokollierung geändert · Loglevel=%s · HTTP-Protokoll=%s", level, access_mode)
+    logger.info(
+        "Protokollierung geändert · event=logging_configuration_changed "
+        "level=%s http_access=%s",
+        level,
+        access_mode,
+    )
     return templates.TemplateResponse(
         request, "_settings_logging_form.html", _settings_logging_context(saved=True)
     )
@@ -1316,10 +1364,13 @@ def settings_capture_write_arm(request: Request) -> HTMLResponse:
     """Zeichnet GENAU den nächsten eingehenden /api/write-Request auf (Rohdaten
     inkl. Werten/Entity-IDs, aber ohne Authorization-Header) — kein Dauer-
     Logging, siehe Kommentar bei _write_capture oben."""
+    now = time.time()
     with _write_capture_lock:
         _write_capture["armed"] = True
         _write_capture["captured_at"] = None
+        _write_capture["expires_at"] = now + api_routes.WRITE_CAPTURE_TTL_SECONDS
         _write_capture["payload"] = None
+    api_routes.schedule_write_capture_expiry(_api_state)
     return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
 
 
@@ -1328,6 +1379,7 @@ def settings_capture_write_clear(request: Request) -> HTMLResponse:
     with _write_capture_lock:
         _write_capture["armed"] = False
         _write_capture["captured_at"] = None
+        _write_capture["expires_at"] = None
         _write_capture["payload"] = None
     return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
 
@@ -1335,6 +1387,7 @@ def settings_capture_write_clear(request: Request) -> HTMLResponse:
 @app.get("/settings/logging/capture-write/download")
 def settings_capture_write_download() -> Response:
     with _write_capture_lock:
+        api_routes.expire_write_capture(_write_capture)
         payload = _write_capture["payload"]
         captured_at = _write_capture["captured_at"]
     if payload is None:
@@ -1343,7 +1396,10 @@ def settings_capture_write_download() -> Response:
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
     )
 
 
@@ -1365,7 +1421,11 @@ async def settings_trace_start(request: Request) -> HTMLResponse:
         _entity_trace["entity_id"] = entity_id
         _entity_trace["started_at"] = time.time()
         _entity_trace["expires_at"] = time.time() + _ENTITY_TRACE_DURATION_SECONDS
-    trace_logger.debug("Trace gestartet für %s · %d Minuten", entity_id, _ENTITY_TRACE_DURATION_SECONDS // 60)
+    trace_logger.debug(
+        "Trace gestartet · event=entity_trace_started entity_id=%s duration_minutes=%d",
+        entity_id,
+        _ENTITY_TRACE_DURATION_SECONDS // 60,
+    )
     return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
 
 
@@ -1377,7 +1437,7 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
         _entity_trace["started_at"] = None
         _entity_trace["expires_at"] = None
     if entity_id:
-        trace_logger.debug("Trace beendet für %s", entity_id)
+        trace_logger.debug("Trace beendet · event=entity_trace_stopped entity_id=%s", entity_id)
     return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
 
 
@@ -1417,7 +1477,10 @@ def settings_rotation(request: Request) -> HTMLResponse:
         result = "Nichts zu tun — alle Entitäten sind bereits aktuell rotiert."
     else:
         result = f"{rotated} Monatsdatei{'en' if rotated != 1 else ''} archiviert."
-    logger.info("Manuelle Rotation abgeschlossen · Monatsdateien=%d", rotated)
+    logger.info(
+        "Manuelle Rotation abgeschlossen · event=manual_rotation_completed files=%d",
+        rotated,
+    )
     return templates.TemplateResponse(
         request, "_settings_rotation_form.html", _settings_rotation_context(result=result)
     )
@@ -1463,7 +1526,12 @@ def settings_purge(request: Request) -> HTMLResponse:
             f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt, "
             f"davon {months} bereits archivierte{'r' if months == 1 else ''} Monat{'e' if months != 1 else ''} neu berechnet."
         )
-    logger.info("Manuelle Bereinigung abgeschlossen · Zeilen=%d · Monate=%d", total_rows, months)
+    logger.info(
+        "Manuelle Bereinigung abgeschlossen · event=manual_cleanup_completed "
+        "rows=%d months=%d",
+        total_rows,
+        months,
+    )
     _refresh_purge_preview_if_stale(force=True)
     return templates.TemplateResponse(
         request, "_settings_purge_form.html", _settings_purge_context(result=result)
@@ -1608,7 +1676,11 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
         _backup_progress.total = backup.estimate_file_count(DATA_DIR)
         _backup_progress.job_id = job_id
         _backup_progress.error = None
-    logger.info("Backup gestartet · Job=%d · Auslöser=%s", job_id, trigger)
+    logger.info(
+        "Backup gestartet · event=backup_started job_id=%d trigger=%s",
+        job_id,
+        trigger,
+    )
 
     def on_progress(done: int, total: int) -> None:
         with _backup_progress.lock:
@@ -1653,7 +1725,11 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
                 backup.prune_backups(BACKUPS_DIR, keep_count, keep_days, time.time())
             except OSError as exc:
                 cleanup_error = f"Backup gültig; alte Sicherungen konnten nicht bereinigt werden: {exc}"[:2000]
-                logger.exception("Alte Backups konnten nicht bereinigt werden")
+                logger.exception(
+                    "Alte Backups konnten nicht bereinigt werden · "
+                    "event=backup_prune_failed job_id=%d",
+                    job_id,
+                )
             finished_at = time.time()
             index.update_backup_job(
                 job_id,
@@ -1665,14 +1741,18 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
             )
             index.set_setting("backup_last_success", str(finished_at))
             logger.info(
-                "Backup erfolgreich · Job=%d · Datei=%s · Größe=%s · Dauer=%.1f s",
+                "Backup erfolgreich · event=backup_completed job_id=%d file=%s "
+                "size_bytes=%d duration_s=%.1f",
                 job_id,
                 dest_path.name,
-                format_size(dest_path.stat().st_size),
+                dest_path.stat().st_size,
                 max(0.0, finished_at - started_at),
             )
         except Exception as exc:
-            logger.exception("Backup konnte nicht erstellt werden")
+            logger.exception(
+                "Backup fehlgeschlagen · event=backup_failed job_id=%d",
+                job_id,
+            )
             finished_at = time.time()
             error = str(exc)[:2000] or exc.__class__.__name__
             index.update_backup_job(
@@ -1754,10 +1834,12 @@ def _background_storage_reconciliation() -> None:
     }
     _storage_reconcile_completed = True
     logger.info(
-        "Speicherindex-Hintergrundabgleich beendet · Entitäten=%d · Abweichungen=%d · Fehler=%d",
+        "Speicherindex-Hintergrundabgleich beendet · event=storage_reconcile_completed "
+        "entities=%d mismatches=%d errors=%d duration_s=%.1f",
         _storage_reconcile_last["entities_checked"],
         len(_storage_reconcile_last["mismatches"]),
         len(_storage_reconcile_last["errors"]),
+        max(0.0, time.time() - started_at),
     )
 
 
@@ -1780,7 +1862,10 @@ def _maintenance_scheduler_loop() -> None:
     while not _maintenance_scheduler_stop.is_set():
         try:
             if index.record_stats_snapshot_if_stale():
-                logger.debug("Stündlicher Statistik-Schnappschuss gespeichert")
+                logger.debug(
+                    "Stündlicher Statistik-Schnappschuss gespeichert · "
+                    "event=hourly_stats_snapshot_completed"
+                )
             supervisor_stats.maybe_record_memory_snapshot(index)
             _refresh_retention_overview_if_stale()
             _refresh_purge_preview_if_stale()
@@ -1788,7 +1873,10 @@ def _maintenance_scheduler_loop() -> None:
             _run_backup_schedule_if_due(datetime.now(TZ))
             _run_retention_enforcement_if_due(datetime.now(TZ))
         except Exception:
-            logger.exception("Wartungsplaner konnte den nächsten Lauf nicht prüfen")
+            logger.exception(
+                "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "
+                "event=maintenance_scheduler_failed"
+            )
         _maintenance_scheduler_stop.wait(30)
 
 

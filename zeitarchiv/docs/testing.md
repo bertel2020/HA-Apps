@@ -21,6 +21,7 @@ der Testumgebung nicht installiert ist).
 | Datei | Prüft |
 | --- | --- |
 | `test_ingestion.py` | Idempotenz, Dedup, Crash-Recovery (siehe [ingestion.md](ingestion.md)) |
+| `test_logging.py`, `test_api_observability.py`, `test_logs_template.py` | Secret-Redaction, ISO-Zeitstempel, Rate-Limits, Request-Korrelation, Capture-TTL, Entity-Trace und Logquellen |
 | `test_index.py` | SQLite-Schema, Migrationen, Aggregationen |
 | `test_query.py`, `test_period_navigation.py` | Zeitfenster-/Range-Logik |
 | `test_rollup.py`, `test_rotate.py` | Bucket-Berechnung, Hot-→-Archiv-Übergang |

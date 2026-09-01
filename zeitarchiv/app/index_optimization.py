@@ -78,10 +78,12 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
         after_bytes = int(vacuum_result["after"]["database_bytes"])
         freed_bytes = max(0, before_bytes - after_bytes)
         logger.info(
-            "SQLite-Index optimiert · vorher=%d · nachher=%d · freigegeben=%d",
+            "SQLite-Index optimiert · event=index_optimization_completed "
+            "before_bytes=%d after_bytes=%d freed_bytes=%d duration_ms=%.1f",
             before_bytes,
             after_bytes,
             freed_bytes,
+            (time.monotonic() - started_at) * 1000,
         )
         return {
             "success": True,
@@ -92,7 +94,11 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
             ),
         }
     except (sqlite3.DatabaseError, OSError, ValueError) as exc:
-        logger.exception("SQLite-Index konnte nicht optimiert werden")
+        logger.exception(
+            "SQLite-Index konnte nicht optimiert werden · "
+            "event=index_optimization_failed duration_ms=%.1f",
+            (time.monotonic() - started_at) * 1000,
+        )
         return {
             "success": False,
             "message": f"Optimierung fehlgeschlagen: {exc}",

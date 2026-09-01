@@ -13,11 +13,12 @@ from pathlib import Path
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .formatting import decimals_to_int
 from .limits import MAX_MULTI_QUERY_ENTITIES, MAX_WRITE_EVENTS
+from .logging_setup import log_rate_limited
 from .route_support import storage_locked
 from .storage import query as query_mod
 from .storage.coordinator import StorageCoordinator
@@ -28,6 +29,12 @@ from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_ent
 
 logger = logging.getLogger(__name__)
 trace_logger = logging.getLogger("zeitarchiv.trace")
+
+WRITE_CAPTURE_TTL_SECONDS = 60 * 60
+INGEST_WARNING_MIN_EVENTS = 20
+INGEST_DUPLICATE_WARNING_RATIO = 0.50
+INGEST_DISCARDED_WARNING_RATIO = 0.95
+INGEST_SLOW_BATCH_MS = 1_000.0
 
 EntityId = Annotated[
     str,
@@ -80,7 +87,7 @@ class ApiState:
     })
     write_capture_lock: threading.Lock = field(default_factory=threading.Lock)
     write_capture: dict = field(default_factory=lambda: {
-        "armed": False, "captured_at": None, "payload": None,
+        "armed": False, "captured_at": None, "expires_at": None, "payload": None,
     })
     entity_trace_lock: threading.Lock = field(default_factory=threading.Lock)
     entity_trace: dict = field(default_factory=lambda: {
@@ -97,6 +104,46 @@ class ApiDependencies:
     ingestion: IngestionService
     api_token: Callable[[], str]
     app_version: str
+
+
+def expire_write_capture(capture: dict, now: float | None = None) -> bool:
+    """Entfernt einen abgelaufenen scharfen oder bereits gefüllten Capture."""
+    now = time.time() if now is None else now
+    expires_at = capture.get("expires_at")
+    if expires_at is None or expires_at > now:
+        return False
+    capture.update(armed=False, captured_at=None, expires_at=None, payload=None)
+    return True
+
+
+def expire_entity_trace(trace: dict, now: float | None = None) -> bool:
+    """Setzt einen abgelaufenen Entity-Trace vollständig zurück."""
+    now = time.time() if now is None else now
+    expires_at = trace.get("expires_at")
+    if expires_at is None or expires_at > now:
+        return False
+    trace.update(entity_id=None, started_at=None, expires_at=None)
+    return True
+
+
+def schedule_write_capture_expiry(state: ApiState) -> None:
+    """Löscht einen Capture zum gesetzten Ablaufzeitpunkt auch ohne UI-Poll."""
+    with state.write_capture_lock:
+        expected_expires_at = state.write_capture.get("expires_at")
+    if expected_expires_at is None:
+        return
+
+    def expire_if_current() -> None:
+        with state.write_capture_lock:
+            if state.write_capture.get("expires_at") == expected_expires_at:
+                expire_write_capture(state.write_capture, expected_expires_at + 0.001)
+
+    timer = threading.Timer(
+        max(0.0, float(expected_expires_at) - time.time()) + 0.01,
+        expire_if_current,
+    )
+    timer.daemon = True
+    timer.start()
 
 
 def _validate_entity_id_or_400(entity_id: str) -> None:
@@ -135,11 +182,20 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     router = APIRouter()
     locked = lambda getter: storage_locked(deps.coordinator, getter)
 
-    def check_auth(authorization: str | None) -> None:
+    def check_auth(authorization: str | None, request_id: str = "-") -> None:
         expected = f"Bearer {deps.api_token()}"
         if authorization is None or not secrets.compare_digest(authorization, expected):
             state.connection_stats["auth_failures"] += 1
             state.connection_stats["last_auth_failure_ts"] = time.time()
+            log_rate_limited(
+                logger,
+                logging.WARNING,
+                "api_auth_failure",
+                "API-Authentifizierung fehlgeschlagen · event=api_auth_failure request_id=%s gesamt_seit_start=%d",
+                request_id,
+                state.connection_stats["auth_failures"],
+                interval_seconds=300,
+            )
             raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
 
     def limited_multi_entity_ids(args: dict) -> list[str]:
@@ -152,43 +208,130 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         return ids
 
     @router.get("/api/health")
-    def health(authorization: str | None = Header(default=None)) -> dict:
-        check_auth(authorization)
+    def health(request: Request, authorization: str | None = Header(default=None)) -> dict:
+        check_auth(authorization, getattr(request.state, "request_id", "-"))
         return {"status": "ok", "version": deps.app_version}
 
     @router.post("/api/write")
-    def write(payload: WriteRequest, authorization: str | None = Header(default=None)) -> dict:
-        check_auth(authorization)
+    def write(
+        payload: WriteRequest,
+        request: Request,
+        authorization: str | None = Header(default=None),
+    ) -> dict:
+        request_id = getattr(request.state, "request_id", "-")
+        check_auth(authorization, request_id)
         state.connection_stats["write_requests_ok"] += 1
+        now = time.time()
+        captured_now = False
         with state.write_capture_lock:
+            expire_write_capture(state.write_capture, now)
             if state.write_capture["armed"]:
                 state.write_capture.update(
-                    armed=False, captured_at=time.time(), payload=payload.model_dump()
+                    armed=False,
+                    captured_at=now,
+                    expires_at=now + WRITE_CAPTURE_TTL_SECONDS,
+                    payload=payload.model_dump(),
                 )
+                captured_now = True
+        if captured_now:
+            schedule_write_capture_expiry(state)
 
-        now = time.time()
         with state.entity_trace_lock:
+            expire_entity_trace(state.entity_trace, now)
             trace_entity = state.entity_trace["entity_id"]
             trace_active = bool(trace_entity) and (state.entity_trace["expires_at"] or 0) > now
-        if trace_active:
-            for event in payload.events:
-                if event.entity_id == trace_entity:
-                    trace_logger.debug(
-                        "Trace %s · ts=%s · value=%s · unit=%s · domain=%s",
-                        event.entity_id, event.ts, event.value, event.unit or "—", event.domain,
-                    )
 
         counts = {"written": 0, "skipped": 0, "filtered": 0, "duplicate": 0, "recovered": 0}
-        for event in payload.events:
-            event_data = event.model_dump()
-            event_id = event.event_id or legacy_event_id(
-                {key: value for key, value in event_data.items() if key != "event_id"}
+        started = time.perf_counter()
+        try:
+            for event in payload.events:
+                event_data = event.model_dump()
+                event_id = event.event_id or legacy_event_id(
+                    {key: value for key, value in event_data.items() if key != "event_id"}
+                )
+                result = deps.ingestion.ingest(IngestEvent(event_id=event_id, **{
+                    key: value for key, value in event_data.items() if key != "event_id"
+                }))
+                counts[result] += 1
+                if trace_active and event.entity_id == trace_entity:
+                    trace_logger.debug(
+                        "Entity-Trace · event=entity_trace request_id=%s entity_id=%s "
+                        "event_id=%s ts=%s time=%s value=%s unit=%s domain=%s result=%s",
+                        request_id,
+                        event.entity_id,
+                        event_id[:12],
+                        event.ts,
+                        datetime.fromtimestamp(event.ts, deps.tz).isoformat(timespec="milliseconds"),
+                        event.value,
+                        event.unit or "—",
+                        event.domain,
+                        result,
+                    )
+        except Exception:
+            logger.exception(
+                "Ingest-Batch fehlgeschlagen · event=ingest_batch_failed request_id=%s events=%d",
+                request_id,
+                len(payload.events),
             )
-            result = deps.ingestion.ingest(IngestEvent(event_id=event_id, **{
-                key: value for key, value in event_data.items() if key != "event_id"
-            }))
-            counts[result] += 1
-        logger.debug("Schreibbatch verarbeitet · Events=%d · Ergebnis=%s", len(payload.events), counts)
+            raise
+        duration_ms = (time.perf_counter() - started) * 1000
+        throughput = len(payload.events) / max(duration_ms / 1000, 0.001)
+        logger.debug(
+            "Schreibbatch verarbeitet · event=ingest_batch_completed request_id=%s "
+            "events=%d written=%d skipped=%d filtered=%d duplicate=%d recovered=%d "
+            "duration_ms=%.1f events_per_second=%.1f",
+            request_id,
+            len(payload.events),
+            counts["written"],
+            counts["skipped"],
+            counts["filtered"],
+            counts["duplicate"],
+            counts["recovered"],
+            duration_ms,
+            throughput,
+        )
+        event_count = len(payload.events)
+        if duration_ms >= INGEST_SLOW_BATCH_MS:
+            log_rate_limited(
+                logger,
+                logging.WARNING,
+                "ingest_slow_batch",
+                "Langsamer Ingest-Batch · event=ingest_batch_slow request_id=%s events=%d duration_ms=%.1f",
+                request_id,
+                event_count,
+                duration_ms,
+                interval_seconds=300,
+            )
+        if event_count >= INGEST_WARNING_MIN_EVENTS:
+            duplicate_ratio = counts["duplicate"] / event_count
+            discarded_ratio = (counts["filtered"] + counts["skipped"]) / event_count
+            if duplicate_ratio >= INGEST_DUPLICATE_WARNING_RATIO:
+                log_rate_limited(
+                    logger,
+                    logging.WARNING,
+                    "ingest_duplicate_ratio",
+                    "Hohe Duplikatquote im Ingest · event=ingest_duplicate_ratio request_id=%s "
+                    "events=%d duplicate=%d ratio=%.3f",
+                    request_id,
+                    event_count,
+                    counts["duplicate"],
+                    duplicate_ratio,
+                    interval_seconds=300,
+                )
+            if discarded_ratio >= INGEST_DISCARDED_WARNING_RATIO:
+                log_rate_limited(
+                    logger,
+                    logging.WARNING,
+                    "ingest_discarded_ratio",
+                    "Hohe Filterquote im Ingest · event=ingest_discarded_ratio request_id=%s "
+                    "events=%d filtered=%d skipped=%d ratio=%.3f",
+                    request_id,
+                    event_count,
+                    counts["filtered"],
+                    counts["skipped"],
+                    discarded_ratio,
+                    interval_seconds=300,
+                )
         return counts
 
     @router.get("/api/query")

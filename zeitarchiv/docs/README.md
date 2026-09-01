@@ -27,6 +27,7 @@ Release-Reihenfolge): [operations.md](operations.md).
 | [architecture.md](architecture.md) | Prozessmodell, Request-Fluss, nginx-Gateway, Nebenläufigkeit |
 | [data-model.md](data-model.md) | Speicherformate (Hot Buffer/Archiv/Rollup), SQLite-Schema, Lösch-/Aufbewahrungslebenszyklus |
 | [ingestion.md](ingestion.md) | Schreibpfad: Idempotenz, Filterregeln, Zähler-Semantik, Rotation |
+| [logging.md](logging.md) | Logging-Betrieb: Quellen, Level, Redaction, Korrelation, Ingest-Observability |
 | [api-reference.md](api-reference.md) | REST-API (`/api/write`, `/api/health`, `/api/query[-multi]`) |
 | [frontend.md](frontend.md) | Template-/JS-Architektur (Jinja, Alpine.js, htmx, ECharts) |
 | [operations.md](operations.md) | Backup/Restore, Retention, Wartungsplaner, Versionierung/Release |

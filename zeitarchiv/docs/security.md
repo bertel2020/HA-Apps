@@ -31,7 +31,23 @@ die nginx-Allowlist blockiert — ABER ein Refactoring, das `/api/health` oder
   Assistants Supervisor-Ingress.
 - Fehlversuche werden gezählt (`connection_stats.auth_failures`,
   `last_auth_failure_ts`) und unter **Einstellungen → Verbindung**
-  angezeigt — kein Lockout, nur Sichtbarkeit.
+  angezeigt. Wiederholte Auth-Warnungen werden gedrosselt; Token oder
+  Authorization-Header erscheinen dabei nie im Log. Es gibt keinen Lockout,
+  nur Sichtbarkeit.
+
+## Logging und sensible Diagnosedaten
+
+Eine zentrale Redaction entfernt Bearer-Token, `token`, `api_token`,
+`password` und `secret` aus Text-, JSON-, Header- und Querystring-Darstellungen,
+bevor App- oder Fremdlogger nach `stdout`/`stderr` schreiben. Beim Einlesen der
+Supervisor-Historie wird als zweite Schutzschicht erneut redigiert.
+
+Der Write-Capture enthält bewusst rohe Entity-IDs und Messwerte. Er erfasst
+genau den nächsten Schreibbatch, niemals den Authorization-Header, läuft nach
+spätestens 60 Minuten ab und wird auch ohne weiteren UI-Aufruf automatisch
+gelöscht. Downloads liefern `Cache-Control: no-store`. Der 15-minütige
+Entity-Trace kann dieselben Betriebsdaten im Log sichtbar machen und sollte
+nur gezielt zur Diagnose verwendet werden. Siehe [logging.md](logging.md).
 
 ## Pfad-/Symlink-Schutz
 

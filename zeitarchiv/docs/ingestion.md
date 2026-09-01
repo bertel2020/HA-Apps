@@ -54,6 +54,24 @@ Die Idempotenz-Tabelle wird selbst nicht unbegrenzt groß: alle 10.000
 abgeschlossenen Events (`_PRUNE_EVERY_COMPLETIONS`) werden Einträge älter als
 7 Tage (`_IDEMPOTENCY_RETENTION_SECONDS`) entfernt.
 
+## Beobachtbarkeit
+
+Der normale Schreibpfad erzeugt keine Logzeile pro Messwert. Stattdessen wird
+je `/api/write`-Batch auf `debug` eine Zusammenfassung mit Request-ID,
+Ergebniszählern (`written`, `duplicate`, `recovered`, `skipped`, `filtered`),
+Laufzeit und Durchsatz geschrieben. Auffällig langsame Batches sowie hohe
+Duplikat- oder Filterquoten werden erst ab sinnvollen Mindestgrößen als
+gedrosselte Warnung sichtbar.
+
+Beim Start meldet die Recovery Anzahl und Alter offener Claims,
+wiederhergestellte Events, betroffene Entitäten und bereinigte Ledger-Einträge.
+Ein `processing`-Claim ab fünf Minuten Alter erzeugt eine Warnung; offene
+Claims werden niemals durch das Pruning abgeschlossener Events gelöscht.
+
+Der gezielt gestartete Entity-Trace ergänzt Eingangsdaten um das finale
+Ingest-Ergebnis und eine gekürzte Event-ID. Details zu Log-Leveln, Event-Codes
+und Datenschutz stehen in [logging.md](logging.md).
+
 ## Neue Entität
 
 `Index.get_or_create_entity()` legt eine neue Zeile in `entities` an, sobald

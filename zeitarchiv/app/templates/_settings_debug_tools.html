@@ -4,6 +4,7 @@
     <h3 class="settings-subsection-title">Nächsten Schreibvorgang aufzeichnen</h3>
     <p class="hint">
       Zeichnet einmalig den nächsten Schreib-Request auf (ohne API-Token), dann automatisch aus.
+      Die Aufzeichnung enthält sensible Entity-IDs und Rohwerte und wird nach spätestens 60 Minuten automatisch gelöscht.
     </p>
     {% if capture_armed %}
     <p class="save-status">⏳ Wartet auf den nächsten Schreibvorgang …</p>
@@ -11,7 +12,7 @@
       <button type="button" class="btn btn-danger" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Abbrechen</button>
     </div>
     {% elif capture_payload_json %}
-    <p class="hint" style="margin:0 0 10px;">Aufgezeichnet um {{ capture_captured_at }} &middot; {{ capture_event_count }} Event(s)</p>
+    <p class="hint" style="margin:0 0 10px;">Aufgezeichnet um {{ capture_captured_at }} &middot; {{ capture_event_count }} Event(s) &middot; automatische Löschung in {{ capture_expires_in_minutes }} Minute(n)</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;justify-content:flex-end;">
       <a class="btn" href="settings/logging/capture-write/download">Herunterladen</a>
       <button type="button" class="btn" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Löschen</button>
@@ -30,7 +31,7 @@
   <div class="settings-subsection">
     <h3 class="settings-subsection-title">Entität verfolgen</h3>
     <p class="hint">
-      Protokolliert 15 Minuten lang alle Werte einer Entität, dann automatisch aus.
+      Protokolliert 15 Minuten lang alle Werte und Ingest-Ergebnisse einer Entität, dann automatisch aus. Die Rohwerte können entsprechend der Supervisor-Aufbewahrung im Protokoll verbleiben.
     </p>
     {% if trace_entity_id %}
     <p class="save-status">🔴 Verfolgt <code>{{ trace_entity_id }}</code> &middot; noch {{ trace_expires_in_minutes }} Minute(n)</p>

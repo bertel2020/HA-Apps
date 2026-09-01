@@ -956,7 +956,7 @@ class Index:
         """Offene Event-Claims für die Crash-Recovery beim App-Start."""
         with self._lock:
             rows = self._conn.execute(
-                "SELECT event_id, entity_id, ts FROM ingested_events "
+                "SELECT event_id, entity_id, ts, created_at FROM ingested_events "
                 "WHERE status = 'processing' ORDER BY created_at"
             ).fetchall()
             return [dict(row) for row in rows]

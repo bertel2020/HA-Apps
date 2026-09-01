@@ -6,7 +6,7 @@
 
 <p align="center">
   Langfristige, kompakte Zeitreihen für Home Assistant.<br>
-  <sub>PARQUET + ZSTD · INGRESS · CHARTS · TABELLEN · IMPORT · BACKUP</sub>
+  <sub>PARQUET + ZSTD · INGRESS · ENERGIEDASHBOARD · CHARTS · TABELLEN · IMPORT · BACKUP</sub>
 </p>
 
 Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
@@ -45,6 +45,7 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Speichert dauerhaft** | Verlaufsdaten bleiben erhalten, unabhängig davon, wie lange Home Assistants eigene Aufbewahrung läuft |
 | **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
 | **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
+| **Energiedashboard** | Eigene Sankey-Ansicht des Energieflusses mit Autarkie-, Kosten- und CO₂-Auswertung — auf Wunsch mit einem Klick aktiviert |
 | **Datenpflege** | Ausreißer, Lücken und Duplikate erkennen, korrigieren oder bereinigen |
 | **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Wiederherstellung und Zeitplan |
@@ -122,6 +123,21 @@ einzigen Startseite. Die Übersichten von Dashboards, Charts und Tabellen
 bieten Suche, wählbare Sortierung und einen davon unabhängigen Schalter
 „Favoriten zuerst“.
 
+**Energiedashboard.** Eigenständige, per Kachel auf der Dashboard-Übersicht
+aktivierbare Ansicht des gesamten Energieflusses als Sankey-Diagramm —
+Netzbezug, beliebig viele Erzeuger, ein Speicher und Verbraucher, jeweils
+mit Stunde-/Tag-/Monat-/Jahr-Navigation:
+
+- **Kennzahlen und Ringe:** Erzeugung, Verbrauch, Netzbezug, Speicher und
+  Einspeisung als KPI-Kacheln; Autarkie-, Eigenverbrauchs-, Speicher-SOC- und
+  Wirkungsgrad-Ringe mit anklickbarem Monatstrend über die letzten drei Jahre.
+- **Kosten und CO₂:** Bilanz aus Strompreis- bzw. CO₂-Entität oder einem
+  eigenen Festpreis, falls keine passende Entität vorhanden ist.
+- **PV-Ertragsprognose** und ein **Tageslastprofil** (stündlicher Verbrauch
+  der letzten 7 Tage).
+- **Datenqualitäts-Check:** prüft die Energiebilanz auf Plausibilität und
+  meldet veraltete Sensorwerte, statt sie unbemerkt zu glätten.
+
 **Entitäten und Verläufe.** Jede archivierte Entität besitzt eine eigene
 Verlaufsansicht mit Zeitraum-Navigation von Stunde bis Dekade, Vergleich mit
 Vorperiode oder Vorjahr sowie individuell einstellbarer Auflösung,
@@ -137,12 +153,6 @@ gleiche Wiederholungen werden erkannt und lassen sich einzeln korrigieren
 oder als zunächst rückgängig machbare Soft-Delete-Markierung entfernen.
 Physisch entfernt werden markierte Werte erst durch einen separaten,
 endgültigen Schritt.
-
-**Energiedashboard.** Eigenständige, optional aktivierbare Sankey-Ansicht des
-Energieflusses (Netzbezug, Erzeugung, Speicher, Verbraucher) mit
-Stunde-/Tag-/Monat-/Jahr-Navigation, Autarkie-/Eigenverbrauchs-/SOC-/
-Wirkungsgrad-Trends, Kosten- und CO₂-Bilanz, PV-Ertragsprognose und
-Datenqualitäts-Check.
 
 **Statistik.** Zeigt Bestand, Speicherbedarf und Wachstum; der SQLite-Index
 kann bei Bedarf kontrolliert optimiert werden.
@@ -206,6 +216,12 @@ Supervisor-Option ist `timezone` (IANA-Zeitzone, Standard `Europe/Berlin`).
 Beim Start sowie nach Datenimporten gleicht Zeitarchiv die abgeleiteten
 Indexkennzahlen automatisch mit Parquet-Archiv und Hot Buffer ab, um
 Inkonsistenzen früh sichtbar zu machen.
+
+Für die Diagnose stehen ein begrenzter lokaler Live-Logpuffer und die
+Supervisor-Historie zur Verfügung. Secrets werden vor der Ausgabe maskiert;
+Request-IDs, stabile Ereigniscodes und zusammengefasste Ingest-Kennzahlen
+erleichtern die Fehlersuche ohne ein dauerhaftes Log pro Messwert. Details:
+[Logging-Betrieb](docs/logging.md).
 
 ## Bekannte Grenzen
 

@@ -673,6 +673,66 @@ keine passende Entität vorhanden ist), die PV-Ertragsprognose sowie einen
 Datenqualitäts-Check (Bilanzplausibilität, veraltete Sensorwerte) zusammen.
 Ein Tageslastprofil zeigt den stündlichen Verbrauch der letzten 7 Tage.
 
+### Benötigte und sinnvolle Entitäten
+
+Das Rollen-Formular (**Rollen zuordnen** bzw. **Rollen bearbeiten** im
+Kartenkopf) wählt ausschließlich
+aus bereits archivierten Entitäten aus — für das Energiedashboard muss also
+vorher nichts zusätzlich eingerichtet werden, was nicht ohnehin schon in
+Zeitarchiv ankommt.
+
+| Rolle | Pflicht? | Erwarteter Wert |
+| --- | --- | --- |
+| Netzbezug | **ja** | Zählerstand Strombezug aus dem Netz (kWh, aufsteigend) |
+| Einspeisung | nein | Zählerstand Netzeinspeisung (kWh, aufsteigend) |
+| Erzeuger (beliebig viele) | nein | je ein Ertragszähler (kWh, aufsteigend) mit eigenem Namen — z. B. Dachanlage und Balkonkraftwerk getrennt geführt |
+| Speicher: Laden / Entladen | nein (ein Speicher) | zwei Zählerstände (kWh, aufsteigend) |
+| Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler |
+| Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
+| Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
+| CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
+| PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |
+
+Einzig Netzbezug ist Pflicht — alle anderen Rollen schalten lediglich
+zusätzliche Kacheln, Ringe oder Badges frei; ohne Speicher-Rolle bleiben
+z. B. einfach die Speicher-Kacheln und der Wirkungsgrad-Ring ausgeblendet.
+
+Für Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen) und
+Verbraucher wird ein **kWh-Gesamtzähler** erwartet (Home-Assistant-Gerätetyp
+`total_increasing`), keine Momentanleistung in Watt — viele Geräte-
+Integrationen bieten beides parallel an, hier zählt jeweils die
+kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Strompreis,
+CO₂-Intensität und PV-Prognose sind dagegen bewusst Momentan-/Messwerte
+(`measurement`), keine Zähler.
+
+### Aufbewahrung richtig einstellen
+
+Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
+wirkt sich unterschiedlich stark auf das Energiedashboard aus — nicht jede
+Rolle braucht dieselbe Frist:
+
+- **Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen/SOC) und
+  Verbraucher** sollten großzügig aufbewahrt werden — mindestens
+  **2 Jahre**, im Zweifel **Unbegrenzt**. Die Autarkie-, Eigenverbrauchs-,
+  SOC- und Wirkungsgrad-Trends im Ring-Popup werten jeweils die letzten drei
+  Kalenderjahre aus; eine kürzere Frist lässt diese Trends mit der Zeit
+  lückenhaft werden.
+- **Strompreis- und CO₂-Entitäten** (falls über eine Entität statt eines
+  festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
+  eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
+  inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
+  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
+  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
+  alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
+  aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
+  aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
+- **PV-Ertragsprognose-Entitäten** werden ausschließlich als aktueller Wert
+  angezeigt („Rest heute“ / „morgen“) — unabhängig vom gerade angezeigten
+  Zeitraum wird nie ein archivierter, alter Prognosewert gelesen. Hier
+  genügt die kürzeste verfügbare Frist (**30 Tage**); mehr Aufbewahrung
+  bringt für diese Rolle keinen Vorteil, kostet bei häufig aktualisierenden
+  Quellen aber unnötig Speicherplatz.
+
 ## Statistik
 
 Zeigt Entitätenzahl, Datensätze, Speicherbedarf und Wachstum über die Zeit,
@@ -877,13 +937,22 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 | **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung) oben) |
 | **Aufbewahrung** | Vorschau fälliger Löschungen, Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag), Lauf-Historie |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start |
-| **Protokollierung** | Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung — hilfreich bei der Fehlersuche, sollte im Normalbetrieb aber sparsam eingestellt bleiben |
-| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen; eine einzelne Entität 15 Minuten lang verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit |
+| **Protokollierung** | Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung sowie Logansicht mit lokalem Live-Puffer oder Supervisor-Historie. Erfolgreiche interne Polls bleiben ruhig; langsame und fehlgeschlagene Anfragen weiterhin sichtbar. |
+| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit |
 | **Über Zeitarchiv** | Version, Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
 
 Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
 sofort — die Zeitarchiv-Integration muss danach mit dem neuen Token
 aktualisiert werden, sonst schlagen weitere Schreibversuche fehl.
+
+Für den Normalbetrieb sind `warning` und HTTP **Nur fehlgeschlagene Anfragen**
+die empfohlenen Einstellungen. `debug` und der Entity-Trace sind zeitlich
+begrenzt zur Fehlersuche gedacht. Die lokale Logquelle reagiert schnell und
+enthält nur den begrenzten Puffer des laufenden Prozesses; die
+Supervisor-Historie reicht weiter zurück und kann beim Laden etwas länger
+dauern. Zugangsdaten werden vor der Ausgabe maskiert. Write-Captures und
+Entity-Traces können trotzdem Entity-IDs und Messwerte enthalten und sollten
+nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
 ## Typische Aufgaben
 

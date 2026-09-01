@@ -67,8 +67,17 @@ def filter_external_log_text(
     return result[-limit:]
 
 
-def load_log_lines(*, level: str = "all", search: str = "", limit: int = 500) -> dict:
-    """Supervisor ist primär; lokaler Ringpuffer ist der robuste Fallback."""
+def load_log_lines(
+    *, level: str = "all", search: str = "", limit: int = 500,
+    source: str = "supervisor",
+) -> dict:
+    """Lädt lokale Live-Meldungen oder die umfassendere Supervisor-Historie."""
+    if source == "local":
+        return {
+            "source": "Lokaler Prozesspuffer",
+            "lines": local_log_lines(level=level, search=search, limit=limit),
+            "fallback": False,
+        }
     try:
         text = fetch_supervisor_log_text(max(limit * 4, 2_000))
         return {
@@ -83,4 +92,3 @@ def load_log_lines(*, level: str = "all", search: str = "", limit: int = 500) ->
             "fallback": True,
             "notice": str(exc),
         }
-

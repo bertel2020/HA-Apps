@@ -16,6 +16,7 @@ import pyarrow.parquet as pq
 from . import hotbuffer, rollup, rotate
 from .coordinator import StorageCoordinator
 from .index import Index, should_accept_value, should_accept_write
+from ..logging_setup import log_rate_limited
 from .paths import entity_dir, validate_entity_id
 
 
@@ -42,6 +43,7 @@ def legacy_event_id(event: dict) -> str:
 
 _IDEMPOTENCY_RETENTION_SECONDS = 7 * 24 * 60 * 60
 _PRUNE_EVERY_COMPLETIONS = 10_000
+_PENDING_WARNING_SECONDS = 5 * 60
 
 
 def _event_exists(
@@ -126,29 +128,77 @@ class IngestionService:
                 self._completions_since_prune = 0
                 should_prune = True
         if should_prune:
-            self._index.prune_ingested_events(
+            pruned = self._index.prune_ingested_events(
                 time.time() - _IDEMPOTENCY_RETENTION_SECONDS
+            )
+            logger.debug(
+                "Ingest-Ledger bereinigt · event=ingest_ledger_pruned removed=%d retention_days=7",
+                pruned,
             )
 
     def recover_pending(self) -> int:
         """Schließt nach einem Prozessabbruch bereits persistierte Events ab."""
         recovered = 0
-        for claim in self._index.list_processing_ingest_events():
+        claims = self._index.list_processing_ingest_events()
+        now = time.time()
+        oldest_age = max(
+            (now - float(claim.get("created_at") or now) for claim in claims),
+            default=0.0,
+        )
+        old_claims = [
+            claim for claim in claims
+            if now - float(claim.get("created_at") or now) >= _PENDING_WARNING_SECONDS
+        ]
+        if old_claims:
+            logger.warning(
+                "Alte offene Ingest-Claims erkannt · event=ingest_pending_old "
+                "claims=%d entities=%d oldest_age_seconds=%.1f",
+                len(old_claims),
+                len({claim["entity_id"] for claim in old_claims}),
+                oldest_age,
+            )
+        for claim in claims:
             with self._coordinator.entity(claim["entity_id"]):
-                if _event_exists(
-                    self._data_dir,
-                    claim["entity_id"],
-                    claim["ts"],
-                    claim["event_id"],
-                    self._tz,
-                ):
-                    self._index.complete_ingest_event(
-                        claim["event_id"], claim["entity_id"], claim["ts"], recorded=True
+                try:
+                    exists = _event_exists(
+                        self._data_dir,
+                        claim["entity_id"],
+                        claim["ts"],
+                        claim["event_id"],
+                        self._tz,
                     )
-                    recovered += 1
-        self._index.prune_ingested_events(
+                    if exists:
+                        self._index.complete_ingest_event(
+                            claim["event_id"], claim["entity_id"], claim["ts"], recorded=True
+                        )
+                        recovered += 1
+                except Exception:
+                    logger.exception(
+                        "Ingest-Recovery fehlgeschlagen · event=ingest_recovery_failed "
+                        "entity_id=%s event_id=%s",
+                        claim["entity_id"],
+                        claim["event_id"][:12],
+                    )
+        pruned = self._index.prune_ingested_events(
             time.time() - _IDEMPOTENCY_RETENTION_SECONDS
         )
+        logger.debug(
+            "Ingest-Recovery geprüft · event=ingest_recovery_checked pending=%d "
+            "recovered=%d unresolved=%d pruned=%d oldest_age_seconds=%.1f",
+            len(claims),
+            recovered,
+            len(claims) - recovered,
+            pruned,
+            oldest_age,
+        )
+        if recovered:
+            logger.info(
+                "Ingest-Recovery abgeschlossen · event=ingest_recovery_completed "
+                "recovered=%d entities=%d oldest_age_seconds=%.1f",
+                recovered,
+                len({claim["entity_id"] for claim in claims}),
+                oldest_age,
+            )
         return recovered
 
     def ingest(self, event: IngestEvent) -> str:
@@ -238,11 +288,16 @@ class IngestionService:
         )
         self._complete(event, recorded=True)
         if counter_decrease:
-            logger.warning(
-                "Zählerrückgang gespeichert · Entität=%s · Vorwert=%s · Wert=%s · Zeitstempel=%s",
+            log_rate_limited(
+                logger,
+                logging.WARNING,
+                f"counter_decrease:{event.entity_id}",
+                "Zählerrückgang gespeichert · event=counter_decrease entity_id=%s "
+                "previous_value=%s value=%s timestamp=%s",
                 event.entity_id,
                 entity["last_value"],
                 event.value,
                 event.ts,
+                interval_seconds=15 * 60,
             )
         return "written"

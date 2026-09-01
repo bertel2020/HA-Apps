@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.72.0 - 2026-09-01
+
+### Neu
+
+- Die Logansicht kann zwischen dem lokalen Live-Puffer und der umfassenderen
+  Supervisor-Historie wechseln. Lokale Meldungen aktualisieren sich ohne
+  Supervisor-Aufruf und ohne selbst neue erfolgreiche Polling-Logs zu
+  erzeugen.
+- HTTP-Anfragen und Ingest-Batches erhalten eine korrelierbare Request-ID;
+  wichtige Betriebsereignisse verwenden stabile `event=`-Codes sowie
+  Laufzeiten und Ergebniszähler.
+- Ingest-Recovery meldet offene beziehungsweise überalterte Claims,
+  wiederhergestellte Events, betroffene Entitäten und Ledger-Bereinigungen.
+
+### Verbesserung
+
+- Zentrale Redaction entfernt Bearer-Token und benannte Secrets nun auch aus
+  JSON-Ausgaben sowie aus Uvicorn-, FastAPI- und anderen Fremdloggern, bevor
+  sie in der Supervisor-Ausgabe landen.
+- Langsame HTTP-Anfragen und auffällige Ingest-Batches werden unabhängig vom
+  normalen Access-Log sichtbar; wiederkehrende Warnungen sind zeitlich
+  gedrosselt und weisen auf unterdrückte Wiederholungen hin.
+- Logzeitstempel verwenden ISO 8601 inklusive Millisekunden und lokaler
+  Zeitzone. Backup-, Retention-, Speicherabgleich- und Indexwartungslogs
+  enthalten konsistente Event-Codes, Job-IDs und Laufzeiten.
+- Der einmalige Write-Capture wird spätestens nach 60 Minuten auch ohne
+  weiteren Seitenaufruf automatisch gelöscht. Der Download ist ausdrücklich
+  nicht cachebar; der Entity-Trace zeigt zusätzlich das finale
+  Ingest-Ergebnis und eine gekürzte Event-ID.
+
+### Dokumentation
+
+- Neue Betriebsdokumentation zu Logquellen, Level-Semantik, Redaction,
+  Request-Korrelation, Ingest-Observability und sicherem Diagnoseeinsatz.
+- Benutzerhandbuch, Ingest-, Sicherheits- und Testdokumentation wurden an das
+  neue Verhalten angepasst.
+
 ## 0.71.0 - 2026-09-01
 
 ### Neu
