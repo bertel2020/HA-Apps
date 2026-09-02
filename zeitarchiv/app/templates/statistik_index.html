@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Zeitarchiv — Indexdetails</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="../static/css/app.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ app_root }}/static/css/app.css?v={{ css_v }}">
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
   .index-intro{max-width:90ch;}
@@ -30,7 +30,7 @@
 {% include "_topnav.html" %}
 <div class="page">
   <h1>Indexdetails</h1>
-  <p class="sub" data-dynamic-back data-app-root="{{ app_root }}"><a href="../statistik">&larr; Zurück zur Statistik</a></p>
+  <p class="sub" data-dynamic-back data-app-root="{{ app_root }}"><a href="{{ app_root }}/statistik">&larr; Zurück zur Statistik</a></p>
   <div class="settings-panel">
     <p class="index-intro">Der Index ist die SQLite-Datei <code>index.sqlite</code>. Er enthält Metadaten, Konfiguration und Betriebsverläufe, aber nicht die eigentlichen Messreihen: Rohwerte liegen im Hot Buffer und Archiv, Aggregate in den Rollups.</p>
     <div class="stat-row">
@@ -80,9 +80,9 @@
     </section>
   </div>
 </div>
-<script src="../static/js/sortable-table.js?v={{ js_v }}"></script>
-<script src="../static/js/confirm-dialog.js?v={{ js_v }}"></script>
-<script src="../static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
 <script>
   // Bestätigung im App-Look statt des nativen confirm()-Dialogs (dieselbe
   // appConfirm()-Mechanik wie beim Löschen von Charts/Tabellen). form.submit()
