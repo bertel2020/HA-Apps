@@ -20,11 +20,11 @@
     {# title + aria-label, weil der Text-Span mobil (<560px, siehe
        .edash-quality-badge-text in energiedashboard.html) ausgeblendet wird und
        der Chip dann nur noch aus dem Symbol besteht. #}
-    <button type="button" class="edash-quality-badge" :class="{'is-warn': !quality.plausible}"
-            title="Datenqualität" aria-label="Datenqualität"
+    <button type="button" class="edash-quality-badge" :class="{'is-warn': !quality.plausible || anomalien.length > 0}"
+            title="Status" aria-label="Status"
             @click="$refs.qualityDialog.showModal()">
-      <span x-text="quality.plausible ? '✓' : '!'"></span>
-      <span class="edash-quality-badge-text">Datenqualität</span>
+      <span x-text="(quality.plausible && !anomalien.length) ? '✓' : '!'"></span>
+      <span class="edash-quality-badge-text">Status</span>
     </button>
     {% endif %}
     {# Rechtsbündige Badge-Gruppe als EIN Flex-Kind (margin-left:auto auf dem
@@ -67,8 +67,8 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="quality-dialog-title">Bilanz &amp; Datenqualität</h2>
-        <p class="hint">Energiebilanz-Prüfung und die übrigen Datenqualitäts-Checks für den gewählten Zeitraum.</p>
+        <h2 id="quality-dialog-title">Bilanz, Datenqualität &amp; Auffälligkeiten</h2>
+        <p class="hint">Energiebilanz-Prüfung, Datenqualitäts-Checks und ungewöhnlich hoher Verbrauch für den gewählten Zeitraum.</p>
       </div>
       <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
     </div>
@@ -106,26 +106,33 @@
       </template>
     </ul>
 
-    {# Auffälligkeiten (Schwellenwert-Färbung, siehe compute_flow()) — eigener
-       Abschnitt statt Teil der obigen Prüfungsliste, weil das keine
-       Ja/Nein-Prüfung ist, sondern eine Rangliste mit Zahlen. Keine eigene
-       Sichtbarkeits-Bedingung nötig: ist die Schwelle auf "Aus" gestellt,
-       bleibt anomalien serverseitig leer und der Abschnitt blendet sich
-       über x-show von selbst aus. #}
-    <div x-show="anomalien.length" style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
-      <strong style="font-size:calc(13px * var(--font-scale, 1));display:block;margin-bottom:6px;">Auffälligkeiten</strong>
-      <ul class="edash-quality-list">
-        <template x-for="a in anomalien" :key="a.name">
-          <li class="is-warn">
-            <span class="edash-quality-check-icon">!</span>
-            <span>
-              <strong x-text="a.name"></strong> —
-              <span x-text="fmt(a.value, 1) + ' kWh, +' + a.pct + ' % über dem Schnitt der letzten Perioden (' + fmt(a.baseline, 1) + ' kWh)'"></span>
-            </span>
-          </li>
-        </template>
-      </ul>
+    {# Auffälligkeiten (Schwellenwert-Färbung, siehe compute_flow()) — eigene
+       Status-Zeile im selben Muster wie Bilanz/Datenqualität oben (immer
+       sichtbar, auch wenn nichts gefunden wurde — "aktiv zeigen, WAS
+       geprüft wurde" statt nur bei Problemen zu erscheinen), die Treffer
+       selbst als eigene Liste darunter statt als Ja/Nein-Detail, weil es
+       hier keine feste Anzahl Prüfungen, sondern eine Rangliste mit Zahlen
+       ist. Ist die Schwelle auf "Aus" gestellt, bleibt anomalien
+       serverseitig leer — die Zeile zeigt dann "Keine Auffälligkeiten"
+       (nicht von "geprüft, nichts gefunden" unterschieden). #}
+    <div class="edash-quality-row" :class="{'is-warn': anomalien.length > 0}">
+      <div class="edash-quality-icon" x-text="anomalien.length ? '!' : '✓'"></div>
+      <div>
+        <strong x-text="anomalien.length ? (anomalien.length + ' Auffälligkeit' + (anomalien.length === 1 ? '' : 'en')) : 'Keine Auffälligkeiten'"></strong>
+        <p class="hint" style="margin:0;" x-show="!anomalien.length">Kein Verbraucher/keine Gruppe deutlich über dem üblichen Schnitt.</p>
+      </div>
     </div>
+    <ul class="edash-quality-list" x-show="anomalien.length">
+      <template x-for="a in anomalien" :key="a.name">
+        <li class="is-warn">
+          <span class="edash-quality-check-icon">!</span>
+          <span>
+            <strong x-text="a.name"></strong> —
+            <span x-text="fmt(a.value, 1) + ' kWh, +' + a.pct + ' % über dem Schnitt der letzten Perioden (' + fmt(a.baseline, 1) + ' kWh)'"></span>
+          </span>
+        </li>
+      </template>
+    </ul>
   </dialog>
   {% endif %}
 

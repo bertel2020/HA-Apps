@@ -243,7 +243,12 @@
   @media(max-width:560px){.edash-sankey-wrap{height:560px;}}
   .edash-sankey-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-faint);font-size:calc(12.5px * var(--font-scale, 1));}
 
-  .edash-quality-row{display:flex;gap:10px;align-items:flex-start;}
+  /* center statt flex-start: die Auffälligkeiten-Zeile hat bei Treffern nur
+     EINE Textzeile (kein Hinweistext darunter, siehe x-show unten) — mit
+     flex-start hing das Icon dann sichtbar oben, statt zur Zeile
+     zentriert zu stehen. Bei den zweizeiligen Titel+Hinweis-Zeilen (Bilanz/
+     Datenqualität) bleibt center genauso stimmig. */
+  .edash-quality-row{display:flex;gap:10px;align-items:center;}
   .edash-quality-icon{width:30px;height:30px;border-radius:8px;background:var(--accent-line-soft);color:var(--accent-line);display:flex;align-items:center;justify-content:center;flex:none;font-size:calc(15px * var(--font-scale, 1));}
   .edash-quality-row.is-warn .edash-quality-icon{background:#F3E4C4;color:#8A6414;}
   .edash-quality-row strong{font-size:calc(13px * var(--font-scale, 1));display:block;margin-bottom:3px;}
@@ -252,6 +257,11 @@
      pauschalen ::before-Häkchens, da einzelne Prüfungen fehlschlagen können,
      während die Kachel insgesamt trotzdem weiterläuft. */
   .edash-quality-list{list-style:none;margin:10px 0 0;padding:10px 0 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+  /* Auffälligkeiten-Zeile folgt auf die Prüfungsliste (statt wie die übrigen
+     .edash-quality-row auf eine andere .edash-quality-row) — ohne diese
+     Regel hätte sie keinerlei Abstand/Trennlinie zur Liste darüber und
+     wirkte wie ein weiterer Listeneintrag statt eines eigenen Abschnitts. */
+  .edash-quality-list + .edash-quality-row{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);}
   .edash-quality-list li{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);display:flex;align-items:baseline;gap:7px;}
   .edash-quality-check-icon{flex:none;color:var(--chart-6);font-weight:700;}
   .edash-quality-list li.is-warn .edash-quality-check-icon{color:#8A6414;}
@@ -418,6 +428,73 @@
   .edash-section-erzeuger{background:color-mix(in srgb, var(--chart-3) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-3) 32%, var(--border));}
   .edash-section-speicher{background:color-mix(in srgb, var(--chart-4) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-4) 32%, var(--border));}
   .edash-section-verbraucher{background:color-mix(in srgb, var(--chart-7) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-7) 32%, var(--border));}
+
+  /* Nebeneinander statt untereinander, aber jede Karte nur so breit wie ihr
+     Inhalt (Name-/Feldbreite 260px + Rahmen) tatsächlich braucht, statt
+     erzwungen gleich breiter 1fr-Grid-Spalten mit viel Leerraum daneben.
+     Flex statt Grid: Flex-Items sind standardmäßig content-groß (kein
+     flex-grow gesetzt), Karten wrappen bei Platzmangel einfach in die
+     nächste Zeile — kein Sonderfall für einen dritten/vierten Speicher
+     nötig, kein horizontales Scrollen. */
+  .edash-speicher-grid{display:flex;flex-wrap:wrap;gap:14px;}
+
+  /* Feld-Erklärungen einmal zentral über den Karten (siehe Template) statt
+     in jeder Karte wiederholt — bei mehreren Speichern stünde derselbe
+     Hinweistext sonst mehrfach identisch da. Feste vier Spalten
+     (repeat(4,1fr), nicht auto-fill) — bei auto-fill fiel die vierte Spalte
+     je nach Fensterbreite unvorhersehbar in eine zweite Zeile, mit einer
+     festen Spaltenzahl bleiben es immer vier nebeneinander; die Beschreibung
+     selbst darf innerhalb ihrer eigenen Spalte mehrzeilig umbrechen (nur
+     die vier Spalten dürfen nicht umbrechen). Unter 640px zwei statt vier
+     Spalten, sonst würden die Texte auf schmalen Bildschirmen zu einzelnen
+     Wörtern pro Zeile zusammengequetscht. */
+  .edash-speicher-legend{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:4px 14px;
+    margin:0 0 14px;padding:10px 14px;border-radius:10px;background:var(--surface-alt);
+  }
+  @media(max-width:640px){.edash-speicher-legend{grid-template-columns:repeat(2,1fr);}}
+  .edash-speicher-legend dt{margin:0;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+  .edash-speicher-legend dd{margin:1px 0 0;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.4;}
+
+  /* Speicher ist die einzige Liste mit einer eigenen Karte statt einer
+     kompakten Zeile pro Eintrag (wie Erzeuger/Verbraucher) — 4 Felder
+     (Entladung/Ladung/Ladezustand/Kapazität) plus Name wären in einer Zeile
+     entweder zu schmal für vernünftige dd-picker-Breiten oder bräuchten
+     horizontales Scrollen. Eigene, hellere Fläche statt der Section-Tönung,
+     damit sich mehrere Speicher optisch klar voneinander abgrenzen —
+     dieselbe Idee wie eine Kachel auf getöntem Kartengrund. */
+  .edash-speicher-card{
+    border:1px solid var(--border);border-radius:10px;background:var(--surface);
+    padding:12px 14px;
+  }
+  .edash-speicher-card.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;}
+  .edash-speicher-card-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  /* width:260px/flex:none = dieselbe Standardbreite wie die Namensfelder bei
+     Erzeuger/Verbraucher (.edash-list-row input[type="text"]), statt sich
+     wie zuvor über die ganze Kartenbreite zu strecken. Normale statt fetter
+     Schrift — die Kapazität daneben (falls belegt) wird sonst nachrangig
+     wichtig wirken, ist es aber nicht. */
+  .edash-speicher-name-input{
+    width:260px;flex:none;font-family:var(--font-mono);font-size:calc(13.5px * var(--font-scale, 1));font-weight:400;
+    padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+    box-sizing:border-box;
+  }
+  .edash-speicher-name-input:focus{outline:none;border-color:var(--accent-line);background:var(--surface);}
+  /* Immer eine einzelne Spalte (statt des app-weiten auto-fill-Verhaltens
+     von .edash-field-grid) und links um Zieh-Icon+Abstand (20px+8px)
+     eingerückt — die Felder stehen damit optisch genau unter dem
+     Namensfeld statt unter dem Drag-Handle, unabhängig von der
+     Kartenbreite. */
+  /* 260px statt 1fr — dieselbe Standardbreite wie das Namensfeld darüber
+     und wie Entitäts-Felder überall sonst in der App (.edash-list-row
+     input[type="text"], Netz/Kosten/CO2-Felder). Ohne feste Breite hätten
+     sich die Picker-Buttons hier auf die volle restliche Kartenbreite
+     gestreckt, statt die sonst überall gleiche Feldbreite zu übernehmen. */
+  .edash-speicher-card .edash-field-grid{margin-top:0;grid-template-columns:260px;margin-left:28px;}
+  /* Kapazität ist nur eine kurze Zahl (2-3 Stellen) — auf gut die Hälfte der
+     übrigen Feldbreite (260px) begrenzt statt sich wie die Entitäts-Picker
+     auf volle Spaltenbreite zu strecken. */
+  .edash-speicher-capacity-input{max-width:120px;}
 
   /* max-width statt reinem flex:1 — sonst zieht sich der Entitäts-Button bei
      voller Seitenbreite über die gesamte restliche Zeile (dieselbe "riesige

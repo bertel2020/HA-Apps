@@ -172,3 +172,17 @@ unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
   Opt-in-Klasse `.tooltip-lines` (`white-space:pre-line`) plus echte `\n` im
   Attributwert — die App-weite Basisregel rendert sonst `white-space:normal`
   und Zeilenumbrüche fallen zu Leerzeichen zusammen.
+- **`group-picker.js`** (Energiedashboard, Verbraucher-Gruppen): durchsuchbares
+  Dropdown ohne feste Optionsliste — bestehenden Eintrag auswählen oder per
+  Freitext einen neuen erzeugen (wie Tags/Labels in Home Assistant), analog zu
+  `entity-picker.js`, aber die Optionsliste selbst ist eine im Root-`x-data`
+  gehaltene, per Referenz (nicht kopiert) an jede Instanz durchgereichte
+  Alpine-Liste — eine hier neu angelegte Gruppe taucht dadurch sofort in jedem
+  anderen Gruppen-Feld auf, ganz ohne Server-Rundtrip.
+- **Content-breite Karten statt gleich breiter Grid-Spalten** (Energiedashboard,
+  mehrere Speicher): `display:flex;flex-wrap:wrap` statt `display:grid` mit
+  `1fr`-Spalten, wenn Karten unterschiedlich viel Platz brauchen können —
+  Flex-Items sind standardmäßig content-groß statt sich auf eine erzwungene
+  gleiche Spaltenbreite zu strecken (die bei schmalerem Karteninhalt sichtbaren
+  Leerraum danaben hinterlassen hätte), wrappen aber bei Platzmangel genauso
+  in die nächste Zeile wie ein Grid.

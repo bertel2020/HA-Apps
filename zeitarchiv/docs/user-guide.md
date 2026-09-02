@@ -670,21 +670,37 @@ Energiefluss eines Haushalts als Sankey-Diagramm zeigt. Sie wird über eine
 feste Kachel oben auf der Dashboard-Übersicht ein- und ausgeschaltet und ist
 danach auch im Menü **Dashboards** erreichbar. Beim ersten Aktivieren fragt
 ein Rollen-Formular die vorhandenen Entitäten ab: Netzbezug (Pflicht),
-Einspeisung, beliebig viele Erzeuger, optional ein Speicher (Laden/Entladen/
-SOC) sowie Verbraucher.
+Einspeisung, beliebig viele Erzeuger, beliebig viele Speicher (je
+Laden/Entladen/SOC) sowie Verbraucher, die sich optional zu frei benannten
+Gruppen zusammenfassen lassen.
 
 Navigation läuft wie bei Charts über Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
-Neben dem Sankey-Fluss und den KPI-Kacheln (Erzeugung, Verbrauch, Netzbezug,
-Speicher, Einspeisung) zeigen vier Ringe Autarkie, Eigenverbrauch,
-Speicher-Ladezustand und Speicher-Wirkungsgrad — ein Klick auf einen Ring
-öffnet den jeweiligen Monatstrend der letzten drei Jahre. Optionale Badges
-im Kopfbereich fassen Kosten- und CO₂-Bilanz (mit eigenem Festpreis-Feld, wenn
-keine passende Entität vorhanden ist), die PV-Ertragsprognose sowie einen
-Datenqualitäts-Check (Bilanzplausibilität, veraltete Sensorwerte) zusammen.
-Ein Tageslastprofil zeigt bei Tag/Stunde den stündlichen Verbrauch der
-letzten 7 Kalendertage; bei Monat/Jahr stattdessen den nach Wochentag
-gemittelten Verbrauch (Mo–So) über den gewählten Zeitraum, sodass erkennbar
-wird, an welchen Wochentagen typischerweise mehr verbraucht wird.
+Ein Verbraucher mit zugewiesener Gruppe hängt im Sankey zweistufig am Bus
+(Bus → Gruppe → Gerät), ein ungruppierter direkt am Bus wie ein Erzeuger —
+hält den Fluss bei vielen einzelnen Verbrauchern übersichtlich. Gruppen
+werden direkt beim Zuordnen eines Verbrauchers angelegt (bestehende
+auswählen oder per Freitext eine neue erzeugen) oder über den eigenen
+**„Gruppen"**-Button verwaltet (umbenennen, löschen — betroffene Verbraucher
+werden dabei nur wieder gruppenlos, nicht verändert). Neben dem Sankey-Fluss
+und den KPI-Kacheln (Erzeugung, Verbrauch, Netzbezug, Speicher, Einspeisung —
+bei mehreren Speichern/Erzeugern als Summe mit Aufschlüsselung im Tooltip)
+zeigen vier Ringe Autarkie, Eigenverbrauch, Speicher-Ladezustand und
+Speicher-Wirkungsgrad (bei mehreren Speichern kapazitätsgewichtet
+zusammengefasst, damit ein leerer und ein voller Speicher nicht fälschlich
+als "50 %" erscheinen) — ein Klick auf einen Ring öffnet den jeweiligen
+Monatstrend der letzten drei Jahre. Optionale Badges im Kopfbereich fassen
+Kosten- und CO₂-Bilanz (mit eigenem Festpreis-Feld, wenn keine passende
+Entität vorhanden ist) sowie die PV-Ertragsprognose zusammen. Der
+**„Status"**-Chip öffnet ein Popup mit Bilanzprüfung, den übrigen
+Datenqualitäts-Checks (veraltete Sensorwerte, Zählerrücksetzungen,
+Einheiten/Zähler-Typ, doppelt zugeordnete Entitäten) und Auffälligkeiten —
+Verbraucher oder Gruppen, die deutlich über ihrem Schnitt der letzten
+Perioden liegen. Die Schwelle dafür (Standard +50 %) lässt sich im
+Rollen-Formular unter „Allgemein" anpassen oder ganz abschalten. Ein
+Tageslastprofil zeigt bei Tag/Stunde den stündlichen Verbrauch der letzten
+7 Kalendertage; bei Monat/Jahr stattdessen den nach Wochentag gemittelten
+Verbrauch (Mo–So) über den gewählten Zeitraum, sodass erkennbar wird, an
+welchen Wochentagen typischerweise mehr verbraucht wird.
 
 ### Benötigte und sinnvolle Entitäten
 
@@ -699,9 +715,9 @@ Zeitarchiv ankommt.
 | Netzbezug | **ja** | Zählerstand Strombezug aus dem Netz (kWh, aufsteigend) |
 | Einspeisung | nein | Zählerstand Netzeinspeisung (kWh, aufsteigend) |
 | Erzeuger (beliebig viele) | nein | je ein Ertragszähler (kWh, aufsteigend) mit eigenem Namen — z. B. Dachanlage und Balkonkraftwerk getrennt geführt |
-| Speicher: Laden / Entladen | nein (ein Speicher) | zwei Zählerstände (kWh, aufsteigend) |
-| Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler |
-| Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
+| Speicher: Laden / Entladen (beliebig viele Speicher) | nein | je zwei Zählerstände (kWh, aufsteigend) — Werte über mehrere Speicher hinweg werden addiert |
+| Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler — bei mehreren Speichern kapazitätsgewichtet gemittelt |
+| Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
 | Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
 | CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
 | PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |

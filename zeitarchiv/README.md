@@ -125,18 +125,23 @@ bieten Suche, wählbare Sortierung und einen davon unabhängigen Schalter
 
 **Energiedashboard.** Eigenständige, per Kachel auf der Dashboard-Übersicht
 aktivierbare Ansicht des gesamten Energieflusses als Sankey-Diagramm —
-Netzbezug, beliebig viele Erzeuger, ein Speicher und Verbraucher, jeweils
-mit Stunde-/Tag-/Monat-/Jahr-Navigation:
+Netzbezug, beliebig viele Erzeuger, beliebig viele Speicher und Verbraucher
+(optional zu frei benannten Gruppen zusammengefasst), jeweils mit
+Stunde-/Tag-/Monat-/Jahr-Navigation:
 
 - **Kennzahlen und Ringe:** Erzeugung, Verbrauch, Netzbezug, Speicher und
-  Einspeisung als KPI-Kacheln; Autarkie-, Eigenverbrauchs-, Speicher-SOC- und
-  Wirkungsgrad-Ringe mit anklickbarem Monatstrend über die letzten drei Jahre.
+  Einspeisung als KPI-Kacheln (bei mehreren Speichern/Erzeugern als Summe mit
+  Aufschlüsselung im Tooltip); Autarkie-, Eigenverbrauchs-, Speicher-SOC- und
+  Wirkungsgrad-Ringe (bei mehreren Speichern kapazitätsgewichtet
+  zusammengefasst) mit anklickbarem Monatstrend über die letzten drei Jahre.
 - **Kosten und CO₂:** Bilanz aus Strompreis- bzw. CO₂-Entität oder einem
   eigenen Festpreis, falls keine passende Entität vorhanden ist.
 - **PV-Ertragsprognose** und ein **Tageslastprofil** (stündlicher Verbrauch
   der letzten 7 Tage; bei Monat/Jahr stattdessen nach Wochentag gemittelt).
-- **Datenqualitäts-Check:** prüft die Energiebilanz auf Plausibilität und
-  meldet veraltete Sensorwerte, statt sie unbemerkt zu glätten.
+- **Status-Check:** prüft die Energiebilanz auf Plausibilität, meldet
+  veraltete Sensorwerte statt sie unbemerkt zu glätten, und markiert
+  Verbraucher/Gruppen, die deutlich über ihrem üblichen Schnitt liegen
+  (Schwelle einstellbar, auch abschaltbar).
 
 **Entitäten und Verläufe.** Jede archivierte Entität besitzt eine eigene
 Verlaufsansicht mit Zeitraum-Navigation von Stunde bis Dekade, Vergleich mit

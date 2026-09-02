@@ -638,79 +638,142 @@ class EnergieDashboardService:
             erzeuger_breakdown.append({"name": name, "value": round(max(val, 0.0), 3)})
             add_stale_issue(name, stale)
 
-        speicher = config.get("speicher") or {}
-        speicher_name = speicher.get("name") or "Speicher"
+        # Mehrere Speicher gleichzeitig (z. B. Hausspeicher + separates
+        # Balkonkraftwerk): jeder bekommt sein eigenes Node-Paar im Sankey
+        # (analog zu Erzeuger/Verbraucher, kein eigenes Gruppierungs-Konzept
+        # nötig — realistisch sind das 1-2 Speicher, nicht die vielen
+        # Einzelgeräte, die bei Verbrauchern die Gruppen-Funktion nötig
+        # machten). Energiemengen (Laden/Entladen) werden über alle Speicher
+        # SUMMIERT; SOC (%) dagegen kapazitätsgewichtet GEMITTELT (siehe
+        # _capacity_weighted_avg) — eine reine Summe ergäbe bei zwei Speichern
+        # bis zu 200 %, ein unkapazitätsgewichteter Schnitt würde "einer
+        # leer, einer voll" fälschlich als "50 %" ausweisen.
+        speicher_list: list[dict] = config.get("speicher") or []
         speicher_entladen_val = 0.0
         speicher_laden_val = 0.0
-        speicher_entladen_series: dict[float, float] = {}
-        speicher_laden_series: dict[float, float] = {}
-        speicher_soc = None
-        if speicher.get("entladen_entity_id"):
-            speicher_entladen_series, stale = entity_series(speicher["entladen_entity_id"])
-            speicher_entladen_val = self._series_total(speicher_entladen_series)
-            label = f"{speicher_name} (Entladung)"
-            nodes.append({
-                "name": label, "entity_id": speicher["entladen_entity_id"], "role": "source",
-                "kind": "storage_out",
-                "value": max(speicher_entladen_val, 0.0), "stale": stale,
+        speicher_entladen_series_list: list[dict[float, float]] = []
+        speicher_laden_series_list: list[dict[float, float]] = []
+        # (Name, Entladung, Ladung) je Speicher — nur für die Plausibilitäts-
+        # Prüfung weiter unten (Entladung darf Ladung nicht übersteigen),
+        # dort pro Speicher statt nur aggregiert geprüft, damit ein einzelner
+        # falsch zugeordneter Speicher nicht von einem unauffälligen Rest
+        # verdeckt wird.
+        speicher_per_entity: list[dict] = []
+        # Parallel zu speicher_list (per Index, nicht per Name — Namen sind
+        # frei vergeben und müssen nicht eindeutig sein) für die Ladung-Sink-
+        # Knoten weiter unten, die erst nach Einspeisung/vor Grundlast
+        # emittiert werden (Grundlast braucht die aggregierte Summe zuerst).
+        speicher_laden_vals: list[float] = []
+        soc_period_pairs: list[tuple[float, float]] = []
+        soc_now_pairs: list[tuple[float, float]] = []
+        speicher_breakdown: list[dict] = []
+        for sp in speicher_list:
+            sp_name = sp.get("name") or "Speicher"
+            sp_entladen_val = 0.0
+            sp_laden_val = 0.0
+            if sp.get("entladen_entity_id"):
+                sp_entladen_series, stale = entity_series(sp["entladen_entity_id"])
+                sp_entladen_val = self._series_total(sp_entladen_series)
+                speicher_entladen_series_list.append(sp_entladen_series)
+                label = f"{sp_name} (Entladung)"
+                nodes.append({
+                    "name": label, "entity_id": sp["entladen_entity_id"], "role": "source",
+                    "kind": "storage_out",
+                    "value": max(sp_entladen_val, 0.0), "stale": stale,
+                })
+                links.append({"source": label, "target": hub_name, "value": max(sp_entladen_val, 0.0)})
+                bus_in += sp_entladen_val
+                add_stale_issue(label, stale)
+            if sp.get("laden_entity_id"):
+                sp_laden_series, stale = entity_series(sp["laden_entity_id"])
+                sp_laden_val = self._series_total(sp_laden_series)
+                speicher_laden_series_list.append(sp_laden_series)
+                add_stale_issue(f"{sp_name} (Ladung)", stale)
+            speicher_entladen_val += sp_entladen_val
+            speicher_laden_val += sp_laden_val
+            speicher_per_entity.append({
+                "name": sp_name, "entladen_val": sp_entladen_val, "laden_val": sp_laden_val,
+                "has_both": bool(sp.get("laden_entity_id")) and bool(sp.get("entladen_entity_id")),
             })
-            links.append({"source": label, "target": hub_name, "value": max(speicher_entladen_val, 0.0)})
-            bus_in += speicher_entladen_val
-            add_stale_issue(label, stale)
-        if speicher.get("laden_entity_id"):
-            speicher_laden_series, stale = entity_series(speicher["laden_entity_id"])
-            speicher_laden_val = self._series_total(speicher_laden_series)
-            add_stale_issue(f"{speicher_name} (Ladung)", stale)
-        speicher_soc_kwh = None
-        if speicher.get("soc_entity_id"):
-            # SOC ist ein Gauge (%), nicht Zähler — "auto" ist hier der
-            # Perioden-Durchschnitt, ein plausibler Kompakt-Wert für die KPI.
-            soc_series, _stale = entity_series(speicher["soc_entity_id"])
-            if soc_series:
-                speicher_soc = round(sum(soc_series.values()) / len(soc_series), 1)
-                capacity_kwh = speicher.get("capacity_kwh")
-                if capacity_kwh:
-                    # % ist die primäre, immer verständliche Einheit; die
-                    # kWh-Entsprechung nur als Zusatz, wenn eine Kapazität
-                    # hinterlegt ist — sonst gäbe es nichts, woraus sich kWh
-                    # ableiten ließe.
-                    speicher_soc_kwh = round(speicher_soc / 100 * capacity_kwh, 1)
+            speicher_laden_vals.append(sp_laden_val)
+            if len(speicher_list) > 1 and (sp_entladen_val or sp_laden_val):
+                speicher_breakdown.append({"name": sp_name, "value": round(sp_laden_val - sp_entladen_val, 3)})
 
-        # Aktueller (Jetzt-)Füllstand, unabhängig vom gewählten Zeitraum —
-        # speicher_soc oben ist der Ø-Wert ÜBER DIE PERIODE (bei Monat/Jahr
-        # kann das deutlich vom tatsächlichen Stand gerade eben abweichen).
-        # index.get_entity()["last_value"] wäre die billigere Variante (kein
-        # Datei-Zugriff), ist aber NICHT zuverlässig: die Spalte wird nur bei
-        # laufender Live-Ingestion gepflegt, nicht bei per reconcile()
-        # neu aufgebauten Metadaten (z. B. nach Reparatur/Bulk-Import) — dort
-        # bleibt last_value trotz vorhandener Daten None (derselbe blinde
-        # Fleck, den auch die Dashboard-Kachel in main.py hat, dort mit "–"
-        # sichtbar gemacht statt verschleiert). _boundary_value() liest
-        # stattdessen den tatsächlich letzten Rohwert aus Hot-Buffer/Archiv.
-        speicher_soc_now = None
-        speicher_soc_now_kwh = None
-        if speicher.get("soc_entity_id"):
-            raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                self.deps.data_dir, speicher["soc_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache,
-            )
-            if raw_value is not None:
-                speicher_soc_now = round(raw_value, 1)
-                capacity_kwh = speicher.get("capacity_kwh")
-                if capacity_kwh:
-                    speicher_soc_now_kwh = round(speicher_soc_now / 100 * capacity_kwh, 1)
+            capacity_kwh = sp.get("capacity_kwh")
+            weight = capacity_kwh if capacity_kwh else 1.0
+            if sp.get("soc_entity_id"):
+                # SOC ist ein Gauge (%), nicht Zähler — "auto" ist hier der
+                # Perioden-Durchschnitt, ein plausibler Kompakt-Wert für die KPI.
+                soc_series, _stale = entity_series(sp["soc_entity_id"])
+                if soc_series:
+                    soc_period_pairs.append((sum(soc_series.values()) / len(soc_series), weight))
+                # Aktueller (Jetzt-)Füllstand, unabhängig vom gewählten
+                # Zeitraum — der Perioden-Ø oben kann bei Monat/Jahr deutlich
+                # vom tatsächlichen Stand gerade eben abweichen.
+                # index.get_entity()["last_value"] wäre die billigere Variante
+                # (kein Datei-Zugriff), ist aber NICHT zuverlässig: die Spalte
+                # wird nur bei laufender Live-Ingestion gepflegt, nicht bei
+                # per reconcile() neu aufgebauten Metadaten (z. B. nach
+                # Reparatur/Bulk-Import) — dort bleibt last_value trotz
+                # vorhandener Daten None. _boundary_value() liest stattdessen
+                # den tatsächlich letzten Rohwert aus Hot-Buffer/Archiv.
+                raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
+                    self.deps.data_dir, sp["soc_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache,
+                )
+                if raw_value is not None:
+                    soc_now_pairs.append((raw_value, weight))
+
+        speicher_entladen_series = (
+            self._series_merge(*speicher_entladen_series_list) if speicher_entladen_series_list else {}
+        )
+        speicher_laden_series = self._series_merge(*speicher_laden_series_list) if speicher_laden_series_list else {}
+
+        speicher_soc = round(self._capacity_weighted_avg(soc_period_pairs), 1) if soc_period_pairs else None
+        speicher_soc_now = round(self._capacity_weighted_avg(soc_now_pairs), 1) if soc_now_pairs else None
+        # % ist die primäre, immer verständliche Einheit; die kWh-Entsprechung
+        # nur als Zusatz, wenn für ALLE Speicher mit SOC eine Kapazität
+        # hinterlegt ist — bei nur teilweise bekannten Kapazitäten wäre die
+        # Summe sonst irreführend niedrig (fehlende Speicher zählen nicht mit,
+        # ihr SOC ging aber mit Gewicht 1 in den Schnitt oben ein).
+        speicher_soc_capacity_total = sum(sp.get("capacity_kwh") or 0.0 for sp in speicher_list if sp.get("soc_entity_id"))
+        speicher_soc_capacity_complete = all(
+            sp.get("capacity_kwh") for sp in speicher_list if sp.get("soc_entity_id")
+        )
+        speicher_soc_kwh = (
+            round(speicher_soc / 100 * speicher_soc_capacity_total, 1)
+            if speicher_soc is not None and speicher_soc_capacity_complete and speicher_soc_capacity_total
+            else None
+        )
+        speicher_soc_now_kwh = (
+            round(speicher_soc_now / 100 * speicher_soc_capacity_total, 1)
+            if speicher_soc_now is not None and speicher_soc_capacity_complete and speicher_soc_capacity_total
+            else None
+        )
 
         # Trend fürs Popup (Klick auf den Speicher-SOC-Ring) — anders als
         # Wirkungsgrad braucht SOC keine Ratio-Berechnung, der Monats-Bucket
-        # ist bei einem Gauge (%) schon der Ø-Wert dieses Monats. Unabhängig
-        # von Laden/Entladen, nur an soc_entity_id gebunden.
+        # ist bei einem Gauge (%) schon der Ø-Wert dieses Monats. Über mehrere
+        # Speicher hinweg wird je Monat kapazitätsgewichtet gemittelt statt
+        # (wie bei Erzeuger/Verbraucher) summiert — dieselbe Begründung wie
+        # bei speicher_soc oben.
         speicher_soc_trend: list[dict] = []
-        if not (continuous or skip_quality) and speicher.get("soc_entity_id"):
-            soc_monthly = self._monthly_sum_by_year([speicher["soc_entity_id"]], now, read_cache)
+        if not (continuous or skip_quality) and soc_period_pairs:
+            soc_weighted_sum: dict[float, float] = {}
+            soc_weight_sum: dict[float, float] = {}
+            for sp in speicher_list:
+                if not sp.get("soc_entity_id"):
+                    continue
+                sp_weight = sp.get("capacity_kwh") or 1.0
+                sp_monthly = self._monthly_sum_by_year([sp["soc_entity_id"]], now, read_cache)
+                for ts, val in sp_monthly.items():
+                    soc_weighted_sum[ts] = soc_weighted_sum.get(ts, 0.0) + val * sp_weight
+                    soc_weight_sum[ts] = soc_weight_sum.get(ts, 0.0) + sp_weight
+            soc_monthly_avg = {ts: soc_weighted_sum[ts] / soc_weight_sum[ts] for ts in soc_weighted_sum}
             by_year_soc: dict[str, list[float | None]] = {}
-            for ts in sorted(soc_monthly):
+            for ts in sorted(soc_monthly_avg):
                 dt = datetime.fromtimestamp(ts, self.deps.tz)
                 year_key = dt.strftime("%Y")
-                by_year_soc.setdefault(year_key, [None] * 12)[dt.month - 1] = round(soc_monthly[ts], 1)
+                by_year_soc.setdefault(year_key, [None] * 12)[dt.month - 1] = round(soc_monthly_avg[ts], 1)
             speicher_soc_trend = [
                 {"year": year_key, "months": by_year_soc[year_key]} for year_key in sorted(by_year_soc)
             ]
@@ -740,11 +803,8 @@ class EnergieDashboardService:
 
         speicher_efficiency = None
         speicher_efficiency_trend: list[dict] = []
-        if (
-            not (continuous or skip_quality)
-            and speicher.get("laden_entity_id")
-            and speicher.get("entladen_entity_id")
-        ):
+        speichers_with_both = [sp for sp in speicher_list if sp.get("laden_entity_id") and sp.get("entladen_entity_id")]
+        if not (continuous or skip_quality) and speichers_with_both:
             # Selbst berechnet statt manuell im Setup einzutragen (vorher
             # "Wirkungsgrad"-Feld, ohne Auswirkung auf die Berechnung) —
             # Entladung/Ladung über die GESAMTE bisherige Historie statt nur
@@ -753,54 +813,70 @@ class EnergieDashboardService:
             # herausmittelt und so eine deutlich stabilere Schätzung ergibt.
             # "decade" (10 Jahre) ist der größte vorhandene range_key in
             # query.py und deckt die Speicher-Lebensdauer damit praktisch
-            # immer komplett ab.
-            laden_all, _ = self._entity_series(speicher["laden_entity_id"], "decade", 0, now, read_cache)
-            entladen_all, _ = self._entity_series(speicher["entladen_entity_id"], "decade", 0, now, read_cache)
-            laden_all_total = self._series_total(laden_all)
-            entladen_all_total = self._series_total(entladen_all)
-
-            # Korrektur um den aktuell noch im Speicher steckenden Füllstand:
-            # ohne sie zählt "Ladung" auch Energie mit, die noch gar nicht
-            # wieder entladen wurde (verfälscht die Quote vor allem bei kurzer
-            # Historie oder kurz nach einer großen Ladung). Nötig dafür: SOC
-            # am Anfang UND am Ende der Historie (erster/letzter Bucket
-            # derselben "decade"-Abfrage) plus eine hinterlegte Kapazität, um
-            # die %-Differenz in kWh umzurechnen — fehlt eins davon, bleibt es
-            # bei der einfachen (unkorrigierten) Quote als Fallback.
-            capacity_kwh = speicher.get("capacity_kwh")
-            corrected_laden_total = laden_all_total
-            if capacity_kwh and speicher.get("soc_entity_id"):
-                soc_all, _ = self._entity_series(speicher["soc_entity_id"], "decade", 0, now, read_cache)
-                if len(soc_all) >= 2:
-                    soc_start = soc_all[min(soc_all)]
-                    soc_end = soc_all[max(soc_all)]
-                    delta_kwh = (soc_end - soc_start) / 100.0 * capacity_kwh
-                    corrected_laden_total = laden_all_total - delta_kwh
-
-            if corrected_laden_total > 0:
-                speicher_efficiency = round(max(0.0, min(1.0, entladen_all_total / corrected_laden_total)) * 100, 1)
-            elif laden_all_total > 0:
-                speicher_efficiency = round(max(0.0, min(1.0, entladen_all_total / laden_all_total)) * 100, 1)
-
-            # Trend fürs Popup (Klick auf den Wirkungsgrad-Ring): monatliche
-            # statt jährliche Auflösung — "decade" liefert nur Jahres-Buckets
-            # (siehe laden_all/entladen_all oben, weiterhin für die
-            # Momentaufnahme genutzt), für Monate braucht es stattdessen
-            # "year"-Abfragen (die liefern Monats-Buckets, aber jeweils nur
-            # für EIN Kalenderjahr) über mehrere offsets. 3 Jahre zurück ist
-            # ein Kompromiss: genug für eine erkennbare Kurve, ohne beliebig
-            # viele Einzel-Abfragen zu brauchen. Bewusst OHNE die SOC-
-            # Korrektur von oben (die lohnt sich vor allem bei kurzen
-            # Fenstern; ein Monat mit normaler Nutzung hat i. d. R. schon ein
-            # Vielfaches der Speicherkapazität umgesetzt) — hält den Trend
-            # einfach statt pro Monat eine eigene Korrektur zu brauchen.
+            # immer komplett ab. Über mehrere Speicher hinweg werden Ladung
+            # und (korrigierte) Entladung SUMMIERT statt als Schnitt der
+            # einzelnen Quoten gemittelt — ergibt denselben blended
+            # Wirkungsgrad, den man bekäme, behandelte man alle Speicher als
+            # einen einzigen großen (korrekt gewichtet nach tatsächlichem
+            # Energiedurchsatz statt nach Anzahl Speicher).
+            total_laden_all = 0.0
+            total_entladen_all = 0.0
+            total_corrected_laden = 0.0
             monthly_laden: dict[float, float] = {}
             monthly_entladen: dict[float, float] = {}
-            for year_offset in range(0, -3, -1):
-                laden_year, _ = self._entity_series(speicher["laden_entity_id"], "year", year_offset, now, read_cache)
-                entladen_year, _ = self._entity_series(speicher["entladen_entity_id"], "year", year_offset, now, read_cache)
-                monthly_laden.update(laden_year)
-                monthly_entladen.update(entladen_year)
+            for sp in speichers_with_both:
+                laden_all, _ = self._entity_series(sp["laden_entity_id"], "decade", 0, now, read_cache)
+                entladen_all, _ = self._entity_series(sp["entladen_entity_id"], "decade", 0, now, read_cache)
+                laden_all_total = self._series_total(laden_all)
+                entladen_all_total = self._series_total(entladen_all)
+                total_laden_all += laden_all_total
+                total_entladen_all += entladen_all_total
+
+                # Korrektur um den aktuell noch im Speicher steckenden
+                # Füllstand: ohne sie zählt "Ladung" auch Energie mit, die
+                # noch gar nicht wieder entladen wurde (verfälscht die Quote
+                # vor allem bei kurzer Historie oder kurz nach einer großen
+                # Ladung). Nötig dafür: SOC am Anfang UND am Ende der
+                # Historie plus eine hinterlegte Kapazität — fehlt eins
+                # davon, bleibt es bei der einfachen (unkorrigierten) Menge
+                # dieses Speichers als Fallback.
+                capacity_kwh = sp.get("capacity_kwh")
+                corrected = laden_all_total
+                if capacity_kwh and sp.get("soc_entity_id"):
+                    soc_all, _ = self._entity_series(sp["soc_entity_id"], "decade", 0, now, read_cache)
+                    if len(soc_all) >= 2:
+                        soc_start = soc_all[min(soc_all)]
+                        soc_end = soc_all[max(soc_all)]
+                        delta_kwh = (soc_end - soc_start) / 100.0 * capacity_kwh
+                        corrected = laden_all_total - delta_kwh
+                total_corrected_laden += corrected
+
+                # Trend fürs Popup (Klick auf den Wirkungsgrad-Ring): monatliche
+                # statt jährliche Auflösung — "decade" liefert nur Jahres-Buckets
+                # (siehe oben, weiterhin für die Momentaufnahme genutzt), für
+                # Monate braucht es stattdessen "year"-Abfragen (liefern
+                # Monats-Buckets, aber jeweils nur für EIN Kalenderjahr) über
+                # mehrere offsets. 3 Jahre zurück ist ein Kompromiss: genug
+                # für eine erkennbare Kurve, ohne beliebig viele
+                # Einzel-Abfragen zu brauchen. Bewusst OHNE die SOC-Korrektur
+                # von oben (lohnt sich vor allem bei kurzen Fenstern) — hält
+                # den Trend einfach statt pro Monat eine eigene Korrektur zu
+                # brauchen. += statt .update(), weil sich hier (anders als
+                # bei den Jahres-Offsets desselben Speichers) die Zeitstempel
+                # MEHRERER Speicher im selben Monat überschneiden können.
+                for year_offset in range(0, -3, -1):
+                    laden_year, _ = self._entity_series(sp["laden_entity_id"], "year", year_offset, now, read_cache)
+                    entladen_year, _ = self._entity_series(sp["entladen_entity_id"], "year", year_offset, now, read_cache)
+                    for ts, v in laden_year.items():
+                        monthly_laden[ts] = monthly_laden.get(ts, 0.0) + v
+                    for ts, v in entladen_year.items():
+                        monthly_entladen[ts] = monthly_entladen.get(ts, 0.0) + v
+
+            if total_corrected_laden > 0:
+                speicher_efficiency = round(max(0.0, min(1.0, total_entladen_all / total_corrected_laden)) * 100, 1)
+            elif total_laden_all > 0:
+                speicher_efficiency = round(max(0.0, min(1.0, total_entladen_all / total_laden_all)) * 100, 1)
+
             # Eine Zeile je Jahr mit einer festen 12-Slot-Sparkline (Jan..Dez)
             # statt einer einzigen durchgehenden Kurve über alle Monate —
             # fehlende Monate (vor Speicher-Inbetriebnahme oder noch in der
@@ -955,14 +1031,17 @@ class EnergieDashboardService:
             links.append({"source": hub_name, "target": "Einspeisung", "value": max(einspeisung_val, 0.0)})
             add_stale_issue("Einspeisung", stale)
 
-        if speicher.get("laden_entity_id"):
-            label = f"{speicher_name} (Ladung)"
+        for sp, sp_laden_val in zip(speicher_list, speicher_laden_vals):
+            if not sp.get("laden_entity_id"):
+                continue
+            sp_name = sp.get("name") or "Speicher"
+            label = f"{sp_name} (Ladung)"
             nodes.append({
-                "name": label, "entity_id": speicher["laden_entity_id"], "role": "sink",
+                "name": label, "entity_id": sp["laden_entity_id"], "role": "sink",
                 "kind": "storage_in",
-                "value": max(speicher_laden_val, 0.0), "stale": False,
+                "value": max(sp_laden_val, 0.0), "stale": False,
             })
-            links.append({"source": hub_name, "target": label, "value": max(speicher_laden_val, 0.0)})
+            links.append({"source": hub_name, "target": label, "value": max(sp_laden_val, 0.0)})
 
         # Grundlast ist der algebraische Rest, kein eigener Sensor — negativ
         # bedeutet: Verbraucher+Einspeisung+Speicherladung übersteigen den Bus,
@@ -1018,12 +1097,10 @@ class EnergieDashboardService:
             netzbezug_monthly = self._monthly_sum_by_year([netzbezug_id], now, read_cache)
             erzeugung_monthly = self._monthly_sum_by_year(erzeuger_ids, now, read_cache)
             einspeisung_monthly = self._monthly_sum_by_year([config.get("einspeisung") or ""], now, read_cache)
-            speicher_entladen_monthly = self._monthly_sum_by_year(
-                [speicher.get("entladen_entity_id") or ""], now, read_cache
-            )
-            speicher_laden_monthly = self._monthly_sum_by_year(
-                [speicher.get("laden_entity_id") or ""], now, read_cache
-            )
+            speicher_entladen_ids = [sp.get("entladen_entity_id") for sp in speicher_list if sp.get("entladen_entity_id")]
+            speicher_laden_ids = [sp.get("laden_entity_id") for sp in speicher_list if sp.get("laden_entity_id")]
+            speicher_entladen_monthly = self._monthly_sum_by_year(speicher_entladen_ids, now, read_cache)
+            speicher_laden_monthly = self._monthly_sum_by_year(speicher_laden_ids, now, read_cache)
             by_year_autarkie: dict[str, list[float | None]] = {}
             by_year_eigenverbrauch: dict[str, list[float | None]] = {}
             for ts in sorted(set(netzbezug_monthly) | set(erzeugung_monthly)):
@@ -1229,12 +1306,16 @@ class EnergieDashboardService:
             self._display_name(erz["entity_id"], erz.get("name", ""))
             for erz in (config.get("erzeuger") or []) if erz.get("entity_id")
         ]
-        if speicher.get("entladen_entity_id"):
-            balance_sources.append(f"{speicher_name} (Entladung)")
+        # "Speicherentladung"/"Speicherladung" als EIN generisches Label statt
+        # je Speicher einzeln benannt (anders als bei Erzeugern) — die Bilanz-
+        # Gleichung selbst kennt nur die Summe, mehrere Namen hier würden bei
+        # mehreren Speichern nur unnötig lang statt informativer.
+        if any(sp.get("entladen_entity_id") for sp in speicher_list):
+            balance_sources.append("Speicherentladung")
         if netzbezug_id:
             balance_sources.append("Netzbezug")
         balance_sinks = ["Verbrauch"]
-        if speicher.get("laden_entity_id"):
+        if any(sp.get("laden_entity_id") for sp in speicher_list):
             balance_sinks.append("Speicherladung")
         if einspeisung_id:
             balance_sinks.append("Einspeisung")
@@ -1248,10 +1329,13 @@ class EnergieDashboardService:
         # Speicher: über einen längeren Zeitraum kann nicht mehr entladen als
         # geladen worden sein (Wirkungsgrad ≤ 100 %) — eine spürbare
         # Überschreitung deutet auf vertauschte Ladung/Entladung-Zuordnung hin.
-        speicher_entladen_exceeds = (
-            bool(speicher) and speicher_entladen_val > speicher_laden_val + 0.05
-            and speicher.get("laden_entity_id") and speicher.get("entladen_entity_id")
-        )
+        # Je Speicher einzeln geprüft (nicht nur aggregiert), damit ein
+        # einzelner falsch zugeordneter Speicher nicht von einem
+        # unauffälligen Rest verdeckt wird.
+        speicher_entladen_exceeds_names = [
+            e["name"] for e in speicher_per_entity
+            if e["has_both"] and e["entladen_val"] > e["laden_val"] + 0.05
+        ]
 
         # Immer alle Prüfungen zeigen (nicht nur bei Problemen) — ein Sankey,
         # der scheinbar exakt aufgeht, aber auf veralteten, falsch
@@ -1320,13 +1404,13 @@ class EnergieDashboardService:
                 ),
             },
         ]
-        if speicher_entladen_exceeds:
+        if speicher_entladen_exceeds_names:
             quality_checks.append({
                 "label": "Speicher-Wirkungsgrad plausibel",
                 "ok": False,
                 "detail": (
-                    f"{speicher_name}: Entladung ({round(speicher_entladen_val, 2)} kWh) übersteigt "
-                    f"Ladung ({round(speicher_laden_val, 2)} kWh) — Ladung/Entladung vertauscht?"
+                    "Entladung übersteigt Ladung — Ladung/Entladung vertauscht? "
+                    + ", ".join(speicher_entladen_exceeds_names)
                 ),
             })
         quality_plausible = all(check["ok"] for check in quality_checks)
@@ -1356,7 +1440,7 @@ class EnergieDashboardService:
                 # der Speicher-Kachel steuert).
                 "speicher_netto": (
                     round(speicher_laden_val - speicher_entladen_val, 3)
-                    if speicher.get("laden_entity_id") or speicher.get("entladen_entity_id")
+                    if any(sp.get("laden_entity_id") or sp.get("entladen_entity_id") for sp in speicher_list)
                     else None
                 ),
                 "speicher_soc": speicher_soc,
@@ -1385,6 +1469,7 @@ class EnergieDashboardService:
             },
             "verbraucher_breakdown": verbraucher_breakdown,
             "erzeuger_breakdown": erzeuger_breakdown,
+            "speicher_breakdown": speicher_breakdown,
             "anomalien": anomalien,
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
         }
@@ -1467,13 +1552,21 @@ class EnergieDashboardService:
                 self.deps.tz, now, read_cache,
             )
 
-        speicher = config.get("speicher") or {}
+        speicher_list = config.get("speicher") or []
         netzbezug_series = hourly(config.get("netzbezug"))
         erzeuger_series_list = [
             hourly(erz.get("entity_id")) for erz in (config.get("erzeuger") or []) if erz.get("entity_id")
         ]
-        speicher_entladen_series = hourly(speicher.get("entladen_entity_id"))
-        speicher_laden_series = hourly(speicher.get("laden_entity_id"))
+        speicher_entladen_series_list = [
+            hourly(sp.get("entladen_entity_id")) for sp in speicher_list if sp.get("entladen_entity_id")
+        ]
+        speicher_laden_series_list = [
+            hourly(sp.get("laden_entity_id")) for sp in speicher_list if sp.get("laden_entity_id")
+        ]
+        speicher_entladen_series = (
+            self._series_merge(*speicher_entladen_series_list) if speicher_entladen_series_list else {}
+        )
+        speicher_laden_series = self._series_merge(*speicher_laden_series_list) if speicher_laden_series_list else {}
         verbraucher_series_list = [
             hourly(verbraucher.get("entity_id"))
             for verbraucher in (config.get("verbraucher") or [])
@@ -1563,11 +1656,11 @@ class EnergieDashboardService:
             einspeisung: str = Form(""),
             erzeuger_entity_id: list[str] = Form([]),
             erzeuger_name: list[str] = Form([]),
-            speicher_name: str = Form(""),
-            speicher_laden_entity_id: str = Form(""),
-            speicher_entladen_entity_id: str = Form(""),
-            speicher_soc_entity_id: str = Form(""),
-            speicher_capacity_kwh: str = Form(""),
+            speicher_name: list[str] = Form([]),
+            speicher_laden_entity_id: list[str] = Form([]),
+            speicher_entladen_entity_id: list[str] = Form([]),
+            speicher_soc_entity_id: list[str] = Form([]),
+            speicher_capacity_kwh: list[str] = Form([]),
             verbraucher_entity_id: list[str] = Form([]),
             verbraucher_name: list[str] = Form([]),
             verbraucher_gruppe: list[str] = Form([]),
@@ -1614,15 +1707,37 @@ class EnergieDashboardService:
                     rows.append(row)
                 return rows
 
-            speicher = None
-            if speicher_laden_entity_id.strip() or speicher_entladen_entity_id.strip() or speicher_soc_entity_id.strip():
-                speicher = {
-                    "name": speicher_name.strip(),
-                    "laden_entity_id": speicher_laden_entity_id.strip(),
-                    "entladen_entity_id": speicher_entladen_entity_id.strip(),
-                    "soc_entity_id": speicher_soc_entity_id.strip(),
-                    "capacity_kwh": _parse_float(speicher_capacity_kwh),
-                }
+            def speicher_rows(
+                names: list[str], laden_ids: list[str], entladen_ids: list[str],
+                soc_ids: list[str], capacities: list[str],
+            ) -> list[dict]:
+                # Eine Zeile zählt als "vorhanden", sobald mindestens EINE der
+                # drei Entitäten gesetzt ist — Name/Kapazität allein wären ein
+                # Speicher ohne jede Messgröße. Reihen ganz ohne jede Angabe
+                # (z. B. eine per "+ hinzufügen" angelegte, dann leer
+                # gelassene Zeile) werden stillschweigend übersprungen,
+                # dasselbe Prinzip wie pairs() oben.
+                max_len = max((len(names), len(laden_ids), len(entladen_ids), len(soc_ids), len(capacities)), default=0)
+                rows = []
+                for idx in range(max_len):
+                    laden_id = (laden_ids[idx] if idx < len(laden_ids) else "").strip()
+                    entladen_id = (entladen_ids[idx] if idx < len(entladen_ids) else "").strip()
+                    soc_id = (soc_ids[idx] if idx < len(soc_ids) else "").strip()
+                    if not (laden_id or entladen_id or soc_id):
+                        continue
+                    rows.append({
+                        "name": (names[idx] if idx < len(names) else "").strip(),
+                        "laden_entity_id": laden_id,
+                        "entladen_entity_id": entladen_id,
+                        "soc_entity_id": soc_id,
+                        "capacity_kwh": _parse_float(capacities[idx] if idx < len(capacities) else ""),
+                    })
+                return rows
+
+            speicher = speicher_rows(
+                speicher_name, speicher_laden_entity_id, speicher_entladen_entity_id,
+                speicher_soc_entity_id, speicher_capacity_kwh,
+            )
 
             def _cent_to_euro(text: str) -> float | None:
                 # Formular nimmt den festen Preis bewusst in Cent/kWh entgegen

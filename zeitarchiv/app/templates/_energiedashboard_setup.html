@@ -78,6 +78,15 @@
   // erkennt Alpine die Zeile als tatsächlich verschoben und baut den
   // kompletten DOM-Knoten (inkl. entityPicker) neu auf.
   erzeuger: ({{ (config.erzeuger or []) | tojson }}).map((row, i) => ({...row, _key: "e" + i})),
+  // capacity_kwh lokalisiert vorformatiert (Komma statt Punkt) fürs erste
+  // Anzeigen — dieselbe Notwendigkeit wie beim bisherigen number_field()
+  // (siehe dort), hier aber innerhalb einer dynamischen x-for-Liste, wo ein
+  // serverseitig einmalig gerenderter x-init-Wert nicht funktioniert.
+  // Danach reines x-model: was der Nutzer eintippt, geht unverändert ins
+  // Formularfeld — _parse_float() auf dem Server versteht Komma UND Punkt.
+  speicher: ({{ (config.speicher or []) | tojson }}).map((row, i) => ({
+    ...row, capacity_kwh: row.capacity_kwh != null ? NumberFormat.fmt(row.capacity_kwh) : "", _key: "sp" + i,
+  })),
   verbraucher: ({{ (config.verbraucher or []) | tojson }}).map((row, i) => ({...row, _key: "v" + i})),
   // Eigenständige, per Namen referenzierte Gruppen-Liste (siehe group-picker.js) —
   // bleibt bestehen, auch wenn gerade kein Verbraucher sie trägt (genau wie
@@ -226,34 +235,55 @@
 
     <section class="settings-section edash-section-speicher">
       <h2 class="settings-section-title">Speicher</h2>
-      <p class="settings-section-description">Optional — nur ausfüllen, wenn ein Batteriespeicher vorhanden ist.</p>
-      <div class="edash-field-grid">
-        <div class="field">
-          <label>Name</label>
-          <input type="text" name="speicher_name" value="{{ config.speicher.name if config.speicher else '' }}" placeholder="z. B. Hausspeicher">
-          <p class="hint">Beschriftung der beiden Speicher-Knoten im Sankey.</p>
+      <p class="settings-section-description">Beliebig viele Batteriespeicher, z. B. ein Hausspeicher und ein separates Balkonkraftwerk mit eigenem Speicher. Werte über mehrere Speicher hinweg werden addiert (Energie) bzw. kapazitätsgewichtet gemittelt (Ladezustand).</p>
+      {# Feld-Erklärungen einmal zentral statt in jeder Karte wiederholt —
+         bei mehreren Speichern stünde derselbe Hinweistext sonst mehrfach
+         identisch da. Die Karten selbst behalten nur die kurzen Feld-Labels
+         (Entladung/Ladung/...) zur Orientierung. Feste 4-Spalten statt
+         auto-fill: bei auto-fill brach die vierte Spalte je nach
+         Fensterbreite in eine zweite Zeile um — mit repeat(4,1fr) bleiben
+         es immer vier nebeneinanderstehende Spalten, die Beschreibung
+         selbst darf innerhalb ihrer Spalte mehrzeilig umbrechen. #}
+      <dl class="edash-speicher-legend">
+        <div><dt>Entladung</dt><dd>Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).</dd></div>
+        <div><dt>Ladung</dt><dd>Zähler „in den Speicher geladene Energie" (kWh, steigend).</dd></div>
+        <div><dt>Ladezustand</dt><dd>Aktueller Füllstand in % (SOC).</dd></div>
+        <div><dt>Kapazität</dt><dd>Nutzbare Gesamtkapazität. Nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt wird und mehrere Speicher richtig gewichtet werden.</dd></div>
+      </dl>
+      <div class="edash-speicher-grid">
+      <template x-for="(row, idx) in speicher" :key="row._key">
+        <div class="edash-speicher-card" :class="{'is-drag-over': dragList === speicher && dragOverIdx === idx && dragIdx !== idx}"
+             @dragover.prevent="dragOver(speicher, idx)" @drop.prevent="dragDrop(speicher, idx)">
+          <div class="edash-speicher-card-head">
+            <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren"
+                  @dragstart="dragStart(speicher, idx)" @dragend="dragEnd()">⠿</span>
+            <input type="text" name="speicher_name" x-model="row.name" placeholder="z. B. Hausspeicher" class="edash-speicher-name-input">
+            <button type="button" class="edash-list-remove" @click="speicher.splice(idx, 1)" title="Entfernen">✕</button>
+          </div>
+          <div class="edash-field-grid">
+            <div class="field">
+              <label>Entladung</label>
+              {{ entity_field('speicher_entladen_entity_id', 'row.entladen_entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
+            </div>
+            <div class="field">
+              <label>Ladung</label>
+              {{ entity_field('speicher_laden_entity_id', 'row.laden_entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
+            </div>
+            <div class="field">
+              <label>Ladezustand</label>
+              {{ entity_field('speicher_soc_entity_id', 'row.soc_entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
+            </div>
+            <div class="field">
+              <label>Kapazität</label>
+              <input type="text" inputmode="decimal" name="speicher_capacity_kwh" x-model="row.capacity_kwh"
+                     placeholder="z. B. 10" class="edash-speicher-capacity-input">
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label>Entladung</label>
-          {{ entity_field('speicher_entladen_entity_id', (config.speicher.entladen_entity_id if config.speicher else '') | tojson) }}
-          <p class="hint">Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).</p>
-        </div>
-        <div class="field">
-          <label>Ladung</label>
-          {{ entity_field('speicher_laden_entity_id', (config.speicher.laden_entity_id if config.speicher else '') | tojson) }}
-          <p class="hint">Zähler „in den Speicher geladene Energie" (kWh, steigend).</p>
-        </div>
-        <div class="field">
-          <label>Ladezustand</label>
-          {{ entity_field('speicher_soc_entity_id', (config.speicher.soc_entity_id if config.speicher else '') | tojson) }}
-          <p class="hint">Aktueller Füllstand in % (SOC).</p>
-        </div>
-        <div class="field">
-          <label>Kapazität (kWh)</label>
-          {{ number_field('speicher_capacity_kwh', config.speicher.capacity_kwh if config.speicher and config.speicher.capacity_kwh is not none else none, 'z. B. 10') }}
-          <p class="hint">Nutzbare Gesamtkapazität. Nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt wird.</p>
-        </div>
+      </template>
       </div>
+      <button type="button" class="edash-setup-add"
+              @click="speicher.push({name: '', entladen_entity_id: '', laden_entity_id: '', soc_entity_id: '', capacity_kwh: '', _key: 'sp' + Date.now() + Math.random()})">+ Speicher hinzufügen</button>
       {# Kein manuelles Wirkungsgrad-Feld mehr — die App berechnet ihn selbst
          aus Entladung/Ladung über die gesamte bisherige Historie (siehe
          speicher_efficiency in compute_flow, energiedashboard_routes.py)
