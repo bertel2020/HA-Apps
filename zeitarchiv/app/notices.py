@@ -38,6 +38,10 @@ from .version import APP_VERSION
 MUTABLE_SEVERITIES = {"info", "warn"}
 NOTICE_MUTES_SETTING = "notice_mutes"
 TIPS_ENABLED_SETTING = "tips_enabled"
+# Takt ist 30s (_maintenance_scheduler_loop) — 5 Minuten sind ~10 verpasste
+# Durchläufe, großzügig genug für einzelne Ausreißer, eng genug um einen
+# wirklich hängengebliebenen Thread zeitnah zu melden.
+SCHEDULER_STALLED_SECONDS = 5 * 60
 # Eskalierende Schwellwerte statt eines einzelnen — je länger eine Entität
 # schon schweigt, desto ernster die Severity. Bänder sind exklusiv (siehe
 # _bucket_inactive_entities): dieselbe Entität zählt nie in mehr als einer
@@ -84,17 +88,19 @@ def build_notices(
     purge_totals: dict,
     storage_reconcile: dict | None,
     stale_entity_count: int,
+    scheduler_last_tick: float,
 ) -> list[dict]:
     """Ungefilterte, aktuell aktive Meldungen — auch stummgeschaltete sind
     hier noch enthalten (main.py braucht das z. B. beim Stummschalten selbst,
     um Titel/Text/Severity serverseitig nachzuschlagen statt dem Client zu
     vertrauen). Für die Anzeige in der Topnav siehe collect_notices().
 
-    purge_totals/storage_reconcile/stale_entity_count kommen von main.py
-    (jeweils aus bereits vorhandenen, günstigen Quellen: _load_purge_preview(),
-    dem In-Prozess-Zustand _storage_reconcile_last, _count_stale_entities())
-    statt hier selbst gelesen zu werden — vermeidet zweite, abweichende
-    Kopien dieser main.py-spezifischen Zugriffe in diesem Modul."""
+    purge_totals/storage_reconcile/stale_entity_count/scheduler_last_tick
+    kommen von main.py (jeweils aus bereits vorhandenen, günstigen Quellen:
+    _load_purge_preview(), dem In-Prozess-Zustand _storage_reconcile_last,
+    _count_stale_entities(), _last_scheduler_tick) statt hier selbst gelesen
+    zu werden — vermeidet zweite, abweichende Kopien dieser main.py-
+    spezifischen Zugriffe in diesem Modul."""
     notices: list[dict] = []
 
     latest_version = version_check.latest_known_version(index)
@@ -122,6 +128,50 @@ def build_notices(
             ),
             "meta": "Statistik · System",
             "link": "/statistik/index",
+        })
+
+    # Kein Tick seit über 5 Minuten (Takt ist 30s, das sind ~10 verpasste
+    # Durchläufe) — deckt einen Wartungsplaner-Thread ab, der ganz aufgehört
+    # hat zu laufen (Endlosschleife, blockierender Aufruf ohne eigenes
+    # Timeout), nicht nur einen einzelnen fehlgeschlagenen Durchlauf (der
+    # wird schon geloggt und beim nächsten Tick automatisch erneut versucht).
+    # Nur erreichbar, solange die App selbst noch antwortet — ein Deadlock im
+    # Index-Lock (siehe system.index_lock_contention unten) friert auch diese
+    # Abfrage ein; dafür gibt's stattdessen den Docker-Healthcheck.
+    scheduler_idle_seconds = time.time() - scheduler_last_tick
+    if scheduler_idle_seconds > SCHEDULER_STALLED_SECONDS:
+        notices.append({
+            "id": "system.scheduler_stalled",
+            "severity": "warn",
+            "title": "Wartungsplaner reagiert nicht",
+            "detail": (
+                f"Seit {round(scheduler_idle_seconds / 60)} Minuten kein "
+                "abgeschlossener Durchlauf des Wartungsplaners — Sicherungs-/"
+                "Aufbewahrungspläne, Statistik-Schnappschüsse und Vorschauen "
+                "könnten veraltet sein."
+            ),
+            "meta": "Diagnose",
+            "link": "/settings#diagnose",
+        })
+
+    # IndexBusy-Vorkommen (siehe _TimeoutLock in index.py) — heilt sich
+    # selbst, bliebe sonst aber unbemerkt. Bewusst nur info: ein einzelnes
+    # Vorkommen kann ein legitimes, länger laufendes VACUUM sein; erst
+    # gehäuftes Auftreten wäre ein Hinweis auf ein echtes Problem.
+    busy_events = index.recent_lock_busy_events()
+    if busy_events:
+        notices.append({
+            "id": "system.index_lock_contention",
+            "severity": "info",
+            "title": "Kurzzeitige Datenbank-Überlastung erkannt",
+            "detail": (
+                f"{busy_events}× in den letzten 24h musste eine Datenbank-"
+                "Operation abgebrochen werden, weil sie nicht rechtzeitig an "
+                "die Reihe kam — trat z. B. bei einem laufenden VACUUM "
+                "auf und hat sich von selbst gelöst."
+            ),
+            "meta": "Diagnose",
+            "link": "/settings#diagnose",
         })
 
     # errors sind Entitäten, die gar nicht erst geprüft werden konnten — ein
@@ -529,6 +579,7 @@ def collect_notices(
     purge_totals: dict,
     storage_reconcile: dict | None,
     stale_entity_count: int,
+    scheduler_last_tick: float,
 ) -> list[dict]:
     """Für die Anzeige in der Topnav — build_notices() abzüglich aktuell
     gültiger Stummschaltungen (beim Tipp bereits durch _current_tip_notice
@@ -537,7 +588,8 @@ def collect_notices(
     now = time.time()
     return [
         notice for notice in build_notices(
-            index, index_path, tz, purge_totals, storage_reconcile, stale_entity_count
+            index, index_path, tz, purge_totals, storage_reconcile, stale_entity_count,
+            scheduler_last_tick,
         )
         if not _is_muted(notice, mutes.get(notice["id"]), now)
     ]

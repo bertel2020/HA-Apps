@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.76.0 - 2026-09-03
+
+### Neu
+
+- **Verbraucher-Gruppen im Energiedashboard**: beliebig viele Verbraucher
+  lassen sich zu frei benannten Gruppen zusammenfassen (z. B. „Mobilität",
+  „Haushaltsgeräte") — im Sankey-Fluss hängt ein gruppierter Verbraucher
+  zweistufig am Bus (Bus → Gruppe → Gerät), ein ungruppierter weiterhin
+  direkt am Bus. Ersetzt den bisherigen einzelnen „Verbraucher"-Sammelknoten
+  für alle Geräte, der bei sehr unterschiedlichen Größenordnungen unruhige,
+  sich kreuzende Bänder erzeugte. Gruppen lassen sich direkt beim Zuordnen
+  eines Verbrauchers anlegen oder über einen eigenen „Gruppen"-Button
+  verwalten (umbenennen, löschen).
+- **Mehrere Speicher im Energiedashboard**: Speicher-Rollen (Laden/Entladen/
+  Ladezustand) lassen sich jetzt beliebig oft statt nur einmal zuordnen.
+  Werte über mehrere Speicher hinweg werden addiert, der Ladezustand
+  kapazitätsgewichtet gemittelt (ein leerer und ein voller Speicher zeigen
+  dadurch nicht fälschlich „50 %"). Bestehende Konfigurationen mit einem
+  einzelnen Speicher werden automatisch migriert.
+- **Auffälligkeiten-Erkennung im Energiedashboard**: Verbraucher oder
+  Gruppen, die deutlich über ihrem Schnitt der letzten drei Vergleichs-
+  perioden liegen, werden im Sankey farblich markiert und im „Status"-Popup
+  aufgelistet. Schwelle (25 %/50 %/100 % über dem Schnitt, Standard 50 %)
+  im Rollen-Formular unter „Allgemein" einstellbar oder ganz abschaltbar.
+- **Docker-Healthcheck**: Home Assistant Supervisor kann jetzt erkennen,
+  wenn die App nicht mehr antwortet (z. B. bei einem internen Locking-
+  Fehler, siehe „Behoben" unten).
+- **2 neue System-Meldungen**: „Wartungsplaner reagiert nicht" (wenn seit
+  über 5 Minuten kein Durchlauf des Hintergrund-Wartungsplaners
+  abgeschlossen wurde) und „Kurzzeitige Datenbank-Überlastung erkannt"
+  (wenn ein Datenbankzugriff wegen interner Auslastung abgebrochen und
+  automatisch wiederholt werden musste).
+
+### Verbesserung
+
+- Der Tooltip auf einer Sankey-Verbindung zeigt den Prozentanteil jetzt an
+  der tatsächlich aufschlüsselnden Seite (Quelle oder Ziel — je nachdem, wo
+  mehrere Linien zusammenlaufen), nicht mehr immer am Ziel.
+
+### Behoben
+
+- Ein interner Locking-Fehler beim Ändern des Zähler-/Wertetyps einer
+  Entität (z. B. wenn eine Integration den `state_class` einer Entität
+  nachträglich ändert) konnte die App vollständig einfrieren, weil ein
+  Hintergrund-Thread endlos auf ein bereits von ihm selbst gehaltenes Lock
+  wartete. Datenbank-Zugriffe scheitern jetzt nach spätestens 8 Sekunden
+  mit einer klaren Meldung statt unbegrenzt zu blockieren; der Fehler
+  behebt sich dadurch von selbst.
+
 ## 0.75.0 - 2026-09-02
 
 ### Neu

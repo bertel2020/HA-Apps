@@ -11,11 +11,58 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
-    from app.storage.index import Index, filter_deleted_occurrences, should_accept_write
+    from app.storage.index import (
+        Index,
+        IndexBusy,
+        _TimeoutLock,
+        filter_deleted_occurrences,
+        should_accept_write,
+    )
 
     _PYARROW_AVAILABLE = True  # Index selbst braucht kein pyarrow, aber der Rest der Suite schon
 except ImportError:
     _PYARROW_AVAILABLE = False
+
+
+def test_timeout_lock_acquires_and_releases_normally() -> None:
+    lock = _TimeoutLock(timeout=1.0)
+    with lock:
+        pass
+    with lock:
+        pass
+
+
+def test_timeout_lock_heals_a_self_deadlock_via_exception_unwind() -> None:
+    """Simuliert den tatsächlich gefundenen Bug: derselbe Thread versucht,
+    ein von ihm selbst bereits gehaltenes Lock erneut zu erwerben (z. B. ein
+    on_type_change-Callback, der intern eine weitere Index-Methode aufruft).
+    Der innere Versuch scheitert nach dem Timeout mit IndexBusy — die
+    Exception verlässt den äußeren with-Block, dessen __exit__ gibt das
+    Lock frei. Ein Aufruf danach muss wieder normal funktionieren, sonst
+    wäre die App dauerhaft blockiert statt sich zu erholen."""
+    lock = _TimeoutLock(timeout=0.2)
+    with lock:
+        try:
+            with lock:
+                pass
+            raise AssertionError("innerer Erwerb hätte scheitern müssen")
+        except IndexBusy:
+            pass
+    # Nach Verlassen des äußeren with-Blocks ist das Lock wieder frei.
+    with lock:
+        pass
+
+
+def test_timeout_lock_records_busy_events_for_notices() -> None:
+    lock = _TimeoutLock(timeout=0.1)
+    assert lock.recent_busy_events() == 0
+    with lock:
+        try:
+            with lock:
+                pass
+        except IndexBusy:
+            pass
+    assert lock.recent_busy_events() == 1
 
 
 def test_get_or_create_backfills_unit_and_friendly_name_on_existing_entity() -> None:

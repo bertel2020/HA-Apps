@@ -27,4 +27,8 @@ RUN chmod 0755 /usr/local/bin/zeitarchiv-run \
 
 EXPOSE 8099 8127
 
+# 401 auf /api/health (ohne Token) gilt als gesund, siehe app/healthcheck.py.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD ["python3", "/app/app/healthcheck.py"]
+
 CMD ["/usr/local/bin/zeitarchiv-run"]

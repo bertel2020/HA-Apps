@@ -12,6 +12,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
@@ -485,6 +486,59 @@ def derive_type(domain: str, state_class: str | None) -> str:
     return "standard"
 
 
+class IndexBusy(RuntimeError):
+    """Das Index-Lock wurde nicht innerhalb von INDEX_LOCK_TIMEOUT_SECONDS
+    erhalten — z. B. weil eine andere Operation (VACUUM, ein sehr großer
+    Import) es gerade legitim lange hält, oder im schlimmsten Fall ein
+    Programmierfehler denselben Thread erneut darauf warten lässt."""
+
+
+INDEX_LOCK_TIMEOUT_SECONDS = 8.0
+# Fenster, über das IndexBusy-Vorkommen für die Meldung "kurzzeitige
+# Datenbank-Überlastung" gezählt werden (siehe notices.py).
+_BUSY_EVENTS_WINDOW_SECONDS = 24 * 60 * 60
+
+
+class _TimeoutLock:
+    """threading.Lock mit Timeout beim Erwerb statt endlosem Blockieren.
+
+    Dieselbe with-Schnittstelle wie ein normales Lock, deshalb an jeder der
+    ~110 bestehenden "with self._lock, self._conn:"-Stellen einsetzbar, ohne
+    sie einzeln anzufassen — nur das Lock-Objekt selbst wird ausgetauscht.
+
+    Heilt insbesondere einen Self-Deadlock (derselbe Thread versucht, ein
+    von ihm selbst bereits gehaltenes Lock erneut zu erwerben, z. B. ein
+    on_type_change-Callback, der intern eine weitere Index-Methode aufruft):
+    die IndexBusy-Exception verlässt den äußeren with-Block, dessen
+    __exit__ gibt das ursprünglich erworbene Lock frei — statt für immer zu
+    hängen, scheitert die Operation nach INDEX_LOCK_TIMEOUT_SECONDS sichtbar
+    und die App bleibt für alle anderen Anfragen weiter benutzbar."""
+
+    def __init__(self, timeout: float = INDEX_LOCK_TIMEOUT_SECONDS) -> None:
+        self._lock = threading.Lock()
+        self._timeout = timeout
+        self._busy_events: deque[float] = deque()
+
+    def __enter__(self) -> None:
+        if not self._lock.acquire(timeout=self._timeout):
+            now = time.time()
+            self._busy_events.append(now)
+            while self._busy_events and now - self._busy_events[0] > _BUSY_EVENTS_WINDOW_SECONDS:
+                self._busy_events.popleft()
+            raise IndexBusy(
+                f"Index-Lock nicht innerhalb von {self._timeout:g}s erhalten"
+            )
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._lock.release()
+
+    def recent_busy_events(self, window_seconds: float = _BUSY_EVENTS_WINDOW_SECONDS) -> int:
+        """Anzahl IndexBusy-Vorkommen innerhalb der letzten window_seconds —
+        für die Meldung "kurzzeitige Datenbank-Überlastung" (notices.py)."""
+        cutoff = time.time() - window_seconds
+        return sum(1 for ts in self._busy_events if ts >= cutoff)
+
+
 class Index:
     """Dünner Wrapper um die SQLite-Datenbank. Ein Lock, weil sqlite3 hier
     aus mehreren FastAPI-Requests parallel angesprochen werden kann."""
@@ -492,7 +546,7 @@ class Index:
     def __init__(self, db_path: Path) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db_path = db_path
-        self._lock = threading.Lock()
+        self._lock = _TimeoutLock()
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         with self._lock, self._conn:
@@ -2901,6 +2955,13 @@ class Index:
                 ).fetchone()
                 if row:
                     self._conn.execute("DELETE FROM deleted_points WHERE id = ?", (row["id"],))
+
+    def recent_lock_busy_events(self, window_seconds: float = _BUSY_EVENTS_WINDOW_SECONDS) -> int:
+        """Anzahl IndexBusy-Vorkommen (Lock-Timeout) innerhalb der letzten
+        window_seconds — für die Meldung "kurzzeitige Datenbank-Überlastung"
+        (notices.py). Kein eigenes Lock nötig: liest nur self._lock's
+        eigene, threadsichere deque, fasst self._conn nicht an."""
+        return self._lock.recent_busy_events(window_seconds)
 
     def close(self) -> None:
         with self._lock:

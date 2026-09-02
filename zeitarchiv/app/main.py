@@ -107,6 +107,7 @@ from .storage.index import (
     MAX_SAVED_NAME_LENGTH,
     DuplicateNameError,
     Index,
+    IndexBusy,
     InvalidNameError,
 )
 from .storage.ingestion import IngestionService
@@ -318,7 +319,7 @@ def _notices_context(request: Request) -> dict:
     return {
         "notices": collect_notices(
             index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-            _storage_reconcile_last, _count_stale_entities(),
+            _storage_reconcile_last, _count_stale_entities(), _last_scheduler_tick,
         ),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
     }
@@ -579,6 +580,19 @@ async def _invalid_name_handler(
     zu langen Namen. Die Editoren zeigen "detail" unverändert an."""
     status = 409 if isinstance(exc, DuplicateNameError) else 400
     return JSONResponse(status_code=status, content={"detail": str(exc)})
+
+
+@app.exception_handler(IndexBusy)
+async def _index_busy_handler(_request: Request, exc: IndexBusy) -> JSONResponse:
+    """Das Index-Lock war nicht innerhalb von INDEX_LOCK_TIMEOUT_SECONDS frei
+    (siehe _TimeoutLock in index.py) — z. B. während eines laufenden VACUUM,
+    im schlimmsten Fall ein Self-Deadlock, den dieser Timeout gerade heilt.
+    503 statt der übrigen 4xx-Handler oben, weil das keine fehlerhafte
+    Anfrage ist, sondern ein "gleich nochmal versuchen"-Zustand."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Datenbank kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
+    )
 
 
 def _storage_locked(entity_ids_getter):
@@ -1379,7 +1393,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
         (
             n for n in notices_mod.build_notices(
                 index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-                _storage_reconcile_last, _count_stale_entities(),
+                _storage_reconcile_last, _count_stale_entities(), _last_scheduler_tick,
             )
             if n["id"] == notice_id
         ),
@@ -1398,7 +1412,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
     remaining = collect_notices(
         index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-        _storage_reconcile_last, _count_stale_entities(),
+        _storage_reconcile_last, _count_stale_entities(), _last_scheduler_tick,
     )
     return {"success": True, "remaining_count": len(remaining)}
 
@@ -2098,6 +2112,14 @@ def _run_backup_schedule_if_due(now: datetime) -> None:
 
 _maintenance_scheduler_stop = threading.Event()
 _maintenance_scheduler_thread: threading.Thread | None = None
+# Zeitpunkt des letzten (versuchten) Wartungsplaner-Durchlaufs — unabhängig
+# davon, ob er erfolgreich war (siehe try/except in _maintenance_scheduler_
+# loop()). Erkennt einen Thread, der ganz aufgehört hat zu ticken (z. B. eine
+# Endlosschleife oder ein blockierender Aufruf ohne eigenes Timeout), nicht
+# nur einzelne fehlgeschlagene Durchläufe — die werden schon geloggt.
+# Initial auf den Startzeitpunkt gesetzt, damit vor dem ersten Tick keine
+# falsche "seit 1970 kein Tick"-Meldung entsteht.
+_last_scheduler_tick = time.time()
 
 
 def _background_storage_reconciliation() -> None:
@@ -2156,6 +2178,7 @@ def _refresh_duplicate_snapshot_if_stale() -> None:
 
 def _maintenance_scheduler_loop() -> None:
     """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
+    global _last_scheduler_tick
     while not _maintenance_scheduler_stop.is_set():
         try:
             if index.record_stats_snapshot_if_stale():
@@ -2177,6 +2200,7 @@ def _maintenance_scheduler_loop() -> None:
                 "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "
                 "event=maintenance_scheduler_failed"
             )
+        _last_scheduler_tick = time.time()
         _maintenance_scheduler_stop.wait(30)
 
 
