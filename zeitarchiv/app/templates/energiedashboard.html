@@ -154,8 +154,8 @@
   .edash-ring-clickable{cursor:pointer;border-radius:12px;transition:background-color .15s ease;}
   .edash-ring-clickable:hover{background:var(--surface-alt);}
   .edash-ring-svg{width:100%;height:auto;}
-  .edash-ring-num{font-family:var(--font-mono);font-size:15px;font-weight:700;fill:var(--ink);}
-  .edash-ring-sub{font-size:8px;fill:var(--ink-faint);text-transform:uppercase;letter-spacing:.02em;}
+  .edash-ring-num{font-family:var(--font-mono);font-size:calc(15px * var(--font-scale, 1));font-weight:700;fill:var(--ink);}
+  .edash-ring-sub{font-size:calc(8px * var(--font-scale, 1));fill:var(--ink-faint);text-transform:uppercase;letter-spacing:.02em;}
 
   /* PV-Prognose: schmale Info-Zeile über der KPI-Reihe, kein eigenes Badge
      im Titel-Kopf (der hat mit Datenqualität/CO2/Kostenanalyse schon genug
@@ -436,6 +436,51 @@
     display:inline-flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);font-weight:600;
     background:none;border:1px dashed var(--border-strong);border-radius:7px;padding:6px 10px;cursor:pointer;margin-top:2px;
   }
+
+  /* "Gruppen"-Button neben der Verbraucher-Überschrift, zum Öffnen des
+     Verwalten-Popups (Umbenennen/Löschen) — dieselbe schlichte Flex-Zeile
+     wie .edash-title-row im Ansichts-Template, hier lokal benannt, weil sie
+     nur Titel + EIN Button nebeneinander braucht statt eines Badge-Wraps. */
+  .edash-section-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .edash-section-title-row .settings-section-title{margin:0;}
+  .edash-manage-groups-btn{flex:none;padding:5px 12px;font-size:calc(12px * var(--font-scale, 1));}
+
+  /* Verbraucher ist die einzige Liste mit drei statt zwei Spalten (Name/
+     Entität/Gruppe) — dritte Kopfspalte etwas schmaler als Entität, da
+     Gruppennamen meist kurz sind (z. B. "Mobilität"). */
+  .edash-list-head-3col span:nth-child(3){flex:1;max-width:200px;}
+  .edash-list-row .edash-group-picker-wrap{flex:1;min-width:0;max-width:200px;}
+  .edash-list-row .edash-group-picker-wrap>.btn{
+    width:100%;text-align:left;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* Eigene Farbe statt der neutralen .dd-picker-row-Optik — hebt die
+     Neu-anlegen-Zeile klar von den bestehenden Gruppen darüber ab, analog zu
+     .edash-setup-add (derselbe "etwas hinzufügen"-Grundton). */
+  .edash-group-create-row{color:var(--accent-line);font-weight:600;}
+
+  /* Gruppen-Verwalten-Popup: schmaler als der App-Standard-Dialog
+     (.detail-dialog ist auf bis zu 860px ausgelegt, für Datenqualität/
+     Kosten-Aufschlüsselungen mit Tabellen) — hier reicht eine kompakte
+     Liste kurzer Namen. */
+  .edash-gruppen-dialog{width:min(420px, calc(100vw - 32px));}
+  .edash-gruppen-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .edash-gruppen-row{display:flex;align-items:center;gap:8px;}
+  .edash-gruppen-rename-input{
+    flex:1;min-width:0;font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));
+    padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);
+    box-sizing:border-box;
+  }
+  .edash-gruppen-rename-input:focus{outline:none;border-color:var(--accent-line);}
+  .edash-gruppen-usage{
+    flex:none;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;
+  }
+  .edash-gruppen-add{display:flex;align-items:center;gap:8px;margin-top:4px;}
+  .edash-gruppen-add input[type="text"]{
+    flex:1;min-width:0;font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));
+    padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);
+    box-sizing:border-box;
+  }
+  .edash-gruppen-add input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
 </style>
 </head>
 <body>
@@ -449,7 +494,10 @@
   <script src="static/vendor/htmx.min.js"></script>
   <script src="static/vendor/echarts.min.js"></script>
   <script src="static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script src="static/js/entity-picker.js?v={{ js_v }}"></script>
+  <script src="static/js/group-picker.js?v={{ js_v }}"></script>
+  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/energiedashboard.js?v={{ js_v }}"></script>
 </body>
 </html>

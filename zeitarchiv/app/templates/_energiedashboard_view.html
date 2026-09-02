@@ -105,6 +105,27 @@
         </li>
       </template>
     </ul>
+
+    {# Auffälligkeiten (Schwellenwert-Färbung, siehe compute_flow()) — eigener
+       Abschnitt statt Teil der obigen Prüfungsliste, weil das keine
+       Ja/Nein-Prüfung ist, sondern eine Rangliste mit Zahlen. Keine eigene
+       Sichtbarkeits-Bedingung nötig: ist die Schwelle auf "Aus" gestellt,
+       bleibt anomalien serverseitig leer und der Abschnitt blendet sich
+       über x-show von selbst aus. #}
+    <div x-show="anomalien.length" style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
+      <strong style="font-size:calc(13px * var(--font-scale, 1));display:block;margin-bottom:6px;">Auffälligkeiten</strong>
+      <ul class="edash-quality-list">
+        <template x-for="a in anomalien" :key="a.name">
+          <li class="is-warn">
+            <span class="edash-quality-check-icon">!</span>
+            <span>
+              <strong x-text="a.name"></strong> —
+              <span x-text="fmt(a.value, 1) + ' kWh, +' + a.pct + ' % über dem Schnitt der letzten Perioden (' + fmt(a.baseline, 1) + ' kWh)'"></span>
+            </span>
+          </li>
+        </template>
+      </ul>
+    </div>
   </dialog>
   {% endif %}
 

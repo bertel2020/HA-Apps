@@ -53,23 +53,27 @@
   .col-unit{width:84px;}       /* Header "Einheit" ≈ 40px + Puffer */
   .col-rows{width:114px;}      /* "1.857.990" ≈ 65px + Puffer */
   .col-size{width:96px;}       /* "14.8 MB" ≈ 51px + Puffer */
+  .col-value-filter{width:96px;}    /* Header "Wertfilter" ≈ 62px + Puffer */
+  .col-gap-threshold{width:92px;}   /* "6 Stunden" ≈ 58px + Puffer */
+  .col-outlier-threshold{width:92px;} /* Header "Ausreißer" ≈ 58px + Puffer */
   /* Ausrichtung je Spalte statt Position (:not(:first-child)) — dieselbe
      Klasse steuert oben schon die Breite, für th UND td gemeinsam, damit
-     Kopf- und Datenzeile nie auseinanderlaufen. Favorit + Typ zentriert;
-     die sichtbaren Bestandsdaten (Zeitpunkte, Einheit, Datensätze, Größe)
-     sind wie Entität linksbündig. Nur die optionalen Konfigurationsspalten
-     bleiben rechtsbündig. th a{text-align:inherit} lässt die Ausrichtung vom
-     <th> auf den Sortierlink durchreichen. */
+     Kopf- und Datenzeile nie auseinanderlaufen. Favorit + Typ + Einheit
+     zentriert; Entität und die beiden Zeitpunkte bleiben linksbündig. Alle
+     übrigen Spalten (Auflösung/Aufbewahrung, Datensätze, Größe, die
+     optionalen Konfigurationsspalten) sind rechtsbündig. th a{text-align:inherit}
+     lässt die Ausrichtung vom <th> auf den Sortierlink durchreichen. */
   .entities-dt th.col-fav,.entities-dt td.col-fav,
-  .entities-dt th.col-type,.entities-dt td.col-type{text-align:center;}
-  .entities-dt th.col-date,.entities-dt td.col-date,
-  .entities-dt th.col-size,.entities-dt td.col-size{text-align:left;}
-  /* Diese beiden Bestandswerte bleiben ausdrücklich linksbündig — auch wenn
-     spätere generische Zahlen-/Headerregeln ergänzt werden. */
-  .entities-dt th.col-unit,.entities-dt td.col-unit,
-  .entities-dt th.col-rows,.entities-dt td.col-rows{text-align:left!important;}
+  .entities-dt th.col-type,.entities-dt td.col-type,
+  .entities-dt th.col-unit,.entities-dt td.col-unit{text-align:center;}
+  .entities-dt th.col-date,.entities-dt td.col-date{text-align:left;}
+  .entities-dt th.col-rows,.entities-dt td.col-rows,
+  .entities-dt th.col-size,.entities-dt td.col-size,
   .entities-dt th.col-resolution,.entities-dt td.col-resolution,
-  .entities-dt th.col-retention,.entities-dt td.col-retention{text-align:right;}
+  .entities-dt th.col-retention,.entities-dt td.col-retention,
+  .entities-dt th.col-value-filter,.entities-dt td.col-value-filter,
+  .entities-dt th.col-gap-threshold,.entities-dt td.col-gap-threshold,
+  .entities-dt th.col-outlier-threshold,.entities-dt td.col-outlier-threshold{text-align:right;}
   /* Einfache (einzeilige) Spalten zusätzlich vertikal zentrieren — Entität
      und Erster/Letzter Wert bleiben oben ausgerichtet (vertical-align:top,
      geerbt von table.dt td), weil sie zweizeiligen Inhalt (Name+ID bzw.

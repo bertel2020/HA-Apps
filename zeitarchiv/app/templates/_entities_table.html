@@ -9,7 +9,7 @@
      Spalten Überlappung riskiert (zu niedrig, siehe .col-*-Breiten in
      entities_list.html). Passt sich dadurch bei jedem htmx-Reload dieses
      Fragments automatisch der jeweils aktiven Auswahl an. #}
-  {% set _col_widths = {'type': 112, 'first_ts': 126, 'last_ts': 126, 'resolution': 104, 'retention': 118, 'unit': 84, 'rows': 114, 'size': 96} %}
+  {% set _col_widths = {'type': 112, 'first_ts': 126, 'last_ts': 126, 'resolution': 104, 'retention': 118, 'unit': 84, 'rows': 114, 'size': 96, 'value_filter': 96, 'gap_threshold': 92, 'outlier_threshold': 92} %}
   {% set ns = namespace(min_width = 40 + 330) %}
   {% for col, px in _col_widths.items() %}
     {% if col in visible_columns %}{% set ns.min_width = ns.min_width + px %}{% endif %}
@@ -26,6 +26,9 @@
       {% if 'unit' in visible_columns %}<col class="col-unit">{% endif %}
       {% if 'rows' in visible_columns %}<col class="col-rows">{% endif %}
       {% if 'size' in visible_columns %}<col class="col-size">{% endif %}
+      {% if 'value_filter' in visible_columns %}<col class="col-value-filter">{% endif %}
+      {% if 'gap_threshold' in visible_columns %}<col class="col-gap-threshold">{% endif %}
+      {% if 'outlier_threshold' in visible_columns %}<col class="col-outlier-threshold">{% endif %}
     </colgroup>
     <tr>
       <th class="col-fav"></th>
@@ -64,6 +67,9 @@
       {% if 'unit' in visible_columns %}<td class="va-mid col-unit">{{ row.unit or "—" }}</td>{% endif %}
       {% if 'rows' in visible_columns %}<td class="va-mid col-rows">{{ row.row_count | format_int }}</td>{% endif %}
       {% if 'size' in visible_columns %}<td class="va-mid col-size">{{ row.size }}</td>{% endif %}
+      {% if 'value_filter' in visible_columns %}<td class="va-mid col-value-filter">{{ row.value_filter_label }}</td>{% endif %}
+      {% if 'gap_threshold' in visible_columns %}<td class="va-mid col-gap-threshold">{{ row.gap_threshold_label }}</td>{% endif %}
+      {% if 'outlier_threshold' in visible_columns %}<td class="va-mid col-outlier-threshold">{{ row.outlier_threshold_label }}</td>{% endif %}
     </tr>
     {% endfor %}
   </table>

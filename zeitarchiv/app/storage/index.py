@@ -149,6 +149,12 @@ SORTABLE_COLUMNS = {
     "first_ts": "first_ts",
     "last_ts": "last_ts",
     "size": "size_bytes",
+    "value_filter": "value_filter",
+    # "off" sortiert bewusst ans Ende (aufsteigend) statt lexikografisch
+    # zwischen die numerischen Werte zu rutschen ("15" < "30" < "5" als Text)
+    # — CAST auf INTEGER für den natürlichen Größenvergleich.
+    "gap_threshold": "CASE WHEN gap_threshold = 'off' THEN 999999 ELSE CAST(gap_threshold AS INTEGER) END",
+    "outlier_threshold": "CASE WHEN outlier_threshold = 'off' THEN 999999 ELSE CAST(outlier_threshold AS INTEGER) END",
 }
 
 # Anzahl gelöschter Vorkommen je Entität, einmalig aggregiert statt als
@@ -880,7 +886,7 @@ class Index:
         state_class: str | None,
         unit: str | None,
         friendly_name: str | None = None,
-        on_type_change: Callable[[str, str], None] | None = None,
+        on_type_change: Callable[[str, str, bool], None] | None = None,
     ) -> str:
         """Gibt den Aggregationstyp zurück; legt die Entität bei Bedarf neu an.
 
@@ -888,12 +894,17 @@ class Index:
         abgeleitete Aggregationstyp, muss ``on_type_change`` zuerst die
         persistierten Rollups migrieren; ohne Handler wird der potenziell
         inkonsistente Typwechsel bewusst abgelehnt.
+
+        ``on_type_change`` bekommt das bereits geladene ``hourly_rollup``-Flag
+        als dritten Parameter mit, statt es selbst nachzuladen: ``self._lock``
+        ist nicht reentrant, ein Callback-interner Aufruf von z. B.
+        ``get_entity()`` würde hier deadlocken (siehe CHANGELOG_INTERNAL.md).
         """
         validate_entity_id(entity_id)
         aggregation_type = derive_type(domain, state_class)
         with self._lock, self._conn:
             row = self._conn.execute(
-                "SELECT aggregation_type, state_class, friendly_name, unit "
+                "SELECT aggregation_type, state_class, friendly_name, unit, hourly_rollup "
                 "FROM entities WHERE entity_id = ?",
                 (entity_id,),
             ).fetchone()
@@ -905,7 +916,7 @@ class Index:
                             f"Aggregationstyp von {entity_id} änderte sich von "
                             f"{old_type} zu {aggregation_type}; Rollup-Migration erforderlich"
                         )
-                    on_type_change(old_type, aggregation_type)
+                    on_type_change(old_type, aggregation_type, bool(row["hourly_rollup"]))
                 self._conn.execute(
                     """UPDATE entities
                        SET aggregation_type = ?, state_class = ?,

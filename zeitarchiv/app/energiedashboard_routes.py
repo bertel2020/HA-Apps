@@ -85,14 +85,28 @@ HEATMAP_DAYS = 7
 
 DEFAULT_HUB_NAME = "Haus"
 
+# Auffälligkeiten (Schwellenwert-Färbung): dieselbe Optik wie
+# OUTLIER_THRESHOLD_LABELS (formatting.py) für den bereits vorhandenen
+# Ausreißer-Schwellenwert je Entität, hier aber eigenständig (kleinere
+# Auswahl — 5 %/10 % wären für einen Perioden-Gesamtwert-Vergleich zu
+# empfindlich, das ist ein anderer Vergleichsmaßstab als ein einzelner
+# Rohwert-Sprung) und global fürs ganze Energiedashboard statt pro Entität.
+ANOMALIE_SCHWELLE_LABELS = {"off": "Aus", "25": "25 %", "50": "50 %", "100": "100 %"}
+# Anzahl vorheriger Perioden, deren Schnitt als "üblicher" Vergleichswert
+# dient — mehrere statt nur der einen Vorperiode, damit ein Gerät, das
+# einfach nicht jeden Tag läuft (z. B. Waschmaschine), nicht bei jedem
+# normalen Lauf als "Anomalie" markiert wird.
+ANOMALIE_BASELINE_PERIODS = 3
+
 
 def _empty_config() -> dict:
     return {
         "netzbezug": None,
         "einspeisung": None,
         "erzeuger": [],
-        "speicher": None,
+        "speicher": [],
         "verbraucher": [],
+        "verbraucher_gruppen": [],
         "hub_name": None,
         "kosten": None,
         "co2": None,
@@ -108,6 +122,11 @@ def _empty_config() -> dict:
         "show_co2": True,
         "show_tageslastprofil": True,
         "show_bilanz_datenqualitaet": True,
+        # Schwellenwert für die Verbraucher-Auffälligkeiten-Markierung (siehe
+        # ANOMALIE_SCHWELLE_LABELS) — "50" (Default an, +50 %) statt "off",
+        # analog zu den übrigen Kacheln, die ebenfalls per Default sichtbar
+        # sind.
+        "anomalie_schwelle": "50",
     }
 
 
@@ -122,6 +141,14 @@ def _load_config(index: Index) -> dict:
         return config
     if isinstance(data, dict):
         config.update({key: data[key] for key in config if key in data})
+    # Migration: "speicher" war früher ein einzelnes Objekt (oder None), ist
+    # jetzt eine Liste (mehrere Speicher gleichzeitig). Ältere gespeicherte
+    # Configs bekommen ihren einen Speicher automatisch als Ein-Element-Liste
+    # zurück statt ihn beim Laden zu verlieren.
+    if isinstance(config.get("speicher"), dict):
+        config["speicher"] = [config["speicher"]]
+    elif config.get("speicher") is None:
+        config["speicher"] = []
     return config
 
 
@@ -337,6 +364,20 @@ class EnergieDashboardService:
     def _series_total(series: dict[float, float]) -> float:
         return round(sum(series.values()), 3)
 
+    @staticmethod
+    def _capacity_weighted_avg(pairs: list[tuple[float, float]]) -> float | None:
+        """Kapazitätsgewichteter Schnitt über mehrere Speicher (z. B. SOC %) —
+        ein einfacher Durchschnitt würde "ein Speicher leer, einer voll"
+        fälschlich als "50 %" ausweisen, obwohl der tatsächliche
+        Gesamtfüllstand von den jeweiligen Kapazitäten abhängt. Ein Speicher
+        ohne hinterlegte Kapazität geht mit Gewicht 1 ein — schlechtere
+        Näherung als eine echte Kapazitätsangabe, aber besser, als ihn ganz
+        aus dem Schnitt herauszulassen."""
+        total_weight = sum(w for _, w in pairs)
+        if total_weight <= 0:
+            return None
+        return sum(v * w for v, w in pairs) / total_weight
+
     def _monthly_sum_by_year(
         self, entity_ids: list[str], now: datetime, read_cache: query_mod.QueryReadCache,
     ) -> dict[float, float]:
@@ -459,12 +500,12 @@ class EnergieDashboardService:
             entity_id = verbraucher.get("entity_id")
             if entity_id:
                 roles.append((entity_id, self._display_name(entity_id, verbraucher.get("name", ""))))
-        speicher = config.get("speicher") or {}
-        speicher_name = speicher.get("name") or "Speicher"
-        if speicher.get("laden_entity_id"):
-            roles.append((speicher["laden_entity_id"], f"{speicher_name} (Ladung)"))
-        if speicher.get("entladen_entity_id"):
-            roles.append((speicher["entladen_entity_id"], f"{speicher_name} (Entladung)"))
+        for sp in config.get("speicher") or []:
+            sp_name = sp.get("name") or "Speicher"
+            if sp.get("laden_entity_id"):
+                roles.append((sp["laden_entity_id"], f"{sp_name} (Ladung)"))
+            if sp.get("entladen_entity_id"):
+                roles.append((sp["entladen_entity_id"], f"{sp_name} (Entladung)"))
         return roles
 
     def _check_entity_metadata(self, entity_roles: list[tuple[str, str]]) -> dict:
@@ -782,16 +823,50 @@ class EnergieDashboardService:
                 {"year": year_key, "months": by_year[year_key]} for year_key in sorted(by_year)
             ]
 
-        # Verbraucher hängen im Sankey zweistufig am Bus: Bus -> "Verbraucher"
-        # (ein aggregierter Knoten, Summe aller Geräte) -> einzelne Geräte
-        # als zweite Ebene, statt jedes Gerät einzeln direkt vom Bus abgehen
-        # zu lassen — hält den Sankey bei vielen Verbrauchern übersichtlich.
-        # Der Farbmix (blend) sitzt dadurch nur noch auf dem ersten Hop
-        # (Bus -> Verbraucher); die zweite Ebene (Verbraucher -> Gerät) nutzt
-        # den normalen Verlaufs-Farbton, weil sich "wie grün" ohnehin nicht
-        # weiter auf einzelne Geräte herunterbrechen lässt (dieselbe
-        # Begründung wie bisher schon für Grundlast/Verbraucher galt).
-        verbraucher_hub_name = "Verbraucher"
+        # Verbraucher hängen im Sankey je nach Gruppen-Zuordnung ein- oder
+        # zweistufig am Bus: mit Gruppe Bus -> Gruppenname (Summe der
+        # Gruppen-Mitglieder) -> einzelnes Gerät; ohne Gruppe direkt
+        # Bus -> Gerät, wie Erzeuger/Einspeisung. Ersetzt den früheren
+        # einzelnen "Verbraucher"-Sammelknoten für ALLE Geräte: der lag bei
+        # sehr ungleichen Größenordnungen (ein Klumpen neben Einspeisung/
+        # Grundlast) sichtbar quer zu ECharts' Sankey-Layout und erzeugte
+        # unruhige, sich kreuzende Bänder. Mehrere, vom Nutzer frei benannte
+        # Gruppen liegen typischerweise näher an der Größenordnung ihrer
+        # Geschwisterknoten. Gruppen werden nach absteigendem Gesamtwert
+        # sortiert (größte zuerst) — reduziert Kreuzungen zusätzlich. Der
+        # Farbmix (blend) sitzt nur auf Bus -> Gruppe bzw. Bus -> Gerät
+        # (ungruppiert); Gruppe -> Gerät nutzt den normalen Verlaufs-Farbton,
+        # da sich "wie grün" nicht sinnvoll weiter auf einzelne Geräte
+        # herunterbrechen lässt (dieselbe Begründung wie bei Grundlast).
+        #
+        # Kollisionshinweis: ein Gruppenname, der zufällig mit einem anderen
+        # Knoten übereinstimmt (Bus-Name, "Grundlast", "Einspeisung", ein
+        # anderer Rollen-Name), würde im Sankey denselben Knoten teilen —
+        # bewusst nicht validiert (sehr unwahrscheinlich, kein Datenverlust,
+        # nur ein optisch verwirrender Sankey).
+        # Auffälligkeiten (Schwellenwert-Färbung): wie bei den Trend-Popups
+        # nur für die tatsächlich angezeigte Periode nötig, nicht für die
+        # verworfenen Vergleichs-/Heatmap-Hilfsaufrufe — sonst würde sich die
+        # zusätzliche Baseline-Abfrage je Verbraucher (ANOMALIE_BASELINE_PERIODS
+        # Perioden zurück) mit jedem dieser Aufrufe vervielfachen. Bewusst nur
+        # für Verbraucher/Gruppen, NICHT für Grundlast — die ist ein
+        # rechnerischer Rest ohne eigenen Sensor; ihre Baseline würde eine
+        # komplette Bus-Bilanz je Vergleichsperiode neu berechnen (alle
+        # Quellen erneut abfragen) und wäre damit der mit Abstand teuerste
+        # Teil, für einen Wert, den man ohnehin nicht gezielt "reparieren"
+        # kann.
+        anomalie_schwelle = config.get("anomalie_schwelle") or "50"
+        anomalie_active = not (continuous or skip_quality) and anomalie_schwelle != "off"
+        anomalie_factor = 1 + int(anomalie_schwelle) / 100 if anomalie_active else None
+        anomalien: list[dict] = []
+
+        def _anomaly_baseline(entity_id: str) -> float | None:
+            values = [
+                self._series_total(self._entity_series(entity_id, range_key, offset - i, now, read_cache)[0])
+                for i in range(1, ANOMALIE_BASELINE_PERIODS + 1)
+            ]
+            return sum(values) / len(values) if values else None
+
         verbraucher_sum = 0.0
         verbraucher_display_sum = 0.0
         verbraucher_series_list: list[dict[float, float]] = []
@@ -800,30 +875,72 @@ class EnergieDashboardService:
         # Kosten-Spalte in der Verbraucheranteile-Tabelle — Name als Schlüssel
         # statt Index, weil verbraucher_breakdown weiter unten sortiert wird.
         verbraucher_series_by_name: dict[str, dict[float, float]] = {}
+        gruppen_totals: dict[str, float] = {}
+        gruppen_baseline_totals: dict[str, float] = {}
         for verbraucher in config.get("verbraucher") or []:
             entity_id = verbraucher.get("entity_id")
             if not entity_id:
                 continue
             name = self._display_name(entity_id, verbraucher.get("name", ""))
+            gruppe = (verbraucher.get("gruppe") or "").strip() or None
             series, stale = entity_series(entity_id)
             val = self._series_total(series)
-            nodes.append({
+            display_val = max(val, 0.0)
+            node = {
                 "name": name, "entity_id": entity_id, "role": "sink",
-                "value": max(val, 0.0), "stale": stale,
-            })
-            links.append({"source": verbraucher_hub_name, "target": name, "value": max(val, 0.0)})
+                "value": display_val, "stale": stale,
+            }
+            if anomalie_active:
+                # Baseline == 0 (Gerät lief in keiner der Vergleichsperioden)
+                # bewusst nicht bewertet — sonst würde ein Gerät, das schlicht
+                # nicht jeden Tag läuft (Waschmaschine), bei praktisch jedem
+                # normalen Lauf als "unendlich % über dem Schnitt" markiert.
+                baseline = _anomaly_baseline(entity_id)
+                if gruppe and baseline is not None:
+                    gruppen_baseline_totals[gruppe] = gruppen_baseline_totals.get(gruppe, 0.0) + baseline
+                if baseline and display_val > baseline * anomalie_factor:
+                    pct = round((display_val / baseline - 1) * 100)
+                    node["anomaly"] = True
+                    node["anomaly_pct"] = pct
+                    node["anomaly_baseline"] = round(baseline, 3)
+                    if not gruppe:
+                        anomalien.append({
+                            "name": name, "value": round(display_val, 3),
+                            "baseline": round(baseline, 3), "pct": pct,
+                        })
+            nodes.append(node)
+            if gruppe:
+                links.append({"source": gruppe, "target": name, "value": display_val})
+                gruppen_totals[gruppe] = gruppen_totals.get(gruppe, 0.0) + display_val
+            else:
+                links.append({"source": hub_name, "target": name, "value": display_val})
             verbraucher_sum += val
-            verbraucher_display_sum += max(val, 0.0)
+            verbraucher_display_sum += display_val
             verbraucher_series_list.append(series)
-            verbraucher_breakdown.append({"name": name, "value": round(max(val, 0.0), 3), "entity_id": entity_id})
+            verbraucher_breakdown.append({
+                "name": name, "value": round(display_val, 3), "entity_id": entity_id, "gruppe": gruppe,
+            })
             verbraucher_series_by_name[name] = series
             add_stale_issue(name, stale)
-        if verbraucher_display_sum > 0:
-            nodes.append({
-                "name": verbraucher_hub_name, "role": "sink", "blend": True,
-                "value": round(verbraucher_display_sum, 3),
-            })
-            links.append({"source": hub_name, "target": verbraucher_hub_name, "value": round(verbraucher_display_sum, 3)})
+        for gruppe_name in sorted(gruppen_totals, key=gruppen_totals.get, reverse=True):  # type: ignore[arg-type]
+            total = gruppen_totals[gruppe_name]
+            if total <= 0:
+                continue
+            gruppe_node = {"name": gruppe_name, "role": "sink", "blend": True, "value": round(total, 3)}
+            if anomalie_active:
+                gruppe_baseline = gruppen_baseline_totals.get(gruppe_name)
+                if gruppe_baseline and total > gruppe_baseline * anomalie_factor:
+                    pct = round((total / gruppe_baseline - 1) * 100)
+                    gruppe_node["anomaly"] = True
+                    gruppe_node["anomaly_pct"] = pct
+                    gruppe_node["anomaly_baseline"] = round(gruppe_baseline, 3)
+                    anomalien.append({
+                        "name": gruppe_name, "value": round(total, 3),
+                        "baseline": round(gruppe_baseline, 3), "pct": pct,
+                    })
+            nodes.append(gruppe_node)
+            links.append({"source": hub_name, "target": gruppe_name, "value": round(total, 3)})
+        anomalien.sort(key=lambda a: a["pct"], reverse=True)
 
         einspeisung_id = config.get("einspeisung") or ""
         einspeisung_val = 0.0
@@ -1268,6 +1385,7 @@ class EnergieDashboardService:
             },
             "verbraucher_breakdown": verbraucher_breakdown,
             "erzeuger_breakdown": erzeuger_breakdown,
+            "anomalien": anomalien,
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
         }
 
@@ -1430,7 +1548,11 @@ class EnergieDashboardService:
             config = _load_config(deps.index)
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_setup.html",
-                {"config": config, "entity_options": self._entity_options(), **deps.app_root_context(request)},
+                {
+                    "config": config, "entity_options": self._entity_options(),
+                    "anomalie_schwelle_options": list(ANOMALIE_SCHWELLE_LABELS.items()),
+                    **deps.app_root_context(request),
+                },
             )
 
         @router.post("/energiedashboard/setup", response_class=HTMLResponse)
@@ -1448,6 +1570,8 @@ class EnergieDashboardService:
             speicher_capacity_kwh: str = Form(""),
             verbraucher_entity_id: list[str] = Form([]),
             verbraucher_name: list[str] = Form([]),
+            verbraucher_gruppe: list[str] = Form([]),
+            verbraucher_gruppen: list[str] = Form([]),
             preis_netzbezug: str = Form(""),
             preis_einspeisung: str = Form(""),
             preis_netzbezug_fixed: str = Form(""),
@@ -1462,19 +1586,33 @@ class EnergieDashboardService:
             show_co2: str = Form(""),
             show_tageslastprofil: str = Form(""),
             show_bilanz_datenqualitaet: str = Form(""),
+            anomalie_schwelle: str = Form("50"),
         ) -> HTMLResponse:
             if not netzbezug.strip():
                 raise HTTPException(status_code=422, detail="Netzbezug ist Pflicht")
+            if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
+                raise HTTPException(status_code=422, detail="Ungültige Auffälligkeiten-Schwelle")
 
-            def pairs(entity_ids: list[str], names: list[str]) -> list[dict]:
+            def pairs(entity_ids: list[str], names: list[str], gruppen: list[str] | None = None) -> list[dict]:
                 # Reihen ohne gewählte Entität (z. B. eine per "+ hinzufügen"
                 # angelegte, dann leer gelassene Zeile) werden stillschweigend
                 # übersprungen statt einer leeren Rolle gespeichert zu werden.
-                return [
-                    {"entity_id": eid.strip(), "name": (name or "").strip()}
-                    for eid, name in zip(entity_ids, names + [""] * len(entity_ids))
-                    if eid.strip()
-                ]
+                # gruppen (nur für Verbraucher) ist ein optionaler, parallel
+                # zu entity_ids/names übermittelter dritter Formular-Array —
+                # ohne ihn (Erzeuger-Aufruf) bekommt kein Eintrag ein
+                # "gruppe"-Feld.
+                rows = []
+                for idx, eid in enumerate(entity_ids):
+                    if not eid.strip():
+                        continue
+                    row = {
+                        "entity_id": eid.strip(),
+                        "name": (names[idx] if idx < len(names) else "").strip(),
+                    }
+                    if gruppen is not None:
+                        row["gruppe"] = (gruppen[idx] if idx < len(gruppen) else "").strip() or None
+                    rows.append(row)
+                return rows
 
             speicher = None
             if speicher_laden_entity_id.strip() or speicher_entladen_entity_id.strip() or speicher_soc_entity_id.strip():
@@ -1535,7 +1673,12 @@ class EnergieDashboardService:
                 "einspeisung": einspeisung.strip() or None,
                 "erzeuger": pairs(erzeuger_entity_id, erzeuger_name),
                 "speicher": speicher,
-                "verbraucher": pairs(verbraucher_entity_id, verbraucher_name),
+                "verbraucher": pairs(verbraucher_entity_id, verbraucher_name, verbraucher_gruppe),
+                # dict.fromkeys() statt set() — entfernt Duplikate (z. B. wenn
+                # eine Gruppe angelegt, aber nie einem Verbraucher zugewiesen
+                # wurde und trotzdem zusätzlich noch im Verwalten-Popup
+                # erscheint), behält aber die Reihenfolge aus dem Formular bei.
+                "verbraucher_gruppen": list(dict.fromkeys(g.strip() for g in verbraucher_gruppen if g.strip())),
                 "kosten": kosten,
                 "co2": co2,
                 "prognose": prognose,
@@ -1545,6 +1688,7 @@ class EnergieDashboardService:
                 "show_co2": show_co2 == "on",
                 "show_tageslastprofil": show_tageslastprofil == "on",
                 "show_bilanz_datenqualitaet": show_bilanz_datenqualitaet == "on",
+                "anomalie_schwelle": anomalie_schwelle,
             }
             _save_config(deps.index, config)
             sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])

@@ -211,7 +211,7 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 .notice-badge{
   position:absolute; top:2px; right:2px; min-width:15px; height:15px; padding:0 3px;
   border-radius:999px; background:var(--danger); color:var(--danger-contrast);
-  font-family:var(--font-mono); font-size:9.5px; font-weight:600;
+  font-family:var(--font-mono); font-size:calc(9.5px * var(--font-scale, 1)); font-weight:600;
   display:flex; align-items:center; justify-content:center; line-height:1;
   border:2px solid var(--surface);
 }

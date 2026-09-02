@@ -865,6 +865,10 @@ voneinander ab (z. B. `klx` in Symcon vs. `lx` in Home Assistant), erscheint
 ein Hinweis und ein Umrechnungsfaktor kann angegeben werden (hier `1000`).
 Vor dem eigentlichen Import lässt sich die Zuordnung noch einmal prüfen.
 
+Für bereits abgeschlossene Monate mit vorhandener Archivdatei gilt
+Monatsgranularität: der ganze Monat wird übersprungen, auch wenn er
+tatsächlich Lücken enthält — siehe „Duplikatschutz" weiter unten.
+
 ### CSV
 
 Trennzeichen sowie Zeit-, Wert- und Zielspalte frei zuordnen, das Ergebnis
@@ -884,10 +888,15 @@ Einzelmodi bleiben für gezielte Importe verfügbar:
 
 - **Vollimport:** ermittelt zuerst die tatsächlich verfügbare Rohhistorie und
   ergänzt davor die ältere Stundenstatistik. Die Schnittstelle wird
-  für jede Entität einzeln auf eine volle Stunde gelegt. Der letzte bekannte
-  Rohzustand wird an dieser Grenze fortgeführt; Statistik-Buckets enden exakt
-  davor. Dadurch erzeugt Zeitarchiv weder eine Lücke noch eine zeitliche
-  Überschneidung zwischen den Quellen.
+  für jede Entität einzeln auf die nächste volle Stunde ab dem ersten
+  abgerufenen Rohwert gelegt — aber nur, wenn die Statistik dort lückenlos
+  bis zu dieser Stunde reicht. Der letzte bekannte Rohzustand wird an dieser
+  Grenze fortgeführt; Statistik-Buckets enden exakt davor. Besteht zwischen
+  den beiden HA-Quellen selbst eine Lücke, wird nicht gerundet: die Grenze
+  liegt dann exakt beim ersten verfügbaren Rohwert, damit Zeitarchiv diese
+  Lücke nicht künstlich vergrößert. So erzeugt Zeitarchiv nie eine
+  Überschneidung und vergrößert nie eine bestehende Lücke zwischen den
+  Quellen.
 
 - **Rohhistorie:** Einzelmesswerte über die Home-Assistant-REST-API. Home
   Assistant hält diese standardmäßig aber nur einige Tage vor, deckt also
@@ -922,10 +931,12 @@ verfügbaren Rohhistorie importiert; ein Ausfall einer Quelle verhindert nicht,
 dass erfolgreich abgerufene Werte der anderen Quelle verarbeitet werden.
 
 Der laufende Kalendermonat wird unabhängig vom bereits vorhandenen
-Datenbestand immer automatisch in den Hot Buffer importiert. Die Option
-"Archivlücken füllen" ist nur erforderlich, wenn in bereits
-abgeschlossenen Monatsarchiven echte historische Lücken geschlossen werden
-sollen. Vorhandene Zeitstempel und Werte bleiben dabei unverändert.
+Datenbestand immer automatisch in den Hot Buffer importiert. Ohne die Option
+"Archivlücken füllen" wird ein bereits abgeschlossener Monat mit
+vorhandener Archivdatei komplett übersprungen — wie bei Symcon und CSV
+(siehe „Duplikatschutz" weiter unten). Erst mit aktivierter Option werden
+solche Monate zeilenweise um fehlende Zeitstempel ergänzt; vorhandene
+Zeitstempel und Werte bleiben dabei unverändert.
 
 Nach einem Dry Run kann eine Debug-Datei als ZIP heruntergeladen werden. Sie
 enthält alle für die Diagnose relevanten abgerufenen, übernommenen und
@@ -956,13 +967,24 @@ den Hot Buffer gerettete Werte getrennt aus.
 
 ### Duplikatschutz
 
-Importe ergänzen ausschließlich fehlende Zeitstempel. Der laufende Monat
-landet im Hot Buffer; bereits abgeschlossene Archive werden nur mit aktivierter
-Option "Archivlücken füllen" um fehlende Zeitstempel erweitert.
-Vorhandene Messpunkte derselben Entität und desselben Zeitstempels werden
-übersprungen — auch bei abweichender Event-ID — und niemals ersetzt. Ein
-erneuter Symcon- oder CSV-Upload derselben Quelle dupliziert also nichts,
-ebenso wenig ein wiederholter Home-Assistant-Import über denselben Zeitraum.
+Der laufende Kalendermonat landet immer im Hot Buffer und wird dabei
+zeilenweise dedupliziert: nur Zeitstempel, die dort noch nicht vorhanden
+sind, werden ergänzt.
+
+Für bereits abgeschlossene Archivmonate hängt das Verhalten von der Quelle
+ab. Bei **Symcon- und CSV-Import** gilt Monatsgranularität: existiert für
+einen Monat bereits eine Archivdatei, wird der gesamte Monat übersprungen —
+auch wenn er tatsächlich Lücken enthält. Eine nachträgliche Ergänzung ist
+hier nicht möglich, dafür muss der Monat notfalls manuell gelöscht und neu
+importiert werden. Beim **Home-Assistant-Import** lässt sich das mit der
+Option "Archivlücken füllen" gezielt aufheben: dann werden auch
+abgeschlossene Monate um fehlende Zeitstempel ergänzt.
+
+In allen Fällen gilt: vorhandene Messpunkte derselben Entität und desselben
+Zeitstempels werden übersprungen — auch bei abweichender Event-ID — und
+niemals ersetzt. Ein erneuter Symcon- oder CSV-Upload derselben Quelle
+dupliziert also nichts, ebenso wenig ein wiederholter Home-Assistant-Import
+über denselben Zeitraum.
 
 ### CSV-Export
 

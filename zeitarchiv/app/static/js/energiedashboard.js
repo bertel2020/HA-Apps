@@ -32,6 +32,7 @@
       use: cssVar('--ink-faint'),
       bus: cssVar('--border-strong'),
       ink: cssVar('--ink'),
+      warning: cssVar('--warning'),
     };
   }
 
@@ -204,6 +205,7 @@
       hasFlow: false,
       verbraucherBreakdown: [],
       erzeugerBreakdown: [],
+      anomalien: [],
       speicherEfficiencyTrend: [],
       speicherSocTrend: [],
       autarkieTrend: [],
@@ -478,6 +480,7 @@
           this.hasFlow = data.nodes.some(n => n.role !== 'bus' && n.value > 0);
           this.verbraucherBreakdown = data.verbraucher_breakdown || [];
           this.erzeugerBreakdown = data.erzeuger_breakdown || [];
+          this.anomalien = data.anomalien || [];
           this.speicherEfficiencyTrend = data.speicher_efficiency_trend || [];
           this.speicherSocTrend = data.speicher_soc_trend || [];
           this.autarkieTrend = data.autarkie_trend || [];
@@ -633,6 +636,23 @@
             }
             return l;
           });
+        // Ein- und ausgehende Link-Zahl je Knoten — nur für den Tooltip: der
+        // "X % von …"-Zusatz (edge-Zweig des Formatters unten) ist nur dann
+        // aussagekräftig, wenn EINE der beiden Seiten eines Links tatsächlich
+        // mehrere Linien hat. Ziel bevorzugt (Zufluss-Aufschlüsselung, z. B.
+        // "Haus" aus Netzbezug + Erzeugung); hat das Ziel dagegen nur eine
+        // einzige eingehende Linie (jeder Verbraucher/jede Gruppe), aber die
+        // QUELLE mehrere ausgehende (z. B. "Haushaltsgeräte" verzweigt sich
+        // auf Waschmaschine + Trockner, oder "Haus" auf alle Senken),
+        // stattdessen Anteil an der Quelle zeigen — das ist dann die
+        // eigentlich interessante Aufteilung, nicht die sonst immer triviale
+        // 100 % vom (einzigen) Ziel.
+        const incomingLinkCount = {};
+        const outgoingLinkCount = {};
+        links.forEach(l => {
+          incomingLinkCount[l.target] = (incomingLinkCount[l.target] || 0) + 1;
+          outgoingLinkCount[l.source] = (outgoingLinkCount[l.source] || 0) + 1;
+        });
         // Nur Knoten mit mindestens einem sichtbaren (nicht herausgefilterten)
         // Link aufnehmen — sonst bleibt z. B. ein Erzeuger ohne Ertrag in
         // diesem Zeitraum als unverbundener, "schwebender" Knoten im Sankey
@@ -656,7 +676,14 @@
           .filter(n => n.role === 'bus' || connectedNames.has(n.name))
           .map(n => ({
             name: n.name,
-            itemStyle: {color: colorForNode(n, palette)},
+            // Auffälligkeiten (Schwellenwert-Färbung, siehe compute_flow()):
+            // Umrandung statt geänderter Füllfarbe — die Füllfarbe bleibt für
+            // den PV-/Netz-Mix reserviert (colorForNode), eine zweite
+            // Bedeutung auf demselben Kanal wäre nicht mehr eindeutig lesbar.
+            itemStyle: {
+              color: colorForNode(n, palette),
+              ...(n.anomaly ? {borderColor: palette.warning, borderWidth: 2.5} : {}),
+            },
             label: {color: palette.ink, ...(isNarrow ? narrowLabelFor(n) : {})},
           }));
         const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
@@ -664,10 +691,27 @@
           tooltip: {
             trigger: 'item',
             formatter: (p) => {
-              if (p.dataType !== 'edge') return `${p.name}: ${fmt(p.value)} kWh`;
+              if (p.dataType !== 'edge') {
+                const node = nodeByName[p.name];
+                if (node && node.anomaly) {
+                  return `${p.name}: ${fmt(p.value)} kWh<br/>`
+                    + `<span style="color:${palette.warning}">+${node.anomaly_pct} % über dem Schnitt `
+                    + `der letzten Perioden (${fmt(node.anomaly_baseline)} kWh)</span>`;
+                }
+                return `${p.name}: ${fmt(p.value)} kWh`;
+              }
               const target = nodeByName[p.data.target];
-              const pct = target && target.value > 0 ? this.fmt((p.data.value / target.value) * 100, 0) : null;
-              const share = pct != null ? ` (${pct} % von ${p.data.target})` : '';
+              const source = nodeByName[p.data.source];
+              let pct = null;
+              let shareOf = null;
+              if ((incomingLinkCount[p.data.target] || 0) > 1 && target && target.value > 0) {
+                pct = this.fmt((p.data.value / target.value) * 100, 0);
+                shareOf = p.data.target;
+              } else if ((outgoingLinkCount[p.data.source] || 0) > 1 && source && source.value > 0) {
+                pct = this.fmt((p.data.value / source.value) * 100, 0);
+                shareOf = p.data.source;
+              }
+              const share = pct != null ? ` (${pct} % von ${shareOf})` : '';
               return `${p.data.source} → ${p.data.target}: ${fmt(p.data.value)} kWh${share}`;
             },
           },

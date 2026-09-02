@@ -18,46 +18,25 @@
   .fav-star.active{color:#D9A22B;opacity:1;}
   .fav-star:hover{color:#D9A22B;opacity:1;}
 
-  /* Kompakte Entitäts-Kennzahlen zwischen Kopf und Werkzeug-Tabs, als ZWEI
-     getrennte Zeilen: "Gesamter Zeitraum" (komplette Historie, ändert sich
-     nicht mit dem Zeitraum-Chip) und der gerade gewählte Zeitraum darunter —
-     vorher beides in einer Zeile vermischt, wodurch unklar war, was "insgesamt"
-     eigentlich bedeutet. Das äußere Element wird bei jedem Tabellen-Request
-     per htmx OOB komplett ersetzt, bleibt optisch aber ein stabiler Teil des
-     Seitenkopfs. */
-  .entity-stats-groups{display:flex;flex-direction:column;gap:8px;margin:14px 0 2px;}
-  .entity-stats{
-    display:flex;align-items:stretch;flex-wrap:wrap;
-    border:1px solid var(--border);border-left:3px solid var(--accent-line);
-    border-radius:9px;background:var(--surface-alt);overflow:hidden;
-    color:var(--ink-muted);font-family:var(--font-mono);
-  }
-  /* Feste statt dynamisch gemessene Breite: 270px passt beim
-     Basis-Font-Scale (1) auch das längste vorkommende Label
-     "Gesamter Zeitraum (seit DD.MM.YYYY)" (231px Text + Innenabstand)
-     bequem — die Breite bleibt so über beide Zeilen hinweg stabil,
-     ohne dass JS bei jedem htmx-Swap nachmessen muss. */
-  .entity-stats-tag{
-    display:flex;align-items:center;padding:9px 13px;white-space:nowrap;
-    flex:none;box-sizing:border-box;width:calc(270px * var(--font-scale, 1));
-    overflow:hidden;text-overflow:ellipsis;
-    font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;letter-spacing:.03em;
-    text-transform:uppercase;color:var(--ink-faint);background:var(--surface);
-    border-right:1px solid var(--border);
-  }
-  @media (max-width:720px){
-    .entity-stats-tag{width:calc(150px * var(--font-scale, 1));}
-  }
-  .entity-stat{display:flex;align-items:baseline;gap:6px;padding:9px 13px;white-space:nowrap;flex:none;box-sizing:border-box;}
-  .entity-stat + .entity-stat{border-left:1px solid var(--border);}
-  .entity-stat strong{color:var(--ink);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;}
-  .entity-stat span{font-size:calc(11.5px * var(--font-scale, 1));}
-  .entity-stat.has-issues strong,.entity-stat.has-issues span{color:var(--danger);}
+  /* Kompakte Entitäts-Kennzahlen zwischen Kopf und Werkzeug-Tabs, als
+     Tabelle mit ZWEI Zeilen: "Gesamter Zeitraum" (komplette Historie, ändert
+     sich nicht mit dem Zeitraum-Chip) und der gerade gewählte Zeitraum
+     darunter — vorher beides in einer Zeile vermischt, wodurch unklar war,
+     was "insgesamt" eigentlich bedeutet. Als Tabelle statt frei umbrechender
+     Zeile (Konzept-Erweiterung "Bereinigung: Kennzahlen ohne Zeilenumbruch"),
+     damit größere Zahlen/lange Zeitraum-Labels nicht mehr umbrechen — jede
+     Spalte bleibt rechtsbündig fest, bei zu schmalem Fenster scrollt nur die
+     Tabelle selbst (.tbl-wrap), wie jede andere Tabelle in der App. Das
+     äußere Element wird bei jedem Tabellen-Request per htmx OOB komplett
+     ersetzt, bleibt optisch aber ein stabiler Teil des Seitenkopfs. */
+  .entity-stats-groups{margin:14px 0 2px;}
+  .entity-stats-table{table-layout:fixed;}
+  .entity-stats-table th.num,.entity-stats-table td.num{text-align:right;}
+  .entity-stats-table td{white-space:nowrap;}
+  .entity-stats-table td.label{color:var(--ink);font-weight:600;}
+  .entity-stats-table td.val{color:var(--ink);font-weight:600;font-family:var(--font-mono);}
+  .entity-stats-table td.val.has-issues{color:var(--danger);}
   .entity-stats-loading{padding:9px 13px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  @media (max-width:720px){
-    .entity-stat + .entity-stat{border-left:none;}
-    .entity-stat{padding:8px 10px;}
-  }
 
   /* Drei Reiter für die drei bisher getrennten Werkzeuge (Bereinigen/
      Hinzufügen/Korrigieren, Konzept-Erweiterung "Bearbeitungsbereich") — eine

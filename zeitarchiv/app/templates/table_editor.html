@@ -231,7 +231,17 @@
      .tbl-letters-gutter weiter unten) — deshalb die explizite
      .tbl-label-col-Klasse statt :first-child, für den Fall, dass hier
      künftig doch einmal wieder eine Spalte davorstehen sollte. */
-  .tbl-preview{overflow-x:auto;}
+  /* flex:1 + min-width:0, weil .tbl-preview neben .tbl-letters-gutter
+     (flex:none, feste 26px) in einer Flex-Zeile (.tbl-preview-row) steht:
+     ohne flex:1 nimmt sich .tbl-preview standardmäßig nur so viel Breite wie
+     die Tabelle selbst braucht (table-layout:auto ohne "Spalten gleichmäßig"
+     hat oft weniger als die volle Kartenbreite) — rechts blieb dadurch
+     Leerraum in der Karte übrig, obwohl die Tabelle ihren eigenen Wrapper
+     korrekt ausfüllte. min-width:0 ist der übliche Flexbox-Gegenpart dazu:
+     ohne das weigert sich ein Flex-Kind, unter seine Inhalts-Mindestbreite
+     zu schrumpfen, wodurch overflow-x:auto bei einer breiteren Tabelle nie
+     zum Scrollen käme, sondern die Zeile stattdessen aufgedrückt hätte. */
+  .tbl-preview{overflow-x:auto;flex:1;min-width:0;}
   /* "Header fixieren" (style.sticky_header) braucht einen ECHTEN vertikal
      scrollenden Container, gegen den th{position:sticky;top:0} überhaupt
      etwas hat — ohne Höhenbegrenzung wächst .tbl-wrap immer exakt auf die
@@ -460,9 +470,15 @@
      Editor-Ansicht scrollt stattdessen die ganze Seite, dort bleibt die
      Regel wirkungslos. th statt tr:first-child th, da in dieser Tabelle
      ausschließlich die Kopfzeile th-Zellen enthält (alle anderen Zeilen
-     nutzen td) — .tbl-style-sticky-first-col th.tbl-label-col (2 Klassen)
-     bleibt dadurch weiterhin spezifischer für die Eck-Zelle und gewinnt
-     dort beim z-index, wenn beide Optionen gleichzeitig aktiv sind. */
+     nutzen td). */
+  /* Schnittzelle von fixiertem Header und fixierter erster Spalte muss über
+     BEIDEN Sticky-Ebenen liegen (dasselbe Problem wie bei entities.html) —
+     die Regel .tbl-style-sticky-header tr.tbl-header-row th weiter unten ist
+     TROTZ der obigen 2-Klassen-Regel spezifischer (2 Klassen + 2 Typen statt
+     2 Klassen + 1 Typ, siehe tr davor) und setzte die Eck-Zelle sonst wieder
+     auf z-index:2 zurück. Dann übermalte beim vertikalen Scrollen die erste
+     Datenzelle die linke obere Headerzelle. */
+  .tbl-style-sticky-header.tbl-style-sticky-first-col tr.tbl-header-row th.tbl-label-col{z-index:4;}
   /* Sticky auf dem GANZEN thead (nicht auf einzelnen th), seit es zwei
      Kopfzeilen geben kann (Gruppen- + Zeitraum-Zeile, siehe .tbl-group-
      header-row): mit position:sticky auf jeder th einzeln konkurrierten

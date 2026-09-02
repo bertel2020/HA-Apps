@@ -38,6 +38,34 @@
        x-init="const v = {{ raw_value | tojson }}; if (v !== null) $el.value = NumberFormat.fmt(v)">
 {% endmacro %}
 
+{# Gruppen-Auswahl je Verbraucher-Zeile — dasselbe Such-Dropdown-Muster wie
+   entity_field, aber ohne feste Optionsliste: "gruppen" (Root-x-data) wird
+   per Referenz an groupPicker() durchgereicht, eine hier neu getippte
+   Gruppe landet also sofort auch in jedem anderen Gruppen-Feld UND im
+   Gruppen-Verwalten-Popup, ganz ohne Server-Rundtrip. #}
+{% macro group_field(name, initial_expr, onselect_expr='') %}
+<span class="dd-picker-wrap edash-group-picker-wrap" x-data='groupPicker(gruppen, {{ initial_expr }}{{ (", " ~ onselect_expr) if onselect_expr }})' @click.outside="open = false">
+  <button type="button" class="btn" :class="{'dd-picker-btn-clearable': value}"
+          @click="toggleOpen($refs.search)"
+          x-text="value || 'Gruppe wählen …'"></button>
+  <button type="button" class="dd-picker-clear" x-show="value" x-cloak
+          @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:220px;overflow-y:auto;">
+    <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen oder neu anlegen …">
+    <template x-for="g in filtered()" :key="g">
+      <div class="dd-picker-row" :class="{active: value === g}" @click="select(g)">
+        <span x-text="g"></span>
+      </div>
+    </template>
+    <div class="dd-picker-row edash-group-create-row" x-show="search.trim() && !exactMatch()" @click="createAndSelect()">
+      <span>+ „<span x-text="search.trim()"></span>" anlegen</span>
+    </div>
+    <p class="hint" x-show="!groups.length && !search.trim()" style="padding:5px 4px;margin:0;">Noch keine Gruppen — Namen eingeben, um eine anzulegen.</p>
+  </div>
+  <input type="hidden" name="{{ name }}" :value="value">
+</span>
+{% endmacro %}
+
 <div x-data='{
   entityOptions: {{ entity_options | tojson }},
   // _key: stabile, von der Array-Position UNABHÄNGIGE Kennung je Zeile —
@@ -51,9 +79,44 @@
   // kompletten DOM-Knoten (inkl. entityPicker) neu auf.
   erzeuger: ({{ (config.erzeuger or []) | tojson }}).map((row, i) => ({...row, _key: "e" + i})),
   verbraucher: ({{ (config.verbraucher or []) | tojson }}).map((row, i) => ({...row, _key: "v" + i})),
+  // Eigenständige, per Namen referenzierte Gruppen-Liste (siehe group-picker.js) —
+  // bleibt bestehen, auch wenn gerade kein Verbraucher sie trägt (genau wie
+  // Tags/Labels in Home Assistant unabhängig vom einzelnen Gerät existieren).
+  gruppen: {{ (config.verbraucher_gruppen or []) | tojson }},
+  newGroupName: "",
   nameFor(id) {
     const o = this.entityOptions.find(o => o.entity_id === id);
     return o ? o.label : id;
+  },
+  groupUsage(name) {
+    return this.verbraucher.filter(v => v.gruppe === name).length;
+  },
+  addGroup() {
+    const name = this.newGroupName.trim();
+    if (!name || this.gruppen.includes(name)) { this.newGroupName = ""; return; }
+    this.gruppen.push(name);
+    this.newGroupName = "";
+  },
+  renameGroup(oldName, newValue) {
+    const name = (newValue || "").trim();
+    if (!name || name === oldName || this.gruppen.some(g => g.toLowerCase() === name.toLowerCase())) return;
+    const idx = this.gruppen.indexOf(oldName);
+    if (idx === -1) return;
+    this.gruppen[idx] = name;
+    this.verbraucher.forEach(v => { if (v.gruppe === oldName) v.gruppe = name; });
+  },
+  async deleteGroup(name) {
+    const count = this.groupUsage(name);
+    if (count > 0) {
+      const suffix = count === 1 ? "" : "n";
+      const ok = await window.appConfirm(
+        "Gruppe „" + name + "\" wird von " + count + " Verbraucher" + suffix + " verwendet. Beim Löschen wird dort nur die Gruppen-Zuordnung entfernt, die Verbraucher selbst bleiben erhalten.",
+        {danger: true, confirmLabel: "Löschen"}
+      );
+      if (!ok) return;
+    }
+    this.gruppen = this.gruppen.filter(g => g !== name);
+    this.verbraucher.forEach(v => { if (v.gruppe === name) v.gruppe = ""; });
   },
   dragList: null,
   dragIdx: null,
@@ -113,6 +176,19 @@
           </label>
         </div>
         <p class="hint">Energiefluss ist immer sichtbar. Alle anderen Kacheln lassen sich hier einzeln ausblenden.</p>
+      </div>
+      <div class="field">
+        <label>Auffälligkeiten</label>
+        <span class="dd-picker-wrap">
+          <button type="button" class="btn" id="anomalie-schwelle-btn" onclick="toggleDDPicker('anomalie-schwelle')">{% for k, l in anomalie_schwelle_options %}{% if k == config.anomalie_schwelle %}{{ l }}{% endif %}{% endfor %} ▾</button>
+          <input type="hidden" name="anomalie_schwelle" id="anomalie-schwelle-input" value="{{ config.anomalie_schwelle }}">
+          <div class="dd-picker-popover" id="anomalie-schwelle-popover">
+            {% for key, label in anomalie_schwelle_options %}
+            <div class="dd-picker-row" onclick="selectDDOption('anomalie-schwelle', '{{ key }}', '{{ label }}')">{{ label }}</div>
+            {% endfor %}
+          </div>
+        </span>
+        <p class="hint">Verbraucher/Gruppen, die deutlich über ihrem üblichen Schnitt liegen, im Sankey und unter Bilanz &amp; Datenqualität markieren. "Aus" deaktiviert die Prüfung.</p>
       </div>
     </section>
 
@@ -185,9 +261,12 @@
     </section>
 
     <section class="settings-section edash-section-verbraucher">
-      <h2 class="settings-section-title">Verbraucher</h2>
-      <p class="settings-section-description">Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe.</p>
-      <div class="edash-list-head" x-show="verbraucher.length"><span>Name</span><span>Entität</span></div>
+      <div class="edash-section-title-row">
+        <h2 class="settings-section-title">Verbraucher</h2>
+        <button type="button" class="btn edash-manage-groups-btn" @click="$refs.gruppenDialog.showModal()">Gruppen</button>
+      </div>
+      <p class="settings-section-description">Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen.</p>
+      <div class="edash-list-head edash-list-head-3col" x-show="verbraucher.length"><span>Name</span><span>Entität</span><span>Gruppe</span></div>
       <template x-for="(row, idx) in verbraucher" :key="row._key">
         <div class="edash-list-row" :class="{'is-drag-over': dragList === verbraucher && dragOverIdx === idx && dragIdx !== idx}"
              @dragover.prevent="dragOver(verbraucher, idx)" @drop.prevent="dragDrop(verbraucher, idx)">
@@ -195,11 +274,15 @@
                 @dragstart="dragStart(verbraucher, idx)" @dragend="dragEnd()">⠿</span>
           <input type="text" name="verbraucher_name" x-model="row.name" placeholder="Name">
           {{ entity_field('verbraucher_entity_id', 'row.entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
+          {{ group_field('verbraucher_gruppe', 'row.gruppe', "(name) => { row.gruppe = name; }") }}
           <button type="button" class="edash-list-remove" @click="verbraucher.splice(idx, 1)" title="Entfernen">✕</button>
         </div>
       </template>
-      <button type="button" class="edash-setup-add" @click="verbraucher.push({entity_id: '', name: '', _key: 'v' + Date.now() + Math.random()})">+ Verbraucher hinzufügen</button>
+      <button type="button" class="edash-setup-add" @click="verbraucher.push({entity_id: '', name: '', gruppe: '', _key: 'v' + Date.now() + Math.random()})">+ Verbraucher hinzufügen</button>
       <p class="hint">Der Rest (Netzbezug + Erzeuger − Verbraucher − Einspeisung − Speicherladung) erscheint automatisch als „Grundlast" — kein eigener Sensor nötig.</p>
+      <template x-for="g in gruppen" :key="'hidden-' + g">
+        <input type="hidden" name="verbraucher_gruppen" :value="g">
+      </template>
     </section>
 
     <section class="settings-section">
@@ -272,4 +355,32 @@
       <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">Speichern</button>
     </div>
   </form>
+
+  {# Außerhalb des obigen <form> platziert: <form method="dialog"> für den
+     Schließen-Button unten wäre sonst ein ungültig verschachteltes Formular
+     im Formular. #}
+  <dialog class="detail-dialog edash-gruppen-dialog" x-ref="gruppenDialog" aria-labelledby="gruppen-dialog-title"
+          @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <div>
+        <h2 id="gruppen-dialog-title">Verbraucher-Gruppen</h2>
+        <p class="hint">Fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen, z. B. „Mobilität" oder „Haushaltsgeräte".</p>
+      </div>
+      <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+    </div>
+    <div class="edash-gruppen-list" x-show="gruppen.length">
+      <template x-for="g in gruppen" :key="g">
+        <div class="edash-gruppen-row">
+          <input type="text" class="edash-gruppen-rename-input" :value="g" @change="renameGroup(g, $event.target.value)">
+          <span class="edash-gruppen-usage" x-text="groupUsage(g) + ' Verbraucher'"></span>
+          <button type="button" class="edash-list-remove" @click="deleteGroup(g)" title="Gruppe löschen">✕</button>
+        </div>
+      </template>
+    </div>
+    <p class="hint" x-show="!gruppen.length">Noch keine Gruppen angelegt.</p>
+    <div class="edash-gruppen-add">
+      <input type="text" x-model="newGroupName" placeholder="Neue Gruppe …" @keydown.enter.prevent="addGroup()">
+      <button type="button" class="edash-setup-add" @click="addGroup()">+ Hinzufügen</button>
+    </div>
+  </dialog>
 </div>

@@ -27,24 +27,60 @@
   </script>
 </div>
 
+{% set entity_stats_number_cols = 3 + (1 if outlier_detection_enabled else 0) + (1 if gap_detection_enabled else 0) + (1 if counter_decrease_enabled else 0) %}
 <div class="entity-stats-groups" id="rows-summary" hx-swap-oob="true" aria-live="polite">
-  <div class="entity-stats">
-    <span class="entity-stats-tag" title="Gesamter Zeitraum">Gesamter Zeitraum</span>
-    <div class="entity-stat"><strong>{{ total_row_count_label }}</strong><span>Werte</span></div>
-    {% if outlier_detection_enabled %}<div class="entity-stat {{ 'has-issues' if alltime_counts.outliers else '' }}"><strong>{{ alltime_counts.outliers }}</strong><span>Ausreißer</span></div>{% endif %}
-    {% if gap_detection_enabled %}<div class="entity-stat {{ 'has-issues' if alltime_counts.gaps else '' }}"><strong>{{ alltime_counts.gaps }}</strong><span>Lücken</span></div>{% endif %}
-    <div class="entity-stat {{ 'has-issues' if alltime_counts.duplicates else '' }}"><strong>{{ alltime_counts.duplicates }}</strong><span>Duplikate</span></div>
-    <div class="entity-stat {{ 'has-issues' if alltime_counts.repetitions else '' }}"><strong>{{ alltime_counts.repetitions }}</strong><span>Wiederholungen</span></div>
-    {% if counter_decrease_enabled %}<div class="entity-stat {{ 'has-issues' if alltime_counts.counter_decreases else '' }}"><strong>{{ alltime_counts.counter_decreases }}</strong><span>Zählerrückgänge</span></div>{% endif %}
-  </div>
-  <div class="entity-stats">
-    <span class="entity-stats-tag" title="{{ period_label }}">{{ period_label }}</span>
-    <div class="entity-stat"><strong>{{ range_row_count_label }}</strong><span>Werte</span></div>
-    {% if outlier_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.outliers else '' }}"><strong>{{ counts.outliers }}</strong><span>Ausreißer</span></div>{% endif %}
-    {% if gap_detection_enabled %}<div class="entity-stat {{ 'has-issues' if counts.gaps else '' }}"><strong>{{ counts.gaps }}</strong><span>Lücken</span></div>{% endif %}
-    <div class="entity-stat {{ 'has-issues' if counts.duplicates else '' }}"><strong>{{ counts.duplicates }}</strong><span>Duplikate</span></div>
-    <div class="entity-stat {{ 'has-issues' if counts.repetitions else '' }}"><strong>{{ counts.repetitions }}</strong><span>Wiederholungen</span></div>
-    {% if counter_decrease_enabled %}<div class="entity-stat {{ 'has-issues' if counts.counter_decreases else '' }}"><strong>{{ counts.counter_decreases }}</strong><span>Zählerrückgänge</span></div>{% endif %}
+  <div class="tbl-wrap">
+    {# table-layout:fixed + Colgroup, damit Spalten nie je nach Inhalt springen:
+       Zeitraum bekommt eine feste Breite, breit genug auch für "Gesamter
+       Zeitraum (seit DD.MM.YYYY)" (der period_label-Wert bei Range "Gesamt"),
+       die übrigen (je nach aktivierten Prüfungen 3-6) Kennzahl-Spalten ohne
+       eigene Breite teilen sich den Rest automatisch gleichmäßig auf (Standard-
+       Verhalten von table-layout:fixed für Spalten ohne width). min-width auf
+       der Tabelle selbst verhindert, dass sie auf schmalen Fenstern unter eine
+       noch lesbare Breite gestaucht wird — .tbl-wrap scrollt dann stattdessen
+       horizontal, wie jede andere Tabelle in der App. #}
+    <table class="dt entity-stats-table" style="min-width:calc((270px + {{ entity_stats_number_cols }} * 110px) * var(--font-scale, 1));">
+      <colgroup>
+        <col style="width:calc(270px * var(--font-scale, 1));">
+        <col>
+        {% if outlier_detection_enabled %}<col>{% endif %}
+        {% if gap_detection_enabled %}<col>{% endif %}
+        <col>
+        <col>
+        {% if counter_decrease_enabled %}<col>{% endif %}
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Zeitraum</th>
+          <th class="num">Werte</th>
+          {% if outlier_detection_enabled %}<th class="num">Ausreißer</th>{% endif %}
+          {% if gap_detection_enabled %}<th class="num">Lücken</th>{% endif %}
+          <th class="num">Duplikate</th>
+          <th class="num">Wiederholungen</th>
+          {% if counter_decrease_enabled %}<th class="num">Zählerrückgänge</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="label">Gesamter Zeitraum</td>
+          <td class="num val">{{ total_row_count_label }}</td>
+          {% if outlier_detection_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.outliers else '' }}">{{ alltime_counts.outliers | format_int }}</td>{% endif %}
+          {% if gap_detection_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.gaps else '' }}">{{ alltime_counts.gaps | format_int }}</td>{% endif %}
+          <td class="num val {{ 'has-issues' if alltime_counts.duplicates else '' }}">{{ alltime_counts.duplicates | format_int }}</td>
+          <td class="num val {{ 'has-issues' if alltime_counts.repetitions else '' }}">{{ alltime_counts.repetitions | format_int }}</td>
+          {% if counter_decrease_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.counter_decreases else '' }}">{{ alltime_counts.counter_decreases | format_int }}</td>{% endif %}
+        </tr>
+        <tr>
+          <td class="label" title="{{ period_label }}">{{ period_label }}</td>
+          <td class="num val">{{ range_row_count_label }}</td>
+          {% if outlier_detection_enabled %}<td class="num val {{ 'has-issues' if counts.outliers else '' }}">{{ counts.outliers | format_int }}</td>{% endif %}
+          {% if gap_detection_enabled %}<td class="num val {{ 'has-issues' if counts.gaps else '' }}">{{ counts.gaps | format_int }}</td>{% endif %}
+          <td class="num val {{ 'has-issues' if counts.duplicates else '' }}">{{ counts.duplicates | format_int }}</td>
+          <td class="num val {{ 'has-issues' if counts.repetitions else '' }}">{{ counts.repetitions | format_int }}</td>
+          {% if counter_decrease_enabled %}<td class="num val {{ 'has-issues' if counts.counter_decreases else '' }}">{{ counts.counter_decreases | format_int }}</td>{% endif %}
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 

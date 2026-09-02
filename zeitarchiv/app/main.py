@@ -21,6 +21,7 @@ import shutil
 import threading
 import time
 from collections import deque
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
@@ -2179,7 +2180,6 @@ def _maintenance_scheduler_loop() -> None:
         _maintenance_scheduler_stop.wait(30)
 
 
-@app.on_event("startup")
 def _start_maintenance_scheduler() -> None:
     global _maintenance_scheduler_thread, _storage_reconcile_thread
     # Einmalig beim Start: entities.hourly_rollup für eine bereits VOR diesem
@@ -2208,7 +2208,6 @@ def _start_maintenance_scheduler() -> None:
     _maintenance_scheduler_thread.start()
 
 
-@app.on_event("shutdown")
 def _stop_maintenance_scheduler() -> None:
     _maintenance_scheduler_stop.set()
     if _maintenance_scheduler_thread is not None:
@@ -2220,6 +2219,21 @@ def _stop_maintenance_scheduler() -> None:
     # sauberer Shutdown; dann wird beim nächsten Start synchron geprüft.
     if _requires_synchronous_reconciliation or _storage_reconcile_completed:
         index.set_setting("storage_clean_shutdown", "1")
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    _start_maintenance_scheduler()
+    yield
+    _stop_maintenance_scheduler()
+
+
+# Nachträglich statt über FastAPI(lifespan=...) gesetzt: _start_/_stop_
+# _maintenance_scheduler() referenzieren Module-Zustand (Scheduler-Threads,
+# _energiedashboard_service, index), der erst nach der App-Instanziierung
+# (Zeile ~326) definiert wird — app.router.lifespan_context wird laut
+# Starlette erst beim tatsächlichen Start gelesen, nicht bei Zuweisung.
+app.router.lifespan_context = _lifespan
 
 
 _BACKUP_SORT_COLUMNS = [("created_at", "Erstellt"), ("size_bytes", "Größe")]
@@ -3178,6 +3192,9 @@ ENTITIES_OPTIONAL_COLUMNS = [
     ("unit", "Einheit"),
     ("rows", "Datensätze"),
     ("size", "Größe"),
+    ("value_filter", "Wertfilter"),
+    ("gap_threshold", "Lücken"),
+    ("outlier_threshold", "Ausreißer"),
 ]
 # Nur Auflösung/Aufbewahrung initial aus — diese beiden Konfigurationsdetails
 # sind für den ersten Überblick am ehesten verzichtbar. Alle übrigen Spalten,
@@ -3232,6 +3249,12 @@ def _entities_table_response(
             "last_ts_time": format_time(row["last_ts"], TZ),
             "size": format_size(row["size_bytes"]),
             "is_favorite": bool(row["is_favorite"]),
+            # Kurzform statt der vollen Dropdown-Beschriftung ("Gleiche
+            # gerundete Werte filtern") — die Spaltenüberschrift "Wertfilter"
+            # gibt den Kontext schon vor, in der Tabellenzelle reicht An/Aus.
+            "value_filter_label": "An" if row["value_filter"] == "decimals" else "Aus",
+            "gap_threshold_label": GAP_THRESHOLD_LABELS.get(row["gap_threshold"], row["gap_threshold"]),
+            "outlier_threshold_label": OUTLIER_THRESHOLD_LABELS.get(row["outlier_threshold"], row["outlier_threshold"]),
         }
         for row in page_matched
     ]
@@ -3257,6 +3280,9 @@ def _entities_table_response(
         "unit": "col-unit",
         "rows": "col-rows",
         "size": "col-size",
+        "value_filter": "col-value-filter",
+        "gap_threshold": "col-gap-threshold",
+        "outlier_threshold": "col-outlier-threshold",
     }
     header_links = [
         {
