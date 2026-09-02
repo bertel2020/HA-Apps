@@ -284,6 +284,17 @@
      genau so breit wie die Summe der Mindestbreiten, "gleichmäßig verteilt"
      hätte dann nichts zu verteilen. */
   table.dt.tbl-style-equal-cols{table-layout:fixed;width:100%;}
+  /* Mobil hat "gleichmäßig" nichts zu verteilen: bei 314px Kachelbreite und
+     198px Beschriftungsspalte blieben acht Wertespalten je 15px breit, die
+     Zahlen lagen übereinander. Unterhalb von 820px daher Inhaltsbreite mit
+     horizontalem Scrollen im .tbl-wrap (wie ohne die Option); die inline
+     gesetzte Beschriftungsbreite wird gekappt, damit neben der sticky ersten
+     Spalte noch Platz zum Scrollen bleibt (!important gegen das Inline-Style
+     aus labelColStyle()). */
+  @media (max-width:820px){
+    table.dt.tbl-style-equal-cols{table-layout:auto;width:auto;min-width:100%;}
+    .tbl-preview th.tbl-label-col,.tbl-preview td.tbl-label-col{width:auto!important;max-width:150px!important;}
+  }
   .tbl-cell{display:inline-flex;justify-content:flex-end;align-items:baseline;gap:.3em;white-space:nowrap;}
   .tbl-cell-number{white-space:nowrap;}
   .tbl-cell-deviation{display:block;margin-top:1px;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));font-weight:400;line-height:1.1;}

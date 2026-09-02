@@ -167,6 +167,7 @@
   let shareChartInstance = null;
   let heatmapChartInstance = null;
   let heatmapResizeObserver = null;
+  let shareResizeObserver = null;
   let resizeListenerAdded = false;
   const SHARE_COLORS = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6', '--chart-7', '--chart-8'];
   // Dieselbe Breakpoint-Zahl wie die übrigen @media(max-width:560px)-Regeln
@@ -177,6 +178,13 @@
   // registrierte Listener) die aktuelle Komponente trifft — dieselbe
   // Begründung wie bei chartInstance oben.
   const SANKEY_NARROW_BREAKPOINT = 560;
+  // Über matchMedia statt window.innerWidth: innerWidth ist auf Mobilgeräten
+  // die Breite des VISUELLEN Viewports und wächst mit, sobald irgendein
+  // Element die Seite breiter als das Gerät macht (dann zoomt der Browser
+  // heraus) — der Sankey wurde dadurch bei 390px Gerätebreite als "breit"
+  // gerendert. matchMedia liefert exakt dasselbe Ergebnis wie die
+  // @media(max-width:560px)-Regeln in energiedashboard.html.
+  const sankeyIsNarrow = () => window.matchMedia(`(max-width:${SANKEY_NARROW_BREAKPOINT}px)`).matches;
   let lastSankeyData = null;
   let lastSankeyIsNarrow = null;
   let currentRenderChart = null;
@@ -238,6 +246,10 @@
           shareChartInstance.dispose();
           shareChartInstance = null;
         }
+        if (shareResizeObserver) {
+          shareResizeObserver.disconnect();
+          shareResizeObserver = null;
+        }
         if (heatmapChartInstance) {
           heatmapChartInstance.dispose();
           heatmapChartInstance = null;
@@ -257,7 +269,7 @@
             // Sankey-Orientierung (horizontal/vertikal) nur neu rendern, wenn
             // der Breakpoint wirklich über-/unterschritten wurde — sonst bei
             // jedem Pixel-Resize unnötig den ganzen Chart neu aufbauen.
-            const isNarrow = window.innerWidth < SANKEY_NARROW_BREAKPOINT;
+            const isNarrow = sankeyIsNarrow();
             if (lastSankeyData && isNarrow !== lastSankeyIsNarrow && currentRenderChart) {
               currentRenderChart(lastSankeyData);
             }
@@ -601,7 +613,7 @@
         const el = this.$refs.sankeyEl;
         if (!el || typeof echarts === 'undefined') return;
         lastSankeyData = data;
-        const isNarrow = window.innerWidth < SANKEY_NARROW_BREAKPOINT;
+        const isNarrow = sankeyIsNarrow();
         lastSankeyIsNarrow = isNarrow;
         const palette = colors();
         if (!chartInstance) chartInstance = echarts.init(el);
@@ -628,12 +640,24 @@
         // was wie ein fehlender/kaputter Knoten statt wie "0 kWh" wirkt.
         const connectedNames = new Set();
         links.forEach(l => { connectedNames.add(l.source); connectedNames.add(l.target); });
+        // Vertikal: Labels je Ebene platzieren statt pauschal rechts neben
+        // den Knoten — Quellen über ihrer (oberen) Reihe, Senken unter der
+        // unteren, nur der Bus behält das Label rechts. Rechts neben dünnen,
+        // nebeneinanderliegenden Knoten überlagerten sich die Namen sonst
+        // komplett; oben/unten mit Umbruch auf 80px (overflow:'break') bleibt
+        // jeder Name über/unter seinem Knoten lesbar. Die Serie bekommt dafür
+        // oben/unten Reserve (top/bottom unten).
+        const narrowLabelFor = (n) => {
+          if (n.role === 'source') return {position: 'top', width: 80, overflow: 'break', lineHeight: 12};
+          if (n.role === 'sink') return {position: 'bottom', width: 80, overflow: 'break', lineHeight: 12};
+          return {position: 'right'};
+        };
         const nodes = data.nodes
           .filter(n => n.role === 'bus' || connectedNames.has(n.name))
           .map(n => ({
             name: n.name,
             itemStyle: {color: colorForNode(n, palette)},
-            label: {color: palette.ink},
+            label: {color: palette.ink, ...(isNarrow ? narrowLabelFor(n) : {})},
           }));
         const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
         chartInstance.setOption({
@@ -652,7 +676,8 @@
             // Mobil: vertikal statt horizontal (Quellen oben, Bus in der
             // Mitte, Verbraucher/Speicher/Netz darunter) — auf schmalen
             // Bildschirmen liest sich das deutlich besser als ein seitlich
-            // gequetschter horizontaler Sankey.
+            // gequetschter horizontaler Sankey. (Zwischenzeitlich horizontal
+            // getestet und auf Wunsch wieder auf vertikal zurückgestellt.)
             orient: isNarrow ? 'vertical' : 'horizontal',
             data: nodes,
             links,
@@ -663,8 +688,19 @@
             // mehr nodeGap geben den Labels dort mehr Luft, bevor sie sich
             // überlappen.
             label: {fontFamily: 'IBM Plex Sans, sans-serif', fontSize: isNarrow ? 10 : 12},
+            // Vertikal: Platz für die bis zu dreizeiligen Labels über der
+            // oberen und unter der unteren Knotenreihe (siehe narrowLabelFor).
+            top: isNarrow ? 44 : '5%',
+            bottom: isNarrow ? 44 : '5%',
+            // Seitlich 40px: die 80px breiten, mittig über/unter dem Knoten
+            // zentrierten Labels ragen sonst am äußersten Knoten aus der Karte.
+            left: isNarrow ? 40 : '5%',
+            right: isNarrow ? 40 : '20%',
             nodeWidth: 14,
-            nodeGap: isNarrow ? 20 : 10,
+            // Vertikal deutlich mehr Abstand zwischen nebeneinanderliegenden
+            // Knoten, damit sich die Labels dünner Nachbarknoten seltener
+            // überlagern.
+            nodeGap: isNarrow ? 36 : 10,
           }],
         }, true);
         chartInstance.off('click');
@@ -709,6 +745,19 @@
             })),
           }],
         }, true);
+        // Dasselbe ResizeObserver-Muster wie renderHeatmap()/#storage-pie:
+        // die Kachel steht unter x-show und ist beim ersten setOption() oft
+        // noch display:none — ECharts fällt dann auf seine 100px-Standard-
+        // breite zurück und der Donut blieb (v. a. mobil, wo der Container
+        // per CSS auf 260px zentriert wird) winzig und linksbündig. Der
+        // window-resize-Listener allein greift beim Sichtbarwerden nicht.
+        if (typeof ResizeObserver !== 'undefined') {
+          if (shareResizeObserver) shareResizeObserver.disconnect();
+          shareResizeObserver = new ResizeObserver(() => {
+            if (shareChartInstance) shareChartInstance.resize();
+          });
+          shareResizeObserver.observe(el);
+        }
       },
 
       // Tabellenzeile ↔ Donut-Segment verbinden (Hover), identisch zur

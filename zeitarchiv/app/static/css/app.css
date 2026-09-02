@@ -289,6 +289,13 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
   .topnav-links{display:none;}
   .topnav-burger{display:flex;}
   .topnav-notice{margin-left:auto;}
+  /* Mobil sitzt die Glocke mittig (rechts folgt noch der Burger) — ein an
+     der Glocke rechtsbündig verankertes 340px-Panel ragte dadurch links aus
+     dem Viewport. Stattdessen am Viewport selbst ausrichten: direkt unter
+     der 56px-Kopfzeile, mit demselben 16px-Seitenabstand wie das mobile
+     body-Padding. position:fixed funktioniert hier, weil kein Vorfahre
+     einen transform trägt (.topnav ist nur sticky). */
+  .notice-panel{position:fixed;top:62px;left:16px;right:16px;width:auto;max-width:none;}
 }
 
 /* Mobiles Menü: Hamburger öffnet ein Slide-in-Drawer von rechts statt des
@@ -339,10 +346,20 @@ a.stat:hover .label{color:var(--accent-line);}
 }
 input[type="date"],input[type="time"]{color-scheme:inherit;}
 #controls input[type="search"],.search{min-width:250px;}
+/* Buttons/Filter-Chips rechtsbündig, unabhängig von der (unveränderten)
+   Breite des Suchfelds davor — auto-Margin auf dem ELEMENT DIREKT NACH dem
+   Suchfeld schiebt sich selbst plus alle folgenden Geschwister an den
+   rechten Rand. Der Geschwister-Selektor statt einer festen Klasse, weil
+   Charts/Tabellen "Favoriten zuerst" und die Sortiergruppe in vertauschter
+   Reihenfolge zeigen (siehe charts.html/tables.html) — so passt sich die
+   Regel automatisch an, welches Element dort gerade zuerst kommt. */
+#controls > input[type="search"] + *,.card-browser > input[type="search"] + *{margin-left:auto;}
 /* Such-/Sortierleiste der Kachel-Übersichten (Dashboards, Charts, Tabellen)
-   — siehe static/js/card-browser.js. Erbt Feld-Optik von .search/select oben. */
+   — siehe static/js/card-browser.js. Erbt Feld-Optik von .search/select oben,
+   inklusive derselben min-width:250px wie das Entitäten-Suchfeld (#controls)
+   — bewusst NICHT gestreckt (kein flex:1 mehr), die Gruppe danach schiebt
+   sich stattdessen per auto-Margin an den rechten Rand (siehe oben). */
 .card-browser{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px;}
-.card-browser .search{flex:1;min-width:220px;}
 /* Beschriftung und Auswahlfeld als eine Einheit umbrechen — sonst bleibt in
    schmalen Fenstern "Sortierung" allein in der ersten Zeile zurück. */
 .card-browser-sortgroup{display:inline-flex;align-items:center;gap:8px;}

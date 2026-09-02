@@ -9,6 +9,29 @@
 <style>:root{--font-scale:{{ font_scale_value }};}</style>
 <style>
   .edash-title-row{display:flex;align-items:center;gap:10px;}
+  /* Mobil: die nowrap-Badges drückten den <h1> (word-break:break-word, app.css)
+     auf Mindestbreite — "Energiedashboard" brach Buchstabe für Buchstabe um.
+     Der Titel behält mindestens 60% der Zeile (der Stift passt daneben), die
+     Badges rutschen als eigene Zeile darunter und beginnen links. */
+  @media(max-width:560px){
+    .edash-title-row{flex-wrap:wrap;row-gap:8px;}
+    /* Titel nur so breit wie sein Text, damit der Bearbeiten-Stift direkt
+       dahinter bleibt; der Datenqualität-Chip rückt per margin-left:auto an
+       den rechten Rand. Die CO2-/Kosten-Badges bekommen eine eigene Zeile
+       (flex-basis:100%), unabhängig von der Titellänge. */
+    .edash-title-row h1{flex:0 1 auto;min-width:0;}
+    .edash-title-row .edash-quality-badge{margin-left:auto;}
+    .edash-title-row .edash-badge-group{flex-basis:100%;}
+    /* Höhere Spezifität als die Desktop-Regel .edash-badge-group{margin-left:
+       auto} weiter unten — bei gleicher Spezifität gewänne die spätere. */
+    .edash-title-row .edash-badge-group{margin-left:0;flex-wrap:wrap;}
+    /* Datenqualität-Chip nur als Symbol (✓/!) — der Text passt neben den
+       CO2-/Kosten-Badges nicht mehr in eine Zeile. Bedeutung bleibt über
+       title/aria-label am Button (_energiedashboard_view.html) erhalten;
+       symmetrisches Padding, damit der Chip als runde Marke steht. */
+    .edash-quality-badge-text{display:none;}
+    .edash-quality-badge{gap:0;padding:6px 11px;}
+  }
   .edash-title-edit{color:var(--ink-faint);text-decoration:none;padding:2px;background:none;border:0;cursor:pointer;font-size:calc(15px * var(--font-scale, 1));line-height:1;}
   .edash-title-edit:hover{color:var(--accent-line);}
   /* Status-Badge statt eigener Vollbreite-Kachel für Bilanz & Datenqualität
@@ -83,6 +106,19 @@
   @media(max-width:820px){.edash-grid{grid-template-columns:repeat(2,1fr);}.edash-card.edash-span3,.edash-card.edash-ring-card{grid-column:span 2;}}
   @media(max-width:560px){.edash-grid{grid-template-columns:1fr;}.edash-card.edash-span3,.edash-card.edash-span2,.edash-card.edash-ring-card{grid-column:span 1;}}
 
+  /* Wrapper für Perioden-Pills + Pfeil-Navigation (vorher Inline-Style) —
+     als eigene Klasse, damit die mobile Regel unten ihn zentrieren kann. */
+  .edash-period-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  /* Mobil: die Steuerelemente stehen unter dem Kachel-Titel in eigener
+     Zeile(n) — dort zentriert statt linksbündig "angeklebt". Der Wrapper
+     nimmt die volle Breite (das Umbrechen von .edash-card-head trennt ihn
+     ohnehin vom Titel), Pills und Navigation zentrieren sich darin je
+     einzeln, weil beide zusammen (~250px + ~270px) nicht in eine Zeile
+     passen und sonst nur die erste Zeile mittig säße. */
+  @media(max-width:560px){
+    .edash-period-controls{flex:1 1 100%;justify-content:center;}
+    .edash-period-nav{flex:1 1 100%;justify-content:center;}
+  }
   .edash-period-pills{display:flex;align-items:center;gap:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:3px;}
   .edash-period-pills button{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));padding:5px 10px;border-radius:6px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;}
   .edash-period-pills button.is-active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600;}
@@ -272,7 +308,15 @@
      Beschriftungsspalte noch reichlich Platz hatte. */
   .edash-share-table th:nth-child(2),.edash-share-table th:nth-child(3),.edash-share-table th:nth-child(4),
   .edash-share-table td:nth-child(2),.edash-share-table td:nth-child(3),.edash-share-table td:nth-child(4){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
-  @media(max-width:560px){.edash-share-donut{width:100%;}}
+  /* Mobil: flex-basis (220px) ausschalten, sonst gewinnt sie gegen
+     width:100% und der Donut hängt 220px breit links in der Kachel. Als
+     zentrierter Block mit 260px (dieselbe Größe wie #storage-pie in
+     statistik.html) oberhalb der Tabelle. */
+  @media(max-width:560px){
+    .edash-share-wrap{flex-direction:column;align-items:stretch;}
+    .edash-share-donut{flex:0 0 auto;width:100%;max-width:260px;height:260px;margin:0 auto;}
+    .edash-share-wrap .tbl-wrap{min-width:0;width:100%;}
+  }
 
   /* Setup-Formular orientiert sich bewusst am Bereich "Einstellungen"
      (settings.html): echte .settings-section/.field/.actionbar-Klassen aus

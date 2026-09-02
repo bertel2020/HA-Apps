@@ -99,8 +99,9 @@
     <div class="settings-panel" data-card-browser-root>
         <div class="card-browser" data-storage-key="zeitarchiv.charts.sort">
           <input type="search" class="search card-browser-search" placeholder="Chart suchen …" aria-label="Charts durchsuchen">
+          <button type="button" class="chip card-browser-fav" data-aktiv="1" aria-pressed="true"
+                  title="Favoriten unabhängig von der Sortierung nach oben ziehen">★ Favoriten zuerst</button>
           <span class="card-browser-sortgroup">
-            <span class="card-browser-sort-label">Sortierung</span>
             {% set sort_options = [
               ('neueste', 'Neueste zuerst'), ('aelteste', 'Älteste zuerst'),
               ('name_asc', 'Name A–Z'), ('name_desc', 'Name Z–A')
@@ -116,8 +117,6 @@
               </div>
             </span>
           </span>
-          <button type="button" class="chip card-browser-fav" data-aktiv="1" aria-pressed="true"
-                  title="Favoriten unabhängig von der Sortierung nach oben ziehen">★ Favoriten zuerst</button>
           <p class="card-browser-empty" hidden>Kein Chart passt zur Suche.</p>
         </div>
         <div class="chart-grid" data-card-grid>

@@ -17,10 +17,14 @@
     {# Status-Badge statt einer eigenen Vollbreite-Kachel — Details im Popup
        (dasselbe <dialog>-Muster wie "Markierte Datensätze" in settings.html:
        showModal()/.detail-dialog, native Fokus-/Tastatur-Semantik). #}
+    {# title + aria-label, weil der Text-Span mobil (<560px, siehe
+       .edash-quality-badge-text in energiedashboard.html) ausgeblendet wird und
+       der Chip dann nur noch aus dem Symbol besteht. #}
     <button type="button" class="edash-quality-badge" :class="{'is-warn': !quality.plausible}"
+            title="Datenqualität" aria-label="Datenqualität"
             @click="$refs.qualityDialog.showModal()">
       <span x-text="quality.plausible ? '✓' : '!'"></span>
-      <span>Datenqualität</span>
+      <span class="edash-quality-badge-text">Datenqualität</span>
     </button>
     {% endif %}
     {# Rechtsbündige Badge-Gruppe als EIN Flex-Kind (margin-left:auto auf dem
@@ -216,7 +220,7 @@
   <div class="edash-card edash-span3">
     <div class="edash-card-head">
       <div class="edash-card-title">Energiefluss</div>
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div class="edash-period-controls">
         <div class="edash-period-pills">
           <template x-for="r in ranges" :key="r.key">
             <button type="button" :class="{'is-active': range === r.key}" @click="setRange(r.key)" x-text="r.label"></button>

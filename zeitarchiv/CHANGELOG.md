@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.74.0 - 2026-09-02
+
+### Verbesserung
+
+- **Smartphone-Ansicht** (alle Punkte greifen nur auf schmalen Bildschirmen,
+  die Desktop-Darstellung bleibt unverändert):
+  - Vergleichstabellen mit der Option „Spalten gleichmäßig" zeigen auf dem
+    Handy wieder lesbare Werte: statt alle Spalten auf 15 px zu quetschen,
+    behalten sie ihre Inhaltsbreite und scrollen horizontal — in der
+    Tabellenansicht wie in der Dashboard-Kachel.
+  - Das Meldungen-Panel (Glocke) öffnet sich innerhalb des Bildschirms statt
+    links herauszuragen.
+  - Energiedashboard: Titel bricht nicht mehr Buchstabe für Buchstabe um; der
+    Datenqualität-Chip zeigt nur noch das Symbol (Text als Tooltip), die
+    CO2-/Kosten-Badges stehen in eigener Zeile. Zeitraum-Auswahl und
+    Perioden-Navigation sind zentriert. Der Verbraucheranteile-Donut ist
+    zentriert und so groß wie der Speichernutzungs-Donut in der Statistik;
+    der Sankey wird vertikal gezeichnet, mit Namen über den Quellen und unter
+    den Verbrauchern statt überlappend neben den Knoten.
+  - Statistik: Speichernutzungs-Donut mittig über der Tabelle.
+  - Protokoll-Seite: die Karte „Protokollierung" ist einklappbar und startet
+    zugeklappt, damit das Log direkt sichtbar ist.
+- Übersichten Charts und Tabellen: „★ Favoriten zuerst" steht jetzt direkt
+  neben der Suche vor der Sortierung, die Beschriftung „Sortierung" entfällt.
+
+### Behoben
+
+- Der Verbraucheranteile-Donut im Energiedashboard blieb winzig, wenn die
+  Kachel beim ersten Zeichnen noch ausgeblendet war (jetzt größenüberwacht
+  wie Heatmap und Speichernutzungs-Donut).
+- Die mobile Sankey-Erkennung nutzte die Breite des sichtbaren Viewports, die
+  bei überbreiter Seite mitwächst; jetzt dieselbe Media-Query wie das CSS.
+
 ## 0.73.0 - 2026-09-02
 
 ### Neu

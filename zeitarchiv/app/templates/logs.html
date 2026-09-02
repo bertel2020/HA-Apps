@@ -29,6 +29,23 @@
   @media(max-width:700px){
     #log-output{height:430px;}
     .log-toolbar>*{max-width:100%;}
+    /* Mobil ist die Protokollierungs-Karte einklappbar (Standard: zu), damit
+       das eigentliche Log nicht erst nach zwei großen Dropdown-Zeilen
+       beginnt. Der Titel ist der Schalter (siehe Skript unten), der Chevron
+       zeigt den Zustand; Desktop bleibt unverändert immer offen. */
+    .log-settings-section .settings-subsection-title{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      margin:0;cursor:pointer;user-select:none;
+    }
+    .log-settings-section .settings-subsection-title::after{
+      content:"";width:8px;height:8px;flex:none;margin-right:4px;
+      border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+      transform:rotate(45deg) translateY(-2px);transition:transform .15s;
+    }
+    .log-settings-section.is-collapsed .settings-subsection-title::after{transform:rotate(-45deg) translateY(2px);}
+    .log-settings-section:not(.is-collapsed) .settings-subsection-title{margin-bottom:8px;}
+    .log-settings-section.is-collapsed #logging-settings{display:none;}
+    .log-settings-section.is-collapsed{padding-top:14px;padding-bottom:14px;}
   }
 </style>
 </head>
@@ -45,8 +62,8 @@
        klar bleibt: das hier sind zwei Einstellungen, keine dritte
        Werkzeugleiste des Viewers darunter. #}
     <div class="settings-panel log-settings-panel">
-      <section class="settings-section log-settings-section">
-        <h2 class="settings-subsection-title">Protokollierung</h2>
+      <section class="settings-section log-settings-section" id="log-settings-section">
+        <h2 class="settings-subsection-title" id="log-settings-toggle" aria-controls="logging-settings">Protokollierung</h2>
         <div id="logging-settings">
           {% include "_settings_logging_form.html" %}
         </div>
@@ -86,6 +103,43 @@
   <script src="static/vendor/htmx.min.js"></script>
   <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
   <script>
+    // Mobil einklappbare Protokollierungs-Karte (CSS: @media(max-width:700px)
+    // oben). Die Klasse wird nur gesetzt, wenn der schmale Breakpoint gilt —
+    // am Desktop hat sie ohnehin keine Wirkung, so bleibt die Karte dort
+    // ohne Zustandslogik immer offen. Beim Wechsel schmal→breit (z. B.
+    // Tablet drehen) wird die Klasse entfernt, sonst käme sie beim Zurück-
+    // drehen im zuletzt gewählten Zustand wieder — gewollt: Standard zu.
+    (function () {
+      const section = document.getElementById('log-settings-section');
+      const toggle = document.getElementById('log-settings-toggle');
+      if (!section || !toggle) return;
+      const narrow = window.matchMedia('(max-width:700px)');
+      const setCollapsed = (collapsed) => {
+        section.classList.toggle('is-collapsed', collapsed);
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+      };
+      const applyMode = () => {
+        if (narrow.matches) {
+          toggle.setAttribute('role', 'button');
+          toggle.setAttribute('tabindex', '0');
+          setCollapsed(true);
+        } else {
+          toggle.removeAttribute('role');
+          toggle.removeAttribute('tabindex');
+          toggle.removeAttribute('aria-expanded');
+          section.classList.remove('is-collapsed');
+        }
+      };
+      toggle.addEventListener('click', () => {
+        if (narrow.matches) setCollapsed(!section.classList.contains('is-collapsed'));
+      });
+      toggle.addEventListener('keydown', (e) => {
+        if (!narrow.matches) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle.click(); }
+      });
+      narrow.addEventListener('change', applyMode);
+      applyMode();
+    })();
     (() => {
       const output = document.getElementById('log-output');
       const source = document.getElementById('log-source');

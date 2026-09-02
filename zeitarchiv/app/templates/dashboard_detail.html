@@ -269,6 +269,13 @@
      labelWidthAttr() (style.label_col_width), das dashboard-tiles.js beim
      Rendern der Kachel setzt — dieselbe gespeicherte Breite wie im Editor. */
   table.dt.dtile-mini-table.tbl-style-equal-cols{table-layout:fixed;width:100%;}
+  /* Mobil dieselbe Rückfallregel wie in table_editor.html: Inhaltsbreite und
+     Scrollen in .dtile-table-preview statt 15px-Wertespalten. Greift nur für
+     Tabellen ohne gespeicherte Spaltenbreiten — mit tableWidthAttr()
+     (Inline min-width) ist die Tabelle ohnehin nicht komprimierbar. */
+  @media (max-width:820px){
+    table.dt.dtile-mini-table.tbl-style-equal-cols{table-layout:auto;width:auto;min-width:100%;}
+  }
   .tbl-cell{display:inline-flex;justify-content:flex-end;align-items:baseline;gap:.3em;white-space:nowrap;}
   .tbl-cell-number{white-space:nowrap;}
   .tbl-cell-deviation{display:block;margin-top:1px;color:var(--ink-faint);font-size:calc(9.5px * var(--font-scale, 1));font-weight:400;line-height:1.1;}
