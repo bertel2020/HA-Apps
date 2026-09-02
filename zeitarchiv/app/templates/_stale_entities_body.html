@@ -1,0 +1,32 @@
+{# Inhalt von #stale-entities-body — eigenes Partial, damit der initiale
+   Seitenaufruf und ein Schwellwert-Wechsel (siehe #stale-entities-form,
+   hx-trigger="change") exakt dasselbe Markup erzeugen. #}
+{% if stale_entities %}
+<div class="tbl-wrap">
+  <table class="dt" data-sortable data-paginate data-page-size="10">
+    <thead><tr><th>Entität</th><th>Letzter Wert</th><th class="num">Vor</th><th class="num">Datenpunkte</th><th data-no-sort></th></tr></thead>
+    <tbody>
+    {% for row in stale_entities %}
+    <tr>
+      <td class="entity" data-sort="{{ row.display_name }}">
+        <a href="entities/{{ row.entity_id }}" class="entity-tooltip-host">
+          {% if row.has_name %}
+          <span class="name">{{ row.display_name }}</span><span class="id">{{ row.entity_id }}</span>
+          {% else %}
+          <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+          {% endif %}
+          <span class="entity-tooltip" role="tooltip"><strong>{{ row.display_name }}</strong><code>{{ row.entity_id }}</code></span>
+        </a>
+      </td>
+      <td>{{ row.last_value_label }}</td>
+      <td class="num" data-sort="{{ row.days_ago_raw }}">{{ row.days_ago_label }}</td>
+      <td class="num" data-sort="{{ row.row_count_raw }}">{{ row.row_count }}</td>
+      <td><a class="btn" href="entities/{{ row.entity_id }}">Zur Entität</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">Alle Entitäten haben in den letzten {{ stale_entities_days }} Tagen neue Werte geliefert.</div>
+{% endif %}

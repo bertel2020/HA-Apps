@@ -1,0 +1,35 @@
+{# Inhalt von #tips-list-body (Dialog "Alle Tipps", Einstellungen → Meldungen)
+   — eigenes Partial, damit Aus-/Einblenden nur diese Liste statt des ganzen
+   Dialogs neu lädt (natives <dialog> würde bei einem Swap des Dialogs selbst
+   sonst schließen). Nur der heute fällige Tipp trägt eine Aktion — die
+   übrigen sind rein informativ, da an einem Tag ohnehin nur einer sichtbar
+   ist (tägliche Rotation, siehe notices.TIP_ROTATION_DAYS). #}
+<div class="tbl-wrap">
+  <table class="dt">
+    <thead><tr><th>Tipp</th><th>Kategorie</th><th>Status</th><th data-no-sort></th></tr></thead>
+    <tbody>
+    {% for tip in tips_list %}
+    <tr>
+      <td class="label">{{ tip.title }}</td>
+      <td>{{ tip.meta }}</td>
+      <td>
+        {% if tip.is_today %}
+        <span class="tip-status {{ 'hidden' if tip.hidden_today else 'today' }}">{{ 'Heute ausgeblendet' if tip.hidden_today else 'Heute aktiv' }}</span>
+        {% else %}
+        <span class="tip-status-none">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if tip.is_today %}
+        {% if tip.hidden_today %}
+        <button type="button" class="btn btn-sm" hx-post="settings/tips/unhide" hx-target="#tips-list-body" hx-swap="innerHTML">Wieder einblenden</button>
+        {% else %}
+        <button type="button" class="btn btn-sm" hx-post="settings/tips/hide" hx-vals='{"slug": "{{ tip.slug }}"}' hx-target="#tips-list-body" hx-swap="innerHTML">Ausblenden</button>
+        {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

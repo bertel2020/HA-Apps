@@ -21,6 +21,7 @@
     {re: /^\/charts(\/|$)/, text: 'zu den Charts'},
     {re: /^\/tables(\/|$)/, text: 'zu den Tabellen'},
     {re: /^\/statistik(\/|$)/, text: 'zur Statistik'},
+    {re: /^\/housekeeping(\/|$)/, text: 'zum Housekeeping'},
     {re: /^\/import(\/|$)/, text: 'zum Import'},
   ];
 

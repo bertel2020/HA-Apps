@@ -145,10 +145,17 @@ Aufbewahrung und Rundung. Ein optionaler, rein app-interner Anzeigename
 überschreibt bei Bedarf Home Assistants eigenen Namen nur in der
 Darstellung.
 
+**Housekeeping.** Eigener Bereich für Dinge, die sonst leicht übersehen
+werden: erkannte Duplikate, inaktive Entitäten, ungenutzte Charts/Tabellen,
+sowie Speicherplatz-, Aufbewahrungs- und Rotations-Verwaltung an einer
+Stelle.
+
 **Meldungen.** Die Glocke in der Kopfzeile bündelt Systemhinweise —
-empfohlene Wartung, fehlgeschlagene Backup-/Aufbewahrungsläufe, verfügbare
-Updates. Einzelne Meldungen lassen sich befristet oder dauerhaft
-stummschalten; echte Fehler nie.
+empfohlene Wartung, fehlgeschlagene Backup-/Aufbewahrungs-/Importläufe,
+verfügbare Updates, sowie mehrere Housekeeping-Prüfungen. Einzelne Meldungen
+lassen sich befristet oder dauerhaft stummschalten; echte Fehler nie. Ein
+rotierender Praxis-Tipp ergänzt die Meldungen, lässt sich einzeln ausblenden
+oder komplett abschalten.
 
 **Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
 unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren
@@ -240,10 +247,12 @@ und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
 
 ## Einstellungen und Konfiguration
 
-Darstellung, Archivierungs-Standards, Aufbewahrung, Verbindung, Diagnose und
-mehr werden vollständig in der App verwaltet und im Zeitarchiv-Index
-gespeichert — siehe [Benutzerhandbuch → Einstellungen im
-Detail](docs/user-guide.md#einstellungen-im-detail). Die einzige
+Darstellung, Archivierungs-Standards, Verbindung, Diagnose und mehr werden
+vollständig in der App verwaltet und im Zeitarchiv-Index gespeichert — siehe
+[Benutzerhandbuch → Einstellungen im
+Detail](docs/user-guide.md#einstellungen-im-detail). Speicherplatz,
+Aufbewahrung und Rotation liegen im eigenen [Housekeeping-Bereich](docs/user-guide.md#housekeeping).
+Die einzige
 Supervisor-Option ist `timezone` (IANA-Zeitzone, Standard `Europe/Berlin`).
 
 Beim Start sowie nach Datenimporten gleicht Zeitarchiv die abgeleiteten

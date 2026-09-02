@@ -258,6 +258,13 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 .notice-row:hover .notice-mute-btn,.notice-mute-btn:focus-visible{opacity:1;}
 .notice-mute-btn:hover{background:var(--surface); color:var(--ink);}
 .notice-mute-btn svg{width:14px; height:14px;}
+/* Der Button sitzt nahe am rechten Rand von .notice-list (overflow-y:auto,
+   siehe oben) — die generische [data-tooltip]::after-Regel (left:0, wächst
+   nach rechts) lief dort in den überlaufenen, abgeschnittenen Bereich.
+   Rechtsbündig statt linksbündig löst es, weil links davon in der Zeile
+   immer genug Platz ist. Spezifischer als die generische Regel (0-2-1 statt
+   0-1-1), gewinnt also unabhängig von der Reihenfolge im Stylesheet. */
+.notice-mute-btn[data-tooltip]::after{left:auto; right:0;}
 /* Dauer-Auswahl ersetzt Link+Mute-Button INNERHALB derselben Zeile, statt
    eines zusätzlichen schwebenden Popovers (siehe Kommentar im Template) —
    .notice-row.is-snoozing blendet die beiden aus, .notice-snooze-options
@@ -855,7 +862,12 @@ button[data-tooltip]{cursor:pointer;}
 .settings-panel{min-width:0;max-width:100%;}
 .settings-section + .settings-section{margin-top:20px;}
 .settings-section{
-  scroll-margin-top:24px;background:var(--surface);border:1px solid var(--border);
+  /* 81px = Höhe der global-sticky .topnav (57px) + 24px Luft, dieselbe
+     Rechnung wie .settings-nav's sticky top: oben — ein Sprunglink (Notice-
+     Panel, Sprungmarke, dynamischer Zurück-Link) landete mit dem alten
+     Basiswert 24px sonst mit der Abschnittsüberschrift HINTER der sticky
+     Kopfleiste statt sichtbar darunter. */
+  scroll-margin-top:81px;background:var(--surface);border:1px solid var(--border);
   border-radius:12px;padding:22px 24px;box-shadow:var(--shadow);
 }
 .settings-panel .settings-section-title{

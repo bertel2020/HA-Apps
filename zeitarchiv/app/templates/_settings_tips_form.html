@@ -1,0 +1,24 @@
+{# Globaler Ein/Aus-Schalter für den rotierenden Tipp im Meldungs-Center —
+   eigenes Partial (wie die übrigen An/Aus-Felder in _settings_darstellung_form.html),
+   damit ein Toggle nur dieses kleine Fragment statt der ganzen Seite neu lädt. #}
+<div class="settings-compact-list">
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Tipps anzeigen</div>
+      <div class="settings-compact-hint">Ein wechselnder Praxis-Tipp im Meldungs-Center (Glocken-Icon oben)</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button type="button" class="btn btn-sm" onclick="document.getElementById('tips-list-dialog').showModal()">Alle Tipps</button>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="tips-enabled-btn" onclick="toggleDDPicker('tips-enabled')">{% for k, l in tips_on_off_options %}{% if k == tips_enabled %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        <input type="hidden" name="tips_enabled" id="tips-enabled-input" value="{{ tips_enabled }}"
+               hx-post="settings/tips-enabled" hx-trigger="change" hx-target="#tips-settings-form" hx-swap="innerHTML">
+        <div class="dd-picker-popover" id="tips-enabled-popover">
+          {% for key, label in tips_on_off_options %}
+          <div class="dd-picker-row" onclick="selectDDOption('tips-enabled', '{{ key }}', '{{ label }}')">{{ label }}</div>
+          {% endfor %}
+        </div>
+      </span>
+    </div>
+  </div>
+</div>

@@ -44,7 +44,7 @@ Nutzereingaben ohne diese Validierung.
 ## Rotation (Hot → Archiv)
 
 `storage/rotate.py`: beim ersten Schreibvorgang einer Entität in einen neuen
-Kalendermonat (oder manuell unter **Einstellungen → Rotation**) wird die
+Kalendermonat (oder manuell unter **Housekeeping → Rotation**) wird die
 Hot-Datei des/der Vormonate(s) als Parquet ins Archiv geschrieben, ihre
 Rollup-Zeilen berechnet (`rollup.append_completed_month()`), und die
 Hot-CSV-Datei gelöscht. Eine Entität, die aufhört zu senden, würde ihre
@@ -107,7 +107,7 @@ zwei identischen Zeitstempeln lässt sich so gezielt nur einmal entfernen).
 - **Rückgängig:** Löschen aus `deleted_points`, Rohdatei bleibt unverändert
   — jederzeit möglich, solange nicht purged wurde.
 - **Purge** (`cleanup.purge_hot_buffer()` / `purge_archived_months()`, nur
-  über **Einstellungen → Speicherplatz**, explizite Bestätigung): entfernt
+  über **Housekeeping → Speicherplatz**, explizite Bestätigung): entfernt
   die markierten Zeilen physisch. Für den laufenden Monat ein CSV-Rewrite;
   für bereits archivierte Monate ein Parquet-Rewrite **plus** Neuberechnung
   der betroffenen Rollup-Zeilen (`rollup.replace_month()` /

@@ -20,6 +20,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Vergleichstabellen](#vergleichstabellen)
 - [Energiedashboard](#energiedashboard)
 - [Statistik](#statistik)
+- [Housekeeping](#housekeeping)
 - [Import und Export](#import-und-export)
 - [Backup / Restore](#backup--restore)
 - [Einstellungen im Detail](#einstellungen-im-detail)
@@ -260,8 +261,8 @@ Verlaufsansicht) erreichbar:
 | Auflösung | Mindestabstand zwischen zwei gespeicherten Werten (z. B. "alle 5 Minuten"); engmaschigere Quellwerte werden entsprechend verdichtet |
 | Aufbewahrung | Wie lange Werte behalten werden, bevor eine aktivierte automatische Löschung greift (**Unbegrenzt** möglich) |
 | Nachkommastellen | „Automatisch“ zeigt bis zu drei Stellen und entfernt Nullen am Ende (z. B. 4 statt 4,000); eine feste Anzahl (0–3) rundet auf genau diese Stellen und ergänzt bei Bedarf Nullen (z. B. 4,00 bei 2 Stellen) |
-| Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte (spart Speicherplatz bei trägen Sensoren), behält aber mindestens alle 6 Stunden ein Lebenszeichen, damit lange Stillstände von fehlenden Daten unterscheidbar bleiben |
-| Lücken-Erkennung | Schwellwert von 1 Minute bis 1 Tag (einschließlich 6 und 12 Stunden), ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — „Aus“ deaktiviert die Markierung |
+| Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte (spart Speicherplatz bei trägen Sensoren), behält aber mindestens alle 6 Stunden ein Lebenszeichen, damit lange Stillstände von fehlenden Daten unterscheidbar bleiben. Bei neu erkannten Entitäten standardmäßig aktiv (einstellbar unter **Einstellungen → Archivierung → Standards**) |
+| Lücken-Erkennung | Schwellwert von 1 Minute bis 1 Tag (einschließlich 6 und 12 Stunden), ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — „Aus“ deaktiviert die Markierung. Wird beim Aktivieren des Wertänderungsfilters automatisch auf mindestens 6 Stunden angehoben, falls kürzer eingestellt — sonst würde dessen eigenes, normales Schweigen ständig als Lücke gemeldet. Lässt sich danach jederzeit wieder manuell verkleinern |
 | Ausreißer-Erkennung | Schwellwert in Prozent, um den ein Wert gegenüber dem Vorwert mindestens abweichen muss, um als Ausreißer markiert zu werden — "Aus" deaktiviert die Markierung |
 | Anzeigemodus | Nur bei Schaltern: Rohwert (AN/AUS als Zustand) oder Zeit (kumulierte Einschaltdauer je Zeitraum) |
 
@@ -333,7 +334,7 @@ Ausreißern/Lücken/Duplikaten/Wiederholungen über die **komplette** Historie
 der Entität — unabhängig vom gerade angezeigten Ausschnitt.
 
 Soft-gelöschte Werte belegen weiterhin Speicherplatz, bis sie unter
-**Einstellungen → Speicherplatz** physisch bereinigt werden. Dort zeigt
+**Housekeeping → Speicherplatz** physisch bereinigt werden. Dort zeigt
 eine Vorschau vorab, wie viele Zeilen tatsächlich entfernbar sind
 (inklusive Aufschlüsselung nach laufendem Monat und Archiv), bevor der
 Schritt tatsächlich ausgeführt wird. Dieser Schritt ist endgültig — danach
@@ -383,10 +384,10 @@ siehe [Entität konfigurieren](#entität-konfigurieren)) wird nicht laufend
 angewendet, sondern nur, wenn die Aufbewahrungs-Durchsetzung tatsächlich
 läuft:
 
-- **Manuell** über **Einstellungen → Aufbewahrung** — mit einer Vorschau,
+- **Manuell** über **Housekeeping → Aufbewahrung** — mit einer Vorschau,
   die zeigt, was ein Lauf entfernen würde, bevor er tatsächlich ausgeführt
   wird.
-- **Automatisch**, wenn unter **Einstellungen → Aufbewahrung** ein Zeitplan
+- **Automatisch**, wenn unter **Housekeeping → Aufbewahrung** ein Zeitplan
   (täglich oder wöchentlich, mit Uhrzeit) hinterlegt ist. Ein einzelner
   Wartungsplaner prüft im Hintergrund regelmäßig, ob der nächste geplante
   Lauf fällig ist; war die App zum geplanten Zeitpunkt nicht aktiv, wird
@@ -432,7 +433,7 @@ Als gelöscht markiert (Soft-Delete)
   · die Datei auf der Festplatte bleibt dabei unverändert
   · zählt weiterhin zum belegten Speicherplatz
       │                                    │
-      │  Bereinigen →                      │  Einstellungen → Speicherplatz →
+      │  Bereinigen →                      │  Housekeeping → Speicherplatz →
       │  "Rückgängig (letzte Löschung)"    │  "Bereinigen" (mit Vorschau)
       ▼                                    ▼
 Wert wieder sichtbar                Physisch entfernt
@@ -461,7 +462,7 @@ Zu "Rückgängig (letzte Löschung)":
   (siehe unten) — danach existiert die Markierung nicht mehr, es gibt
   nichts mehr rückgängig zu machen.
 
-Zu "Bereinigen" unter **Einstellungen → Speicherplatz**:
+Zu "Bereinigen" unter **Housekeeping → Speicherplatz**:
 
 - Das ist der einzige Schritt in diesem Kapitel, der Dateien auf der
   Festplatte tatsächlich verändert: Die betroffene Archiv- bzw.
@@ -797,6 +798,60 @@ Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
 Backups, da auch diese Speicherplatz belegen, aber in der reinen
 Entitäten-Statistik nicht enthalten sind.
 
+## Housekeeping
+
+Eigener Menüpunkt unter **System**, unterhalb Statistik — sammelt an einer
+Stelle, was sonst leicht übersehen wird, mit derselben seitlichen Navigation
+wie die Einstellungen:
+
+| Bereich | Zeigt |
+| --- | --- |
+| **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
+| **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
+| **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
+| **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
+| **Rotation** | Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat. |
+| **Ungenutzte Elemente** | Charts und Vergleichstabellen, die in keinem Dashboard angepinnt sind — direkt öffnen oder löschen. Verschwindet automatisch aus der Liste, sobald irgendwo angepinnt. |
+
+Jeder Bereich verlinkt aus der passenden Systemmeldung (siehe unten), falls
+gerade etwas ansteht — Housekeeping selbst muss dafür nicht regelmäßig
+aufgesucht werden.
+
+### Systemmeldungen
+
+Das Meldungs-Center (Glocke in der Kopfzeile) sammelt Hinweise, die
+automatisch verschwinden, sobald ihre Ursache behoben ist — kein eigener
+Erledigt-Status nötig. Neben Update-Verfügbarkeit, empfohlener
+Index-Optimierung und fehlgeschlagenen Backup-/Aufbewahrung-Läufen prüft
+Zeitarchiv unter anderem:
+
+- Speicherindex-Prüfung unvollständig oder mit gefundenen (meist bereits
+  automatisch reparierten) Abweichungen
+- Kein automatischer Backup-Zeitplan aktiv
+- Aufbewahrung für Entitäten konfiguriert, aber die automatische Durchsetzung
+  ausgeschaltet
+- Letzter Import fehlgeschlagen oder nur teilweise abgeschlossen
+- Endgültige Bereinigung möglich, Duplikate gefunden, Rotation ausstehend
+- Inaktive Entitäten, dreistufig nach Alter (1/3/7 Tage, mit steigendem
+  Schweregrad)
+- Wertänderungsfilter einer Entität steht im Konflikt mit einer zu kurzen
+  Lücken-Erkennung (siehe [Entität konfigurieren](#entität-konfigurieren))
+- Tageslastprofil im Energiedashboard wird nach einer Konfigurationsänderung
+  noch rückwirkend vervollständigt
+
+Alle Meldungen außer echten Fehlern lassen sich über das 🔕-Icon
+stummschalten (1 Stunde bis dauerhaft) — einsehbar und vorzeitig
+zurückholbar unter **Einstellungen → Meldungen**.
+
+### Tipps
+
+Im Meldungs-Center rotiert außerdem ein kurzer Praxis-Tipp zu Funktionen der
+App — 30 Tipps insgesamt, täglich wechselnd. Unter **Einstellungen →
+Meldungen** lässt sich die Tipp-Anzeige komplett abschalten oder ein Dialog
+mit allen Tipps und ihrem aktuellen Status öffnen; darin lässt sich der
+gerade aktuelle Tipp für den Rest des Tages ausblenden, ohne die Rotation zu
+unterbrechen.
+
 ## Import und Export
 
 Erreichbar über **Import**, vier Reiter:
@@ -944,11 +999,8 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 | Bereich | Enthält |
 | --- | --- |
 | **Darstellung** | Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
-| **Archivierung** | Standard-Auflösung/-Aufbewahrung für neu erkannte Entitäten (wirkt nie rückwirkend auf bestehende Entitäten) |
-| **Rotation** | Zeigt Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat |
-| **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung) oben) |
-| **Aufbewahrung** | Vorschau fälliger Löschungen, Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag), Lauf-Historie |
-| **Meldungen** | Übersicht stummgeschalteter Systemmeldungen (Glocke in der Kopfzeile) mit verbleibender Dauer; einzeln vorzeitig wieder aktivierbar |
+| **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
+| **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start |
 | **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
 | **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
@@ -976,7 +1028,7 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 → Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf einen
 passenden Prozentsatz einstellen → zurück zur Verlaufsansicht →
 **Bereinigen** → erkannte Ausreißer prüfen und löschen (Soft-Delete,
-rückgängig machbar) → **Einstellungen → Speicherplatz**, wenn der Platz
+rückgängig machbar) → **Housekeeping → Speicherplatz**, wenn der Platz
 tatsächlich freigegeben werden soll.
 
 **"Ich will Innen- und Außentemperatur über die letzten 12 Monate

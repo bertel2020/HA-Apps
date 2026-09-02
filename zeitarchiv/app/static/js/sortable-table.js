@@ -114,4 +114,12 @@
 
   document.addEventListener('DOMContentLoaded', () => initAll());
   document.body.addEventListener('htmx:afterSwap', (e) => initAll(e.target));
+
+  // Für Aufrufer, die eine Zeile außerhalb von htmx (z. B. per fetch() +
+  // .remove(), siehe hkDeleteChart/hkDeleteTable in housekeeping.html) aus
+  // einer paginierten Tabelle entfernen — ohne diesen Aufruf bliebe "1–10 von
+  // 13" im Pager stehen, obwohl nur noch 12 Zeilen übrig sind.
+  window.refreshSortableTable = function (table) {
+    if (table) updatePager(table);
+  };
 })();

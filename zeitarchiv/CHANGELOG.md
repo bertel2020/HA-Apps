@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.75.0 - 2026-09-02
+
+### Neu
+
+- **Housekeeping-Bereich** (neuer Menüpunkt unter System, unterhalb Statistik):
+  sammelt an einer Stelle, was sonst leicht übersehen wird — erkannte
+  Duplikate (letzte 30 Tage), inaktive Entitäten (Schwellwert von 1 bis 30
+  Tagen wählbar) und ungenutzte Charts/Tabellen (in keinem Dashboard
+  eingebunden). Außerdem ziehen die bisher unter Einstellungen verstreuten
+  Wartungsbereiche hierher um: Speicherplatz (Indexkonsistenz-Prüfung,
+  endgültige Bereinigung markierter Datensätze), Aufbewahrung (inkl. der
+  bisher auf der Statistik-Seite gezeigten Fällig/Freigebbar-Übersicht) und
+  Rotation.
+- **Rotierende Praxis-Tipps** im Meldungs-Center: 30 kurze Tipps zu Funktionen
+  der App, wechseln täglich. Über Einstellungen → Meldungen komplett
+  abschaltbar oder in einem Dialog mit allen Tipps samt Status einsehbar; der
+  gerade aktuelle Tipp lässt sich für den Rest des Tages ausblenden, ohne die
+  Rotation zu unterbrechen.
+- **9 neue System-Meldungen** ergänzen die bestehenden (Update verfügbar,
+  Index-Optimierung, Backup-/Aufbewahrung-Fehlschlag): Speicherindex-Prüfung
+  unvollständig, Index-Abweichungen gefunden, kein Backup-Zeitplan aktiv,
+  Aufbewahrung konfiguriert aber nicht durchgesetzt, Import fehlgeschlagen
+  oder unvollständig, endgültige Bereinigung möglich, Duplikate gefunden,
+  Rotation ausstehend, inaktive Entitäten (dreistufig nach Alter: 1/3/7 Tage),
+  Wertänderungsfilter im Konflikt mit einer zu kurzen Lücken-Erkennung, sowie
+  ein Hinweis, solange das Tageslastprofil im Energiedashboard nach einer
+  Konfigurationsänderung noch rückwirkend vervollständigt wird.
+- **Standardwerte für neu erkannte Entitäten** erweitert (Einstellungen →
+  Archivierung → Standards): neben Auflösung/Aufbewahrung jetzt auch
+  Nachkommastellen, Wertänderungsfilter sowie Lücken-/Ausreißer-Erkennung
+  voreinstellbar. Neu erkannte Entitäten aktivieren den Wertänderungsfilter
+  ab sofort standardmäßig.
+- Aktiviert man den Wertänderungsfilter (pro Entität oder als Standard für
+  neue Entitäten), wird eine zu kurz eingestellte Lücken-Erkennung
+  automatisch auf 6 Stunden angehoben — der Filter überspringt unveränderte
+  Werte bis zu 6 Stunden lang, eine kürzere Schwelle hätte sonst laufend
+  falsche Lücken-Meldungen erzeugt. Lässt sich danach jederzeit wieder
+  manuell verkleinern.
+
+### Verbesserung
+
+- Die Kennzahlen-Tabelle „Bestand und Fälligkeit nach Aufbewahrungsfrist"
+  folgt jetzt wie die übrigen Tabellen dem App-Standard: Sortierung per Klick
+  auf die Spaltenüberschrift, Seitennavigation ab mehr als 10 Zeilen.
+
+### Behoben
+
+- Die Bereinigungs-Vorschau („Endgültige Bereinigung") konnte bis zu einer
+  Stunde veraltet bleiben, nachdem irgendwo Datensätze zur Löschung markiert
+  wurden — aktualisiert sich jetzt binnen rund 30 Sekunden.
+- Stummschalten oder Zurückholen einer Meldung im Glocken-Menü aktualisierte
+  die „Meldungen"-Sektion in den Einstellungen nicht automatisch (und
+  umgekehrt) — beide Ansichten zeigten bis zum manuellen Neuladen
+  unterschiedliche Stände.
+- Der Tooltip des Stummschalten-Buttons im Meldungs-Center wurde am rechten
+  Rand des Panels abgeschnitten.
+- Sprungmarken auf Seiten mit seitlicher Navigation (Einstellungen,
+  Housekeeping) — etwa aus dem Meldungen-Panel — landeten mit der
+  Abschnittsüberschrift teilweise hinter der Kopfzeile.
+
 ## 0.74.0 - 2026-09-02
 
 ### Verbesserung

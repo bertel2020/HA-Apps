@@ -2,7 +2,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Standard-Auflösung</div>
-      <div class="settings-compact-hint">Speichertakt für neu erkannte Entitäten</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Auflösung“ in der Entität-Konfiguration</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-resolution-btn" onclick="toggleDDPicker('default-resolution')">{% for k, l in resolution_options %}{% if k == default_resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -18,7 +18,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Standard-Aufbewahrung</div>
-      <div class="settings-compact-hint">Für neue Entitäten, siehe „Aufbewahrung“</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Aufbewahrung“ in der Entität-Konfiguration</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-retention-btn" onclick="toggleDDPicker('default-retention')">{% for k, l in retention_options %}{% if k == default_retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -31,5 +31,74 @@
       </div>
     </span>
   </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Nachkommastellen</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Nachkommastellen“ in der Entität-Konfiguration</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-decimals-btn" onclick="toggleDDPicker('default-decimals')">{% for k, l in decimals_options %}{% if k == default_decimals %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_decimals" id="default-decimals-input" value="{{ default_decimals }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-decimals-popover">
+        {% for key, label in decimals_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-decimals', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Wertänderungsfilter</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Wertänderungsfilter“ in der Entität-Konfiguration</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-value-filter-btn" onclick="toggleDDPicker('default-value-filter')">{% for k, l in value_filter_options %}{% if k == default_value_filter %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_value_filter" id="default-value-filter-input" value="{{ default_value_filter }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-value-filter-popover">
+        {% for key, label in value_filter_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-value-filter', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Lücken-Erkennung</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Lücken-Erkennung“ in der Entität-Konfiguration</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-gap-threshold-btn" onclick="toggleDDPicker('default-gap-threshold')">{% for k, l in gap_threshold_options %}{% if k == default_gap_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_gap_threshold" id="default-gap-threshold-input" value="{{ default_gap_threshold }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-gap-threshold-popover">
+        {% for key, label in gap_threshold_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-gap-threshold', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Ausreißer-Erkennung</div>
+      <div class="settings-compact-hint">Für neue Entitäten, siehe „Ausreißer-Erkennung“ in der Entität-Konfiguration</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-outlier-threshold-btn" onclick="toggleDDPicker('default-outlier-threshold')">{% for k, l in outlier_threshold_options %}{% if k == default_outlier_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_outlier_threshold" id="default-outlier-threshold-input" value="{{ default_outlier_threshold }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-outlier-threshold-popover">
+        {% for key, label in outlier_threshold_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-outlier-threshold', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
 </div>
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+{% if gap_threshold_auto_adjusted %}
+<script>
+  appAlert('Standard-Lücken-Erkennung automatisch auf 6 Stunden gesetzt: Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst nach spätestens 6 Stunden wieder — eine kürzere Lücken-Schwelle hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit wieder manuell verkleinern.');
+</script>
+{% endif %}

@@ -75,6 +75,13 @@
   .bgproc-pill.ok{color:var(--ink-muted);}
   .bgproc-pill.pending{color:var(--accent-bar);background:var(--accent-bar-soft);border-color:transparent;}
   .bgproc-pill.error{color:var(--danger);background:var(--danger-soft);border-color:transparent;}
+  /* Status-Pills im "Alle Tipps"-Dialog — dieselbe Farbsprache wie
+     .bgproc-pill.pending (Akzentfarbe = "hier ist gerade was los", nicht
+     "Fehler") bzw. .about-update-chip.is-update (Warnfarbe = ausgeblendet). */
+  .tip-status{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale,1));font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;}
+  .tip-status.today{color:var(--accent-line);background:var(--accent-line-soft);}
+  .tip-status.hidden{color:var(--accent-bar);background:var(--accent-bar-soft);}
+  .tip-status-none{color:var(--ink-faint);}
   /* auto-fit statt einer festen Spaltenzahl — bleibt bei nur zwei Einträgen
      (Zeitzone/Datenverzeichnis) zweispaltig auf breiten Bildschirmen und
      fällt auf schmalen von selbst einspaltig, ohne eigene @media-Regel. */
@@ -116,75 +123,32 @@
           </div>
         </section>
 
-        <section id="rotation" class="settings-section">
-          <h2 class="settings-section-title">Rotation</h2>
-          <div id="rotation-form">
-            {% include "_settings_rotation_form.html" %}
-          </div>
-        </section>
-
-        <section id="speicherplatz" class="settings-section">
-          <h2 class="settings-section-title">Speicherplatz</h2>
-          <p class="settings-section-description">Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.</p>
-          <div class="settings-subsection">
-            <div id="storage-index-form">
-              {% include "_settings_storage_index_form.html" %}
-            </div>
-          </div>
-          <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Endgültige Bereinigung</h3>
-            <div id="purge-form">
-              {% include "_settings_purge_form.html" %}
-            </div>
-          </div>
-          <dialog id="marked-points-dialog" class="detail-dialog" aria-labelledby="marked-points-title">
-            <div class="detail-dialog-header">
-              <div>
-                <h2 id="marked-points-title">Markierte Datensätze</h2>
-                <p class="hint">Read-only-Übersicht der noch rückgängig machbaren Löschmarkierungen.</p>
-              </div>
-              <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
-            </div>
-            <input id="marked-points-search" class="search" type="search" name="search"
-                   placeholder="Entität durchsuchen …" aria-label="Markierte Datensätze durchsuchen"
-                   hx-get="settings/purge/marked" hx-trigger="input changed delay:300ms, search"
-                   hx-target="#marked-points-list" hx-swap="innerHTML">
-            <div id="marked-points-list" style="margin-top:14px;">
-              <p class="hint">Liste wird beim Öffnen geladen …</p>
-            </div>
-          </dialog>
-        </section>
-
-        <section id="aufbewahrung" class="settings-section">
-          <h2 class="settings-section-title">Aufbewahrung</h2>
-          <div id="retention-form">
-            {% include "_settings_retention_form.html" %}
-          </div>
-        </section>
-
         <section id="meldungen" class="settings-section">
           <h2 class="settings-section-title">Meldungen</h2>
           <p class="settings-section-description">Stummgeschaltete Meldungen aus dem Meldungs-Center (Glocken-Icon oben) &mdash; nur Empfehlungen lassen sich stumm schalten, keine Fehler.</p>
-          {% if muted_notices %}
-          <div class="settings-compact-list" id="muted-notices-list">
-            {% for entry in muted_notices %}
-            <div class="settings-compact-row" data-notice-id="{{ entry.id }}">
-              <div class="settings-compact-row-text">
-                <span class="settings-compact-label">{{ entry.title }}</span>
-                <div class="settings-compact-hint">{{ entry.detail }}</div>
-                <div class="settings-compact-hint">
-                  Stummgeschaltet seit {{ entry.muted_at_text }}
-                  {% if entry.until_text %} &middot; läuft ab {{ entry.until_text }} aus{% endif %}
-                  {% if entry.meta %} &middot; {{ entry.meta }}{% endif %}
-                </div>
-              </div>
-              <button type="button" class="btn btn-sm" onclick="unmuteNotice(event)">Zurückholen</button>
+          <div class="settings-subsection">
+            <div id="tips-settings-form">
+              {% include "_settings_tips_form.html" %}
             </div>
-            {% endfor %}
+            <dialog id="tips-list-dialog" class="detail-dialog" aria-labelledby="tips-list-title">
+              <div class="detail-dialog-header">
+                <div>
+                  <h2 id="tips-list-title">Alle Tipps</h2>
+                  <p class="hint">Nur der heute fällige Tipp lässt sich für den Rest des Tages ausblenden — ab morgen ist ohnehin ein anderer dran.</p>
+                </div>
+                <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+              </div>
+              <div id="tips-list-body">
+                {% include "_tips_list_body.html" %}
+              </div>
+            </dialog>
           </div>
-          {% else %}
-          <div class="empty">Keine stummgeschalteten Meldungen.</div>
-          {% endif %}
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Stummgeschaltet</h3>
+            <div id="muted-notices-body">
+              {% include "_muted_notices_body.html" %}
+            </div>
+          </div>
         </section>
 
         <section id="verbindung" class="settings-section">
@@ -306,6 +270,15 @@
   <script src="static/js/entity-picker.js?v={{ js_v }}"></script>
   <script src="static/js/sortable-table.js?v={{ js_v }}"></script>
   <script>
+    // Aus-/Einblenden des heutigen Tipps (im "Alle Tipps"-Dialog, siehe
+    // _tips_list_body.html) wirkt sich auch auf das Glocken-Menü aus —
+    // htmx:afterRequest bubbelt vom auslösenden Button bis hierher hoch,
+    // ein einziger Listener auf dem Container reicht deshalb für beide
+    // Buttons (Ausblenden/Wieder einblenden).
+    document.getElementById('tips-list-body')?.addEventListener('htmx:afterRequest', () => {
+      if (window.refreshNoticePanel) refreshNoticePanel();
+    });
+
     async function unmuteNotice(evt) {
       const btn = evt.currentTarget;
       const row = btn.closest('.settings-compact-row');
@@ -320,6 +293,10 @@
         if (list && !list.querySelector('.settings-compact-row')) {
           list.outerHTML = '<div class="empty">Keine stummgeschalteten Meldungen.</div>';
         }
+        // Die zurückgeholte Meldung erscheint wieder im Glocken-Menü — ohne
+        // diesen Refresh (definiert in _topnav.html, global verfügbar) blieb
+        // sie dort bis zum manuellen Neuladen unsichtbar.
+        refreshNoticePanel();
       } catch (e) {
         btn.disabled = false;
       }
@@ -366,74 +343,7 @@
       showStatus(ok ? 'In Zwischenablage kopiert.' : 'Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.');
     }
 
-    // Scroll-Spy für die Einstellungen-Navigation: alle Abschnitte oben
-    // (Archivierung … Über Zeitarchiv) liegen auf DERSELBEN Seite, nav_active
-    // wird also serverseitig nur einmal beim Laden auf "archivierung" gesetzt
-    // — ohne dieses Skript bliebe der erste Eintrag unabhängig vom
-    // tatsächlichen Scroll-/Anker-Stand dauerhaft hervorgehoben.
-    (function () {
-      const nav = document.querySelector('.settings-nav');
-      if (!nav) return;
-      const navLinks = Array.from(nav.querySelectorAll('a[href*="#"]'));
-      const sections = navLinks
-        .map(a => document.getElementById(a.getAttribute('href').split('#')[1]))
-        .filter(Boolean);
-      if (!sections.length) return;
-
-      // Mobil ist .settings-nav eine horizontal scrollbare Einzeile (siehe
-      // app.css) — ohne diesen Abgleich bliebe der Scroll-Streifen an seiner
-      // ursprünglichen Position stehen, während sich die Hervorhebung beim
-      // Scrollen durch die Seite weiterbewegt, sodass der aktive Punkt
-      // irgendwann außerhalb des sichtbaren Streifens verschwindet. Nur bei
-      // TATSÄCHLICHEM Wechsel scrollen (currentId-Vergleich), sonst würde
-      // jeder scroll-Event (auch ohne Abschnittswechsel) erneut
-      // scrollIntoView auslösen und mit dem Scrollen der Seite selbst
-      // konkurrieren. Auf Desktop (vertikale Liste, komplett sichtbar) ist
-      // der Aufruf ein No-op, da bereits alles im Bild ist.
-      let currentId = null;
-      function setActive(id) {
-        if (id === currentId) return;
-        currentId = id;
-        let activeLink = null;
-        navLinks.forEach(a => {
-          const isActive = a.getAttribute('href').split('#')[1] === id;
-          a.classList.toggle('active', isActive);
-          if (isActive) activeLink = a;
-        });
-        if (activeLink) activeLink.scrollIntoView({behavior: 'smooth', inline: 'center', block: 'nearest'});
-      }
-
-      // "Aktuell" ist der Abschnitt, von dem GERADE DER GRÖSSTE ANTEIL seiner
-      // eigenen Höhe im Viewport sichtbar ist (Anteil, nicht Pixelhöhe — sonst
-      // gewinnt ein großer Abschnitt allein durch seine Größe). Zwei frühere
-      // Varianten scheiterten bei hohen Viewports/kurzen Abschnitten nahe dem
-      // Seitenende: ein fester Pixel-Schwellwert ("Überschrift hat Marke X
-      // überschritten") setzt voraus, dass darunter noch genug Scroll-Weg
-      // übrig ist, um dorthin zu gelangen — reicht der Rest der Seite dafür
-      // nicht mehr aus (z. B. "Verbindung" kurz vor "Über Zeitarchiv"), wird
-      // der Abschnitt nie aktiv. Der Sichtbarkeits-Anteil braucht dagegen
-      // keinen bestimmten Scroll-Weg zu erreichen und funktioniert für jede
-      // Seitenlänge/jeden Viewport gleich.
-      function updateActiveSection() {
-        const viewportHeight = window.innerHeight;
-        let current = sections[0];
-        let bestRatio = -1;
-        for (const section of sections) {
-          const rect = section.getBoundingClientRect();
-          if (rect.height <= 0) continue;
-          const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
-          const ratio = visibleHeight / rect.height;
-          if (ratio > bestRatio) {
-            bestRatio = ratio;
-            current = section;
-          }
-        }
-        setActive(current.id);
-      }
-
-      updateActiveSection();
-      window.addEventListener('scroll', updateActiveSection, {passive: true});
-    })();
   </script>
+  <script src="static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
 </body>
 </html>

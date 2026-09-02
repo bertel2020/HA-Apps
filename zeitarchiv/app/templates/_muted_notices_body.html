@@ -1,0 +1,24 @@
+{# Inhalt von #muted-notices-body — eigenes Partial, damit sowohl der
+   initiale Seitenaufruf als auch ein gezielter Refresh nach dem
+   Stummschalten einer Meldung im Glocken-Menü (siehe muteNotice() in
+   _topnav.html) exakt dasselbe Markup erzeugen. #}
+{% if muted_notices %}
+<div class="settings-compact-list" id="muted-notices-list">
+  {% for entry in muted_notices %}
+  <div class="settings-compact-row" data-notice-id="{{ entry.id }}">
+    <div class="settings-compact-row-text">
+      <span class="settings-compact-label">{{ entry.title }}</span>
+      <div class="settings-compact-hint">{{ entry.detail }}</div>
+      <div class="settings-compact-hint">
+        Stummgeschaltet seit {{ entry.muted_at_text }}
+        {% if entry.until_text %} &middot; läuft ab {{ entry.until_text }} aus{% endif %}
+        {% if entry.meta %} &middot; {{ entry.meta }}{% endif %}
+      </div>
+    </div>
+    <button type="button" class="btn btn-sm" onclick="unmuteNotice(event)">Zurückholen</button>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">Keine stummgeschalteten Meldungen.</div>
+{% endif %}

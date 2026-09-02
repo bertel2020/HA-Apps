@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zeitarchiv — Housekeeping</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+<style>
+  /* Chart/Tabelle-Unterscheidung in der ansonsten typübergreifenden Liste —
+     dieselbe visuelle Sprache wie die Entitätstyp-Badges (.badge in
+     app.css), nur zwei neue Farbvarianten statt die vorhandenen (counter/
+     standard/switch) sachfremd wiederzuverwenden. */
+  .hk-badge{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border);}
+  .hk-badge.chart{color:var(--accent-bar);border-color:var(--accent-bar);}
+  .hk-badge.table{color:var(--accent-line);border-color:var(--accent-line);}
+  /* Höhere Spezifität als das app.css-Standardpaar table.dt th/table.dt td
+     nötig (0-1-2 bzw. 0-1-1) — eine einzelne .hk-col-typ-Klasse (0-1-0) würde
+     sonst von deren text-align:left überstimmt, exakt dasselbe
+     Spezifitätsmuster wie der Sticky-Header-Bug in table_editor.html. */
+  table.dt th.hk-col-typ,table.dt td.hk-col-typ{text-align:center;}
+  .hk-row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap;}
+  /* Duplikat-Tabelle hat nur 2 Spalten (Entität + Anzahl) — dieselbe
+     78%/22%-Aufteilung wie zuvor auf der Statistik-Seite, damit die
+     Wert-Spalte nicht unnötig breit wirkt. */
+  table.stats-dt{table-layout:fixed;min-width:420px;}
+  .stats-col-entity{width:78%;}
+  .stats-col-value{width:22%;}
+  /* Abschnittstitel + Schwellwert-Dropdown ("Inaktive Entitäten") in
+     einer Zeile, statt wie die übrigen Abschnitte nur eine Überschrift zu
+     tragen — .settings-panel .hk-section-head .settings-section-title ist
+     bewusst spezifischer als app.css' .settings-panel .settings-section-title
+     (margin-bottom:8px), damit hier zuverlässig margin:0 gewinnt, unabhängig
+     von der Reihenfolge im Stylesheet. */
+  .hk-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .settings-panel .hk-section-head .settings-section-title{margin:0;}
+  .hk-section-head .dd-picker-wrap{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
+     Untertext auch dann bündig, wenn nur einzelne Titel umbrechen. */
+  .retention-summary .stat .label{min-height:3em;}
+</style>
+</head>
+<body>
+{% include "_topnav.html" %}
+<div class="page">
+  <h1>Housekeeping</h1>
+  <p class="sub">Dinge, die im Alltag leicht untergehen.</p>
+
+  <div class="settings-layout">
+    {% set nav_active = 'duplikate' %}
+    {% include "_housekeeping_nav.html" %}
+    <div class="settings-panel">
+
+      <section id="duplikate" class="settings-section">
+        <h2 class="settings-section-title">Duplikate</h2>
+        <p class="settings-section-description">Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage.</p>
+        <div class="tbl-wrap">
+          {% if duplicates_by_entity %}
+          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+            <colgroup>
+              <col class="stats-col-entity"><col class="stats-col-value">
+            </colgroup>
+            <thead><tr><th>Entität</th><th>Duplikate</th></tr></thead>
+            <tbody>
+            {% for row in duplicates_by_entity %}
+            <tr>
+              <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
+                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+                  {% if row.friendly_name %}
+                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  {% else %}
+                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+                  {% endif %}
+                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
+                </a>
+              </td>
+              <td data-sort="{{ row.count_raw }}">{{ row.count }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty">Keine Duplikate in den letzten 30 Tagen gefunden.</div>
+          {% endif %}
+        </div>
+        {% if duplicates_by_entity %}
+        <p class="hint" style="margin-top:14px;">{{ duplicates_total }} doppelte Zeitstempel insgesamt in den letzten 30 Tagen &mdash; entfernbar über "Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite.</p>
+        {% endif %}
+      </section>
+
+      <section id="entitaeten" class="settings-section">
+        <div class="hk-section-head">
+          <h2 class="settings-section-title">Inaktive Entitäten</h2>
+          <form id="stale-entities-form" hx-get="housekeeping/stale-entities" hx-trigger="change"
+                hx-target="#stale-entities-body" hx-swap="innerHTML" hx-include="#stale-entities-form">
+            <span class="dd-picker-wrap">
+              seit
+              <button type="button" class="btn btn-sm" id="stale-entities-days-btn" onclick="toggleDDPicker('stale-entities-days')">
+                {% for value, label in stale_entities_day_options %}{% if value == stale_entities_days %}{{ label }}{% endif %}{% endfor %} ▾
+              </button>
+              <input type="hidden" name="days" id="stale-entities-days-input" value="{{ stale_entities_days }}">
+              <div class="dd-picker-popover" id="stale-entities-days-popover">
+                {% for value, label in stale_entities_day_options %}
+                <div class="dd-picker-row{{ ' active' if value == stale_entities_days else '' }}"
+                     onclick="selectDDOption('stale-entities-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
+                {% endfor %}
+              </div>
+            </span>
+          </form>
+        </div>
+        <p class="settings-section-description">Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.</p>
+        <div id="stale-entities-body">
+          {% include "_stale_entities_body.html" %}
+        </div>
+      </section>
+
+      <section id="speicherplatz" class="settings-section">
+        <h2 class="settings-section-title">Speicherplatz</h2>
+        <p class="settings-section-description">Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.</p>
+        <div class="settings-subsection">
+          <div id="storage-index-form">
+            {% include "_settings_storage_index_form.html" %}
+          </div>
+        </div>
+        <div class="settings-subsection">
+          <h3 class="settings-subsection-title">Endgültige Bereinigung</h3>
+          <div id="purge-form">
+            {% include "_settings_purge_form.html" %}
+          </div>
+        </div>
+        <dialog id="marked-points-dialog" class="detail-dialog" aria-labelledby="marked-points-title">
+          <div class="detail-dialog-header">
+            <div>
+              <h2 id="marked-points-title">Markierte Datensätze</h2>
+              <p class="hint">Read-only-Übersicht der noch rückgängig machbaren Löschmarkierungen.</p>
+            </div>
+            <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+          </div>
+          <input id="marked-points-search" class="search" type="search" name="search"
+                 placeholder="Entität durchsuchen …" aria-label="Markierte Datensätze durchsuchen"
+                 hx-get="settings/purge/marked" hx-trigger="input changed delay:300ms, search"
+                 hx-target="#marked-points-list" hx-swap="innerHTML">
+          <div id="marked-points-list" style="margin-top:14px;">
+            <p class="hint">Liste wird beim Öffnen geladen …</p>
+          </div>
+        </dialog>
+      </section>
+
+      <section id="aufbewahrung" class="settings-section">
+        <h2 class="settings-section-title">Aufbewahrung</h2>
+        <div id="retention-form">
+          {% include "_settings_retention_form.html" %}
+        </div>
+      </section>
+
+      <section id="rotation" class="settings-section">
+        <h2 class="settings-section-title">Rotation</h2>
+        <div id="rotation-form">
+          {% include "_settings_rotation_form.html" %}
+        </div>
+      </section>
+
+      <section id="ungenutzt" class="settings-section">
+        <h2 class="settings-section-title">Ungenutzte Elemente</h2>
+        <p class="settings-section-description"><span id="hk-unused-count">{{ unused_charts | length + unused_tables | length }}</span> von <span id="hk-total-count">{{ chart_count + table_count }}</span> &middot; in keinem Dashboard eingebunden. Ermittelt aus den bestehenden Dashboard-Kacheln &mdash; sobald ein Chart oder eine Tabelle irgendwo angepinnt wird, verschwindet der Eintrag hier von selbst.</p>
+        <div class="tbl-wrap">
+          {% if unused_charts or unused_tables %}
+          <table class="dt" data-sortable data-paginate data-page-size="10">
+            <thead><tr><th>Name</th><th class="hk-col-typ">Typ</th><th>Details</th><th data-no-sort></th></tr></thead>
+            <tbody>
+            {% for c in unused_charts %}
+            <tr data-hk-row>
+              <td class="label">{{ c.name }}</td>
+              <td class="hk-col-typ"><span class="hk-badge chart">Chart</span></td>
+              <td>{{ c.entity_count }} Entität{{ 'en' if c.entity_count != 1 else '' }}{% if c.type_label %} &middot; {{ c.type_label }}{% endif %} &middot; {{ c.range_label }}</td>
+              <td>
+                <div class="hk-row-actions">
+                  <a class="btn" href="charts/{{ c.id }}">Öffnen</a>
+                  <button type="button" class="btn btn-danger-outline" onclick="hkDeleteChart({{ c.id }}, this)">Löschen</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+            {% for t in unused_tables %}
+            <tr data-hk-row>
+              <td class="label">{{ t.name }}</td>
+              <td class="hk-col-typ"><span class="hk-badge table">Tabelle</span></td>
+              <td>{{ t.row_count }} Zeile{{ 'n' if t.row_count != 1 else '' }} &middot; {{ t.column_count }} Spalte{{ 'n' if t.column_count != 1 else '' }}</td>
+              <td>
+                <div class="hk-row-actions">
+                  <a class="btn" href="tables/{{ t.id }}">Öffnen</a>
+                  <button type="button" class="btn btn-danger-outline" onclick="hkDeleteTable({{ t.id }}, this)">Löschen</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty">Alle Charts und Tabellen sind mindestens einem Dashboard zugeordnet.</div>
+          {% endif %}
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+<script src="static/vendor/htmx.min.js"></script>
+<script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
+<script src="static/js/sortable-table.js?v={{ js_v }}"></script>
+<script src="static/js/dd-picker.js?v={{ js_v }}"></script>
+<script>
+  // table VOR dem .remove() der Zeile merken — danach hat die Zeile keinen
+  // Elternknoten mehr, closest('table') liefe dann ins Leere und der Pager
+  // ("1–10 von 13") bliebe nach dem Löschen auf dem alten Stand stehen.
+  // hkRemoveRow wird ausschließlich von hkDeleteChart/hkDeleteTable
+  // aufgerufen (nur die "Ungenutzte Elemente"-Tabelle hat data-hk-row-Zeilen)
+  // — die "X von Y"-Kennzahl direkt darüber lässt sich deshalb hier immer
+  // gefahrlos mitaktualisieren, ohne den Abschnitt gegenprüfen zu müssen.
+  function hkRemoveRow(btn) {
+    const row = btn.closest('[data-hk-row]');
+    const table = row.closest('table');
+    row.remove();
+    if (window.refreshSortableTable) window.refreshSortableTable(table);
+    const unusedEl = document.getElementById('hk-unused-count');
+    const totalEl = document.getElementById('hk-total-count');
+    if (unusedEl) unusedEl.textContent = String(Math.max(0, parseInt(unusedEl.textContent, 10) - 1));
+    if (totalEl) totalEl.textContent = String(Math.max(0, parseInt(totalEl.textContent, 10) - 1));
+  }
+
+  async function hkDeleteChart(id, btn) {
+    if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+    btn.disabled = true;
+    fetch(`{{ app_root }}/charts/${id}/delete`, {method: 'POST'}).then(r => {
+      if (r.ok) {
+        hkRemoveRow(btn);
+      } else {
+        btn.disabled = false;
+        appAlert('Löschen fehlgeschlagen.');
+      }
+    }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
+  }
+
+  async function hkDeleteTable(id, btn) {
+    if (!await appConfirm('Diese Tabelle wirklich löschen?', {danger: true})) return;
+    btn.disabled = true;
+    fetch(`{{ app_root }}/tables/${id}/delete`, {method: 'POST'}).then(r => {
+      if (r.ok) {
+        hkRemoveRow(btn);
+      } else {
+        btn.disabled = false;
+        appAlert('Löschen fehlgeschlagen.');
+      }
+    }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
+  }
+</script>
+<script src="static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
+</body>
+</html>

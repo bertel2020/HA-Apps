@@ -95,8 +95,13 @@ from .storage import (
 )
 from .storage import query as query_mod
 from .storage.index import (
+    DEFAULT_DECIMALS,
+    DEFAULT_GAP_THRESHOLD,
+    DEFAULT_OUTLIER_THRESHOLD,
     DEFAULT_RESOLUTION,
     DEFAULT_RETENTION,
+    DEFAULT_VALUE_FILTER,
+    VALUE_FILTER_HEARTBEAT_SECONDS,
     MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
     DuplicateNameError,
@@ -310,7 +315,10 @@ def _notices_context(request: Request) -> dict:
     in ihren Kontext aufnehmen müsste. collect_notices() fragt bewusst nur
     günstige Werte ab (PRAGMA-Stats, LIMIT-1-Queries), siehe notices.py."""
     return {
-        "notices": collect_notices(index, DATA_DIR / "index.sqlite"),
+        "notices": collect_notices(
+            index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
+            _storage_reconcile_last, _count_stale_entities(),
+        ),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
     }
 
@@ -839,8 +847,16 @@ def _settings_archivierung_context(saved: bool = False) -> dict:
     return {
         "default_resolution": index.get_setting("default_resolution", DEFAULT_RESOLUTION),
         "default_retention": index.get_setting("default_retention", DEFAULT_RETENTION),
+        "default_decimals": index.get_setting("default_decimals", DEFAULT_DECIMALS),
+        "default_value_filter": index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER),
+        "default_gap_threshold": index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD),
+        "default_outlier_threshold": index.get_setting("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD),
         "resolution_options": list(RESOLUTION_LABELS.items()),
         "retention_options": list(RETENTION_LABELS.items()),
+        "decimals_options": list(DECIMALS_LABELS.items()),
+        "value_filter_options": list(VALUE_FILTER_LABELS.items()),
+        "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
+        "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
         "saved": saved,
     }
 
@@ -881,6 +897,20 @@ def _empty_purge_preview() -> dict:
         },
         "rows": [],
     }
+
+
+def _invalidate_purge_preview() -> None:
+    """Erzwingt eine Aktualisierung der Bereinigungsvorschau beim nächsten
+    Wartungsplaner-Durchlauf (binnen ~30s), NICHT synchron im aufrufenden
+    Request — der Vollscan ist teuer (siehe _refresh_purge_preview_if_stale)
+    und würde sonst jeden einzelnen Markier-Klick auf der Bereinigungsseite
+    spürbar verlangsamen. Nach dem Markieren neuer Datensätze zur Löschung
+    aufgerufen (delete_rows, Duplikate-/Wiederholungen-Löschung), damit
+    Housekeeping → Speicherplatz nicht bis zu einer Stunde lang veraltete
+    Zahlen zeigt, nur weil noch niemand "Jetzt bereinigen" geklickt hat."""
+    current = _load_purge_preview()
+    current["generated_at"] = 0
+    index.set_setting(_PURGE_PREVIEW_SETTING, json.dumps(current, ensure_ascii=False, separators=(",", ":")))
 
 
 def _load_purge_preview() -> dict:
@@ -981,6 +1011,9 @@ def _settings_retention_context(result: str | None = None) -> dict:
         next_ts = _set_next_retention_run(datetime.now(TZ))
 
     retention_overview = _load_retention_overview()
+    retention_totals = retention_overview.get("totals", {})
+    retention_history_30d = index.get_retention_job_totals(time.time() - 30 * 86400)
+    retention_history_all = index.get_retention_job_totals(0.0)
     retention_groups = {
         row["retention"]: row for row in retention_overview.get("groups", [])
         if isinstance(row, dict) and row.get("retention")
@@ -1057,6 +1090,14 @@ def _settings_retention_context(result: str | None = None) -> dict:
         "retention_jobs": jobs,
         "retention_running": running,
         "limited_retention_count": format_int(limited_count),
+        "retention_due_rows": format_int(int(retention_totals.get('rows_deleted', 0) or 0)),
+        "retention_due_entities": int(retention_totals.get("entities_affected", 0) or 0),
+        "retention_due_months": int(retention_totals.get("months_deleted", 0) or 0),
+        "retention_due_size": format_size(int(retention_totals.get("bytes_freed", 0) or 0)),
+        "retention_history_30d_rows": format_int(retention_history_30d['rows_deleted']),
+        "retention_history_30d_size": format_size(retention_history_30d["bytes_freed"]),
+        "retention_history_all_rows": format_int(retention_history_all['rows_deleted']),
+        "retention_history_all_size": format_size(retention_history_all["bytes_freed"]),
         "by_retention": by_retention,
         "retention_preview_generated_at": (
             f"{format_timestamp(retention_overview['generated_at'], TZ)} "
@@ -1282,8 +1323,18 @@ def _settings_notices_context() -> dict:
             ),
         }
         for entry in notices_mod.list_muted_notices(index)
+        # Tipps nutzen ihr eigenes Ausblenden (hide_tip_today), nicht das
+        # allgemeine Stummschalt-System — ein hier trotzdem noch
+        # vorhandener "tips."-Eintrag wäre nur ein Überbleibsel aus der Zeit
+        # vor dieser Trennung und soll auch dann nicht mehr auftauchen.
+        if not entry["id"].startswith("tips.")
     ]
-    return {"muted_notices": muted}
+    return {
+        "muted_notices": muted,
+        "tips_enabled": "1" if notices_mod.tips_enabled(index) else "0",
+        "tips_on_off_options": list(_ON_OFF_LABELS.items()),
+        "tips_list": notices_mod.list_tips_with_status(index, TZ),
+    }
 
 
 @app.get("/settings", response_class=HTMLResponse)
@@ -1301,10 +1352,6 @@ def settings_view(request: Request) -> HTMLResponse:
             **_settings_verbindung_context(),
             **_settings_darstellung_context(),
             **_settings_archivierung_context(),
-            **_settings_rotation_context(),
-            **_settings_storage_index_context(),
-            **_settings_purge_context(),
-            **_settings_retention_context(),
             **_debug_tools_context(),
             **_settings_notices_context(),
             **_settings_background_processes_context(),
@@ -1314,21 +1361,32 @@ def settings_view(request: Request) -> HTMLResponse:
 
 @app.post("/notices/{notice_id}/mute")
 async def mute_notice_route(request: Request, notice_id: str) -> dict:
-    """Stummschaltung nur für info/warn — main.py vertraut dabei nicht dem
-    Client, sondern schlägt Titel/Text/Severity server-seitig in den gerade
-    aktiven Meldungen nach (build_notices()), bevor irgendwas gespeichert
-    wird. Ein Fehler (severity "error") lässt sich so nie stumm schalten,
-    selbst bei einem manipulierten Request. Die Dauer kommt aus einer festen
-    Preset-Liste (SNOOZE_PRESETS) statt einem frei wählbaren Datum —
-    "forever" (None) eingeschlossen, bleibt trotzdem sicher, siehe
-    Kommentar dort (Fingerprint statt Ablaufdatum)."""
+    """Stummschaltung nur für als "mutable" markierte Meldungen — main.py
+    vertraut dabei nicht dem Client, sondern schlägt Titel/Text/Severity
+    server-seitig in den gerade aktiven Meldungen nach (build_notices()),
+    bevor irgendwas gespeichert wird. Prüft notice["mutable"] statt die
+    Severity erneut gegen MUTABLE_SEVERITIES zu spiegeln: ein Fehler
+    (severity "error") lässt sich so nie stumm schalten, selbst bei einem
+    manipulierten Request — UND ein Tipp (severity "info", aber explizit
+    mutable=False, siehe notices._current_tip_notice) landet nicht versehentlich
+    im allgemeinen Stummschalt-System, obwohl seine Severity das erlauben
+    würde. Tipps haben ihr eigenes Ausblenden (settings_tips_hide()). Die
+    Dauer kommt aus einer festen Preset-Liste (SNOOZE_PRESETS) statt einem
+    frei wählbaren Datum — "forever" (None) eingeschlossen, bleibt trotzdem
+    sicher, siehe Kommentar dort (Fingerprint statt Ablaufdatum)."""
     notice = next(
-        (n for n in notices_mod.build_notices(index, DATA_DIR / "index.sqlite") if n["id"] == notice_id),
+        (
+            n for n in notices_mod.build_notices(
+                index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
+                _storage_reconcile_last, _count_stale_entities(),
+            )
+            if n["id"] == notice_id
+        ),
         None,
     )
     if notice is None:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden oder nicht mehr aktiv")
-    if notice["severity"] not in notices_mod.MUTABLE_SEVERITIES:
+    if not notice["mutable"]:
         raise HTTPException(status_code=400, detail="Diese Meldung lässt sich nicht stumm schalten")
     form = await request.form()
     duration = form.get("duration")
@@ -1337,7 +1395,10 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     seconds = notices_mod.SNOOZE_PRESETS[duration]
     until = time.time() + seconds if seconds is not None else None
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
-    remaining = collect_notices(index, DATA_DIR / "index.sqlite")
+    remaining = collect_notices(
+        index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
+        _storage_reconcile_last, _count_stale_entities(),
+    )
     return {"success": True, "remaining_count": len(remaining)}
 
 
@@ -1345,6 +1406,62 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
 def unmute_notice_route(notice_id: str) -> dict:
     notices_mod.unmute_notice(index, notice_id)
     return {"success": True}
+
+
+@app.get("/notices/panel", response_class=HTMLResponse)
+def notices_panel(request: Request) -> HTMLResponse:
+    """Frischer Inhalt für #notice-panel-body (Glocken-Menü) — von
+    refreshNoticePanel() nach dem Zurückholen einer stummgeschalteten Meldung
+    auf der Einstellungen-Seite abgerufen (_topnav.html), damit das Panel
+    nicht bis zum nächsten vollständigen Seitenaufruf veraltet bleibt.
+    _notices_context läuft zwar als globaler context_processor mit, aber nur
+    für ganze TemplateResponses — hier explizit erneut aufgerufen, weil diese
+    Route ganz bewusst nur das kleine Partial zurückgibt."""
+    return templates.TemplateResponse(request, "_notice_panel_body.html", _notices_context(request))
+
+
+@app.get("/settings/muted-notices", response_class=HTMLResponse)
+def settings_muted_notices(request: Request) -> HTMLResponse:
+    """Frischer Inhalt für #muted-notices-body (Einstellungen · Meldungen) —
+    von refreshMutedNotices() nach dem Stummschalten einer Meldung im
+    Glocken-Menü abgerufen (_topnav.html), Gegenstück zu notices_panel()."""
+    return templates.TemplateResponse(request, "_muted_notices_body.html", _settings_notices_context())
+
+
+@app.post("/settings/tips-enabled", response_class=HTMLResponse)
+async def settings_tips_enabled(request: Request) -> HTMLResponse:
+    """Globaler Schalter für den rotierenden Tipp im Meldungs-Center (siehe
+    notices.tips_enabled/_current_tip_notice) — ausgeschaltet erscheint gar
+    kein Tipp mehr, unabhängig vom Rotationsstand oder einem einzeln
+    ausgeblendeten Tipp."""
+    form = await request.form()
+    enabled = form.get("tips_enabled")
+    if enabled not in _ON_OFF_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültiger Wert")
+    notices_mod.set_tips_enabled(index, enabled == "1")
+    return templates.TemplateResponse(request, "_settings_tips_form.html", _settings_notices_context())
+
+
+@app.post("/settings/tips/hide", response_class=HTMLResponse)
+async def settings_tips_hide(request: Request) -> HTMLResponse:
+    """Blendet den HEUTE fälligen Tipp für den Rest des Tages aus (siehe
+    notices.hide_tip_today) — vertraut dem übergebenen slug nicht blind,
+    sondern lehnt ab, falls er nicht (mehr) dem tatsächlich heute fälligen
+    Tipp entspricht (z. B. ein Klick aus einem seit Mitternacht offenen,
+    veralteten Dialog)."""
+    form = await request.form()
+    slug = form.get("slug")
+    today_tip, ordinal = notices_mod.resolve_today_tip(TZ)
+    if slug != today_tip["slug"]:
+        raise HTTPException(status_code=400, detail="Nur der heute fällige Tipp lässt sich ausblenden")
+    notices_mod.hide_tip_today(index, slug, ordinal)
+    return templates.TemplateResponse(request, "_tips_list_body.html", _settings_notices_context())
+
+
+@app.post("/settings/tips/unhide", response_class=HTMLResponse)
+def settings_tips_unhide(request: Request) -> HTMLResponse:
+    notices_mod.unhide_tip_today(index)
+    return templates.TemplateResponse(request, "_tips_list_body.html", _settings_notices_context())
 
 
 @app.get("/settings/ram", response_class=HTMLResponse)
@@ -1608,26 +1725,40 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
 
 @app.post("/settings/archivierung", response_class=HTMLResponse)
 async def settings_archivierung(request: Request) -> HTMLResponse:
-    """Speichert die globalen Auflösungs-/Aufbewahrungs-Standardwerte für neu
-    erkannte Entitäten (Einstellungen-Bereich, Konzept Abschnitt 03) — wirkt
-    nur auf Entitäten, die AB JETZT zum ersten Mal einen Wert senden; bereits
-    archivierte Entitäten behalten ihre individuelle Einstellung aus der
-    jeweiligen Konfigurationsseite unverändert (Index.get_or_create_entity()
-    greift nur beim Neuanlegen auf diese Standardwerte zu)."""
+    """Speichert die globalen Standardwerte für neu erkannte Entitäten
+    (Einstellungen-Bereich, Konzept Abschnitt 03) — wirkt nur auf Entitäten,
+    die AB JETZT zum ersten Mal einen Wert senden; bereits archivierte
+    Entitäten behalten ihre individuelle Einstellung aus der jeweiligen
+    Konfigurationsseite unverändert (Index.get_or_create_entity() greift nur
+    beim Neuanlegen auf diese Standardwerte zu)."""
     form = await request.form()
-    resolution = form.get("default_resolution")
-    retention = form.get("default_retention")
-    if resolution is not None and resolution not in RESOLUTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Auflösung")
-    if retention is not None and retention not in RETENTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Aufbewahrung")
-    if resolution is not None:
-        index.set_setting("default_resolution", str(resolution))
-    if retention is not None:
-        index.set_setting("default_retention", str(retention))
-    return templates.TemplateResponse(
-        request, "_settings_archivierung_form.html", _settings_archivierung_context(saved=True)
-    )
+    fields = {
+        "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, "Ungültige Auflösung"),
+        "default_retention": (form.get("default_retention"), RETENTION_LABELS, "Ungültige Aufbewahrung"),
+        "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, "Ungültige Nachkommastellen"),
+        "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, "Ungültiger Wertänderungsfilter"),
+        "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, "Ungültige Lücken-Erkennung"),
+        "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, "Ungültige Ausreißer-Erkennung"),
+    }
+    for key, (value, labels, error) in fields.items():
+        if value is not None and value not in labels:
+            raise HTTPException(status_code=400, detail=error)
+    for key, (value, _labels, _error) in fields.items():
+        if value is not None:
+            index.set_setting(key, str(value))
+    # Dieselbe Kopplung wie bei der einzelnen Entität (update_entity_config)
+    # — nur wenn der Standard-Filter in DIESEM Request aktiviert wird, nicht
+    # bei jedem Speichern, solange er schon aktiv ist.
+    gap_threshold_auto_adjusted = False
+    default_value_filter = fields["default_value_filter"][0]
+    if default_value_filter == "decimals":
+        current_gap = index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
+        if _should_raise_gap_threshold_for_value_filter(current_gap):
+            index.set_setting("default_gap_threshold", _VALUE_FILTER_GAP_FLOOR_MINUTES)
+            gap_threshold_auto_adjusted = True
+    context = _settings_archivierung_context(saved=True)
+    context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
+    return templates.TemplateResponse(request, "_settings_archivierung_form.html", context)
 
 
 @app.post("/settings/rotation", response_class=HTMLResponse)
@@ -2009,7 +2140,7 @@ def _background_storage_reconciliation() -> None:
 
 
 def _refresh_duplicate_snapshot_if_stale() -> None:
-    """Berechnet die Duplikat-Zählung für /statistik höchstens einmal pro
+    """Berechnet die Duplikat-Zählung für /housekeeping höchstens einmal pro
     Stunde im Hintergrund (ZP-002 in PERFORMANCE.md) — dieselbe teure
     Rohdaten-Prüfung wie zuvor, aber nicht mehr bei jedem Seitenaufruf."""
     if not index.is_duplicate_snapshot_stale():
@@ -2603,6 +2734,26 @@ def _ingestion_rate_per_second(snapshots: list[dict], window_seconds: float) -> 
     return max(0.0, (latest["total_rows"] - baseline["total_rows"]) / elapsed)
 
 
+def _duplicate_rows_for_display() -> tuple[list[dict], list[dict], str]:
+    """Liest den gecachten globalen Duplikat-Schnappschuss (siehe
+    _refresh_duplicate_snapshot_if_stale, stündlich, 30-Tage-Fenster über alle
+    Entitäten) und bereitet ihn für die Anzeige im Housekeeping-Bereich auf —
+    eigene Funktion statt Inline-Code in housekeeping_view(), damit die
+    Aufbereitung unabhängig von der Route testbar/lesbar bleibt."""
+    duplicate_rows = (index.get_duplicate_snapshot() or {}).get("rows", [])
+    duplicates_by_entity = [
+        {
+            "entity_id": row["entity_id"],
+            "friendly_name": row["friendly_name"],
+            "count": format_int(row['count']),
+            "count_raw": row["count"],
+        }
+        for row in duplicate_rows
+    ]
+    duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
+    return duplicate_rows, duplicates_by_entity, duplicates_total
+
+
 @app.get("/statistik", response_class=HTMLResponse)
 @_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
 def statistik_view(request: Request) -> HTMLResponse:
@@ -2635,26 +2786,10 @@ def statistik_view(request: Request) -> HTMLResponse:
         }
         for row in index.get_stats_by_resolution()
     ]
-    retention_overview = _load_retention_overview()
     snapshots = index.get_stats_snapshots(time.time() - 30 * 86400)
     growth_points = [
         {"ts": s["ts"], "total_rows": s["total_rows"], "total_size_bytes": s["total_size_bytes"]}
         for s in snapshots
-    ]
-    # Aus dem stündlichen Wartungsplaner-Snapshot gelesen statt live berechnet
-    # (ZP-002 in PERFORMANCE.md) — vor dem allerersten Planer-Lauf nach einer
-    # frischen Installation ist der Cache noch leer, dann zeigt die Seite
-    # übergangsweise "keine Duplikate" statt die teure Prüfung synchron
-    # nachzuholen.
-    duplicate_rows = (index.get_duplicate_snapshot() or {}).get("rows", [])
-    duplicates_by_entity = [
-        {
-            "entity_id": row["entity_id"],
-            "friendly_name": row["friendly_name"],
-            "count": format_int(row['count']),
-            "count_raw": row["count"],
-        }
-        for row in duplicate_rows
     ]
     storage_breakdown_raw = _storage_breakdown()
     index_optimization = _index_optimization_state()
@@ -2679,10 +2814,6 @@ def statistik_view(request: Request) -> HTMLResponse:
         for row in storage_breakdown_raw
     ]
 
-    retention_totals = retention_overview.get("totals", {})
-    retention_history_30d = index.get_retention_job_totals(now.timestamp() - 30 * 86400)
-    retention_history_all = index.get_retention_job_totals(0.0)
-
     rate_per_hour = _ingestion_rate_per_second(growth_points, 24 * 3600)
     rate_per_day = _ingestion_rate_per_second(growth_points, 7 * 86400)
     dashboard_count = len(index.list_dashboards())
@@ -2703,21 +2834,117 @@ def statistik_view(request: Request) -> HTMLResponse:
             "events_per_day": format_int(round(rate_per_day * 86400)) if rate_per_day is not None else None,
             "by_type": by_type,
             "by_resolution": by_resolution,
-            "retention_due_rows": format_int(int(retention_totals.get('rows_deleted', 0) or 0)),
-            "retention_due_entities": int(retention_totals.get("entities_affected", 0) or 0),
-            "retention_due_months": int(retention_totals.get("months_deleted", 0) or 0),
-            "retention_due_size": format_size(int(retention_totals.get("bytes_freed", 0) or 0)),
-            "retention_history_30d_rows": format_int(retention_history_30d['rows_deleted']),
-            "retention_history_30d_size": format_size(retention_history_30d["bytes_freed"]),
-            "retention_history_all_rows": format_int(retention_history_all['rows_deleted']),
-            "retention_history_all_size": format_size(retention_history_all["bytes_freed"]),
             "growth_points": growth_points,
             "has_growth_history": len(growth_points) >= 2,
             "growth_range_options": _GROWTH_RANGE_OPTIONS,
-            "duplicates_by_entity": duplicates_by_entity,
-            "duplicates_total": format_int(sum(row['count'] for row in duplicate_rows)),
             "storage_breakdown": storage_breakdown,
             "storage_total_size": format_size(storage_total_bytes),
+        },
+    )
+
+
+_STALE_ENTITIES_DAY_OPTIONS = [("1", "1 Tag"), ("3", "3 Tage"), ("7", "7 Tage"), ("14", "14 Tage"), ("30", "30 Tage")]
+_STALE_ENTITIES_DEFAULT_DAYS = "3"
+
+
+def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> dict:
+    """Entitäten, deren letzter Wert (entities.last_ts, ohnehin vorhanden —
+    kein neuer Hintergrundjob nötig) länger als der gewählte Schwellwert
+    zurückliegt. Meist harmlos (Gerät im Standby, seltener Sensor), aber ein
+    früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte
+    HA-Entität. Nie empfangene Entitäten (last_ts NULL) erscheinen unabhängig
+    vom gewählten Schwellwert immer — für sie gibt es kein sinnvolles "seit
+    wann", das sich unter- oder überschreiten ließe."""
+    if days not in dict(_STALE_ENTITIES_DAY_OPTIONS):
+        days = _STALE_ENTITIES_DEFAULT_DAYS
+    threshold_seconds = int(days) * 86400
+    now_ts = time.time()
+    rows = []
+    for entity in index.list_entities():
+        last_ts = entity["last_ts"]
+        if last_ts is None:
+            days_ago = None
+        else:
+            age_seconds = now_ts - last_ts
+            if age_seconds < threshold_seconds:
+                continue
+            days_ago = age_seconds / 86400
+        has_name = bool(entity["custom_name"] or entity["friendly_name"])
+        rows.append({
+            "entity_id": entity["entity_id"],
+            "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
+            "has_name": has_name,
+            "last_value_label": (
+                datetime.fromtimestamp(last_ts, TZ).strftime("%d.%m.%Y, %H:%M") if last_ts is not None else "Nie empfangen"
+            ),
+            # 10**6 Tage statt float('inf') — sortiert serverseitig genauso
+            # zuverlässig an die Spitze, ist aber über data-sort auch für
+            # sortable-table.js' parseFloat() im Client ein gültiger Wert
+            # ("inf" wird dort zu NaN).
+            "days_ago_raw": days_ago if days_ago is not None else 10**6,
+            "days_ago_label": f"{format_value(days_ago, 1)} Tage" if days_ago is not None else "—",
+            "row_count": format_int(entity["row_count"]),
+            "row_count_raw": entity["row_count"],
+        })
+    rows.sort(key=lambda r: r["days_ago_raw"], reverse=True)
+    return {
+        "stale_entities": rows,
+        "stale_entities_days": days,
+        "stale_entities_day_options": _STALE_ENTITIES_DAY_OPTIONS,
+    }
+
+
+@app.get("/housekeeping/stale-entities", response_class=HTMLResponse)
+def housekeeping_stale_entities(request: Request, days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> HTMLResponse:
+    """Von refreshStaleEntities() bzw. dem hx-trigger="change" auf
+    #stale-entities-form (housekeeping.html) abgerufen, wenn der Schwellwert
+    im Dropdown geändert wird — rendert nur die Tabelle neu, nicht die ganze
+    Seite."""
+    return templates.TemplateResponse(request, "_stale_entities_body.html", _stale_entities_context(days))
+
+
+@app.get("/housekeeping", response_class=HTMLResponse)
+@_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
+def housekeeping_view(request: Request) -> HTMLResponse:
+    """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
+    sucht: ungenutzte Charts/Tabellen (kein Dashboard-Pin), Entitäten mit
+    erkannten Duplikaten (bestehender globaler Schnappschuss, siehe
+    _duplicate_rows_for_display) und Entitäten ohne neue Werte. Wiederholungen
+    sind bewusst noch nicht enthalten (siehe Diskussion zu Schwellwert/
+    Kalibrierung)."""
+    aggregation_types = {
+        row["entity_id"]: row["aggregation_type"] for row in index.list_entities()
+    }
+    unused_charts = [
+        {
+            "id": c["id"],
+            "name": c["name"],
+            "entity_count": len(c["entity_ids"]),
+            "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
+            "type_label": _chart_type_label(c, aggregation_types),
+        }
+        for c in index.list_unused_saved_charts()
+    ]
+    unused_tables = [
+        {"id": t["id"], "name": t["name"], "row_count": t["row_count"], "column_count": t["column_count"]}
+        for t in index.list_unused_saved_tables()
+    ]
+    _, duplicates_by_entity, duplicates_total = _duplicate_rows_for_display()
+    return templates.TemplateResponse(
+        request,
+        "housekeeping.html",
+        {
+            "unused_charts": unused_charts,
+            "unused_tables": unused_tables,
+            "chart_count": index.count_saved_charts(),
+            "table_count": index.count_saved_tables(),
+            "duplicates_by_entity": duplicates_by_entity,
+            "duplicates_total": duplicates_total,
+            **_stale_entities_context(),
+            **_settings_storage_index_context(),
+            **_settings_purge_context(),
+            **_settings_retention_context(),
+            **_settings_rotation_context(),
         },
     )
 
@@ -3088,6 +3315,29 @@ def entities_table(
     )
 
 
+# Der Wertänderungsfilter überspringt unveränderte Werte, garantiert aber
+# spätestens alle VALUE_FILTER_HEARTBEAT_SECONDS ein Lebenszeichen (siehe
+# should_accept_value() in storage/index.py) — eine kürzere Lücken-Schwelle
+# würde dieses regelmäßige, harmlose Schweigen fälschlich als Lücke melden.
+# Aus der Sekunden-Konstante abgeleitet statt separat gepflegt, damit beide
+# nie auseinanderlaufen können.
+_VALUE_FILTER_GAP_FLOOR_MINUTES = str(VALUE_FILTER_HEARTBEAT_SECONDS // 60)
+
+
+def _should_raise_gap_threshold_for_value_filter(current_gap_threshold: str) -> bool:
+    """True, wenn `current_gap_threshold` enger als der Wertänderungsfilter-
+    Herzschlag ist UND nicht "off" — dann würde der Filter selbst regelmäßig
+    Fehlalarme auf der Bereinigungs-Seite auslösen. Nur ein Vorschlag/Guard
+    beim AKTIVIEREN des Filters (siehe update_entity_config/
+    settings_archivierung), keine dauerhafte Sperre — danach lässt sich die
+    Lücken-Erkennung jederzeit wieder manuell verkleinern."""
+    return (
+        current_gap_threshold != "off"
+        and current_gap_threshold.isdigit()
+        and int(current_gap_threshold) < int(_VALUE_FILTER_GAP_FLOOR_MINUTES)
+    )
+
+
 def _entity_config_context(entity) -> dict:
     """Gemeinsamer Kontext für die volle Konfigurationsseite (GET) und das per
     htmx nachgeladene/gespeicherte Formular-Fragment (POST) — beide zeigen
@@ -3206,9 +3456,20 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
             )
             if retention is not None:
                 _invalidate_retention_overview()
+            # Nur auslösen, wenn der Filter in DIESEM Request aktiviert wird
+            # (nicht bei jedem Speichern, solange er schon aktiv ist) — sonst
+            # würde ein späteres, bewusstes Verkleinern der Lücken-Erkennung
+            # bei der nächsten Gelegenheit einfach wieder zurückgedreht.
+            gap_threshold_auto_adjusted = False
+            if value_filter == "decimals":
+                current_gap = _require_entity(entity_id)["gap_threshold"]
+                if _should_raise_gap_threshold_for_value_filter(current_gap):
+                    index.set_config(entity_id, gap_threshold=_VALUE_FILTER_GAP_FLOOR_MINUTES)
+                    gap_threshold_auto_adjusted = True
             entity = _require_entity(entity_id)
             context = _entity_config_context(entity)
             context["saved"] = True
+            context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
             return templates.TemplateResponse(request, "_entity_config_form.html", context)
 
     return await run_in_threadpool(update_locked)
@@ -4905,7 +5166,10 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
             cleanup.soft_delete(index, entity_id, timestamps)
             return _rows_fragment(request, entity_id, filter_, range_key, offset, page, page_size, mode)
 
-    return await run_in_threadpool(delete_locked)
+    result = await run_in_threadpool(delete_locked)
+    if timestamps:
+        _invalidate_purge_preview()
+    return result
 
 
 class _AddValueBody(BaseModel):
@@ -5147,7 +5411,10 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
 
+    marked_any = False
+
     def delete_locked() -> HTMLResponse:
+        nonlocal marked_any
         with storage_coordinator.entity(entity_id):
             rows = cleanup.iter_raw_rows(
                 DATA_DIR, index, entity_id,
@@ -5159,14 +5426,19 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
                 batch.append(ts)
                 if len(batch) >= 10_000:
                     index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                    marked_any = True
                     batch = []
             if batch:
                 index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                marked_any = True
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode
             )
 
-    return await run_in_threadpool(delete_locked)
+    result = await run_in_threadpool(delete_locked)
+    if marked_any:
+        _invalidate_purge_preview()
+    return result
 
 
 # Symcon-/CSV-/Home-Assistant-Import (Upload, Scan, Dry-Run/Start, /import

@@ -23,12 +23,13 @@
 {% set nav_charts = _rel.startswith('/charts') %}
 {% set nav_tables = _rel.startswith('/tables') %}
 {% set nav_statistik = _rel.startswith('/statistik') %}
+{% set nav_housekeeping = _rel.startswith('/housekeeping') %}
 {% set nav_import = _rel.startswith('/import') %}
 {% set nav_export = _rel.startswith('/export') %}
 {% set nav_backup = _rel.startswith('/backup') %}
 {% set nav_logs = _rel.startswith('/logs') %}
 {% set nav_settings = _rel.startswith('/settings') %}
-{% set nav_system = nav_statistik or nav_import or nav_export or nav_backup or nav_logs or nav_settings %}
+{% set nav_system = nav_statistik or nav_housekeeping or nav_import or nav_export or nav_backup or nav_logs or nav_settings %}
 
 {% macro nav_icon(name) -%}
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="topnav-icon" aria-hidden="true">{%- if name == 'home' -%}
@@ -45,6 +46,8 @@
 <line x1="6" y1="5" x2="6" y2="19"/><circle cx="6" cy="9" r="2"/><line x1="12" y1="5" x2="12" y2="19"/><circle cx="12" cy="15" r="2"/><line x1="18" y1="5" x2="18" y2="19"/><circle cx="18" cy="8" r="2"/>
 {%- elif name == 'statistik' -%}
 <line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/>
+{%- elif name == 'housekeeping' -%}
+<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1z"/><polyline points="8.5,12 10.5,14 15.5,9.5"/>
 {%- elif name == 'import' -%}
 <polyline points="7,11 12,16 17,11"/><line x1="12" y1="4" x2="12" y2="16"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>
 {%- elif name == 'export' -%}
@@ -113,6 +116,7 @@
         </button>
         <div class="topnav-menu" x-show="systemOpen" x-cloak @click="systemOpen = false">
           <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ nav_icon('statistik') }}Statistik</a>
+          <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">{{ nav_icon('housekeeping') }}Housekeeping</a>
           <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ nav_icon('import') }}Import</a>
           <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ nav_icon('export') }}Export</a>
           <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ nav_icon('backup') }}Backup / Restore</a>
@@ -137,51 +141,8 @@
         {% if notices %}<span class="notice-badge">{{ notices | length if notices | length <= 9 else '9+' }}</span>{% endif %}
       </button>
       <div class="notice-panel" x-show="noticesOpen" x-cloak>
-        <div class="notice-panel-head">
-          <h3><a class="notice-panel-title-link" href="{{ app_root }}/settings#meldungen">Meldungen</a></h3>
-          <span>{{ notices | length ~ ' offen' if notices else 'Alles erledigt' }}</span>
-        </div>
-        <ul class="notice-list"{% if not notices %} hidden{% endif %}>
-          {% for notice in notices %}
-          <li class="notice-row" data-notice-id="{{ notice.id }}">
-            <a class="notice-row-link" href="{{ app_root }}{{ notice.link }}">
-              <span class="notice-dot {{ notice.severity }}"></span>
-              <span class="notice-body">
-                <span class="notice-row-title">{{ notice.title }}</span>
-                <span class="notice-row-detail">{{ notice.detail }}</span>
-                <span class="notice-row-meta">{{ notice.meta }}</span>
-              </span>
-              <svg class="notice-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9,6 15,12 9,18"/></svg>
-            </a>
-            {% if notice.mutable %}
-            <button type="button" class="notice-mute-btn" data-tooltip="Stumm schalten"
-                    aria-label="Stumm schalten" onclick="toggleSnoozeOptions(event)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            </button>
-            {# Ersetzt Link+Mute-Button INNERHALB derselben Zeile (siehe
-               is-snoozing-Klasse auf .notice-row), statt eines zusätzlichen
-               schwebenden Popovers — .notice-list hat overflow-y:auto und
-               würde ein frei positioniertes Popover genauso abschneiden wie
-               vorher schon den Tooltip (siehe :has()-Fix weiter oben in
-               app.css). Inline vermeidet das Problem von vornherein. #}
-            <div class="notice-snooze-options" hidden>
-              <span class="notice-snooze-label">Stumm schalten für</span>
-              <span class="notice-snooze-buttons">
-                {% for key in ['1h', '1d', '7d', '30d', 'forever'] %}
-                <button type="button" data-duration="{{ key }}" onclick="muteNotice(event)">{{ snooze_labels[key] }}</button>
-                {% endfor %}
-              </span>
-              <button type="button" class="notice-snooze-cancel" aria-label="Abbrechen" onclick="toggleSnoozeOptions(event)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
-              </button>
-            </div>
-            {% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        <div class="notice-empty"{% if notices %} hidden{% endif %}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <div>Keine offenen Meldungen.</div>
+        <div id="notice-panel-body">
+          {% include "_notice_panel_body.html" %}
         </div>
       </div>
     </div>
@@ -200,12 +161,6 @@
         if (options) options.hidden = !opening;
       }
 
-      // Mute-Aktion aktualisiert nur den DOM direkt (Badge/Zähler/Zeile),
-      // statt das ganze Meldungs-Fragment per htmx neu zu rendern — das
-      // Panel hängt an Alpines noticesOpen (siehe x-data oben), ein
-      // outerHTML-Swap würde diese Bindung ohne zusätzlichen
-      // Alpine.initTree()-Aufruf verlieren. Gleiches Muster wie
-      // toggleFavorite() in favorite-toggle.js.
       async function muteNotice(evt) {
         evt.preventDefault();
         evt.stopPropagation();
@@ -217,21 +172,94 @@
           const body = new URLSearchParams({duration});
           const res = await fetch('{{ app_root }}/notices/' + encodeURIComponent(noticeId) + '/mute', {method: 'POST', body});
           if (!res.ok) return;
-          const data = await res.json();
-          if (li) li.remove();
-          document.querySelectorAll('.notice-badge').forEach((badge) => {
-            if (data.remaining_count > 0) badge.textContent = data.remaining_count > 9 ? '9+' : String(data.remaining_count);
-            else badge.remove();
-          });
-          document.querySelectorAll('.notice-panel-head span').forEach((el) => {
-            el.textContent = data.remaining_count > 0 ? data.remaining_count + ' offen' : 'Alles erledigt';
-          });
-          if (data.remaining_count === 0) {
-            document.querySelectorAll('.notice-list').forEach((el) => { el.hidden = true; });
-            document.querySelectorAll('.notice-empty').forEach((el) => { el.hidden = false; });
-          }
+          // Kompletter Panel-Refresh statt der Zeile nur zu entfernen —
+          // aktualisiert Kopfzeile ("X offen") und Badge in einem Rutsch,
+          // statt beides separat von Hand nachzuziehen.
+          await refreshNoticePanel();
+          // Die stummgeschaltete Meldung taucht ggf. gleichzeitig in der
+          // "Meldungen"-Sektion der Einstellungen auf (#muted-notices-body,
+          // nur vorhanden, wenn diese Seite gerade offen ist) — ohne diesen
+          // Refresh blieb sie dort bis zum manuellen Neuladen unsichtbar,
+          // obwohl das Glocken-Menü direkt daneben schon aktualisiert war.
+          refreshMutedNotices();
         } catch (e) {
           // Netzwerkfehler: Zeile bleibt stehen, kein stiller falscher Erfolg.
+        }
+      }
+
+      // Tipp-Zeilen haben einen eigenen Ausblenden-Button statt des
+      // allgemeinen Stummschalt-Menüs (siehe _notice_panel_body.html) — ein
+      // Klick blendet den heutigen Tipp direkt aus, ohne Dauer-Auswahl.
+      async function hideTipNotice(evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const li = evt.currentTarget.closest('.notice-row');
+        const noticeId = li ? li.dataset.noticeId : null;
+        if (!noticeId || !noticeId.startsWith('tips.')) return;
+        const slug = noticeId.slice('tips.'.length);
+        try {
+          const body = new URLSearchParams({slug});
+          const res = await fetch('{{ app_root }}/settings/tips/hide', {method: 'POST', body});
+          if (!res.ok) return;
+          await refreshNoticePanel();
+        } catch (e) {
+          // Netzwerkfehler: Zeile bleibt stehen, kein stiller falscher Erfolg.
+        }
+      }
+
+      // Von muteNotice() (oben) UND von unmuteNotice() (settings.html,
+      // #muted-notices-body) genutzt, um das Glocken-Menü auf den aktuellen
+      // Stand zu bringen. Beide Panels rendern serverseitig aus demselben
+      // Partial (_notice_panel_body.html), ein kompletter Refresh ist hier
+      // deshalb einfacher und robuster als ein manuell nachgebautes
+      // Einfügen/Entfernen einzelner Zeilen samt aller Felder (Titel/Text/
+      // Meta/Link/Severity) im Client.
+      async function refreshNoticePanel() {
+        try {
+          const res = await fetch('{{ app_root }}/notices/panel');
+          if (!res.ok) return;
+          const body = document.getElementById('notice-panel-body');
+          if (!body) return;
+          body.innerHTML = await res.text();
+          // Der externe Badge auf dem Glocken-Button liegt AUSSERHALB dieses
+          // Fragments (siehe notice-btn weiter oben) — Zeilenzahl im frisch
+          // eingesetzten Markup zählen statt eine zweite Zählung vom Server
+          // zu holen.
+          const count = body.querySelectorAll('.notice-row').length;
+          const existingBadge = document.querySelector('.notice-badge');
+          if (count === 0) {
+            if (existingBadge) existingBadge.remove();
+          } else if (existingBadge) {
+            existingBadge.textContent = count > 9 ? '9+' : String(count);
+          } else {
+            // War die Liste beim ursprünglichen Seitenaufruf leer, gibt es
+            // noch keinen Badge-Knoten (nur gerendert, wenn beim Laden schon
+            // Meldungen vorlagen) — jetzt aber (z. B. durch einen frisch
+            // rotierten Tipp) wieder eine Meldung.
+            const btn = document.querySelector('.notice-btn');
+            if (btn) {
+              const span = document.createElement('span');
+              span.className = 'notice-badge';
+              span.textContent = count > 9 ? '9+' : String(count);
+              btn.appendChild(span);
+            }
+          }
+        } catch (e) {
+          // Netzwerkfehler: Panel bleibt auf dem letzten Stand.
+        }
+      }
+
+      // No-op, wenn die Einstellungen-Seite (mit der "Meldungen"-Sektion)
+      // gerade nicht offen ist — #muted-notices-body existiert dann schlicht
+      // nicht im DOM.
+      async function refreshMutedNotices() {
+        const container = document.getElementById('muted-notices-body');
+        if (!container) return;
+        try {
+          const res = await fetch('{{ app_root }}/settings/muted-notices');
+          if (res.ok) container.innerHTML = await res.text();
+        } catch (e) {
+          // Netzwerkfehler: Liste bleibt auf dem letzten Stand.
         }
       }
     </script>
@@ -272,6 +300,7 @@
       </button>
       <div class="topnav-drawer-sub" x-show="drawerSystemOpen">
         <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">Statistik</a>
+        <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">Housekeeping</a>
         <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">Import</a>
         <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">Export</a>
         <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">Backup / Restore</a>

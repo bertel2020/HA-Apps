@@ -22,6 +22,15 @@ COUNTER_STATE_CLASSES = {"total", "total_increasing"}
 
 DEFAULT_RESOLUTION = "raw"
 DEFAULT_RETENTION = "unlimited"
+# Fallback, solange kein "default_*"-Setting existiert (Einstellungen →
+# Archivierung → Standards) — dieselbe Konvention wie DEFAULT_RESOLUTION/
+# DEFAULT_RETENTION oben. Betrifft nur neu erkannte Entitäten, siehe
+# INSERT INTO entities unten; bereits registrierte behalten ihre
+# individuelle Einstellung aus der jeweiligen Konfigurationsseite.
+DEFAULT_DECIMALS = "auto"
+DEFAULT_VALUE_FILTER = "decimals"
+DEFAULT_GAP_THRESHOLD = "15"
+DEFAULT_OUTLIER_THRESHOLD = "25"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 
 _RESOLUTION_SECONDS = {
@@ -920,28 +929,38 @@ class Index:
                 return aggregation_type
 
             # Globale Standardwerte kommen aus der settings-Tabelle (Einstellungen-
-            # Bereich, "Archivierung") statt der Modulkonstante — self.get_setting()
+            # Bereich, "Archivierung") statt den Modulkonstanten — self.get_setting()
             # kann hier nicht aufgerufen werden, self._lock ist nicht reentrant.
-            default_resolution_row = self._conn.execute(
-                "SELECT value FROM settings WHERE key = 'default_resolution'"
-            ).fetchone()
-            default_retention_row = self._conn.execute(
-                "SELECT value FROM settings WHERE key = 'default_retention'"
-            ).fetchone()
-            resolution = default_resolution_row["value"] if default_resolution_row else DEFAULT_RESOLUTION
-            retention = default_retention_row["value"] if default_retention_row else DEFAULT_RETENTION
+            default_rows = dict(
+                self._conn.execute(
+                    "SELECT key, value FROM settings WHERE key IN "
+                    "('default_resolution', 'default_retention', 'default_decimals', "
+                    "'default_value_filter', 'default_gap_threshold', 'default_outlier_threshold')"
+                ).fetchall()
+            )
+            resolution = default_rows.get("default_resolution", DEFAULT_RESOLUTION)
+            retention = default_rows.get("default_retention", DEFAULT_RETENTION)
+            decimals = default_rows.get("default_decimals", DEFAULT_DECIMALS)
+            value_filter = default_rows.get("default_value_filter", DEFAULT_VALUE_FILTER)
+            gap_threshold = default_rows.get("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
+            outlier_threshold = default_rows.get("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD)
             self._conn.execute(
                 """
                 INSERT INTO entities
-                    (entity_id, aggregation_type, resolution, retention,
+                    (entity_id, aggregation_type, resolution, retention, decimals, value_filter,
+                     gap_threshold, outlier_threshold,
                      unit, state_class, friendly_name, row_count, size_bytes, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
                 """,
                 (
                     entity_id,
                     aggregation_type,
                     resolution,
                     retention,
+                    decimals,
+                    value_filter,
+                    gap_threshold,
+                    outlier_threshold,
                     unit,
                     state_class,
                     friendly_name,
@@ -1616,6 +1635,19 @@ class Index:
         with self._lock, self._conn:
             return self._conn.execute("SELECT COUNT(*) FROM saved_charts").fetchone()[0]
 
+    def list_unused_saved_charts(self) -> list[dict]:
+        """Gespeicherte Charts, die auf KEINEM Dashboard angeheftet sind — für
+        den Housekeeping-Bereich. dashboard_pins ist typübergreifend
+        (item_type/item_id, siehe list_item_dashboards()), ein NOT IN über alle
+        Pins genügt deshalb, statt je Dashboard einzeln zu prüfen."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT * FROM saved_charts WHERE id NOT IN "
+                "(SELECT item_id FROM dashboard_pins WHERE item_type = 'chart') "
+                "ORDER BY is_favorite DESC, created_at DESC"
+            ).fetchall()
+            return [self._row_to_saved_chart(row) for row in rows]
+
     def get_saved_chart(self, chart_id: int) -> dict | None:
         with self._lock, self._conn:
             row = self._conn.execute("SELECT * FROM saved_charts WHERE id = ?", (chart_id,)).fetchone()
@@ -2171,6 +2203,19 @@ class Index:
     def count_saved_tables(self) -> int:
         with self._lock, self._conn:
             return self._conn.execute("SELECT COUNT(*) FROM saved_tables").fetchone()[0]
+
+    def list_unused_saved_tables(self) -> list[dict]:
+        """Analogon zu list_unused_saved_charts() für Vergleichstabellen."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                """SELECT t.*,
+                          (SELECT COUNT(*) FROM table_columns c WHERE c.table_id = t.id) AS column_count,
+                          (SELECT COUNT(*) FROM table_rows r WHERE r.table_id = t.id) AS row_count
+                   FROM saved_tables t
+                   WHERE t.id NOT IN (SELECT item_id FROM dashboard_pins WHERE item_type = 'table')
+                   ORDER BY t.is_favorite DESC, t.created_at DESC"""
+            ).fetchall()
+            return [dict(row) for row in rows]
 
     def set_table_favorite(self, table_id: int, favorite: bool) -> None:
         with self._lock, self._conn:

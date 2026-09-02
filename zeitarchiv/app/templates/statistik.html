@@ -81,17 +81,6 @@
   .stats-col-rows{width:26%;}
   .stats-col-size{width:22%;}
 
-  /* Erkannte Duplikate haben nur 2 Spalten (Entität +
-     Anzahl), sollen aber trotzdem bündig zu den 4-spaltigen Tabellen oben
-     wirken — die Wert-Spalte ("Datensätze"/"Duplikate") bekommt deshalb
-     dieselbe Breite/Position wie die Spalte "Größe" oben (32%+20%+26%=78%
-     davor, 22% Wert-Spalte), damit sie exakt unterhalb von "Größe" sitzt statt
-     unterhalb von "Datensätze" (Text ist überall linksbündig). */
-  .stats-col-entity{width:78%;}
-  .stats-col-value{width:22%;}
-  /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
-     Untertext auch dann bündig, wenn nur einzelne Titel umbrechen. */
-  .retention-summary .stat .label{min-height:3em;}
 </style>
 </head>
 <body>
@@ -204,64 +193,6 @@
         </tbody>
       </table>
     </div>
-
-    <h2>Aufbewahrung und endgültiges Löschen</h2>
-    <div class="stat-row retention-summary">
-      <div class="stat">
-        <div class="label">Aktuell durch Aufbewahrung fällig</div>
-        <div class="value">{{ retention_due_rows }}</div>
-        <div class="sub-value">{{ retention_due_entities }} Entitäten · {{ retention_due_months }} Monatsdateien</div>
-      </div>
-      <div class="stat">
-        <div class="label">Voraussichtlich freigebbar</div>
-        <div class="value">{{ retention_due_size }}</div>
-        <div class="sub-value">Archivdateien</div>
-      </div>
-      <div class="stat">
-        <div class="label">Letzte 30 Tage endgültig gelöscht</div>
-        <div class="value">{{ retention_history_30d_rows }}</div>
-        <div class="sub-value">{{ retention_history_30d_size }} freigegeben</div>
-      </div>
-      <div class="stat">
-        <div class="label">Insgesamt durch Aufbewahrung gelöscht</div>
-        <div class="value">{{ retention_history_all_rows }}</div>
-        <div class="sub-value">{{ retention_history_all_size }} freigegeben</div>
-      </div>
-    </div>
-
-    <h2>Erkannte Duplikate (letzte 30 Tage)</h2>
-    <div class="tbl-wrap">
-      {% if duplicates_by_entity %}
-      <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-        <colgroup>
-          <col class="stats-col-entity"><col class="stats-col-value">
-        </colgroup>
-        <thead><tr><th>Entität</th><th>Duplikate</th></tr></thead>
-        <tbody>
-        {% for row in duplicates_by_entity %}
-        <tr>
-          <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
-            <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
-              {% if row.friendly_name %}
-              <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
-              {% else %}
-              <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
-              {% endif %}
-              <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
-            </a>
-          </td>
-          <td data-sort="{{ row.count_raw }}">{{ row.count }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <div class="empty">Keine Duplikate in den letzten 30 Tagen gefunden.</div>
-      {% endif %}
-    </div>
-    {% if duplicates_by_entity %}
-    <p class="hint" style="margin-top:14px;">{{ duplicates_total }} doppelte Zeitstempel insgesamt in den letzten 30 Tagen &mdash; entfernbar über "Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite.</p>
-    {% endif %}
 
     <h2>Inhalte</h2>
     <div class="stat-row">

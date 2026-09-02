@@ -206,7 +206,7 @@ Fall dringend empfohlen.
 ## Demo-Daten neu erzeugen (`--clean`)
 
 `--clean` bereinigt vor dem Neuschreiben die Werte aller 41 `demo_*`-
-Entitäten — wie **Einstellungen → Speicherplatz** in der App, nur für alle
+Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben
 während des ganzen Laufs durchgehend im Index bestehen (nur die Werte werden
