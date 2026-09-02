@@ -179,40 +179,28 @@ Entität lässt sich als CSV exportieren.
 ## Screenshots
 
 <p align="center">
-  <picture>
+  <a href="docs/img/startseite-light.png"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/startseite-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/img/startseite-light.png">
-    <img src="docs/img/startseite-light.png" alt="Startseite mit Kennzahlen und Standard-Dashboard" width="100%">
-  </picture>
-  <br><sub>Startseite — Kennzahlen und frei bestückbares Standard-Dashboard</sub>
-</p>
-
-<p align="center">
-  <picture>
+    <img src="docs/img/startseite-light.png" alt="Startseite mit Kennzahlen und Standard-Dashboard" width="270">
+  </picture></a>
+  <a href="docs/img/energiedashboard-light.png"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/energiedashboard-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/img/energiedashboard-light.png">
-    <img src="docs/img/energiedashboard-light.png" alt="Energiedashboard: Sankey-Energiefluss über einen Monat" width="100%">
-  </picture>
-  <br><sub>Energiedashboard — Energiefluss als Sankey-Diagramm</sub>
+    <img src="docs/img/energiedashboard-light.png" alt="Energiedashboard: Sankey-Energiefluss über einen Monat" width="270">
+  </picture></a>
+  <a href="docs/img/entitaeten.png"><img src="docs/img/entitaeten.png" alt="Entitätenübersicht mit Suche und Filtern" width="270"></a>
+  <br><sub>Startseite &nbsp;·&nbsp; Energiedashboard &nbsp;·&nbsp; Entitätenübersicht</sub>
 </p>
 
 <p align="center">
-  <img src="docs/img/dashboard-energie.png" alt="Ein Dashboard mit Vergleichstabelle und Charts" width="49%">
-  <img src="docs/img/entitaeten.png" alt="Entitätenübersicht mit Suche und Filtern" width="49%">
-  <br><sub>Frei kombinierbares Dashboard &nbsp;·&nbsp; Entitätenübersicht</sub>
+  <a href="docs/img/tabelle.png"><img src="docs/img/tabelle.png" alt="Vergleichstabelle über mehrere Zeiträume" width="270"></a>
+  <a href="docs/img/meldungen.png"><img src="docs/img/meldungen.png" alt="Meldungs-Center in der Kopfzeile" width="270"></a>
+  <a href="docs/img/energiedashboard-scheme-ha.png"><img src="docs/img/energiedashboard-scheme-ha.png" alt="Farbschema Home Assistant" width="270"></a>
+  <br><sub>Vergleichstabelle &nbsp;·&nbsp; Meldungs-Center &nbsp;·&nbsp; Farbschema „Home Assistant"</sub>
 </p>
 
-<p align="center">
-  <img src="docs/img/entity-verlauf.png" alt="Verlaufsansicht einer einzelnen Entität" width="49%">
-  <img src="docs/img/tabelle.png" alt="Vergleichstabelle über mehrere Zeiträume" width="49%">
-  <br><sub>Entitäts-Verlauf &nbsp;·&nbsp; Vergleichstabelle über mehrere Zeiträume</sub>
-</p>
-
-<p align="center">
-  <img src="docs/img/statistik.png" alt="Statistik-Seite mit Wachstum über Zeit" width="49%">
-  <img src="docs/img/meldungen.png" alt="Meldungs-Center in der Kopfzeile" width="49%">
-  <br><sub>Statistik &nbsp;·&nbsp; Meldungs-Center</sub>
-</p>
+<p align="center"><sub>Passt sich automatisch Hell/Dunkel an (siehe Startseite/Energiedashboard oben); neben „Zeitarchiv" (Standard) und „Home Assistant" auch als „Modern" wählbar. Weitere Ansichten: <a href="docs/img">docs/img</a>.</sub></p>
 
 ## Speicherung und Aufbewahrung
 
