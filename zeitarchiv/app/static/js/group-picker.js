@@ -39,7 +39,17 @@ function groupPicker(groupsRef, initialValue, onSelectFn) {
     toggleOpen(searchInputEl) {
       this.open = !this.open;
       this.search = '';
-      if (this.open) this.$nextTick(() => searchInputEl && searchInputEl.focus());
+      // scrollIntoView zusätzlich zum Fokus — dasselbe Problem wie beim
+      // Entitäts-Picker (siehe entity-picker.js): in einem kleinen, selbst
+      // scrollbaren Popup kann das Feld nahe am unteren Rand liegen, das
+      // aufklappende Popover würde sonst über den sichtbaren Bereich
+      // hinausragen. block:'nearest' scrollt nur, wenn nötig.
+      if (this.open) this.$nextTick(() => {
+        if (!searchInputEl) return;
+        searchInputEl.focus();
+        const popover = searchInputEl.closest('.dd-picker-popover');
+        if (popover) popover.scrollIntoView({block: 'nearest'});
+      });
     },
     select(name) {
       this.value = name;

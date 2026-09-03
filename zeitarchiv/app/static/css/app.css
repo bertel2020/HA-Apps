@@ -1012,18 +1012,17 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 
 /* Eigenes Bestätigungs-Popup (confirm-dialog.js) statt window.confirm()/hx-confirm
    im Browser-Default-Look — ersetzt sowohl htmx:confirm als auch direkte
-   appConfirm()-Aufrufe (z. B. Chart löschen). */
+   appConfirm()-Aufrufe (z. B. Chart löschen). Natives <dialog> statt eines
+   reinen position:fixed-Overlays (siehe confirm-dialog.js) — dadurch landet
+   es im Top-Layer und liegt auch über bereits offenen anderen <dialog>-
+   Elementen, was mit einem einfachen z-index nicht zuverlässig ginge. */
 .confirm-overlay{
-  position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.4);
-  display:flex;align-items:center;justify-content:center;padding:20px;
-  opacity:0;pointer-events:none;transition:opacity .12s ease;
-}
-.confirm-overlay.open{opacity:1;pointer-events:auto;}
-.confirm-dialog{
-  background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  box-shadow:var(--shadow);padding:20px 22px;max-width:380px;width:100%;
+  width:min(380px, calc(100vw - 40px));
+  border:1px solid var(--border);border-radius:14px;background:var(--surface);
+  box-shadow:var(--shadow);padding:20px 22px;
   transform:translateY(4px) scale(.98);transition:transform .12s ease;
 }
-.confirm-overlay.open .confirm-dialog{transform:translateY(0) scale(1);}
+.confirm-overlay.open{transform:translateY(0) scale(1);}
+.confirm-overlay::backdrop{background:rgba(0,0,0,.4);}
 .confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}

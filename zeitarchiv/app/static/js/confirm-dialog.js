@@ -12,16 +12,23 @@
 (function () {
   let overlay = null;
 
+  // <dialog> statt eines reinen position:fixed-Divs: landet damit im
+  // Top-Layer des Browsers und erscheint zuverlässig ÜBER bereits offenen
+  // anderen <dialog>-Elementen (z. B. den Rollen-Kachel-Popups im
+  // Energiedashboard-Setup) — das kann ein reines z-index grundsätzlich
+  // NICHT leisten: der Top-Layer ignoriert z-index komplett und stapelt nur
+  // nach Öffnungsreihenfolge (zuletzt geöffnet = oben). role="alertdialog"
+  // bleibt auf dem <dialog> selbst statt einem inneren Wrapper-Div, das mit
+  // der Umstellung entfällt.
   function build() {
-    overlay = document.createElement('div');
+    overlay = document.createElement('dialog');
     overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'alertdialog');
     overlay.innerHTML =
-      '<div class="confirm-dialog" role="alertdialog" aria-modal="true">' +
-        '<p class="confirm-message"></p>' +
-        '<div class="confirm-actions">' +
-          '<button type="button" class="btn confirm-cancel">Abbrechen</button>' +
-          '<button type="button" class="btn confirm-ok">Bestätigen</button>' +
-        '</div>' +
+      '<p class="confirm-message"></p>' +
+      '<div class="confirm-actions">' +
+        '<button type="button" class="btn confirm-cancel">Abbrechen</button>' +
+        '<button type="button" class="btn confirm-ok">Bestätigen</button>' +
       '</div>';
     document.body.appendChild(overlay);
     return overlay;
@@ -35,7 +42,11 @@
     const cancelBtn = overlay.querySelector('.confirm-cancel');
     okBtn.textContent = opts.confirmLabel || 'Bestätigen';
     okBtn.className = 'btn confirm-ok ' + (opts.danger ? 'btn-danger' : 'primary');
-    overlay.classList.add('open');
+    if (!overlay.open) overlay.showModal();
+    // .open separat von showModal() — showModal() zeigt sofort an (nötig für
+    // den Top-Layer), die Transform-Transition (siehe CSS) braucht die Klasse
+    // aber erst NACH dem ersten Paint, sonst springt sie ohne Übergang.
+    requestAnimationFrame(() => overlay.classList.add('open'));
     // Fokus auf Abbrechen, nicht auf die Aktion — bei destruktiven Aktionen ein
     // sichererer Default, falls jemand versehentlich Enter/Leertaste drückt.
     cancelBtn.focus();
@@ -43,17 +54,26 @@
     return new Promise((resolve) => {
       function close(result) {
         overlay.classList.remove('open');
-        document.removeEventListener('keydown', onKeydown);
+        overlay.removeEventListener('cancel', onCancel);
         okBtn.onclick = null; cancelBtn.onclick = null; overlay.onclick = null;
+        // Kurze Verzögerung, damit die Schließen-Transition noch sichtbar
+        // abläuft, bevor close() den Dialog aus dem Top-Layer entfernt.
+        setTimeout(() => overlay.close(), 120);
         resolve(result);
       }
-      function onKeydown(e) {
-        if (e.key === 'Escape') close(false);
+      // Natives Escape-Verhalten (dialog schließt sofort UND feuert 'cancel')
+      // abgefangen statt eines eigenen document-weiten keydown-Listeners —
+      // der wäre sonst auch dann ausgelöst worden, wenn (theoretisch) noch
+      // ein anderer Dialog "darunter" offen ist. preventDefault() verhindert
+      // das native Sofort-Schließen, damit die Close-Transition oben greift.
+      function onCancel(e) {
+        e.preventDefault();
+        close(false);
       }
       okBtn.onclick = () => close(true);
       cancelBtn.onclick = () => close(false);
       overlay.onclick = (e) => { if (e.target === overlay) close(false); };
-      document.addEventListener('keydown', onKeydown);
+      overlay.addEventListener('cancel', onCancel);
     });
   };
 

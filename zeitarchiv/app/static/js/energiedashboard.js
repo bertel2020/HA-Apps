@@ -205,6 +205,8 @@
       hasFlow: false,
       verbraucherBreakdown: [],
       erzeugerBreakdown: [],
+      speicherBreakdown: [],
+      speicherSocNowBreakdown: [],
       anomalien: [],
       speicherEfficiencyTrend: [],
       speicherSocTrend: [],
@@ -389,6 +391,35 @@
         return this.erzeugerBreakdown.map((e) => `${e.name}: ${this.fmt(e.value, 1)} kWh`).join('\n');
       },
 
+      // Analog zu erzeugerBreakdownText() für die Speicher-KPI-Kachel — Wert
+      // ist hier bereits Laden minus Entladen (netto) je Speicher, siehe
+      // speicher_breakdown im Backend.
+      speicherBreakdownText() {
+        if (this.speicherBreakdown.length <= 1) return null;
+        return this.speicherBreakdown.map((s) => `${s.name}: ${this.fmt(s.value, 1)} kWh`).join('\n');
+      },
+
+      // Analog für den "Jetzt"-Ladezustand im Autarkie&Speicher-Ring — anders
+      // als speicherBreakdownText() ein Momentanwert (%, plus kWh wenn die
+      // Kapazität dieses Speichers bekannt ist), kein Perioden-Wert.
+      speicherSocNowBreakdownText() {
+        if (this.speicherSocNowBreakdown.length <= 1) return null;
+        return this.speicherSocNowBreakdown
+          .map((s) => `${s.name}: ${this.fmt(s.soc, 0)} %` + (s.kwh != null ? ` (${this.fmt(s.kwh, 1)} kWh)` : ''))
+          .join('\n');
+      },
+
+      // Statischer Erklärtext des "Jetzt"-Ladezustands (siehe
+      // _energiedashboard_view.html) plus, bei mehr als einem Speicher, die
+      // Aufschlüsselung je Speicher darunter — sonst wüsste man bei "Jetzt
+      // 89 %" nicht, wie sich das über mehrere Speicher unterschiedlicher
+      // Kapazität zusammensetzt.
+      socNowTooltipText() {
+        const base = 'Aktueller Ladezustand, unabhängig vom gewählten Zeitraum — der Ring unten zeigt den Ø-Wert über die Periode.';
+        const breakdown = this.speicherSocNowBreakdownText();
+        return breakdown ? base + '\n\n' + breakdown : base;
+      },
+
       // Gesamt-Linie oben im Popup, über allen Jahres-Zeilen — durchgehend
       // (keine Lücken nötig wie bei den Jahres-Sparklines, weil hier einfach
       // alle tatsächlich vorhandenen Monate chronologisch aneinandergereiht
@@ -480,6 +511,8 @@
           this.hasFlow = data.nodes.some(n => n.role !== 'bus' && n.value > 0);
           this.verbraucherBreakdown = data.verbraucher_breakdown || [];
           this.erzeugerBreakdown = data.erzeuger_breakdown || [];
+          this.speicherBreakdown = data.speicher_breakdown || [];
+          this.speicherSocNowBreakdown = data.speicher_soc_now_breakdown || [];
           this.anomalien = data.anomalien || [];
           this.speicherEfficiencyTrend = data.speicher_efficiency_trend || [];
           this.speicherSocTrend = data.speicher_soc_trend || [];
@@ -647,9 +680,20 @@
         // stattdessen Anteil an der Quelle zeigen — das ist dann die
         // eigentlich interessante Aufteilung, nicht die sonst immer triviale
         // 100 % vom (einzigen) Ziel.
+        // Bewusst aus data.links (VOR dem value>0.001-Filter unten) gezählt,
+        // nicht aus der gefilterten links-Liste: eine Gruppe mit z. B. drei
+        // zugeordneten Geräten soll ihren Anteil zeigen, auch wenn in einem
+        // bestimmten Monat nur eines davon tatsächlich Verbrauch hatte (die
+        // anderen beiden dann mit Wert 0 aus der gefilterten Liste
+        // herausfallen) — sonst blinkt die %-Anzeige je nach Periode ein/aus,
+        // obwohl die Gruppe strukturell weiterhin mehrere Mitglieder hat.
+        // Bei einer Gruppe mit wirklich nur einem einzigen Mitglied (z. B.
+        // "Mobilität" → nur Wallbox) bleibt die Zahl unverändert bei 1 —
+        // der ursprüngliche "immer triviale 100%"-Fall wird also weiterhin
+        // korrekt unterdrückt.
         const incomingLinkCount = {};
         const outgoingLinkCount = {};
-        links.forEach(l => {
+        data.links.forEach(l => {
           incomingLinkCount[l.target] = (incomingLinkCount[l.target] || 0) + 1;
           outgoingLinkCount[l.source] = (outgoingLinkCount[l.source] || 0) + 1;
         });
@@ -675,6 +719,11 @@
         const nodes = data.nodes
           .filter(n => n.role === 'bus' || connectedNames.has(n.name))
           .map(n => ({
+            // "name" bleibt die interne Sankey-Knoten-ID (verlinkt über
+            // links/nodeByName, siehe colorForNode-Kommentar zu "kind") —
+            // Netzbezug/Einspeisung haben optional einen eigenen Anzeige-
+            // Namen (config.netzbezug_name/.einspeisung_name), der NUR den
+            // Label-Text überschreibt, nicht die Knoten-Identität.
             name: n.name,
             // Auffälligkeiten (Schwellenwert-Färbung, siehe compute_flow()):
             // Umrandung statt geänderter Füllfarbe — die Füllfarbe bleibt für
@@ -684,7 +733,7 @@
               color: colorForNode(n, palette),
               ...(n.anomaly ? {borderColor: palette.warning, borderWidth: 2.5} : {}),
             },
-            label: {color: palette.ink, ...(isNarrow ? narrowLabelFor(n) : {})},
+            label: {color: palette.ink, formatter: n.label || n.name, ...(isNarrow ? narrowLabelFor(n) : {})},
           }));
         const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
         chartInstance.setOption({
@@ -693,26 +742,29 @@
             formatter: (p) => {
               if (p.dataType !== 'edge') {
                 const node = nodeByName[p.name];
+                const label = (node && node.label) || p.name;
                 if (node && node.anomaly) {
-                  return `${p.name}: ${fmt(p.value)} kWh<br/>`
+                  return `${label}: ${fmt(p.value)} kWh<br/>`
                     + `<span style="color:${palette.warning}">+${node.anomaly_pct} % über dem Schnitt `
                     + `der letzten Perioden (${fmt(node.anomaly_baseline)} kWh)</span>`;
                 }
-                return `${p.name}: ${fmt(p.value)} kWh`;
+                return `${label}: ${fmt(p.value)} kWh`;
               }
               const target = nodeByName[p.data.target];
               const source = nodeByName[p.data.source];
+              const targetLabel = (target && target.label) || p.data.target;
+              const sourceLabel = (source && source.label) || p.data.source;
               let pct = null;
               let shareOf = null;
               if ((incomingLinkCount[p.data.target] || 0) > 1 && target && target.value > 0) {
                 pct = this.fmt((p.data.value / target.value) * 100, 0);
-                shareOf = p.data.target;
+                shareOf = targetLabel;
               } else if ((outgoingLinkCount[p.data.source] || 0) > 1 && source && source.value > 0) {
                 pct = this.fmt((p.data.value / source.value) * 100, 0);
-                shareOf = p.data.source;
+                shareOf = sourceLabel;
               }
               const share = pct != null ? ` (${pct} % von ${shareOf})` : '';
-              return `${p.data.source} → ${p.data.target}: ${fmt(p.data.value)} kWh${share}`;
+              return `${sourceLabel} → ${targetLabel}: ${fmt(p.data.value)} kWh${share}`;
             },
           },
           series: [{

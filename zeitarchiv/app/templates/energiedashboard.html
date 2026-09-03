@@ -16,11 +16,12 @@
   @media(max-width:560px){
     .edash-title-row{flex-wrap:wrap;row-gap:8px;}
     /* Titel nur so breit wie sein Text, damit der Bearbeiten-Stift direkt
-       dahinter bleibt; der Datenqualität-Chip rückt per margin-left:auto an
-       den rechten Rand. Die CO2-/Kosten-Badges bekommen eine eigene Zeile
-       (flex-basis:100%), unabhängig von der Titellänge. */
+       dahinter bleibt; die ganze Badge-Gruppe (Status+CO2+Kosten, seit
+       Status mit hineingezogen wurde — siehe _energiedashboard_view.html)
+       bekommt eine eigene Zeile (flex-basis:100%), unabhängig von der
+       Titellänge. Kein separates margin-left:auto für Status mehr nötig,
+       das gehörte zur alten Position direkt neben dem Titel. */
     .edash-title-row h1{flex:0 1 auto;min-width:0;}
-    .edash-title-row .edash-quality-badge{margin-left:auto;}
     .edash-title-row .edash-badge-group{flex-basis:100%;}
     /* Höhere Spezifität als die Desktop-Regel .edash-badge-group{margin-left:
        auto} weiter unten — bei gleicher Spezifität gewänne die spätere. */
@@ -151,18 +152,36 @@
      Schrift im selben Verhältnis mitvergrößert. */
   .edash-ring-panel{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;row-gap:18px;}
   .edash-ring-item{flex:0 0 auto;width:132px;}
-  .edash-ring-clickable{cursor:pointer;border-radius:12px;transition:background-color .15s ease;}
-  .edash-ring-clickable:hover{background:var(--surface-alt);}
+  .edash-ring-clickable{cursor:pointer;border-radius:12px;transition:background-color .15s ease,transform .15s ease;}
+  .edash-ring-clickable:hover{background:var(--surface-alt);transform:translateY(-2px);}
   .edash-ring-svg{width:100%;height:auto;}
-  .edash-ring-num{font-family:var(--font-mono);font-size:calc(15px * var(--font-scale, 1));font-weight:700;fill:var(--ink);}
-  .edash-ring-sub{font-size:calc(8px * var(--font-scale, 1));fill:var(--ink-faint);text-transform:uppercase;letter-spacing:.02em;}
+  .edash-ring-num{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));font-weight:700;fill:var(--ink);}
+  /* Etwas kleiner + engerer Letter-Spacing als zuvor (8px/.02em) — die
+     längsten Labels ("EIGENVERBRAUCH", "WIRKUNGSGRAD") liefen sonst fast bis
+     an den Ring heran statt sauber innerhalb zu bleiben. */
+  .edash-ring-sub{font-size:calc(6.8px * var(--font-scale, 1));fill:var(--ink-faint);text-transform:uppercase;letter-spacing:.01em;}
 
   /* PV-Prognose: schmale Info-Zeile über der KPI-Reihe, kein eigenes Badge
      im Titel-Kopf (der hat mit Datenqualität/CO2/Kostenanalyse schon genug
      Kandidaten) — bewusst neutral/dezent, keine Statusfarbe, da es keinen
      guten/schlechten Zustand gibt, nur eine Zahl. */
-  .edash-prognose{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);margin:2px 0 14px;flex-wrap:wrap;}
-  .edash-prognose strong{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
+  /* Hero-Leiste: bündelt Autarkie/CO2/Kostensaldo (sonst nur als Ring bzw.
+     Popup-Badges sichtbar) mit der bisherigen Live-Prognose-Zeile zu EINER
+     Zeile — ein Blick genügt, statt erst zu Ringen/Badges wandern zu müssen.
+     Dezenter Verlauf (Akzentfarbe → Kartenweiß) statt eines flachen Rands,
+     damit die Zeile sich als eigenes Element vom Rest der Karte abhebt, ohne
+     eine weitere volle Kachel zu sein. Vertikale Trennstriche statt Kommas
+     zwischen den Werten — bei unterschiedlich vielen sichtbaren Items
+     (x-show je nach Datenlage) bleibt die Zeile so immer sauber lesbar. */
+  .edash-hero{
+    display:flex;align-items:center;flex-wrap:wrap;
+    background:linear-gradient(90deg, var(--accent-line-soft), var(--surface) 70%);
+    border:1px solid var(--border);border-radius:10px;padding:8px 4px;margin:2px 0 14px;
+  }
+  .edash-hero-item{display:flex;align-items:center;gap:6px;padding:4px 14px;white-space:nowrap;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .edash-hero-item + .edash-hero-item{border-left:1px solid var(--border-strong);}
+  .edash-hero-item svg{flex:none;}
+  .edash-hero-item strong{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
   .edash-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:16px;align-items:stretch;}
   /* Flex-Spalte statt gestapelter Blöcke: die Speicher-Kachel hat mit der
      zusätzlichen Ladezustand-Zeile (.edash-kpi-sub) eine Zeile mehr als die
@@ -171,12 +190,30 @@
      Reihe. .edash-kpi-row streckt alle Kacheln per Grid schon auf dieselbe
      Höhe, hier wird nur noch der freie Rest nach unten an die Sparkline
      verteilt. */
-  .edash-kpi{border:1px solid var(--border);border-radius:9px;background:var(--surface-alt);padding:10px 12px 8px;overflow:hidden;display:flex;flex-direction:column;}
+  .edash-kpi{
+    position:relative;border:1px solid var(--border);border-radius:9px;background:var(--surface-alt);
+    padding:10px 12px 8px;overflow:hidden;display:flex;flex-direction:column;
+    transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;
+  }
+  /* Dieselbe Hover-Reaktion wie die Ringe darunter und die Rollen-Kacheln im
+     Setup — einheitliche Mikro-Interaktion statt nur an einer Stelle der
+     App. Kein Klickziel-Anspruch (nicht alle Kacheln sind klickbar), rein
+     als "die Seite reagiert" wahrgenommen. */
+  .edash-kpi:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(19,28,23,.09);border-color:var(--border-strong);}
   /* overflow:hidden oben ist für die Sparkline in der Energiefluss-Zeile
      nötig, schneidet aber den [data-tooltip]::after-Ballon ab, wenn ein
      Tooltip auf der ganzen Kachel sitzt (Kostenanalyse-Kacheln haben keine
      Sparkline und brauchen das Clipping nicht). */
   .edash-kpi.has-tooltip{overflow:visible;}
+  /* Farbiger Akzentbalken oben, dieselbe Rollenfarbe wie der zugehörige
+     Sankey-Knoten (colorForNode() in energiedashboard.js) — macht die
+     KPI-Zeile auf einen Blick den Farben im Fluss darunter zuordenbar, statt
+     fünf optisch gleiche graue Kacheln zu zeigen. Nur in der Energiefluss-
+     Zeile gesetzt (.edash-kpi-accent existiert nur dort im Markup), die
+     übrigen .edash-kpi (Kosten-/CO2-Popups) bleiben unverändert ohne Balken. */
+  .edash-kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;}
+  .edash-kpi-head{display:flex;align-items:center;gap:6px;}
+  .edash-kpi-icon{flex:none;display:flex;}
   .edash-kpi-label{font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
   .edash-kpi-val{font-family:var(--font-mono);font-size:calc(17px * var(--font-scale, 1));font-weight:600;color:var(--ink);margin-top:4px;font-variant-numeric:tabular-nums;}
   .edash-kpi-val small{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);font-weight:500;}
@@ -236,6 +273,16 @@
      Farbe (Rollen-Legende auswendig kennen) erschlossen werden muss. */
   .edash-netbalance-ends{display:flex;justify-content:space-between;margin-top:4px;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em;}
 
+  /* Kaum wahrnehmbarer Verlauf (Quellfarbe oben-links, Netzfarbe unten-
+     rechts, je 5% Deckkraft) statt reinem Kartenweiß hinter dem Sankey —
+     nur auf der Energiefluss-Karte (.edash-flow-card), NICHT auf
+     .edash-span3 allgemein, das auch die Tageslastprofil-Karte trägt. */
+  .edash-flow-card{
+    background:
+      radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--chart-3) 5%, transparent), transparent 55%),
+      radial-gradient(140% 100% at 100% 100%, color-mix(in srgb, var(--chart-1) 5%, transparent), transparent 55%),
+      var(--surface);
+  }
   .edash-sankey-wrap{height:420px;}
   /* Vertikale Sankey-Orientierung (siehe renderChart() in energiedashboard.js,
      unter demselben 560px-Breakpoint) braucht mehr Höhe — Quellen/Bus/
@@ -344,74 +391,104 @@
   .edash-toggle-list{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:4px;}
   .edash-toggle-row{display:flex;align-items:center;gap:7px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;}
   .edash-toggle-row input[type="checkbox"]{margin:0;cursor:pointer;}
-  .edash-field-grid .field .dd-picker-wrap{width:100%;}
+  .edash-field-grid .field .dd-picker-wrap,
+  .edash-item-dialog .field .dd-picker-wrap{width:100%;}
   /* overflow/text-overflow/white-space fehlten hier — ein langer Friendly-
      Name lief dadurch unter den absolut positionierten "✕"-Leeren-Button und
      wirkte "abgeschnitten/überlappend" statt sauber mit … zu enden. Dasselbe
-     Dreiergespann wie beim etablierten .dtile-entity-picker>.btn. */
-  .edash-field-grid .field .dd-picker-wrap>.btn{
+     Dreiergespann wie beim etablierten .dtile-entity-picker>.btn. Gilt auch
+     für die Einzelrollen-Popups (.edash-item-dialog) — dieselbe Feldbreite
+     wie im Setup-Formular selbst, unabhängig davon ob ein Popup ein oder
+     mehrere Felder hat (.edash-dialog-fields-Wrapper optional). */
+  .edash-field-grid .field .dd-picker-wrap .btn,
+  .edash-item-dialog .field .dd-picker-wrap .btn{
     width:100%;text-align:left;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   /* Textfelder hatten keine eigene Breitenregel und fielen auf die
      Browser-Standardbreite eines <input> zurück (~150px) — sichtbar
      schmaler als die auf 100% gestreckten Entitäts-Auswahlfelder in
-     derselben Spalte. Jetzt beide gleich breit wie die Spalte selbst. */
-  .edash-field-grid .field input[type="text"]{width:100%;box-sizing:border-box;}
+     derselben Spalte. Jetzt beide gleich breit wie die Spalte/das Feld. */
+  .edash-field-grid .field input[type="text"],
+  .edash-item-dialog .field input[type="text"]{width:100%;box-sizing:border-box;}
   /* Dropdown-Popover war fest 220px breit und rechtsbündig positioniert
      (Standardverhalten aus app.css) — bei einer bis zu 260px breiten Spalte
-     passte das weder in der Breite noch in der Ausrichtung zum Feld
-     darüber. Dasselbe Muster wie .dtile-entity-picker>.dd-picker-popover
-     in app.css: volle Breite, linksbündig statt rechtsbündig. */
+     bzw. einem schmalen Popup passte das weder in der Breite noch in der
+     Ausrichtung zum Feld darüber. Dasselbe Muster wie
+     .dtile-entity-picker>.dd-picker-popover in app.css: volle Breite,
+     linksbündig statt rechtsbündig. */
   .edash-field-grid .dd-picker-popover,
-  .edash-list-row .dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
-  /* Fester-Preis-Fallback (Kosten) sitzt als weiteres Kind IM selben Span wie
-     der Entitäts-Button (siehe den call-Block um entity_field in
-     _energiedashboard_setup.html) — dadurch kann es per x-show="!entityId"
-     auf den Picker-Zustand reagieren. Ohne eigenen Abstand würde es direkt
-     unter dem Button kleben, da beide nur per erzwungenem Zeilenumbruch
-     (width:100% auf dem Button) untereinander landen. */
-  .dd-picker-wrap > input.edash-fixed-price-input{margin-top:6px;display:block;}
+  .edash-item-dialog .dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
+  /* Fester-Wert-Fallback (Kosten/CO2/Speicher-Kapazität) sitzt als weiteres
+     Kind IM selben Span wie der Entitäts-Button (siehe den call-Block um
+     entity_field in _energiedashboard_setup.html) — dadurch kann er per
+     x-show="!entityId" auf den Picker-Zustand reagieren. Ohne eigenen
+     Abstand würde er direkt unter dem Button kleben, da beide nur per
+     erzwungenem Zeilenumbruch (width:100% auf dem Button) untereinander
+     landen. .edash-unit-input ist jetzt der direkte Kind-Span (statt des
+     Inputs selbst) — das Feld hat seit der Einheiten-Suffix-Ergänzung
+     (siehe unten) eine Wrapper-Ebene mehr. */
+  .dd-picker-wrap > .edash-unit-input{margin-top:6px;}
+  /* Einheiten-Suffix im Eingabefeld (z. B. "29  Ct/kWh") statt nur im
+     Hinweistext darunter — bleibt auch sichtbar, wenn der Hinweistext
+     überlesen wird. Rahmen/Hintergrund sitzen jetzt auf dem Wrapper, das
+     Input-Element selbst wird rahmenlos/transparent, damit sich beides wie
+     EIN Feld liest statt wie Eingabe + separates Label daneben. */
+  .edash-unit-input{
+    display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;
+    border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:0 10px;
+  }
+  .edash-unit-input:focus-within{border-color:var(--accent-line);}
+  /* .field statt nur .edash-unit-input als Vorsatz — sonst verliert border:
+     none gegen das app-weite .field input[type="text"] (app.css), das mit
+     einem Typ-Selektor (input) eine Stufe höher spezifisch ist als zwei
+     Klassen allein. Ohne diesen Fix behielt der <input> seinen eigenen
+     Rahmen UNTER dem des Wrappers — sah wie zwei verschachtelte Boxen statt
+     einem einzigen Feld "2  kWh" aus. */
+  .field .edash-unit-input .edash-fixed-price-input{
+    flex:1;min-width:0;border:none;background:none;padding:8px 0;
+    font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));color:var(--ink);
+  }
+  .field .edash-unit-input .edash-fixed-price-input:focus{outline:none;}
+  .edash-unit-suffix{flex:none;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
 
-  .edash-list-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-  .edash-list-head span{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:600;}
-  /* Platzhalter in Breite des Drag-Handles (siehe .edash-drag-handle), damit
-     die Spaltenüberschriften "Name"/"Entität" exakt über den Feldern
-     stehen statt durch das Handle nach rechts verschoben zu wirken. */
-  .edash-list-head::before{content:'';width:20px;flex:none;}
-  /* 260px = dieselbe (maximale) Breite wie .edash-field-grid (minmax(200px,260px))
-     — Netzbezug im Bereich "Netz" ist die optisch etablierte Referenzbreite;
-     Name-Spalte UND Entitäts-Spalte in Erzeuger/Verbraucher halten sich
-     exakt daran, statt schmaler (Name) bzw. breiter (Entität, vorher
-     max-width:420px) als das Referenzfeld zu wirken. */
-  .edash-list-head span:first-child{width:260px;flex:none;}
-  .edash-list-head span:nth-child(2){flex:1;max-width:260px;}
+  /* dd-picker-anchor: eigener position:relative-Anker NUR für Button/✕/
+     Popover innerhalb von entity_field (siehe _energiedashboard_setup.html)
+     — der "✕"-Leeren-Button und das Popover sind position:absolute relativ
+     zum nächsten positionierten Vorfahren; ohne eigene Regeln hier verhält
+     sich der Anker wie ein stilloses <span> (display:inline), das sowohl
+     .dd-picker-wrap > .btn{background:...} (app.css, direkter-Kind-
+     Selektor, greift durch den Zwischen-Anker nicht mehr) als auch die
+     100%-Breite bricht. display:block;width:100% repliziert exakt das
+     frühere Verhalten von .dd-picker-wrap selbst (bevor der Anker
+     eingeführt wurde). */
+  .dd-picker-anchor{position:relative;display:block;width:100%;}
+  .dd-picker-anchor > .btn{background:var(--surface);}
+  .dd-picker-anchor > .btn:hover:not(:disabled){background:var(--surface-alt);}
 
-  .edash-list-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
-  /* Eigenes Ziehen-Handle statt der ganzen Zeile draggable — sonst würde ein
-     Klick ins Namensfeld oder auf die Entitäts-Schaltfläche einen
-     Browser-Drag statt Text-Auswahl/Klick auslösen. Reordering selbst läuft
-     rein in Alpine (Array-Splice), kein natives HTML5-Drag&Drop wie bei den
-     Dashboard-Kacheln nötig, weil hier kein separater Persistenz-Request
-     existiert — die neue Reihenfolge geht beim normalen Speichern einfach
-     als Formular-Feldreihenfolge mit. */
+  /* dd-picker-wrap-inline (entity_field(..., inline_fallback=true)): Zahl+
+     Einheit-Fallback (Kosten/CO2/Speicher-Kapazität) NEBEN statt UNTER dem
+     Auswahl-Button — als eine kurze Zahl+Einheit wirkte er als eigene volle
+     Zeile darunter wie ein zweites, unabhängiges Feld statt eines
+     Fallback-Wegs für dasselbe Feld. Der Anker (statt früher der Button
+     direkt) verliert dafür seine erzwungene 100%-Breite und teilt sich die
+     Zeile per flex:1 mit dem kompakten, nicht wachsenden Zahlenfeld —
+     flex-wrap:wrap als Rückfalloption für sehr schmale Popups. */
+  .field .dd-picker-wrap-inline{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;}
+  .field .dd-picker-wrap-inline > .dd-picker-anchor{width:auto;flex:1 1 140px;}
+  .dd-picker-wrap-inline > .edash-unit-input{width:auto;flex:none;margin-top:0;}
+
+  /* Eigenes Ziehen-Handle statt der ganzen Kachel draggable — sonst würde ein
+     Klick auf die Kachel (öffnet das Popup) einen Browser-Drag statt eines
+     Klicks auslösen. Reordering selbst läuft rein in Alpine (Array-Splice),
+     kein natives HTML5-Drag&Drop-Backend nötig, weil hier kein separater
+     Persistenz-Request existiert — die neue Reihenfolge geht beim normalen
+     Speichern einfach als Formular-Feldreihenfolge mit. */
   .edash-drag-handle{
-    flex:none;width:20px;height:34px;display:flex;align-items:center;justify-content:center;
-    color:var(--ink-faint);cursor:grab;font-size:calc(13px * var(--font-scale, 1));line-height:1;
+    flex:none;width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+    color:var(--ink-faint);cursor:grab;font-size:calc(12px * var(--font-scale, 1));line-height:1;
     touch-action:none;
   }
   .edash-drag-handle:active{cursor:grabbing;}
-  .edash-list-row.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;border-radius:8px;}
-  /* Dieselbe Feld-Optik wie .field input[type="text"] in app.css (Mono-
-     Schrift, 13px, padding 8px 12px, radius 8px, --surface statt
-     --surface-alt) — hier separat notiert, weil die Zeile nicht in einem
-     .field steckt (eigenes kompaktes Reihen-Layout statt gestapelter
-     Einzelfelder), sonst exakt derselbe App-Standard. */
-  .edash-list-row input[type="text"]{
-    width:260px;flex:none;font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));
-    padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);
-    box-sizing:border-box;
-  }
-  .edash-list-row input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
 
   /* Bereichs-Einfärbung passend zur Rollen-Farblegende ("04 Datenquellen" im
      Mockup, vom Nutzer nochmal explizit als Referenz-Screenshot bestätigt):
@@ -429,16 +506,139 @@
   .edash-section-speicher{background:color-mix(in srgb, var(--chart-4) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-4) 32%, var(--border));}
   .edash-section-verbraucher{background:color-mix(in srgb, var(--chart-7) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-7) 32%, var(--border));}
 
-  /* Nebeneinander statt untereinander, aber jede Karte nur so breit wie ihr
-     Inhalt (Name-/Feldbreite 260px + Rahmen) tatsächlich braucht, statt
-     erzwungen gleich breiter 1fr-Grid-Spalten mit viel Leerraum daneben.
-     Flex statt Grid: Flex-Items sind standardmäßig content-groß (kein
-     flex-grow gesetzt), Karten wrappen bei Platzmangel einfach in die
-     nächste Zeile — kein Sonderfall für einen dritten/vierten Speicher
-     nötig, kein horizontales Scrollen. */
-  .edash-speicher-grid{display:flex;flex-wrap:wrap;gap:14px;}
+  /* Rollen-Kacheln: eine Kachel pro Einzeleintrag (Netzbezug/Einspeisung
+     fix, Erzeuger/Speicher/Verbraucher dynamisch) statt einer Formularzeile
+     — Grundriss/Optik bewusst am "Neues Dashboard hinzufügen"-Muster von
+     /dashboards orientiert (Kachel-Raster, gestrichelte Hinzufügen-Kachel),
+     Farbakzent oben je Kachel identisch zu .edash-section-* (Sankey-Rollen-
+     farbe), damit Bereichs- und Kachelfarbe sich verstärken statt zu
+     kollidieren. auto-fill statt fester Spaltenzahl: die Kacheln sind
+     content-arm genug (Icon+Name+eine Meta-Zeile), dass eine feste Breite
+     hier nicht nötig ist wie beim breiteren .edash-field-grid. */
+  /* Feste 4 Spalten statt auto-fill/minmax — bei auto-fill blieben die
+     Kacheln auf breiten Bildschirmen sehr schmal (mehr Spalten statt
+     größerer Kacheln). Unter 640px zwei Spalten, sonst wären einzelne
+     Kacheln auf schmalen Bildschirmen unlesbar schmal. Feste Höhe (statt nur
+     min-height) sorgt dafür, dass wirklich ALLE Kacheln gleich hoch sind —
+     nicht nur die einer Zeile (CSS-Grid würde das ohnehin tun, aber
+     Verbraucher-Kacheln mit Gruppen-Chip hätten sonst mehr Inhalt als z. B.
+     Netzbezug/Kosten und dadurch andere Bereiche zeilenweise unterschiedlich
+     hoch gemacht). */
+  .edash-item-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px;}
+  @media(max-width:640px){.edash-item-grid{grid-template-columns:repeat(2,1fr);}}
+  .edash-item-tile{
+    all:unset;box-sizing:border-box;display:flex;flex-direction:column;cursor:pointer;height:132px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;
+    box-shadow:var(--shadow);transition:border-color .12s;
+  }
+  .edash-item-tile:hover{border-color:var(--border-strong);}
+  .edash-item-tile:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
+  .edash-item-tile.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;}
+  .edash-item-accent{height:3px;flex:none;}
+  /* Für Rollen ohne natürliche Sankey-Farbe (Kosten/PV-Prognose/CO2, siehe
+     .edash-section-* oben) — neutraler Rahmenton statt einer erfundenen
+     Farbe, dieselbe "bewusst ungefärbt"-Logik wie bei den Bereichen. */
+  .edash-item-accent-neutral{background:var(--border-strong);}
+  /* flex:1 — ohne das füllt der Body nur seine Inhaltshöhe, die feste
+     Kachelhöhe bliebe darunter als toter Leerraum stehen und
+     .edash-item-bottoms margin-top:auto (siehe unten) hätte innerhalb des
+     Bodys keinen Freiraum zum Verteilen. */
+  .edash-item-body{padding:10px 12px 11px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;}
+  .edash-item-head{display:flex;align-items:center;gap:7px;}
+  .edash-item-glyph{flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
+  .edash-item-name{
+    font-weight:600;font-size:calc(13px * var(--font-scale, 1));flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;
+  }
+  .edash-item-req{
+    flex:none;font-size:calc(9px * var(--font-scale, 1));font-weight:700;letter-spacing:.03em;
+    color:var(--accent-bar);background:var(--accent-bar-soft);padding:2px 5px;border-radius:4px;
+  }
+  /* Kopf (Icon+Name) bleibt oben, alles Weitere (Chip, dann Entität/Wert)
+     wird als Gruppe an den unteren Rand der Kachel gedrückt (margin-top:auto
+     auf dem Wrapper) — bei fester Kachelhöhe sonst ein unschön mittig
+     "schwebender" Block statt klar oben (Identität) vs. unten (Zustand)
+     getrennter Information. */
+  .edash-item-bottom{margin-top:auto;display:flex;flex-direction:column;gap:4px;}
+  .edash-item-meta{
+    font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);text-align:left;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .edash-item-meta.is-empty{font-style:italic;}
+  /* Zweite Zeile unter .edash-item-meta, bewusst IDENTISCH gestylt (nicht
+     kleiner/blasser) — bisher nur für die Speicher-Kachel: bei zugeordneter
+     Kapazitäts-Entität zeigt .edash-item-meta die aufgelöste kWh-Zahl
+     (capacityLabel(), siehe Setup-Formular), hier zusätzlich der
+     Entitätsname darunter — sonst wäre auf der Kachel nicht erkennbar, DASS
+     überhaupt eine Entität (statt eines festen Werts) hinterlegt ist,
+     geschweige denn welche. */
+  .edash-item-meta-sub{
+    font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);text-align:left;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .edash-item-chip{
+    align-self:flex-start;max-width:100%;font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;
+    background:var(--surface-alt);color:var(--ink-muted);border:1px solid var(--border);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;
+  }
+  /* Verbraucher ohne Gruppe: eigener Chip statt einfach nichts anzuzeigen —
+     macht sichtbar, dass hier (noch) keine Gruppe gesetzt ist, statt es wie
+     eine leere/kaputte Kachel wirken zu lassen. Gestrichelt + Akzentfarbe
+     statt der neutralen Chip-Optik = "leicht hervorgehoben", aber bewusst
+     nicht in Warnfarbe (Fehlen einer Gruppe ist normal, keine Auffälligkeit). */
+  .edash-item-chip-empty{background:none;border-style:dashed;border-color:var(--accent-line);color:var(--accent-line);}
+  .edash-item-add{
+    all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;height:132px;
+    border:1px dashed var(--border-strong);border-radius:12px;cursor:pointer;
+  }
+  .edash-item-add-btn{
+    width:28px;height:28px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);
+    color:var(--ink-muted);display:flex;align-items:center;justify-content:center;
+    font-size:calc(16px * var(--font-scale, 1));line-height:1;
+  }
+  .edash-item-add:hover .edash-item-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
 
-  /* Feld-Erklärungen einmal zentral über den Karten (siehe Template) statt
+  /* Einzelrollen-Popup: deutlich schmaler als der App-Standard-Dialog
+     (.detail-dialog, bis 860px, für Datenqualität/Kosten-Tabellen) — hier
+     stehen nur 1-4 Felder für genau EINEN Eintrag, dieselbe Größenordnung
+     wie .edash-gruppen-dialog. */
+  .edash-item-dialog{width:min(440px, calc(100vw - 32px));}
+  /* Farbiger Streifen oben im Popup, in derselben Rollenfarbe wie
+     .edash-item-accent auf der zugehörigen Kachel — schließt den optischen
+     Kreis "diese Kachel gehört zu diesem Popup", ohne (wie ein vollständig
+     umrandetes Popup) wie ein Warn-/Fehlerzustand zu wirken, den ein
+     farbiger Rahmen um einen ganzen Dialog sonst nahelegen würde. Per
+     CSS-Var (--dialog-accent, inline am jeweiligen <dialog> gesetzt) statt
+     eigener Klasse je Rolle — dieselbe Variable versorgt sowohl feste als
+     auch dynamische (x-for) Popups einheitlich. Neutrale Rollen (Kosten/
+     Prognose/CO2/Gruppen, deren Kacheln ebenfalls nur den neutralen
+     .edash-item-accent-neutral-Ton zeigen) bekommen denselben grauen Ton
+     statt einer Rollenfarbe — sonst wirkt der fehlende Streifen dort wie ein
+     Darstellungsfehler statt einer bewussten Auslassung. */
+  /* KEIN eigenes position:relative hier — ein per showModal() geöffneter
+     <dialog> bekommt von der UA-Stylesheet-Regel dialog:modal bereits
+     position:fixed (zusammen mit margin:auto fürs Zentrieren) und ist damit
+     schon ein positionierter Vorfahre für das ::before unten. Eine
+     Autoren-Regel schlägt UA-Regeln immer, unabhängig von Spezifität —
+     ein eigenes position:relative hätte also genau dieses position:fixed
+     überschrieben und die native Zentrierung gebrochen (Dialog landet dann
+     irgendwo im normalen Layoutfluss statt mittig im Viewport). */
+  .edash-item-dialog,.edash-gruppen-dialog{--dialog-accent:var(--border-strong);}
+  .edash-item-dialog::before,.edash-gruppen-dialog::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:4px;
+    border-radius:14px 14px 0 0;background:var(--dialog-accent);
+  }
+  /* margin-bottom:0 statt des app-weiten .field-Standards (20px) — der
+     Abstand zwischen den Feldern kommt hier allein vom Flex-gap, sonst
+     würden sich beide Abstände addieren. */
+  .edash-dialog-fields{display:flex;flex-direction:column;gap:14px;}
+  .edash-dialog-fields .field{margin-bottom:0;}
+  /* "Entfernen"-Button nutzt bewusst die app-weite .btn-danger-Klasse (siehe
+     app.css) statt einer eigenen Farbe — dieselbe Bestätigung wie beim
+     Gruppen-Löschen (window.appConfirm, siehe removeRow() im Root-x-data). */
+  .edash-dialog-footer{display:flex;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+
+  /* Feld-Erklärungen einmal zentral über den Kacheln (siehe Template) statt
      in jeder Karte wiederholt — bei mehreren Speichern stünde derselbe
      Hinweistext sonst mehrfach identisch da. Feste vier Spalten
      (repeat(4,1fr), nicht auto-fill) — bei auto-fill fiel die vierte Spalte
@@ -456,54 +656,23 @@
   .edash-speicher-legend dt{margin:0;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
   .edash-speicher-legend dd{margin:1px 0 0;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.4;}
 
-  /* Speicher ist die einzige Liste mit einer eigenen Karte statt einer
-     kompakten Zeile pro Eintrag (wie Erzeuger/Verbraucher) — 4 Felder
-     (Entladung/Ladung/Ladezustand/Kapazität) plus Name wären in einer Zeile
-     entweder zu schmal für vernünftige dd-picker-Breiten oder bräuchten
-     horizontales Scrollen. Eigene, hellere Fläche statt der Section-Tönung,
-     damit sich mehrere Speicher optisch klar voneinander abgrenzen —
-     dieselbe Idee wie eine Kachel auf getöntem Kartengrund. */
-  .edash-speicher-card{
-    border:1px solid var(--border);border-radius:10px;background:var(--surface);
-    padding:12px 14px;
-  }
-  .edash-speicher-card.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;}
-  .edash-speicher-card-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
-  /* width:260px/flex:none = dieselbe Standardbreite wie die Namensfelder bei
-     Erzeuger/Verbraucher (.edash-list-row input[type="text"]), statt sich
-     wie zuvor über die ganze Kartenbreite zu strecken. Normale statt fetter
-     Schrift — die Kapazität daneben (falls belegt) wird sonst nachrangig
-     wichtig wirken, ist es aber nicht. */
-  .edash-speicher-name-input{
-    width:260px;flex:none;font-family:var(--font-mono);font-size:calc(13.5px * var(--font-scale, 1));font-weight:400;
-    padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
-    box-sizing:border-box;
-  }
-  .edash-speicher-name-input:focus{outline:none;border-color:var(--accent-line);background:var(--surface);}
-  /* Immer eine einzelne Spalte (statt des app-weiten auto-fill-Verhaltens
-     von .edash-field-grid) und links um Zieh-Icon+Abstand (20px+8px)
-     eingerückt — die Felder stehen damit optisch genau unter dem
-     Namensfeld statt unter dem Drag-Handle, unabhängig von der
-     Kartenbreite. */
-  /* 260px statt 1fr — dieselbe Standardbreite wie das Namensfeld darüber
-     und wie Entitäts-Felder überall sonst in der App (.edash-list-row
-     input[type="text"], Netz/Kosten/CO2-Felder). Ohne feste Breite hätten
-     sich die Picker-Buttons hier auf die volle restliche Kartenbreite
-     gestreckt, statt die sonst überall gleiche Feldbreite zu übernehmen. */
-  .edash-speicher-card .edash-field-grid{margin-top:0;grid-template-columns:260px;margin-left:28px;}
-  /* Kapazität ist nur eine kurze Zahl (2-3 Stellen) — auf gut die Hälfte der
-     übrigen Feldbreite (260px) begrenzt statt sich wie die Entitäts-Picker
-     auf volle Spaltenbreite zu strecken. */
-  .edash-speicher-capacity-input{max-width:120px;}
+  /* Kapazität ist nur eine kurze Zahl (2-3 Stellen) — deutlich schmaler als
+     ein Entitäts-Picker, jetzt innerhalb der einspaltigen Popup-Felder
+     (.edash-dialog-fields). */
+  .edash-speicher-capacity-input{max-width:84px;padding:0 8px;}
+  .edash-speicher-capacity-input .edash-fixed-price-input{padding:8px 0;text-align:right;}
 
-  /* max-width statt reinem flex:1 — sonst zieht sich der Entitäts-Button bei
-     voller Seitenbreite über die gesamte restliche Zeile (dieselbe "riesige
-     leere Schaltfläche"-Beschwerde wie ursprünglich beim Netzbezug-Feld).
-     Schaltflächen-Größe bewusst NICHT überschrieben — reiner .btn-Standard. */
-  .edash-list-row .dd-picker-wrap{flex:1;min-width:0;max-width:260px;}
-  .edash-list-row .dd-picker-wrap>.btn{
-    width:100%;text-align:left;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
+  /* Fester Preis/CO2-Faktor (Kosten-Bezug/-Einspeisung, CO2) — dieselbe kurze
+     Zahl+Einheit-Behandlung wie .edash-speicher-capacity-input oben: ohne
+     eigene Breitenbegrenzung fällt number_field()s <input> auf die
+     Browser-Standardbreite (~170px) zurück, das Feld brach dadurch trotz
+     inline_fallback in eine zweite Zeile um statt neben dem Entitäts-Picker
+     zu stehen. Breiter als die 84px bei Speicher-Kapazität — "Ct/kWh"/
+     "g/kWh" sind länger als "kWh" und hätten bei 84px der Zahl selbst kaum
+     noch Platz gelassen (Suffix allein ~49px von 62px nutzbarer Breite). */
+  .edash-price-fixed-input{max-width:124px;padding:0 8px;}
+  .edash-price-fixed-input .edash-fixed-price-input{padding:8px 0;text-align:right;}
+
   .edash-list-remove{
     flex:none;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
     color:var(--ink-faint);cursor:pointer;font-size:calc(12px * var(--font-scale, 1));line-height:1;
@@ -522,14 +691,6 @@
   .edash-section-title-row .settings-section-title{margin:0;}
   .edash-manage-groups-btn{flex:none;padding:5px 12px;font-size:calc(12px * var(--font-scale, 1));}
 
-  /* Verbraucher ist die einzige Liste mit drei statt zwei Spalten (Name/
-     Entität/Gruppe) — dritte Kopfspalte etwas schmaler als Entität, da
-     Gruppennamen meist kurz sind (z. B. "Mobilität"). */
-  .edash-list-head-3col span:nth-child(3){flex:1;max-width:200px;}
-  .edash-list-row .edash-group-picker-wrap{flex:1;min-width:0;max-width:200px;}
-  .edash-list-row .edash-group-picker-wrap>.btn{
-    width:100%;text-align:left;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
   /* Eigene Farbe statt der neutralen .dd-picker-row-Optik — hebt die
      Neu-anlegen-Zeile klar von den bestehenden Gruppen darüber ab, analog zu
      .edash-setup-add (derselbe "etwas hinzufügen"-Grundton). */
@@ -558,6 +719,13 @@
     box-sizing:border-box;
   }
   .edash-gruppen-add input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
+  /* Feste Breite statt content-basierter Auto-Breite, exakt so groß wie die
+     Verbraucherzahl+Lösch-Button-Spalte der Zeilen darüber (.edash-gruppen-
+     usage ~86px + 8px Gap + .edash-list-remove 34px) — sonst bestimmt allein
+     die (kürzere) Button-Beschriftung "+ Hinzufügen" die zweite Spalte, das
+     Eingabefeld wird dadurch breiter als die Namensfelder darüber statt mit
+     ihnen bündig abzuschließen. */
+  .edash-gruppen-add .edash-setup-add{flex:none;width:128px;justify-content:center;}
 </style>
 </head>
 <body>

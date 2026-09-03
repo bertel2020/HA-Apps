@@ -39,6 +39,23 @@
   /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
      Untertext auch dann bündig, wenn nur einzelne Titel umbrechen. */
   .retention-summary .stat .label{min-height:3em;}
+  /* Inaktive-Entitäten-Tabelle (_stale_entities_body.html): Name und ID
+     hatten keine eigene Breitenbegrenzung (anders als z. B. in
+     entities_list.html/statistik.html) — bei langen Namen/IDs wuchs die
+     Entität-Spalte unbegrenzt und drängte "Letzter Wert"/"Vor" in den
+     Zeilenumbruch. display:block trennt Name/ID zusätzlich sauber in zwei
+     Zeilen (liefen vorher ohne Trenner zusammen), max-width+Ellipsis
+     begrenzt die Spaltenbreite. Auf #stale-entities-body statt global
+     gescopt, da table.dt/td.entity auch auf vielen anderen Seiten ohne
+     diese Begrenzung verwendet wird. */
+  #stale-entities-body td.entity .name{
+    display:block;max-width:260px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  #stale-entities-body td.entity .id{
+    display:block;max-width:260px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;
+  }
 </style>
 </head>
 <body>

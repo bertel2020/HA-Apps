@@ -1,20 +1,36 @@
-{% macro entity_field(name, initial_expr, onselect_expr='') %}
-<span class="dd-picker-wrap" x-data='entityPicker(entityOptions, {{ initial_expr }}{{ (", " ~ onselect_expr) if onselect_expr }})' @click.outside="open = false">
-  <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
-          @click="toggleOpen($refs.search)"
-          x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
-  <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
-          @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
-  <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
-    <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen …">
-    <template x-for="opt in filtered()" :key="opt.entity_id">
-      <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
-        <span x-text="opt.label"></span>
-        <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
-      </div>
-    </template>
-  </div>
-  <input type="hidden" name="{{ name }}" :value="entityId">
+{# inline_fallback: bei Feldern mit Fest-Wert-Fallback (call-Block, siehe
+   unten) sitzt der Fallback standardmäßig als eigene volle Zeile UNTER dem
+   Auswahl-Button — bei kurzen Fallback-Feldern (Zahl+Einheit, z. B. Kosten/
+   CO2/Kapazität) wirkte das wie zwei separate Felder statt einem Feld mit
+   zwei Eingabewegen. inline_fallback=true stellt den Fallback stattdessen
+   NEBEN den (dann nicht mehr volle-Breite) Button, beide in einer Zeile. #}
+{% macro entity_field(name, initial_expr, onselect_expr='', allow_units=none, deny_units=none, require_counter=false, inline_fallback=false) %}
+<span class="dd-picker-wrap{{ ' dd-picker-wrap-inline' if inline_fallback }}" x-data='entityPicker(entityOptions, {{ initial_expr }}, {{ onselect_expr if onselect_expr else "null" }}, {{ (allow_units | tojson) if allow_units else "null" }}, {{ (deny_units | tojson) if deny_units else "null" }}, {{ "true" if require_counter else "false" }})' @click.outside="open = false">
+  {# dd-picker-anchor: eigener position:relative-Anker NUR für Button/✕/
+     Popover, getrennt vom äußeren dd-picker-wrap — der "✕"-Button ist
+     position:absolute;right:6px relativ zum NÄCHSTEN positionierten
+     Vorfahren; ohne diesen Zwischen-Anker wäre das bei inline_fallback der
+     GESAMTE (breitere, Button+Zahl+Einheit umfassende) Wrap, das "✕" würde
+     also am rechten Rand der Zahl-Einheit-Box statt am rechten Rand des
+     Buttons selbst landen. Bei normalen (nicht-inline) Feldern verhält sich
+     der Anker exakt wie vorher der Wrap (width:100%, siehe CSS). #}
+  <span class="dd-picker-anchor">
+    <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
+            @click="toggleOpen($refs.search)"
+            x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
+    <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
+            @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
+      <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen …">
+      <template x-for="opt in filtered()" :key="opt.entity_id">
+        <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
+          <span x-text="opt.label"></span>
+          <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+        </div>
+      </template>
+    </div>
+    <input type="hidden" name="{{ name }}" :value="entityId">
+  </span>
   {# caller() nur vorhanden, wenn per {% call entity_field(...) %}...{% endcall %}
      aufgerufen (z. B. Kosten-Fallback-Eingabefeld) — dadurch landet der
      zusätzliche Inhalt IM selben x-data-Scope wie der Picker und kann per
@@ -30,12 +46,18 @@
    Locale). NumberFormat.fmt() ist bereits die einzige Stelle im Frontend, die
    Zahlenformat kennt (aktuell de-DE, siehe number-format.js) — eine künftige
    Sprachumschaltung muss dafür nur dort ansetzen, nicht hier zusätzlich.
-   extra_attrs: rohe zusätzliche Attribute (z. B. x-show), nur für den
-   Kosten-Fallback gebraucht — leer bei den übrigen Aufrufen (Speicher). #}
-{% macro number_field(name, raw_value, placeholder, extra_attrs='') %}
-<input type="text" inputmode="decimal" name="{{ name }}" placeholder="{{ placeholder }}"
-       class="edash-fixed-price-input" {{ extra_attrs | safe }}
-       x-init="const v = {{ raw_value | tojson }}; if (v !== null) $el.value = NumberFormat.fmt(v)">
+   extra_attrs: rohe zusätzliche Attribute (z. B. x-show) — sitzen auf dem
+   ÄUSSEREN Wrapper (nicht dem Input direkt), damit Einheiten-Suffix und Feld
+   gemeinsam ein-/ausgeblendet werden. unit: Einheit als Suffix IM Feld
+   (z. B. "Ct/kWh"), statt sie nur einmal weiter unten im Hinweistext zu
+   nennen — bleibt auch dann sichtbar, wenn man den Hinweistext nicht liest. #}
+{% macro number_field(name, raw_value, placeholder, extra_attrs='', unit='', extra_class='') %}
+<span class="edash-unit-input{{ ' ' ~ extra_class if extra_class }}" {{ extra_attrs | safe }}>
+  <input type="text" inputmode="decimal" name="{{ name }}" placeholder="{{ placeholder }}"
+         class="edash-fixed-price-input"
+         x-init="const v = {{ raw_value | tojson }}; if (v !== null) $el.value = NumberFormat.fmt(v)">
+  {% if unit %}<span class="edash-unit-suffix">{{ unit }}</span>{% endif %}
+</span>
 {% endmacro %}
 
 {# Gruppen-Auswahl je Verbraucher-Zeile — dasselbe Such-Dropdown-Muster wie
@@ -66,8 +88,80 @@
 </span>
 {% endmacro %}
 
+{# Grobe Negativliste für Rollen ohne festen Einheiten-Standard (Preis,
+   CO2-Faktor — siehe entity_field()/entityPicker()): blendet nur eindeutig
+   falsche Einheiten aus, statt (wie bei kWh/%-Rollen) auf wenige erlaubte
+   Werte zu verengen — für Preis/CO2 gibt es keinen einzelnen kanonischen
+   Einheiten-String über alle HA-Integrationen hinweg. #}
+{% set OBVIOUSLY_WRONG_UNITS = ['kWh', 'Wh', 'MWh', '%', '°C', '°F', 'W', 'kW', 'V', 'A', 'Hz', 'hPa', 'mbar'] %}
+
+<script>
+  // showModal() fokussiert per Spec automatisch ein Element im Dialog (das
+  // erste fokussierbare Kind, sonst den Dialog selbst) — Browser scrollen
+  // die Seite dabei manchmal trotzdem ein Stück (beobachtet z. B. bei einer
+  // Kachel weiter unten im langen Setup-Formular), obwohl der Dialog als
+  // position:fixed ohnehin schon vollständig im Viewport sitzt. Scroll-
+  // Position vor showModal() merken und im nächsten Frame zurücksetzen,
+  // falls der Browser sie doch verschoben hat — bewusst NICHT einfach das
+  // Fokussieren unterdrücken, das würde Tastatur-/Screenreader-Bedienung
+  // verschlechtern.
+  function openEdashDialog(idOrEl) {
+    const dlg = typeof idOrEl === "string" ? document.getElementById(idOrEl) : idOrEl;
+    if (!dlg) return;
+    const y = window.scrollY;
+    dlg.showModal();
+    requestAnimationFrame(() => { if (window.scrollY !== y) window.scrollTo(0, y); });
+  }
+</script>
+
 <div x-data='{
   entityOptions: {{ entity_options | tojson }},
+  // Root-Spiegel der Einzelfeld-Rollen (Netz/Kosten/Prognose/CO2) — der
+  // TATSÄCHLICHE Stand nach dem letzten "Übernehmen" je Popup (siehe draft
+  // unten). Kacheln lesen NUR diese Root-Felder, nie draft direkt — deshalb
+  // ändert sich an einer Kachel nichts, solange ein Popup nur offen ist,
+  // ohne dass "Übernehmen" geklickt wurde.
+  netzbezug: {{ (config.netzbezug or '') | tojson }},
+  netzbezugName: {{ (config.netzbezug_name or '') | tojson }},
+  einspeisung: {{ (config.einspeisung or '') | tojson }},
+  einspeisungName: {{ (config.einspeisung_name or '') | tojson }},
+  kostenBezugEntity: {{ (config.kosten.preis_netzbezug if config.kosten else '') | tojson }},
+  kostenEinspeisungEntity: {{ (config.kosten.preis_einspeisung if config.kosten else '') | tojson }},
+  prognoseHeute: {{ (config.prognose.rest_heute_entity_id if config.prognose else '') | tojson }},
+  prognoseMorgen: {{ (config.prognose.morgen_entity_id if config.prognose else '') | tojson }},
+  co2Entity: {{ (config.co2.faktor_netzbezug_entity if config.co2 else '') | tojson }},
+  {% set kb = config.kosten.get('preis_netzbezug_fixed') if config.kosten else none %}
+  kostenBezugFixed: {{ ((kb * 100) if kb is not none else none) | tojson }},
+  {% set ke = config.kosten.get('preis_einspeisung_fixed') if config.kosten else none %}
+  kostenEinspeisungFixed: {{ ((ke * 100) if ke is not none else none) | tojson }},
+  co2Fixed: {{ (config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none) | tojson }},
+  // Entwurf für die Einzelrollen-Popups (Netz/Kosten/Prognose/CO2): beim
+  // Öffnen einer Kachel wird der AKTUELLE Stand hierher kopiert, alle
+  // Eingaben im Popup ändern NUR draft.*, die Kachel bleibt unverändert, bis
+  // der "Übernehmen"-Button im Popup draft.* zurück in die echten Felder
+  // oben kopiert. Schließen ohne "Übernehmen" (✕ oder Klick daneben) lässt
+  // draft einfach verwaist liegen, ohne Wirkung — beim nächsten Öffnen wird
+  // es ohnehin neu aus dem aktuellen (unveränderten) Stand befüllt.
+  draft: {},
+  // Dasselbe Prinzip für Erzeuger/Speicher/Verbraucher: eine flache Kopie
+  // der geöffneten Zeile. "Übernehmen" kopiert draftRow zurück in die
+  // echte Zeile (dieselbe Objektreferenz wie in erzeuger/speicher/
+  // verbraucher, damit Kachel + x-for weiter darauf zeigen), "entfernen"
+  // arbeitet unverändert direkt auf der echten Zeile.
+  draftRow: {},
+  // Alpines x-data (also auch der Entitäts-Picker in entity_field) liest
+  // seinen Anfangswert NUR EINMAL beim ersten Rendern der Seite, nicht bei
+  // jedem erneuten Öffnen eines <dialog> — ohne diesen Schalter würde das
+  // Popup-Feld dauerhaft leer bleiben (Startwert = der beim Laden noch
+  // leere draft/draftRow), selbst wenn draft/draftRow direkt vor dem
+  // Öffnen frisch befüllt wurde. Der Inhalt jedes Popups steckt deshalb in
+  // einem <template x-if="activePopup === KEY">, das bei jedem Öffnen neu
+  // (mit dem gerade befüllten draft/draftRow) gemountet wird.
+  // @close (natives <dialog>-Event, feuert bei JEDEM Schließen — Button,
+  // Escape, Klick daneben) setzt es zuverlässig wieder zurück, sonst würde
+  // ein erneutes Öffnen DESSELBEN Popups keine Änderung erkennen und nicht
+  // neu mounten.
+  activePopup: null,
   // _key: stabile, von der Array-Position UNABHÄNGIGE Kennung je Zeile —
   // :key="idx" (die alte Variante) verwechselte Alpine beim Umsortieren:
   // dieselbe DOM-Position (idx) blieb bestehen, nur die einfachen
@@ -93,12 +187,88 @@
   // Tags/Labels in Home Assistant unabhängig vom einzelnen Gerät existieren).
   gruppen: {{ (config.verbraucher_gruppen or []) | tojson }},
   newGroupName: "",
+  // Serverseitig aufgelöste Kapazität je bereits konfiguriertem Speicher
+  // (echter letzter archivierter Rohwert, bereits Wh->kWh umgerechnet —
+  // siehe _resolve_speicher_capacity/resolved_capacities im Backend). Genauer
+  // als entityOptions[].last_value (dort günstiger, aber für viele
+  // Kapazitäts-Sensoren leer) und deshalb in capacityLabel() zuerst geprüft.
+  resolvedCapacities: {{ resolved_capacities | tojson }},
   nameFor(id) {
     const o = this.entityOptions.find(o => o.entity_id === id);
     return o ? o.label : id;
   },
+  // Für die Kosten-/CO2-Kacheln: Entität hat Vorrang (wie beim Speichern),
+  // sonst der feste Wert (einmalig beim Laden gerendert, siehe oben), sonst
+  // "Nicht konfiguriert" — dieselbe Vorrang-Logik wie im Backend.
+  priceLabel(entityId, fixedVal, unit) {
+    if (entityId) return this.nameFor(entityId);
+    if (fixedVal !== null && fixedVal !== undefined) return NumberFormat.fmt(fixedVal) + " " + unit + " (fest)";
+    return "Nicht konfiguriert";
+  },
+  // Anders als priceLabel() (zeigt bei Entitäts-Zuordnung nur deren Namen)
+  // soll die Speicher-Kachel die Kapazität IMMER als kWh-Zahl zeigen, egal
+  // ob fest eingetragen oder aus einer Entität — sonst wüsste man auf der
+  // Kachel nicht, wie groß der Speicher tatsächlich ist, ohne das Popup zu
+  // öffnen. last_value kommt unverändert vom letzten archivierten Messwert
+  // (siehe _entity_options() im Backend); Wh-Entitäten werden wie überall
+  // sonst (_resolve_speicher_capacity) durch 1000 geteilt.
+  capacityLabel(row) {
+    if (row.capacity_entity_id) {
+      const resolved = this.resolvedCapacities[row.capacity_entity_id];
+      if (resolved !== null && resolved !== undefined) {
+        return NumberFormat.fmt(Math.round(resolved * 100) / 100) + " kWh";
+      }
+      const o = this.entityOptions.find(o => o.entity_id === row.capacity_entity_id);
+      if (o && o.last_value !== null && o.last_value !== undefined) {
+        const kwh = o.unit === "Wh" ? o.last_value / 1000 : o.last_value;
+        return NumberFormat.fmt(Math.round(kwh * 100) / 100) + " kWh";
+      }
+      return this.nameFor(row.capacity_entity_id);
+    }
+    if (row.capacity_kwh) return row.capacity_kwh + " kWh";
+    return "Nicht konfiguriert";
+  },
   groupUsage(name) {
     return this.verbraucher.filter(v => v.gruppe === name).length;
+  },
+  // Dieselbe Bestätigung wie deleteGroup() unten (appConfirm statt native
+  // window.confirm, passend zum App-Look) — ein Entfernen-Klick in einem
+  // Kachel-Popup darf nicht sofort löschen, sonst kein Unterschied mehr zum
+  // versehentlichen Doppelklick.
+  async removeRow(list, idx, row, kind) {
+    const name = row && row.name;
+    const message = name ? kind + " „" + name + "\" wirklich entfernen?" : kind + " wirklich entfernen?";
+    const ok = await window.appConfirm(message, {danger: true, confirmLabel: "Entfernen"});
+    if (ok) list.splice(idx, 1);
+  },
+  // +-Kachel legt eine neue (leere) Zeile an, befüllt draftRow direkt damit
+  // und öffnet ihr Popup — Felder darin gehen wie bei jeder Zeile zunächst
+  // nur in draftRow, "Übernehmen" schreibt sie in die bereits echte
+  // (aber noch leere) Zeile. $nextTick, weil das <dialog> erst nach dem
+  // reaktiven DOM-Update (neue x-for-Iteration) existiert.
+  addErzeuger() {
+    const key = "e" + Date.now() + Math.random();
+    const row = {entity_id: "", name: "", _key: key};
+    this.erzeuger.push(row);
+    this.draftRow = {...row};
+    this.activePopup = key;
+    this.$nextTick(() => openEdashDialog("edash-dlg-erz-" + key));
+  },
+  addSpeicher() {
+    const key = "sp" + Date.now() + Math.random();
+    const row = {name: "", entladen_entity_id: "", laden_entity_id: "", soc_entity_id: "", capacity_kwh: "", capacity_entity_id: "", _key: key};
+    this.speicher.push(row);
+    this.draftRow = {...row};
+    this.activePopup = key;
+    this.$nextTick(() => openEdashDialog("edash-dlg-sp-" + key));
+  },
+  addVerbraucher() {
+    const key = "v" + Date.now() + Math.random();
+    const row = {entity_id: "", name: "", gruppe: "", _key: key};
+    this.verbraucher.push(row);
+    this.draftRow = {...row};
+    this.activePopup = key;
+    this.$nextTick(() => openEdashDialog("edash-dlg-vb-" + key));
   },
   addGroup() {
     const name = this.newGroupName.trim();
@@ -152,138 +322,278 @@
       <div class="edash-field-grid">
         <div class="field">
           <label>Name des zentralen Knotens</label>
-          <input type="text" name="hub_name" value="{{ config.hub_name or '' }}" placeholder="Haus">
+          <input type="text" name="hub_name" value="{{ config.hub_name or '' }}" placeholder="Haus" maxlength="40">
           <p class="hint">Beschriftung des Sammelknotens in der Sankey-Mitte.</p>
         </div>
+        <div class="field">
+          <label>Auffälligkeiten</label>
+          <span class="dd-picker-wrap">
+            <button type="button" class="btn" id="anomalie-schwelle-btn" onclick="toggleDDPicker('anomalie-schwelle')">{% for k, l in anomalie_schwelle_options %}{% if k == config.anomalie_schwelle %}{{ l }}{% endif %}{% endfor %} ▾</button>
+            <input type="hidden" name="anomalie_schwelle" id="anomalie-schwelle-input" value="{{ config.anomalie_schwelle }}">
+            <div class="dd-picker-popover" id="anomalie-schwelle-popover">
+              {% for key, label in anomalie_schwelle_options %}
+              <div class="dd-picker-row" onclick="selectDDOption('anomalie-schwelle', '{{ key }}', '{{ label }}')">{{ label }}</div>
+              {% endfor %}
+            </div>
+          </span>
+          <p class="hint">Schwellenwert für die Auffälligkeiten-Markierung. „Aus" deaktiviert die Prüfung.</p>
+        </div>
       </div>
-      <div class="field">
+      {# Chip-Mehrfachauswahl (.filter-chip, app-weiter Standard z. B. in
+         entities_list.html/cleanup.html) statt Checkbox+Label-Zeilen —
+         gleiche Funktion, aber deutlich kompakter (eine umbrechende Zeile
+         statt sechs) und einheitlich mit dem Rest der App. #}
+      <div class="field" style="margin-bottom:0;">
         <label>Sichtbare Kacheln</label>
         <div class="edash-toggle-list">
-          <label class="edash-toggle-row">
-            <input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}>
-            <span>Autarkie &amp; Speicher</span>
-          </label>
-          <label class="edash-toggle-row">
-            <input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}>
-            <span>Verbraucheranteile</span>
-          </label>
-          <label class="edash-toggle-row">
-            <input type="checkbox" name="show_kostenanalyse" {% if config.show_kostenanalyse %}checked{% endif %}>
-            <span>Kostenanalyse</span>
-          </label>
-          <label class="edash-toggle-row">
-            <input type="checkbox" name="show_co2" {% if config.show_co2 %}checked{% endif %}>
-            <span>CO2-Bilanz</span>
-          </label>
-          <label class="edash-toggle-row">
-            <input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}>
-            <span>Tageslastprofil</span>
-          </label>
-          <label class="edash-toggle-row">
-            <input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}>
-            <span>Bilanz &amp; Datenqualität</span>
-          </label>
+          <label class="filter-chip"><input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}><span>Autarkie &amp; Speicher</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}><span>Verbraucheranteile</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_kostenanalyse" {% if config.show_kostenanalyse %}checked{% endif %}><span>Kostenanalyse</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_co2" {% if config.show_co2 %}checked{% endif %}><span>CO2-Bilanz</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}><span>Tageslastprofil</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}><span>Bilanz &amp; Datenqualität</span></label>
         </div>
-        <p class="hint">Energiefluss ist immer sichtbar. Alle anderen Kacheln lassen sich hier einzeln ausblenden.</p>
-      </div>
-      <div class="field">
-        <label>Auffälligkeiten</label>
-        <span class="dd-picker-wrap">
-          <button type="button" class="btn" id="anomalie-schwelle-btn" onclick="toggleDDPicker('anomalie-schwelle')">{% for k, l in anomalie_schwelle_options %}{% if k == config.anomalie_schwelle %}{{ l }}{% endif %}{% endfor %} ▾</button>
-          <input type="hidden" name="anomalie_schwelle" id="anomalie-schwelle-input" value="{{ config.anomalie_schwelle }}">
-          <div class="dd-picker-popover" id="anomalie-schwelle-popover">
-            {% for key, label in anomalie_schwelle_options %}
-            <div class="dd-picker-row" onclick="selectDDOption('anomalie-schwelle', '{{ key }}', '{{ label }}')">{{ label }}</div>
-            {% endfor %}
-          </div>
-        </span>
-        <p class="hint">Verbraucher/Gruppen, die deutlich über ihrem üblichen Schnitt liegen, im Sankey und unter Bilanz &amp; Datenqualität markieren. "Aus" deaktiviert die Prüfung.</p>
+        <p class="hint">Energiefluss ist immer sichtbar — alle anderen Kacheln lassen sich hier einzeln ausblenden.</p>
       </div>
     </section>
 
     <section class="settings-section edash-section-netz">
       <h2 class="settings-section-title">Netz</h2>
       <p class="settings-section-description">Netzbezug ist die einzige Pflicht-Rolle. Alles andere bleibt leer, bis passende Sensoren zugeordnet sind.</p>
-      <div class="edash-field-grid">
-        <div class="field">
-          <label>Netzbezug *</label>
-          {{ entity_field('netzbezug', (config.netzbezug or '') | tojson) }}
-        </div>
-        <div class="field">
-          <label>Einspeisung</label>
-          {{ entity_field('einspeisung', (config.einspeisung or '') | tojson) }}
-        </div>
+      <div class="edash-item-grid">
+        <button type="button" class="edash-item-tile"
+                @click="draft.netzbezug = netzbezug; draft.netzbezugName = netzbezugName; activePopup = 'netzbezug'; openEdashDialog('edash-dlg-netzbezug')">
+          <div class="edash-item-accent" style="background:var(--chart-1);"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+              <span class="edash-item-name" x-text="netzbezugName || 'Netzbezug'"></span>
+              <span class="edash-item-req">Pflicht</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !netzbezug}" x-text="netzbezug ? nameFor(netzbezug) : 'Nicht zugeordnet'"></span>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="edash-item-tile"
+                @click="draft.einspeisung = einspeisung; draft.einspeisungName = einspeisungName; activePopup = 'einspeisung'; openEdashDialog('edash-dlg-einspeisung')">
+          <div class="edash-item-accent" style="background:var(--chart-2);"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+              <span class="edash-item-name" x-text="einspeisungName || 'Einspeisung'"></span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !einspeisung}" x-text="einspeisung ? nameFor(einspeisung) : 'Nicht zugeordnet'"></span>
+            </div>
+          </div>
+        </button>
       </div>
+
+      <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-1)" id="edash-dlg-netzbezug" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Netzbezug</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-netzbezug').close()" aria-label="Schließen">✕</button>
+        </div>
+        <template x-if="activePopup === 'netzbezug'">
+          <div>
+            <div class="edash-dialog-fields">
+              <div class="field"><label>Name</label><input type="text" x-model="draft.netzbezugName" placeholder="Netzbezug" maxlength="40"></div>
+              <div class="field">
+                <label>Entität *</label>
+                {{ entity_field('netzbezug_draft', 'draft.netzbezug', "(id) => { draft.netzbezug = id; }", allow_units=['kWh'], require_counter=true) }}
+                <p class="hint">Zähler „aus dem Netz bezogene Energie" (kWh, steigend).</p>
+              </div>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="netzbezug = draft.netzbezug; netzbezugName = draft.netzbezugName; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+      </dialog>
+      <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-2)" id="edash-dlg-einspeisung" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Einspeisung</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-einspeisung').close()" aria-label="Schließen">✕</button>
+        </div>
+        <template x-if="activePopup === 'einspeisung'">
+          <div>
+            <div class="edash-dialog-fields">
+              <div class="field"><label>Name</label><input type="text" x-model="draft.einspeisungName" placeholder="Einspeisung" maxlength="40"></div>
+              <div class="field">
+                <label>Entität</label>
+                {{ entity_field('einspeisung_draft', 'draft.einspeisung', "(id) => { draft.einspeisung = id; }", allow_units=['kWh'], require_counter=true) }}
+                <p class="hint">Zähler „ins Netz eingespeiste Energie" (kWh, steigend).</p>
+              </div>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="einspeisung = draft.einspeisung; einspeisungName = draft.einspeisungName; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+      </dialog>
+      {# Die vier echten, gesendeten Felder (Name UND Entität) — im Popup
+         oben heißt die entity_field-Instanz bewusst "..._draft" und wird
+         NICHT mitgesendet (steckt außerdem in einem <template x-if>, das
+         beim Schließen des Popups komplett aus dem DOM verschwindet, siehe
+         Kommentar bei activePopup weiter oben — ein <input> darin würde
+         beim Speichern schlicht fehlen). Die echten Felder hier sind
+         IMMER im DOM vorhanden und an den committeten Root-Stand gebunden,
+         genau wie bei Erzeuger/Speicher/Verbraucher (siehe deren
+         "hidden-erz-"/"hidden-sp-"/"hidden-vb-" x-for-Blöcke). #}
+      <input type="hidden" name="netzbezug_name" :value="netzbezugName">
+      <input type="hidden" name="netzbezug" :value="netzbezug">
+      <input type="hidden" name="einspeisung_name" :value="einspeisungName">
+      <input type="hidden" name="einspeisung" :value="einspeisung">
     </section>
 
     <section class="settings-section edash-section-erzeuger">
       <h2 class="settings-section-title">Erzeuger</h2>
       <p class="settings-section-description">Beliebig viele Erzeuger, z. B. Dach-PV und ein zusätzliches Balkonkraftwerk.</p>
-      <div class="edash-list-head" x-show="erzeuger.length"><span>Name</span><span>Entität</span></div>
-      <template x-for="(row, idx) in erzeuger" :key="row._key">
-        <div class="edash-list-row" :class="{'is-drag-over': dragList === erzeuger && dragOverIdx === idx && dragIdx !== idx}"
-             @dragover.prevent="dragOver(erzeuger, idx)" @drop.prevent="dragDrop(erzeuger, idx)">
-          <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren"
-                @dragstart="dragStart(erzeuger, idx)" @dragend="dragEnd()">⠿</span>
-          <input type="text" name="erzeuger_name" x-model="row.name" placeholder="Name">
-          {{ entity_field('erzeuger_entity_id', 'row.entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
-          <button type="button" class="edash-list-remove" @click="erzeuger.splice(idx, 1)" title="Entfernen">✕</button>
-        </div>
+      <div class="edash-item-grid">
+        <template x-for="(row, idx) in erzeuger" :key="row._key">
+          <div style="display:contents">
+            <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === erzeuger && dragOverIdx === idx && dragIdx !== idx}"
+                    @dragover.prevent="dragOver(erzeuger, idx)" @drop.prevent="dragDrop(erzeuger, idx)"
+                    @click="draftRow = {...row}; activePopup = row._key; openEdashDialog('edash-dlg-erz-' + row._key)">
+              <div class="edash-item-accent" style="background:var(--chart-3);"></div>
+              <div class="edash-item-body">
+                <div class="edash-item-head">
+                  <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren" @click.stop
+                        @dragstart="dragStart(erzeuger, idx)" @dragend="dragEnd()">⠿</span>
+                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
+                  <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : 'Erzeuger')"></span>
+                </div>
+                <div class="edash-item-bottom">
+                  <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : 'Nicht zugeordnet'"></span>
+                </div>
+              </div>
+            </button>
+            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-3)" :id="'edash-dlg-erz-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+              <div class="detail-dialog-header">
+                <h2>Erzeuger</h2>
+                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="Schließen">✕</button>
+              </div>
+              <template x-if="activePopup === row._key">
+                <div>
+                  <div class="edash-dialog-fields">
+                    <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="Name" maxlength="40"></div>
+                    <div class="field">
+                      <label>Entität</label>
+                      {{ entity_field('erzeuger_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      <p class="hint">Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).</p>
+                    </div>
+                  </div>
+                  <div class="edash-dialog-footer" style="justify-content:space-between;">
+                    <button type="button" class="btn btn-danger" @click="removeRow(erzeuger, idx, row, 'Erzeuger')">Erzeuger entfernen</button>
+                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">Übernehmen</button>
+                  </div>
+                </div>
+              </template>
+            </dialog>
+          </div>
+        </template>
+        <button type="button" class="edash-item-add" @click="addErzeuger()">
+          <span class="edash-item-add-btn">+</span>
+        </button>
+      </div>
+      {# Reale, gesendete Felder — die entity_field-Instanz im Popup oben
+         heißt bewusst anders ("_draft"-Suffix) und wird NICHT mitgesendet,
+         sonst kämen zwei "erzeuger_entity_id"-Werte pro Zeile im Formular an
+         (der Entwurf UND der committete Stand). Reihenfolge/Länge dieser
+         Listen bestimmt weiterhin, wie viele Erzeuger ankommen (siehe
+         energiedashboard_setup_save). #}
+      <template x-for="row in erzeuger" :key="'hidden-erz-' + row._key">
+        <span>
+          <input type="hidden" name="erzeuger_name" :value="row.name">
+          <input type="hidden" name="erzeuger_entity_id" :value="row.entity_id">
+        </span>
       </template>
-      <button type="button" class="edash-setup-add" @click="erzeuger.push({entity_id: '', name: '', _key: 'e' + Date.now() + Math.random()})">+ Erzeuger hinzufügen</button>
     </section>
 
     <section class="settings-section edash-section-speicher">
       <h2 class="settings-section-title">Speicher</h2>
       <p class="settings-section-description">Beliebig viele Batteriespeicher, z. B. ein Hausspeicher und ein separates Balkonkraftwerk mit eigenem Speicher. Werte über mehrere Speicher hinweg werden addiert (Energie) bzw. kapazitätsgewichtet gemittelt (Ladezustand).</p>
-      {# Feld-Erklärungen einmal zentral statt in jeder Karte wiederholt —
-         bei mehreren Speichern stünde derselbe Hinweistext sonst mehrfach
-         identisch da. Die Karten selbst behalten nur die kurzen Feld-Labels
-         (Entladung/Ladung/...) zur Orientierung. Feste 4-Spalten statt
-         auto-fill: bei auto-fill brach die vierte Spalte je nach
-         Fensterbreite in eine zweite Zeile um — mit repeat(4,1fr) bleiben
-         es immer vier nebeneinanderstehende Spalten, die Beschreibung
-         selbst darf innerhalb ihrer Spalte mehrzeilig umbrechen. #}
-      <dl class="edash-speicher-legend">
-        <div><dt>Entladung</dt><dd>Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).</dd></div>
-        <div><dt>Ladung</dt><dd>Zähler „in den Speicher geladene Energie" (kWh, steigend).</dd></div>
-        <div><dt>Ladezustand</dt><dd>Aktueller Füllstand in % (SOC).</dd></div>
-        <div><dt>Kapazität</dt><dd>Nutzbare Gesamtkapazität. Nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt wird und mehrere Speicher richtig gewichtet werden.</dd></div>
-      </dl>
-      <div class="edash-speicher-grid">
-      <template x-for="(row, idx) in speicher" :key="row._key">
-        <div class="edash-speicher-card" :class="{'is-drag-over': dragList === speicher && dragOverIdx === idx && dragIdx !== idx}"
-             @dragover.prevent="dragOver(speicher, idx)" @drop.prevent="dragDrop(speicher, idx)">
-          <div class="edash-speicher-card-head">
-            <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren"
-                  @dragstart="dragStart(speicher, idx)" @dragend="dragEnd()">⠿</span>
-            <input type="text" name="speicher_name" x-model="row.name" placeholder="z. B. Hausspeicher" class="edash-speicher-name-input">
-            <button type="button" class="edash-list-remove" @click="speicher.splice(idx, 1)" title="Entfernen">✕</button>
+      <div class="edash-item-grid">
+        <template x-for="(row, idx) in speicher" :key="row._key">
+          <div style="display:contents">
+            <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === speicher && dragOverIdx === idx && dragIdx !== idx}"
+                    @dragover.prevent="dragOver(speicher, idx)" @drop.prevent="dragDrop(speicher, idx)"
+                    @click="draftRow = {...row}; activePopup = row._key; openEdashDialog('edash-dlg-sp-' + row._key)">
+              <div class="edash-item-accent" style="background:var(--chart-4);"></div>
+              <div class="edash-item-body">
+                <div class="edash-item-head">
+                  <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren" @click.stop
+                        @dragstart="dragStart(speicher, idx)" @dragend="dragEnd()">⠿</span>
+                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
+                  <span class="edash-item-name" x-text="row.name || 'Speicher'"></span>
+                </div>
+                <div class="edash-item-bottom">
+                  <span class="edash-item-meta" :class="{'is-empty': !row.capacity_entity_id && !row.capacity_kwh}"
+                        x-text="capacityLabel(row)"></span>
+                  <span class="edash-item-meta-sub" x-show="row.capacity_entity_id" x-text="nameFor(row.capacity_entity_id)"></span>
+                </div>
+              </div>
+            </button>
+            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-4)" :id="'edash-dlg-sp-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+              <div class="detail-dialog-header">
+                <h2>Speicher</h2>
+                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="Schließen">✕</button>
+              </div>
+              <template x-if="activePopup === row._key">
+                <div>
+                  <div class="edash-dialog-fields">
+                    <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="z. B. Hausspeicher" maxlength="40"></div>
+                    <div class="field">
+                      <label>Entladung</label>
+                      {{ entity_field('speicher_entladen_entity_id_draft', 'draftRow.entladen_entity_id', "(id) => { draftRow.entladen_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      <p class="hint">Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).</p>
+                    </div>
+                    <div class="field">
+                      <label>Ladung</label>
+                      {{ entity_field('speicher_laden_entity_id_draft', 'draftRow.laden_entity_id', "(id) => { draftRow.laden_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      <p class="hint">Zähler „in den Speicher geladene Energie" (kWh, steigend).</p>
+                    </div>
+                    <div class="field">
+                      <label>Ladezustand</label>
+                      {{ entity_field('speicher_soc_entity_id_draft', 'draftRow.soc_entity_id', "(id) => { draftRow.soc_entity_id = id; }", allow_units=['%']) }}
+                      <p class="hint">Aktueller Füllstand in Prozent (SOC).</p>
+                    </div>
+                    <div class="field">
+                      <label>Kapazität</label>
+                      {% call entity_field('speicher_capacity_entity_id_draft', 'draftRow.capacity_entity_id', "(id) => { draftRow.capacity_entity_id = id; }", allow_units=['kWh', 'Wh'], inline_fallback=true) %}
+                        <span class="edash-unit-input edash-speicher-capacity-input" x-show="!entityId">
+                          <input type="text" inputmode="decimal" x-model="draftRow.capacity_kwh"
+                                 placeholder="z. B. 10" class="edash-fixed-price-input">
+                          <span class="edash-unit-suffix">kWh</span>
+                        </span>
+                      {% endcall %}
+                      <p class="hint">Nutzbare Gesamtkapazität, nur nötig für die kWh-Anzeige. Entität hat Vorrang, Wh wird automatisch umgerechnet.</p>
+                    </div>
+                  </div>
+                  <div class="edash-dialog-footer" style="justify-content:space-between;">
+                    <button type="button" class="btn btn-danger" @click="removeRow(speicher, idx, row, 'Speicher')">Speicher entfernen</button>
+                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">Übernehmen</button>
+                  </div>
+                </div>
+              </template>
+            </dialog>
           </div>
-          <div class="edash-field-grid">
-            <div class="field">
-              <label>Entladung</label>
-              {{ entity_field('speicher_entladen_entity_id', 'row.entladen_entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
-            </div>
-            <div class="field">
-              <label>Ladung</label>
-              {{ entity_field('speicher_laden_entity_id', 'row.laden_entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
-            </div>
-            <div class="field">
-              <label>Ladezustand</label>
-              {{ entity_field('speicher_soc_entity_id', 'row.soc_entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
-            </div>
-            <div class="field">
-              <label>Kapazität</label>
-              <input type="text" inputmode="decimal" name="speicher_capacity_kwh" x-model="row.capacity_kwh"
-                     placeholder="z. B. 10" class="edash-speicher-capacity-input">
-            </div>
-          </div>
-        </div>
-      </template>
+        </template>
+        <button type="button" class="edash-item-add" @click="addSpeicher()">
+          <span class="edash-item-add-btn">+</span>
+        </button>
       </div>
-      <button type="button" class="edash-setup-add"
-              @click="speicher.push({name: '', entladen_entity_id: '', laden_entity_id: '', soc_entity_id: '', capacity_kwh: '', _key: 'sp' + Date.now() + Math.random()})">+ Speicher hinzufügen</button>
+      <template x-for="row in speicher" :key="'hidden-sp-' + row._key">
+        <span>
+          <input type="hidden" name="speicher_name" :value="row.name">
+          <input type="hidden" name="speicher_entladen_entity_id" :value="row.entladen_entity_id">
+          <input type="hidden" name="speicher_laden_entity_id" :value="row.laden_entity_id">
+          <input type="hidden" name="speicher_soc_entity_id" :value="row.soc_entity_id">
+          <input type="hidden" name="speicher_capacity_kwh" :value="row.capacity_kwh">
+          <input type="hidden" name="speicher_capacity_entity_id" :value="row.capacity_entity_id">
+        </span>
+      </template>
       {# Kein manuelles Wirkungsgrad-Feld mehr — die App berechnet ihn selbst
          aus Entladung/Ladung über die gesamte bisherige Historie (siehe
          speicher_efficiency in compute_flow, energiedashboard_routes.py)
@@ -293,23 +603,71 @@
     <section class="settings-section edash-section-verbraucher">
       <div class="edash-section-title-row">
         <h2 class="settings-section-title">Verbraucher</h2>
-        <button type="button" class="btn edash-manage-groups-btn" @click="$refs.gruppenDialog.showModal()">Gruppen</button>
+        <button type="button" class="btn edash-manage-groups-btn" @click="openEdashDialog($refs.gruppenDialog)">Gruppen</button>
       </div>
       <p class="settings-section-description">Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen.</p>
-      <div class="edash-list-head edash-list-head-3col" x-show="verbraucher.length"><span>Name</span><span>Entität</span><span>Gruppe</span></div>
-      <template x-for="(row, idx) in verbraucher" :key="row._key">
-        <div class="edash-list-row" :class="{'is-drag-over': dragList === verbraucher && dragOverIdx === idx && dragIdx !== idx}"
-             @dragover.prevent="dragOver(verbraucher, idx)" @drop.prevent="dragDrop(verbraucher, idx)">
-          <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren"
-                @dragstart="dragStart(verbraucher, idx)" @dragend="dragEnd()">⠿</span>
-          <input type="text" name="verbraucher_name" x-model="row.name" placeholder="Name">
-          {{ entity_field('verbraucher_entity_id', 'row.entity_id', "(id) => { if (!row.name) row.name = nameFor(id); }") }}
-          {{ group_field('verbraucher_gruppe', 'row.gruppe', "(name) => { row.gruppe = name; }") }}
-          <button type="button" class="edash-list-remove" @click="verbraucher.splice(idx, 1)" title="Entfernen">✕</button>
-        </div>
-      </template>
-      <button type="button" class="edash-setup-add" @click="verbraucher.push({entity_id: '', name: '', gruppe: '', _key: 'v' + Date.now() + Math.random()})">+ Verbraucher hinzufügen</button>
+      <div class="edash-item-grid">
+        <template x-for="(row, idx) in verbraucher" :key="row._key">
+          <div style="display:contents">
+            <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === verbraucher && dragOverIdx === idx && dragIdx !== idx}"
+                    @dragover.prevent="dragOver(verbraucher, idx)" @drop.prevent="dragDrop(verbraucher, idx)"
+                    @click="draftRow = {...row}; activePopup = row._key; openEdashDialog('edash-dlg-vb-' + row._key)">
+              <div class="edash-item-accent" style="background:var(--chart-7);"></div>
+              <div class="edash-item-body">
+                <div class="edash-item-head">
+                  <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren" @click.stop
+                        @dragstart="dragStart(verbraucher, idx)" @dragend="dragEnd()">⠿</span>
+                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
+                  <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : 'Verbraucher')"></span>
+                </div>
+                <div class="edash-item-bottom">
+                  <span class="edash-item-chip" x-show="row.gruppe" x-text="row.gruppe"></span>
+                  <span class="edash-item-chip edash-item-chip-empty" x-show="!row.gruppe">Keine Gruppe</span>
+                  <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : 'Nicht zugeordnet'"></span>
+                </div>
+              </div>
+            </button>
+            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-7)" :id="'edash-dlg-vb-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+              <div class="detail-dialog-header">
+                <h2>Verbraucher</h2>
+                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="Schließen">✕</button>
+              </div>
+              <template x-if="activePopup === row._key">
+                <div>
+                  <div class="edash-dialog-fields">
+                    <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="Name" maxlength="40"></div>
+                    <div class="field">
+                      <label>Entität</label>
+                      {{ entity_field('verbraucher_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      <p class="hint">Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).</p>
+                    </div>
+                    <div class="field">
+                      <label>Gruppe</label>
+                      {{ group_field('verbraucher_gruppe_draft', 'draftRow.gruppe', "(name) => { draftRow.gruppe = name; }") }}
+                      <p class="hint">Optional — fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen.</p>
+                    </div>
+                  </div>
+                  <div class="edash-dialog-footer" style="justify-content:space-between;">
+                    <button type="button" class="btn btn-danger" @click="removeRow(verbraucher, idx, row, 'Verbraucher')">Verbraucher entfernen</button>
+                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">Übernehmen</button>
+                  </div>
+                </div>
+              </template>
+            </dialog>
+          </div>
+        </template>
+        <button type="button" class="edash-item-add" @click="addVerbraucher()">
+          <span class="edash-item-add-btn">+</span>
+        </button>
+      </div>
       <p class="hint">Der Rest (Netzbezug + Erzeuger − Verbraucher − Einspeisung − Speicherladung) erscheint automatisch als „Grundlast" — kein eigener Sensor nötig.</p>
+      <template x-for="row in verbraucher" :key="'hidden-vb-' + row._key">
+        <span>
+          <input type="hidden" name="verbraucher_name" :value="row.name">
+          <input type="hidden" name="verbraucher_entity_id" :value="row.entity_id">
+          <input type="hidden" name="verbraucher_gruppe" :value="row.gruppe">
+        </span>
+      </template>
       <template x-for="g in gruppen" :key="'hidden-' + g">
         <input type="hidden" name="verbraucher_gruppen" :value="g">
       </template>
@@ -318,30 +676,94 @@
     <section class="settings-section">
       <h2 class="settings-section-title">Kosten</h2>
       <p class="settings-section-description">Optional — Preis-Sensoren für Netzbezug und Einspeisung. Bucket-genau verrechnet, funktioniert also auch mit variablen/dynamischen Tarifen. Ohne passende Preis-Entität kann ersatzweise ein fester Preis in Cent je kWh eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
+      <div class="edash-item-grid">
+        <button type="button" class="edash-item-tile" @click="draft.kostenBezugEntity = kostenBezugEntity; activePopup = 'kosten-bezug'; openEdashDialog('edash-dlg-kosten-bezug')">
+          <div class="edash-item-accent edash-item-accent-neutral"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
+              <span class="edash-item-name">Netzbezug-Preis</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !kostenBezugEntity && kostenBezugFixed === null}" x-text="priceLabel(kostenBezugEntity, kostenBezugFixed, 'Ct/kWh')"></span>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="edash-item-tile" @click="draft.kostenEinspeisungEntity = kostenEinspeisungEntity; activePopup = 'kosten-einspeisung'; openEdashDialog('edash-dlg-kosten-einspeisung')">
+          <div class="edash-item-accent edash-item-accent-neutral"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
+              <span class="edash-item-name">Einspeisevergütung</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !kostenEinspeisungEntity && kostenEinspeisungFixed === null}" x-text="priceLabel(kostenEinspeisungEntity, kostenEinspeisungFixed, 'Ct/kWh')"></span>
+            </div>
+          </div>
+        </button>
+      </div>
+
       {# Preis-Entitäten liefern €/kWh und werden genau so gespeichert; der
          feste Preis wird bewusst in Cent/kWh EINGEGEBEN (z. B. "29" statt
          "0,29"), aber ebenfalls als €/kWh gespeichert — dieselbe Einheit wie
          die Entitäten, konsistent mit bereits vorhandenen Configs. Deshalb
          hier beim Anzeigen ×100 (Euro -> Cent) und beim Speichern ÷100
-         (siehe energiedashboard_setup_save in energiedashboard_routes.py). #}
-      <div class="edash-field-grid">
-        <div class="field">
-          <label>Netzbezug-Preis</label>
-          {% call entity_field('preis_netzbezug', (config.kosten.preis_netzbezug if config.kosten else '') | tojson) %}
-            {% set v = config.kosten.get('preis_netzbezug_fixed') if config.kosten else none %}
-            {{ number_field('preis_netzbezug_fixed', (v * 100) if v is not none else none, 'Cent/kWh, z. B. 29', 'x-show="!entityId"') }}
-          {% endcall %}
-          <p class="hint">Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.</p>
+         (siehe energiedashboard_setup_save in energiedashboard_routes.py).
+         Sowohl Entität als auch fester Preis stecken im Popup in einer
+         "..._draft"-Instanz (steckt in einem <template x-if>, das beim
+         Schließen komplett aus dem DOM verschwindet — ein <input> darin
+         würde beim Speichern fehlen). Die echten <input>s liegen als
+         IMMER vorhandene Geschwister direkt nach dem </template>: die
+         Entität wie üblich per :value an den committeten Root-Stand
+         gebunden, der feste Preis (ohne eigene Alpine-Reaktivität, siehe
+         number_field) per einfachem oninput-Mirror bei jeder Eingabe
+         synchron gehalten. #}
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-bezug" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Netzbezug-Preis</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-bezug').close()" aria-label="Schließen">✕</button>
         </div>
-        <div class="field">
-          <label>Einspeisevergütung</label>
-          {% call entity_field('preis_einspeisung', (config.kosten.preis_einspeisung if config.kosten else '') | tojson) %}
-            {% set v = config.kosten.get('preis_einspeisung_fixed') if config.kosten else none %}
-            {{ number_field('preis_einspeisung_fixed', (v * 100) if v is not none else none, 'Cent/kWh, z. B. 8', 'x-show="!entityId"') }}
-          {% endcall %}
-          <p class="hint">Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.</p>
+        {% set kb_fixed = config.kosten.get('preis_netzbezug_fixed') if config.kosten else none %}
+        <template x-if="activePopup === 'kosten-bezug'">
+          <div>
+            <div class="field">
+              <label>Preis</label>
+              {% call entity_field('preis_netzbezug_draft', 'draft.kostenBezugEntity', "(id) => { draft.kostenBezugEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
+                {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, 'z. B. 29', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
+              {% endcall %}
+              <p class="hint">Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.</p>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="preis_netzbezug" :value="kostenBezugEntity">
+        <input type="hidden" id="preis_netzbezug_fixed_real" name="preis_netzbezug_fixed" value="{{ (kb_fixed * 100) if kb_fixed is not none else '' }}">
+      </dialog>
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-einspeisung" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Einspeisevergütung</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-einspeisung').close()" aria-label="Schließen">✕</button>
         </div>
-      </div>
+        {% set ke_fixed = config.kosten.get('preis_einspeisung_fixed') if config.kosten else none %}
+        <template x-if="activePopup === 'kosten-einspeisung'">
+          <div>
+            <div class="field">
+              <label>Vergütung</label>
+              {% call entity_field('preis_einspeisung_draft', 'draft.kostenEinspeisungEntity', "(id) => { draft.kostenEinspeisungEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
+                {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, 'z. B. 8', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
+              {% endcall %}
+              <p class="hint">Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.</p>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="preis_einspeisung" :value="kostenEinspeisungEntity">
+        <input type="hidden" id="preis_einspeisung_fixed_real" name="preis_einspeisung_fixed" value="{{ (ke_fixed * 100) if ke_fixed is not none else '' }}">
+      </dialog>
       {# Kein eigenes "PV-Eigenverbrauch-Preis"-Feld mehr — der Wert des
          selbst verbrauchten PV-Stroms (Kachel "Vermiedene Kosten") wird aus
          dem Netzbezug-Preis oben abgeleitet (dieselbe kWh × Netzbezug-Preis
@@ -352,32 +774,114 @@
     <section class="settings-section">
       <h2 class="settings-section-title">PV-Prognose</h2>
       <p class="settings-section-description">Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast. Anders als bei Kosten/CO2 gibt es hier keinen festen Ersatzwert (eine Prognose lässt sich nicht sinnvoll als fixe Zahl eintragen) — nur Entitäten.</p>
-      <div class="edash-field-grid">
-        <div class="field">
-          <label>Prognose Rest heute</label>
-          {{ entity_field('prognose_rest_heute_entity_id', (config.prognose.rest_heute_entity_id if config.prognose else '') | tojson) }}
-          <p class="hint">kWh, die für den Rest des heutigen Tages noch erwartet werden (z. B. Forecast.Solar "Geschätzte Energieerzeugung – Resttag").</p>
-        </div>
-        <div class="field">
-          <label>Prognose morgen</label>
-          {{ entity_field('prognose_morgen_entity_id', (config.prognose.morgen_entity_id if config.prognose else '') | tojson) }}
-          <p class="hint">kWh, die für morgen insgesamt erwartet werden.</p>
-        </div>
+      <div class="edash-item-grid">
+        <button type="button" class="edash-item-tile" @click="draft.prognoseHeute = prognoseHeute; activePopup = 'prog-heute'; openEdashDialog('edash-dlg-prog-heute')">
+          <div class="edash-item-accent edash-item-accent-neutral"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="18" height="14" viewBox="0 0 26 20" aria-hidden="true"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--ink-faint)" opacity=".7"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface-alt)" stroke="var(--ink-faint)" stroke-width="1.6"/></svg></span>
+              <span class="edash-item-name">Rest heute</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !prognoseHeute}" x-text="prognoseHeute ? nameFor(prognoseHeute) : 'Nicht konfiguriert'"></span>
+            </div>
+          </div>
+        </button>
+        <button type="button" class="edash-item-tile" @click="draft.prognoseMorgen = prognoseMorgen; activePopup = 'prog-morgen'; openEdashDialog('edash-dlg-prog-morgen')">
+          <div class="edash-item-accent edash-item-accent-neutral"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="18" height="14" viewBox="0 0 26 20" aria-hidden="true"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--ink-faint)" opacity=".7"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface-alt)" stroke="var(--ink-faint)" stroke-width="1.6"/></svg></span>
+              <span class="edash-item-name">Morgen</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !prognoseMorgen}" x-text="prognoseMorgen ? nameFor(prognoseMorgen) : 'Nicht konfiguriert'"></span>
+            </div>
+          </div>
+        </button>
       </div>
+
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-prog-heute" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Prognose Rest heute</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-prog-heute').close()" aria-label="Schließen">✕</button>
+        </div>
+        <template x-if="activePopup === 'prog-heute'">
+          <div>
+            <div class="field">
+              <label>Entität</label>
+              {{ entity_field('prognose_rest_heute_entity_id_draft', 'draft.prognoseHeute', "(id) => { draft.prognoseHeute = id; }", allow_units=['kWh']) }}
+              <p class="hint">kWh, die für den Rest des heutigen Tages noch erwartet werden (z. B. Forecast.Solar "Geschätzte Energieerzeugung – Resttag").</p>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="prognoseHeute = draft.prognoseHeute; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="prognose_rest_heute_entity_id" :value="prognoseHeute">
+      </dialog>
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-prog-morgen" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Prognose morgen</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-prog-morgen').close()" aria-label="Schließen">✕</button>
+        </div>
+        <template x-if="activePopup === 'prog-morgen'">
+          <div>
+            <div class="field">
+              <label>Entität</label>
+              {{ entity_field('prognose_morgen_entity_id_draft', 'draft.prognoseMorgen', "(id) => { draft.prognoseMorgen = id; }", allow_units=['kWh']) }}
+              <p class="hint">kWh, die für morgen insgesamt erwartet werden.</p>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="prognoseMorgen = draft.prognoseMorgen; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="prognose_morgen_entity_id" :value="prognoseMorgen">
+      </dialog>
     </section>
 
     <section class="settings-section">
       <h2 class="settings-section-title">CO₂</h2>
       <p class="settings-section-description">Optional — CO2-Intensität des bezogenen Netzstroms (g/kWh), z. B. über eine Electricity-Maps-/CO2-Signal-Entität. PV und Speicher gelten als emissionsfrei, brauchen also keinen eigenen Faktor. Ohne passende Entität kann ersatzweise ein fester Wert eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
-      <div class="edash-field-grid">
-        <div class="field">
-          <label>Netzbezug CO2-Intensität</label>
-          {% call entity_field('co2_faktor_netzbezug_entity', (config.co2.faktor_netzbezug_entity if config.co2 else '') | tojson) %}
-            {{ number_field('co2_faktor_netzbezug_fixed', config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none, 'g/kWh, z. B. 380', 'x-show="!entityId"') }}
-          {% endcall %}
-          <p class="hint">g CO2/kWh, wird mit dem bezogenen Strom verrechnet — ergibt CO2-Ausstoß und, auf den PV-Eigenverbrauch angewendet, vermiedenes CO2.</p>
-        </div>
+      <div class="edash-item-grid">
+        <button type="button" class="edash-item-tile" @click="draft.co2Entity = co2Entity; activePopup = 'co2'; openEdashDialog('edash-dlg-co2')">
+          <div class="edash-item-accent edash-item-accent-neutral"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c-2-7 2-14 14-14 1 8-4 13-11 13-1 0-2 .3-3 1Z" fill="var(--ink-faint)" opacity=".65"/><path d="M6.5 17.5 C10 14 14 10 17.5 6.5" stroke="var(--surface)" stroke-width="1.3" fill="none" opacity=".55"/></svg></span>
+              <span class="edash-item-name">Netzbezug CO2-Intensität</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !co2Entity && co2Fixed === null}" x-text="priceLabel(co2Entity, co2Fixed, 'g/kWh')"></span>
+            </div>
+          </div>
+        </button>
       </div>
+
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-co2" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Netzbezug CO2-Intensität</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-co2').close()" aria-label="Schließen">✕</button>
+        </div>
+        {% set co2_fixed = config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none %}
+        <template x-if="activePopup === 'co2'">
+          <div>
+            <div class="field">
+              <label>Entität</label>
+              {% call entity_field('co2_faktor_netzbezug_entity_draft', 'draft.co2Entity', "(id) => { draft.co2Entity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
+                {{ number_field('co2_faktor_netzbezug_fixed_draft', co2_fixed, 'z. B. 380', 'x-show="!entityId" oninput="document.getElementById(\'co2_faktor_netzbezug_fixed_real\').value = event.target.value"', 'g/kWh', 'edash-price-fixed-input') }}
+              {% endcall %}
+              <p class="hint">g CO2/kWh, wird mit dem bezogenen Strom verrechnet — ergibt CO2-Ausstoß und, auf den PV-Eigenverbrauch angewendet, vermiedenes CO2.</p>
+            </div>
+            <div class="edash-dialog-footer">
+              <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="co2_faktor_netzbezug_entity" :value="co2Entity">
+        <input type="hidden" id="co2_faktor_netzbezug_fixed_real" name="co2_faktor_netzbezug_fixed" value="{{ co2_fixed if co2_fixed is not none else '' }}">
+      </dialog>
     </section>
 
     <div class="actionbar" style="justify-content:flex-end;">
@@ -401,7 +905,7 @@
     <div class="edash-gruppen-list" x-show="gruppen.length">
       <template x-for="g in gruppen" :key="g">
         <div class="edash-gruppen-row">
-          <input type="text" class="edash-gruppen-rename-input" :value="g" @change="renameGroup(g, $event.target.value)">
+          <input type="text" class="edash-gruppen-rename-input" :value="g" @change="renameGroup(g, $event.target.value)" maxlength="40">
           <span class="edash-gruppen-usage" x-text="groupUsage(g) + ' Verbraucher'"></span>
           <button type="button" class="edash-list-remove" @click="deleteGroup(g)" title="Gruppe löschen">✕</button>
         </div>
@@ -409,7 +913,7 @@
     </div>
     <p class="hint" x-show="!gruppen.length">Noch keine Gruppen angelegt.</p>
     <div class="edash-gruppen-add">
-      <input type="text" x-model="newGroupName" placeholder="Neue Gruppe …" @keydown.enter.prevent="addGroup()">
+      <input type="text" x-model="newGroupName" placeholder="Neue Gruppe …" maxlength="40" @keydown.enter.prevent="addGroup()">
       <button type="button" class="edash-setup-add" @click="addGroup()">+ Hinzufügen</button>
     </div>
   </dialog>

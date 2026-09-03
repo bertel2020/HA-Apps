@@ -103,6 +103,15 @@ def _empty_config() -> dict:
     return {
         "netzbezug": None,
         "einspeisung": None,
+        # Optionale Anzeige-Namen für die beiden Netz-Rollen — analog zu
+        # "name" bei Erzeuger/Speicher/Verbraucher, aber als eigene Skalare
+        # statt Teil eines dict/list-Eintrags, weil netzbezug/einspeisung
+        # selbst weiterhin einfache Entity-ID-Strings bleiben (kein
+        # Schema-Umbau auf {entity_id, name}-Objekte für diese zwei Rollen).
+        # Der Sankey-Knotenname bleibt intern immer "Netzbezug"/"Einspeisung"
+        # (siehe compute_flow) — nur "label" für die Anzeige weicht ab.
+        "netzbezug_name": None,
+        "einspeisung_name": None,
         "erzeuger": [],
         "speicher": [],
         "verbraucher": [],
@@ -306,12 +315,33 @@ class EnergieDashboardService:
         self.deps = deps
 
     def _entity_options(self) -> list[dict]:
+        # "unit"/"aggregation_type" zusätzlich zu den bisherigen Feldern — die
+        # Rollen-Kacheln-Popups filtern die Auswahl damit clientseitig auf
+        # plausible Kandidaten je Rolle (siehe entityPicker in
+        # entity-picker.js): "unit" für z. B. nur kWh bei Netzbezug/nur % bei
+        # Speicher-Ladezustand, "aggregation_type" zusätzlich, um "switch"
+        # (An/Aus-Schalter, hat nie eine erfasste Einheit) generell und
+        # "standard"-Gauges bei den echten Zähler-Rollen (Netzbezug/
+        # Einspeisung/Erzeuger/Speicher-Ladung&Entladung/Verbraucher)
+        # auszuschließen.
         return [
             {
                 "entity_id": row["entity_id"],
                 "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
                 "ha_name": row["friendly_name"] or row["entity_id"],
                 "is_custom": bool(row["custom_name"]),
+                "unit": row["unit"],
+                "aggregation_type": row["aggregation_type"],
+                # Für die Speicher-Kapazitäts-Kachel (siehe capacityLabel() im
+                # Setup-Formular): zeigt dort den letzten bekannten Messwert
+                # in kWh an, egal ob die Kapazität über eine Entität oder
+                # einen festen Wert kommt — ohne last_value bliebe bei
+                # Entitäts-Zuordnung nur der Entitätsname sichtbar, keine
+                # Zahl. Bewusst last_value (billig, schon geladen) statt
+                # einer echten Boundary-Value-Abfrage wie im Datenendpunkt
+                # (_resolve_speicher_capacity) — für eine Vorschau im
+                # Einrichtungsformular reicht der letzte bekannte Stand.
+                "last_value": row["last_value"],
             }
             for row in self.deps.index.list_entities()
         ]
@@ -363,6 +393,28 @@ class EnergieDashboardService:
     @staticmethod
     def _series_total(series: dict[float, float]) -> float:
         return round(sum(series.values()), 3)
+
+    def _resolve_speicher_capacity(self, sp: dict, now: datetime, read_cache: dict) -> float | None:
+        """Kapazität in kWh für einen Speicher — Entität hat Vorrang vor dem
+        festen Wert (dieselbe Vorrang-Logik wie bei Kosten/CO2). Kapazitäts-
+        Sensoren (Batterie-/BMS-Integrationen) melden häufig Wh statt kWh —
+        bei erkannter Wh-Einheit automatisch durch 1000 geteilt, damit
+        Anzeige und Gewichtung überall konsistent kWh verwenden, ohne dass
+        Nutzer selbst umrechnen müssen. Wie beim SOC-Jetzt-Wert liest
+        _boundary_value() den tatsächlich letzten Rohwert (kein Live-State,
+        aber dieselbe "aktueller Wert, keine Historie nötig"-Logik wie bei
+        der PV-Prognose)."""
+        entity_id = sp.get("capacity_entity_id")
+        if entity_id:
+            raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
+                self.deps.data_dir, entity_id, now.timestamp() + 1, self.deps.tz, read_cache,
+            )
+            if raw_value is not None:
+                entity = self.deps.index.get_entity(entity_id)
+                if entity and entity["unit"] == "Wh":
+                    raw_value = raw_value / 1000.0
+                return round(raw_value, 3)
+        return sp.get("capacity_kwh")
 
     @staticmethod
     def _capacity_weighted_avg(pairs: list[tuple[float, float]]) -> float | None:
@@ -489,9 +541,9 @@ class EnergieDashboardService:
         fälschlich als Fehler markieren."""
         roles: list[tuple[str, str]] = []
         if config.get("netzbezug"):
-            roles.append((config["netzbezug"], "Netzbezug"))
+            roles.append((config["netzbezug"], config.get("netzbezug_name") or "Netzbezug"))
         if config.get("einspeisung"):
-            roles.append((config["einspeisung"], "Einspeisung"))
+            roles.append((config["einspeisung"], config.get("einspeisung_name") or "Einspeisung"))
         for erz in config.get("erzeuger") or []:
             entity_id = erz.get("entity_id")
             if entity_id:
@@ -615,10 +667,11 @@ class EnergieDashboardService:
             nodes.append({
                 "name": "Netzbezug", "entity_id": netzbezug_id, "role": "source",
                 "value": max(netzbezug_val, 0.0), "stale": stale,
+                "label": config.get("netzbezug_name") or "Netzbezug",
             })
             links.append({"source": "Netzbezug", "target": hub_name, "value": max(netzbezug_val, 0.0)})
             bus_in += netzbezug_val
-            add_stale_issue("Netzbezug", stale)
+            add_stale_issue(config.get("netzbezug_name") or "Netzbezug", stale)
 
         for erz in config.get("erzeuger") or []:
             entity_id = erz.get("entity_id")
@@ -666,6 +719,7 @@ class EnergieDashboardService:
         speicher_laden_vals: list[float] = []
         soc_period_pairs: list[tuple[float, float]] = []
         soc_now_pairs: list[tuple[float, float]] = []
+        soc_now_breakdown: list[dict] = []
         speicher_breakdown: list[dict] = []
         for sp in speicher_list:
             sp_name = sp.get("name") or "Speicher"
@@ -699,7 +753,13 @@ class EnergieDashboardService:
             if len(speicher_list) > 1 and (sp_entladen_val or sp_laden_val):
                 speicher_breakdown.append({"name": sp_name, "value": round(sp_laden_val - sp_entladen_val, 3)})
 
-            capacity_kwh = sp.get("capacity_kwh")
+            # Einmal aufgelöst und im dict zwischengespeichert (Entität ODER
+            # fester Wert, siehe _resolve_speicher_capacity) — die drei
+            # weiteren Stellen unten (SOC-Kapazitätssumme, SOC-Trend-
+            # Gewichtung, Wirkungsgrad-Delta) lesen denselben Wert, statt die
+            # Entität je Stelle erneut abzufragen.
+            capacity_kwh = self._resolve_speicher_capacity(sp, now, read_cache)
+            sp["_resolved_capacity_kwh"] = capacity_kwh
             weight = capacity_kwh if capacity_kwh else 1.0
             if sp.get("soc_entity_id"):
                 # SOC ist ein Gauge (%), nicht Zähler — "auto" ist hier der
@@ -722,6 +782,10 @@ class EnergieDashboardService:
                 )
                 if raw_value is not None:
                     soc_now_pairs.append((raw_value, weight))
+                    soc_now_breakdown.append({
+                        "name": sp_name, "soc": round(raw_value, 1),
+                        "kwh": round(raw_value / 100 * capacity_kwh, 1) if capacity_kwh else None,
+                    })
 
         speicher_entladen_series = (
             self._series_merge(*speicher_entladen_series_list) if speicher_entladen_series_list else {}
@@ -735,9 +799,11 @@ class EnergieDashboardService:
         # hinterlegt ist — bei nur teilweise bekannten Kapazitäten wäre die
         # Summe sonst irreführend niedrig (fehlende Speicher zählen nicht mit,
         # ihr SOC ging aber mit Gewicht 1 in den Schnitt oben ein).
-        speicher_soc_capacity_total = sum(sp.get("capacity_kwh") or 0.0 for sp in speicher_list if sp.get("soc_entity_id"))
+        speicher_soc_capacity_total = sum(
+            sp.get("_resolved_capacity_kwh") or 0.0 for sp in speicher_list if sp.get("soc_entity_id")
+        )
         speicher_soc_capacity_complete = all(
-            sp.get("capacity_kwh") for sp in speicher_list if sp.get("soc_entity_id")
+            sp.get("_resolved_capacity_kwh") for sp in speicher_list if sp.get("soc_entity_id")
         )
         speicher_soc_kwh = (
             round(speicher_soc / 100 * speicher_soc_capacity_total, 1)
@@ -763,7 +829,7 @@ class EnergieDashboardService:
             for sp in speicher_list:
                 if not sp.get("soc_entity_id"):
                     continue
-                sp_weight = sp.get("capacity_kwh") or 1.0
+                sp_weight = sp.get("_resolved_capacity_kwh") or 1.0
                 sp_monthly = self._monthly_sum_by_year([sp["soc_entity_id"]], now, read_cache)
                 for ts, val in sp_monthly.items():
                     soc_weighted_sum[ts] = soc_weighted_sum.get(ts, 0.0) + val * sp_weight
@@ -840,7 +906,7 @@ class EnergieDashboardService:
                 # Historie plus eine hinterlegte Kapazität — fehlt eins
                 # davon, bleibt es bei der einfachen (unkorrigierten) Menge
                 # dieses Speichers als Fallback.
-                capacity_kwh = sp.get("capacity_kwh")
+                capacity_kwh = sp.get("_resolved_capacity_kwh")
                 corrected = laden_all_total
                 if capacity_kwh and sp.get("soc_entity_id"):
                     soc_all, _ = self._entity_series(sp["soc_entity_id"], "decade", 0, now, read_cache)
@@ -1027,9 +1093,10 @@ class EnergieDashboardService:
             nodes.append({
                 "name": "Einspeisung", "entity_id": einspeisung_id, "role": "sink",
                 "value": max(einspeisung_val, 0.0), "stale": stale,
+                "label": config.get("einspeisung_name") or "Einspeisung",
             })
             links.append({"source": hub_name, "target": "Einspeisung", "value": max(einspeisung_val, 0.0)})
-            add_stale_issue("Einspeisung", stale)
+            add_stale_issue(config.get("einspeisung_name") or "Einspeisung", stale)
 
         for sp, sp_laden_val in zip(speicher_list, speicher_laden_vals):
             if not sp.get("laden_entity_id"):
@@ -1313,12 +1380,12 @@ class EnergieDashboardService:
         if any(sp.get("entladen_entity_id") for sp in speicher_list):
             balance_sources.append("Speicherentladung")
         if netzbezug_id:
-            balance_sources.append("Netzbezug")
+            balance_sources.append(config.get("netzbezug_name") or "Netzbezug")
         balance_sinks = ["Verbrauch"]
         if any(sp.get("laden_entity_id") for sp in speicher_list):
             balance_sinks.append("Speicherladung")
         if einspeisung_id:
-            balance_sinks.append("Einspeisung")
+            balance_sinks.append(config.get("einspeisung_name") or "Einspeisung")
         balance_description = (
             f"{' + '.join(balance_sources)} entsprechen {' + '.join(balance_sinks)}, innerhalb der Toleranz. "
             "Nicht einzeln gemessene Lasten erscheinen als „Grundlast“."
@@ -1470,6 +1537,7 @@ class EnergieDashboardService:
             "verbraucher_breakdown": verbraucher_breakdown,
             "erzeuger_breakdown": erzeuger_breakdown,
             "speicher_breakdown": speicher_breakdown,
+            "speicher_soc_now_breakdown": soc_now_breakdown,
             "anomalien": anomalien,
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
         }
@@ -1639,10 +1707,28 @@ class EnergieDashboardService:
         @router.get("/energiedashboard/setup", response_class=HTMLResponse)
         def energiedashboard_setup_form(request: Request) -> HTMLResponse:
             config = _load_config(deps.index)
+            # Aufgelöste Kapazität je bereits konfiguriertem Speicher (nur für
+            # dessen capacity_entity_id, nicht für jede Entität in
+            # entity_options — dieselbe Berechnung wie im Datenendpunkt,
+            # siehe _resolve_speicher_capacity) — die Kachel zeigt damit auch
+            # bei Entitäts-Zuordnung eine echte kWh-Zahl statt nur des
+            # Entitätsnamens (Kontrolle der Wh/kWh-Umrechnung, ohne dafür das
+            # Popup öffnen zu müssen). entities.last_value (der günstigere
+            # Fallback in _entity_options()) ist für viele Kapazitäts-
+            # Sensoren leer (siehe Kommentar dort) — hier wird stattdessen
+            # der tatsächlich letzte archivierte Rohwert gelesen.
+            now = datetime.now(self.deps.tz)
+            read_cache = query_mod.QueryReadCache()
+            resolved_capacities = {
+                sp["capacity_entity_id"]: self._resolve_speicher_capacity(sp, now, read_cache)
+                for sp in (config.get("speicher") or [])
+                if sp.get("capacity_entity_id")
+            }
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_setup.html",
                 {
                     "config": config, "entity_options": self._entity_options(),
+                    "resolved_capacities": resolved_capacities,
                     "anomalie_schwelle_options": list(ANOMALIE_SCHWELLE_LABELS.items()),
                     **deps.app_root_context(request),
                 },
@@ -1653,7 +1739,9 @@ class EnergieDashboardService:
             request: Request,
             hub_name: str = Form(""),
             netzbezug: str = Form(""),
+            netzbezug_name: str = Form(""),
             einspeisung: str = Form(""),
+            einspeisung_name: str = Form(""),
             erzeuger_entity_id: list[str] = Form([]),
             erzeuger_name: list[str] = Form([]),
             speicher_name: list[str] = Form([]),
@@ -1661,6 +1749,7 @@ class EnergieDashboardService:
             speicher_entladen_entity_id: list[str] = Form([]),
             speicher_soc_entity_id: list[str] = Form([]),
             speicher_capacity_kwh: list[str] = Form([]),
+            speicher_capacity_entity_id: list[str] = Form([]),
             verbraucher_entity_id: list[str] = Form([]),
             verbraucher_name: list[str] = Form([]),
             verbraucher_gruppe: list[str] = Form([]),
@@ -1709,7 +1798,7 @@ class EnergieDashboardService:
 
             def speicher_rows(
                 names: list[str], laden_ids: list[str], entladen_ids: list[str],
-                soc_ids: list[str], capacities: list[str],
+                soc_ids: list[str], capacities: list[str], capacity_entity_ids: list[str],
             ) -> list[dict]:
                 # Eine Zeile zählt als "vorhanden", sobald mindestens EINE der
                 # drei Entitäten gesetzt ist — Name/Kapazität allein wären ein
@@ -1717,7 +1806,10 @@ class EnergieDashboardService:
                 # (z. B. eine per "+ hinzufügen" angelegte, dann leer
                 # gelassene Zeile) werden stillschweigend übersprungen,
                 # dasselbe Prinzip wie pairs() oben.
-                max_len = max((len(names), len(laden_ids), len(entladen_ids), len(soc_ids), len(capacities)), default=0)
+                max_len = max(
+                    (len(names), len(laden_ids), len(entladen_ids), len(soc_ids), len(capacities), len(capacity_entity_ids)),
+                    default=0,
+                )
                 rows = []
                 for idx in range(max_len):
                     laden_id = (laden_ids[idx] if idx < len(laden_ids) else "").strip()
@@ -1731,12 +1823,20 @@ class EnergieDashboardService:
                         "entladen_entity_id": entladen_id,
                         "soc_entity_id": soc_id,
                         "capacity_kwh": _parse_float(capacities[idx] if idx < len(capacities) else ""),
+                        # Entität hat Vorrang vor dem festen Wert (siehe
+                        # _resolve_speicher_capacity in compute_flow) —
+                        # capacity_kwh bleibt trotzdem gespeichert, damit ein
+                        # späteres Entfernen der Entität nicht auch den
+                        # zuletzt eingetragenen festen Wert verwirft.
+                        "capacity_entity_id": (
+                            capacity_entity_ids[idx] if idx < len(capacity_entity_ids) else ""
+                        ).strip() or None,
                     })
                 return rows
 
             speicher = speicher_rows(
                 speicher_name, speicher_laden_entity_id, speicher_entladen_entity_id,
-                speicher_soc_entity_id, speicher_capacity_kwh,
+                speicher_soc_entity_id, speicher_capacity_kwh, speicher_capacity_entity_id,
             )
 
             def _cent_to_euro(text: str) -> float | None:
@@ -1785,7 +1885,9 @@ class EnergieDashboardService:
             config = {
                 "hub_name": hub_name.strip() or None,
                 "netzbezug": netzbezug.strip(),
+                "netzbezug_name": netzbezug_name.strip() or None,
                 "einspeisung": einspeisung.strip() or None,
+                "einspeisung_name": einspeisung_name.strip() or None,
                 "erzeuger": pairs(erzeuger_entity_id, erzeuger_name),
                 "speicher": speicher,
                 "verbraucher": pairs(verbraucher_entity_id, verbraucher_name, verbraucher_gruppe),

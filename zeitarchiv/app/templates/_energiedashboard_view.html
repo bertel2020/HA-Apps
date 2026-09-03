@@ -13,25 +13,13 @@
     <h1>Energiedashboard</h1>
     <button type="button" class="edash-title-edit" title="Rollen bearbeiten"
             hx-get="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">&#9998;</button>
-    {% if config.show_bilanz_datenqualitaet %}
-    {# Status-Badge statt einer eigenen Vollbreite-Kachel — Details im Popup
-       (dasselbe <dialog>-Muster wie "Markierte Datensätze" in settings.html:
-       showModal()/.detail-dialog, native Fokus-/Tastatur-Semantik). #}
-    {# title + aria-label, weil der Text-Span mobil (<560px, siehe
-       .edash-quality-badge-text in energiedashboard.html) ausgeblendet wird und
-       der Chip dann nur noch aus dem Symbol besteht. #}
-    <button type="button" class="edash-quality-badge" :class="{'is-warn': !quality.plausible || anomalien.length > 0}"
-            title="Status" aria-label="Status"
-            @click="$refs.qualityDialog.showModal()">
-      <span x-text="(quality.plausible && !anomalien.length) ? '✓' : '!'"></span>
-      <span class="edash-quality-badge-text">Status</span>
-    </button>
-    {% endif %}
     {# Rechtsbündige Badge-Gruppe als EIN Flex-Kind (margin-left:auto auf dem
        Container, nicht auf dem ersten Badge) — bleibt so robust, egal welche
-       Kombination aus CO2/Kostenanalyse-Badge per Toggle sichtbar ist, statt
-       sich auf "das erste sichtbare Badge trägt margin-left:auto" zu
-       verlassen (bricht sonst, sobald z. B. nur die Kostenanalyse an ist). #}
+       Kombination aus CO2-/Kostenanalyse-/Status-Badge per Toggle sichtbar
+       ist, statt sich auf "das erste sichtbare Badge trägt margin-left:auto"
+       zu verlassen (bricht sonst, sobald z. B. nur die Kostenanalyse an ist).
+       Status steht bewusst ALS LETZTES Badge in dieser Gruppe (ganz außen
+       rechts), nicht mehr direkt neben Titel/Stift. #}
     <div class="edash-badge-group">
       {% if config.show_co2 %}
       {# Eigenes, grün getöntes Badge statt einer Vollbreite-Kachel für nur 2
@@ -56,6 +44,20 @@
               @click="$refs.costDialog.showModal()">
         <span>💰</span>
         <span x-text="fmtCurrency(kpi.net_cost)"></span>
+      </button>
+      {% endif %}
+      {% if config.show_bilanz_datenqualitaet %}
+      {# Status-Badge statt einer eigenen Vollbreite-Kachel — Details im Popup
+         (dasselbe <dialog>-Muster wie "Markierte Datensätze" in settings.html:
+         showModal()/.detail-dialog, native Fokus-/Tastatur-Semantik). #}
+      {# title + aria-label, weil der Text-Span mobil (<560px, siehe
+         .edash-quality-badge-text in energiedashboard.html) ausgeblendet wird und
+         der Chip dann nur noch aus dem Symbol besteht. #}
+      <button type="button" class="edash-quality-badge" :class="{'is-warn': !quality.plausible || anomalien.length > 0}"
+              title="Status" aria-label="Status"
+              @click="$refs.qualityDialog.showModal()">
+        <span x-text="(quality.plausible && !anomalien.length) ? '✓' : '!'"></span>
+        <span class="edash-quality-badge-text">Status</span>
       </button>
       {% endif %}
     </div>
@@ -245,7 +247,7 @@
      'speicherSocTrend',
      'Noch nicht genug Historie für einen Trend.') }}
 
-  <div class="edash-card edash-span3">
+  <div class="edash-card edash-span3 edash-flow-card">
     <div class="edash-card-head">
       <div class="edash-card-title">Energiefluss</div>
       <div class="edash-period-controls">
@@ -262,43 +264,80 @@
       </div>
     </div>
 
-    {# Live-Wert, unabhängig von Tag/Monat/Jahr (siehe prognose_rest_heute/
-       -morgen in compute_flow — aktuellster Rohwert der Prognose-Entität,
-       keine Perioden-Aggregation). Direkt in der Energiefluss-Kachel statt
-       als weiteres Badge im Titel-Kopf, der sonst zu voll würde. #}
-    <div class="edash-prognose" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
-      <span>☀️</span>
-      <span x-show="kpi.prognose_rest_heute != null">Prognose: noch <strong x-text="fmt(kpi.prognose_rest_heute, 1) + ' kWh'"></strong> heute</span>
-      <span x-show="kpi.prognose_morgen != null">&middot; morgen <strong x-text="fmt(kpi.prognose_morgen, 1) + ' kWh'"></strong></span>
+    {# Hero-Leiste: bündelt die Periodenkennzahlen, die sonst nur als Ring
+       (Autarkie) bzw. Popup-Badge (CO2/Kosten, siehe Titel-Kopf oben) zu
+       sehen sind, plus die Live-Prognose (unabhängig von Tag/Monat/Jahr,
+       siehe prognose_rest_heute/-morgen in compute_flow) zu einer Zeile —
+       ein Blick genügt statt erst zu Ringen/Badges wandern zu müssen. Jedes
+       Item einzeln x-show, da nicht jede Rolle in jeder Config zugeordnet
+       ist (z. B. kein Speicher/keine Kostenanalyse). #}
+    <div class="edash-hero" x-show="kpi.autarkie != null || kpi.co2_vermieden != null || kpi.net_cost != null || kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
+      <div class="edash-hero-item" x-show="kpi.autarkie != null">
+        <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--chart-1)" stroke-width="2.2"/><path d="M8 12l3 3 5-6" stroke="var(--chart-1)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <strong x-text="ratioText(kpi.autarkie)"></strong><span>Autarkie</span>
+      </div>
+      <div class="edash-hero-item" x-show="kpi.co2_vermieden != null">
+        <svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 19c-2-7 2-14 14-14 1 8-4 13-11 13-1 0-2 .3-3 1Z" fill="var(--positive)" opacity=".85"/></svg>
+        <strong x-text="fmt(kpi.co2_vermieden, 1) + ' kg'"></strong><span>CO2 vermieden</span>
+      </div>
+      <div class="edash-hero-item" x-show="kpi.net_cost != null">
+        <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2.2"/><path d="M14.5 9a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
+        <strong x-text="fmtCurrency(kpi.net_cost)"></strong><span x-text="kpi.net_cost < 0 ? 'gespart' : 'Kosten'"></span>
+      </div>
+      <div class="edash-hero-item" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
+        <svg width="16" height="13" viewBox="0 0 26 20"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--chart-3)" opacity=".8"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface)" stroke="var(--chart-3)" stroke-width="1.6"/></svg>
+        <span x-show="kpi.prognose_rest_heute != null">Prognose noch <strong x-text="fmt(kpi.prognose_rest_heute, 1) + ' kWh'"></strong> heute</span>
+        <span x-show="kpi.prognose_morgen != null">&middot; morgen <strong x-text="fmt(kpi.prognose_morgen, 1) + ' kWh'"></strong></span>
+      </div>
     </div>
 
     <div class="edash-kpi-row">
       <div class="edash-kpi has-tooltip tooltip-lines" :data-tooltip="erzeugerBreakdownText()">
-        <div class="edash-kpi-label">Erzeugung</div>
+        <div class="edash-kpi-accent" style="background:var(--chart-3);"></div>
+        <div class="edash-kpi-head">
+          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
+          <div class="edash-kpi-label">Erzeugung</div>
+        </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.erzeugung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('erzeugung')" x-text="deltaText('erzeugung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkErzeugung"></div>
       </div>
       <div class="edash-kpi">
-        <div class="edash-kpi-label">Verbrauch</div>
+        <div class="edash-kpi-accent" style="background:var(--chart-7);"></div>
+        <div class="edash-kpi-head">
+          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
+          <div class="edash-kpi-label">Verbrauch</div>
+        </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.verbrauch, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('verbrauch')" x-text="deltaText('verbrauch')"></div>
         <div class="edash-kpi-spark" x-ref="sparkVerbrauch"></div>
       </div>
       <div class="edash-kpi">
-        <div class="edash-kpi-label">Netzbezug</div>
+        <div class="edash-kpi-accent" style="background:var(--chart-1);"></div>
+        <div class="edash-kpi-head">
+          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+          <div class="edash-kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+        </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
         <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
       </div>
-      <div class="edash-kpi" x-show="kpi.speicher_netto != null">
-        <div class="edash-kpi-label">Speicher</div>
+      <div class="edash-kpi has-tooltip tooltip-lines" x-show="kpi.speicher_netto != null" :data-tooltip="speicherBreakdownText()">
+        <div class="edash-kpi-accent" style="background:var(--chart-4);"></div>
+        <div class="edash-kpi-head">
+          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
+          <div class="edash-kpi-label">Speicher</div>
+        </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.speicher_netto, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('speicher_netto')" x-text="deltaText('speicher_netto')"></div>
         <div class="edash-kpi-spark" x-ref="sparkSpeicher"></div>
       </div>
       <div class="edash-kpi">
-        <div class="edash-kpi-label">Einspeisung</div>
+        <div class="edash-kpi-accent" style="background:var(--chart-2);"></div>
+        <div class="edash-kpi-head">
+          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+          <div class="edash-kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
+        </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('einspeisung')" x-text="deltaText('einspeisung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
@@ -322,8 +361,8 @@
         <div class="edash-netbalance-divider"></div>
       </div>
       <div class="edash-netbalance-ends">
-        <span>Einspeisung</span>
-        <span>Bezug</span>
+        <span>{{ config.einspeisung_name or "Einspeisung" }}</span>
+        <span>{{ config.netzbezug_name or "Bezug" }}</span>
       </div>
     </div>
 
@@ -341,8 +380,8 @@
         {# Unabhängig von Tag/Monat/Jahr — der Speicher-SOC-Ring darunter
            zeigt den Ø-Wert ÜBER DIE PERIODE, was bei Monat/Jahr deutlich
            vom tatsächlichen Füllstand gerade eben abweichen kann. #}
-        <div class="edash-soc-now" x-show="kpi.speicher_soc_now != null"
-             data-tooltip="Aktueller Ladezustand, unabhängig vom gewählten Zeitraum — der Ring unten zeigt den Ø-Wert über die Periode.">
+        <div class="edash-soc-now has-tooltip tooltip-lines" x-show="kpi.speicher_soc_now != null"
+             :data-tooltip="socNowTooltipText()">
           <span class="edash-soc-now-dot"></span>Jetzt
           <strong x-text="fmt(kpi.speicher_soc_now, 0) + ' %'"></strong>
           <span x-show="kpi.speicher_soc_now_kwh != null" x-text="'(' + fmt(kpi.speicher_soc_now_kwh, 1) + ' kWh)'"></span>
