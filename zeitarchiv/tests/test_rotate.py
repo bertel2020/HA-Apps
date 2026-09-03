@@ -1,8 +1,8 @@
 """Tests für app/storage/rotate.py — CSV→Parquet-Rundreise.
 
-Braucht pyarrow (siehe requirements.txt) — in der normalen Python-Umgebung
+Braucht pyarrow (siehe addon/requirements.txt) — in der normalen Python-Umgebung
 dieses Repos nicht installiert, deshalb hier übersprungen statt fehlzuschlagen,
-wenn pyarrow fehlt (z. B. außerhalb des .venv).
+wenn pyarrow fehlt (z. B. außerhalb des addon/-venv).
 """
 
 from __future__ import annotations
@@ -127,7 +127,7 @@ def test_rotate_all_stale_rotates_entities_that_stopped_sending() -> None:
 
 def _run_all() -> None:
     if not _PYARROW_AVAILABLE:
-        print("übersprungen: pyarrow nicht installiert (siehe requirements.txt)")
+        print("übersprungen: pyarrow nicht installiert (siehe addon/requirements.txt)")
         return
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

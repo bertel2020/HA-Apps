@@ -8,8 +8,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT  / "app" / "templates"
-CSS = ROOT  / "app" / "static" / "css" / "app.css"
+TEMPLATES = ROOT / "app" / "templates"
+CSS = ROOT / "app" / "static" / "css" / "app.css"
 
 
 def test_display_settings_offer_both_color_schemes() -> None:
@@ -67,7 +67,7 @@ def test_all_full_pages_receive_the_persisted_color_scheme() -> None:
 
 def test_home_assistant_scheme_has_light_dark_and_chart_tokens() -> None:
     css = CSS.read_text(encoding="utf-8")
-    dashboard_script = (ROOT  / "app" / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    dashboard_script = (ROOT / "app" / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
     chart_template = (TEMPLATES / "chart_editor.html").read_text(encoding="utf-8")
     assert ':root[data-color-scheme="home_assistant"]' in css
     assert "--accent-line:#006787" in css

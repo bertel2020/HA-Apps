@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE = ROOT  / "app" / "templates" / "entity_config.html"
+TEMPLATE = ROOT / "app" / "templates" / "entity_config.html"
 
 
 def test_entity_configuration_uses_the_full_app_width() -> None:

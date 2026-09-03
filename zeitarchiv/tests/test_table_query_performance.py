@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT ))
+sys.path.insert(0, str(ROOT))
 
 from app.storage import hotbuffer, query
 from app.api_routes import ApiDependencies, ApiState, TableQueryRequest, create_api_router

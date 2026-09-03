@@ -9,6 +9,24 @@ Antwortformen simuliert.
 python3 -m pytest -q
 ```
 
+## Sync in die Produkt-Repos
+
+`tests/` wird pro Datei nach `HA-Apps/zeitarchiv/tests/` (App) bzw.
+`HA-Zeitarchiv/tests/` (Integration) übertragen, automatisch klassifiziert
+anhand ihrer tatsächlichen Importe (`scripts/sync_tests.py`, analog zu
+`scripts/sync_versions.py`):
+
+```bash
+python3 scripts/sync_tests.py          # überträgt, listet Änderungen
+python3 scripts/sync_tests.py --check  # nur prüfen, Exit-Code 1 bei Drift
+```
+
+Eine Datei, die sich nicht eindeutig zuordnen lässt (Signale für beide
+Zielrepos oder für keins), bricht den Lauf ab statt still übersprungen zu
+werden — Details und die beiden dokumentierten Ausnahmen
+(`test_routes.py`, `test_metadata_and_versions.py`) im Docstring des
+Skripts.
+
 Kein `pytest.ini`/`pyproject.toml` — Standard-Discovery über `tests/test_*.py`.
 `tests/_pkg.py` registriert `custom_components.zeitarchiv` als Namespace-Paket
 **ohne** dessen `__init__.py` auszuführen, damit Integrationsmodule

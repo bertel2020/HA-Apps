@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT  / "app" / "static" / "js" / "period-navigation.js"
+SCRIPT = ROOT / "app" / "static" / "js" / "period-navigation.js"
 TZ = ZoneInfo("Europe/Berlin")
 
 

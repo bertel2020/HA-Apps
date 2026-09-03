@@ -242,7 +242,7 @@ def test_preview_overview_groups_due_data_and_next_expiration_by_policy() -> Non
 
 def _run_all() -> None:
     if not _PYARROW_AVAILABLE:
-        print("übersprungen: pyarrow nicht installiert (siehe requirements.txt)")
+        print("übersprungen: pyarrow nicht installiert (siehe addon/requirements.txt)")
         return
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

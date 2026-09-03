@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ADDON = ROOT 
+ADDON = ROOT
 
 
 def test_runtime_requirements_are_fully_pinned_and_used_by_docker() -> None:

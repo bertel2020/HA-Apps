@@ -653,7 +653,7 @@ def test_bar_profile_is_coarser_while_line_resolution_stays_unchanged() -> None:
 
 def _run_all() -> None:
     if not _PYARROW_AVAILABLE:
-        print("übersprungen: pyarrow nicht installiert (siehe requirements.txt)")
+        print("übersprungen: pyarrow nicht installiert (siehe addon/requirements.txt)")
         return
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

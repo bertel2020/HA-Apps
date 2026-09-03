@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MAIN_SOURCE = (ROOT  / "app" / "main.py").read_text(encoding="utf-8")
+MAIN_SOURCE = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
 
 
 def _function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:

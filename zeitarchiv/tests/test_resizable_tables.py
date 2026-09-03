@@ -6,9 +6,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT  / "app" / "templates"
-SCRIPT = ROOT  / "app" / "static" / "js" / "resizable-tables.js"
-STYLES = ROOT  / "app" / "static" / "css" / "app.css"
+TEMPLATES = ROOT / "app" / "templates"
+SCRIPT = ROOT / "app" / "static" / "js" / "resizable-tables.js"
+STYLES = ROOT / "app" / "static" / "css" / "app.css"
 
 
 def test_all_technical_table_pages_load_resize_module() -> None:

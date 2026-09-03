@@ -283,7 +283,7 @@ def test_replace_month_recomputes_existing_year_total() -> None:
 
 def _run_all() -> None:
     if not _PYARROW_AVAILABLE:
-        print("übersprungen: pyarrow nicht installiert (siehe requirements.txt)")
+        print("übersprungen: pyarrow nicht installiert (siehe addon/requirements.txt)")
         return
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

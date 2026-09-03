@@ -729,7 +729,7 @@ def test_extract_variable_names_resolves_units_from_settings_profiles() -> None:
 
 def _run_all() -> None:
     if not _PYARROW_AVAILABLE:
-        print("übersprungen: pyarrow nicht installiert (siehe requirements.txt)")
+        print("übersprungen: pyarrow nicht installiert (siehe addon/requirements.txt)")
         return
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

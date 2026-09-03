@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT  / "app" / "templates"
+TEMPLATES = ROOT / "app" / "templates"
 FRAGMENT_TEMPLATES = ("_entities_table.html", "_rows_table.html")
 
 
@@ -23,10 +23,10 @@ def test_all_list_size_selects_offer_1000_instead_of_unlimited() -> None:
 
 
 def test_server_and_streaming_pagination_cap_at_1000() -> None:
-    main_path = ROOT  / "app" / "main.py"
+    main_path = ROOT / "app" / "main.py"
     main = main_path.read_text(encoding="utf-8")
     cleanup = (
-        ROOT  / "app" / "storage" / "cleanup.py"
+        ROOT / "app" / "storage" / "cleanup.py"
     ).read_text(encoding="utf-8")
     assert "page_size = 1000 if page_size <= 0 else min(page_size, 1000)" in main
     assert "page_size = max(1, min(int(page_size), 1000))" in cleanup

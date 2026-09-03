@@ -8,7 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT  / "app" / "templates"
+TEMPLATES = ROOT / "app" / "templates"
 
 
 def test_logs_page_uses_text_content_for_untrusted_log_lines() -> None:
@@ -52,15 +52,15 @@ def test_logging_settings_are_not_duplicated_in_settings_nav() -> None:
 
 
 def test_ingress_accepts_two_gib_zip_plus_multipart_overhead() -> None:
-    nginx = (ROOT  / "nginx.conf").read_text(encoding="utf-8")
-    addon_config = (ROOT  / "config.yaml").read_text(encoding="utf-8")
+    nginx = (ROOT / "nginx.conf").read_text(encoding="utf-8")
+    addon_config = (ROOT / "config.yaml").read_text(encoding="utf-8")
     assert "client_max_body_size 2050m;" in nginx
     assert "access_log off;" in nginx
     assert "ingress_stream: true" in addon_config
 
 
 def test_addon_grants_access_to_supervisor_logs_api() -> None:
-    addon_config = (ROOT  / "config.yaml").read_text(encoding="utf-8")
+    addon_config = (ROOT / "config.yaml").read_text(encoding="utf-8")
     assert "hassio_api: true" in addon_config
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT  / "app"
+APP = ROOT / "app"
 TEMPLATES = APP / "templates"
 APP_CSS = APP / "static" / "css" / "app.css"
 

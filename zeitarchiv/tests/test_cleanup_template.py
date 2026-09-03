@@ -8,11 +8,11 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT ))
+sys.path.insert(0, str(ROOT))
 
 from app.formatting import format_int, format_value
 
-TEMPLATES = ROOT  / "app" / "templates"
+TEMPLATES = ROOT / "app" / "templates"
 
 
 def test_cleanup_delete_requires_reversible_confirmation() -> None:
@@ -39,7 +39,7 @@ def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
     cleanup = (TEMPLATES / "cleanup.html").read_text(encoding="utf-8")
     rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
     chart_editor = (TEMPLATES / "chart_editor.html").read_text(encoding="utf-8")
-    main = (ROOT  / "app" / "main.py").read_text(encoding="utf-8")
+    main = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
     assert "static/js/period-navigation.js" in cleanup
     assert "PeriodNavigation.anchorForWindow" in cleanup
     assert "PeriodNavigation.offsetForRange" in cleanup
