@@ -2,9 +2,9 @@ name: Zeitarchiv Tests
 
 on:
   push:
-    paths: ["zeitarchiv/**"]
+    paths: ["zeitarchiv/**", ".github/workflows/zeitarchiv-tests.yml"]
   pull_request:
-    paths: ["zeitarchiv/**"]
+    paths: ["zeitarchiv/**", ".github/workflows/zeitarchiv-tests.yml"]
 
 jobs:
   test:
