@@ -17,6 +17,19 @@
         <strong>{{ auth_failures }}</strong>
         {% if last_auth_failure_at %}<span class="status-card-detail">Zuletzt {{ last_auth_failure_at }}</span>{% endif %}
       </div>
+      <div class="status-card{% if integration_outdated %} status-card-danger{% endif %}">
+        <span class="hint">Integrations-Version</span>
+        <strong>{{ integration_version or "Keine Verbindung erkannt" }}</strong>
+        {% if integration_last_seen_at %}<span class="status-card-detail">Zuletzt gesehen {{ integration_last_seen_at }}</span>{% endif %}
+        {% if integration_outdated %}<span class="status-card-detail">Update verfügbar — siehe Hinweis-Center</span>{% endif %}
+      </div>
+      {% if integration_update_kind %}
+      <div class="status-card{% if integration_update_kind == 'feature' %} status-card-accent-strong{% else %} status-card-accent{% endif %}">
+        <span class="hint">Integrations-Update</span>
+        <strong>{{ integration_latest_version }}</strong>
+        <span class="status-card-detail">{{ "Bugfix verfügbar" if integration_update_kind == "bugfix" else "Neue Funktionsversion verfügbar" }}</span>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>

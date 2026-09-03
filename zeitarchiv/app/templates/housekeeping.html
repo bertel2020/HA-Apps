@@ -135,6 +135,22 @@
       <section id="speicherplatz" class="settings-section">
         <h2 class="settings-section-title">Speicherplatz</h2>
         <p class="settings-section-description">Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.</p>
+        {% if host_disk_usage %}
+        <div class="settings-subsection">
+          <h3 class="settings-subsection-title">Host-Dateisystem</h3>
+          <p class="hint" style="margin:0 0 14px;">Andere Frage als die Zahlen unten — nicht Zeitarchivs eigener Speicherverbrauch, sondern der freie Platz auf der zugrunde liegenden Platte selbst.</p>
+          <div class="status-grid">
+            <div class="status-card{% if host_disk_usage.severity == 'danger' %} status-card-danger{% elif host_disk_usage.severity == 'warning' %} status-card-accent-strong{% endif %}">
+              <span class="hint">Frei</span>
+              <strong>{{ host_disk_usage.free_label }}</strong>
+              <span class="status-card-detail">von {{ host_disk_usage.total_label }} ({{ host_disk_usage.free_percent }} %)</span>
+              <div class="usage-bar-track" style="margin-top:8px;">
+                <div class="usage-bar-fill {{ host_disk_usage.severity }}" style="width:{{ host_disk_usage.used_percent }}%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
         <div class="settings-subsection">
           <div id="storage-index-form">
             {% include "_settings_storage_index_form.html" %}

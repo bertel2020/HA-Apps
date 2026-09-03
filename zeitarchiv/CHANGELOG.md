@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.78.0 - 2026-09-03
+
+### Neu
+
+- **Rückkopplung zur Home-Assistant-Integration.** Neuer Endpunkt
+  `GET /api/notices` liefert die aktuellen Meldungen für die Integration —
+  Grundlage für Home-Assistant-Repairs und automatisierbare
+  `binary_sensor`-Entities bei kritischen Zuständen (Backup/Aufbewahrung/
+  Import fehlgeschlagen, lange inaktive Entitäten).
+- Die Verbindungs-Einstellungen zeigen jetzt die verbundene
+  Integrationsversion, wann sie zuletzt gesehen wurde, sowie einen Hinweis
+  bei veralteter oder bei neu verfügbarer Integrationsversion (getrennt
+  nach Bugfix/Funktionsupdate).
+- Neue Meldung für knappen Speicherplatz auf dem Host-Dateisystem (nicht zu
+  verwechseln mit Zeitarchivs eigenem internen Speicherverbrauch) —
+  zweistufig (Warnung ab 10 % frei, kritisch ab 5 % frei). Housekeeping →
+  Speicherplatz zeigt den aktuellen Füllstand jetzt immer als Kachel mit
+  Auslastungsbalken an.
+
+### Geändert
+
+- Neue Design-Variable `--warning` für alle drei Farbschemata (hell/dunkel)
+  ergänzt — echtes Gelb/Amber statt einer zweckentfremdeten Akzentfarbe für
+  Hinweise, die kein echtes Problem sind.
+
 ## 0.77.0 - 2026-09-03
 
 ### Verbesserung

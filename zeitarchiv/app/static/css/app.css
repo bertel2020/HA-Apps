@@ -4,6 +4,7 @@
   --accent-line:#0C6B5D; --accent-bar:#B15E1B; --accent-line-soft:#E1F1EC; --accent-bar-soft:#F7E8D6;
   --accent-contrast:#FFFFFF; --danger:#A23B36; --danger-soft:#F4DEDB; --danger-contrast:#FFFFFF;
   --positive:#2E7D46;
+  --warning:#8A6D1E; --warning-soft:#F5EDD3;
   --chart-line:#0C6B5D; --chart-bar:#B15E1B;
   --chart-1:#0C6B5D; --chart-2:#B15E1B; --chart-3:#3B6FA0; --chart-4:#8B5FBF;
   --chart-5:#C4472B; --chart-6:#4C8C4A; --chart-7:#B0932A; --chart-8:#5C6B73;
@@ -17,6 +18,7 @@
     --accent-line:#4FC3AE; --accent-bar:#E2A15E; --accent-line-soft:#173430; --accent-bar-soft:#3A2A18;
     --accent-contrast:#0E1512; --danger:#E28A85; --danger-soft:#3A201E; --danger-contrast:#0E1512;
     --positive:#6FCB88;
+    --warning:#D4B65E; --warning-soft:#332B14;
     --shadow:0 1px 2px rgba(0,0,0,.35);
   }
 }
@@ -26,6 +28,7 @@
   --accent-line:#4FC3AE; --accent-bar:#E2A15E; --accent-line-soft:#173430; --accent-bar-soft:#3A2A18;
   --accent-contrast:#0E1512; --danger:#E28A85; --danger-soft:#3A201E; --danger-contrast:#0E1512;
   --positive:#6FCB88;
+  --warning:#D4B65E; --warning-soft:#332B14;
   --shadow:0 1px 2px rgba(0,0,0,.35);
 }
 
@@ -38,6 +41,7 @@
   --accent-line:#006787; --accent-bar:#C94E00; --accent-line-soft:#DFF3FC; --accent-bar-soft:#FFF0E4;
   --accent-contrast:#FFFFFF; --danger:#B30532; --danger-soft:#FFF0EF; --danger-contrast:#FFFFFF;
   --positive:#2E7D32;
+  --warning:#B77A00; --warning-soft:#FFF4E0;
   --chart-line:#009AC7; --chart-bar:#C94E00;
   --chart-1:#009AC7; --chart-2:#C94E00; --chart-3:#00883C; --chart-4:#8A5FC7;
   --chart-5:#DC3146; --chart-6:#18BCF2; --chart-7:#B77A00; --chart-8:#5E5E5E;
@@ -51,6 +55,7 @@
     --accent-line:#37C8FD; --accent-bar:#FF9342; --accent-line-soft:#002E3E; --accent-bar-soft:#5E1C00;
     --accent-contrast:#141414; --danger:#FD8F90; --danger-soft:#3E0913; --danger-contrast:#141414;
     --positive:#66BB6A;
+    --warning:#FFD166; --warning-soft:#4A2E00;
     --chart-line:#37C8FD; --chart-bar:#FF9342;
     --chart-1:#37C8FD; --chart-2:#FF9342; --chart-3:#5DC36F; --chart-4:#B99AF0;
     --chart-5:#FD8F90; --chart-6:#7BD4FB; --chart-7:#FFD166; --chart-8:#B1B1B1;
@@ -63,6 +68,7 @@
   --accent-line:#37C8FD; --accent-bar:#FF9342; --accent-line-soft:#002E3E; --accent-bar-soft:#5E1C00;
   --accent-contrast:#141414; --danger:#FD8F90; --danger-soft:#3E0913; --danger-contrast:#141414;
   --positive:#66BB6A;
+  --warning:#FFD166; --warning-soft:#4A2E00;
   --chart-line:#37C8FD; --chart-bar:#FF9342;
   --chart-1:#37C8FD; --chart-2:#FF9342; --chart-3:#5DC36F; --chart-4:#B99AF0;
   --chart-5:#FD8F90; --chart-6:#7BD4FB; --chart-7:#FFD166; --chart-8:#B1B1B1;
@@ -977,6 +983,22 @@ select:disabled,textarea[readonly],textarea:disabled{background:var(--surface-al
 .status-card .status-card-detail{display:block;margin-top:4px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
 .status-card.status-card-danger{border-color:var(--danger);background:var(--danger-soft);}
 .status-card.status-card-danger strong,.status-card.status-card-danger .status-card-detail{color:var(--danger);}
+/* Zweistufig über Intensität statt Farbe, bewusst nicht in Danger-Rot (kein
+   Problem, nur ein Hinweis) — Stufe 2 zusätzlich mit eingefärbtem Text, Rot
+   bleibt so exklusiv echten Problemen vorbehalten. */
+.status-card.status-card-accent{border-color:var(--warning);background:var(--warning-soft);}
+.status-card.status-card-accent-strong{border-color:var(--warning);background:var(--warning-soft);}
+.status-card.status-card-accent-strong strong,.status-card.status-card-accent-strong .status-card-detail{color:var(--warning);}
+
+/* Auslastungsbalken (z. B. Host-Speicherplatz in housekeeping.html) — Track
+   wie die bestehende Backup-Fortschrittsanzeige (_settings_backup_progress.
+   html), Füllfarbe je nach übergebener severity (positive/warning/danger),
+   mit dezentem Glanz-Verlauf statt einer bunten Skala über die volle Breite. */
+.usage-bar-track{height:8px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--border);overflow:hidden;}
+.usage-bar-fill{height:100%;transition:width .3s ease;}
+.usage-bar-fill.positive{background:linear-gradient(90deg, var(--positive), color-mix(in srgb, var(--positive) 75%, white));}
+.usage-bar-fill.warning{background:linear-gradient(90deg, var(--warning), color-mix(in srgb, var(--warning) 75%, white));}
+.usage-bar-fill.danger{background:linear-gradient(90deg, var(--danger), color-mix(in srgb, var(--danger) 75%, white));}
 
 /* Verbindungsstatus nutzt dieselben Statuskacheln wie Backup und Retention.
    Das innere Raster enthält ausschließlich die drei Kennzahlen: So bleiben

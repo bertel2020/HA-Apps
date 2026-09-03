@@ -25,6 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import ha_integration
 from . import tips as tips_mod
 from . import version_check
 from .energiedashboard_routes import SETTING_HOURLY_BACKFILL_PENDING
@@ -42,6 +43,15 @@ TIPS_ENABLED_SETTING = "tips_enabled"
 # Durchläufe, großzügig genug für einzelne Ausreißer, eng genug um einen
 # wirklich hängengebliebenen Thread zeitnah zu melden.
 SCHEDULER_STALLED_SECONDS = 5 * 60
+# Anders als der Wartungsplaner hat der Speicherindex-Hintergrundabgleich
+# keinen festen Takt (Laufzeit pro Entität hängt von deren Datenmenge ab) —
+# ein einzelner audit_storage_metadata()-Aufruf braucht aber normalerweise
+# Millisekunden bis niedrige Sekunden, nicht Minuten. Derselbe Schwellwert
+# wie beim Scheduler ist trotzdem großzügig genug, um legitim langsame
+# Entitäten nicht fälschlich zu melden, und eng genug, um denselben
+# deadlock-artigen Zustand zeitnah zu erkennen, der 0.76.0 bereits den
+# Wartungsplaner unsichtbar hängen ließ.
+RECONCILE_STALLED_SECONDS = 5 * 60
 # Eskalierende Schwellwerte statt eines einzelnen — je länger eine Entität
 # schon schweigt, desto ernster die Severity. Bänder sind exklusiv (siehe
 # _bucket_inactive_entities): dieselbe Entität zählt nie in mehr als einer
@@ -58,6 +68,11 @@ INACTIVE_ENTITY_ERROR_DAYS = 7
 # bereits bestehende Entitäten mit der riskanten Kombination ab, die die
 # Automatik nicht rückwirkend anfasst.
 VALUE_FILTER_GAP_FLOOR_MINUTES = VALUE_FILTER_HEARTBEAT_SECONDS // 60
+# Prozentbasiert statt fester Byte-Schwelle — bleibt so von der SD-Karte bis
+# zur NVMe-SSD sinnvoll (ein fester GB-Wert wäre auf kleinen Installationen
+# zu spät, auf großen zu früh dran).
+HOST_DISK_WARN_RATIO = 0.10
+HOST_DISK_ERROR_RATIO = 0.05
 # Täglich statt mehrtägig (Konzept-Entscheidung): nur so garantiert "morgen"
 # auch wirklich einen ANDEREN Tipp, wenn der heutige ausgeblendet wurde —
 # siehe hide_tip_today(). Bei einem mehrtägigen Fenster wäre der übernächste
@@ -89,18 +104,25 @@ def build_notices(
     storage_reconcile: dict | None,
     stale_entity_count: int,
     scheduler_last_tick: float,
+    reconcile_last_tick: float,
+    reconcile_in_progress: bool,
+    host_disk_usage: dict | None = None,
 ) -> list[dict]:
     """Ungefilterte, aktuell aktive Meldungen — auch stummgeschaltete sind
     hier noch enthalten (main.py braucht das z. B. beim Stummschalten selbst,
     um Titel/Text/Severity serverseitig nachzuschlagen statt dem Client zu
     vertrauen). Für die Anzeige in der Topnav siehe collect_notices().
 
-    purge_totals/storage_reconcile/stale_entity_count/scheduler_last_tick
-    kommen von main.py (jeweils aus bereits vorhandenen, günstigen Quellen:
+    purge_totals/storage_reconcile/stale_entity_count/scheduler_last_tick/
+    reconcile_last_tick/reconcile_in_progress/host_disk_usage kommen von
+    main.py (jeweils aus bereits vorhandenen, günstigen Quellen:
     _load_purge_preview(), dem In-Prozess-Zustand _storage_reconcile_last,
-    _count_stale_entities(), _last_scheduler_tick) statt hier selbst gelesen
-    zu werden — vermeidet zweite, abweichende Kopien dieser main.py-
-    spezifischen Zugriffe in diesem Modul."""
+    _count_stale_entities(), _last_scheduler_tick, _last_reconcile_tick,
+    _reconcile_in_progress(), _host_disk_usage_cached) statt hier selbst
+    gelesen zu werden — vermeidet zweite, abweichende Kopien dieser
+    main.py-spezifischen Zugriffe in diesem Modul. host_disk_usage ist
+    {"free": int, "total": int} in Bytes oder None (z. B. wenn der
+    Scheduler noch nicht gelaufen ist oder shutil.disk_usage fehlschlug)."""
     notices: list[dict] = []
 
     latest_version = version_check.latest_known_version(index)
@@ -112,6 +134,47 @@ def build_notices(
             "detail": f"Version {latest_version} ist verfügbar (aktuell installiert: {APP_VERSION}).",
             "meta": "Über Zeitarchiv",
             "link": "/settings#ueber",
+        })
+
+    integration_info = ha_integration.get_info(index)
+    if integration_info and ha_integration.is_outdated(integration_info["version"]):
+        notices.append({
+            "id": "integration.outdated",
+            "severity": "warn",
+            "title": "Home-Assistant-Integration veraltet",
+            "detail": (
+                f"Die Zeitarchiv-Integration meldet sich mit Version "
+                f"{integration_info['version']}, unterstützt wird ab "
+                f"{ha_integration.MIN_SUPPORTED_INTEGRATION_VERSION}. Bitte über "
+                "HACS oder manuell aktualisieren — sonst funktionieren neuere "
+                "Funktionen (z. B. Rückmeldungen an Home Assistant) nicht "
+                "zuverlässig."
+            ),
+            "meta": "Verbindung",
+            "link": "/settings#verbindung",
+        })
+
+    latest_integration_version = ha_integration.latest_known_integration_version(index)
+    integration_update_kind = (
+        ha_integration.integration_update_kind(integration_info["version"], latest_integration_version)
+        if integration_info and latest_integration_version
+        else None
+    )
+    if integration_update_kind:
+        notices.append({
+            "id": "integration.update_available",
+            "severity": "info",
+            "title": (
+                "Integrations-Bugfix verfügbar"
+                if integration_update_kind == "bugfix"
+                else "Neue Integrations-Version verfügbar"
+            ),
+            "detail": (
+                f"Version {latest_integration_version} der Home-Assistant-Integration ist verfügbar "
+                f"(aktuell verbunden: {integration_info['version']})."
+            ),
+            "meta": "Verbindung",
+            "link": "/settings#verbindung",
         })
 
     optimization = get_index_optimization_state(index, index_path)
@@ -149,6 +212,26 @@ def build_notices(
                 "abgeschlossener Durchlauf des Wartungsplaners — Sicherungs-/"
                 "Aufbewahrungspläne, Statistik-Schnappschüsse und Vorschauen "
                 "könnten veraltet sein."
+            ),
+            "meta": "Diagnose",
+            "link": "/settings#diagnose",
+        })
+
+    # Analog zu system.scheduler_stalled oben, aber nur relevant, während der
+    # Hintergrundabgleich tatsächlich noch laufen sollte (reconcile_in_
+    # progress) — im synchronen Modus (Restore/Crash) oder nach normalem
+    # Abschluss bleibt der letzte Tick sonst stehen und würde sonst dauerhaft
+    # fälschlich als "veraltet" gelten.
+    reconcile_idle_seconds = time.time() - reconcile_last_tick
+    if reconcile_in_progress and reconcile_idle_seconds > RECONCILE_STALLED_SECONDS:
+        notices.append({
+            "id": "system.storage_reconcile_stalled",
+            "severity": "warn",
+            "title": "Speicherindex-Abgleich reagiert nicht",
+            "detail": (
+                f"Seit {round(reconcile_idle_seconds / 60)} Minuten kein "
+                "Fortschritt beim Hintergrundabgleich des Speicherindex — "
+                "möglicherweise an einer Entitäts-Sperre hängengeblieben."
             ),
             "meta": "Diagnose",
             "link": "/settings#diagnose",
@@ -251,7 +334,7 @@ def build_notices(
             "link": "/housekeeping#aufbewahrung",
         })
     elif index.get_setting("retention_enforcement_schedule", "off") == "off":
-        limited_count = sum(1 for e in index.list_entities(include_deleted_count=False) if e["retention"] != "unlimited")
+        limited_count = sum(1 for e in index.list_entities() if e["retention"] != "unlimited")
         if limited_count:
             notices.append({
                 "id": "retention.enforcement_disabled",
@@ -290,7 +373,7 @@ def build_notices(
             })
 
     conflict_count = sum(
-        1 for e in index.list_entities(include_deleted_count=False)
+        1 for e in index.list_entities()
         if e["value_filter"] == "decimals"
         and e["gap_threshold"] != "off"
         and e["gap_threshold"].isdigit()
@@ -338,6 +421,31 @@ def build_notices(
             "meta": "Energiedashboard",
             "link": "/energiedashboard",
         })
+
+    # Andere Frage als "wie viel Platz braucht Zeitarchiv intern" (siehe die
+    # übrigen housekeeping.*-Meldungen) — prüft stattdessen, ob die
+    # zugrunde liegende Host-Partition selbst knapp wird. shutil.disk_usage()
+    # auf DATA_DIR statt der Supervisor-API (GET /host/info): Letztere würde
+    # eine hassio_role über dem aktuellen Minimalstand erfordern (siehe
+    # ROADMAP.md 2.2), für eine reine Speicherplatz-Anzeige nicht
+    # gerechtfertigt. DATA_DIR ist in der Praxis (HAOS/Supervised, eine
+    # Platte) dieselbe Partition wie der Rest des Hosts.
+    if host_disk_usage and host_disk_usage.get("total"):
+        free_bytes = host_disk_usage["free"]
+        total_bytes = host_disk_usage["total"]
+        free_ratio = free_bytes / total_bytes
+        if free_ratio < HOST_DISK_WARN_RATIO:
+            notices.append({
+                "id": "housekeeping.host_disk_space_low",
+                "severity": "error" if free_ratio < HOST_DISK_ERROR_RATIO else "warn",
+                "title": "Host-Speicherplatz wird knapp",
+                "detail": (
+                    f"Noch {format_size(free_bytes)} frei ({round(free_ratio * 100)} % der Partition) "
+                    "auf dem Dateisystem, auf dem Zeitarchiv seine Daten ablegt."
+                ),
+                "meta": "Speicherplatz",
+                "link": "/housekeeping#speicherplatz",
+            })
 
     removable_rows = purge_totals.get("removable_rows", 0)
     if removable_rows:
@@ -439,7 +547,7 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
     gibt es kein "seit wann", nur "noch nie"."""
     now_ts = datetime.now(tz).timestamp()
     counts = {"info": 0, "warn": 0, "error": 0}
-    for entity in index.list_entities(include_deleted_count=False):
+    for entity in index.list_entities():
         last_ts = entity["last_ts"]
         if last_ts is None:
             counts["error"] += 1
@@ -580,6 +688,9 @@ def collect_notices(
     storage_reconcile: dict | None,
     stale_entity_count: int,
     scheduler_last_tick: float,
+    reconcile_last_tick: float,
+    reconcile_in_progress: bool,
+    host_disk_usage: dict | None = None,
 ) -> list[dict]:
     """Für die Anzeige in der Topnav — build_notices() abzüglich aktuell
     gültiger Stummschaltungen (beim Tipp bereits durch _current_tip_notice
@@ -589,7 +700,7 @@ def collect_notices(
     return [
         notice for notice in build_notices(
             index, index_path, tz, purge_totals, storage_reconcile, stale_entity_count,
-            scheduler_last_tick,
+            scheduler_last_tick, reconcile_last_tick, reconcile_in_progress, host_disk_usage,
         )
         if not _is_muted(notice, mutes.get(notice["id"]), now)
     ]

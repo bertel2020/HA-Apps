@@ -116,6 +116,7 @@ from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_ent
 from .timezone_config import load_timezone
 from .version import APP_VERSION
 from . import api_routes
+from . import ha_integration
 from .import_routes import ImportDependencies, ImportService
 from .index_optimization import (
     build_index_detail_context,
@@ -320,6 +321,7 @@ def _notices_context(request: Request) -> dict:
         "notices": collect_notices(
             index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
             _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
+            _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
         ),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
     }
@@ -489,6 +491,24 @@ _storage_reconcile_last: dict | None = None
 _storage_reconcile_thread: threading.Thread | None = None
 _storage_reconcile_stop = threading.Event()
 _storage_reconcile_completed = False
+# Analog zu _last_scheduler_tick weiter unten, aber pro geprüfter Entität
+# statt pro Schleifendurchlauf aktualisiert — der Hintergrundabgleich hat
+# keinen festen Takt wie der Wartungsplaner (Laufzeit hängt von der
+# Datenmenge je Entität ab), ein Deadlock am selben Index-Lock (siehe
+# 0.76.0-Fund in Index.get_or_create_entity()) würde ihn aber genauso
+# unsichtbar hängen lassen. Initial auf den Startzeitpunkt gesetzt, siehe
+# Begründung bei _last_scheduler_tick.
+_last_reconcile_tick = time.time()
+
+
+def _reconcile_in_progress() -> bool:
+    """True nur, während der Hintergrund-Thread tatsächlich noch laufen
+    sollte. Im synchronen Modus (_requires_synchronous_reconciliation) wird
+    er nie gestartet — dann bliebe _storage_reconcile_completed sonst
+    dauerhaft False und eine Stall-Meldung würde fälschlich für immer aktiv
+    bleiben, obwohl der Abgleich längst (synchron, vor dem ersten Request)
+    passiert ist."""
+    return _storage_reconcile_thread is not None and not _storage_reconcile_completed
 # Beim ersten Start (und defensiv auch nach einem manuell geleerten DB-Wert)
 # muss vor dem Öffnen eines HTTP-Listeners ein nicht-leerer Token existieren.
 # ZEITARCHIV_API_TOKEN ist ausschließlich der explizite Override für den
@@ -537,6 +557,11 @@ app.include_router(
             ingestion=ingestion_service,
             api_token=_current_api_token,
             app_version=APP_VERSION,
+            collect_notices=lambda: collect_notices(
+                index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
+                _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
+                _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
+            ),
         ),
         _api_state,
     )
@@ -885,7 +910,7 @@ def _count_stale_entities() -> int:
     Aufrufen, die sonst bei jedem Laden von /settings erneut das komplette
     hot_dir je Entität durchsuchen (siehe Kommentar dort)."""
     now_ts = datetime.now(TZ).timestamp()
-    entity_ids = [entity["entity_id"] for entity in index.list_entities(include_deleted_count=False)]
+    entity_ids = [entity["entity_id"] for entity in index.list_entities()]
     with storage_coordinator.entities(entity_ids):
         return len(hotbuffer.find_entities_with_stale_hot_files(DATA_DIR, set(entity_ids), now_ts, TZ))
 
@@ -906,6 +931,50 @@ _stale_entity_count_cached = 0
 def _refresh_stale_entity_count() -> None:
     global _stale_entity_count_cached
     _stale_entity_count_cached = _count_stale_entities()
+
+
+# Für housekeeping.host_disk_space_low (notices.py) — Host-Speicherplatz statt
+# Zeitarchivs eigener interner Aufschlüsselung. Wie _stale_entity_count_cached
+# im Wartungsplaner statt pro Request aktualisiert; shutil.disk_usage() selbst
+# ist zwar günstig genug für den Request-Pfad (siehe index_optimization.py),
+# aber _notices_context() läuft bei JEDER Template-Antwort (siehe deren
+# Docstring) — ein Syscall weniger pro Seitenaufruf ist der einfachere Weg,
+# konsistent mit dem Rest dieser Cache-Gruppe zu bleiben.
+_host_disk_usage_cached: dict | None = None
+
+
+def _refresh_host_disk_usage() -> None:
+    global _host_disk_usage_cached
+    usage = shutil.disk_usage(DATA_DIR)
+    _host_disk_usage_cached = {"free": usage.free, "total": usage.total}
+
+
+def _host_disk_usage_context() -> dict:
+    """Für die immer sichtbare Host-Speicherplatz-Zeile in housekeeping.html —
+    andere Frage als Zeitarchivs eigene interne Aufschlüsselung (Speicherindex,
+    Bereinigung), siehe notices.py housekeeping.host_disk_space_low."""
+    usage = _host_disk_usage_cached
+    if not usage or not usage.get("total"):
+        return {"host_disk_usage": None}
+    free_ratio = usage["free"] / usage["total"]
+    # Dieselben Schwellwerte wie housekeeping.host_disk_space_low (notices.py)
+    # — der Balken wechselt die Farbe genau dann, wenn auch die Notice
+    # anspringen würde, statt eine unabhängige zweite Meinung zu sein.
+    if free_ratio < notices_mod.HOST_DISK_ERROR_RATIO:
+        severity = "danger"
+    elif free_ratio < notices_mod.HOST_DISK_WARN_RATIO:
+        severity = "warning"
+    else:
+        severity = "positive"
+    return {
+        "host_disk_usage": {
+            "free_label": format_size(usage["free"]),
+            "total_label": format_size(usage["total"]),
+            "free_percent": round(free_ratio * 100),
+            "used_percent": round((1 - free_ratio) * 100),
+            "severity": severity,
+        }
+    }
 
 
 def _settings_rotation_context(result: str | None = None) -> dict:
@@ -1186,6 +1255,7 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
 def _settings_verbindung_context(saved: bool = False) -> dict:
     last_write_ts = index.get_last_write_ts()
     last_auth_failure_ts = _CONNECTION_STATS["last_auth_failure_ts"]
+    integration_info = ha_integration.get_info(index)
     return {
         "api_token": _current_api_token(),
         "token_saved": saved,
@@ -1202,6 +1272,29 @@ def _settings_verbindung_context(saved: bool = False) -> dict:
             else None
         ),
         "server_started_at": f"{format_timestamp(_SERVER_STARTED_AT, TZ)} {format_time(_SERVER_STARTED_AT, TZ)}",
+        "integration_version": integration_info["version"] if integration_info else None,
+        "integration_last_seen_at": (
+            f"{format_timestamp(integration_info['last_seen'], TZ)} {format_time(integration_info['last_seen'], TZ)}"
+            if integration_info
+            else None
+        ),
+        "integration_outdated": (
+            bool(integration_info) and ha_integration.is_outdated(integration_info["version"])
+        ),
+        **_integration_update_context(integration_info),
+    }
+
+
+def _integration_update_context(integration_info: dict | None) -> dict:
+    latest = ha_integration.latest_known_integration_version(index)
+    kind = (
+        ha_integration.integration_update_kind(integration_info["version"], latest)
+        if integration_info and latest
+        else None
+    )
+    return {
+        "integration_latest_version": latest if kind else None,
+        "integration_update_kind": kind,
     }
 
 
@@ -1412,6 +1505,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
             n for n in notices_mod.build_notices(
                 index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
                 _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
+                _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
             )
             if n["id"] == notice_id
         ),
@@ -1431,6 +1525,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     remaining = collect_notices(
         index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
         _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
+        _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
     )
     return {"success": True, "remaining_count": len(remaining)}
 
@@ -2147,7 +2242,7 @@ def _background_storage_reconciliation() -> None:
     nie sämtliche Entitäten gleichzeitig an. Nach Restore/Crash wird dieser
     Pfad bewusst nicht verwendet; dort lief der Abgleich bereits synchron.
     """
-    global _storage_reconcile_last, _storage_reconcile_completed
+    global _storage_reconcile_last, _storage_reconcile_completed, _last_reconcile_tick
     started_at = time.time()
     reports: list[dict] = []
     entities = [entity["entity_id"] for entity in index.list_entities()]
@@ -2160,6 +2255,11 @@ def _background_storage_reconciliation() -> None:
                     DATA_DIR, index, TZ, entity_ids=[entity_id], repair=True
                 )
             )
+        # Nach jeder Entität statt nur einmal am Ende — sonst würde ein Hänger
+        # an der Entitäts-Sperre (with storage_coordinator.entity(...)) oder
+        # im audit_storage_metadata()-Aufruf selbst nie sichtbar, weil der
+        # Tick sowieso erst nach vollständigem Durchlauf käme.
+        _last_reconcile_tick = time.time()
     _storage_reconcile_last = {
         "checked_at": time.time(),
         "started_at": started_at,
@@ -2209,7 +2309,9 @@ def _maintenance_scheduler_loop() -> None:
             _refresh_purge_preview_if_stale()
             _refresh_duplicate_snapshot_if_stale()
             _refresh_stale_entity_count()
+            _refresh_host_disk_usage()
             version_check.refresh_if_stale(index)
+            ha_integration.refresh_integration_version_check_if_stale(index)
             process_pending_hourly_backfill(DATA_DIR, index, TZ, storage_coordinator)
             refresh_heatmap_weekday_cache_if_stale(_energiedashboard_service)
             _run_backup_schedule_if_due(datetime.now(TZ))
@@ -2237,6 +2339,10 @@ def _start_maintenance_scheduler() -> None:
         _refresh_stale_entity_count()
     except Exception:
         logger.exception("Rotation-Zähler beim Start nicht ermittelbar · event=stale_entity_count_failed")
+    try:
+        _refresh_host_disk_usage()
+    except Exception:
+        logger.exception("Host-Speicherplatz beim Start nicht ermittelbar · event=host_disk_usage_failed")
     if not _requires_synchronous_reconciliation and (
         _storage_reconcile_thread is None or not _storage_reconcile_thread.is_alive()
     ):
@@ -3005,6 +3111,7 @@ def housekeeping_view(request: Request) -> HTMLResponse:
             "duplicates_by_entity": duplicates_by_entity,
             "duplicates_total": duplicates_total,
             **_stale_entities_context(),
+            **_host_disk_usage_context(),
             **_settings_storage_index_context(),
             **_settings_purge_context(),
             **_settings_retention_context(),

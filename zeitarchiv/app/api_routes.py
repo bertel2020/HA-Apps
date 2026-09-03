@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from . import ha_integration
 from .formatting import decimals_to_int, entity_display_name
 from .limits import MAX_MULTI_QUERY_ENTITIES, MAX_WRITE_EVENTS
 from .logging_setup import log_rate_limited
@@ -104,6 +105,7 @@ class ApiDependencies:
     ingestion: IngestionService
     api_token: Callable[[], str]
     app_version: str
+    collect_notices: Callable[[], list[dict]]
 
 
 def expire_write_capture(capture: dict, now: float | None = None) -> bool:
@@ -182,7 +184,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     router = APIRouter()
     locked = lambda getter: storage_locked(deps.coordinator, getter)
 
-    def check_auth(authorization: str | None, request_id: str = "-") -> None:
+    def check_auth(
+        authorization: str | None,
+        request_id: str = "-",
+        integration_version: str | None = None,
+    ) -> None:
         expected = f"Bearer {deps.api_token()}"
         if authorization is None or not secrets.compare_digest(authorization, expected):
             state.connection_stats["auth_failures"] += 1
@@ -197,6 +203,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 interval_seconds=300,
             )
             raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
+        if integration_version:
+            ha_integration.record_seen(deps.index, integration_version)
 
     def limited_multi_entity_ids(args: dict) -> list[str]:
         ids = [item.strip() for item in args["entity_ids"].split(",") if item.strip()]
@@ -208,18 +216,44 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         return ids
 
     @router.get("/api/health")
-    def health(request: Request, authorization: str | None = Header(default=None)) -> dict:
-        check_auth(authorization, getattr(request.state, "request_id", "-"))
+    def health(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
+    ) -> dict:
+        check_auth(
+            authorization,
+            getattr(request.state, "request_id", "-"),
+            x_zeitarchiv_integration_version,
+        )
         return {"status": "ok", "version": deps.app_version}
+
+    @router.get("/api/notices")
+    def notices(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
+    ) -> dict:
+        """Aktuell aktive, nicht stummgeschaltete Meldungen (siehe notices.py)
+        als stabile API — Grundlage für die HA-Integration (Repairs/Entities),
+        bewusst dieselbe gefilterte Liste wie im Glocken-Icon der Zeitarchiv-
+        UI, damit eine dort stummgeschaltete Meldung nicht in HA weiter nervt."""
+        check_auth(
+            authorization,
+            getattr(request.state, "request_id", "-"),
+            x_zeitarchiv_integration_version,
+        )
+        return {"notices": deps.collect_notices()}
 
     @router.post("/api/write")
     def write(
         payload: WriteRequest,
         request: Request,
         authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         request_id = getattr(request.state, "request_id", "-")
-        check_auth(authorization, request_id)
+        check_auth(authorization, request_id, x_zeitarchiv_integration_version)
         state.connection_stats["write_requests_ok"] += 1
         now = time.time()
         captured_now = False
