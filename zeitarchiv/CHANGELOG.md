@@ -1,33 +1,5 @@
 # Changelog
 
-## 0.79.3 - 2026-09-03
-
-### Geändert
-
-- Formulierung des Hinweistexts zur Startseiten-Einstellung aus 0.79.2
-  angepasst.
-
-## 0.79.2 - 2026-09-03
-
-### Geändert
-
-- Hinweistext zur Startseiten-Einstellung ergänzt: Zeitarchiv lässt sich
-  auch per Klick auf „Zeitarchiv" bei den Apps öffnen, nicht nur über die
-  HA-Sidebar.
-
-## 0.79.1 - 2026-09-03
-
-### Behoben
-
-- **Kosten-Festpreise (Netzbezug/Einspeisung) und CO2-Faktor:** Ein
-  geänderter fester Preis wurde beim Klick auf „Übernehmen" im Popup nicht
-  auf der Kachel sichtbar — der Anzeigewert blieb auf dem zuletzt
-  geladenen Stand hängen, obwohl der neue Wert korrekt in die verborgenen
-  Formularfelder übernommen wurde. Betraf Netzbezug-Preis,
-  Einspeisevergütung und die CO2-Intensität gleichermaßen.
-- Platzhaltertext „z. B. …" in den festen Preis-/Kapazitätsfeldern entfernt
-  — konnte im leeren Zustand wie ein bereits eingetragener Wert wirken.
-
 ## 0.79.0 - 2026-09-03
 
 ### Neu
@@ -40,6 +12,22 @@
   zusätzlich Monatsverlauf und alle Auffälligkeiten des Jahres. Der Button
   „Drucken / Als PDF speichern" ruft nur den Druckdialog des Browsers auf —
   kein neues Dateiformat, kein Versand, rein lokal.
+
+### Geändert
+
+- Hinweistext zur Startseiten-Einstellung ergänzt: Zeitarchiv lässt sich
+  auch per Klick auf „Zeitarchiv" öffnen, nicht nur über die HA-Sidebar.
+
+### Behoben
+
+- **Kosten-Festpreise (Netzbezug/Einspeisung) und CO2-Faktor:** Ein
+  geänderter fester Preis wurde beim Klick auf „Übernehmen" im Popup nicht
+  auf der Kachel sichtbar — der Anzeigewert blieb auf dem zuletzt
+  geladenen Stand hängen, obwohl der neue Wert korrekt in die verborgenen
+  Formularfelder übernommen wurde. Betraf Netzbezug-Preis,
+  Einspeisevergütung und die CO2-Intensität gleichermaßen.
+- Platzhaltertext „z. B. …" in den festen Preis-/Kapazitätsfeldern entfernt
+  — konnte im leeren Zustand wie ein bereits eingetragener Wert wirken.
 
 ## 0.78.0 - 2026-09-03
 
