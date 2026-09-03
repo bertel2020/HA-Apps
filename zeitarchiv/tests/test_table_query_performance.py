@@ -74,6 +74,7 @@ def test_table_batch_endpoint_returns_columns_in_request_order(tmp_path: Path) -
         ingestion=None,  # Für diesen reinen Lese-Endpunkt nicht benötigt.
         api_token=lambda: "test",
         app_version="test",
+        collect_notices=lambda: [],
     ), ApiState())
     endpoint = next(route.endpoint for route in router.routes if route.path == "/api/query-table")
     result = endpoint(TableQueryRequest(

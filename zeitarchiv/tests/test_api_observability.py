@@ -36,20 +36,44 @@ class _FakeIngestion:
         return self.result
 
 
+class _FakeIndex:
+    """Minimaler get_setting/set_setting-Stub für ha_integration.record_seen()
+    — der Endpunkt wird hier direkt als Python-Funktion aufgerufen statt über
+    FastAPI, wodurch x_zeitarchiv_integration_version nicht None sondern das
+    unaufgelöste Header(default=None)-Sentinel ist (truthy) und check_auth()
+    daher immer record_seen(deps.index, ...) auslöst."""
+
+    def __init__(self) -> None:
+        self._settings: dict[str, str] = {}
+
+    def get_setting(self, key: str) -> str | None:
+        return self._settings.get(key)
+
+    def set_setting(self, key: str, value: str) -> None:
+        self._settings[key] = value
+
+
 def _write_endpoint(state: ApiState, result: str = "written"):
     router = create_api_router(
         ApiDependencies(
             data_dir=Path("/tmp"),
-            index=None,
+            index=_FakeIndex(),
             tz=ZoneInfo("Europe/Berlin"),
             coordinator=StorageCoordinator(),
             ingestion=_FakeIngestion(result),
             api_token=lambda: "test-token",
             app_version="test",
+            collect_notices=lambda: [],
         ),
         state,
     )
-    return next(route.endpoint for route in router.routes if route.path == "/api/write")
+    raw = next(route.endpoint for route in router.routes if route.path == "/api/write")
+    # x_zeitarchiv_integration_version fehlt beim Direktaufruf (kein
+    # FastAPI-Request-Parsing hier) sonst als unaufgelöstes
+    # Header(default=None)-Sentinel statt echtem None — siehe _FakeIndex.
+    return lambda payload, request, authorization: raw(
+        payload, request, authorization, x_zeitarchiv_integration_version=None,
+    )
 
 
 def _request(request_id: str) -> Request:

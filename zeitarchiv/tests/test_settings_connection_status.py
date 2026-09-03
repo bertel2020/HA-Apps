@@ -15,7 +15,10 @@ CSS = (ROOT / "app/static/css/app.css").read_text(encoding="utf-8")
 def test_connection_status_uses_shared_status_cards() -> None:
     assert 'class="status-grid connection-status-grid"' in SOURCE
     assert 'class="connection-status-cards"' in SOURCE
-    assert SOURCE.count('<div class="status-card') == 3
+    # 4 immer gerenderte Karten (Letzter Wert/Schreibzugriffe/Auth-Fehler/
+    # Integrations-Version) + 1 bedingte (Update verfügbar) — siehe
+    # Integrationsversions-Anzeige seit 0.78.0, GET /api/notices.
+    assert SOURCE.count('<div class="status-card') == 5
     assert "status-card-danger" in SOURCE
     assert 'class="val mono" style="line-height:1.8;"' not in SOURCE
 
