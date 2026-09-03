@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.79.2 - 2026-09-03
+
+### Geändert
+
+- Hinweistext zur Startseiten-Einstellung ergänzt: Zeitarchiv lässt sich
+  auch per Klick auf „Zeitarchiv" bei den Apps öffnen, nicht nur über die
+  HA-Sidebar.
+
 ## 0.79.1 - 2026-09-03
 
 ### Behoben
