@@ -133,3 +133,37 @@ def test_index_lock_contention_notice_reflects_recent_busy_events() -> None:
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_build_notices_never_requests_deleted_count() -> None:
+    """Die Meldungen lesen retention/value_filter/gap_threshold/last_ts —
+    nie deleted_count. Der deleted_points-Join in list_entities() kostete
+    trotzdem bei jeder Template-Antwort dreimal ~75 ms (0.75.0-Regression,
+    beim Filtern der Entitätenliste pro Tastendruck spürbar)."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
+        index.set_setting("retention_enforcement_schedule", "off")
+        index.set_config("sensor.a", retention="365d")
+        original = index.list_entities
+        seen: list[dict] = []
+
+        def recording(*args, **kwargs):
+            seen.append(kwargs)
+            return original(*args, **kwargs)
+
+        index.list_entities = recording  # type: ignore[method-assign]
+        build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+        )
+        assert seen, "build_notices sollte list_entities aufrufen"
+        assert all(call.get("include_deleted_count") is False for call in seen), seen
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

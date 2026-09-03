@@ -251,7 +251,7 @@ def build_notices(
             "link": "/housekeeping#aufbewahrung",
         })
     elif index.get_setting("retention_enforcement_schedule", "off") == "off":
-        limited_count = sum(1 for e in index.list_entities() if e["retention"] != "unlimited")
+        limited_count = sum(1 for e in index.list_entities(include_deleted_count=False) if e["retention"] != "unlimited")
         if limited_count:
             notices.append({
                 "id": "retention.enforcement_disabled",
@@ -290,7 +290,7 @@ def build_notices(
             })
 
     conflict_count = sum(
-        1 for e in index.list_entities()
+        1 for e in index.list_entities(include_deleted_count=False)
         if e["value_filter"] == "decimals"
         and e["gap_threshold"] != "off"
         and e["gap_threshold"].isdigit()
@@ -439,7 +439,7 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
     gibt es kein "seit wann", nur "noch nie"."""
     now_ts = datetime.now(tz).timestamp()
     counts = {"info": 0, "warn": 0, "error": 0}
-    for entity in index.list_entities():
+    for entity in index.list_entities(include_deleted_count=False):
         last_ts = entity["last_ts"]
         if last_ts is None:
             counts["error"] += 1

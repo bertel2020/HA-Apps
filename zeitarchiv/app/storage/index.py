@@ -1307,6 +1307,7 @@ class Index:
         favorites_only: bool = False,
         limit: int | None = None,
         offset: int = 0,
+        include_deleted_count: bool = True,
     ) -> list[sqlite3.Row]:
         """search filtert per LIKE auf entity_id/friendly_name, type_filter auf
         aggregation_type — ein einzelner Typ (Rückwärtskompatibilität), eine Liste
@@ -1323,7 +1324,15 @@ class Index:
         SQL ein, statt die komplette gefilterte Menge zu laden und erst in Python
         zu paginieren — limit=None (Standard) liefert weiterhin alle Treffer, für
         Aufrufer, die die volle Liste brauchen (Wartungsjobs, Exporte, interne
-        Iterationen)."""
+        Iterationen).
+
+        include_deleted_count=False lässt den _DELETED_COUNT_JOIN weg — der
+        aggregiert bei JEDEM Aufruf die komplette deleted_points-Tabelle
+        (bei 1,5 Mio. Löschmarkierungen ~75 ms), was für Aufrufer ohne
+        Bedarf an deleted_count (Meldungen, Rotation-Zähler, reine
+        ID-Listen) reine Verschwendung ist. Wird der Sort-Ausdruck selbst
+        von dc.deleted_count getragen ("rows"), bleibt der Join trotzdem
+        aktiv, sonst würde ORDER BY auf einen fehlenden Alias zeigen."""
         column = SORTABLE_COLUMNS.get(sort, "entity_id")
         direction_sql = "DESC" if direction == "desc" else "ASC"
 
@@ -1331,10 +1340,14 @@ class Index:
             search, type_filter, unit_filter, favorites_only
         )
 
-        query = (
-            "SELECT entities.*, COALESCE(dc.deleted_count, 0) AS deleted_count "
-            "FROM entities " + _DELETED_COUNT_JOIN
-        )
+        if include_deleted_count or "dc." in column:
+            query = (
+                "SELECT entities.*, COALESCE(dc.deleted_count, 0) AS deleted_count "
+                "FROM entities " + _DELETED_COUNT_JOIN
+            )
+        else:
+            query = "SELECT entities.* FROM entities"
+        
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += f" ORDER BY {column} {direction_sql}, entities.entity_id ASC"

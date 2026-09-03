@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.76.1 - 2026-09-03
+
+### Behoben
+
+- **Träge Seiten und Hänger beim Filtern der Entitätenliste.** Das
+  Meldungs-Center (Glocken-Icon, seit 0.75.0) wurde bei jeder Antwort neu
+  berechnet — auch bei jedem Tastendruck im Suchfeld — und aggregierte dabei
+  dreimal die komplette Tabelle der Löschmarkierungen (bei 1,5 Millionen
+  Einträgen ~75 ms je Durchgang). Zusätzlich nahm es zum Zählen ausstehender
+  Rotationen die Sperren *aller* Entitäten; in Produktion mit laufender
+  Home-Assistant-Ingestion blockierte das gegen die Schreibvorgänge und
+  fühlte sich beim Tippen wie ein Hänger an. Jetzt lesen die Meldungen ohne
+  diese Aggregation, und der Rotations-Zähler kommt aus dem 30-Sekunden-
+  Wartungsplaner statt aus dem Seitenaufruf. Gemessen mit den Demo-Daten:
+  Entitätenliste 0,31 → 0,002 s, Meldungs-Panel 0,60 → 0,003 s, Such-
+  Fragment 0,39 → 0,08 s, Startseite 0,53 → 0,23 s.
+
+### Hinweis
+
+- Ein Downgrade von 0.76.x auf 0.75.0 ist nicht möglich: das Energiedashboard
+  speichert mehrere Speicher seit 0.76.0 als Liste, die ältere Version
+  startet mit dieser Konfiguration nicht mehr.
+
 ## 0.76.0 - 2026-09-03
 
 ### Neu

@@ -319,7 +319,7 @@ def _notices_context(request: Request) -> dict:
     return {
         "notices": collect_notices(
             index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-            _storage_reconcile_last, _count_stale_entities(), _last_scheduler_tick,
+            _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
         ),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
     }
@@ -885,9 +885,27 @@ def _count_stale_entities() -> int:
     Aufrufen, die sonst bei jedem Laden von /settings erneut das komplette
     hot_dir je Entität durchsuchen (siehe Kommentar dort)."""
     now_ts = datetime.now(TZ).timestamp()
-    entity_ids = [entity["entity_id"] for entity in index.list_entities()]
+    entity_ids = [entity["entity_id"] for entity in index.list_entities(include_deleted_count=False)]
     with storage_coordinator.entities(entity_ids):
         return len(hotbuffer.find_entities_with_stale_hot_files(DATA_DIR, set(entity_ids), now_ts, TZ))
+
+
+# Vom Wartungsplaner (alle 30s) gepflegter Zwischenstand für die Meldungen
+# (housekeeping.rotation_pending). _count_stale_entities() selbst nimmt über
+# storage_coordinator.entities() die Sperren ALLER Entitäten — ohne Timeout,
+# wartend auf laufende Exklusiv-Wartung (Backup/VACUUM) und diese ihrerseits
+# blockierend. Als Teil von _notices_context() lief das bisher bei JEDER
+# Template-Antwort, auch bei jedem htmx-Such-Fragment pro Tastendruck — in
+# Produktion mit laufender Ingestion (die dieselben Sperren je Entität hält)
+# der Grund für sekundenlange Hänger beim Filtern der Entitätenliste. Nur
+# _settings_rotation_context() (Housekeeping → Rotation, bewusster
+# Seitenaufruf) zählt weiterhin live.
+_stale_entity_count_cached = 0
+
+
+def _refresh_stale_entity_count() -> None:
+    global _stale_entity_count_cached
+    _stale_entity_count_cached = _count_stale_entities()
 
 
 def _settings_rotation_context(result: str | None = None) -> dict:
@@ -1393,7 +1411,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
         (
             n for n in notices_mod.build_notices(
                 index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-                _storage_reconcile_last, _count_stale_entities(), _last_scheduler_tick,
+                _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
             )
             if n["id"] == notice_id
         ),
@@ -1412,7 +1430,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
     remaining = collect_notices(
         index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-        _storage_reconcile_last, _count_stale_entities(), _last_scheduler_tick,
+        _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
     )
     return {"success": True, "remaining_count": len(remaining)}
 
@@ -2190,6 +2208,7 @@ def _maintenance_scheduler_loop() -> None:
             _refresh_retention_overview_if_stale()
             _refresh_purge_preview_if_stale()
             _refresh_duplicate_snapshot_if_stale()
+            _refresh_stale_entity_count()
             version_check.refresh_if_stale(index)
             process_pending_hourly_backfill(DATA_DIR, index, TZ, storage_coordinator)
             refresh_heatmap_weekday_cache_if_stale(_energiedashboard_service)
@@ -2211,6 +2230,13 @@ def _start_maintenance_scheduler() -> None:
     # bräuchte jede bestehende Installation ein manuelles erneutes Speichern
     # des Setup-Formulars, damit der rückwirkende Backfill überhaupt anläuft.
     sync_hourly_rollup_flags_for_current_config(_energiedashboard_service)
+    # Einmal vorab, damit die erste Seite nach dem Start nicht 30s lang
+    # fälschlich "0 ausstehende Rotationen" meldet — zu diesem Zeitpunkt hält
+    # noch niemand Entitäts-Sperren, der Aufruf ist hier ungefährlich.
+    try:
+        _refresh_stale_entity_count()
+    except Exception:
+        logger.exception("Rotation-Zähler beim Start nicht ermittelbar · event=stale_entity_count_failed")
     if not _requires_synchronous_reconciliation and (
         _storage_reconcile_thread is None or not _storage_reconcile_thread.is_alive()
     ):

@@ -96,6 +96,27 @@ def test_statistik_view_reads_duplicate_snapshot_not_live_scan() -> None:
     assert "_duplicate_rows_for_display" in housekeeping_calls
 
 
+
+def _name_calls(function: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    return {
+        node.func.id
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+
+
+def test_request_path_reads_cached_stale_count_instead_of_locking_all_entities() -> None:
+    """_count_stale_entities() nimmt über storage_coordinator.entities() die
+    Sperren ALLER Entitäten (ohne Timeout, blockiert von/blockierend für
+    Ingestion und Exklusiv-Wartung). Das gehört in den 30s-Wartungsplaner,
+    nicht in einen context_processor, der bei jeder Template-Antwort und
+    damit bei jedem htmx-Such-Fragment läuft."""
+    for name in ("_notices_context", "mute_notice_route"):
+        assert "_count_stale_entities" not in _name_calls(_function(name)), name
+    assert "_refresh_stale_entity_count" in _name_calls(_function("_maintenance_scheduler_loop"))
+    assert "_refresh_stale_entity_count" in _name_calls(_function("_start_maintenance_scheduler"))
+
+
 def _run_all() -> None:
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

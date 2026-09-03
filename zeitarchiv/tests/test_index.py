@@ -943,3 +943,23 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_list_entities_can_skip_the_deleted_points_join() -> None:
+    """include_deleted_count=False darf deleted_points gar nicht erst
+    aggregieren (bei 1,5 Mio. Löschmarkierungen ~75 ms je Aufruf) — nur
+    Aufrufer, die deleted_count wirklich lesen, zahlen dafür. Der Sort
+    "rows" hängt selbst an dc.deleted_count und erzwingt den Join weiterhin."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
+        lean = index.list_entities(include_deleted_count=False)
+        assert len(lean) == 1 and "deleted_count" not in lean[0].keys()
+        full = index.list_entities()
+        assert full[0]["deleted_count"] == 0
+        by_rows = index.list_entities(sort="rows", include_deleted_count=False)
+        assert by_rows[0]["deleted_count"] == 0
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
