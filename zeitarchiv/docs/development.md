@@ -45,6 +45,19 @@ python3 scripts/sync_versions.py
 python3 scripts/sync_versions.py --check
 ```
 
+## Release
+
+1. `addon/VERSION` erhöhen, `python3 scripts/sync_versions.py` ausführen,
+   `CHANGELOG.md` ergänzen.
+2. Nach `HA-Apps/zeitarchiv/` synchronisieren, committen, pushen.
+3. Der Workflow „Zeitarchiv Image" (`.github/workflows/zeitarchiv-image.yml`
+   im HA-Apps-Repo) baut daraufhin per buildx/QEMU die Images für `amd64` und
+   `aarch64` und veröffentlicht sie als
+   `ghcr.io/bertel2020/zeitarchiv-{arch}:<VERSION>` (zusätzlich `latest`).
+   Der Supervisor zieht sie über `image:` in `config.yaml`. Zwischen Push und
+   grünem Lauf liegen einige Minuten; wer in diesem Fenster aktualisiert,
+   bekommt einen Pull-Fehler und kann es danach einfach erneut versuchen.
+
 ## Demo-Daten
 
 Für ein Datenverzeichnis mit realistisch aussehenden Beispieldaten (ohne

@@ -90,11 +90,18 @@ direkt die Installationsseite von Zeitarchiv. Alternativ von Hand:
 **Über den Add-on-Store:** In Home Assistant **Einstellungen → Add-ons →
 Add-on-Store → ⋮ → Repositories** öffnen, `https://github.com/bertel2020/HA-Apps`
 eintragen und hinzufügen. **Zeitarchiv** erscheint danach im Store; installieren
-und starten. Unterstützt werden `amd64` und `aarch64`.
+und starten.
+
+Installation und Updates laufen über vorgebaute Images für `amd64` und
+`aarch64` (`ghcr.io/bertel2020/zeitarchiv-{arch}`), die ein GitHub-Workflow
+bei jedem Release erzeugt. Der Home-Assistant-Host baut also nichts lokal;
+Updates sind entsprechend schnell und der Supervisor zeigt den Fortschritt an.
 
 **Manuell:** Alternativ den Inhalt dieses Verzeichnisses als
 `/addons/zeitarchiv` auf den Home-Assistant-Host kopieren und den Store neu
-laden.
+laden. Auch dann zieht der Supervisor das vorgebaute Image; wer das
+Dockerfile wirklich lokal bauen will, entfernt dafür die Zeile `image:` aus
+der `config.yaml`.
 
 Nach dem Start erscheint Zeitarchiv in der Home-Assistant-Seitenleiste. Die
 vollständige Oberfläche läuft über den authentifizierten Supervisor-Ingress;

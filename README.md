@@ -30,6 +30,10 @@ Alternativ von Hand:
 4. Den App-Store neu laden.
 5. Die gewünschte App auswählen und installieren.
 
+Die Apps werden als vorgebaute Images für `amd64` und `aarch64` auf
+`ghcr.io/bertel2020` veröffentlicht; der Home-Assistant-Host muss beim
+Installieren oder Aktualisieren nichts selbst bauen.
+
 ## Repository-Struktur
 
 ```text

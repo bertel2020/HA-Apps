@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.76.2 - 2026-09-03
+
+### Verbesserung
+
+- **Installation und Updates über vorgebaute Images.** Bisher baute jeder
+  Home-Assistant-Host das Docker-Image beim Installieren oder Aktualisieren
+  selbst, minutenlang und ohne Fortschrittsanzeige („Wird installiert
+  (0 %)"). Jetzt liefert ein GitHub-Workflow fertige Images für `amd64` und
+  `aarch64` auf `ghcr.io`, der Supervisor lädt sie nur noch herunter und
+  zeigt dabei den echten Fortschritt an.
+- Der Add-on-Store verlinkt jetzt auf die Projektseite (das `url`-Feld in der
+  `config.yaml` fehlte bisher). In den READMEs gibt es Buttons für My Home
+  Assistant, die das Repository eintragen bzw. Zeitarchiv direkt öffnen.
+
 ## 0.76.1 - 2026-09-03
 
 ### Behoben
