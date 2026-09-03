@@ -14,10 +14,11 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 ## Was wird erzeugt
 
-41 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+52 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
-Speicher und der Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der
-Entity-ID (leicht wiederzuerkennen und gezielt löschbar):
+eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
+Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
+wiederzuerkennen und gezielt löschbar):
 
 | Entität | Typ | Einheit | Muster |
 | --- | --- | --- | --- |
@@ -51,6 +52,7 @@ Entity-ID (leicht wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_balkonkraftwerk_entladeleistung` | Standard | W | >0 nur während der Speicher entlädt (nachts, bis SoC den Entladeschutz erreicht) |
 | `sensor.demo_balkonkraftwerk_speicher_soc` | Standard | % | Ladezustand 0–100 %, tagsüber steigend/nachts fallend |
 | `sensor.demo_balkonkraftwerk_speicher_stand` | Standard | kWh | Absoluter Energieinhalt des 2-kWh-Speichers (`SoC × Kapazität`), kein Zähler |
+| `sensor.demo_balkonkraftwerk_speicher_kapazitaet` | Standard | **Wh** | Konstant 2000 Wh — bewusst in Wh statt kWh wie `speicher_stand`, als realistisches Beispiel für unterschiedliche Einheiten zwischen thematisch verwandten Sensoren |
 | `sensor.demo_balkonkraftwerk_hausabgabe` | Standard | W | Tatsächlich Richtung Haussteckdose abgegebene Leistung (PV-Überschuss bei vollem Speicher + Speicher-Entladung); mindert `load_power`, bevor Bezug/Einspeisung berechnet werden — wie ein reales Balkonkraftwerk ohne eigenen Zähler/eigene Einspeisevergütung |
 | `sensor.demo_balkonkraftwerk_ertrag_heute` | Zähler (`total_increasing`) | kWh | PV-Ertrag des Balkonkraftwerks, **resettet täglich um Mitternacht auf 0** (wie bei den meisten Mikrowechselrichter-Apps) |
 | `sensor.demo_balkonkraftwerk_ertrag_gesamt` | Zähler (`total_increasing`) | kWh | Derselbe PV-Ertrag, monoton steigend seit „Inbetriebnahme", kein Reset |
@@ -59,6 +61,16 @@ Entity-ID (leicht wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_balkonkraftwerk_entladen_heute` | Zähler (`total_increasing`) | kWh | Entlademenge des Speichers, Tages-Reset wie `ertrag_heute` |
 | `sensor.demo_balkonkraftwerk_entladen_gesamt` | Zähler (`total_increasing`) | kWh | Entlademenge des Speichers, monoton steigend, kein Reset |
 | `binary_sensor.demo_balkonkraftwerk_online` | Schalter | — | An, solange PV liefert oder der Speicher entlädt; aus, sobald der Speicher nachts den Entladeschutz erreicht (bis zur nächsten Sonneneinstrahlung) |
+| `sensor.demo_heimspeicher_kapazitaet` | Standard | kWh | Konstant 10 kWh — deutlich größer als der Balkonkraftwerk-Speicher, direkt an die Dachanlage gekoppelt statt eigenständig |
+| `sensor.demo_heimspeicher_ladeleistung` | Standard | W | >0 nur, wenn die Dachanlage mehr liefert, als das Haus gerade verbraucht (nach Abzug der Balkonkraftwerk-Hausabgabe) — lädt aus dem PV-Überschuss, der sonst eingespeist würde |
+| `sensor.demo_heimspeicher_entladeleistung` | Standard | W | >0 nur, wenn die Dachanlage den Hausverbrauch nicht deckt — deckt einen Teil des sonst nötigen Netzbezugs |
+| `sensor.demo_heimspeicher_speicher_soc` | Standard | % | Ladezustand 0–100 %, folgt dem PV-Überschuss/-Defizit der Dachanlage |
+| `sensor.demo_heimspeicher_speicher_stand` | Standard | kWh | Absoluter Energieinhalt des 10-kWh-Speichers (`SoC × Kapazität`), kein Zähler |
+| `sensor.demo_heimspeicher_geladen_heute` | Zähler (`total_increasing`) | kWh | Lademenge, **Tages-Reset** um Mitternacht |
+| `sensor.demo_heimspeicher_geladen_gesamt` | Zähler (`total_increasing`) | kWh | Lademenge, monoton steigend, kein Reset |
+| `sensor.demo_heimspeicher_entladen_heute` | Zähler (`total_increasing`) | kWh | Entlademenge, Tages-Reset wie `geladen_heute` |
+| `sensor.demo_heimspeicher_entladen_gesamt` | Zähler (`total_increasing`) | kWh | Entlademenge, monoton steigend, kein Reset |
+| `binary_sensor.demo_heimspeicher_online` | Schalter | — | An, solange geladen oder entladen wird; aus im Leerlauf (PV deckt den Hausverbrauch exakt, oder Speicher ist voll/leer und wird gerade nicht gebraucht) |
 | `sensor.demo_wasserzaehler` | Zähler (`total_increasing`) | m³ | Monoton steigend, sparsame zufällige Zuwächse tagsüber |
 | `binary_sensor.demo_praesenz_wohnzimmer` | Schalter | — | Heim/Weg mit tageszeitabhängiger Wahrscheinlichkeit und Trägheit (kein Umschalten alle paar Minuten) |
 | `binary_sensor.demo_regensensor` | Schalter | — | Ein-/mehrmalige Regenfenster an manchen Tagen, Wahrscheinlichkeit steigt mit der Bewölkung dieses Tages |
@@ -74,7 +86,8 @@ Zwei Zähler statt eines: reale bidirektionale Zähler führen Bezug und
 Einspeisung getrennt (beide für sich genommen monoton steigend, nie
 negativ) — welcher der beiden gerade wächst, ergibt sich aus dem
 Vorzeichen von Gesamtwirkleistung minus PV-Leistung **minus der
-Balkonkraftwerk-Hausabgabe** zu jedem Zeitpunkt.
+Balkonkraftwerk-Hausabgabe, plus Heimspeicher-Ladeleistung, minus
+Heimspeicher-Entladeleistung** zu jedem Zeitpunkt.
 
 Das Balkonkraftwerk ist ein eigenständiges Zweitsystem neben der großen
 Dachanlage, kein Ersatz dafür: kleinere Modulleistung mit fester
@@ -89,14 +102,28 @@ Nacht (in der Simulation meist gegen 2–3 Uhr der Fall), schaltet
 anliegt — ein bewusst realistischer Effekt der gewählten Speichergröße,
 kein Fehlerzustand.
 
+Der Heimspeicher ist ein dritter, deutlich größerer Speicher (10 kWh) —
+anders als das unabhängige Balkonkraftwerk aber direkt an die Dachanlage
+gekoppelt, wie bei einem Hybrid-Wechselrichter-Setup üblich: Er hat keine
+eigene PV, sondern lädt aus dem Überschuss der Dachanlage nach Abzug des
+Hausverbrauchs (netto nach der bereits abgezogenen Balkonkraftwerk-
+Hausabgabe) und entlädt bei PV-Defizit, um einen Teil des sonst nötigen
+Netzbezugs zu decken. Lade-/Entladeleistung sind auf 3.000 W begrenzt
+(typisch für Heimspeicher-Wechselrichter). Da er direkt am Hauptzähler
+hängt, fließen seine Lade-/Entladewerte — anders als beim Balkonkraftwerk,
+das nur eine einzelne `hausabgabe` kennt — mit eigenem Vorzeichen in
+Bezug/Einspeisung ein: Laden erhöht effektiv den Bezug (bzw. senkt die
+Einspeisung), Entladen senkt den Bezug.
+
 Gesamtwirkleistung, alle Verbraucher (inkl. Wallbox), PV-Leistung/-Ertrag,
 beide Stromzähler, Innenluftfeuchte, Wind, Regensensor, CO2-Intensität, die
-PV-Prognose-Sensoren und alle Balkonkraftwerk-Entitäten entstehen in einem
-einzigen gemeinsamen Simulationsdurchlauf (`simulate_household()`) statt
-unabhängig voneinander — die Zählerstände sind daher die exakte Integration
-derselben Leistungswerte, die auch als Sensoren geschrieben werden, nicht
-separat gewürfelte Näherungen; die An/Aus-Schalter sind reine
-Zustandsübergänge derselben Leistungswerte statt eigener Zufallslogik.
+PV-Prognose-Sensoren sowie alle Balkonkraftwerk- und Heimspeicher-
+Entitäten entstehen in einem einzigen gemeinsamen Simulationsdurchlauf
+(`simulate_household()`) statt unabhängig voneinander — die Zählerstände
+sind daher die exakte Integration derselben Leistungswerte, die auch als
+Sensoren geschrieben werden, nicht separat gewürfelte Näherungen; die
+An/Aus-Schalter sind reine Zustandsübergänge derselben Leistungswerte statt
+eigener Zufallslogik.
 
 Bewölkung, Temperaturabweichung und ein Wind-Tageswert werden pro
 Kalendertag einmal berechnet und über einen einfachen AR(1)-Prozess an den
@@ -134,7 +161,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 41 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 52 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -205,7 +232,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 41 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 52 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben
@@ -264,13 +291,14 @@ Monate an Daten neu zu berechnen:
   Schreibvorgängen). Ist die Instanz bereits aktuell, beendet sich das
   Skript ohne etwas zu schreiben.
 - Zähler (`_energie`, `_ertrag`, Stromzähler, Wasserzähler,
-  Balkonkraftwerk-`_gesamt`-Zähler und Speicherstand) und Schalter-Zustände
-  knüpfen dabei an ihren zuletzt tatsächlich gespeicherten Wert an — kein
-  Zählersprung/-rücksetzer an der Anschlussstelle. Überlappende Zeitstempel
-  wären ohnehin unkritisch: `import_rows()` dedupliziert danach. Die
-  Balkonkraftwerk-`_heute`-Zähler knüpfen nur an, wenn der letzte Lauf am
-  selben Kalendertag endete — sonst beginnt der neue Tag ohnehin bei 0, wie
-  bei einem echten Tages-Reset.
+  Balkonkraftwerk-/Heimspeicher-`_gesamt`-Zähler und beide Speicherstände)
+  und Schalter-Zustände knüpfen dabei an ihren zuletzt tatsächlich
+  gespeicherten Wert an — kein Zählersprung/-rücksetzer an der
+  Anschlussstelle. Überlappende Zeitstempel wären ohnehin unkritisch:
+  `import_rows()` dedupliziert danach. Die Balkonkraftwerk-/Heimspeicher-
+  `_heute`-Zähler knüpfen nur an, wenn der letzte Lauf am selben Kalendertag
+  endete — sonst beginnt der neue Tag ohnehin bei 0, wie bei einem echten
+  Tages-Reset.
 - Findet `--append` kein vorhandenes `sensor.demo_gesamtwirkleistung` (leeres
   Zielverzeichnis), fällt es automatisch auf eine normale Vollerzeugung mit
   `--months` zurück.
