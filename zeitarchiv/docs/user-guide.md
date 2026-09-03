@@ -828,7 +828,7 @@ wie die Einstellungen:
 | --- | --- |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
-| **Speicherplatz** | Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
+| **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Rotation** | Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat. |
 | **Ungenutzte Elemente** | Charts und Vergleichstabellen, die in keinem Dashboard angepinnt sind — direkt öffnen oder löschen. Verschwindet automatisch aus der Liste, sobald irgendwo angepinnt. |
@@ -858,6 +858,10 @@ Zeitarchiv unter anderem:
   Lücken-Erkennung (siehe [Entität konfigurieren](#entität-konfigurieren))
 - Tageslastprofil im Energiedashboard wird nach einer Konfigurationsänderung
   noch rückwirkend vervollständigt
+- Freier Speicherplatz auf dem Host-Dateisystem wird knapp (zweistufig:
+  Warnung/kritisch) — andere Frage als Zeitarchivs eigener Speicherverbrauch
+- Verbundene Home-Assistant-Integration ist veraltet oder eine neuere Version
+  ist verfügbar (getrennt nach Bugfix/Funktionsupdate)
 
 Alle Meldungen außer echten Fehlern lassen sich über das 🔕-Icon
 stummschalten (1 Stunde bis dauerhaft) — einsehbar und vorzeitig
@@ -1043,7 +1047,7 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 | **Darstellung** | Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
-| **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start |
+| **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
 | **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
 | **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
 

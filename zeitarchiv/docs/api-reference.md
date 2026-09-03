@@ -2,7 +2,7 @@
 
 Zwei Zielgruppen, zwei Erreichbarkeiten (siehe [security.md](security.md)):
 
-- **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`.
+- **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices`.
 - **Nur Ingress, Port `8099`**: alles andere, inklusive `/api/query`,
   `/api/query-multi` und `/api/query-table` — diese sind KEINE öffentliche
   API, sondern werden vom Browser-JS derselben Ingress-Session aufgerufen.
@@ -59,6 +59,25 @@ Authentifiziert wie `/api/write`. Antwort: `{"status": "ok", "version": "<aktuel
 (z. B. `"0.60.0"`) — `version` wird zur Laufzeit aus der installierten App
 gelesen, nicht fest kodiert.
 Von der Integration für den Reauth-Fluss genutzt (falscher Token → 401).
+
+Alle drei öffentlichen Endpunkte akzeptieren zusätzlich den optionalen
+Header `X-Zeitarchiv-Integration-Version` — die Integration schickt darüber
+ihre eigene Version mit (`app/ha_integration.py`). Rein informativ: die App
+zeigt sie in Einstellungen → Verbindung an und meldet per Notice, wenn die
+Integration veraltet ist oder eine neuere Version verfügbar wäre. Kein
+Einfluss auf Auth oder Schreibpfad, fehlt er, ändert sich nichts.
+
+## `GET /api/notices`
+
+Authentifiziert wie `/api/write`. Antwort: `{"notices": [...]}` — dieselbe
+gefilterte (stummschaltungsbereinigte) Meldungsliste wie im Glocken-Icon der
+Zeitarchiv-UI (siehe `notices.py`, `collect_notices()`). Jede Meldung:
+`id`, `severity` (`info`/`warn`/`error`), `title`, `detail`, `meta`, `link`,
+`mutable`.
+
+Grundlage für die HA-Integration: sie pollt diesen Endpunkt (60s) und macht
+daraus Home-Assistant-Repairs (kritische Fälle) sowie `binary_sensor`-
+Entities (automatisierbare Dauerzustände) am Zeitarchiv-Gerät.
 
 ## `GET /api/query` (Ingress-intern)
 

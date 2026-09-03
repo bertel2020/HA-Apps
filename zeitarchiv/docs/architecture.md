@@ -14,10 +14,10 @@ Ein Container, zwei Prozesse, ein Anwendungscode:
 │  │  localhost. Alles / → App.                                │
 │  │                                                            │
 │  └─ :8127  Öffentlicher Server ──►  :8128                    │
-│     Nur /api/health, /api/write                              │
-│     proxied. Alles andere → 404                              │
-│     direkt am Gateway, erreicht                              │
-│     die App nie.                                             │
+│     Nur /api/health, /api/write,                             │
+│     /api/notices proxied. Alles                              │
+│     andere → 404 direkt am Gateway,                          │
+│     erreicht die App nie.                                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -123,6 +123,10 @@ Garantien umgehen. Das ist kein unterstütztes Deployment.
   [data-model.md](data-model.md) → "Gecachte Vorschauen")
 - geplante Backups, geplante Retention-Durchsetzung (beide: verpasster Lauf
   nach Downtime wird nachgeholt, nie mehrfach parallel)
+- Host-Speicherplatz (`shutil.disk_usage(DATA_DIR)`) und die verfügbare
+  Integrations-Version (GitHub-Raw-Abruf, höchstens einmal täglich,
+  `ha_integration.py`) — beide rein informativ, ihr Ausfall (z. B. kein
+  Internet) blockiert nie den Schreibpfad
 
 Ein Fehler in einem Planer-Durchlauf wird geloggt, bricht die Schleife aber
 nicht ab (`except Exception: logger.exception(...)`).

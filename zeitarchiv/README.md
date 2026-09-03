@@ -165,15 +165,18 @@ Darstellung.
 
 **Housekeeping.** Eigener Bereich für Dinge, die sonst leicht übersehen
 werden: erkannte Duplikate, inaktive Entitäten, ungenutzte Charts/Tabellen,
-sowie Speicherplatz-, Aufbewahrungs- und Rotations-Verwaltung an einer
-Stelle.
+freier Speicherplatz auf dem Host-Dateisystem, sowie Speicherplatz-,
+Aufbewahrungs- und Rotations-Verwaltung an einer Stelle.
 
 **Meldungen.** Die Glocke in der Kopfzeile bündelt Systemhinweise —
 empfohlene Wartung, fehlgeschlagene Backup-/Aufbewahrungs-/Importläufe,
-verfügbare Updates, sowie mehrere Housekeeping-Prüfungen. Einzelne Meldungen
-lassen sich befristet oder dauerhaft stummschalten; echte Fehler nie. Ein
-rotierender Praxis-Tipp ergänzt die Meldungen, lässt sich einzeln ausblenden
-oder komplett abschalten.
+verfügbare App- und Integrations-Updates, sowie mehrere
+Housekeeping-Prüfungen. Einzelne Meldungen lassen sich befristet oder
+dauerhaft stummschalten; echte Fehler nie. Ein rotierender Praxis-Tipp
+ergänzt die Meldungen, lässt sich einzeln ausblenden oder komplett
+abschalten. Dieselben Meldungen stehen der Home-Assistant-Integration über
+`GET /api/notices` zur Verfügung — Grundlage für Home-Assistant-Repairs und
+automatisierbare `binary_sensor`-Entities am Zeitarchiv-Gerät.
 
 **Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
 unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren
@@ -256,9 +259,9 @@ dem Überschreiben verschoben, nicht gelöscht.
 | Zugang | Erreichbarer Umfang |
 | --- | --- |
 | Supervisor-Ingress, intern Port `8099` | Vollständige Oberfläche und Verwaltung |
-| Veröffentlichter Port `8127` | Nur `GET /api/health` und `POST /api/write` |
+| Veröffentlichter Port `8127` | Nur `GET /api/health`, `POST /api/write` und `GET /api/notices` |
 
-Beide API-Endpunkte auf Port `8127` benötigen einen Bearer-Token. Oberfläche,
+Alle drei API-Endpunkte auf Port `8127` benötigen einen Bearer-Token. Oberfläche,
 Abfragen, Exporte, Backups, Importe und Verwaltungsrouten antworten dort mit
 HTTP 404. Importpfade werden normalisiert, Archive auf Zip-Bomb-Muster geprüft
 und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.

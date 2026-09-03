@@ -98,9 +98,10 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
 
 ## Theming
 
-CSS-Variablen (`--bg`, `--surface`, `--ink`, `--accent-line`, …) in
-`static/css/app.css`, umgeschaltet über `data-color-scheme`/`data-color-mode`
-auf `<html>`. Drei Farbschemata (`zeitarchiv`, `home_assistant`, `modern`),
+CSS-Variablen (`--bg`, `--surface`, `--ink`, `--accent-line`, `--warning`,
+`--danger`, …) in `static/css/app.css`, umgeschaltet über
+`data-color-scheme`/`data-color-mode` auf `<html>`. Drei Farbschemata
+(`zeitarchiv`, `home_assistant`, `modern`),
 je mit eigenem Hell-/Dunkel-Variablensatz. Neue UI-Elemente müssen
 ausschließlich diese Variablen verwenden, nie feste Hex-Farben — Ausnahme:
 das Zeitarchiv-Logo (SVG) trägt bewusst feste Markenfarben, unabhängig vom
@@ -179,6 +180,17 @@ unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
   gehaltene, per Referenz (nicht kopiert) an jede Instanz durchgereichte
   Alpine-Liste — eine hier neu angelegte Gruppe taucht dadurch sofort in jedem
   anderen Gruppen-Feld auf, ganz ohne Server-Rundtrip.
+- **`.usage-bar-track`/`.usage-bar-fill`**: schlanker Auslastungsbalken
+  (Vorbild: `_settings_backup_progress.html`s Fortschrittsbalken, hier aber
+  für einen Dauerzustand statt eines laufenden Vorgangs). Füllfarbe über eine
+  zusätzliche Klasse `positive`/`warning`/`danger` an `.usage-bar-fill`, mit
+  dezentem `color-mix()`-Glanzverlauf statt einer bunten Skala über die volle
+  Breite. Aktuell genutzt für den Host-Speicherplatz in `housekeeping.html`.
+- **`.status-card-accent`/`.status-card-accent-strong`**: zweistufige, nicht
+  alarmierende Hervorhebung einer `.status-card`-Kachel (z. B. "Update
+  verfügbar") — bewusst getrennt von `.status-card-danger`, damit Rot
+  echten Problemen vorbehalten bleibt. Stufe 1 nur Rahmen/Hintergrund, Stufe
+  2 zusätzlich eingefärbter Text.
 - **Content-breite Karten statt gleich breiter Grid-Spalten** (Energiedashboard,
   mehrere Speicher): `display:flex;flex-wrap:wrap` statt `display:grid` mit
   `1fr`-Spalten, wenn Karten unterschiedlich viel Platz brauchen können —

@@ -25,8 +25,9 @@ die nginx-Allowlist blockiert — ABER ein Refactoring, das `/api/health` oder
   neu generierbar.
 - Vergleich über `secrets.compare_digest` (Timing-Angriff-resistent), nicht
   `==`.
-- Gilt für `/api/write` und `/api/health` (die einzigen Routen, die nginx auf
-  `:8127` überhaupt durchlässt). Die Ingress-Oberfläche selbst hat **kein**
+- Gilt für `/api/write`, `/api/health` und `/api/notices` (die einzigen
+  Routen, die nginx auf `:8127` überhaupt durchlässt). Die Ingress-Oberfläche
+  selbst hat **kein**
   eigenes Login — Authentifizierung übernimmt dort vollständig Home
   Assistants Supervisor-Ingress.
 - Fehlversuche werden gezählt (`connection_stats.auth_failures`,
