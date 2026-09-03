@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.79.1 - 2026-09-03
+
+### Behoben
+
+- **Kosten-Festpreise (Netzbezug/Einspeisung) und CO2-Faktor:** Ein
+  geänderter fester Preis wurde beim Klick auf „Übernehmen" im Popup nicht
+  auf der Kachel sichtbar — der Anzeigewert blieb auf dem zuletzt
+  geladenen Stand hängen, obwohl der neue Wert korrekt in die verborgenen
+  Formularfelder übernommen wurde. Betraf Netzbezug-Preis,
+  Einspeisevergütung und die CO2-Intensität gleichermaßen.
+- Platzhaltertext „z. B. …" in den festen Preis-/Kapazitätsfeldern entfernt
+  — konnte im leeren Zustand wie ein bereits eingetragener Wert wirken.
+
 ## 0.79.0 - 2026-09-03
 
 ### Neu

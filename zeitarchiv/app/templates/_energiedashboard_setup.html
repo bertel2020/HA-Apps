@@ -205,6 +205,14 @@
     if (fixedVal !== null && fixedVal !== undefined) return NumberFormat.fmt(fixedVal) + " " + unit + " (fest)";
     return "Nicht konfiguriert";
   },
+  // Liest den per oninput gespiegelten Festwert (siehe number_field) beim
+  // Klick auf "Übernehmen" aus dem DOM aus — der Kachel-Anzeigewert
+  // (kostenBezugFixed etc.) wird nirgendwo sonst aktualisiert, da das Feld
+  // bewusst nicht per x-model reaktiv ist.
+  readFixedInput(id) {
+    const v = document.getElementById(id).value;
+    return v === "" ? null : NumberFormat.parse(v);
+  },
   // Anders als priceLabel() (zeigt bei Entitäts-Zuordnung nur deren Namen)
   // soll die Speicher-Kachel die Kapazität IMMER als kWh-Zahl zeigen, egal
   // ob fest eingetragen oder aus einer Entität — sonst wüsste man auf der
@@ -564,7 +572,7 @@
                       {% call entity_field('speicher_capacity_entity_id_draft', 'draftRow.capacity_entity_id', "(id) => { draftRow.capacity_entity_id = id; }", allow_units=['kWh', 'Wh'], inline_fallback=true) %}
                         <span class="edash-unit-input edash-speicher-capacity-input" x-show="!entityId">
                           <input type="text" inputmode="decimal" x-model="draftRow.capacity_kwh"
-                                 placeholder="z. B. 10" class="edash-fixed-price-input">
+                                 class="edash-fixed-price-input">
                           <span class="edash-unit-suffix">kWh</span>
                         </span>
                       {% endcall %}
@@ -729,12 +737,12 @@
             <div class="field">
               <label>Preis</label>
               {% call entity_field('preis_netzbezug_draft', 'draft.kostenBezugEntity', "(id) => { draft.kostenBezugEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
-                {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, 'z. B. 29', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
+                {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
               <p class="hint">Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.</p>
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; kostenBezugFixed = readFixedInput('preis_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
             </div>
           </div>
         </template>
@@ -752,12 +760,12 @@
             <div class="field">
               <label>Vergütung</label>
               {% call entity_field('preis_einspeisung_draft', 'draft.kostenEinspeisungEntity', "(id) => { draft.kostenEinspeisungEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
-                {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, 'z. B. 8', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
+                {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
               <p class="hint">Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.</p>
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; kostenEinspeisungFixed = readFixedInput('preis_einspeisung_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
             </div>
           </div>
         </template>
@@ -870,12 +878,12 @@
             <div class="field">
               <label>Entität</label>
               {% call entity_field('co2_faktor_netzbezug_entity_draft', 'draft.co2Entity', "(id) => { draft.co2Entity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
-                {{ number_field('co2_faktor_netzbezug_fixed_draft', co2_fixed, 'z. B. 380', 'x-show="!entityId" oninput="document.getElementById(\'co2_faktor_netzbezug_fixed_real\').value = event.target.value"', 'g/kWh', 'edash-price-fixed-input') }}
+                {{ number_field('co2_faktor_netzbezug_fixed_draft', co2_fixed, '', 'x-show="!entityId" oninput="document.getElementById(\'co2_faktor_netzbezug_fixed_real\').value = event.target.value"', 'g/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
               <p class="hint">g CO2/kWh, wird mit dem bezogenen Strom verrechnet — ergibt CO2-Ausstoß und, auf den PV-Eigenverbrauch angewendet, vermiedenes CO2.</p>
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; co2Fixed = readFixedInput('co2_faktor_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
             </div>
           </div>
         </template>
