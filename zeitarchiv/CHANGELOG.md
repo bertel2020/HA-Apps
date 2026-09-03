@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.80.1 - 2026-09-04
+
+### Behoben
+
+- **Falsche "vs. Vorperiode"-Prozentzahl beim Navigieren in vergangene
+  Tage/Wochen/Monate/Jahre im Energiedashboard.** Der Vergleichswert kam aus
+  einem rollierenden, an "jetzt" verankerten Zeitfenster statt aus der
+  tatsächlich angezeigten Kalenderperiode — konnte z. B. ein "+X %" zeigen,
+  obwohl der angezeigte kWh-Wert gegenüber dem Vortag gesunken war. Betraf
+  alle KPI-Kacheln sowie den Energiebericht. Die rollierende Berechnung wird
+  jetzt nur noch für die aktuell noch laufende Periode verwendet (dort
+  nötig, damit "heute bis 8 Uhr" nicht unfair gegen "gestern komplett"
+  verglichen wird); für abgeschlossene Perioden zählt jetzt derselbe
+  kalendarische Zeitraum wie der angezeigte Wert.
+
 ## 0.80.0 - 2026-09-03
 
 ### Neu

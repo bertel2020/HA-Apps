@@ -2017,17 +2017,22 @@ class EnergieDashboardService:
             # unabhängig neu ein.
             read_cache = query_mod.QueryReadCache()
             current = self.compute_flow(config, range, offset, read_cache=read_cache)
-            # Perioden-Vergleich immer rollierend statt kalendarisch: zwei
-            # rollierende Fenster fester Länge (continuous=True), direkt
-            # aneinander anschließend — unabhängig davon, ob die betrachtete
-            # Periode selbst kalendarisch/noch laufend oder abgeschlossen
-            # ist. Löst zugleich das Problem, dass ein kalendarischer
-            # Vergleich (z. B. "Tag" am Monatsersten gegen exakt denselben
-            # Zeitabschnitt des Vortags) auf dünn archivierte Zeiträume
-            # treffen und leer bleiben kann — ein rollierendes Fenster endet
-            # dagegen immer direkt an der Grenze zum jeweils anderen Fenster.
-            rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
-            rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
+            # Perioden-Vergleich: rollierend (continuous=True, endet exakt
+            # "jetzt" statt an der Kalendergrenze) NUR für die aktuell noch
+            # laufende Periode (offset=0) — dort wäre ein kalendarischer
+            # Vergleich unfair (z. B. "heute bis 8 Uhr" gegen "gestern
+            # komplett"). Für eine bereits abgeschlossene Periode (offset<0)
+            # dagegen kalendarisch, exakt wie der oben angezeigte Wert
+            # "current" — sonst vergleicht die Prozentzahl ein rollierendes,
+            # an "jetzt" verankertes Fenster, das mit der angezeigten
+            # Kalenderperiode gar nichts mehr zu tun hat (beobachtet: Tag N
+            # zeigt weniger kWh als Tag N-1, der Vergleich aber "+X %").
+            if offset == 0:
+                rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
+                rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
+            else:
+                rolling_current = current
+                rolling_previous = self.compute_flow(config, range, offset - 1, read_cache=read_cache)
             current["kpi_compare"] = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
             current["compare_label"] = COMPARE_LABELS[range]
             return current
@@ -2047,11 +2052,15 @@ class EnergieDashboardService:
             now = datetime.now(self.deps.tz)
             read_cache = query_mod.QueryReadCache()
             current = self.compute_flow(config, range, offset, read_cache=read_cache)
-            # Vorjahres-/Vormonatsvergleich: derselbe rollierende Vergleich wie
-            # /energiedashboard/data (siehe dortiger Kommentar) — bei
+            # Vorjahres-/Vormonatsvergleich: derselbe kalendarisch-vs-rollierend
+            # Split wie /energiedashboard/data (siehe dortiger Kommentar) — bei
             # range=year ist die Vorperiode damit exakt "Vorjahr".
-            rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
-            rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
+            if offset == 0:
+                rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
+                rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
+            else:
+                rolling_current = current
+                rolling_previous = self.compute_flow(config, range, offset - 1, read_cache=read_cache)
             kpi_compare = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
             # Autarkie/Eigenverbrauch fehlen in _compare_kpi() (dort bewusst nur
             # Energiemengen, siehe dessen Docstring) — hier als einfache
