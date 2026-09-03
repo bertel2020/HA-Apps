@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.79.0 - 2026-09-03
+
+### Neu
+
+- **Energiebericht im Energiedashboard.** Ein neues Symbol neben der
+  Zeitraum-Navigation (Monat/Jahr) öffnet einen druckoptimierten Bericht für
+  den gewählten Zeitraum: Kennzahlen samt Vorjahres-/Vormonatsvergleich,
+  Kosten- und CO₂-Bilanz (inklusive CO₂-Vergleich als Autofahrt-Strecke),
+  Verbraucheranteile mit Kosten je Verbraucher, bei Jahresberichten
+  zusätzlich Monatsverlauf und alle Auffälligkeiten des Jahres. Der Button
+  „Drucken / Als PDF speichern" ruft nur den Druckdialog des Browsers auf —
+  kein neues Dateiformat, kein Versand, rein lokal.
+
 ## 0.78.0 - 2026-09-03
 
 ### Neu

@@ -52,12 +52,23 @@
 
   .section{margin-bottom:32px;}
   .section-title{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:600;letter-spacing:.06em;
-    text-transform:uppercase;color:var(--ink-faint);margin:0 0 12px;display:flex;align-items:center;gap:10px;}
+    text-transform:uppercase;color:var(--ink-faint);margin:0 0 12px;display:flex;align-items:center;gap:8px;}
   .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  /* Dieselben kleinen Rollen-Icons wie auf den Kacheln der Live-Ansicht,
+     hier vor den Abschnittstiteln — aus demselben Grund wie .kpi-accent
+     oben (siehe Kommentar dort), plus etwas mehr Wiedererkennbarkeit beim
+     schnellen Überfliegen des gedruckten Berichts. */
+  .section-title-icon{flex:none;display:flex;}
 
   .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);
     border:1px solid var(--border);border-radius:10px;overflow:hidden;}
-  .kpi{background:var(--surface);padding:16px 16px 14px;}
+  .kpi{background:var(--surface);padding:16px 16px 14px;position:relative;}
+  /* Farbiger Streifen oben je Kachel, in derselben Rollenfarbe wie die
+     KPI-Kacheln der Live-Ansicht (.edash-kpi-accent) — sonst ist der
+     komplette Bericht bis auf die roten/grünen Delta-Pfeile rein
+     schwarz-weiß und wirkt dadurch wie ein losgelöstes, generisches
+     Dokument statt "derselben App, nur gedruckt". */
+  .kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;}
   .kpi-label{font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);}
   .kpi-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;margin-top:5px;letter-spacing:-.01em;}
   .kpi-delta{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));margin-top:4px;white-space:nowrap;color:var(--ink-faint);}
@@ -191,16 +202,19 @@
     <div class="section-title">Kennzahlen im Überblick</div>
     <div class="kpi-grid">
       <div class="kpi">
+        <div class="kpi-accent" style="background:var(--chart-3);"></div>
         <div class="kpi-label">Erzeugung</div>
         <div class="kpi-value">{{ current.kpi.erzeugung | format_value(1) }} kWh</div>
         {{ kpi_delta(kpi_compare.erzeugung) }}
       </div>
       <div class="kpi">
+        <div class="kpi-accent" style="background:var(--chart-7);"></div>
         <div class="kpi-label">Verbrauch</div>
         <div class="kpi-value">{{ current.kpi.verbrauch | format_value(1) }} kWh</div>
         {{ kpi_delta(kpi_compare.verbrauch) }}
       </div>
       <div class="kpi">
+        <div class="kpi-accent" style="background:var(--chart-1);"></div>
         <div class="kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
         <div class="kpi-value">{{ current.kpi.netzbezug | format_value(1) }} kWh</div>
         {%- if kpi_compare.netzbezug and kpi_compare.netzbezug.pct is not none %}
@@ -208,12 +222,14 @@
         {%- endif %}
       </div>
       <div class="kpi">
+        <div class="kpi-accent" style="background:var(--chart-2);"></div>
         <div class="kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
         <div class="kpi-value">{{ current.kpi.einspeisung | format_value(1) }} kWh</div>
         {{ kpi_delta(kpi_compare.einspeisung) }}
       </div>
       {% if current.kpi.autarkie is not none %}
       <div class="kpi">
+        <div class="kpi-accent" style="background:var(--chart-1);"></div>
         <div class="kpi-label">Autarkie</div>
         <div class="kpi-value">{{ current.kpi.autarkie | format_value(0) }} %</div>
         {%- if autarkie_delta_pkt is not none %}
@@ -223,6 +239,7 @@
       {% endif %}
       {% if current.kpi.eigenverbrauch is not none %}
       <div class="kpi">
+        <div class="kpi-accent" style="background:var(--chart-3);"></div>
         <div class="kpi-label">Eigenverbrauch</div>
         <div class="kpi-value">{{ current.kpi.eigenverbrauch | format_value(0) }} %</div>
         {%- if eigenverbrauch_delta_pkt is not none %}
@@ -235,7 +252,10 @@
 
   {% if current.kpi.speicher_laden is not none or current.kpi.speicher_entladen is not none or current.kpi.speicher_soc is not none %}
   <div class="section">
-    <div class="section-title">Speicher</div>
+    <div class="section-title">
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
+      Speicher
+    </div>
     <div class="stat-card">
       {% if current.kpi.speicher_laden is not none %}
       <div class="stat-line"><span>Ladung</span><strong>{{ current.kpi.speicher_laden | format_value(1) }} kWh</strong></div>
@@ -258,7 +278,10 @@
 
   {% if config.show_kostenanalyse and (current.kpi.netzbezug_cost is not none or current.kpi.co2_ausstoss is not none) %}
   <div class="section">
-    <div class="section-title">Kosten &amp; CO₂-Bilanz</div>
+    <div class="section-title">
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--accent-bar)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
+      Kosten &amp; CO₂-Bilanz
+    </div>
     <div class="two-col">
       <div class="stat-card">
         <div class="stat-title">Kosten</div>
@@ -300,7 +323,10 @@
   {% if current.erzeuger_breakdown and current.erzeuger_breakdown | length > 1 %}
   {% set erz_total = current.erzeuger_breakdown | sum(attribute="value") %}
   <div class="section">
-    <div class="section-title">Erzeuger</div>
+    <div class="section-title">
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
+      Erzeuger
+    </div>
     <table class="report-table value-table">
       {# Leere 4. Spalte ohne Überschrift/Inhalt — nur damit sich die Tabelle
          trotz nur 3 echter Spalten auf 100% Breite streckt und Name/kWh/
@@ -330,7 +356,10 @@
   {% if config.show_verbraucheranteile and current.verbraucher_breakdown %}
   {% set show_kosten_col = current.verbraucher_breakdown | selectattr("kosten", "defined") | map(attribute="kosten") | select("number") | list | length > 0 %}
   <div class="section">
-    <div class="section-title">Verbraucheranteile</div>
+    <div class="section-title">
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
+      Verbraucheranteile
+    </div>
     <table class="report-table value-table">
       <thead><tr><th>Verbraucher</th><th>kWh</th><th>Anteil</th>{% if show_kosten_col %}<th>Kosten</th>{% endif %}</tr></thead>
       <tbody>
@@ -359,7 +388,10 @@
 
   {% if monatsverlauf %}
   <div class="section">
-    <div class="section-title">Monatsverlauf</div>
+    <div class="section-title">
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><polyline points="3,18 9,12 14,15 21,6" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="6" r="2" fill="var(--ink-faint)"/></svg></span>
+      Monatsverlauf
+    </div>
     <table class="report-table">
       <thead><tr><th>Monat</th><th>Erzeugung</th><th>Verbrauch</th><th>{{ config.netzbezug_name or "Netzbezug" }}</th><th>Autarkie</th></tr></thead>
       <tbody>

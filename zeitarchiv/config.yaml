@@ -1,5 +1,5 @@
 name: "Zeitarchiv"
-version: "0.78.0"
+version: "0.79.0"
 slug: "zeitarchiv"
 description: "Kompaktes Zeitreihen-Archiv für Home Assistant"
 url: "https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv"
