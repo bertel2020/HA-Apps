@@ -669,10 +669,13 @@ Eigenständige Ansicht (kein Eintrag im normalen Dashboard-System), die den
 Energiefluss eines Haushalts als Sankey-Diagramm zeigt. Sie wird über eine
 feste Kachel oben auf der Dashboard-Übersicht ein- und ausgeschaltet und ist
 danach auch im Menü **Dashboards** erreichbar. Beim ersten Aktivieren fragt
-ein Rollen-Formular die vorhandenen Entitäten ab: Netzbezug (Pflicht),
+eine Rollenzuordnung die vorhandenen Entitäten ab: Netzbezug (Pflicht),
 Einspeisung, beliebig viele Erzeuger, beliebig viele Speicher (je
-Laden/Entladen/SOC) sowie Verbraucher, die sich optional zu frei benannten
-Gruppen zusammenfassen lassen.
+Laden/Entladen/SOC/Kapazität) sowie Verbraucher, die sich optional zu frei
+benannten Gruppen zusammenfassen lassen — jede Rolle als eigene Kachel, die
+per Klick ein Popup mit den zugehörigen Feldern öffnet. Eingaben darin gelten
+erst nach Klick auf **„Übernehmen"**; endgültig gespeichert wird die gesamte
+Zuordnung erst mit **„Speichern"** am Seitenende.
 
 Navigation läuft wie bei Charts über Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
 Ein Verbraucher mit zugewiesener Gruppe hängt im Sankey zweistufig am Bus
@@ -696,7 +699,7 @@ Datenqualitäts-Checks (veraltete Sensorwerte, Zählerrücksetzungen,
 Einheiten/Zähler-Typ, doppelt zugeordnete Entitäten) und Auffälligkeiten —
 Verbraucher oder Gruppen, die deutlich über ihrem Schnitt der letzten
 Perioden liegen. Die Schwelle dafür (Standard +50 %) lässt sich im
-Rollen-Formular unter „Allgemein" anpassen oder ganz abschalten. Ein
+Rollenzuordnung unter „Allgemein" anpassen oder ganz abschalten. Ein
 Tageslastprofil zeigt bei Tag/Stunde den stündlichen Verbrauch der letzten
 7 Kalendertage; bei Monat/Jahr stattdessen den nach Wochentag gemittelten
 Verbrauch (Mo–So) über den gewählten Zeitraum, sodass erkennbar wird, an
@@ -704,7 +707,7 @@ welchen Wochentagen typischerweise mehr verbraucht wird.
 
 ### Benötigte und sinnvolle Entitäten
 
-Das Rollen-Formular (**Rollen zuordnen** bzw. **Rollen bearbeiten** im
+Die Rollenzuordnung (**Rollen zuordnen** bzw. **Rollen bearbeiten** im
 Kartenkopf) wählt ausschließlich
 aus bereits archivierten Entitäten aus — für das Energiedashboard muss also
 vorher nichts zusätzlich eingerichtet werden, was nicht ohnehin schon in
@@ -717,6 +720,7 @@ Zeitarchiv ankommt.
 | Erzeuger (beliebig viele) | nein | je ein Ertragszähler (kWh, aufsteigend) mit eigenem Namen — z. B. Dachanlage und Balkonkraftwerk getrennt geführt |
 | Speicher: Laden / Entladen (beliebig viele Speicher) | nein | je zwei Zählerstände (kWh, aufsteigend) — Werte über mehrere Speicher hinweg werden addiert |
 | Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler — bei mehreren Speichern kapazitätsgewichtet gemittelt |
+| Speicher: Kapazität | nein | Gesamtkapazität in kWh (Entität oder fester Wert; Wh-Entitäten werden automatisch umgerechnet) — nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt und bei mehreren Speichern richtig gewichtet wird |
 | Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
 | Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
 | CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
@@ -730,8 +734,8 @@ Für Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen) und
 Verbraucher wird ein **kWh-Gesamtzähler** erwartet (Home-Assistant-Gerätetyp
 `total_increasing`), keine Momentanleistung in Watt — viele Geräte-
 Integrationen bieten beides parallel an, hier zählt jeweils die
-kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Strompreis,
-CO₂-Intensität und PV-Prognose sind dagegen bewusst Momentan-/Messwerte
+kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität,
+Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst Momentan-/Messwerte
 (`measurement`), keine Zähler.
 
 ### Aufbewahrung richtig einstellen

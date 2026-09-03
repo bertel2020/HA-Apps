@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.77.0 - 2026-09-03
+
+### Verbesserung
+
+- **Rollenzuordnung im Energiedashboard als Kacheln mit Konfig-Popups.**
+  Statt eines einzigen langen Formulars zeigt „Rollen bearbeiten" jetzt für
+  jede Rolle (Netzbezug, Einspeisung, Erzeuger, Speicher, Verbraucher,
+  Kosten, Prognose, CO₂) eine eigene Kachel — Klick öffnet ein Popup mit den
+  zugehörigen Feldern, farblich passend zur Kachel umrahmt. Änderungen
+  gelten dort erst nach **„Übernehmen"**, nicht mehr sofort — ein
+  versehentlich geöffnetes Popup lässt sich wieder schließen, ohne etwas zu
+  verändern.
+- Entitäts-Auswahlfelder zeigen nur noch Entitäten mit passender Einheit
+  bzw. Zähler-Typ für die jeweilige Rolle (z. B. nur kWh-Zähler für
+  Netzbezug, keine Schalter-Entitäten).
+- Speicher-Kacheln zeigen die aufgelöste Kapazität direkt in kWh — auch bei
+  Zuordnung über eine Entität statt eines festen Werts (Wh wird automatisch
+  umgerechnet), mit dem Entitätsnamen als zweite Zeile.
+- Speicher-KPI-Kachel und aktueller Ladezustand zeigen bei mehreren
+  Speichern eine Aufschlüsselung je Speicher im Tooltip, analog zur
+  bestehenden Erzeugung-Aufschlüsselung.
+- Feldhinweise in der Rollenzuordnung vereinheitlicht: jeder Hinweis sitzt
+  jetzt direkt unter seinem Feld statt in einer separaten Legende oder über
+  dem Feld.
+- Bestätigungsdialoge (z. B. beim Entfernen eines Erzeugers) nutzen jetzt
+  ein natives `<dialog>` und liegen dadurch zuverlässig über bereits
+  offenen Konfig-Popups statt dahinter.
+
+### Behoben
+
+- **Rollen speichern konnte fehlschlagen.** Beim Öffnen und Schließen eines
+  Konfig-Popups verschwanden dessen Felder anschließend wieder aus der
+  Seite (technisch bedingt durch die Popup-Neuinitialisierung) und wurden
+  beim Klick auf „Speichern" nicht mitgesendet — im ungünstigsten Fall
+  bereits ohne gültigen Netzbezug, wodurch das Speichern komplett verweigert
+  wurde, in anderen Fällen wurden Kosten-/Prognose-/CO₂-Zuordnungen beim
+  Speichern still verworfen.
+- Konfig-Popups öffneten sich zeitweise nicht mehr mittig im Fenster
+  (verursacht durch die Akzentfarben-Umrandung), und die Seite konnte beim
+  Öffnen eines Popups ungewollt etwas verschieben.
+
 ## 0.76.2 - 2026-09-03
 
 ### Verbesserung
