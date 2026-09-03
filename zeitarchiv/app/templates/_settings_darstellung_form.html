@@ -179,7 +179,7 @@
            hx-include="#entity-legend-metrics-group">
         <span id="entity-legend-metrics-group" style="display:contents;">
           {% for key, label in entity_legend_metric_options %}
-          <label class="legend-metric-check">
+          <label class="filter-chip">
             <input type="checkbox" name="entity_legend_metrics" value="{{ key }}" {% if key in entity_legend_metrics %}checked{% endif %}>
             <span>{{ label }}</span>
           </label>
