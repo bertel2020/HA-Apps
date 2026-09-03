@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -44,6 +44,17 @@ SETTING_HOURLY_BACKFILL_PENDING = "energiedashboard_hourly_backfill_pending"
 
 RANGE_LABELS = {"hour": "Stunde", "day": "Tag", "month": "Monat", "year": "Jahr"}
 RANGE_KEYS = tuple(RANGE_LABELS)
+# Eigene Kopie statt Import von main.py._MONTH_NAMES_DE — dort modul-privat
+# (Unterstrich-Präfix), und eine einzelne kurze Konstante rechtfertigt keine
+# Kopplung zwischen den Modulen.
+_MONTH_NAMES_DE = (
+    "Januar", "Februar", "März", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Dezember",
+)
+# Energiebericht (siehe /energiedashboard/report): nur für Monat/Jahr
+# sinnvoll — Stunde/Tag sind zu kurze Zeiträume für einen druckbaren
+# Rückblick (siehe ROADMAP.md 1.7).
+REPORT_RANGE_KEYS = ("month", "year")
 # Perioden-Vergleich: immer rollierend (zwei aneinander anschließende
 # Fenster fester Länge, siehe compute_flow(..., continuous=True) in
 # energiedashboard_data) statt kalendarisch — bleibt dadurch auch für die
@@ -1510,6 +1521,15 @@ class EnergieDashboardService:
                     if any(sp.get("laden_entity_id") or sp.get("entladen_entity_id") for sp in speicher_list)
                     else None
                 ),
+                # Roh-Summen (statt nur speicher_netto) für den Energiebericht
+                # — dort sollen Ladung/Entladung wie bei den übrigen KPIs
+                # einzeln als Zahl stehen, nicht nur als Saldo.
+                "speicher_laden": (
+                    round(speicher_laden_val, 3) if any(sp.get("laden_entity_id") for sp in speicher_list) else None
+                ),
+                "speicher_entladen": (
+                    round(speicher_entladen_val, 3) if any(sp.get("entladen_entity_id") for sp in speicher_list) else None
+                ),
                 "speicher_soc": speicher_soc,
                 "speicher_soc_kwh": speicher_soc_kwh,
                 "speicher_soc_now": speicher_soc_now,
@@ -1672,6 +1692,76 @@ class EnergieDashboardService:
             rows.append({"label": _WEEKDAY_LABELS[weekday], "hours": hours})
 
         return {"rows": rows, "max_value": round(max_value, 3)}
+
+    def _monatsverlauf_for_year(
+        self, config: dict, year: int, now: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> list[dict]:
+        """Erzeugung/Verbrauch/Netzbezug/Autarkie je Monat EINES Kalenderjahres,
+        für den Monatsverlauf-Abschnitt im Energiebericht (Jahr). Dieselbe
+        Erhaltungs-Identität und dieselben _monthly_sum_by_year()-Bausteine
+        wie beim Autarkie-/Eigenverbrauch-Trend in compute_flow() (siehe
+        dort) — hier aber nur die Roh-kWh-Werte statt nur der Quote, und
+        gefiltert auf ein einzelnes Jahr statt aller drei zusammengeführt.
+        _monthly_sum_by_year() selbst deckt nur die letzten 3 Kalenderjahre
+        ab (dieselbe Begründung wie dort) — bei einem älteren Berichtsjahr
+        bleibt dieser Abschnitt dadurch leer, statt falsche/fehlende Werte
+        vorzutäuschen."""
+        netzbezug_id = config.get("netzbezug") or ""
+        erzeuger_ids = [erz.get("entity_id") for erz in (config.get("erzeuger") or []) if erz.get("entity_id")]
+        einspeisung_id = config.get("einspeisung") or ""
+        speicher_list = config.get("speicher") or []
+        speicher_entladen_ids = [sp.get("entladen_entity_id") for sp in speicher_list if sp.get("entladen_entity_id")]
+        speicher_laden_ids = [sp.get("laden_entity_id") for sp in speicher_list if sp.get("laden_entity_id")]
+        netzbezug_monthly = self._monthly_sum_by_year([netzbezug_id], now, read_cache)
+        erzeugung_monthly = self._monthly_sum_by_year(erzeuger_ids, now, read_cache)
+        einspeisung_monthly = self._monthly_sum_by_year([einspeisung_id], now, read_cache)
+        entladen_monthly = self._monthly_sum_by_year(speicher_entladen_ids, now, read_cache)
+        laden_monthly = self._monthly_sum_by_year(speicher_laden_ids, now, read_cache)
+        rows_by_month: dict[int, dict] = {}
+        for ts in sorted(set(netzbezug_monthly) | set(erzeugung_monthly)):
+            dt = datetime.fromtimestamp(ts, self.deps.tz)
+            if dt.year != year:
+                continue
+            netzbezug_month = max(netzbezug_monthly.get(ts, 0.0), 0.0)
+            erzeugung_month = erzeugung_monthly.get(ts, 0.0)
+            einspeisung_month = max(einspeisung_monthly.get(ts, 0.0), 0.0)
+            entladen_month = entladen_monthly.get(ts, 0.0)
+            laden_month = laden_monthly.get(ts, 0.0)
+            bus_in_month = netzbezug_month + erzeugung_month + entladen_month
+            verbrauch_month = bus_in_month - einspeisung_month - laden_month
+            autarkie_month = None
+            if verbrauch_month > 0:
+                autarkie_month = round(max(0.0, min(1.0, 1 - netzbezug_month / verbrauch_month)) * 100, 1)
+            rows_by_month[dt.month] = {
+                "name": _MONTH_NAMES_DE[dt.month - 1],
+                "erzeugung": round(erzeugung_month, 1),
+                "verbrauch": round(verbrauch_month, 1),
+                "netzbezug": round(netzbezug_month, 1),
+                "autarkie": autarkie_month,
+            }
+        return [rows_by_month[m] for m in sorted(rows_by_month)]
+
+    def _anomalien_for_months(
+        self, config: dict, year: int, now: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> list[dict]:
+        """Auffälligkeiten je bereits vergangenem Monat EINES Kalenderjahres,
+        für den Energiebericht (Jahr) — ruft compute_flow() für jeden Monat
+        einzeln auf (dieselbe Methode wie die Tageslastprofil-Heatmap für
+        ~90 Tage, unkritisch in der Kostenwirkung für eine einmalige,
+        gezielte Aktion statt eines Live-Seitenaufrufs), damit die
+        Auffälligkeiten-Erkennung exakt dieselbe ist wie live im Dashboard
+        für den jeweiligen Monat — keine zweite, eigene Schwellenwert-Logik
+        nur für den Bericht."""
+        base_total_months = now.year * 12 + (now.month - 1)
+        result: list[dict] = []
+        for month in range(1, 13):
+            offset = (year * 12 + (month - 1)) - base_total_months
+            if offset > 0:
+                break
+            flow = self.compute_flow(config, "month", offset, read_cache=read_cache)
+            for anomaly in flow.get("anomalien") or []:
+                result.append({"month": _MONTH_NAMES_DE[month - 1], **anomaly})
+        return result
 
     def _page_context(self, request: Request) -> dict:
         config = _load_config(self.deps.index)
@@ -1941,6 +2031,79 @@ class EnergieDashboardService:
             current["kpi_compare"] = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
             current["compare_label"] = COMPARE_LABELS[range]
             return current
+
+        @router.get("/energiedashboard/report", response_class=HTMLResponse)
+        def energiedashboard_report(request: Request, range: str = "year", offset: int = 0) -> HTMLResponse:  # noqa: A002
+            # Eigenständige, druckoptimierte Seite (kein Ingress-Rahmen/Topnav,
+            # siehe _energiedashboard_report.html) statt einer neuen PDF-
+            # Bibliothek als Abhängigkeit — "Drucken → Als PDF speichern" ist
+            # bereits im Browser eingebaut (ROADMAP.md 1.7). Nur Monat/Jahr
+            # ergeben als Rückblick Sinn, siehe REPORT_RANGE_KEYS.
+            if range not in REPORT_RANGE_KEYS:
+                raise HTTPException(status_code=400, detail="Ungültiger Zeitraum für den Energiebericht")
+            config = _load_config(deps.index)
+            if not _is_configured(config):
+                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+            now = datetime.now(self.deps.tz)
+            read_cache = query_mod.QueryReadCache()
+            current = self.compute_flow(config, range, offset, read_cache=read_cache)
+            # Vorjahres-/Vormonatsvergleich: derselbe rollierende Vergleich wie
+            # /energiedashboard/data (siehe dortiger Kommentar) — bei
+            # range=year ist die Vorperiode damit exakt "Vorjahr".
+            rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
+            rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
+            kpi_compare = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
+            # Autarkie/Eigenverbrauch fehlen in _compare_kpi() (dort bewusst nur
+            # Energiemengen, siehe dessen Docstring) — hier als einfache
+            # Prozentpunkt-Differenz statt relativer %-Änderung, da es selbst
+            # bereits ein Prozentwert ist.
+            autarkie_cur = rolling_current["kpi"].get("autarkie")
+            autarkie_prev = rolling_previous["kpi"].get("autarkie")
+            autarkie_delta_pkt = round(autarkie_cur - autarkie_prev, 1) if autarkie_cur is not None and autarkie_prev is not None else None
+            eigenverbrauch_cur = rolling_current["kpi"].get("eigenverbrauch")
+            eigenverbrauch_prev = rolling_previous["kpi"].get("eigenverbrauch")
+            eigenverbrauch_delta_pkt = (
+                round(eigenverbrauch_cur - eigenverbrauch_prev, 1)
+                if eigenverbrauch_cur is not None and eigenverbrauch_prev is not None else None
+            )
+            window_start, _window_end, natural_end = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
+                range, now.astimezone(self.deps.tz), offset,
+            )
+            display_end = natural_end - timedelta(days=1)
+            if range == "year":
+                period_title = f"Jahr {window_start.year}"
+                period_range_text = f"1. Januar – 31. Dezember {window_start.year}"
+                monatsverlauf = self._monatsverlauf_for_year(config, window_start.year, now, read_cache)
+                anomalien_report = self._anomalien_for_months(config, window_start.year, now, read_cache)
+            else:
+                period_title = f"{_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
+                period_range_text = f"1.–{display_end.day}. {_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
+                monatsverlauf = []
+                anomalien_report = [{"month": None, **a} for a in (current.get("anomalien") or [])]
+            return deps.templates.TemplateResponse(
+                request, "_energiedashboard_report.html",
+                {
+                    "config": config,
+                    "range": range,
+                    "range_label": RANGE_LABELS[range],
+                    "period_title": period_title,
+                    "period_range_text": period_range_text,
+                    "current": current,
+                    "kpi_compare": kpi_compare,
+                    "compare_label": COMPARE_LABELS[range],
+                    "autarkie_delta_pkt": autarkie_delta_pkt,
+                    "eigenverbrauch_delta_pkt": eigenverbrauch_delta_pkt,
+                    "monatsverlauf": monatsverlauf,
+                    "anomalien_report": anomalien_report,
+                    "generated_at": now,
+                    "month_names": _MONTH_NAMES_DE,
+                    # /energiedashboard/report liegt eine Ebene tiefer als die
+                    # übrigen Seiten (dieselbe Konvention wie dashboard_detail.html
+                    # u. a. — siehe main.py, "base": ".."/"../.." je Verschachtelungstiefe).
+                    "base": "..",
+                    **deps.app_root_context(request),
+                },
+            )
 
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002

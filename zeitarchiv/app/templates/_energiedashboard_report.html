@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Energiebericht — {{ period_title }}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{# Eigenständige, druckoptimierte Seite (siehe ROADMAP.md 1.7) — bewusst
+   OHNE _topnav.html/App-Rahmen: sie soll wie ein Dokument wirken, das man
+   drucken/als PDF speichert, nicht wie eine weitere App-Unterseite. Nutzt
+   trotzdem app.css für die Farb-/Font-Variablen (--surface, --chart-*, …),
+   damit Hell/Dunkel und das gewählte Farbschema automatisch mitgelten,
+   statt sie hier (wie im ursprünglichen Mockup) ein zweites Mal fest zu
+   hinterlegen. #}
+<style>
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);color:var(--ink);font-family:var(--font-display);margin:0;
+    padding:28px 20px 80px;font-size:calc(14.5px * var(--font-scale, 1));line-height:1.5;
+  }
+  .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+
+  .toolbar{max-width:760px;margin:0 auto 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .toolbar a{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);text-decoration:none;}
+  .toolbar a:hover{color:var(--ink);text-decoration:underline;}
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;font-family:var(--font-display);font-size:calc(13px * var(--font-scale, 1));
+    font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--border-strong);
+    background:var(--surface);color:var(--ink);cursor:pointer;
+  }
+  .btn.primary{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);}
+
+  .page{
+    max-width:760px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    box-shadow:0 18px 50px rgba(19,28,23,.16);padding:48px 52px 40px;
+  }
+  :root:not([data-theme="light"]) .page{box-shadow:0 18px 50px rgba(0,0,0,.5);}
+
+  {# Logo links, Titel+Zeitraum rechtsbündig als eigene Spalte daneben —
+     align-items:center statt flex-start, damit "Energiebericht" auf
+     derselben Höhe wie das (jetzt größere) Logo sitzt, nicht darunter. #}
+  .report-head{display:flex;align-items:center;justify-content:space-between;gap:20px;
+    padding-bottom:20px;margin-bottom:28px;border-bottom:2px solid var(--ink);}
+  .report-head .mark{display:flex;align-items:center;gap:11px;flex:none;}
+  .report-head .mark svg{flex:none;border-radius:8px;}
+  .report-head .mark-name{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));font-weight:600;letter-spacing:.03em;color:var(--ink-muted);}
+  .report-head-title{text-align:right;}
+  .report-head-title h1{margin:0 0 4px;font-size:calc(28px * var(--font-scale, 1));font-weight:700;text-wrap:balance;letter-spacing:-.01em;}
+  .report-head-title .period{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
+
+  .section{margin-bottom:32px;}
+  .section-title{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-faint);margin:0 0 12px;display:flex;align-items:center;gap:10px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);
+    border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .kpi{background:var(--surface);padding:16px 16px 14px;}
+  .kpi-label{font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);}
+  .kpi-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;margin-top:5px;letter-spacing:-.01em;}
+  .kpi-delta{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));margin-top:4px;white-space:nowrap;color:var(--ink-faint);}
+  .kpi-delta.up{color:var(--positive);}
+  .kpi-delta.down{color:var(--danger);}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .stat-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .stat-card .stat-title{font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;margin-bottom:8px;}
+  .stat-line{display:flex;justify-content:space-between;gap:10px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;}
+  .stat-line span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .stat-line strong{font-family:var(--font-mono);color:var(--ink);font-weight:600;flex:none;}
+  .stat-total{display:flex;justify-content:space-between;margin-top:6px;padding-top:8px;border-top:1px solid var(--border);
+    font-size:calc(13px * var(--font-scale, 1));font-weight:600;}
+  /* Farbe + Wort ("gespart"/"Kosten", dieselbe Unterscheidung wie in der
+     Hero-Leiste der Live-Ansicht) statt einer reinen Zahl — beim Drucken
+     sollte auf einen Blick klar sein, ob der Saldo Einnahme oder Ausgabe
+     ist, nicht nur aus dem Vorzeichen einer Centzahl ablesbar. */
+  .stat-total.is-surplus{color:var(--positive);}
+  .stat-total.is-cost{color:var(--danger);}
+  /* Erläuternde Unterzeile zur Stat-Line direkt darüber (z. B. CO2 "Vermieden"
+     als Autofahrt-Strecke) — bewusst kleiner/blasser und mit Pfeil-Einzug
+     statt einer eigenen gleichrangigen stat-line, damit auf Anhieb klar ist,
+     DASS und WORAUF sich die Zahl bezieht, statt wie ein drittes,
+     unabhängiges Kosten-/CO2-Item danebenzustehen. */
+  .stat-subnote{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);padding:0 0 3px 14px;}
+
+  table.report-table{width:100%;border-collapse:collapse;font-size:calc(12.5px * var(--font-scale, 1));}
+  table.report-table th{text-align:right;font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+    color:var(--ink-faint);padding:0 0 8px;border-bottom:1px solid var(--border-strong);}
+  table.report-table th:first-child{text-align:left;}
+  table.report-table td{padding:6px 0;border-bottom:1px solid var(--border);text-align:right;font-family:var(--font-mono);}
+  table.report-table td:first-child{text-align:left;font-family:var(--font-display);color:var(--ink);}
+  table.report-table tr:last-child td{border-bottom:none;}
+  table.report-table tr.total td{border-top:1.5px solid var(--ink);border-bottom:none;padding-top:8px;font-weight:600;}
+  table.report-table tr.total td:first-child{font-weight:600;}
+  /* Spalte 1-3 (Name/kWh/Anteil) bekommen EXPLIZIT dieselbe Prozentbreite in
+     BEIDEN Tabellen — nur so fluchten ihre Grenzen exakt, unabhängig von der
+     jeweiligen Gesamtspaltenzahl. Wäre stattdessen (wie zuvor) nur Name fest
+     und der Rest "gleichmäßig verteilt", würde Name in der schmaleren
+     Erzeuger-Tabelle (3 statt 4 Spalten) breiter ausfallen als in
+     Verbraucheranteile — und alles danach mitverschieben. Eine 4. Spalte
+     bleibt unspezifiziert und füllt automatisch den Rest (20%): bei
+     Verbraucheranteile ist das die echte Kosten-Spalte, bei Erzeuger ein
+     leerer Platzhalter (siehe dort) — nur so bleiben BEIDE Tabellen exakt
+     100% breit, ohne dass Erzeuger (nur 3 echte Spalten) auf 80% schrumpft. */
+  table.value-table{table-layout:fixed;}
+  table.value-table th:nth-child(1), table.value-table td:nth-child(1){width:40%;}
+  table.value-table th:nth-child(2), table.value-table td:nth-child(2),
+  table.value-table th:nth-child(3), table.value-table td:nth-child(3){width:20%;}
+
+  .anomaly-note{display:flex;flex-direction:column;gap:8px;background:var(--warning-soft, var(--accent-line-soft));border-radius:10px;
+    padding:12px 14px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);}
+  .anomaly-line{display:flex;gap:10px;align-items:flex-start;}
+  .anomaly-line .icon{flex:none;width:20px;height:20px;border-radius:6px;background:var(--surface);
+    border:1.5px solid var(--warning, var(--accent-line));color:var(--warning, var(--accent-line));display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:calc(12px * var(--font-scale, 1));}
+  .anomaly-line b{font-weight:600;}
+  .quality-plausible-line{display:flex;align-items:center;gap:9px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .quality-plausible-line .dot{width:8px;height:8px;border-radius:50%;background:var(--positive);flex:none;}
+
+  .report-foot{margin-top:36px;padding-top:16px;border-top:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);
+    font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  @media print{
+    body{background:#fff;padding:0;}
+    .toolbar{display:none;}
+    .page{box-shadow:none;border:none;border-radius:0;max-width:none;padding:8mm 10mm;}
+    /* Verhindert, dass eine Karte/Kachel oder eine einzelne Tabellenzeile
+       mittendrin über zwei Druckseiten reißt — betrifft nur kleine,
+       garantiert Seiten-große Blöcke (Karten, Zeilen); ein zu langes
+       Monatsverlauf/Verbraucheranteile-Table selbst darf trotzdem zwischen
+       Zeilen umbrechen, sonst gäbe es keine gültige Umbruchstelle mehr.
+       break-inside zusätzlich zu page-break-inside für die modernen
+       Browser-Engines (Druckvorschau nutzt teils die neuere Eigenschaft). */
+    .section, .kpi, .stat-card{page-break-inside:avoid;break-inside:avoid;}
+    tr{page-break-inside:avoid;break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+
+{% macro kpi_delta(compare) %}
+  {%- if compare and compare.pct is not none -%}
+    <div class="kpi-delta {{ 'up' if compare.pct >= 0 else 'down' }}">{{ '▲' if compare.pct >= 0 else '▼' }} {{ compare.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
+  {%- elif compare and compare.abs is not none -%}
+    <div class="kpi-delta {{ 'up' if compare.abs >= 0 else 'down' }}">{{ '▲' if compare.abs >= 0 else '▼' }} {{ compare.abs | abs | format_value(1) }} kWh ggü. {{ compare_label }}</div>
+  {%- endif -%}
+{% endmacro %}
+
+<div class="toolbar">
+  <a href="{{ base }}/energiedashboard">&larr; Zurück zum Energiedashboard</a>
+  <button class="btn primary" onclick="window.print()">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="6,9 6,2 18,2 18,9"/>
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+      <rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Drucken / Als PDF speichern
+  </button>
+</div>
+
+<div class="page">
+  <div class="report-head">
+    {# Dasselbe Logo wie im Topnav (_topnav.html) — Inline-SVG statt
+       Bilddatei, es gibt kein Logo/Icon unter app/static (icon.png/logo.png
+       am Repo-Root sind reine Add-on-Store-Metadaten, vom laufenden Server
+       nicht ausgeliefert). #}
+    <div class="mark">
+      <svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
+        <rect width="64" height="64" rx="14" fill="#13211C"/>
+        <rect x="13" y="44" width="6" height="7" rx="1.5" fill="#E79A5B"/>
+        <rect x="23.8" y="35.87" width="6" height="15.13" rx="1.5" fill="#E79A5B"/>
+        <rect x="34.6" y="27.73" width="6" height="23.27" rx="1.5" fill="#E79A5B"/>
+        <polyline points="16,40 26.8,31.87 37.6,23.73 48.4,15.6" fill="none" stroke="#57C9BB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="16" cy="40" r="1.4" fill="#57C9BB"/>
+        <circle cx="26.8" cy="31.87" r="1.4" fill="#57C9BB"/>
+        <circle cx="37.6" cy="23.73" r="1.4" fill="#57C9BB"/>
+        <circle cx="48.4" cy="15.6" r="2.6" fill="#57C9BB"/>
+      </svg>
+      <span class="mark-name">ZEITARCHIV</span>
+    </div>
+    <div class="report-head-title">
+      <h1>Energiebericht</h1>
+      <div class="period">{{ period_title }} &middot; {{ period_range_text }}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Kennzahlen im Überblick</div>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Erzeugung</div>
+        <div class="kpi-value">{{ current.kpi.erzeugung | format_value(1) }} kWh</div>
+        {{ kpi_delta(kpi_compare.erzeugung) }}
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Verbrauch</div>
+        <div class="kpi-value">{{ current.kpi.verbrauch | format_value(1) }} kWh</div>
+        {{ kpi_delta(kpi_compare.verbrauch) }}
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+        <div class="kpi-value">{{ current.kpi.netzbezug | format_value(1) }} kWh</div>
+        {%- if kpi_compare.netzbezug and kpi_compare.netzbezug.pct is not none %}
+        <div class="kpi-delta {{ 'down' if kpi_compare.netzbezug.pct >= 0 else 'up' }}">{{ '▲' if kpi_compare.netzbezug.pct >= 0 else '▼' }} {{ kpi_compare.netzbezug.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
+        {%- endif %}
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
+        <div class="kpi-value">{{ current.kpi.einspeisung | format_value(1) }} kWh</div>
+        {{ kpi_delta(kpi_compare.einspeisung) }}
+      </div>
+      {% if current.kpi.autarkie is not none %}
+      <div class="kpi">
+        <div class="kpi-label">Autarkie</div>
+        <div class="kpi-value">{{ current.kpi.autarkie | format_value(0) }} %</div>
+        {%- if autarkie_delta_pkt is not none %}
+        <div class="kpi-delta {{ 'up' if autarkie_delta_pkt >= 0 else 'down' }}">{{ '▲' if autarkie_delta_pkt >= 0 else '▼' }} {{ autarkie_delta_pkt | abs | format_value(1) }} Pkt. ggü. {{ compare_label }}</div>
+        {%- endif %}
+      </div>
+      {% endif %}
+      {% if current.kpi.eigenverbrauch is not none %}
+      <div class="kpi">
+        <div class="kpi-label">Eigenverbrauch</div>
+        <div class="kpi-value">{{ current.kpi.eigenverbrauch | format_value(0) }} %</div>
+        {%- if eigenverbrauch_delta_pkt is not none %}
+        <div class="kpi-delta {{ 'up' if eigenverbrauch_delta_pkt >= 0 else 'down' }}">{{ '▲' if eigenverbrauch_delta_pkt >= 0 else '▼' }} {{ eigenverbrauch_delta_pkt | abs | format_value(1) }} Pkt. ggü. {{ compare_label }}</div>
+        {%- endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if current.kpi.speicher_laden is not none or current.kpi.speicher_entladen is not none or current.kpi.speicher_soc is not none %}
+  <div class="section">
+    <div class="section-title">Speicher</div>
+    <div class="stat-card">
+      {% if current.kpi.speicher_laden is not none %}
+      <div class="stat-line"><span>Ladung</span><strong>{{ current.kpi.speicher_laden | format_value(1) }} kWh</strong></div>
+      {% endif %}
+      {% if current.kpi.speicher_entladen is not none %}
+      <div class="stat-line"><span>Entladung</span><strong>{{ current.kpi.speicher_entladen | format_value(1) }} kWh</strong></div>
+      {% endif %}
+      {% if current.kpi.speicher_soc is not none %}
+      <div class="stat-line">
+        <span>Ladezustand (Ø {{ period_title }})</span>
+        <strong>{{ current.kpi.speicher_soc | format_value(0) }} %{{ " (" ~ (current.kpi.speicher_soc_kwh | format_value(1)) ~ " kWh)" if current.kpi.speicher_soc_kwh is not none else "" }}</strong>
+      </div>
+      {% endif %}
+      {% if current.kpi.speicher_efficiency is not none %}
+      <div class="stat-line"><span>Wirkungsgrad</span><strong>{{ current.kpi.speicher_efficiency | format_value(0) }} %</strong></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if config.show_kostenanalyse and (current.kpi.netzbezug_cost is not none or current.kpi.co2_ausstoss is not none) %}
+  <div class="section">
+    <div class="section-title">Kosten &amp; CO₂-Bilanz</div>
+    <div class="two-col">
+      <div class="stat-card">
+        <div class="stat-title">Kosten</div>
+        {% if current.kpi.netzbezug_cost is not none %}
+        <div class="stat-line"><span>{{ config.netzbezug_name or "Netzbezug" }}</span><strong>{{ current.kpi.netzbezug_cost | format_value(2) }} €</strong></div>
+        {% endif %}
+        {% if current.kpi.einspeisung_revenue is not none %}
+        <div class="stat-line"><span>{{ config.einspeisung_name or "Einspeisung" }}</span><strong>{{ current.kpi.einspeisung_revenue | format_value(2) }} €</strong></div>
+        {% endif %}
+        {% if current.kpi.vermiedene_kosten is not none %}
+        <div class="stat-line"><span>Vermiedene Kosten (Eigenverbrauch)</span><strong>{{ current.kpi.vermiedene_kosten | format_value(2) }} €</strong></div>
+        {% endif %}
+        {% if current.kpi.net_cost is not none %}
+        <div class="stat-total {{ 'is-surplus' if current.kpi.net_cost < 0 else 'is-cost' }}">
+          <span>Saldo &#8213; {{ "gespart" if current.kpi.net_cost < 0 else "Kosten" }}</span>
+          <span class="mono">{{ '+' if current.kpi.net_cost < 0 else '' }}{{ (current.kpi.net_cost * -1) | format_value(2) if current.kpi.net_cost < 0 else current.kpi.net_cost | format_value(2) }} €</span>
+        </div>
+        {% endif %}
+      </div>
+      {# 130 g CO2/km: grobe, oft zitierte Faustzahl für einen durchschnittlichen
+         PKW (Herstellerangaben/UBA-Vergleiche schwanken je nach Fahrzeugmix
+         zwischen ca. 120-150 g/km) — nur zur Einordnung einer sonst abstrakten
+         kg-Zahl, bewusst als Annahme ausgewiesen statt als exakter Wert. #}
+      {% set CAR_G_PER_KM = 130 %}
+      <div class="stat-card">
+        <div class="stat-title">CO₂</div>
+        {% if current.kpi.co2_ausstoss is not none %}
+        <div class="stat-line"><span>Ausstoß ({{ config.netzbezug_name or "Netzbezug" }})</span><strong>{{ current.kpi.co2_ausstoss | format_value(1) }} kg</strong></div>
+        {% endif %}
+        {% if current.kpi.co2_vermieden is not none %}
+        <div class="stat-line"><span>Vermieden (Eigenverbrauch)</span><strong>{{ current.kpi.co2_vermieden | format_value(1) }} kg</strong></div>
+        <div class="stat-subnote">&#8618; &#8776; {{ (current.kpi.co2_vermieden * 1000 / CAR_G_PER_KM) | format_value(0) }} km Autofahrt</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if current.erzeuger_breakdown and current.erzeuger_breakdown | length > 1 %}
+  {% set erz_total = current.erzeuger_breakdown | sum(attribute="value") %}
+  <div class="section">
+    <div class="section-title">Erzeuger</div>
+    <table class="report-table value-table">
+      {# Leere 4. Spalte ohne Überschrift/Inhalt — nur damit sich die Tabelle
+         trotz nur 3 echter Spalten auf 100% Breite streckt und Name/kWh/
+         Anteil exakt so breit wie in der Verbraucheranteile-Tabelle bleiben
+         (siehe CSS-Kommentar bei .value-table). #}
+      <thead><tr><th>Erzeuger</th><th>kWh</th><th>Anteil</th><th class="placeholder-col"></th></tr></thead>
+      <tbody>
+        {% for item in current.erzeuger_breakdown %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.value | format_value(1) }}</td>
+          <td>{{ (item.value / erz_total * 100) | format_value(0) if erz_total > 0 else "–" }} %</td>
+          <td class="placeholder-col"></td>
+        </tr>
+        {% endfor %}
+        <tr class="total">
+          <td>Gesamt</td>
+          <td>{{ erz_total | format_value(1) }}</td>
+          <td>100 %</td>
+          <td class="placeholder-col"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if config.show_verbraucheranteile and current.verbraucher_breakdown %}
+  {% set show_kosten_col = current.verbraucher_breakdown | selectattr("kosten", "defined") | map(attribute="kosten") | select("number") | list | length > 0 %}
+  <div class="section">
+    <div class="section-title">Verbraucheranteile</div>
+    <table class="report-table value-table">
+      <thead><tr><th>Verbraucher</th><th>kWh</th><th>Anteil</th>{% if show_kosten_col %}<th>Kosten</th>{% endif %}</tr></thead>
+      <tbody>
+        {% set total_kwh = namespace(v=0) %}
+        {% set total_kosten = namespace(v=0) %}
+        {% for item in current.verbraucher_breakdown %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.value | format_value(1) }}</td>
+          <td>{{ item.share | format_value(0) if item.share is not none else "–" }} %</td>
+          {% if show_kosten_col %}<td>{{ item.kosten | format_value(2) ~ " €" if item.kosten is not none else "–" }}</td>{% endif %}
+        </tr>
+        {% set total_kwh.v = total_kwh.v + item.value %}
+        {% if item.kosten is not none %}{% set total_kosten.v = total_kosten.v + item.kosten %}{% endif %}
+        {% endfor %}
+        <tr class="total">
+          <td>Gesamt</td>
+          <td>{{ total_kwh.v | format_value(1) }}</td>
+          <td>100 %</td>
+          {% if show_kosten_col %}<td>{{ total_kosten.v | format_value(2) }} €</td>{% endif %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if monatsverlauf %}
+  <div class="section">
+    <div class="section-title">Monatsverlauf</div>
+    <table class="report-table">
+      <thead><tr><th>Monat</th><th>Erzeugung</th><th>Verbrauch</th><th>{{ config.netzbezug_name or "Netzbezug" }}</th><th>Autarkie</th></tr></thead>
+      <tbody>
+        {% for row in monatsverlauf %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td>{{ row.erzeugung | format_value(0) }}</td>
+          <td>{{ row.verbrauch | format_value(0) }}</td>
+          <td>{{ row.netzbezug | format_value(0) }}</td>
+          <td>{{ (row.autarkie | format_value(0) ~ " %") if row.autarkie is not none else "–" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="section" style="margin-bottom:0;">
+    <div class="section-title">Auffälligkeiten{{ " im Jahresverlauf" if range == "year" else "" }}</div>
+    {% if anomalien_report %}
+    <div class="anomaly-note">
+      {% for a in anomalien_report %}
+      <div class="anomaly-line">
+        <span class="icon">!</span>
+        <span>{% if a.month %}<b>{{ a.month }}:</b> {% endif %}{{ a.name }} {{ a.value | format_value(1) }} kWh, {{ a.pct | format_value(0) }} % über dem Schnitt ({{ a.baseline | format_value(1) }} kWh).</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="quality-plausible-line"><span class="dot"></span> Keine Auffälligkeiten in diesem Zeitraum.</div>
+    {% endif %}
+  </div>
+
+
+  <div class="report-foot">
+    <span>Zeitarchiv &middot; lokal erzeugt, keine Cloud-Übertragung</span>
+    <span>Erstellt am {{ generated_at.day }}. {{ month_names[generated_at.month - 1] }} {{ generated_at.year }}</span>
+  </div>
+</div>
+
+</body>
+</html>

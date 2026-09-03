@@ -1,6 +1,22 @@
 <div class="settings-compact-list">
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Startseite</div>
+      <div class="settings-compact-hint">Was beim Öffnen von Zeitarchiv erscheint (z. B. über die HA-Sidebar)</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="startseite-btn" onclick="toggleDDPicker('startseite')">{% for k, l in startseite_options %}{% if k == startseite %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="startseite" id="startseite-input" value="{{ startseite }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="startseite-popover">
+        {% for key, label in startseite_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('startseite', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">Farbschema</div>
       <div class="settings-compact-hint">Petrol/Kupfer, HA-Blau oder Cobalt/Teal</div>
     </div>

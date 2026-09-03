@@ -666,52 +666,39 @@ liegt, direkt erreichbar.
 ## Energiedashboard
 
 Eigenständige Ansicht (kein Eintrag im normalen Dashboard-System), die den
-Energiefluss eines Haushalts als Sankey-Diagramm zeigt. Sie wird über eine
-feste Kachel oben auf der Dashboard-Übersicht ein- und ausgeschaltet und ist
-danach auch im Menü **Dashboards** erreichbar. Beim ersten Aktivieren fragt
-eine Rollenzuordnung die vorhandenen Entitäten ab: Netzbezug (Pflicht),
-Einspeisung, beliebig viele Erzeuger, beliebig viele Speicher (je
-Laden/Entladen/SOC/Kapazität) sowie Verbraucher, die sich optional zu frei
-benannten Gruppen zusammenfassen lassen — jede Rolle als eigene Kachel, die
-per Klick ein Popup mit den zugehörigen Feldern öffnet. Eingaben darin gelten
-erst nach Klick auf **„Übernehmen"**; endgültig gespeichert wird die gesamte
-Zuordnung erst mit **„Speichern"** am Seitenende.
+Energiefluss eines Haushalts als Sankey-Diagramm zeigt: von Netzbezug und
+Erzeugern über einen zentralen Knoten zu Verbrauchern, Speichern und
+Einspeisung. Sie wird über eine feste Kachel oben auf der
+Dashboard-Übersicht ein- und ausgeschaltet und ist danach auch im Menü
+**Dashboards** erreichbar.
 
-Navigation läuft wie bei Charts über Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
-Ein Verbraucher mit zugewiesener Gruppe hängt im Sankey zweistufig am Bus
-(Bus → Gruppe → Gerät), ein ungruppierter direkt am Bus wie ein Erzeuger —
-hält den Fluss bei vielen einzelnen Verbrauchern übersichtlich. Gruppen
-werden direkt beim Zuordnen eines Verbrauchers angelegt (bestehende
-auswählen oder per Freitext eine neue erzeugen) oder über den eigenen
-**„Gruppen"**-Button verwaltet (umbenennen, löschen — betroffene Verbraucher
-werden dabei nur wieder gruppenlos, nicht verändert). Neben dem Sankey-Fluss
-und den KPI-Kacheln (Erzeugung, Verbrauch, Netzbezug, Speicher, Einspeisung —
-bei mehreren Speichern/Erzeugern als Summe mit Aufschlüsselung im Tooltip)
-zeigen vier Ringe Autarkie, Eigenverbrauch, Speicher-Ladezustand und
-Speicher-Wirkungsgrad (bei mehreren Speichern kapazitätsgewichtet
-zusammengefasst, damit ein leerer und ein voller Speicher nicht fälschlich
-als "50 %" erscheinen) — ein Klick auf einen Ring öffnet den jeweiligen
-Monatstrend der letzten drei Jahre. Optionale Badges im Kopfbereich fassen
-Kosten- und CO₂-Bilanz (mit eigenem Festpreis-Feld, wenn keine passende
-Entität vorhanden ist) sowie die PV-Ertragsprognose zusammen. Der
-**„Status"**-Chip öffnet ein Popup mit Bilanzprüfung, den übrigen
-Datenqualitäts-Checks (veraltete Sensorwerte, Zählerrücksetzungen,
-Einheiten/Zähler-Typ, doppelt zugeordnete Entitäten) und Auffälligkeiten —
-Verbraucher oder Gruppen, die deutlich über ihrem Schnitt der letzten
-Perioden liegen. Die Schwelle dafür (Standard +50 %) lässt sich im
-Rollenzuordnung unter „Allgemein" anpassen oder ganz abschalten. Ein
-Tageslastprofil zeigt bei Tag/Stunde den stündlichen Verbrauch der letzten
-7 Kalendertage; bei Monat/Jahr stattdessen den nach Wochentag gemittelten
-Verbrauch (Mo–So) über den gewählten Zeitraum, sodass erkennbar wird, an
-welchen Wochentagen typischerweise mehr verbraucht wird.
+### Einrichtung
+
+Beim ersten Aktivieren (und später jederzeit über den Stift neben dem Titel,
+**„Rollen bearbeiten"**) zeigt die Rollenzuordnung jede mögliche Rolle als
+eigene Kachel: Netzbezug, Einspeisung, beliebig viele Erzeuger, beliebig
+viele Speicher, beliebig viele Verbraucher, Kosten, PV-Ertragsprognose und
+CO₂. Ein Klick auf eine Kachel öffnet ein Popup mit den zugehörigen Feldern;
+bei Erzeuger/Speicher/Verbraucher legt die **„+"**-Kachel eine neue Zeile an,
+der Ziehgriff (⠿) sortiert bestehende Zeilen um. Eingaben in einem Popup
+gelten erst nach Klick auf **„Übernehmen"** — ein versehentlich geöffnetes
+Popup lässt sich also gefahrlos wieder schließen, ohne etwas zu verändern.
+Endgültig gespeichert wird die gesamte Zuordnung erst mit **„Speichern"** am
+Seitenende.
+
+Der Bereich **„Allgemein"** legt zusätzlich den Namen des zentralen Knotens
+fest (Standard „Haus"), die Schwelle für die Auffälligkeiten-Markierung
+(siehe [unten](#status-datenqualität-und-auffälligkeiten)) sowie **„Sichtbare
+Kacheln"** — welche der optionalen Karten (Autarkie & Speicher,
+Verbraucheranteile, Kostenanalyse, CO₂-Bilanz, Tageslastprofil, Bilanz &
+Datenqualität) überhaupt angezeigt werden. Der Energiefluss selbst lässt
+sich nicht abschalten.
 
 ### Benötigte und sinnvolle Entitäten
 
-Die Rollenzuordnung (**Rollen zuordnen** bzw. **Rollen bearbeiten** im
-Kartenkopf) wählt ausschließlich
-aus bereits archivierten Entitäten aus — für das Energiedashboard muss also
-vorher nichts zusätzlich eingerichtet werden, was nicht ohnehin schon in
-Zeitarchiv ankommt.
+Die Rollenzuordnung wählt ausschließlich aus bereits archivierten Entitäten
+aus — für das Energiedashboard muss also vorher nichts zusätzlich
+eingerichtet werden, was nicht ohnehin schon in Zeitarchiv ankommt.
 
 | Rolle | Pflicht? | Erwarteter Wert |
 | --- | --- | --- |
@@ -729,14 +716,84 @@ Zeitarchiv ankommt.
 Einzig Netzbezug ist Pflicht — alle anderen Rollen schalten lediglich
 zusätzliche Kacheln, Ringe oder Badges frei; ohne Speicher-Rolle bleiben
 z. B. einfach die Speicher-Kacheln und der Wirkungsgrad-Ring ausgeblendet.
+Die Auswahlfelder zeigen dabei von vornherein nur Entitäten mit passender
+Einheit bzw. Zähler-Typ für die jeweilige Rolle.
 
 Für Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen) und
 Verbraucher wird ein **kWh-Gesamtzähler** erwartet (Home-Assistant-Gerätetyp
 `total_increasing`), keine Momentanleistung in Watt — viele Geräte-
 Integrationen bieten beides parallel an, hier zählt jeweils die
 kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität,
-Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst Momentan-/Messwerte
-(`measurement`), keine Zähler.
+Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst
+Momentan-/Messwerte (`measurement`), keine Zähler.
+
+### Energiefluss und Verbraucher-Gruppen
+
+Der Sankey zeigt Quellen (Netzbezug, Erzeuger, Speicherentladung) links,
+Senken (Verbraucher, Speicherladung, Einspeisung) rechts, dazwischen den
+zentralen Knoten. Der Rest — Netzbezug plus Erzeugung minus Verbraucher
+minus Einspeisung minus Speicherladung — erscheint automatisch als
+**„Grundlast“**, ohne eigenen Sensor. Navigation läuft wie bei Charts über
+Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
+
+Ein Verbraucher mit zugewiesener Gruppe hängt im Sankey zweistufig am
+zentralen Knoten (Knoten → Gruppe → Gerät), ein ungruppierter direkt daran
+wie ein Erzeuger — hält den Fluss bei vielen einzelnen Verbrauchern
+übersichtlich. Gruppen entstehen direkt beim Zuordnen eines Verbrauchers
+(bestehende auswählen oder per Freitext eine neue anlegen) oder lassen sich
+über den eigenen **„Gruppen"**-Button neben der Verbraucher-Überschrift
+zentral verwalten (umbenennen, löschen — betroffene Verbraucher werden dabei
+nur wieder gruppenlos, ihre Werte bleiben unverändert).
+
+### Kennzahlen, Ringe und Badges
+
+Direkt unter dem Sankey stehen fünf KPI-Kacheln (Erzeugung, Verbrauch,
+Netzbezug, Speicher, Einspeisung) für den gewählten Zeitraum; bei mehreren
+Speichern oder Erzeugern zeigt ihr Tooltip zusätzlich die Aufschlüsselung je
+Gerät. Die Karte **„Autarkie & Speicher"** darunter zeigt vier Ringe —
+Autarkie, Eigenverbrauch, Speicher-Ladezustand und Speicher-Wirkungsgrad
+(bei mehreren Speichern jeweils kapazitätsgewichtet zusammengefasst, damit
+ein leerer und ein voller Speicher nicht fälschlich als „50 %“ erscheinen).
+Ein Klick auf einen Ring öffnet dessen Monatstrend der letzten drei
+Kalenderjahre.
+
+Optionale Badges im Kopfbereich fassen die CO₂-Bilanz (🌱) und den
+Kosten-Saldo (💰) zusammen — je ein Klick öffnet die Details. Eine
+Kennzahlen-Leiste über dem Sankey bündelt zusätzlich Autarkie, vermiedenes
+CO₂, Kosten-Saldo und die PV-Ertragsprognose für „heute“ und „morgen“ auf
+einen Blick.
+
+### Status, Datenqualität und Auffälligkeiten
+
+Der **„Status"**-Chip (✓ bzw. ! bei Problemen) öffnet ein Popup mit der
+Bilanzprüfung sowie den übrigen Datenqualitäts-Checks: veraltete
+Sensorwerte, Zählerrücksetzungen, falsche Einheit, falscher Zähler-Typ und
+doppelt zugeordnete Entitäten. Dasselbe Popup listet Auffälligkeiten —
+Verbraucher oder Gruppen, die deutlich über ihrem Schnitt der letzten
+Perioden liegen. Die Schwelle dafür (Standard +50 %) lässt sich in der
+Rollenzuordnung unter **„Allgemein"** anpassen oder ganz abschalten.
+
+### Tageslastprofil
+
+Zeigt bei Tag/Stunde den stündlichen Verbrauch der letzten 7 Kalendertage;
+bei Monat/Jahr stattdessen den nach Wochentag gemittelten Verbrauch (Mo–So)
+über den gewählten Zeitraum, sodass erkennbar wird, an welchen Wochentagen
+typischerweise mehr verbraucht wird.
+
+### Energiebericht
+
+Ein Symbol neben der Zeitraum-Navigation (nur bei Monat/Jahr aktiv) öffnet
+einen druckoptimierten Bericht für den gerade gewählten Zeitraum —
+Kennzahlen samt Vorjahres-/Vormonatsvergleich, Kosten- und CO₂-Bilanz (inkl.
+CO₂-Vergleich als Autofahrt-Strecke), Verbraucheranteile inklusive
+Kosten je Verbraucher, bei Jahresberichten zusätzlich ein Monatsverlauf und
+alle Auffälligkeiten des Jahres. Ein Link oben führt jederzeit zurück zur
+normalen Ansicht. Die Seite selbst erzeugt
+kein neues Dateiformat und keine Bibliothek läuft im Hintergrund — der
+Button **„Drucken / Als PDF speichern"** ruft lediglich den Druckdialog des
+Browsers auf, dort lässt sich wie gewohnt „Als PDF speichern“ statt eines
+echten Druckers wählen. Es gibt keinen automatischen Versand per E-Mail —
+der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
 
 ### Aufbewahrung richtig einstellen
 
@@ -748,8 +805,8 @@ Rolle braucht dieselbe Frist:
   Verbraucher** sollten großzügig aufbewahrt werden — mindestens
   **2 Jahre**, im Zweifel **Unbegrenzt**. Die Autarkie-, Eigenverbrauchs-,
   SOC- und Wirkungsgrad-Trends im Ring-Popup werten jeweils die letzten drei
-  Kalenderjahre aus; eine kürzere Frist lässt diese Trends mit der Zeit
-  lückenhaft werden.
+  Kalenderjahre aus (ebenso der Monatsverlauf im Energiebericht); eine
+  kürzere Frist lässt diese Trends mit der Zeit lückenhaft werden.
 - **Strompreis- und CO₂-Entitäten** (falls über eine Entität statt eines
   festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
   eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
@@ -759,11 +816,11 @@ Rolle braucht dieselbe Frist:
   alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
   aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
   aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
-- **PV-Ertragsprognose-Entitäten** werden ausschließlich als aktueller Wert
-  angezeigt („Rest heute“ / „morgen“) — unabhängig vom gerade angezeigten
-  Zeitraum wird nie ein archivierter, alter Prognosewert gelesen. Hier
+- **Speicher-Kapazitäts- und PV-Ertragsprognose-Entitäten** werden
+  ausschließlich als aktueller Wert gelesen — unabhängig vom gerade
+  angezeigten Zeitraum wird nie ein archivierter, alter Wert benötigt. Hier
   genügt die kürzeste verfügbare Frist (**30 Tage**); mehr Aufbewahrung
-  bringt für diese Rolle keinen Vorteil, kostet bei häufig aktualisierenden
+  bringt für diese Rollen keinen Vorteil, kostet bei häufig aktualisierenden
   Quellen aber unnötig Speicherplatz.
 
 ## Statistik

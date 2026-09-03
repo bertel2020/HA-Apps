@@ -146,7 +146,7 @@ SORTABLE_COLUMNS = {
     "resolution": "resolution",
     "retention": "retention",
     "unit": "unit",
-    "rows": "MAX(row_count - COALESCE(dc.deleted_count, 0), 0)",
+    "rows": "MAX(row_count - deleted_count, 0)",
     "first_ts": "first_ts",
     "last_ts": "last_ts",
     "size": "size_bytes",
@@ -157,16 +157,6 @@ SORTABLE_COLUMNS = {
     "gap_threshold": "CASE WHEN gap_threshold = 'off' THEN 999999 ELSE CAST(gap_threshold AS INTEGER) END",
     "outlier_threshold": "CASE WHEN outlier_threshold = 'off' THEN 999999 ELSE CAST(outlier_threshold AS INTEGER) END",
 }
-
-# Anzahl gelöschter Vorkommen je Entität, einmalig aggregiert statt als
-# korrelierte Subquery pro Zeile (ZP-003 in PERFORMANCE.md): eine korrelierte
-# Subquery wertet SQLite pro äußerer Zeile separat aus (O(Entities × Deletes));
-# dieser LEFT JOIN aggregiert deleted_points genau einmal.
-_DELETED_COUNT_JOIN = (
-    "LEFT JOIN ("
-    "SELECT entity_id, COUNT(*) AS deleted_count FROM deleted_points GROUP BY entity_id"
-    ") dc ON dc.entity_id = entities.entity_id"
-)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS entities (
@@ -187,6 +177,7 @@ CREATE TABLE IF NOT EXISTS entities (
     last_ts REAL,
     last_value REAL,
     row_count INTEGER NOT NULL DEFAULT 0,
+    deleted_count INTEGER NOT NULL DEFAULT 0,
     size_bytes INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
     display_mode TEXT NOT NULL DEFAULT 'onoff',
@@ -649,6 +640,23 @@ class Index:
             "CREATE INDEX IF NOT EXISTS idx_ingested_events_status_completed "
             "ON ingested_events(status, completed_at)"
         )
+
+        if "deleted_count" not in columns:
+            # Vorher wurde die Anzahl gelöschter Vorkommen je Entität bei jedem
+            # Aufruf frisch aus deleted_points aggregiert (LEFT JOIN, ZP-003 in
+            # PERFORMANCE.md) — bei 1,5 Mio. Löschmarkierungen ~75-78 ms pro
+            # Seitenaufruf/Tastendruck in der Entitätenliste. deleted_count wird
+            # jetzt als gepflegte Spalte geführt (siehe mark_deleted(),
+            # undo_last_deleted_batch(), remove_deleted_points(),
+            # clear_entity_data()) und einmalig aus dem bisherigen Bestand
+            # zurückgerechnet, damit bereits markierte Löschungen nicht auf 0
+            # zurückfallen.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN deleted_count INTEGER NOT NULL DEFAULT 0")
+            self._conn.execute(
+                """UPDATE entities SET deleted_count = (
+                    SELECT COUNT(*) FROM deleted_points dp WHERE dp.entity_id = entities.entity_id
+                )"""
+            )
 
         sc_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_charts)")}
         if "entity_names" not in sc_columns:
@@ -1307,7 +1315,6 @@ class Index:
         favorites_only: bool = False,
         limit: int | None = None,
         offset: int = 0,
-        include_deleted_count: bool = True,
     ) -> list[sqlite3.Row]:
         """search filtert per LIKE auf entity_id/friendly_name, type_filter auf
         aggregation_type — ein einzelner Typ (Rückwärtskompatibilität), eine Liste
@@ -1326,13 +1333,13 @@ class Index:
         Aufrufer, die die volle Liste brauchen (Wartungsjobs, Exporte, interne
         Iterationen).
 
-        include_deleted_count=False lässt den _DELETED_COUNT_JOIN weg — der
-        aggregiert bei JEDEM Aufruf die komplette deleted_points-Tabelle
-        (bei 1,5 Mio. Löschmarkierungen ~75 ms), was für Aufrufer ohne
-        Bedarf an deleted_count (Meldungen, Rotation-Zähler, reine
-        ID-Listen) reine Verschwendung ist. Wird der Sort-Ausdruck selbst
-        von dc.deleted_count getragen ("rows"), bleibt der Join trotzdem
-        aktiv, sonst würde ORDER BY auf einen fehlenden Alias zeigen."""
+        deleted_count ist eine normale, gepflegte Spalte auf entities (siehe
+        mark_deleted()/undo_last_deleted_batch()/remove_deleted_points()/
+        clear_entity_data()) und kommt daher mit entities.* praktisch gratis
+        mit — früher aggregierte hier bei JEDEM Aufruf ein LEFT JOIN die
+        komplette deleted_points-Tabelle neu (ZP-003 in PERFORMANCE.md, bei
+        1,5 Mio. Löschmarkierungen ~75-78 ms pro Seitenaufruf/Tastendruck in
+        der Entitätenliste)."""
         column = SORTABLE_COLUMNS.get(sort, "entity_id")
         direction_sql = "DESC" if direction == "desc" else "ASC"
 
@@ -1340,14 +1347,7 @@ class Index:
             search, type_filter, unit_filter, favorites_only
         )
 
-        if include_deleted_count or "dc." in column:
-            query = (
-                "SELECT entities.*, COALESCE(dc.deleted_count, 0) AS deleted_count "
-                "FROM entities " + _DELETED_COUNT_JOIN
-            )
-        else:
-            query = "SELECT entities.* FROM entities"
-        
+        query = "SELECT entities.* FROM entities"
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += f" ORDER BY {column} {direction_sql}, entities.entity_id ASC"
@@ -2348,12 +2348,12 @@ class Index:
     def get_overview(self) -> dict:
         with self._lock, self._conn:
             row = self._conn.execute(
-                f"""
+                """
                 SELECT
                     COUNT(*) AS entity_count,
-                    COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
+                    COALESCE(SUM(MAX(row_count - deleted_count, 0)), 0) AS total_rows,
                     COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities {_DELETED_COUNT_JOIN}
+                FROM entities
                 """
             ).fetchone()
             return dict(row)
@@ -2534,12 +2534,12 @@ class Index:
             if latest is not None and now - latest < min_interval_seconds:
                 return False
             overview = self._conn.execute(
-                f"""
+                """
                 SELECT
                     COUNT(*) AS entity_count,
-                    COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
+                    COALESCE(SUM(MAX(row_count - deleted_count, 0)), 0) AS total_rows,
                     COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities {_DELETED_COUNT_JOIN}
+                FROM entities
                 """
             ).fetchone()
             self._conn.execute(
@@ -2716,11 +2716,11 @@ class Index:
     def get_stats_by_type(self) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                f"""
+                """
                 SELECT aggregation_type, COUNT(*) AS entity_count,
-                       COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
+                       COALESCE(SUM(MAX(row_count - deleted_count, 0)), 0) AS total_rows,
                        COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities {_DELETED_COUNT_JOIN}
+                FROM entities
                 GROUP BY aggregation_type ORDER BY total_size_bytes DESC
                 """
             ).fetchall()
@@ -2729,11 +2729,11 @@ class Index:
     def get_stats_by_resolution(self) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                f"""
+                """
                 SELECT resolution, COUNT(*) AS entity_count,
-                       COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
+                       COALESCE(SUM(MAX(row_count - deleted_count, 0)), 0) AS total_rows,
                        COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities {_DELETED_COUNT_JOIN}
+                FROM entities
                 GROUP BY resolution ORDER BY total_size_bytes DESC
                 """
             ).fetchall()
@@ -2742,11 +2742,11 @@ class Index:
     def get_stats_by_retention(self) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                f"""
+                """
                 SELECT retention, COUNT(*) AS entity_count,
-                       COALESCE(SUM(MAX(row_count - COALESCE(dc.deleted_count, 0), 0)), 0) AS total_rows,
+                       COALESCE(SUM(MAX(row_count - deleted_count, 0)), 0) AS total_rows,
                        COALESCE(SUM(size_bytes), 0) AS total_size_bytes
-                FROM entities {_DELETED_COUNT_JOIN}
+                FROM entities
                 GROUP BY retention ORDER BY total_size_bytes DESC
                 """
             ).fetchall()
@@ -2755,9 +2755,7 @@ class Index:
     def get_entity(self, entity_id: str) -> sqlite3.Row | None:
         with self._lock, self._conn:
             return self._conn.execute(
-                "SELECT entities.*, "
-                "(SELECT COUNT(*) FROM deleted_points d WHERE d.entity_id = entities.entity_id) AS deleted_count "
-                "FROM entities WHERE entity_id = ?",
+                "SELECT * FROM entities WHERE entity_id = ?",
                 (entity_id,),
             ).fetchone()
 
@@ -2774,7 +2772,7 @@ class Index:
             self._conn.execute(
                 """UPDATE entities
                    SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
-                       size_bytes = 0, updated_at = ?
+                       deleted_count = 0, size_bytes = 0, updated_at = ?
                    WHERE entity_id = ?""",
                 (time.time(), entity_id),
             )
@@ -2814,6 +2812,10 @@ class Index:
                 "INSERT INTO deleted_points (entity_id, ts, deleted_at) VALUES (?, ?, ?)",
                 [(entity_id, ts, now) for ts in timestamps],
             )
+            self._conn.execute(
+                "UPDATE entities SET deleted_count = deleted_count + ? WHERE entity_id = ?",
+                (len(timestamps), entity_id),
+            )
 
     def undo_last_deleted_batch(self, entity_id: str) -> int:
         """Macht die zuletzt gelöschte Charge (gleicher deleted_at-Zeitstempel) rückgängig."""
@@ -2828,6 +2830,10 @@ class Index:
             cursor = self._conn.execute(
                 "DELETE FROM deleted_points WHERE entity_id = ? AND deleted_at = ?",
                 (entity_id, latest),
+            )
+            self._conn.execute(
+                "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
+                (cursor.rowcount, entity_id),
             )
             return cursor.rowcount
 
@@ -2961,6 +2967,7 @@ class Index:
         Buffer entfernt wurden (purge_hot_buffer() in cleanup.py), sie brauchen
         dann keine Soft-Delete-Filterung mehr."""
         with self._lock, self._conn:
+            removed = 0
             for ts in timestamps:
                 row = self._conn.execute(
                     "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? LIMIT 1",
@@ -2968,6 +2975,12 @@ class Index:
                 ).fetchone()
                 if row:
                     self._conn.execute("DELETE FROM deleted_points WHERE id = ?", (row["id"],))
+                    removed += 1
+            if removed:
+                self._conn.execute(
+                    "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
+                    (removed, entity_id),
+                )
 
     def recent_lock_busy_events(self, window_seconds: float = _BUSY_EVENTS_WINDOW_SECONDS) -> int:
         """Anzahl IndexBusy-Vorkommen (Lock-Timeout) innerhalb der letzten

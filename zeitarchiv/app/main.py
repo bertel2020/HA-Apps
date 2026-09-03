@@ -251,6 +251,14 @@ COLOR_MODE_LABELS = {
 # eine Kachel-für-Kachel-Steuerung in der Praxis kaum genutzt wurde und die
 # Chart-Bearbeitung dafür unnötig überladen hat.
 DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
+# Steuert, wohin "/" (Ingress-Root — was beim Öffnen von Zeitarchiv über die
+# HA-Sidebar erscheint) weiterleitet. Die Übersicht selbst lebt dafür unter
+# der eigenen URL "/uebersicht" statt weiter unter "/" — die Topnav
+# verlinkt "Übersicht" fest auf "/uebersicht", damit dieser Link IMMER zur
+# Übersicht führt, unabhängig von dieser Einstellung (sonst würde er bei
+# startseite="energiedashboard" auf sich selbst zurückverweisen und die
+# Übersicht wäre über die Topnav gar nicht mehr erreichbar).
+STARTSEITE_LABELS = {"uebersicht": "Übersicht", "energiedashboard": "Energiedashboard"}
 
 
 def _font_scale_context(request: Request) -> dict:
@@ -844,7 +852,21 @@ def _invalidate_retention_overview() -> None:
     index.set_setting(_RETENTION_OVERVIEW_SETTING, "")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
+def app_root(request: Request) -> RedirectResponse:
+    """Ingress-Root — was beim Öffnen von Zeitarchiv über die HA-Sidebar
+    erscheint. Reine Weiche auf Basis der Einstellung "startseite"
+    (Einstellungen → Darstellung), die eigentlichen Seiten leben unter
+    ihrer jeweils eigenen URL (siehe STARTSEITE_LABELS-Kommentar oben)."""
+    startseite = index.get_setting("startseite", "uebersicht")
+    if startseite not in STARTSEITE_LABELS:
+        startseite = "uebersicht"
+    app_root = _app_root_context(request)["app_root"]
+    target = "energiedashboard" if startseite == "energiedashboard" else "uebersicht"
+    return RedirectResponse(url=f"{app_root}/{target}", status_code=307)
+
+
+@app.get("/uebersicht", response_class=HTMLResponse)
 def entities_view(request: Request) -> HTMLResponse:
     overview = index.get_overview()
     snapshots = index.get_stats_snapshots(time.time() - 24 * 3600)
@@ -1221,6 +1243,9 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
     dashboard_animation = index.get_setting("dashboard_animation", "1")
     if dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
         dashboard_animation = "1"
+    startseite = index.get_setting("startseite", "uebersicht")
+    if startseite not in STARTSEITE_LABELS:
+        startseite = "uebersicht"
     entity_defaults = _get_entity_chart_defaults()
     return {
         "font_scale": index.get_setting("font_scale", "1"),
@@ -1232,6 +1257,8 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         "color_mode_options": list(COLOR_MODE_LABELS.items()),
         "dashboard_animation": dashboard_animation,
         "dashboard_animation_options": list(DASHBOARD_ANIMATION_LABELS.items()),
+        "startseite": startseite,
+        "startseite_options": list(STARTSEITE_LABELS.items()),
         # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
         # (entity_detail.html) — siehe _get_entity_chart_defaults()/
         # _resolve_entity_chart_options() weiter unten in dieser Datei. Bool-
@@ -1703,6 +1730,11 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         raise HTTPException(status_code=400, detail="Ungültige Dashboard-Animation")
     if dashboard_animation is not None:
         index.set_setting("dashboard_animation", str(dashboard_animation))
+    startseite = form.get("startseite")
+    if startseite is not None and startseite not in STARTSEITE_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültige Startseite")
+    if startseite is not None:
+        index.set_setting("startseite", str(startseite))
 
     # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
     # (entity_detail.html) — jedes Feld postet wie oben einzeln für sich,

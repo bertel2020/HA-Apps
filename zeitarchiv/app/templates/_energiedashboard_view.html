@@ -261,6 +261,16 @@
           <span class="edash-period-nav-label" x-text="periodText"></span>
           <button type="button" @click="goForward()" :disabled="!canGoForward" title="Nächste Periode">&#8250;</button>
         </div>
+        {# Energiebericht (ROADMAP.md 1.7): nur bei Monat/Jahr sinnvoll (siehe
+           REPORT_RANGE_KEYS in energiedashboard_routes.py) — Stunde/Tag sind
+           zu kurze Zeiträume für einen druckbaren Rückblick. Dieselbe Seite
+           statt neuem Tab (kein target="_blank") — der Bericht selbst trägt
+           einen eigenen "Zurück"-Link (siehe _energiedashboard_report.html). #}
+        <a class="edash-report-btn" x-show="range === 'month' || range === 'year'" x-cloak
+           :href="'energiedashboard/report?range=' + range + '&offset=' + offset"
+           title="Energiebericht (drucken / als PDF speichern)">
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 3v4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 13h7M8.5 16.5h7M8.5 9.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </a>
       </div>
     </div>
 

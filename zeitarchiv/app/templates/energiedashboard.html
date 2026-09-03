@@ -133,6 +133,16 @@
      sichtbar hin und her, weil .edash-card-head sie per
      justify-content:space-between am rechten Rand verankert. */
   .edash-period-nav-label{min-width:210px;text-align:center;font-variant-numeric:tabular-nums;}
+  /* Energiebericht-Link (ROADMAP.md 1.7) — dieselbe kleine Quadrat-Button-
+     Optik wie die ‹/›-Pfeile in .edash-period-nav nebenan, aber ein eigenes
+     <a target="_blank">, kein <button>, da er eine eigenständige Seite in
+     neuem Tab öffnet statt eine Aktion auf DIESER Seite auszulösen. */
+  .edash-report-btn{
+    width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink-faint);
+    cursor:pointer;text-decoration:none;
+  }
+  .edash-report-btn:hover{color:var(--accent-line);border-color:var(--accent-line);}
 
   /* Autarkiegrad/Eigenverbrauchsquote/Speicher-SOC als Ring-Gauges — SVG-
      Technik (Kreis + zweiter Kreis mit stroke-dasharray/-dashoffset als

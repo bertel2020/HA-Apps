@@ -343,11 +343,12 @@ def test_list_entities_unknown_sort_key_falls_back_to_entity_id() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def test_list_entities_deleted_count_uses_join_not_correlated_subquery() -> None:
-    """ZP-003 (PERFORMANCE.md): deleted_count kommt jetzt aus einem einmalig
-    aggregierten LEFT JOIN statt einer pro Zeile ausgewerteten korrelierten
-    Subquery — Query-Plan darf keinen "CORRELATED SCALAR SUBQUERY" mehr
-    enthalten, das Ergebnis muss aber unverändert bleiben."""
+def test_list_entities_deleted_count_matches_marked_deletions() -> None:
+    """ZP-003 (PERFORMANCE.md): deleted_count kommt jetzt aus einer gepflegten
+    Spalte auf entities statt aus einem LEFT JOIN (der davor bei jedem
+    Aufruf die komplette deleted_points-Tabelle aggregierte, ~75-78 ms bei
+    1,5 Mio. Löschmarkierungen) oder gar einer korrelierten Subquery — kein
+    Join/keine Subquery mehr nötig, das Ergebnis muss aber gleich bleiben."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
         index = Index(tmp / "index.sqlite")
@@ -359,17 +360,6 @@ def test_list_entities_deleted_count_uses_join_not_correlated_subquery() -> None
 
         rows = {r["entity_id"]: r["deleted_count"] for r in index.list_entities()}
         assert rows == {"sensor.a": 2, "sensor.b": 0}
-
-        with index._lock, index._conn:
-            plan = index._conn.execute(
-                "EXPLAIN QUERY PLAN SELECT entities.*, COALESCE(dc.deleted_count, 0) "
-                "AS deleted_count FROM entities LEFT JOIN ("
-                "SELECT entity_id, COUNT(*) AS deleted_count FROM deleted_points "
-                "GROUP BY entity_id) dc ON dc.entity_id = entities.entity_id "
-                "ORDER BY entities.entity_id"
-            ).fetchall()
-        details = " | ".join(row["detail"] for row in plan)
-        assert "CORRELATED" not in details.upper()
 
         index.close()
     finally:
@@ -945,21 +935,94 @@ if __name__ == "__main__":
     _run_all()
 
 
-def test_list_entities_can_skip_the_deleted_points_join() -> None:
-    """include_deleted_count=False darf deleted_points gar nicht erst
-    aggregieren (bei 1,5 Mio. Löschmarkierungen ~75 ms je Aufruf) — nur
-    Aufrufer, die deleted_count wirklich lesen, zahlen dafür. Der Sort
-    "rows" hängt selbst an dc.deleted_count und erzwingt den Join weiterhin."""
+def test_deleted_count_is_a_plain_column_on_every_list_entities_call() -> None:
+    """deleted_count kommt jetzt als gepflegte Spalte auf entities mit
+    entities.* praktisch gratis mit — vorher aggregierte list_entities() bei
+    JEDEM Aufruf einen LEFT JOIN gegen die komplette deleted_points-Tabelle
+    (ZP-003 in PERFORMANCE.md, ~75-78 ms bei 1,5 Mio. Löschmarkierungen).
+    Kein include_deleted_count-Opt-out mehr nötig, weil kein Join mehr
+    existiert, den man sich sparen könnte."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
         index = Index(tmp / "index.sqlite")
         index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
-        lean = index.list_entities(include_deleted_count=False)
-        assert len(lean) == 1 and "deleted_count" not in lean[0].keys()
-        full = index.list_entities()
-        assert full[0]["deleted_count"] == 0
-        by_rows = index.list_entities(sort="rows", include_deleted_count=False)
+        rows = index.list_entities()
+        assert rows[0]["deleted_count"] == 0
+        by_rows = index.list_entities(sort="rows")
         assert by_rows[0]["deleted_count"] == 0
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_deleted_count_column_stays_in_sync_with_deleted_points() -> None:
+    """mark_deleted()/undo_last_deleted_batch()/remove_deleted_points()/
+    clear_entity_data() müssen die gepflegte deleted_count-Spalte auf
+    entities exakt mitführen — sonst driftet sie stillschweigend vom
+    tatsächlichen deleted_points-Bestand ab, ohne dass ein LEFT JOIN das je
+    wieder geraderücken würde (siehe deleted_count_is_a_plain_column_...)."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
+        assert index.get_entity("sensor.a")["deleted_count"] == 0
+
+        # Duplikat-Fall: derselbe Zeitstempel zweimal in einer Charge.
+        index.mark_deleted("sensor.a", [1.0, 2.0, 2.0])
+        assert index.get_entity("sensor.a")["deleted_count"] == 3
+
+        undone = index.undo_last_deleted_batch("sensor.a")
+        assert undone == 3
+        assert index.get_entity("sensor.a")["deleted_count"] == 0
+
+        index.mark_deleted("sensor.a", [3.0, 4.0])
+        assert index.get_entity("sensor.a")["deleted_count"] == 2
+
+        index.remove_deleted_points("sensor.a", [3.0])
+        assert index.get_entity("sensor.a")["deleted_count"] == 1
+
+        index.clear_entity_data("sensor.a")
+        assert index.get_entity("sensor.a")["deleted_count"] == 0
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_deleted_count_is_backfilled_from_existing_deleted_points_on_migration() -> None:
+    """Bestehende Installationen mit bereits markierten Löschungen dürfen
+    beim Upgrade nicht auf deleted_count=0 zurückfallen — die Migration
+    rechnet den Wert einmalig aus dem vorhandenen deleted_points-Bestand
+    zurück (siehe Index._migrate())."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
+        index.get_or_create_entity("sensor.b", "sensor", "measurement", "°C")
+        index.mark_deleted("sensor.a", [1.0, 2.0, 2.0])
+        index.close()
+
+        # deleted_count-Spalte simuliert "vor diesem Upgrade" wieder entfernen,
+        # ohne die schon vorhandenen deleted_points-Markierungen anzufassen.
+        conn = sqlite3.connect(db_path)
+        conn.execute("ALTER TABLE entities RENAME TO entities_old")
+        conn.execute(
+            """CREATE TABLE entities AS
+               SELECT entity_id, aggregation_type, resolution, retention, decimals,
+                      value_filter, gap_threshold, outlier_threshold, unit, state_class,
+                      friendly_name, custom_name, hourly_rollup, first_ts, last_ts,
+                      last_value, row_count, size_bytes, is_favorite, display_mode,
+                      chart_options, updated_at
+               FROM entities_old"""
+        )
+        conn.execute("DROP TABLE entities_old")
+        conn.commit()
+        conn.close()
+
+        index = Index(db_path)  # löst die Migration + Backfill aus
+        assert index.get_entity("sensor.a")["deleted_count"] == 3
+        assert index.get_entity("sensor.b")["deleted_count"] == 0
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

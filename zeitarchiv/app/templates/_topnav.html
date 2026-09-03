@@ -16,7 +16,7 @@
 <script src="{{ app_root }}/static/vendor/alpine.min.js" defer></script>
 {% set _path = request.url.path %}
 {% set _rel = _path[(app_root|length):] if app_root and _path.startswith(app_root) else _path %}
-{% set nav_home = _rel in ('/', '') %}
+{% set nav_home = _rel in ('/', '', '/uebersicht') %}
 {% set nav_dashboards = _rel.startswith('/dashboards') %}
 {% set nav_energiedashboard = _rel.startswith('/energiedashboard') %}
 {% set nav_entities = _rel.startswith('/entities') %}
@@ -88,7 +88,7 @@
     </a>
 
     <nav class="topnav-links">
-      <a class="topnav-link{{ ' is-active' if nav_home }}" href="{{ app_root }}/">{{ nav_icon('home') }}Übersicht</a>
+      <a class="topnav-link{{ ' is-active' if nav_home }}" href="{{ app_root }}/uebersicht">{{ nav_icon('home') }}Übersicht</a>
       <div class="topnav-system{{ ' is-active' if nav_dashboards }}" @click.outside="dashboardsOpen = false">
         <button type="button" class="topnav-system-btn" @click="dashboardsOpen = !dashboardsOpen" :aria-expanded="dashboardsOpen.toString()">
           {{ nav_icon('dashboards') }}Dashboards{{ nav_chevron() }}
@@ -276,7 +276,7 @@
       <button type="button" class="topnav-drawer-close" @click="drawerOpen = false" aria-label="Menü schließen">{{ nav_icon('x') }}</button>
     </div>
     <nav>
-      <a class="{{ 'is-active' if nav_home }}" href="{{ app_root }}/">{{ nav_icon('home') }}Übersicht</a>
+      <a class="{{ 'is-active' if nav_home }}" href="{{ app_root }}/uebersicht">{{ nav_icon('home') }}Übersicht</a>
       <button type="button" class="topnav-drawer-system-btn{{ ' is-active' if nav_dashboards }}" @click="drawerDashboardsOpen = !drawerDashboardsOpen" :aria-expanded="drawerDashboardsOpen.toString()">
         <span class="topnav-drawer-system-label">{{ nav_icon('dashboards') }}Dashboards</span>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" :class="{ 'is-open': drawerDashboardsOpen }" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
