@@ -15,6 +15,10 @@ und in dieser Tabelle eingetragen werden.
 
 ## Repository in Home Assistant hinzufügen
 
+[![Add-on-Repository zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+
+Alternativ von Hand:
+
 1. In Home Assistant **Einstellungen → Apps → App-Store** öffnen.
 2. Rechts oben das Menü öffnen und **Repositories** auswählen.
 3. Folgende Adresse hinzufügen:

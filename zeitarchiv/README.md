@@ -81,6 +81,12 @@ Die Verantwortlichkeiten bleiben bewusst getrennt:
 
 ### 1. App installieren
 
+[![Add-on-Repository zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+[![Zeitarchiv in My Home Assistant öffnen](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=c1c17729_zeitarchiv&repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+
+Der erste Button trägt das Repository im Add-on-Store ein, der zweite öffnet
+direkt die Installationsseite von Zeitarchiv. Alternativ von Hand:
+
 **Über den Add-on-Store:** In Home Assistant **Einstellungen → Add-ons →
 Add-on-Store → ⋮ → Repositories** öffnen, `https://github.com/bertel2020/HA-Apps`
 eintragen und hinzufügen. **Zeitarchiv** erscheint danach im Store; installieren
