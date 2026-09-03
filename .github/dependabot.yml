@@ -1,0 +1,21 @@
+# Bewusst nur github-actions und docker — pip (zeitarchiv/requirements.txt)
+# ist via "uv pip compile" aus requirements.in generiert (siehe Kopfzeile
+# der Datei und tests/test_requirements_lock.py); Dependabots pip-
+# Unterstützung ist auf pip-tools/pip-compile ausgelegt und würde einzelne
+# Zeilen direkt hochsetzen statt über uv neu aufzulösen. Sicherheitslücken
+# in pip-Paketen fängt stattdessen Dependabot Security Updates (Repo-
+# Settings → Security), unabhängig von dieser Datei.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "docker"
+    directory: "/zeitarchiv"
+    schedule:
+      interval: "weekly"
