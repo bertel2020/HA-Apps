@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.79.3 - 2026-09-03
+
+### Geändert
+
+- Formulierung des Hinweistexts zur Startseiten-Einstellung aus 0.79.2
+  angepasst.
+
 ## 0.79.2 - 2026-09-03
 
 ### Geändert
