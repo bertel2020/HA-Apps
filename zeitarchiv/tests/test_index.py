@@ -15,8 +15,10 @@ try:
         Index,
         IndexBusy,
         _TimeoutLock,
+        effective_gap_floor_minutes,
         filter_deleted_occurrences,
         should_accept_write,
+        should_raise_gap_threshold,
     )
 
     _PYARROW_AVAILABLE = True  # Index selbst braucht kein pyarrow, aber der Rest der Suite schon
@@ -1026,3 +1028,56 @@ def test_deleted_count_is_backfilled_from_existing_deleted_points_on_migration()
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_effective_gap_floor_minutes_from_resolution_alone() -> None:
+    """resolution allein erzwingt schon einen Mindestabstand (should_accept_
+    write() verwirft jeden engeren Schreibversuch) — unabhängig vom
+    Wertänderungsfilter. "raw" und "30s" liefern 0: "raw" kennt keinen
+    Mindestabstand, "30s" liegt unter der feinsten wählbaren
+    Lücken-Erkennung (1 Minute) und kann sie deshalb nie unterschreiten."""
+    assert effective_gap_floor_minutes("raw", "off") == 0
+    assert effective_gap_floor_minutes("30s", "off") == 0
+    assert effective_gap_floor_minutes("1min", "off") == 1
+    assert effective_gap_floor_minutes("15min", "off") == 15
+    assert effective_gap_floor_minutes("1h", "off") == 60
+
+
+def test_effective_gap_floor_minutes_value_filter_dominates_over_resolution() -> None:
+    """Der Wertänderungsfilter-Heartbeat (360 Min.) ist immer strenger als
+    jeder resolution-Floor (höchstens 60 Min. bei "1h") — das Maximum aus
+    beiden ist deshalb bei aktivem Filter immer der Filter selbst."""
+    assert effective_gap_floor_minutes("1h", "decimals") == 360
+    assert effective_gap_floor_minutes("raw", "decimals") == 360
+
+
+def test_should_raise_gap_threshold_flags_gap_tighter_than_resolution() -> None:
+    """Kein Wertänderungsfilter nötig, um einen strukturellen Fehlalarm
+    auszulösen — resolution="1h" allein reicht schon (vorher unentdeckt,
+    der alte Guard prüfte nur den Wertänderungsfilter)."""
+    tiers = [1, 5, 15, 30, 60, 360, 720, 1440]
+    should_raise, new_gap = should_raise_gap_threshold("15", "1h", "off", tiers)
+    assert should_raise is True
+    assert new_gap == "60"
+
+
+def test_should_raise_gap_threshold_value_filter_wins_when_both_apply() -> None:
+    should_raise, new_gap = should_raise_gap_threshold("60", "1h", "decimals", [1, 5, 15, 30, 60, 360, 720, 1440])
+    assert should_raise is True
+    assert new_gap == "360"
+
+
+def test_should_raise_gap_threshold_leaves_sufficient_or_off_alone() -> None:
+    tiers = [1, 5, 15, 30, 60, 360, 720, 1440]
+    assert should_raise_gap_threshold("off", "1h", "off", tiers) == (False, "off")
+    assert should_raise_gap_threshold("1440", "1h", "off", tiers) == (False, "1440")
+
+
+def test_should_raise_gap_threshold_rounds_up_to_smallest_covering_tier() -> None:
+    """Der Floor selbst muss kein gültiger Tarif sein — hier künstlich mit
+    Lücken in valid_minute_tiers, damit die Rundung sichtbar getestet wird
+    (mit den echten GAP_THRESHOLD_LABELS-Werten liegt der Floor bislang
+    immer exakt auf einem Tarif, siehe die beiden Tests oben)."""
+    should_raise, new_gap = should_raise_gap_threshold("5", "15min", "off", [1, 10, 100])
+    assert should_raise is True
+    assert new_gap == "100"

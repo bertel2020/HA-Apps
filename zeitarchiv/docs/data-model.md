@@ -134,7 +134,7 @@ Existenz-Check in `Index.__init__()`.
 
 | Tabelle | Zweck |
 | --- | --- |
-| `entities` | Eine Zeile je bekannter Entität: Aggregationstyp, Auflösung, Aufbewahrung, Nachkommastellen, Wertfilter, Ausreißer-/Lücken-Schwellen, `first_ts`/`last_ts`/`last_value` (Zustand für Idempotenz- und Filterprüfungen), `row_count`/`size_bytes` (für die Statistik, inkrementell gepflegt statt bei jeder Anzeige neu gezählt) |
+| `entities` | Eine Zeile je bekannter Entität: Aggregationstyp, Auflösung, Aufbewahrung, Nachkommastellen, Wertfilter, Ausreißer-/Lücken-Schwellen, `first_ts`/`last_ts`/`last_value` (Zustand für Idempotenz- und Filterprüfungen), `row_count`/`size_bytes`/`deleted_count` (für die Statistik, inkrementell gepflegt statt bei jeder Anzeige neu gezählt bzw. gegen `deleted_points` gejoint) |
 | `deleted_points` | Soft-Delete-Markierungen, siehe oben. Indiziert auf `(entity_id, ts)` und `(entity_id, deleted_at)` |
 | `ingested_events` | Idempotenz-Ledger des Schreibpfads (siehe [ingestion.md](ingestion.md)); Einträge älter als 7 Tage werden periodisch geprunt |
 | `settings` | Generischer Key-Value-Store: globale Auflösungs-/Aufbewahrungs-Standards, Loglevel, Farbschema, API-Token, sowie **gecachte teure Vorschauen** und **HA-Integrations-Status** (siehe unten) |

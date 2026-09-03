@@ -163,9 +163,11 @@ Aufbewahrung und Rundung. Ein optionaler, rein app-interner Anzeigename
 Darstellung.
 
 **Housekeeping.** Eigener Bereich für Dinge, die sonst leicht übersehen
-werden: erkannte Duplikate, inaktive Entitäten, ungenutzte Charts/Tabellen,
-freier Speicherplatz auf dem Host-Dateisystem, sowie Speicherplatz-,
-Aufbewahrungs- und Rotations-Verwaltung an einer Stelle.
+werden: erkannte Duplikate, inaktive Entitäten, widersprüchliche
+Konfigurationskombinationen (z. B. eine Lücken-Erkennung, die durch
+Auflösung oder Wertänderungsfilter nie zutreffen kann), ungenutzte
+Charts/Tabellen, freier Speicherplatz auf dem Host-Dateisystem, sowie
+Speicherplatz-, Aufbewahrungs- und Rotations-Verwaltung an einer Stelle.
 
 **Meldungen.** Die Glocke in der Kopfzeile bündelt Systemhinweise —
 empfohlene Wartung, fehlgeschlagene Backup-/Aufbewahrungs-/Importläufe,

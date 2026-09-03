@@ -60,12 +60,17 @@ falschen Token/Host in der Integration (Schritt 3).
 
 ## Die Übersichtsseite
 
-Die Startseite (Sidebar-Eintrag "Zeitarchiv") zeigt oben eine
-Kennzahlenübersicht (Anzahl Entitäten, Datensätze, Speicherbedarf) und
-darunter das **Standard-Dashboard** — dieselbe Kachel-Ansicht wie unter
-**Dashboards**, nur fest der Startseite zugeordnet und nicht umbenennbar
-oder löschbar. Es lässt sich wie jedes andere Dashboard mit Kacheln
-bestücken, umsortieren und fixieren (siehe unten).
+Die Übersicht (im Menü über das Haus-Symbol erreichbar, `/uebersicht`)
+zeigt oben eine Kennzahlenübersicht (Anzahl Entitäten, Datensätze,
+Speicherbedarf) und darunter das **Standard-Dashboard** — dieselbe
+Kachel-Ansicht wie unter **Dashboards**, nur fest der Übersicht zugeordnet
+und nicht umbenennbar oder löschbar. Es lässt sich wie jedes andere
+Dashboard mit Kacheln bestücken, umsortieren und fixieren (siehe unten).
+
+Was beim Öffnen von Zeitarchiv über die HA-Sidebar erscheint (Übersicht
+oder direkt das Energiedashboard), legt **Einstellungen → Darstellung →
+Startseite** fest. Der „Übersicht"-Eintrag in der Kopfzeile führt davon
+unabhängig immer zur Übersicht selbst.
 
 Die Glocke in der Kopfzeile (auf jeder Seite sichtbar) zeigt aktuelle
 Systemmeldungen — z. B. eine empfohlene Index-Optimierung, einen
@@ -262,7 +267,7 @@ Verlaufsansicht) erreichbar:
 | Aufbewahrung | Wie lange Werte behalten werden, bevor eine aktivierte automatische Löschung greift (**Unbegrenzt** möglich) |
 | Nachkommastellen | „Automatisch“ zeigt bis zu drei Stellen und entfernt Nullen am Ende (z. B. 4 statt 4,000); eine feste Anzahl (0–3) rundet auf genau diese Stellen und ergänzt bei Bedarf Nullen (z. B. 4,00 bei 2 Stellen) |
 | Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte (spart Speicherplatz bei trägen Sensoren), behält aber mindestens alle 6 Stunden ein Lebenszeichen, damit lange Stillstände von fehlenden Daten unterscheidbar bleiben. Bei neu erkannten Entitäten standardmäßig aktiv (einstellbar unter **Einstellungen → Archivierung → Standards**) |
-| Lücken-Erkennung | Schwellwert von 1 Minute bis 1 Tag (einschließlich 6 und 12 Stunden), ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — „Aus“ deaktiviert die Markierung. Wird beim Aktivieren des Wertänderungsfilters automatisch auf mindestens 6 Stunden angehoben, falls kürzer eingestellt — sonst würde dessen eigenes, normales Schweigen ständig als Lücke gemeldet. Lässt sich danach jederzeit wieder manuell verkleinern |
+| Lücken-Erkennung | Schwellwert von 1 Minute bis 1 Tag (einschließlich 6 und 12 Stunden), ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — „Aus“ deaktiviert die Markierung. Wird beim Ändern von Auflösung oder Wertänderungsfilter automatisch angehoben, falls sie enger eingestellt ist, als die neue Kombination zulässt — eine gröbere Auflösung erzwingt selbst schon einen Mindestabstand zwischen Werten, der aktivierte Wertänderungsfilter zusätzlich mindestens 6 Stunden. Sonst würde die gewählte Kombination normale Pausen ständig als Lücke melden. Lässt sich danach jederzeit wieder manuell verkleinern |
 | Ausreißer-Erkennung | Schwellwert in Prozent, um den ein Wert gegenüber dem Vorwert mindestens abweichen muss, um als Ausreißer markiert zu werden — "Aus" deaktiviert die Markierung |
 | Anzeigemodus | Nur bei Schaltern: Rohwert (AN/AUS als Zustand) oder Zeit (kumulierte Einschaltdauer je Zeitraum) |
 
@@ -883,8 +888,9 @@ wie die Einstellungen:
 
 | Bereich | Zeigt |
 | --- | --- |
-| **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
+| **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
+| **Konfiguration** | Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann, weil die gewählte Auflösung oder der aktive Wertänderungsfilter selbst schon einen größeren Mindestabstand zwischen Werten erzwingt (siehe [Entität konfigurieren](#entität-konfigurieren)) — mit Auflösung, aktueller und empfohlener Lücken-Erkennung je Entität. Rein informativ, keine Sammel-Korrektur: der passende Zielwert unterscheidet sich je Entität. |
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Rotation** | Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat. |
@@ -904,6 +910,8 @@ Zeitarchiv unter anderem:
 
 - Speicherindex-Prüfung unvollständig oder mit gefundenen (meist bereits
   automatisch reparierten) Abweichungen
+- Wartungsplaner oder Speicherindex-Hintergrundabgleich reagiert länger
+  als 5 Minuten nicht mehr (Selbstheilungs-Schutz)
 - Kein automatischer Backup-Zeitplan aktiv
 - Aufbewahrung für Entitäten konfiguriert, aber die automatische Durchsetzung
   ausgeschaltet
@@ -911,8 +919,10 @@ Zeitarchiv unter anderem:
 - Endgültige Bereinigung möglich, Duplikate gefunden, Rotation ausstehend
 - Inaktive Entitäten, dreistufig nach Alter (1/3/7 Tage, mit steigendem
   Schweregrad)
-- Wertänderungsfilter einer Entität steht im Konflikt mit einer zu kurzen
-  Lücken-Erkennung (siehe [Entität konfigurieren](#entität-konfigurieren))
+- Lücken-Erkennung einer Entität kann durch ihre Auflösung oder den aktiven
+  Wertänderungsfilter strukturell nie zutreffen (siehe
+  [Housekeeping → Konfiguration](#housekeeping) und
+  [Entität konfigurieren](#entität-konfigurieren))
 - Tageslastprofil im Energiedashboard wird nach einer Konfigurationsänderung
   noch rückwirkend vervollständigt
 - Freier Speicherplatz auf dem Host-Dateisystem wird knapp (zweistufig:
@@ -1101,7 +1111,7 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Darstellung** | Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |

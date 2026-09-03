@@ -131,6 +131,21 @@ Garantien umgehen. Das ist kein unterstütztes Deployment.
 Ein Fehler in einem Planer-Durchlauf wird geloggt, bricht die Schleife aber
 nicht ab (`except Exception: logger.exception(...)`).
 
+Ein zweiter, unabhängiger Daemon-Thread
+(`main.py:_background_storage_reconciliation()`) gleicht beim Start
+einmalig (danach beendet er sich) den Speicherindex entitätsweise mit
+Archiv/Hot Buffer ab (siehe `storage/reconcile.py`) — läuft nur bei sauber
+beendetem letzten Shutdown im Hintergrund, sonst (Restore/Crash) synchron
+vor dem ersten Request.
+
+Beide Threads schreiben bei jedem Durchlauf bzw. jeder geprüften Entität
+einen Zeitstempel (`_last_scheduler_tick` / `_last_reconcile_tick`). Bleibt
+einer davon länger als 5 Minuten ohne Fortschritt stehen (Deadlock am
+Index- oder Storage-Lock), erscheint eine Meldung im Meldungs-Center
+(`system.scheduler_stalled` / `system.storage_reconcile_stalled`,
+`notices.py`) — die App bleibt für alle anderen Requests weiter
+erreichbar, nur der jeweilige Thread hängt.
+
 ## Frontend-Rendering
 
 Server-Side-Rendering (Jinja2) für den initialen Seitenaufbau, htmx für

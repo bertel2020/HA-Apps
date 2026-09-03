@@ -102,7 +102,7 @@ from .storage.index import (
     DEFAULT_RESOLUTION,
     DEFAULT_RETENTION,
     DEFAULT_VALUE_FILTER,
-    VALUE_FILTER_HEARTBEAT_SECONDS,
+    should_raise_gap_threshold,
     MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
     DuplicateNameError,
@@ -1906,18 +1906,27 @@ async def settings_archivierung(request: Request) -> HTMLResponse:
     for key, (value, _labels, _error) in fields.items():
         if value is not None:
             index.set_setting(key, str(value))
-    # Dieselbe Kopplung wie bei der einzelnen Entität (update_entity_config)
-    # — nur wenn der Standard-Filter in DIESEM Request aktiviert wird, nicht
-    # bei jedem Speichern, solange er schon aktiv ist.
+    # Wie update_entity_config unten — nur bei ÄNDERUNG von default_resolution/default_value_filter auslösen.
     gap_threshold_auto_adjusted = False
+    gap_threshold_auto_adjusted_message = None
+    default_resolution = fields["default_resolution"][0]
     default_value_filter = fields["default_value_filter"][0]
-    if default_value_filter == "decimals":
+    if default_value_filter == "decimals" or default_resolution is not None:
+        current_resolution = index.get_setting("default_resolution", DEFAULT_RESOLUTION)
+        current_value_filter = index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER)
         current_gap = index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
-        if _should_raise_gap_threshold_for_value_filter(current_gap):
-            index.set_setting("default_gap_threshold", _VALUE_FILTER_GAP_FLOOR_MINUTES)
+        should_raise, new_gap = should_raise_gap_threshold(
+            current_gap, current_resolution, current_value_filter, _GAP_THRESHOLD_MINUTE_TIERS
+        )
+        if should_raise:
+            index.set_setting("default_gap_threshold", new_gap)
             gap_threshold_auto_adjusted = True
+            reason = "value_filter" if current_value_filter == "decimals" else "resolution"
+            gap_threshold_auto_adjusted_message = _gap_threshold_auto_adjust_message(
+                reason, new_gap, current_resolution, label="Standard-Lücken-Erkennung")
     context = _settings_archivierung_context(saved=True)
     context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
+    context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
     return templates.TemplateResponse(request, "_settings_archivierung_form.html", context)
 
 
@@ -2955,7 +2964,6 @@ def _duplicate_rows_for_display() -> tuple[list[dict], list[dict], str]:
     duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
     return duplicate_rows, duplicates_by_entity, duplicates_total
 
-
 @app.get("/statistik", response_class=HTMLResponse)
 @_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
 def statistik_view(request: Request) -> HTMLResponse:
@@ -3111,9 +3119,9 @@ def housekeeping_view(request: Request) -> HTMLResponse:
     """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
     sucht: ungenutzte Charts/Tabellen (kein Dashboard-Pin), Entitäten mit
     erkannten Duplikaten (bestehender globaler Schnappschuss, siehe
-    _duplicate_rows_for_display) und Entitäten ohne neue Werte. Wiederholungen
-    sind bewusst noch nicht enthalten (siehe Diskussion zu Schwellwert/
-    Kalibrierung)."""
+    _duplicate_rows_for_display), Entitäten ohne neue Werte und mit
+    unwirksamer Lücken-Erkennung. Wiederholungen sind bewusst noch nicht
+    enthalten (siehe Diskussion zu Schwellwert/Kalibrierung)."""
     aggregation_types = {
         row["entity_id"]: row["aggregation_type"] for row in index.list_entities()
     }
@@ -3142,6 +3150,7 @@ def housekeeping_view(request: Request) -> HTMLResponse:
             "table_count": index.count_saved_tables(),
             "duplicates_by_entity": duplicates_by_entity,
             "duplicates_total": duplicates_total,
+            "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(index),
             **_stale_entities_context(),
             **_host_disk_usage_context(),
             **_settings_storage_index_context(),
@@ -3530,26 +3539,28 @@ def entities_table(
     )
 
 
-# Der Wertänderungsfilter überspringt unveränderte Werte, garantiert aber
-# spätestens alle VALUE_FILTER_HEARTBEAT_SECONDS ein Lebenszeichen (siehe
-# should_accept_value() in storage/index.py) — eine kürzere Lücken-Schwelle
-# würde dieses regelmäßige, harmlose Schweigen fälschlich als Lücke melden.
-# Aus der Sekunden-Konstante abgeleitet statt separat gepflegt, damit beide
-# nie auseinanderlaufen können.
-_VALUE_FILTER_GAP_FLOOR_MINUTES = str(VALUE_FILTER_HEARTBEAT_SECONDS // 60)
+# Gültige Tarife für should_raise_gap_threshold() (index.py kennt bewusst keine Anzeige-Labels).
+_GAP_THRESHOLD_MINUTE_TIERS = [int(k) for k in GAP_THRESHOLD_LABELS if k != "off"]
 
 
-def _should_raise_gap_threshold_for_value_filter(current_gap_threshold: str) -> bool:
-    """True, wenn `current_gap_threshold` enger als der Wertänderungsfilter-
-    Herzschlag ist UND nicht "off" — dann würde der Filter selbst regelmäßig
-    Fehlalarme auf der Bereinigungs-Seite auslösen. Nur ein Vorschlag/Guard
-    beim AKTIVIEREN des Filters (siehe update_entity_config/
-    settings_archivierung), keine dauerhafte Sperre — danach lässt sich die
-    Lücken-Erkennung jederzeit wieder manuell verkleinern."""
+def _gap_threshold_auto_adjust_message(
+    reason: str, new_gap: str, resolution: str, *, label: str = "Lücken-Erkennung"
+) -> str:
+    """Erklärtext für appAlert() nach einer Anhebung durch
+    should_raise_gap_threshold() (label="Standard-Lücken-Erkennung" für die
+    globalen Standards)."""
+    new_label = GAP_THRESHOLD_LABELS.get(new_gap, new_gap)
+    cause = (
+        f"Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst "
+        f"nach spätestens {new_label} wieder"
+        if reason == "value_filter" else
+        f"Die gewählte Auflösung „{RESOLUTION_LABELS.get(resolution, resolution)}“ lässt "
+        f"ohnehin nur alle {new_label} einen neuen Wert zu"
+    )
     return (
-        current_gap_threshold != "off"
-        and current_gap_threshold.isdigit()
-        and int(current_gap_threshold) < int(_VALUE_FILTER_GAP_FLOOR_MINUTES)
+        f"{label} automatisch auf {new_label} gesetzt: {cause} — eine kürzere Lücken-Schwelle "
+        "hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit "
+        "wieder manuell verkleinern."
     )
 
 
@@ -3671,20 +3682,25 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
             )
             if retention is not None:
                 _invalidate_retention_overview()
-            # Nur auslösen, wenn der Filter in DIESEM Request aktiviert wird
-            # (nicht bei jedem Speichern, solange er schon aktiv ist) — sonst
-            # würde ein späteres, bewusstes Verkleinern der Lücken-Erkennung
-            # bei der nächsten Gelegenheit einfach wieder zurückgedreht.
+            # Nur bei ÄNDERUNG von resolution/value_filter auslösen, sonst würde ein späteres,
+            # bewusstes Verkleinern der Lücken-Erkennung bei nächster Gelegenheit zurückgedreht.
             gap_threshold_auto_adjusted = False
-            if value_filter == "decimals":
-                current_gap = _require_entity(entity_id)["gap_threshold"]
-                if _should_raise_gap_threshold_for_value_filter(current_gap):
-                    index.set_config(entity_id, gap_threshold=_VALUE_FILTER_GAP_FLOOR_MINUTES)
+            gap_threshold_auto_adjusted_message = None
+            if value_filter == "decimals" or resolution is not None:
+                current = _require_entity(entity_id)
+                should_raise, new_gap = should_raise_gap_threshold(
+                    current["gap_threshold"], current["resolution"], current["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS
+                )
+                if should_raise:
+                    index.set_config(entity_id, gap_threshold=new_gap)
                     gap_threshold_auto_adjusted = True
+                    reason = "value_filter" if current["value_filter"] == "decimals" else "resolution"
+                    gap_threshold_auto_adjusted_message = _gap_threshold_auto_adjust_message(reason, new_gap, current["resolution"])
             entity = _require_entity(entity_id)
             context = _entity_config_context(entity)
             context["saved"] = True
             context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
+            context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
             return templates.TemplateResponse(request, "_entity_config_form.html", context)
 
     return await run_in_threadpool(update_locked)

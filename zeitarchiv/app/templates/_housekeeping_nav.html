@@ -3,8 +3,9 @@
    leer. #}
 {% set prefix = (base ~ '/') if base else '' %}
 <nav class="settings-nav">
-  <a href="{{ prefix }}housekeeping#duplikate" {% if nav_active == 'duplikate' %}class="active"{% endif %}>Duplikate</a>
   <a href="{{ prefix }}housekeeping#entitaeten" {% if nav_active == 'entitaeten' %}class="active"{% endif %}>Inaktive Entitäten</a>
+  <a href="{{ prefix }}housekeeping#duplikate" {% if nav_active == 'duplikate' %}class="active"{% endif %}>Duplikate</a>
+  <a href="{{ prefix }}housekeeping#konfiguration" {% if nav_active == 'konfiguration' %}class="active"{% endif %}>Konfiguration</a>
   <a href="{{ prefix }}housekeeping#speicherplatz" {% if nav_active == 'speicherplatz' %}class="active"{% endif %}>Speicherplatz</a>
   <a href="{{ prefix }}housekeeping#aufbewahrung" {% if nav_active == 'aufbewahrung' %}class="active"{% endif %}>Aufbewahrung</a>
   <a href="{{ prefix }}housekeeping#rotation" {% if nav_active == 'rotation' %}class="active"{% endif %}>Rotation</a>

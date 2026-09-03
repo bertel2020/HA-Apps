@@ -65,9 +65,35 @@
   <p class="sub">Dinge, die im Alltag leicht untergehen.</p>
 
   <div class="settings-layout">
-    {% set nav_active = 'duplikate' %}
+    {% set nav_active = 'entitaeten' %}
     {% include "_housekeeping_nav.html" %}
     <div class="settings-panel">
+
+      <section id="entitaeten" class="settings-section">
+        <div class="hk-section-head">
+          <h2 class="settings-section-title">Inaktive Entitäten</h2>
+          <form id="stale-entities-form" hx-get="housekeeping/stale-entities" hx-trigger="change"
+                hx-target="#stale-entities-body" hx-swap="innerHTML" hx-include="#stale-entities-form">
+            <span class="dd-picker-wrap">
+              seit
+              <button type="button" class="btn btn-sm" id="stale-entities-days-btn" onclick="toggleDDPicker('stale-entities-days')">
+                {% for value, label in stale_entities_day_options %}{% if value == stale_entities_days %}{{ label }}{% endif %}{% endfor %} ▾
+              </button>
+              <input type="hidden" name="days" id="stale-entities-days-input" value="{{ stale_entities_days }}">
+              <div class="dd-picker-popover" id="stale-entities-days-popover">
+                {% for value, label in stale_entities_day_options %}
+                <div class="dd-picker-row{{ ' active' if value == stale_entities_days else '' }}"
+                     onclick="selectDDOption('stale-entities-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
+                {% endfor %}
+              </div>
+            </span>
+          </form>
+        </div>
+        <p class="settings-section-description">Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.</p>
+        <div id="stale-entities-body">
+          {% include "_stale_entities_body.html" %}
+        </div>
+      </section>
 
       <section id="duplikate" class="settings-section">
         <h2 class="settings-section-title">Duplikate</h2>
@@ -106,30 +132,39 @@
         {% endif %}
       </section>
 
-      <section id="entitaeten" class="settings-section">
-        <div class="hk-section-head">
-          <h2 class="settings-section-title">Inaktive Entitäten</h2>
-          <form id="stale-entities-form" hx-get="housekeeping/stale-entities" hx-trigger="change"
-                hx-target="#stale-entities-body" hx-swap="innerHTML" hx-include="#stale-entities-form">
-            <span class="dd-picker-wrap">
-              seit
-              <button type="button" class="btn btn-sm" id="stale-entities-days-btn" onclick="toggleDDPicker('stale-entities-days')">
-                {% for value, label in stale_entities_day_options %}{% if value == stale_entities_days %}{{ label }}{% endif %}{% endfor %} ▾
-              </button>
-              <input type="hidden" name="days" id="stale-entities-days-input" value="{{ stale_entities_days }}">
-              <div class="dd-picker-popover" id="stale-entities-days-popover">
-                {% for value, label in stale_entities_day_options %}
-                <div class="dd-picker-row{{ ' active' if value == stale_entities_days else '' }}"
-                     onclick="selectDDOption('stale-entities-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
-                {% endfor %}
-              </div>
-            </span>
-          </form>
+      <section id="konfiguration" class="settings-section">
+        <h2 class="settings-section-title">Konfiguration</h2>
+        <p class="settings-section-description">Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder der aktive Wertänderungsfilter erzwingt selbst schon einen größeren Mindestabstand zwischen Werten.</p>
+        <div class="tbl-wrap">
+          {% if gap_threshold_conflicts %}
+          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+            <colgroup>
+              <col class="stats-col-entity"><col class="stats-col-value"><col class="stats-col-value"><col class="stats-col-value">
+            </colgroup>
+            <thead><tr><th>Entität</th><th>Auflösung</th><th>Lücken-Erkennung</th><th>Empfohlen</th></tr></thead>
+            <tbody>
+            {% for row in gap_threshold_conflicts %}
+            <tr>
+              <td class="entity" data-sort="{{ row.friendly_name }}">
+                <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
+                </a>
+              </td>
+              <td>{{ row.resolution_label }}{% if row.value_filter_active %} + Wertänderungsfilter{% endif %}</td>
+              <td>{{ row.gap_threshold_label }}</td>
+              <td>{{ row.suggested_gap_label }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty">Keine widersprüchlichen Kombinationen gefunden.</div>
+          {% endif %}
         </div>
-        <p class="settings-section-description">Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.</p>
-        <div id="stale-entities-body">
-          {% include "_stale_entities_body.html" %}
-        </div>
+        {% if gap_threshold_conflicts %}
+        <p class="hint" style="margin-top:14px;">Kein Sammel-Fix: je nach Entität ist entweder eine gröbere Lücken-Erkennung oder eine feinere Auflösung die richtige Korrektur &mdash; Anpassung auf der jeweiligen Konfigurationsseite.</p>
+        {% endif %}
       </section>
 
       <section id="speicherplatz" class="settings-section">

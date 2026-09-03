@@ -29,11 +29,11 @@ from . import ha_integration
 from . import tips as tips_mod
 from . import version_check
 from .energiedashboard_routes import SETTING_HOURLY_BACKFILL_PENDING
-from .formatting import format_int, format_size
+from .formatting import GAP_THRESHOLD_LABELS, format_int, format_resolution, format_size
 from .index_optimization import get_index_optimization_state
 from .report_routes import SOURCE_LABELS
 from .storage import import_reports
-from .storage.index import VALUE_FILTER_HEARTBEAT_SECONDS
+from .storage.index import should_raise_gap_threshold
 from .version import APP_VERSION
 
 MUTABLE_SEVERITIES = {"info", "warn"}
@@ -60,14 +60,6 @@ RECONCILE_STALLED_SECONDS = 5 * 60
 INACTIVE_ENTITY_INFO_DAYS = 1
 INACTIVE_ENTITY_WARN_DAYS = 3
 INACTIVE_ENTITY_ERROR_DAYS = 7
-# Dieselbe Ableitung wie main.py's _VALUE_FILTER_GAP_FLOOR_MINUTES — der
-# Wertänderungsfilter garantiert spätestens alle VALUE_FILTER_HEARTBEAT_SECONDS
-# ein Lebenszeichen, eine engere Lücken-Schwelle löst dadurch regelmäßig
-# Fehlalarme aus. main.py verhindert das für NEUE Aktivierungen automatisch
-# (siehe _should_raise_gap_threshold_for_value_filter); diese Meldung deckt
-# bereits bestehende Entitäten mit der riskanten Kombination ab, die die
-# Automatik nicht rückwirkend anfasst.
-VALUE_FILTER_GAP_FLOOR_MINUTES = VALUE_FILTER_HEARTBEAT_SECONDS // 60
 # Prozentbasiert statt fester Byte-Schwelle — bleibt so von der SD-Karte bis
 # zur NVMe-SSD sinnvoll (ein fester GB-Wert wäre auf kleinen Installationen
 # zu spät, auf großen zu früh dran).
@@ -78,6 +70,9 @@ HOST_DISK_ERROR_RATIO = 0.05
 # siehe hide_tip_today(). Bei einem mehrtägigen Fenster wäre der übernächste
 # Tag noch derselbe (ausgeblendete) Tipp gewesen.
 TIP_ROTATION_DAYS = 1
+# Gültige Tarife für should_raise_gap_threshold() (storage/index.py kennt
+# bewusst keine Anzeige-Labels).
+_GAP_THRESHOLD_MINUTE_TIERS = [int(k) for k in GAP_THRESHOLD_LABELS if k != "off"]
 
 # Feste Presets statt eines Datums-Pickers im ohnehin schon engen
 # Meldungs-Dropdown. "forever" (None) bleibt trotzdem sicher: der Fingerprint
@@ -94,6 +89,32 @@ SNOOZE_PRESETS = {
 SNOOZE_LABELS = {
     "1h": "1 Stunde", "1d": "1 Tag", "7d": "7 Tage", "30d": "30 Tage", "forever": "Dauerhaft",
 }
+
+
+def gap_threshold_conflicts(index) -> list[dict]:
+    """Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann —
+    ihre Auflösung oder der aktive Wertänderungsfilter erzwingt selbst
+    schon einen größeren Mindestabstand zwischen Werten (siehe
+    effective_gap_floor_minutes() in storage/index.py). Einzige Quelle für
+    die entities.gap_threshold_conflict-Meldung unten (Zähler) UND
+    Housekeeping → Konfiguration (main.py, volle Liste) — beide dürfen nie
+    unterschiedliche Kriterien verwenden."""
+    rows = []
+    for e in index.list_entities():
+        should_flag, suggested_gap = should_raise_gap_threshold(
+            e["gap_threshold"], e["resolution"], e["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS
+        )
+        if not should_flag:
+            continue
+        rows.append({
+            "entity_id": e["entity_id"],
+            "friendly_name": e["custom_name"] or e["friendly_name"] or e["entity_id"],
+            "resolution_label": format_resolution(e["resolution"]),
+            "gap_threshold_label": GAP_THRESHOLD_LABELS.get(e["gap_threshold"], e["gap_threshold"]),
+            "value_filter_active": e["value_filter"] == "decimals",
+            "suggested_gap_label": GAP_THRESHOLD_LABELS.get(suggested_gap, suggested_gap),
+        })
+    return rows
 
 
 def build_notices(
@@ -372,23 +393,23 @@ def build_notices(
                 "link": "/import?tab=reports",
             })
 
-    conflict_count = sum(
-        1 for e in index.list_entities()
-        if e["value_filter"] == "decimals"
-        and e["gap_threshold"] != "off"
-        and e["gap_threshold"].isdigit()
-        and int(e["gap_threshold"]) < VALUE_FILTER_GAP_FLOOR_MINUTES
-    )
+    # main.py verhindert das für NEUE Änderungen an resolution/value_filter
+    # automatisch (storage.index.should_raise_gap_threshold); diese Meldung
+    # deckt bereits bestehende Entitäten mit der riskanten Kombination ab,
+    # die die Automatik nicht rückwirkend anfasst — Details siehe
+    # gap_threshold_conflicts() oben (auch Grundlage für Housekeeping →
+    # Konfiguration).
+    conflict_count = len(gap_threshold_conflicts(index))
     if conflict_count:
         notices.append({
-            "id": "entities.value_filter_gap_conflict",
+            "id": "entities.gap_threshold_conflict",
             "severity": "warn",
-            "title": "Wertänderungsfilter und Lücken-Erkennung im Konflikt",
+            "title": "Lücken-Erkennung kann strukturell nicht zutreffen",
             "detail": (
-                f"{conflict_count} Entität{'en haben' if conflict_count != 1 else ' hat'} den "
-                "Wertänderungsfilter aktiv, aber eine Lücken-Erkennung unter 6 Stunden — das führt "
-                "zu falschen Lücken-Meldungen, weil der Filter selbst bis zu 6 Stunden lang keine "
-                "neuen Werte schreibt."
+                f"{conflict_count} Entität{'en haben' if conflict_count != 1 else ' hat'} eine "
+                "Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die "
+                "gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen "
+                "gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen."
             ),
             "meta": "Entitäten",
             "link": "/entities",

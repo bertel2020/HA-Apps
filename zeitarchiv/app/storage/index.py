@@ -131,6 +131,45 @@ def should_accept_value(
         return True
     return new_ts - last_ts >= VALUE_FILTER_HEARTBEAT_SECONDS
 
+
+def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
+    """Engste Lücken-Erkennung (Minuten), die bei dieser Auflösung/diesem
+    Wertänderungsfilter noch NICHT bei jedem normalen Zyklus fälschlich als
+    Lücke anschlagen würde — 0, wenn keiner von beiden einen Mindestabstand
+    erzwingt.
+
+    Zwei unabhängige Ursachen für einen Mindestabstand zwischen
+    gespeicherten Werten: `resolution` selbst (should_accept_write() oben
+    verwirft jeden Schreibversuch innerhalb des Intervalls, unabhängig vom
+    Wertänderungsfilter) und, falls aktiv, der Wertänderungsfilter
+    (should_accept_value() oben, spätestens alle
+    VALUE_FILTER_HEARTBEAT_SECONDS ein Lebenszeichen). Eine gap_threshold-
+    Einstellung enger als das Maximum aus beiden meldet strukturell
+    garantiert Lücken, die keine sind — Aufrufer siehe should_raise_gap_
+    threshold() unten (Guard beim Ändern, aus main.py) und notices.py
+    (passive Meldung für bereits bestehende Kombinationen)."""
+    floor_seconds = _RESOLUTION_SECONDS.get(resolution, 0)
+    if value_filter == "decimals":
+        floor_seconds = max(floor_seconds, VALUE_FILTER_HEARTBEAT_SECONDS)
+    return floor_seconds // 60
+
+
+def should_raise_gap_threshold(
+    current_gap_threshold: str, resolution: str, value_filter: str, valid_minute_tiers: list[int]
+) -> tuple[bool, str]:
+    """True + anzuhebender Wert (kleinster Tarif aus `valid_minute_tiers` >=
+    Floor), wenn `current_gap_threshold` enger ist als
+    effective_gap_floor_minutes() erlaubt. `valid_minute_tiers` kommt vom
+    Aufrufer (main.py, aus GAP_THRESHOLD_LABELS) — der Index kennt bewusst
+    keine Anzeige-Labels, siehe set_config() oben."""
+    if current_gap_threshold == "off" or not current_gap_threshold.isdigit():
+        return False, current_gap_threshold
+    floor = effective_gap_floor_minutes(resolution, value_filter)
+    if not floor or int(current_gap_threshold) >= floor:
+        return False, current_gap_threshold
+    tiers = sorted(valid_minute_tiers)
+    return True, str(next((t for t in tiers if t >= floor), tiers[-1]))
+
 # Allowlist für ORDER BY — Spaltennamen lassen sich in SQLite nicht parametrisieren,
 # also nie direkt einen Request-Parameter in die Query interpolieren. Die Werte
 # sind vollständige SQL-Ausdrücke (kein Freitext), deshalb auch "entity_id" hier

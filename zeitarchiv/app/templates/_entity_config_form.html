@@ -108,7 +108,7 @@
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
 {% if gap_threshold_auto_adjusted %}
 <script>
-  appAlert('Lücken-Erkennung automatisch auf 6 Stunden gesetzt: Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst nach spätestens 6 Stunden wieder — eine kürzere Lücken-Schwelle hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit wieder manuell verkleinern.');
+  appAlert({{ gap_threshold_auto_adjusted_message | tojson }});
 </script>
 {% endif %}
 

@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.80.0 - 2026-09-03
+
+### Neu
+
+- **Startseite wählbar (Übersicht/Energiedashboard).** Neue Einstellung unter
+  **Einstellungen → Darstellung** legt fest, was beim Öffnen von Zeitarchiv
+  über die HA-Sidebar erscheint. Die Übersichtsseite selbst ist dafür jetzt
+  unter einer eigenen Adresse erreichbar (`/uebersicht`) statt fest unter
+  `/` — der „Übersicht"-Eintrag in der Kopfzeile führt dadurch unabhängig
+  von der gewählten Startseite immer dorthin.
+- **Housekeeping → Konfiguration.** Neuer Abschnitt listet Entitäten, deren
+  Lücken-Erkennung strukturell nie zutreffen kann, weil die gewählte
+  Auflösung oder der aktive Wertänderungsfilter selbst schon einen
+  größeren Mindestabstand zwischen gespeicherten Werten erzwingt — bislang
+  nur über die Glocke als Sammelzahl sichtbar, jetzt mit Auflösung, aktueller
+  und empfohlener Lücken-Erkennung je betroffener Entität. Derselbe Guard,
+  der die Einstellung beim Ändern automatisch anhebt, erkannte bisher nur
+  den Wertänderungsfilter als Ursache — die Auflösung selbst (die genauso
+  einen Mindestabstand zwischen Werten erzwingt) blieb unentdeckt.
+- Selbstheilungs-Heartbeat für den Speicherindex-Hintergrundabgleich
+  (analog zum Wartungsplaner seit 0.76.0): bleibt der Abgleich länger als
+  5 Minuten ohne Fortschritt hängen, erscheint eine Meldung, statt
+  unbemerkt zu blockieren.
+
+### Geändert
+
+- Entitätenliste und -übersicht lesen `deleted_count` jetzt aus einer
+  gepflegten Spalte statt sie bei jedem Aufruf neu über die komplette
+  Löschmarkierungs-Tabelle zu aggregieren — bei 1,5 Mio. Markierungen
+  spart das ~75-78 ms pro Seitenaufruf/Tastendruck im Such-/Filterfeld.
+- In Housekeeping steht „Inaktive Entitäten" jetzt vor „Duplikate".
+
+### Behoben
+
+- Drucken-Button im Energiebericht zeigte in manchen Schriftarten eine
+  leere Box statt eines Drucker-Symbols (schlecht unterstütztes
+  Unicode-Zeichen) — jetzt ein eingebettetes SVG-Icon.
+
 ## 0.79.1 - 2026-09-03
 
 ### Geändert
