@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.81.1 - 2026-09-04
+
+### Behoben
+
+- **„← zurück zum Energiedashboard"-Link fehlte auf der Entitätsseite unter
+  Home-Assistant-Ingress**, wenn man aus der Energiedashboard-Kachel in der
+  HA-Sidebar zum Chart einer Entität gesprungen ist. Der bisherige,
+  referrer-basierte Link (`dynamic-back-link.js`) blieb dort unsichtbar —
+  `document.referrer` ist unter dem Ingress-Iframe offenbar nicht
+  zuverlässig gesetzt. Ein zusätzlicher, serverseitig berechneter Link
+  erscheint jetzt unabhängig davon, sobald die Entität einer
+  Energiedashboard-Rolle zugeordnet ist, mit demselben Zeitraum wie die
+  aktuelle Seite.
+
+### Sonstiges
+
+- **Lizenz auf MIT umgestellt** (vorher Apache License 2.0) — passender für
+  ein Ein-Personen-Projekt ohne eigenes Patentportfolio, jetzt konsistent
+  mit der Lizenz des übergeordneten `HA-Apps`-Repositorys. Die dafür nicht
+  mehr passende `NOTICE`-Datei (Apache-2.0-spezifisches Konzept) wurde
+  entfernt, `THIRD_PARTY_LICENSES.md` entsprechend korrigiert. Die
+  eigenständig veröffentlichte HA-Zeitarchiv-Integration ist davon nicht
+  betroffen und bleibt bei Apache-2.0.
+
 ## 0.81.0 - 2026-09-04
 
 ### Neu
