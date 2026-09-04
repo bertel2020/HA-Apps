@@ -56,3 +56,7 @@ HA-Apps/
 
 Fehler und Verbesserungsvorschläge bitte über die
 [GitHub Issues](https://github.com/bertel2020/HA-Apps/issues) melden.
+
+## Lizenz
+
+[MIT](LICENSE)
