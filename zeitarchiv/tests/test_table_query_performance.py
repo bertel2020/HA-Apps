@@ -27,6 +27,7 @@ from app.storage.index import Index
 TZ = ZoneInfo("Europe/Berlin")
 COMPUTE = (ROOT / "app/static/js/table-compute.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "app/static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+FIXED_TOOLTIP = (ROOT / "app/static/js/fixed-tooltip.js").read_text(encoding="utf-8")
 TABLE_EDITOR = (ROOT / "app/templates/table_editor.html").read_text(encoding="utf-8")
 
 
@@ -158,12 +159,22 @@ def test_dashboard_tile_deviation_tooltip_escapes_tile_clipping() -> None:
     (.dtile-table-preview/.dtile-body: overflow, .tbl-preview: overflow-x:auto)
     — ein normaler CSS-::after-Tooltip (data-tooltip) würde dort abgeschnitten
     (siehe Bugreport: Tooltip lief in den überlaufenen Bereich). data-tooltip-fixed
-    plus ein JS-Popup mit position:fixed (setupFixedTooltips() in
-    dashboard-tiles.js) hängt stattdessen an document.body, außerhalb jeder
-    Beschneidung."""
+    plus ein JS-Popup mit position:fixed (fixed-tooltip.js) hängt stattdessen
+    an document.body, außerhalb jeder Beschneidung."""
     assert 'data-tooltip-fixed="${escapeHtml(deviationTitle)}"' in DASHBOARD
-    assert "function setupFixedTooltips" in DASHBOARD
+    assert "function wire" in FIXED_TOOLTIP
     assert ":data-tooltip-fixed=\"deviationTitle(row, col)\"" in TABLE_EDITOR
+
+
+def test_fixed_tooltip_script_loaded_wherever_data_tooltip_fixed_is_used() -> None:
+    """table_editor.html lädt dashboard-tiles.js NICHT (eigenständige Seite
+    ohne Kacheln) — der Abweichungs-Tooltip braucht deshalb sein eigenes,
+    von beiden Seiten geladenes Skript (fixed-tooltip.js), sonst bleibt
+    data-tooltip-fixed dort ohne jede Wirkung (Regressionsschutz für genau
+    diesen Bug: Tooltip verschwand komplett auf /tables/<id>)."""
+    for name in ("entities.html", "dashboard_detail.html", "table_editor.html"):
+        html = (ROOT / f"app/templates/{name}").read_text(encoding="utf-8")
+        assert "static/js/fixed-tooltip.js" in html, name
 
 
 def test_dashboard_only_computes_visible_table_slice() -> None:

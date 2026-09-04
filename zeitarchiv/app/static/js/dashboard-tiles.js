@@ -1080,11 +1080,6 @@
   }
 
   function setup() {
-    // Unabhängig von evtl. fehlenden Dashboard-Kacheln unten verdrahtet — auch
-    // table_editor.html lädt dieses Skript, zeigt aber selbst keine Kacheln,
-    // braucht das Abweichungs-Tooltip der Vergleichstabelle (data-tooltip-fixed)
-    // trotzdem (siehe setupFixedTooltips()-Kommentar dort).
-    setupFixedTooltips();
     const chartTiles = document.querySelectorAll('.dtile-body[data-entity-ids]');
     const tableTiles = document.querySelectorAll('.dtile-body[data-columns]');
     const entityTiles = document.querySelectorAll('.dtile-entity-body[data-entity-id]');
@@ -1112,63 +1107,12 @@
     setupAutoRefresh();
   }
 
-  // Abweichungs-Tooltip der Vergleichstabellen (data-tooltip-fixed, siehe
-  // renderTableTile() UND table_editor.html) — bewusst NICHT das generische
-  // CSS-Tooltip-System ([data-tooltip]::after, siehe app.css), weil dessen
-  // absolute Positionierung relativ zur auslösenden Zelle von
-  // .dtile-table-preview/.dtile-body (Dashboard-Kachel) bzw. .tbl-preview
-  // (volle Tabellen-Bearbeitung) abgeschnitten würde — beide scrollen/clippen
-  // per overflow, ein am Zellenrand nach rechts wachsender Tooltip lief dort
-  // in den abgeschnittenen Bereich. position:fixed mit selbst berechneten
-  // Koordinaten umgeht das, weil das erzeugte Element direkt an document.body
-  // hängt, außerhalb jeder Beschneidung. Ein einziger delegierter Listener an
-  // document.body (statt je Zelle), damit erneutes setup() nach
-  // htmx:afterSettle keine Mehrfach-Listener anhäuft (siehe
-  // fixedTooltipsWired-Guard).
-  let fixedTooltipEl = null;
-  let fixedTooltipTimer = null;
-  let fixedTooltipTarget = null;
-  let fixedTooltipsWired = false;
-
-  function hideFixedTooltip() {
-    if (fixedTooltipTimer) { clearTimeout(fixedTooltipTimer); fixedTooltipTimer = null; }
-    if (fixedTooltipEl) { fixedTooltipEl.remove(); fixedTooltipEl = null; }
-    fixedTooltipTarget = null;
-  }
-
-  function showFixedTooltip(target) {
-    const text = target.getAttribute('data-tooltip-fixed');
-    if (!text) return;
-    fixedTooltipTarget = target;
-    fixedTooltipEl = document.createElement('div');
-    fixedTooltipEl.className = 'dtile-tooltip-fixed';
-    fixedTooltipEl.textContent = text;
-    document.body.appendChild(fixedTooltipEl);
-    const rect = target.getBoundingClientRect();
-    const tipRect = fixedTooltipEl.getBoundingClientRect();
-    let left = Math.min(rect.left, window.innerWidth - tipRect.width - 8);
-    left = Math.max(8, left);
-    let top = rect.top - tipRect.height - 6;
-    if (top < 8) top = rect.bottom + 6;
-    fixedTooltipEl.style.left = `${left}px`;
-    fixedTooltipEl.style.top = `${top}px`;
-  }
-
-  function setupFixedTooltips() {
-    if (fixedTooltipsWired) return;
-    fixedTooltipsWired = true;
-    document.body.addEventListener('mouseover', (e) => {
-      const target = e.target.closest('[data-tooltip-fixed]');
-      if (!target || target === fixedTooltipTarget) return;
-      hideFixedTooltip();
-      fixedTooltipTimer = setTimeout(() => showFixedTooltip(target), 600);
-    });
-    document.body.addEventListener('mouseout', (e) => {
-      if (e.target.closest('[data-tooltip-fixed]')) hideFixedTooltip();
-    });
-    document.addEventListener('scroll', hideFixedTooltip, true);
-    window.addEventListener('resize', hideFixedTooltip);
-  }
+  // Abweichungs-Tooltip der Vergleichstabellen-Kacheln (data-tooltip-fixed,
+  // siehe renderTableTile()) — Mechanik in static/js/fixed-tooltip.js
+  // ausgelagert, weil table_editor.html (volle Tabellen-Bearbeitung, hat
+  // denselben Tooltip) dieses Skript hier NICHT lädt. Dort auch die
+  // Begründung fürs position:fixed-Vorgehen statt des generischen
+  // [data-tooltip]::after-Systems.
 
   // Lädt bereits sichtbar gewesene Kacheln periodisch neu, solange der Tab
   // sichtbar ist — vorher blieb ein offen gelassenes Dashboard beliebig lange
