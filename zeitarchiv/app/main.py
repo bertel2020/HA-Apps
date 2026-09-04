@@ -5069,11 +5069,21 @@ def tables_unpin(request: Request, table_id: int, dashboard_id: int = 1, base: s
 
 @app.get("/entities/{entity_id}", response_class=HTMLResponse)
 @_storage_locked(lambda args: args["entity_id"])
-def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
+def entity_detail(
+    request: Request,
+    entity_id: str,
+    range_key: str | None = Query(None, alias="range"),
+    offset: int = 0,
+) -> HTMLResponse:
     # "base" ist der relative Pfad zurück zur App-Wurzel — unter Ingress hat die Seite
     # einen dynamischen Pfad-Präfix, ein absoluter Pfad ("/api/query") würde daran
     # vorbeizeigen (Konzept Abschnitt 06). /entities/{id} liegt eine Ebene tief.
     entity = _require_entity(entity_id)
+    # range/offset optional per Query-Parameter — z. B. vom Energiedashboard
+    # aus verlinkt, mit dem dort gerade gewählten Zeitraum. Ungültiger/
+    # fehlender range-Wert fällt auf das Alpine-eigene Standardverhalten
+    # zurück ('day'/0, siehe entityChart()), statt eine Fehlerseite zu zeigen.
+    initial_range = range_key if range_key in query_mod.RANGE_KEYS else None
     # first_date/last_date grenzen den Kalender-Sprung (Periode-Label anklicken)
     # auf den Zeitraum ein, in dem die Entität überhaupt Daten hat — dieselbe
     # Konvention wie bei entity_cleanup() unten.
@@ -5103,6 +5113,8 @@ def entity_detail(request: Request, entity_id: str) -> HTMLResponse:
             "is_favorite": bool(entity["is_favorite"]),
             "chart_options": chart_options,
             "entity_chart_defaults": _get_entity_chart_defaults(),
+            "initial_range": initial_range,
+            "initial_offset": offset if initial_range else 0,
         },
     )
 

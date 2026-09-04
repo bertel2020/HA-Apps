@@ -378,6 +378,13 @@
     // schickt den kompletten aktuellen Stand zurück (saveChartOptions()),
     // kein separater Speichern-Button.
     const CHART_OPTIONS = {{ chart_options | tojson }};
+    // Zeitraum/Offset per Query-Parameter (?range=...&offset=...) — z. B. von
+    // einer Energiedashboard-Kachel aus verlinkt, mit dem dort gerade
+    // gewählten Zeitraum. null, wenn nicht gesetzt/ungültig (main.py
+    // validiert gegen query.RANGE_KEYS) — entityChart() bleibt dann beim
+    // bisherigen Standard ('day'/0).
+    const INITIAL_RANGE = {{ initial_range | tojson }};
+    const INITIAL_OFFSET = {{ initial_offset | tojson }};
     // Globale Startwerte (unabhängig von einer etwaigen Übersteuerung dieser
     // Entität) — Grundlage für hasCustomOptions(), das "Optionen auf Standard
     // zurücksetzen" (Aktionen) nur zeigt, wenn es dafür tatsächlich etwas zu
@@ -559,7 +566,7 @@
           {key: 'hour', label: 'Stunde'}, {key: 'day', label: 'Tag'}, {key: 'week', label: 'Woche'},
           {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}, {key: 'decade', label: 'Dekade'},
         ],
-        range: 'day',
+        range: INITIAL_RANGE || 'day',
         // chart_type "auto" (globaler Default) löst hier zum entitätstyp-
         // abhängigen DEFAULT_CHART_TYPE auf — "line"/"bar" (eigene Wahl,
         // global oder pro Entität übersteuert) gilt dagegen direkt.
@@ -576,7 +583,7 @@
         optionsMenuOpen: false,
         compareMenuOpen: false,
         raw: CHART_OPTIONS.raw,
-        offset: 0,
+        offset: INITIAL_OFFSET,
         continuous: CHART_OPTIONS.continuous,
         points: [],
         comparePoints: [],

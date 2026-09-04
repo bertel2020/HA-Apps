@@ -8,6 +8,11 @@
   <button type="button" class="btn" hx-get="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">Rollen zuordnen</button>
 </div>
 {% else %}
+{# Vor der ersten Verwendung gesetzt (Auswahlfenster für Erzeugung/Verbrauch
+   unten sowie die eigentliche KPI-Zeile brauchen beide diese Listen) — siehe
+   Kommentar bei .edash-kpi-row weiter unten. #}
+{% set erzeuger_list = config.get('erzeuger') or [] %}
+{% set verbraucher_list = config.get('verbraucher') or [] %}
 <div x-data="energieFlow()" x-init="init()">
   <div class="edash-title-row">
     <h1>Energiedashboard</h1>
@@ -247,6 +252,70 @@
      'speicherSocTrend',
      'Noch nicht genug Historie für einen Trend.') }}
 
+  {# Auswahlfenster für Erzeugung/Verbrauch/Speicher, wenn mehr als eine
+     Ziel-Entität infrage kommt (siehe Kommentar bei .edash-kpi-row unten) —
+     je eine Zeile pro Entität, führt zu deren eigenem Chart mit dem aktuell
+     gewählten Zeitraum/Offset. Nur gerendert, wenn überhaupt gebraucht (kein
+     leerer Dialog im DOM für den häufigeren Fall genau einer Quelle).
+     edash-entity-picker-dialog macht alle drei einheitlich kompakt statt der
+     .detail-dialog-Standardbreite (bis 860px, für Datenqualität/Kosten-
+     Tabellen gedacht) — hier reicht eine kurze Namensliste, dieselbe Idee
+     wie .edash-gruppen-dialog/.edash-item-dialog. #}
+  {% if erzeuger_list|length > 1 %}
+  <dialog class="detail-dialog edash-entity-picker-dialog" x-ref="erzeugerPickerDialog" aria-labelledby="erzeuger-picker-title"
+          @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <div>
+        <h2 id="erzeuger-picker-title">Erzeugung — welche Entität?</h2>
+      </div>
+      <form method="dialog"><button class="btn" aria-label="Dialog schließen">×</button></form>
+    </div>
+    <ul class="edash-entity-picker-list">
+      {% for erz in erzeuger_list %}
+      {% if erz.entity_id %}
+      <li><a :href="`{{ app_root }}/entities/{{ erz.entity_id }}?range=${range}&offset=${offset}`">{{ erz.name or erz.entity_id }}</a></li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+  </dialog>
+  {% endif %}
+
+  {% if verbraucher_list|length > 1 %}
+  <dialog class="detail-dialog edash-entity-picker-dialog" x-ref="verbraucherPickerDialog" aria-labelledby="verbraucher-picker-title"
+          @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <div>
+        <h2 id="verbraucher-picker-title">Verbrauch — welche Entität?</h2>
+      </div>
+      <form method="dialog"><button class="btn" aria-label="Dialog schließen">×</button></form>
+    </div>
+    <ul class="edash-entity-picker-list">
+      {% for verbraucher in verbraucher_list %}
+      {% if verbraucher.entity_id %}
+      <li><a :href="`{{ app_root }}/entities/{{ verbraucher.entity_id }}?range=${range}&offset=${offset}`">{{ verbraucher.name or verbraucher.entity_id }}</a></li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+  </dialog>
+  {% endif %}
+
+  {% if speicher_link_entities|length > 1 %}
+  <dialog class="detail-dialog edash-entity-picker-dialog" x-ref="speicherPickerDialog" aria-labelledby="speicher-picker-title"
+          @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <div>
+        <h2 id="speicher-picker-title">Speicher — welche Entität?</h2>
+      </div>
+      <form method="dialog"><button class="btn" aria-label="Dialog schließen">×</button></form>
+    </div>
+    <ul class="edash-entity-picker-list">
+      {% for sp in speicher_link_entities %}
+      <li><a :href="`{{ app_root }}/entities/{{ sp.entity_id }}?range=${range}&offset=${offset}`">{{ sp.name }}</a></li>
+      {% endfor %}
+    </ul>
+  </dialog>
+  {% endif %}
+
   <div class="edash-card edash-span3 edash-flow-card">
     <div class="edash-card-head">
       <div class="edash-card-title">Energiefluss</div>
@@ -301,8 +370,26 @@
       </div>
     </div>
 
+    {# Alle fünf KPI-Kacheln verlinken auf den Chart der zugrundeliegenden
+       Entität (aktueller Zeitraum/Offset übernommen). Netzbezug/Einspeisung
+       sind serverseitig immer genau eine Entität (ein Konfigurationsfeld je
+       Rolle) — direkter Link. Erzeugung/Verbrauch/Speicher können mehrere
+       Ziel-Entitäten sein: bei genau einer direkter Link
+       (single_erzeuger_id/single_verbraucher_id/single_speicher_id, siehe
+       _page_context() in energiedashboard_routes.py), bei mehreren öffnet
+       ein kleines Auswahlfenster (dasselbe <dialog>-Muster wie die
+       Trend-Popups oben), aus dem sich EINE der konfigurierten Entitäten
+       wählen lässt — sonst wäre unklar, zu welcher der Klick führen soll.
+       Speicher landet praktisch immer im Auswahlfenster-Fall: selbst ein
+       einzelner Speicher hat meist zwei Entitäten (Laden/Entladen). Ohne
+       href UND ohne @click ist <a> genau wie <div> nicht interaktiv (Fall:
+       keine einzige Quelle konfiguriert). #}
     <div class="edash-kpi-row">
-      <div class="edash-kpi has-tooltip tooltip-lines" :data-tooltip="erzeugerBreakdownText()">
+      <a class="edash-kpi has-tooltip tooltip-lines{{ ' is-pickable' if erzeuger_list|length > 1 else '' }}"
+         :data-tooltip="erzeugerBreakdownText()"
+         {% if single_erzeuger_id %}:href="`{{ app_root }}/entities/{{ single_erzeuger_id }}?range=${range}&offset=${offset}`"
+         {% elif erzeuger_list|length > 1 %}@click="$refs.erzeugerPickerDialog.showModal()"
+         {% endif %}>
         <div class="edash-kpi-accent" style="background:var(--chart-3);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
@@ -311,8 +398,11 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.erzeugung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('erzeugung')" x-text="deltaText('erzeugung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkErzeugung"></div>
-      </div>
-      <div class="edash-kpi">
+      </a>
+      <a class="edash-kpi{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
+         {% if single_verbraucher_id %}:href="`{{ app_root }}/entities/{{ single_verbraucher_id }}?range=${range}&offset=${offset}`"
+         {% elif verbraucher_list|length > 1 %}@click="$refs.verbraucherPickerDialog.showModal()"
+         {% endif %}>
         <div class="edash-kpi-accent" style="background:var(--chart-7);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
@@ -321,8 +411,9 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.verbrauch, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('verbrauch')" x-text="deltaText('verbrauch')"></div>
         <div class="edash-kpi-spark" x-ref="sparkVerbrauch"></div>
-      </div>
-      <div class="edash-kpi">
+      </a>
+      <a class="edash-kpi"
+         {% if config.netzbezug %}:href="`{{ app_root }}/entities/{{ config.netzbezug }}?range=${range}&offset=${offset}`"{% endif %}>
         <div class="edash-kpi-accent" style="background:var(--chart-1);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
@@ -331,8 +422,12 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
         <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
-      </div>
-      <div class="edash-kpi has-tooltip tooltip-lines" x-show="kpi.speicher_netto != null" :data-tooltip="speicherBreakdownText()">
+      </a>
+      <a class="edash-kpi has-tooltip tooltip-lines{{ ' is-pickable' if speicher_link_entities|length > 1 else '' }}"
+         x-show="kpi.speicher_netto != null" :data-tooltip="speicherBreakdownText()"
+         {% if single_speicher_id %}:href="`{{ app_root }}/entities/{{ single_speicher_id }}?range=${range}&offset=${offset}`"
+         {% elif speicher_link_entities|length > 1 %}@click="$refs.speicherPickerDialog.showModal()"
+         {% endif %}>
         <div class="edash-kpi-accent" style="background:var(--chart-4);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
@@ -341,8 +436,9 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.speicher_netto, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('speicher_netto')" x-text="deltaText('speicher_netto')"></div>
         <div class="edash-kpi-spark" x-ref="sparkSpeicher"></div>
-      </div>
-      <div class="edash-kpi">
+      </a>
+      <a class="edash-kpi"
+         {% if config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}?range=${range}&offset=${offset}`"{% endif %}>
         <div class="edash-kpi-accent" style="background:var(--chart-2);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
@@ -351,7 +447,7 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('einspeisung')" x-text="deltaText('einspeisung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
-      </div>
+      </a>
     </div>
 
     {# Netzenergiebilanz: Netzbezug minus Einspeisung als EIN Netto-Wert,

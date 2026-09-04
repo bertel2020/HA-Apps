@@ -298,6 +298,22 @@ def _is_configured(config: dict) -> bool:
     return bool(config.get("netzbezug"))
 
 
+def _speicher_link_entities(config: dict) -> list[dict]:
+    """Laden/Entladen-Entitäten aller konfigurierten Speicher als
+    {entity_id, name}-Liste fürs Kachel-Auswahlfenster (siehe
+    _page_context()) — dieselbe Rollen-Benennung ("(Ladung)"/"(Entladung)")
+    wie _config_entity_roles() oben, hier eigenständig, weil diese Liste nur
+    die Speicher-Rollen braucht, nicht alle Konfig-Rollen."""
+    entities: list[dict] = []
+    for sp in config.get("speicher") or []:
+        sp_name = sp.get("name") or "Speicher"
+        if sp.get("laden_entity_id"):
+            entities.append({"entity_id": sp["laden_entity_id"], "name": f"{sp_name} (Ladung)"})
+        if sp.get("entladen_entity_id"):
+            entities.append({"entity_id": sp["entladen_entity_id"], "name": f"{sp_name} (Entladung)"})
+    return entities
+
+
 def is_energiedashboard_configured(index: Index) -> bool:
     """Öffentlicher Zugriff für main.py (Dashboards-Übersicht: Status-Text der
     festen Energiedashboard-Kachel), ohne die interne Config-Struktur nach
@@ -1786,10 +1802,26 @@ class EnergieDashboardService:
 
     def _page_context(self, request: Request) -> dict:
         config = _load_config(self.deps.index)
+        erzeuger = config.get("erzeuger") or []
+        verbraucher = config.get("verbraucher") or []
+        speicher_link_entities = _speicher_link_entities(config)
         return {
             "configured": _is_configured(config),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
+            # KPI-Kacheln verlinken auf den Chart der zugrundeliegenden
+            # Entität — direkt bei GENAU einer Entität (Netzbezug/Einspeisung
+            # immer, da je ein Konfigurationsfeld je Rolle; Erzeugung/
+            # Verbrauch/Speicher nur bei genau einer konfigurierten Quelle
+            # bzw. einer einzigen Laden/Entladen-Entität über alle Speicher),
+            # sonst über ein Auswahlfenster (siehe _energiedashboard_view.html)
+            # — Speicher hat selbst bei einem einzigen konfigurierten Gerät
+            # meist zwei Entitäten (Laden/Entladen), landet also fast immer
+            # im Auswahlfenster-Fall.
+            "single_erzeuger_id": erzeuger[0].get("entity_id") if len(erzeuger) == 1 else None,
+            "single_verbraucher_id": verbraucher[0].get("entity_id") if len(verbraucher) == 1 else None,
+            "single_speicher_id": speicher_link_entities[0]["entity_id"] if len(speicher_link_entities) == 1 else None,
+            "speicher_link_entities": speicher_link_entities,
             **self.deps.app_root_context(request),
         }
 
@@ -2021,9 +2053,24 @@ class EnergieDashboardService:
             _save_config(deps.index, config)
             sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])
             deps.index.invalidate_heatmap_weekday_snapshots()
+            erzeuger = config.get("erzeuger") or []
+            verbraucher = config.get("verbraucher") or []
+            speicher_link_entities = _speicher_link_entities(config)
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_view.html",
-                {"configured": _is_configured(config), "config": config},
+                {
+                    "configured": _is_configured(config),
+                    "config": config,
+                    # Dieselbe Regel wie in _page_context() oben — sonst würden
+                    # die KPI-Kacheln-Links direkt nach dem Speichern fehlen
+                    # bzw. ohne Ingress-Präfix zeigen, bis zum nächsten vollen
+                    # Seitenaufruf.
+                    "single_erzeuger_id": erzeuger[0].get("entity_id") if len(erzeuger) == 1 else None,
+                    "single_verbraucher_id": verbraucher[0].get("entity_id") if len(verbraucher) == 1 else None,
+                    "single_speicher_id": speicher_link_entities[0]["entity_id"] if len(speicher_link_entities) == 1 else None,
+                    "speicher_link_entities": speicher_link_entities,
+                    **deps.app_root_context(request),
+                },
             )
 
         @router.get("/energiedashboard/data")

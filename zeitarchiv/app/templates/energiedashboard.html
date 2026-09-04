@@ -210,6 +210,41 @@
      App. Kein Klickziel-Anspruch (nicht alle Kacheln sind klickbar), rein
      als "die Seite reagiert" wahrgenommen. */
   .edash-kpi:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(19,28,23,.09);border-color:var(--border-strong);}
+  /* Erzeugung/Verbrauch/Netzbezug/Einspeisung sind jetzt <a>-Elemente (Link
+     zum Entitäts-Chart, siehe _energiedashboard_view.html) — ohne das hier
+     würden sie als Link-Text erscheinen (blau, unterstrichen). Nur mit
+     href tatsächlich klickbar (Erzeugung/Verbrauch bleiben ohne href, wenn
+     mehr als eine Quelle konfiguriert ist — siehe Kommentar dort). */
+  a.edash-kpi{text-decoration:none;color:inherit;}
+  /* is-pickable: Erzeugung/Verbrauch bei mehr als einer konfigurierten
+     Quelle — kein href (kein eindeutiges Linkziel), stattdessen @click, das
+     das Auswahlfenster öffnet (.edash-entity-picker-list unten). */
+  a.edash-kpi[href],a.edash-kpi.is-pickable{cursor:pointer;}
+  /* Kompakt und für alle drei Auswahlfenster (Erzeugung/Verbrauch/Speicher)
+     gleich groß statt der .detail-dialog-Standardbreite (bis 860px, für
+     Datenqualität/Kosten-Tabellen gedacht) — hier reicht eine kurze
+     Namensliste, dieselbe Idee wie .edash-item-dialog/.edash-gruppen-dialog
+     oben. Eine gemeinsame Klasse statt dreier eigener, weil alle drei
+     denselben Inhalt (Name-Liste) in derselben Größenordnung zeigen. */
+  .edash-entity-picker-dialog{width:min(280px, calc(100vw - 32px));padding:14px;}
+  /* Kompaktere Kopfzeile als der .detail-dialog-Standard (16px-Titel,
+     14px-Abstand, große "Schließen"-Pille) — für ein derart kurzes Popup
+     (Titel + Namensliste) wirkte das schwer/unpassend groß, siehe
+     Nutzer-Feedback ("gefälliger", "kompakter"). Kleinerer, dezenterer
+     ×-Button statt der vollen Pille — dieselbe method="dialog"-Semantik
+     (Enter/Escape schließen weiterhin), nur optisch zurückhaltender. */
+  .edash-entity-picker-dialog .detail-dialog-header{margin-bottom:8px;align-items:center;}
+  .edash-entity-picker-dialog .detail-dialog-header h2{font-size:calc(14.5px * var(--font-scale, 1));}
+  .edash-entity-picker-dialog .detail-dialog-header .btn{
+    padding:0;width:26px;height:26px;border-radius:50%;font-size:calc(15px * var(--font-scale, 1));
+    line-height:1;flex:none;
+  }
+  .edash-entity-picker-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;}
+  .edash-entity-picker-list a{
+    display:block;padding:8px 10px;border-radius:8px;color:var(--ink);text-decoration:none;
+    font-size:calc(13px * var(--font-scale, 1));
+  }
+  .edash-entity-picker-list a:hover{background:var(--surface-alt);}
   /* overflow:hidden oben ist für die Sparkline in der Energiefluss-Zeile
      nötig, schneidet aber den [data-tooltip]::after-Ballon ab, wenn ein
      Tooltip auf der ganzen Kachel sitzt (Kostenanalyse-Kacheln haben keine
