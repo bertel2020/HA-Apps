@@ -370,6 +370,42 @@ def test_day_offset_minus_one_shows_full_yesterday_not_today() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_same_elapsed_no_longer_truncates_the_previous_periods_own_value() -> None:
+    """Regressionstest für den "Vortag zeigt nur einen Teiltag"-Bug: eine
+    same_elapsed-Vergleichsspalte (Vortag neben Tag) muss weiterhin den
+    VOLLEN Vortag zurückgeben — der faire, auf den bisherigen Tagesverlauf
+    gekappte Vergleichswert wird separat über elapsed_seconds abgeleitet
+    (siehe _table_comparison_aggregates() in api_routes.py), nicht mehr
+    durch Kappen von points/window_end selbst."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        now = datetime(2024, 1, 15, 10, 0, 0, tzinfo=TZ)  # "Tag" ist erst 10h alt
+        hotbuffer.append(tmp, entity_id, _ts(2024, 1, 14, 8, 0), 4.0, TZ)   # gestern, vor 10 Uhr
+        hotbuffer.append(tmp, entity_id, _ts(2024, 1, 14, 20, 0), 6.0, TZ)  # gestern, NACH 10 Uhr
+
+        yesterday = query.query_series(
+            tmp, index, entity_id, "day", TZ, now, offset=-1, same_elapsed=True,
+        )
+
+        # Voller Vortag: beide Werte da, nicht nur der vor 10 Uhr.
+        assert sorted(p["value"] for p in yesterday["points"]) == [4.0, 6.0]
+        assert yesterday["window_end"] == yesterday["period_end"]
+        # 10 Stunden seit Mitternacht des laufenden Tages.
+        assert yesterday["elapsed_seconds"] == 10 * 3600
+
+        # Ohne same_elapsed identisches Verhalten wie schon immer (kein neues Feld).
+        yesterday_plain = query.query_series(tmp, index, entity_id, "day", TZ, now, offset=-1)
+        assert yesterday_plain["elapsed_seconds"] is None
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_month_offset_navigates_into_already_archived_month() -> None:
     """Der eigentliche Zweck der Navigation: ein Monat, der schon längst rotiert
     und archiviert ist, muss über offset erreichbar sein — nicht nur der laufende."""

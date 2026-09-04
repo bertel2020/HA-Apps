@@ -180,6 +180,23 @@ def _table_aggregates(result: dict) -> dict[str, float | None]:
     }
 
 
+def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None:
+    """Fairer Vergleichswert für eine abgeschlossene "Vor-"Spalte (Vortag/
+    Vorwoche/…): dieselben Punkte wie der jetzt immer vollständige
+    Hauptwert, aber zusätzlich auf denselben Abstand vom Periodenanfang
+    gekappt, den die noch laufende aktuelle Periode gerade hat
+    (elapsed_seconds, siehe query_series()) — sonst vergliche z. B. "Tag
+    bisher" unfair gegen den ganzen "Vortag" statt gegen "Vortag bis zur
+    selben Uhrzeit". None, wenn kein fairer Vergleich angefordert wurde
+    (kein same_elapsed, offset>=0, oder year_over_year)."""
+    elapsed_seconds = result.get("elapsed_seconds")
+    if elapsed_seconds is None:
+        return None
+    cutoff = result["window_start"] + elapsed_seconds
+    capped_points = [point for point in result["points"] if point["ts"] < cutoff]
+    return _table_aggregates({**result, "points": capped_points})
+
+
 def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     router = APIRouter()
     locked = lambda getter: storage_locked(deps.coordinator, getter)
@@ -495,7 +512,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         column_results = []
         for column in body.columns:
             series = []
-            window_start = window_end = period_end = None
+            window_start = window_end = period_end = elapsed_seconds = None
             is_current = True
             for entity_id in ids:
                 entity = deps.index.get_entity(entity_id)
@@ -526,18 +543,24 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     # tausenden Chart-Punkte nicht als JSON zum Browser zu
                     # schicken spart Transfer und dortige Reduktion.
                     "aggregates": _table_aggregates(result),
+                    # Fairer Vergleichswert für same_elapsed-Spalten (Vortag
+                    # bis zur selben Uhrzeit statt der ganze Vortag) — None,
+                    # wenn kein fairer Vergleich angefordert wurde.
+                    "comparison_aggregates": _table_comparison_aggregates(result),
                 })
                 if window_start is None and "window_start" in result:
                     window_start = result["window_start"]
                     window_end = result["window_end"]
                     period_end = result["period_end"]
                     is_current = result["is_current"]
+                    elapsed_seconds = result.get("elapsed_seconds")
             column_results.append({
                 "series": series,
                 "window_start": window_start,
                 "window_end": window_end,
                 "period_end": period_end,
                 "is_current": is_current,
+                "elapsed_seconds": elapsed_seconds,
             })
         return {"columns": column_results}
 

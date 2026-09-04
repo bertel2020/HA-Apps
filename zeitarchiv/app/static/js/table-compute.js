@@ -128,8 +128,17 @@ window.TableCompute = (() => {
 
   function deviationText(baseCell, comparisonCell) {
     if (!baseCell || !comparisonCell || baseCell.error || comparisonCell.error ||
-        baseCell.value == null || comparisonCell.value == null || comparisonCell.value === 0) return '';
-    const percent = (baseCell.value - comparisonCell.value) / Math.abs(comparisonCell.value) * 100;
+        baseCell.value == null || comparisonCell.value == null) return '';
+    // comparisonValue (falls vorhanden): fairer, auf denselben Zeitabstand
+    // gekappter Vergleichswert (same_elapsed, siehe memberComparisonValueFor()
+    // unten) statt des vollen, immer angezeigten Zellwerts — sonst verglicht
+    // z. B. "Tag bisher" unfair gegen den ganzen "Vortag" statt gegen "Vortag
+    // bis zur selben Uhrzeit". null (Gruppen-/Formel-/Summenzeilen, oder wenn
+    // der Server keinen same_elapsed-Vergleich geliefert hat): unverändert
+    // der volle Wert wie bisher.
+    const comparisonBase = comparisonCell.comparisonValue != null ? comparisonCell.comparisonValue : comparisonCell.value;
+    if (comparisonBase === 0) return '';
+    const percent = (baseCell.value - comparisonBase) / Math.abs(comparisonBase) * 100;
     if (!Number.isFinite(percent)) return '';
     const rounded = Math.abs(percent) >= 10 ? Math.round(percent) : Math.round(percent * 10) / 10;
     return `${rounded > 0 ? '+' : ''}${fmtNum(rounded, Number.isInteger(rounded) ? 0 : 1)} %`;
@@ -224,6 +233,20 @@ window.TableCompute = (() => {
     return isSum ? total : total / pts.length;
   }
 
+  // Fairer Vergleichswert für eine same_elapsed-Spalte (Vortag/Vorwoche/…
+  // neben Tag/Woche/…, siehe deviationText()) — server-seitig auf denselben
+  // Zeitabstand vom Periodenanfang gekappt wie die noch laufende aktuelle
+  // Periode (comparison_aggregates, siehe _table_comparison_aggregates() in
+  // api_routes.py). null, wenn der Server keinen same_elapsed-Vergleich
+  // geliefert hat — deviationText() fällt dann auf den vollen Wert zurück.
+  function memberComparisonValueFor(series, aggregation) {
+    if (series.comparison_aggregates
+        && Object.prototype.hasOwnProperty.call(series.comparison_aggregates, aggregation)) {
+      return series.comparison_aggregates[aggregation];
+    }
+    return null;
+  }
+
   // Berechnet values[colIndex][rowIndex] = {value, unit} | {error:true} | null
   // — ein gemeinsamer Request an /api/query-table für alle Spalten und
   // gebrauchten Entitäten, Formel-Zeilen danach in Zeilen-
@@ -284,7 +307,9 @@ window.TableCompute = (() => {
         if (!members.length) { values[ci][ri] = null; return; }
         const aggregation = row.aggregation || 'auto';
         const memberValues = members.map(s => memberValueFor(s, aggregation));
+        const memberComparisonValues = members.map(s => memberComparisonValueFor(s, aggregation));
         let value;
+        let comparisonValue;
         if (aggregation === 'min' || aggregation === 'max') {
           // Ein Mitglied ganz ohne Datenpunkte fließt hier NICHT als 0 ein
           // (anders als bei avg/sum/auto unten) — sonst würde eine Entität
@@ -293,13 +318,20 @@ window.TableCompute = (() => {
           const valid = memberValues.filter(v => v != null);
           if (!valid.length) { values[ci][ri] = null; return; }
           value = aggregation === 'min' ? Math.min(...valid) : Math.max(...valid);
+          const validComparison = memberComparisonValues.filter(v => v != null);
+          comparisonValue = validComparison.length
+            ? (aggregation === 'min' ? Math.min(...validComparison) : Math.max(...validComparison))
+            : null;
         } else {
           // Wie bisher: eine Gruppen-Zeile summiert die (je nach Modus schon
           // aggregierten) Mitglieder-Werte zusätzlich noch einmal auf.
           value = memberValues.reduce((a, v) => a + (v || 0), 0);
+          comparisonValue = memberComparisonValues.every(v => v == null)
+            ? null
+            : memberComparisonValues.reduce((a, v) => a + (v || 0), 0);
         }
         const memberUnits = [...new Set(members.map(member => member.unit || ''))];
-        values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : ''};
+        values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : '', comparisonValue};
       });
     });
 

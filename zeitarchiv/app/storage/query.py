@@ -655,18 +655,24 @@ def query_series(
     aggregation_type = entity["aggregation_type"]
     resolved_chart_type = _resolved_chart_type(aggregation_type, chart_type)
     now_local = now.astimezone(tz)
-    # "Gleicher Zeitpunkt"-Vergleich (Vergleichstabelle, Konzept-Erweiterung):
-    # eine VERGANGENE Periode (offset<0) auf denselben Abstand vom eigenen
-    # Anfang kappen wie die laufende Periode gerade hat — sonst vergleicht
-    # z. B. "Tag" (bisher gelaufen) unfair gegen "Vortag" (ganz). Nur für
-    # offset<0 ohne year_over_year: eine year_over_year-Spalte bekommt das
-    # bereits automatisch, da sie dieselbe (für offset=0 schon gedeckelte)
-    # Fensterberechnung nur um ein Jahr zurückschiebt (siehe unten).
+    # "Gleicher Zeitpunkt"-Vergleich (Vergleichstabelle): wie viel von der
+    # laufenden aktuellen Periode bereits vergangen ist — z. B. "Tag" steht
+    # gerade bei 14:32 Uhr. Kappt NICHT mehr das Fenster/die Punkte einer
+    # vergangenen Periode (offset<0): "Vortag" zeigt immer den vollständigen
+    # Zeitraum, der Wert selbst darf nicht stillschweigend verkürzt werden.
+    # elapsed_seconds fließt stattdessen nur noch in die Antwort ein, für
+    # einen separat berechneten, fairen Vergleichswert (siehe
+    # _table_aggregates()/"comparison" in api_routes.py) — "Tag bisher"
+    # gegen "Vortag bis zur selben Uhrzeit" statt gegen den ganzen Vortag.
+    # Nur für offset<0 ohne year_over_year: eine year_over_year-Spalte
+    # bekommt einen fairen Vergleich bereits automatisch, da sie dieselbe
+    # (für offset=0 schon gedeckelte) Fensterberechnung nur um ein Jahr
+    # zurückschiebt.
     elapsed = None
     if same_elapsed and offset < 0 and not year_over_year:
         current_start, _current_end, _current_natural = _window(range_key, now_local, 0, continuous)
         elapsed = now_local - current_start
-    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous, elapsed=elapsed)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
     if year_over_year:
         # Vorjahresvergleich verschiebt nur das Fenster um ein Jahr zurück, NICHT
         # now_local — der Rollup/Live-Split (Datei-Modulgrenze in diesem Modul,
@@ -732,6 +738,7 @@ def query_series(
         "window_end": window_end.timestamp(),
         "period_end": period_end.timestamp(),
         "is_current": offset == 0,
+        "elapsed_seconds": elapsed.total_seconds() if elapsed is not None else None,
     }
 
 

@@ -939,10 +939,19 @@
         const numberParts = TableCompute.cellNumberParts(cell, decimals, !!style.explicit_missing);
         const unit = style.show_units === false ? '' : TableCompute.cellUnit(cell);
         const comparisonIndex = TableCompute.comparisonIndexForBase(visibleCols, ci);
+        const comparisonCell = comparisonIndex >= 0 ? (values[comparisonIndex] && values[comparisonIndex][ri]) : null;
         const deviation = style.show_deviation && !row.percent_of_total && comparisonIndex >= 0
-          ? TableCompute.deviationText(cell, values[comparisonIndex] && values[comparisonIndex][ri]) : '';
+          ? TableCompute.deviationText(cell, comparisonCell) : '';
+        // Zusatzhinweis, wenn die Prozentzahl auf comparisonValue beruht (siehe
+        // deviationText()): die Zelle selbst zeigt weiterhin den vollständigen
+        // Zeitraum, nur der Vergleich ist auf "bisher vergangen" gekappt —
+        // ohne diesen Hinweis wirkt das wie ein Widerspruch zueinander.
         const deviationTitle = comparisonIndex >= 0
-          ? `Gegenüber ${TableCompute.resolveLabel(visibleCols[comparisonIndex].label, windowStarts[comparisonIndex])}` : '';
+          ? `Gegenüber ${TableCompute.resolveLabel(visibleCols[comparisonIndex].label, windowStarts[comparisonIndex])}`
+            + (comparisonCell && comparisonCell.comparisonValue != null
+              ? ' bis zur aktuellen Uhrzeit, nicht der vollständige Zeitraum (der Zellwert selbst zeigt den vollständigen Zeitraum)'
+              : '')
+          : '';
         const widthCss = col.width ? `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` : '';
         const heatmapCss = (col.heatmap && (row.row_type === 'entity' || row.row_type === 'group'))
           ? TableCompute.heatmapStyle(values[ci] && values[ci][ri], columnHeatmapRange(ci, ri)) : '';

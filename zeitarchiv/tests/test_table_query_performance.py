@@ -13,7 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.storage import hotbuffer, query
-from app.api_routes import ApiDependencies, ApiState, TableQueryRequest, create_api_router
+from app.api_routes import (
+    ApiDependencies,
+    ApiState,
+    TableQueryRequest,
+    _table_comparison_aggregates,
+    create_api_router,
+)
 from app.storage.coordinator import StorageCoordinator
 from app.storage.index import Index
 
@@ -21,6 +27,7 @@ from app.storage.index import Index
 TZ = ZoneInfo("Europe/Berlin")
 COMPUTE = (ROOT / "app/static/js/table-compute.js").read_text(encoding="utf-8")
 DASHBOARD = (ROOT / "app/static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+TABLE_EDITOR = (ROOT / "app/templates/table_editor.html").read_text(encoding="utf-8")
 
 
 def test_query_read_cache_parses_current_hot_file_once(monkeypatch, tmp_path: Path) -> None:
@@ -92,6 +99,46 @@ def test_table_batch_endpoint_returns_columns_in_request_order(tmp_path: Path) -
     assert "points" not in columns[0]["series"][0]
     assert columns[0]["window_start"] > columns[1]["window_start"]
     index.close()
+
+
+def test_table_comparison_aggregates_uses_elapsed_cutoff_not_full_period() -> None:
+    """_table_comparison_aggregates() liefert den fairen, auf elapsed_seconds
+    gekappten Vergleichswert — unabhängig davon, dass "aggregates"
+    (_table_aggregates()) für eine same_elapsed-Spalte jetzt immer den
+    vollen Zeitraum zeigt (Regressionsschutz für den "Vortag zeigt nur
+    einen Teiltag"-Bug)."""
+    result = {
+        "aggregation_type": "standard",
+        "window_start": 1000.0,
+        "elapsed_seconds": 500.0,  # Cutoff bei ts < 1500
+        "points": [
+            {"ts": 1100.0, "value": 4.0, "min": None, "max": None},
+            {"ts": 1800.0, "value": 6.0, "min": None, "max": None},
+        ],
+    }
+    comparison = _table_comparison_aggregates(result)
+    assert comparison["avg"] == 4.0  # nur der Punkt vor dem Cutoff zählt
+
+    assert _table_comparison_aggregates({**result, "elapsed_seconds": None}) is None
+
+
+def test_frontend_deviation_uses_fair_comparison_value_not_full_period() -> None:
+    """Regressionsschutz fürs Frontend-Gegenstück zum "Vortag zeigt nur einen
+    Teiltag"-Bugfix: die Prozentzahl muss comparisonValue (elapsed-gekappt)
+    nutzen, nicht den jetzt immer vollen Zellwert — sonst wäre die
+    Backend-Korrektur (comparison_aggregates) client-seitig wirkungslos."""
+    assert "comparison_aggregates" in COMPUTE
+    assert "comparisonCell.comparisonValue" in COMPUTE
+    assert "comparisonValue" in DASHBOARD
+
+
+def test_deviation_tooltip_explains_partial_comparison_window() -> None:
+    """Ohne diesen Hinweis wirkt es wie ein Widerspruch, dass die Zelle den
+    vollen Zeitraum zeigt, die daneben stehende Prozentzahl aber auf einem
+    kürzeren, bisher vergangenen Fenster beruht."""
+    assert "vollständige Zeitraum" in DASHBOARD
+    assert "deviationTitle(row, col)" in TABLE_EDITOR
+    assert "vollständige Zeitraum" in TABLE_EDITOR
 
 
 def test_dashboard_only_computes_visible_table_slice() -> None:
