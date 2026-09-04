@@ -750,9 +750,9 @@
       return;
     }
     const base = el.closest('#dashboard-grid')?.dataset.base || '.';
-    let values, windowStarts;
+    let values, windowStarts, elapsedSeconds;
     try {
-      ({values, windowStarts} = await TableCompute.computeValues(base, visibleCols, visibleRows));
+      ({values, windowStarts, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, visibleRows));
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
       return;
@@ -942,21 +942,25 @@
         const comparisonCell = comparisonIndex >= 0 ? (values[comparisonIndex] && values[comparisonIndex][ri]) : null;
         const deviation = style.show_deviation && !row.percent_of_total && comparisonIndex >= 0
           ? TableCompute.deviationText(cell, comparisonCell) : '';
-        // Zusatzhinweis, wenn die Prozentzahl auf comparisonValue beruht (siehe
-        // deviationText()): die Zelle selbst zeigt weiterhin den vollständigen
-        // Zeitraum, nur der Vergleich ist auf "bisher vergangen" gekappt —
-        // ohne diesen Hinweis wirkt das wie ein Widerspruch zueinander.
-        const deviationTitle = comparisonIndex >= 0
-          ? `Gegenüber ${TableCompute.resolveLabel(visibleCols[comparisonIndex].label, windowStarts[comparisonIndex])}`
-            + (comparisonCell && comparisonCell.comparisonValue != null
-              ? ' bis zur aktuellen Uhrzeit, nicht der vollständige Zeitraum (der Zellwert selbst zeigt den vollständigen Zeitraum)'
-              : '')
-          : '';
+        // Zusatzhinweis samt Vergleichswert, wenn die Prozentzahl auf
+        // comparisonValue beruht (siehe deviationText()): die Zelle selbst
+        // zeigt weiterhin den vollständigen Zeitraum, nur der Vergleich ist
+        // auf "bisher vergangen" gekappt — ohne Erklärung UND Zahl wirkt das
+        // wie ein Widerspruch zum vollen, daneben angezeigten Wert.
+        const comparisonLabel = comparisonIndex >= 0
+          ? TableCompute.resolveLabel(visibleCols[comparisonIndex].label, windowStarts[comparisonIndex]) : '';
+        const comparisonValueStr = comparisonIndex >= 0
+          ? TableCompute.comparisonValueText(comparisonCell, visibleCols[comparisonIndex].decimals) : '';
+        const comparisonTimeStr = comparisonIndex >= 0
+          ? TableCompute.comparisonElapsedTimeText(windowStarts[comparisonIndex], elapsedSeconds[comparisonIndex]) : null;
+        const deviationTitle = comparisonIndex < 0 ? '' : comparisonValueStr
+          ? `Gegenüber ${comparisonLabel}${comparisonTimeStr ? ` bis ${comparisonTimeStr}` : ''}: ${comparisonValueStr}`
+          : `Gegenüber ${comparisonLabel}`;
         const widthCss = col.width ? `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` : '';
         const heatmapCss = (col.heatmap && (row.row_type === 'entity' || row.row_type === 'group'))
           ? TableCompute.heatmapStyle(values[ci] && values[ci][ri], columnHeatmapRange(ci, ri)) : '';
         const cellStyleAttr = (widthCss || heatmapCss) ? ` style="${widthCss}${heatmapCss}"` : '';
-        html += `<td class="${cellClasses.join(' ')}"${cellStyleAttr}><span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole">${escapeHtml(numberParts.whole)}</span><span class="tbl-number-separator">${escapeHtml(numberParts.separator)}</span><span class="tbl-number-fraction">${escapeHtml(numberParts.fraction)}</span></span>${unit ? `<span class="tbl-cell-unit">${escapeHtml(unit)}</span>` : ''}</span>${deviation ? `<span class="tbl-cell-deviation" title="${escapeHtml(deviationTitle)}">${escapeHtml(deviation)}</span>` : ''}</td>`;
+        html += `<td class="${cellClasses.join(' ')}"${cellStyleAttr}><span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole">${escapeHtml(numberParts.whole)}</span><span class="tbl-number-separator">${escapeHtml(numberParts.separator)}</span><span class="tbl-number-fraction">${escapeHtml(numberParts.fraction)}</span></span>${unit ? `<span class="tbl-cell-unit">${escapeHtml(unit)}</span>` : ''}</span>${deviation ? `<span class="tbl-cell-deviation" data-tooltip-fixed="${escapeHtml(deviationTitle)}">${escapeHtml(deviation)}</span>` : ''}</td>`;
       });
       html += '</tr>';
     });
@@ -1076,6 +1080,11 @@
   }
 
   function setup() {
+    // Unabhängig von evtl. fehlenden Dashboard-Kacheln unten verdrahtet — auch
+    // table_editor.html lädt dieses Skript, zeigt aber selbst keine Kacheln,
+    // braucht das Abweichungs-Tooltip der Vergleichstabelle (data-tooltip-fixed)
+    // trotzdem (siehe setupFixedTooltips()-Kommentar dort).
+    setupFixedTooltips();
     const chartTiles = document.querySelectorAll('.dtile-body[data-entity-ids]');
     const tableTiles = document.querySelectorAll('.dtile-body[data-columns]');
     const entityTiles = document.querySelectorAll('.dtile-entity-body[data-entity-id]');
@@ -1101,6 +1110,64 @@
     setupDragAndDrop();
     setupLegendToggles();
     setupAutoRefresh();
+  }
+
+  // Abweichungs-Tooltip der Vergleichstabellen (data-tooltip-fixed, siehe
+  // renderTableTile() UND table_editor.html) — bewusst NICHT das generische
+  // CSS-Tooltip-System ([data-tooltip]::after, siehe app.css), weil dessen
+  // absolute Positionierung relativ zur auslösenden Zelle von
+  // .dtile-table-preview/.dtile-body (Dashboard-Kachel) bzw. .tbl-preview
+  // (volle Tabellen-Bearbeitung) abgeschnitten würde — beide scrollen/clippen
+  // per overflow, ein am Zellenrand nach rechts wachsender Tooltip lief dort
+  // in den abgeschnittenen Bereich. position:fixed mit selbst berechneten
+  // Koordinaten umgeht das, weil das erzeugte Element direkt an document.body
+  // hängt, außerhalb jeder Beschneidung. Ein einziger delegierter Listener an
+  // document.body (statt je Zelle), damit erneutes setup() nach
+  // htmx:afterSettle keine Mehrfach-Listener anhäuft (siehe
+  // fixedTooltipsWired-Guard).
+  let fixedTooltipEl = null;
+  let fixedTooltipTimer = null;
+  let fixedTooltipTarget = null;
+  let fixedTooltipsWired = false;
+
+  function hideFixedTooltip() {
+    if (fixedTooltipTimer) { clearTimeout(fixedTooltipTimer); fixedTooltipTimer = null; }
+    if (fixedTooltipEl) { fixedTooltipEl.remove(); fixedTooltipEl = null; }
+    fixedTooltipTarget = null;
+  }
+
+  function showFixedTooltip(target) {
+    const text = target.getAttribute('data-tooltip-fixed');
+    if (!text) return;
+    fixedTooltipTarget = target;
+    fixedTooltipEl = document.createElement('div');
+    fixedTooltipEl.className = 'dtile-tooltip-fixed';
+    fixedTooltipEl.textContent = text;
+    document.body.appendChild(fixedTooltipEl);
+    const rect = target.getBoundingClientRect();
+    const tipRect = fixedTooltipEl.getBoundingClientRect();
+    let left = Math.min(rect.left, window.innerWidth - tipRect.width - 8);
+    left = Math.max(8, left);
+    let top = rect.top - tipRect.height - 6;
+    if (top < 8) top = rect.bottom + 6;
+    fixedTooltipEl.style.left = `${left}px`;
+    fixedTooltipEl.style.top = `${top}px`;
+  }
+
+  function setupFixedTooltips() {
+    if (fixedTooltipsWired) return;
+    fixedTooltipsWired = true;
+    document.body.addEventListener('mouseover', (e) => {
+      const target = e.target.closest('[data-tooltip-fixed]');
+      if (!target || target === fixedTooltipTarget) return;
+      hideFixedTooltip();
+      fixedTooltipTimer = setTimeout(() => showFixedTooltip(target), 600);
+    });
+    document.body.addEventListener('mouseout', (e) => {
+      if (e.target.closest('[data-tooltip-fixed]')) hideFixedTooltip();
+    });
+    document.addEventListener('scroll', hideFixedTooltip, true);
+    window.addEventListener('resize', hideFixedTooltip);
   }
 
   // Lädt bereits sichtbar gewesene Kacheln periodisch neu, solange der Tab

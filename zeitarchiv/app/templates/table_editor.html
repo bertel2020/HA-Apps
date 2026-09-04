@@ -911,7 +911,7 @@
                   <template x-for="col in columns" :key="col.uid">
                     <td x-show="row.row_type !== 'separator' && !col.hidden" class="tbl-num" :class="{'tbl-error': cellError(row, col), 'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col) + heatmapStyleFor(row, col)">
                       <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="cellNumberParts(row, col).whole"></span><span class="tbl-number-separator" x-text="cellNumberParts(row, col).separator"></span><span class="tbl-number-fraction" x-text="cellNumberParts(row, col).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && cellUnit(row, col)" x-text="cellUnit(row, col)"></span></span>
-                      <span class="tbl-cell-deviation" x-show="style.show_deviation && !row.percent_of_total && deviationText(row, col)" :data-tooltip="deviationTitle(row, col)" x-text="deviationText(row, col)"></span>
+                      <span class="tbl-cell-deviation" x-show="style.show_deviation && !row.percent_of_total && deviationText(row, col)" :data-tooltip-fixed="deviationTitle(row, col)" x-text="deviationText(row, col)"></span>
                     </td>
                   </template>
                   <td x-show="row.row_type === 'separator'" :colspan="visibleColumnCount + 1">
@@ -1234,6 +1234,7 @@
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
         windowStarts: {},  // col.uid -> tatsächlich aufgelöster Fensterbeginn (Sekunden) | null
+        elapsedSeconds: {},  // col.uid -> same_elapsed-Kappung ab windowStarts[uid] (Sekunden) | null
         loading: false,
         saving: false,
         savedMessage: '',
@@ -1665,15 +1666,20 @@
           if (comparisonIndex < 0) return '';
           const comparisonCol = this.columns[comparisonIndex];
           const comparisonCell = this.values[comparisonCol.uid] && this.values[comparisonCol.uid][row.uid];
-          // Zusatzhinweis wie in dashboard-tiles.js: die Zelle selbst zeigt
-          // weiterhin den vollständigen Zeitraum, nur der Prozent-Vergleich
-          // ist auf "bisher vergangen" gekappt (comparisonValue, siehe
-          // TableCompute.deviationText()). Nur für Entität-/Gruppenzeilen
-          // vorhanden, siehe computeValues() in table-compute.js.
-          const suffix = comparisonCell && comparisonCell.comparisonValue != null
-            ? ' bis zur aktuellen Uhrzeit, nicht der vollständige Zeitraum (der Zellwert selbst zeigt den vollständigen Zeitraum)'
-            : '';
-          return `Gegenüber ${this.renderedColumnLabel(comparisonCol)}${suffix}`;
+          const comparisonLabel = this.renderedColumnLabel(comparisonCol);
+          // Zusatzhinweis samt Vergleichswert wie in dashboard-tiles.js: die
+          // Zelle selbst zeigt weiterhin den vollständigen Zeitraum, nur der
+          // Prozent-Vergleich ist auf "bisher vergangen" gekappt
+          // (comparisonValue, siehe TableCompute.deviationText()). Nur für
+          // Entität-/Gruppenzeilen vorhanden, siehe computeValues() in
+          // table-compute.js. Statt einer vagen Phrase ("...zum aktuellen
+          // Zeitpunkt") die tatsächliche Uhrzeit des Vergleichs-Cutoffs
+          // (windowStart + elapsedSeconds derselben Spalte).
+          const comparisonValueStr = TableCompute.comparisonValueText(comparisonCell, comparisonCol.decimals);
+          if (!comparisonValueStr) return `Gegenüber ${comparisonLabel}`;
+          const comparisonTimeStr = TableCompute.comparisonElapsedTimeText(
+            this.windowStarts[comparisonCol.uid], this.elapsedSeconds[comparisonCol.uid]);
+          return `Gegenüber ${comparisonLabel}${comparisonTimeStr ? ` bis ${comparisonTimeStr}` : ''}: ${comparisonValueStr}`;
         },
 
         // Rechenkern in static/js/table-compute.js (TableCompute.computeValues) —
@@ -1683,7 +1689,7 @@
         // hier nur die Umwandlung dorthin und die Ergebnisse zurück in
         // this.values[col.uid][row.uid].
         async load() {
-          if (!this.columns.length || !this.rows.length) { this.values = {}; this.windowStarts = {}; return; }
+          if (!this.columns.length || !this.rows.length) { this.values = {}; this.windowStarts = {}; this.elapsedSeconds = {}; return; }
           const requestId = ++this._loadSeq;
           this.loading = true;
           const plainColumns = this.columns.map(c => ({range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year}));
@@ -1691,17 +1697,20 @@
             row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
             formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
           }));
-          const {values: computed, windowStarts} = await TableCompute.computeValues(BASE, plainColumns, plainRows);
+          const {values: computed, windowStarts, elapsedSeconds} = await TableCompute.computeValues(BASE, plainColumns, plainRows);
           if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
           const newValues = {};
           const newWindowStarts = {};
+          const newElapsedSeconds = {};
           this.columns.forEach((col, ci) => {
             newValues[col.uid] = {};
             this.rows.forEach((row, ri) => { newValues[col.uid][row.uid] = computed[ci][ri]; });
             newWindowStarts[col.uid] = windowStarts[ci];
+            newElapsedSeconds[col.uid] = elapsedSeconds[ci];
           });
           this.values = newValues;
           this.windowStarts = newWindowStarts;
+          this.elapsedSeconds = newElapsedSeconds;
           this.loading = false;
         },
 

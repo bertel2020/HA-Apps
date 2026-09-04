@@ -112,6 +112,17 @@ window.TableCompute = (() => {
     return !!(col && ((col.offset || 0) < 0 || col.year_over_year));
   }
 
+  // Formatiert den fairen, elapsed-gekappten Vergleichswert einer
+  // Vergleichszelle (comparisonValue, siehe deviationText()) — für den
+  // Tooltip der Prozentzahl, damit dort nicht nur "wogegen" (Spaltenname),
+  // sondern auch "womit genau" verglichen wird sichtbar ist. Leerstring,
+  // wenn kein fairer Vergleich vorliegt (Formel-/Summenzeilen, oder kein
+  // same_elapsed angefordert) — dieselbe Bedingung wie in deviationText().
+  function comparisonValueText(comparisonCell, decimals) {
+    if (!comparisonCell || comparisonCell.comparisonValue == null) return '';
+    return cellText({value: comparisonCell.comparisonValue, unit: comparisonCell.unit}, decimals);
+  }
+
   // Zugehörige Vergleichsspalte für Tag/Monat/Jahr: gleicher Zeitraum,
   // aber mit Versatz oder Vorjahresmodus. Bewusst nur vorwärts suchen,
   // damit die Tabellenreihenfolge die visuelle Paarung bestimmt und die
@@ -264,6 +275,11 @@ window.TableCompute = (() => {
     const allEntityIds = [...new Set(entityRows.flatMap(r => r.entity_ids))];
     const values = columns.map(() => new Array(rows.length).fill(null));
     const windowStarts = columns.map(() => null);
+    // Sekunden seit windowStarts[colIndex], auf die ein same_elapsed-Vergleich
+    // gekappt wurde (siehe elapsed_seconds in query_series()/api_routes.py) —
+    // Grundlage für comparisonElapsedTimeText() unten (Uhrzeit-Anzeige im
+    // Abweichungs-Tooltip). null, wenn die Spalte ungekappt ist.
+    const elapsedSeconds = columns.map(() => null);
 
     let columnData = [];
     if (allEntityIds.length) {
@@ -299,6 +315,7 @@ window.TableCompute = (() => {
     columns.forEach((col, ci) => {
       const data = columnData[ci] || {series: []};
       windowStarts[ci] = data.window_start ?? null;
+      elapsedSeconds[ci] = data.elapsed_seconds ?? null;
       const byEntity = {};
       (data.series || []).forEach(s => { byEntity[s.entity_id] = s; });
       rows.forEach((row, ri) => {
@@ -377,7 +394,17 @@ window.TableCompute = (() => {
       });
     });
 
-    return {values, windowStarts};
+    return {values, windowStarts, elapsedSeconds};
+  }
+
+  // Uhrzeit-Text für den fairen Vergleichswert einer same_elapsed-Spalte
+  // (z. B. "bis 12:16 Uhr", siehe elapsed_seconds oben) — der tatsächliche
+  // Bezugszeitpunkt ist windowStart + elapsedSeconds derselben Spalte. null,
+  // wenn die Spalte keinen elapsed-Wert hat (kein same_elapsed-Vergleich).
+  function comparisonElapsedTimeText(windowStart, elapsedSeconds) {
+    if (windowStart == null || elapsedSeconds == null) return null;
+    const cutoff = new Date((windowStart + elapsedSeconds) * 1000);
+    return `${cutoff.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} Uhr`;
   }
 
   // Monatsnamen/-kürzel für resolveLabel() unten — dieselbe Wortwahl wie der
@@ -479,7 +506,7 @@ window.TableCompute = (() => {
 
   return {
     evalFormula, inheritedFormulaUnit, fmtNum, cellValueText, cellUnit, cellNumberParts, cellText,
-    isComparisonColumn, comparisonIndexForBase, deviationText, percentOfTotalCell, heatmapStyle,
+    isComparisonColumn, comparisonIndexForBase, deviationText, comparisonValueText, comparisonElapsedTimeText, percentOfTotalCell, heatmapStyle,
     rowLetters, computeValues, styleClasses,
     resolveLabel, LABEL_VARIABLES,
   };

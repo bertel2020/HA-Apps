@@ -136,9 +136,34 @@ def test_deviation_tooltip_explains_partial_comparison_window() -> None:
     """Ohne diesen Hinweis wirkt es wie ein Widerspruch, dass die Zelle den
     vollen Zeitraum zeigt, die daneben stehende Prozentzahl aber auf einem
     kürzeren, bisher vergangenen Fenster beruht."""
-    assert "vollständige Zeitraum" in DASHBOARD
+    assert "vollständigen Zeitraum" in DASHBOARD
     assert "deviationTitle(row, col)" in TABLE_EDITOR
-    assert "vollständige Zeitraum" in TABLE_EDITOR
+    assert "vollständigen Zeitraum" in TABLE_EDITOR
+
+
+def test_deviation_tooltip_shows_actual_reference_time_not_vague_phrase() -> None:
+    """Der Tooltip muss die tatsächliche Uhrzeit des Vergleichs-Cutoffs zeigen
+    (z. B. "Vortag bis 12:16 Uhr"), nicht die vage Phrase "bis zur aktuellen
+    Uhrzeit" — Klarstellung nach Nutzer-Feedback: gemeint ist der konkrete
+    Referenzzeitpunkt, nicht der komplette Zeitraum."""
+    assert "comparisonElapsedTimeText" in COMPUTE
+    assert "bis zur aktuellen Uhrzeit" not in DASHBOARD
+    assert "bis zur aktuellen Uhrzeit" not in TABLE_EDITOR
+    assert "comparisonElapsedTimeText" in DASHBOARD
+    assert "comparisonElapsedTimeText" in TABLE_EDITOR
+
+
+def test_dashboard_tile_deviation_tooltip_escapes_tile_clipping() -> None:
+    """Kachel- und Editor-Vorschau clippen überlaufenden Inhalt
+    (.dtile-table-preview/.dtile-body: overflow, .tbl-preview: overflow-x:auto)
+    — ein normaler CSS-::after-Tooltip (data-tooltip) würde dort abgeschnitten
+    (siehe Bugreport: Tooltip lief in den überlaufenen Bereich). data-tooltip-fixed
+    plus ein JS-Popup mit position:fixed (setupFixedTooltips() in
+    dashboard-tiles.js) hängt stattdessen an document.body, außerhalb jeder
+    Beschneidung."""
+    assert 'data-tooltip-fixed="${escapeHtml(deviationTitle)}"' in DASHBOARD
+    assert "function setupFixedTooltips" in DASHBOARD
+    assert ":data-tooltip-fixed=\"deviationTitle(row, col)\"" in TABLE_EDITOR
 
 
 def test_dashboard_only_computes_visible_table_slice() -> None:

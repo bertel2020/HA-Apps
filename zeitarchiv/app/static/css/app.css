@@ -697,6 +697,19 @@ td.mono{font-family:var(--font-mono);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
 [data-tooltip]{cursor:help;position:relative;}
+/* data-tooltip-fixed: dieselbe Optik wie [data-tooltip]::after unten, aber
+   JS-positioniert (dashboard-tiles.js setupFixedTooltips()) statt per
+   ::after/position:absolute — für Abweichungs-Tooltips innerhalb scrollender/
+   überlaufender Tabellen-Container (.dtile-table-preview, .tbl-preview), wo
+   ein ::after am Zellenrand abgeschnitten würde. Kein position:relative
+   nötig, das erzeugte Tooltip-Element hängt an document.body. */
+[data-tooltip-fixed]{cursor:help;}
+.dtile-tooltip-fixed{
+  position:fixed;background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;
+  font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);white-space:normal;
+  width:max-content;max-width:min(320px,calc(100vw - 16px));overflow-wrap:anywhere;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;z-index:1000;
+}
 /* Ein Button bleibt klickbar (Zeigefinger), auch wenn er zusätzlich einen
    Tooltip trägt — sonst würde die generische cursor:help-Regel oben einen
    eindeutig interaktiven Button fälschlich als "nur informativ" ausweisen. */
