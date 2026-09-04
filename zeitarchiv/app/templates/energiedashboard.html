@@ -276,6 +276,11 @@
       radial-gradient(120% 140% at 15% 0%, color-mix(in srgb, var(--positive) 20%, transparent), transparent 60%),
       color-mix(in srgb, var(--positive) 10%, var(--surface-alt));
     border-color:color-mix(in srgb, var(--positive) 45%, var(--border));
+    /* .edash-kpi hat overflow:hidden (fürs Sparkline-Clipping in der
+       Energiefluss-Zeile) — würde hier den halb außerhalb sitzenden Stern
+       (.edash-kpi-sparkle, top/right negativ) abschneiden. Dasselbe Muster
+       wie .edash-kpi.has-tooltip weiter unten. */
+    overflow:visible;
   }
   .edash-kpi.is-bilanz-win .edash-kpi-val{color:var(--positive);}
   .edash-kpi.is-bilanz-win .edash-kpi-label{color:color-mix(in srgb, var(--positive) 70%, var(--ink-faint));}
@@ -290,12 +295,14 @@
   }
   @keyframes edash-sparkle-in{from{transform:scale(0) rotate(-25deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
   @media (prefers-reduced-motion: reduce){.edash-kpi-sparkle{animation:none;}}
-  /* Erfolgszeile unter der Bilanz-/Saldo-Kachel — eigene, volle Grid-Zeile
-     (grid-column:1/-1) statt in eine der Kacheln hineingequetscht, da sie
-     sich auf die GANZE Reihe bezieht, nicht auf ein einzelnes Nachbarfeld. */
+  /* Erfolgszeile unter der Bilanz-/Saldo-Kachel — bewusst AUSSERHALB von
+     .edash-kpi-row als eigener Block statt als grid-column:1/-1-Kind darin
+     (siehe Kommentar im Template: das hätte in einem auto-fit-Grid das
+     Kollabieren ungenutzter Spalten verhindert und die Kacheln auf ihre
+     Mindestbreite zusammengestaucht). */
   .edash-kpi-win-note{
-    grid-column:1 / -1;display:flex;align-items:center;gap:7px;margin-top:-2px;
-    font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--positive);
+    display:flex;align-items:center;gap:7px;margin-top:10px;
+    font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--positive);
   }
   /* CO2-Chip: nur Farbe bei positiver Bilanz (co2Bilanz() < 0), bewusst OHNE
      Stern — anders als die Kachel im Dialog bleibt der Chip ein ruhiger
