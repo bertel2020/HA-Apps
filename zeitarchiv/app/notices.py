@@ -445,8 +445,8 @@ def build_notices(
                 "gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen "
                 "gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen."
             ),
-            "meta": "Entitäten",
-            "link": "/entities",
+            "meta": "Housekeeping",
+            "link": "/housekeeping#konfiguration",
         })
 
     # entities.hourly_rollup wird bereits automatisch synchron gehalten (beim
