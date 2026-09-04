@@ -45,6 +45,9 @@ der Testumgebung nicht installiert ist).
 | `test_rollup.py`, `test_rotate.py` | Bucket-Berechnung, Hot-→-Archiv-Übergang |
 | `test_retention.py`, `test_cleanup.py` | Aufbewahrung, Soft-Delete/Purge |
 | `test_backup.py`, `test_backup_scheduler.py` | Backup-Format, Restore-Validierung, Zeitplan |
+| `test_storage_coordinator.py` | `StorageCoordinator`-Sperren (Nebenläufigkeit, Timeout/`CoordinatorBusy`) |
+| `test_http_middleware.py` | Security-Header, `X-Request-ID`, Access-Log-Korrelation (globale ASGI-Middleware in `main.py`) |
+| `test_energiedashboard_config_schema.py` | `energiedashboard_config`-`schema_version` (Downgrade-Schutz) |
 | `test_security.py` | Token-Erzeugung/-Vergleich |
 | `test_paths.py` | Entity-ID-Validierung, Symlink-/Traversal-Schutz |
 | `test_csv_import.py`, `test_import_reports.py` | Import-Pipeline |
@@ -62,14 +65,15 @@ gerenderten HTML-Output, nicht clientseitiges Verhalten.
 ## `main.py`-Zeilenbudget
 
 `test_route_modules.py::test_main_keeps_external_api_and_report_routes_out_of_the_monolith`
-erzwingt `len(main.py.splitlines()) < 4_800` als Architektur-Wächter gegen
-unkontrolliertes Wachstum des Monolithen. `/api/*` (`api_routes.py`),
-Import-Reports (`report_routes.py`) und seit 0.51.0 auch der komplette
-Symcon-/CSV-/Home-Assistant-Import (`import_routes.py`) sind dafür
-ausgelagert — jeweils ein `*Dependencies`-Frozen-Dataclass plus ein
+erzwingt `len(main.py.splitlines()) < 5_800` als Architektur-Wächter gegen
+unkontrolliertes Wachstum des Monolithen (angehoben von ursprünglich 4.800
+über 5.700 auf zuletzt 5.800, siehe Git-Historie des Tests). `/api/*`
+(`api_routes.py`), Import-Reports (`report_routes.py`) und seit 0.51.0 auch
+der komplette Symcon-/CSV-/Home-Assistant-Import (`import_routes.py`) sind
+dafür ausgelagert — jeweils ein `*Dependencies`-Frozen-Dataclass plus ein
 `*Service` mit `.router()`, der die Routen als verschachtelte Closures
 registriert (siehe `ReportService`/`ImportService` als Vorlage für weitere
-Extraktionen). Stand 0.51.0: **rund 4.070 Zeilen**, Test grün. Wächst
-`main.py` wieder über das Budget, ist eine weitere Extraktion nach demselben
-Muster der richtige nächste Schritt (Kandidaten: Bereinigungs- oder
-Einstellungen-Routen) — nicht, das Limit stillschweigend hochzusetzen.
+Extraktionen). Stand 0.80.2: **rund 5.720 Zeilen**, Test grün. Wächst
+`main.py` nochmal spürbar über das Budget, ist eine eigene
+`housekeeping_routes.py` (analog zu den bereits ausgelagerten Modulen) der
+nächste Schritt, nicht ein weiteres stillschweigendes Anheben der Zahl.

@@ -106,6 +106,15 @@ Entität A darf weiterlaufen, während Entität B im Bereinigungs-Werkzeug
 bearbeitet wird. Nur echte Wartungsvorgänge (die den GESAMTEN Datenbestand
 anfassen können) pausieren alles andere.
 
+Alle drei Methoden akzeptieren seit 0.80.2 einen optionalen `timeout`
+(Default weiterhin `None` = unbegrenzt, unverändert für Backup/Retention/
+Rotation/Purge/Import). Synchrone HTTP-Routen laufen über
+`storage_locked()` (`route_support.py`) mit einem Default von 30s: hält ein
+Aufrufer eine Sperre und hängt, scheitert der wartende Request nach
+Ablauf sichtbar mit `CoordinatorBusy` (503) statt den anfragenden
+HTTP-Worker-Thread für immer zu blockieren — analog zu `IndexBusy`/
+`_TimeoutLock` beim SQLite-Index (`storage/index.py`).
+
 Diese Sperren sind **prozessintern** (In-Memory, `threading`). Es gibt genau
 einen App-Prozess pro Container — ein zweiter Prozess auf denselben Daten
 (z. B. zwei Container gegen dasselbe `/data`-Volume) würde die Coordinator-
