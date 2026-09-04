@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.80.2 - 2026-09-04
+
+### Behoben
+
+- **`StorageCoordinator` ohne Timeout** (ROADMAP.md, "Neu seit 0.76.1",
+  Punkt 1). `entity()`/`entities()`/`exclusive()` warteten bei einem
+  hängenden Halter unbegrenzt — ein synchroner HTTP-Request über
+  `storage_locked()` (jede Entität-speichern-Route) konnte dadurch für immer
+  blockieren. Neuer optionaler `timeout`-Parameter (Default weiterhin `None`
+  = unbegrenzt, für Hintergrund-Jobs wie Backup/Retention/Rotation/Purge/
+  Import unverändert) wirft nach Ablauf `CoordinatorBusy` (503 "Speicherzugriff
+  kurzzeitig ausgelastet"), analog zu `IndexBusy`. `storage_locked()` nutzt
+  jetzt standardmäßig 30s.
+- **Backup-Hintergrund-Thread ohne Lebenszeichen.** Anders als der
+  Wartungsplaner-Loop lief der Backup-Worker immer in einem eigenen,
+  losgelösten Thread — ein Hang dort (z. B. an einem Entitäts-Lock während
+  `create_source_snapshot()`) blieb komplett unbeobachtet, auch vom
+  Scheduler-Heartbeat. Neue Meldung `system.backup_worker_stalled`, analog
+  zu `system.storage_reconcile_stalled`.
+- **Kein Schema-Schutz gegen einen künftigen Downgrade** (ROADMAP.md, "Neu
+  seit 0.76.1", Punkt 3). `energiedashboard_config` trägt jetzt ein
+  `schema_version`-Feld (`CONFIG_SCHEMA_VERSION` in
+  `energiedashboard_routes.py`); fehlt es, gilt implizit Version 0 und die
+  bestehende Migration (speicher: Dict → Liste) greift unverändert weiter.
+  Liest eine künftige ältere Version eine Config mit höherer
+  `schema_version`, gibt `_load_config()` einen sicheren leeren Stand
+  zurück statt zu raten oder zu crashen, und speichert dabei nichts
+  zurück — die eigentlichen neueren Daten bleiben in der DB erhalten. Neue
+  Meldung `energiedashboard.config_from_newer_version` erklärt den Zustand.
+  Der bereits ausgelieferte 0.75.0-Fall selbst bleibt unheilbar (die alte
+  Version kennt dieses Feld nicht).
+- **`_security_headers`/`_request_logging` als `BaseHTTPMiddleware`**
+  (ROADMAP.md, "Neu seit 0.76.1", Punkt 2). Starlettes `BaseHTTPMiddleware`
+  führt Routen in einem zweiten, über einen Memory-Stream verbundenen
+  `anyio`-Task aus — ein Client-Abbruch mitten im Antwort-Versand erzeugte
+  dadurch `CancelledError`/`WouldBlock`-Tracebacks. Beide Handler sind
+  jetzt reine ASGI-Middleware-Klassen (`RequestLoggingMiddleware`/
+  `SecurityHeadersMiddleware`, über `app.add_middleware()`) — kein zweiter
+  Task mehr. `request.state.request_id` bleibt für `api_routes.py`
+  erhalten. Neue `tests/test_http_middleware.py` charakterisiert das
+  Verhalten (Security-Header, `X-Request-ID`, Access-Log-Korrelation) vor
+  und nach dem Umbau.
+
 ## 0.80.1 - 2026-09-04
 
 ### Behoben

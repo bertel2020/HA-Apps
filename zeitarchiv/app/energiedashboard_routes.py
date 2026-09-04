@@ -37,6 +37,14 @@ from .storage.index import Index
 
 SETTING_ENABLED = "energiedashboard_enabled"
 SETTING_CONFIG = "energiedashboard_config"
+# Ab dieser Version reist ein "schema_version"-Feld im SETTING_CONFIG-JSON
+# mit (siehe _load_config()/_save_config() unten) — Schutz gegen künftige
+# Formänderungen, die beim Downgrade auf eine ältere Zeitarchiv-Version
+# crashen oder falsch interpretiert werden könnten (siehe ROADMAP.md, "Neu
+# seit 0.76.1": genau das ist 0.75.0 mit der damaligen speicher-Dict→Liste-
+# Änderung passiert, siehe Migration in _load_config()). Fehlt das Feld
+# (ältere, unversionierte Configs), gilt implizit Version 0.
+CONFIG_SCHEMA_VERSION = 1
 # Zähler-Entitäten, die als Energiedashboard-Rolle konfiguriert sind, warten
 # hier auf ihren rückwirkenden Rollup-Backfill (bereits archivierte Monate),
 # bevor _wartungsplaner sie einzeln nachträgt — siehe process_pending_hourly_backfill().
@@ -159,8 +167,18 @@ def _load_config(index: Index) -> dict:
         data = json.loads(raw)
     except (TypeError, ValueError):
         return config
-    if isinstance(data, dict):
-        config.update({key: data[key] for key in config if key in data})
+    if not isinstance(data, dict):
+        return config
+    stored_schema_version = data.get("schema_version", 0)
+    if not isinstance(stored_schema_version, int) or stored_schema_version > CONFIG_SCHEMA_VERSION:
+        # Von einer neueren Zeitarchiv-Version gespeichert (Downgrade-Fall) —
+        # Felder/Formen können diesem Code unbekannt sein. Sicherer leerer
+        # Stand statt zu raten oder an einer unerwarteten Form zu crashen;
+        # da hier nicht zurückgespeichert wird, bleiben die eigentlichen,
+        # neueren Daten in der DB unangetastet (siehe notices.py,
+        # energiedashboard.config_from_newer_version).
+        return config
+    config.update({key: data[key] for key in config if key in data})
     # Migration: "speicher" war früher ein einzelnes Objekt (oder None), ist
     # jetzt eine Liste (mehrere Speicher gleichzeitig). Ältere gespeicherte
     # Configs bekommen ihren einen Speicher automatisch als Ein-Element-Liste
@@ -173,7 +191,10 @@ def _load_config(index: Index) -> dict:
 
 
 def _save_config(index: Index, config: dict) -> None:
-    index.set_setting(SETTING_CONFIG, json.dumps(config, ensure_ascii=False))
+    index.set_setting(
+        SETTING_CONFIG,
+        json.dumps({**config, "schema_version": CONFIG_SCHEMA_VERSION}, ensure_ascii=False),
+    )
 
 
 def sync_hourly_rollup_flags(index: Index, role_entity_ids: list[str]) -> None:

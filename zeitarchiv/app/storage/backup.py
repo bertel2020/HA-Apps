@@ -84,6 +84,7 @@ def create_source_snapshot(
     snapshot_dir: Path,
     entity_ids: list[str],
     coordinator: StorageCoordinator,
+    on_entity_done: Callable[[int, int], None] | None = None,
 ) -> None:
     """Kopiert eine stabile Backup-Quelle mit kurzen, gezielten Sperren.
 
@@ -95,6 +96,12 @@ def create_source_snapshot(
     Der SQLite-Index kann gegenüber später kopierten Entitäten einen etwas
     älteren Stand enthalten. Er ist ein abgeleiteter Cache und wird nach einem
     Restore beim Start ohnehin gegen die kopierten Dateien reconciliert.
+
+    on_entity_done(done, total) wird nach jeder kopierten Entität aufgerufen —
+    analog zu on_progress in create_backup(), hier als Lebenszeichen für den
+    Backup-Hintergrund-Thread gedacht (siehe _last_backup_worker_tick in
+    main.py): genau die Phase, in der ein hängendes Entitäts-Lock sonst
+    unbeobachtet bliebe.
     """
     if snapshot_dir.exists():
         raise ValueError("Backup-Snapshot-Verzeichnis existiert bereits")
@@ -116,7 +123,7 @@ def create_source_snapshot(
             shutil.copy2(names_path, snapshot_dir / names_path.name)
 
     hot_root = storage_area_dir(data_dir, "hot")
-    for entity_id in ids:
+    for done, entity_id in enumerate(ids, start=1):
         with coordinator.entity(entity_id):
             _copy_tree(
                 entity_dir(data_dir, "archive", entity_id),
@@ -133,6 +140,8 @@ def create_source_snapshot(
                         continue
                     hot_destination.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(source, hot_destination / source.name)
+        if on_entity_done is not None:
+            on_entity_done(done, len(ids))
 
 
 def resolve_backup_path(backups_dir: Path, filename: str) -> Path | None:

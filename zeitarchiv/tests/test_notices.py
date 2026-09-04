@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import tempfile
@@ -11,7 +12,9 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG
 from app.notices import (
+    BACKUP_WORKER_STALLED_SECONDS,
     RECONCILE_STALLED_SECONDS,
     SCHEDULER_STALLED_SECONDS,
     build_notices,
@@ -182,6 +185,141 @@ def test_reconcile_stalled_notice_absent_when_not_in_progress_despite_old_tick()
 
         ids = [n["id"] for n in notices]
         assert "system.storage_reconcile_stalled" not in ids
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_backup_worker_stalled_notice_appears_when_tick_is_old_and_in_progress() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            backup_worker_last_tick=time.time() - BACKUP_WORKER_STALLED_SECONDS - 1,
+            backup_worker_in_progress=True,
+        )
+
+        ids = [n["id"] for n in notices]
+        assert "system.backup_worker_stalled" in ids
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_backup_worker_stalled_notice_absent_when_tick_is_recent() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            backup_worker_last_tick=time.time(),
+            backup_worker_in_progress=True,
+        )
+
+        ids = [n["id"] for n in notices]
+        assert "system.backup_worker_stalled" not in ids
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_backup_worker_stalled_notice_absent_when_not_in_progress_despite_old_tick() -> None:
+    """Wie bei system.storage_reconcile_stalled: nach einem abgeschlossenen
+    (oder noch nie gestarteten) Backup bleibt der letzte Tick stehen — ohne
+    backup_worker_in_progress würde die Meldung sonst dauerhaft fälschlich
+    weiterfeuern."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            backup_worker_last_tick=time.time() - BACKUP_WORKER_STALLED_SECONDS - 1,
+            backup_worker_in_progress=False,
+        )
+
+        ids = [n["id"] for n in notices]
+        assert "system.backup_worker_stalled" not in ids
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_energiedashboard_config_from_newer_version_notice_appears() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        index.set_setting(
+            SETTING_CONFIG,
+            json.dumps({"schema_version": CONFIG_SCHEMA_VERSION + 1}),
+        )
+
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+        )
+
+        ids = [n["id"] for n in notices]
+        assert "energiedashboard.config_from_newer_version" in ids
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_energiedashboard_config_from_newer_version_notice_absent_for_current_or_legacy() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        # Aktuelle Version UND eine Config ganz ohne schema_version (Stand
+        # vor der Versionierung) dürfen die Meldung beide nicht auslösen.
+        index.set_setting(
+            SETTING_CONFIG,
+            json.dumps({"schema_version": CONFIG_SCHEMA_VERSION}),
+        )
+
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+        )
+
+        ids = [n["id"] for n in notices]
+        assert "energiedashboard.config_from_newer_version" not in ids
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -22,14 +22,15 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     assert '@app.get("/reports")' not in main
     assert "create_api_router" in main
     assert "ReportService" in main
-    # War 4.800, angehoben nach dem Housekeeping-Bereich (0.75.0: eigene
-    # Route + Context-Builder, Meldungen-/Tipps-Infrastruktur, Guardrail-
-    # Logik) — bewusst mit Puffer statt exakt auf den aktuellen Stand (5.490),
-    # damit nicht jede Kleinigkeit die Grenze reißt. Wächst main.py nochmal
+    # War 4.800, dann 5.700 (Housekeeping-Bereich, 0.75.0), jetzt 5.800 nach
+    # CoordinatorBusy-Handler + Backup-Worker-Heartbeat (Roadmap "Neu seit
+    # 0.76.1", Punkt 1: coordinator.entity()/entities() ohne Timeout) —
+    # bewusst mit Puffer statt exakt auf den aktuellen Stand (~5.720), damit
+    # nicht jede Kleinigkeit die Grenze reißt. Wächst main.py nochmal
     # spürbar, ist eine eigene housekeeping_routes.py (analog zu
     # api_routes.py/report_routes.py/import_routes.py) der nächste Schritt,
     # nicht ein weiteres Anheben dieser Zahl.
-    assert len(main.splitlines()) < 5_700
+    assert len(main.splitlines()) < 5_800
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:
@@ -51,4 +52,4 @@ def test_report_router_is_independent_and_route_locking_is_shared() -> None:
     assert "class ReportDependencies" in reports
     assert "from .main import" not in reports
     assert "def storage_locked" in support
-    assert "with coordinator.entities(entity_ids):" in support
+    assert "with coordinator.entities(entity_ids, timeout=timeout):" in support

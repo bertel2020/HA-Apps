@@ -40,6 +40,8 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.datastructures import MutableHeaders
+from starlette.types import Receive, Scope, Send
 
 from .formatting import (
     BACKUP_KEEP_COUNT_LABELS,
@@ -111,7 +113,7 @@ from .storage.index import (
     InvalidNameError,
 )
 from .storage.ingestion import IngestionService
-from .storage.coordinator import StorageCoordinator
+from .storage.coordinator import CoordinatorBusy, StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
@@ -330,6 +332,7 @@ def _notices_context(request: Request) -> dict:
             index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
             _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
             _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
+            _last_backup_worker_tick, _backup_progress.running,
         ),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
     }
@@ -342,52 +345,87 @@ templates = Jinja2Templates(
 )
 
 
-@app.middleware("http")
-async def _request_logging(request: Request, call_next):
-    started = time.perf_counter()
-    request_id = secrets.token_hex(6)
-    request.state.request_id = request_id
-    try:
-        response = await call_next(request)
-    except Exception:
+class RequestLoggingMiddleware:
+    """Reine ASGI-Middleware statt BaseHTTPMiddleware (siehe ROADMAP.md,
+    "Neu seit 0.76.1", Punkt 2) — BaseHTTPMiddleware führt die eigentliche
+    Route in einem zweiten, über einen Memory-Stream verbundenen anyio-Task
+    aus; bricht der Client mitten im Antwort-Versand ab, erzeugte genau das
+    CancelledError/WouldBlock-Tracebacks ("Exception in ASGI application").
+    Reines ASGI kennt diesen zweiten Task nicht, das Problem entfällt
+    strukturell. request.state.request_id bleibt erhalten (dieselbe scope,
+    api_routes.py liest es zur Ingest-Log-Korrelation) — muss VOR dem
+    Aufruf der inneren App gesetzt werden, damit die Route es sieht."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = time.perf_counter()
+        request_id = secrets.token_hex(6)
+        scope.setdefault("state", {})["request_id"] = request_id
+        status_code = 500
+
+        async def send_wrapper(message) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                MutableHeaders(scope=message)["X-Request-ID"] = request_id
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception:
+            log_http_request(
+                scope["method"], scope["path"], 500,
+                (time.perf_counter() - started) * 1000, request_id=request_id,
+            )
+            raise
         log_http_request(
-            request.method,
-            request.url.path,
-            500,
-            (time.perf_counter() - started) * 1000,
-            request_id=request_id,
+            scope["method"], scope["path"], status_code,
+            (time.perf_counter() - started) * 1000, request_id=request_id,
         )
-        raise
-    response.headers["X-Request-ID"] = request_id
-    log_http_request(
-        request.method,
-        request.url.path,
-        response.status_code,
-        (time.perf_counter() - started) * 1000,
-        request_id=request_id,
-    )
-    return response
 
 
-@app.middleware("http")
-async def _security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; "
-        "img-src 'self' data:; connect-src 'self'; "
-        "font-src 'self' https://fonts.gstatic.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        # Alpine.js' Standard-Build kompiliert x-* Ausdrücke über
-        # AsyncFunction und benötigt deshalb unsafe-eval. unsafe-inline wird
-        # für die bestehenden seitenlokalen Skripte/Handler benötigt. Externe
-        # Skriptquellen bleiben trotzdem vollständig auf 'self' begrenzt.
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-    )
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Referrer-Policy"] = "same-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    return response
+class SecurityHeadersMiddleware:
+    """Reine ASGI-Middleware statt BaseHTTPMiddleware — siehe
+    RequestLoggingMiddleware oben für die Begründung."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["Content-Security-Policy"] = (
+                    "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; "
+                    "img-src 'self' data:; connect-src 'self'; "
+                    "font-src 'self' https://fonts.gstatic.com; "
+                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                    # Alpine.js' Standard-Build kompiliert x-* Ausdrücke über
+                    # AsyncFunction und benötigt deshalb unsafe-eval. unsafe-inline wird
+                    # für die bestehenden seitenlokalen Skripte/Handler benötigt. Externe
+                    # Skriptquellen bleiben trotzdem vollständig auf 'self' begrenzt.
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+                )
+                headers["X-Content-Type-Options"] = "nosniff"
+                headers["X-Frame-Options"] = "SAMEORIGIN"
+                headers["Referrer-Policy"] = "same-origin"
+                headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 
 
@@ -569,6 +607,7 @@ app.include_router(
                 index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
                 _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
                 _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
+                _last_backup_worker_tick, _backup_progress.running,
             ),
         ),
         _api_state,
@@ -625,6 +664,16 @@ async def _index_busy_handler(_request: Request, exc: IndexBusy) -> JSONResponse
     return JSONResponse(
         status_code=503,
         content={"detail": "Datenbank kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
+    )
+
+
+@app.exception_handler(CoordinatorBusy)
+async def _coordinator_busy_handler(_request: Request, exc: CoordinatorBusy) -> JSONResponse:
+    """Wie _index_busy_handler, aber für den Storage-Coordinator statt des
+    Index-Locks (siehe CoordinatorBusy/storage_locked() in route_support.py)."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Speicherzugriff kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
     )
 
 
@@ -1553,6 +1602,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
         index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
         _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
         _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
+        _last_backup_worker_tick, _backup_progress.running,
     )
     return {"success": True, "remaining_count": len(remaining)}
 
@@ -2121,6 +2171,12 @@ class _BackupProgress:
 
 
 _backup_progress = _BackupProgress()
+# Lebenszeichen des Backup-Hintergrund-Threads — analog zu _last_reconcile_tick
+# oben, aber für create_source_snapshot()/create_backup(): dieser Thread läuft
+# IMMER losgelöst vom Wartungsplaner (auch bei geplanten Backups), ein Hang an
+# einem Entitäts-Lock bliebe also vom Scheduler-Heartbeat unentdeckt. Nur
+# relevant, während _backup_progress.running True ist (siehe notices.py).
+_last_backup_worker_tick = time.time()
 
 
 def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | None = None) -> bool:
@@ -2148,12 +2204,20 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
     )
 
     def on_progress(done: int, total: int) -> None:
+        global _last_backup_worker_tick
         with _backup_progress.lock:
             _backup_progress.done = done
             _backup_progress.total = total
+        _last_backup_worker_tick = time.time()
+
+    def on_entity_snapshot_done(done: int, total: int) -> None:
+        global _last_backup_worker_tick
+        _last_backup_worker_tick = time.time()
 
     def worker() -> None:
+        global _last_backup_worker_tick
         started_at = time.time()
+        _last_backup_worker_tick = started_at
         index.update_backup_job(job_id, status="running", started_at=started_at)
         snapshot_dir = BACKUPS_DIR / f".backup-source-{job_id}-{secrets.token_hex(6)}"
         try:
@@ -2165,6 +2229,7 @@ def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | No
                 snapshot_dir,
                 entity_ids,
                 storage_coordinator,
+                on_entity_done=on_entity_snapshot_done,
             )
             with _backup_progress.lock:
                 _backup_progress.total = backup.estimate_file_count(snapshot_dir)

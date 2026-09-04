@@ -28,7 +28,7 @@ from zoneinfo import ZoneInfo
 from . import ha_integration
 from . import tips as tips_mod
 from . import version_check
-from .energiedashboard_routes import SETTING_HOURLY_BACKFILL_PENDING
+from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETTING_HOURLY_BACKFILL_PENDING
 from .formatting import GAP_THRESHOLD_LABELS, format_int, format_resolution, format_size
 from .index_optimization import get_index_optimization_state
 from .report_routes import SOURCE_LABELS
@@ -52,6 +52,12 @@ SCHEDULER_STALLED_SECONDS = 5 * 60
 # deadlock-artigen Zustand zeitnah zu erkennen, der 0.76.0 bereits den
 # Wartungsplaner unsichtbar hängen ließ.
 RECONCILE_STALLED_SECONDS = 5 * 60
+# Anders als Wartungsplaner/Hintergrundabgleich läuft der Backup-Worker immer
+# in einem eigenen, vom Wartungsplaner losgelösten Thread (siehe main.py,
+# _run_backup_background()) — dessen eigener Heartbeat _last_scheduler_tick
+# bliebe von einem Hang dort also unberührt und würde ihn nie melden. Gleicher
+# Schwellwert wie oben, aus denselben Gründen.
+BACKUP_WORKER_STALLED_SECONDS = 5 * 60
 # Eskalierende Schwellwerte statt eines einzelnen — je länger eine Entität
 # schon schweigt, desto ernster die Severity. Bänder sind exklusiv (siehe
 # _bucket_inactive_entities): dieselbe Entität zählt nie in mehr als einer
@@ -128,6 +134,8 @@ def build_notices(
     reconcile_last_tick: float,
     reconcile_in_progress: bool,
     host_disk_usage: dict | None = None,
+    backup_worker_last_tick: float | None = None,
+    backup_worker_in_progress: bool = False,
 ) -> list[dict]:
     """Ungefilterte, aktuell aktive Meldungen — auch stummgeschaltete sind
     hier noch enthalten (main.py braucht das z. B. beim Stummschalten selbst,
@@ -135,15 +143,19 @@ def build_notices(
     vertrauen). Für die Anzeige in der Topnav siehe collect_notices().
 
     purge_totals/storage_reconcile/stale_entity_count/scheduler_last_tick/
-    reconcile_last_tick/reconcile_in_progress/host_disk_usage kommen von
-    main.py (jeweils aus bereits vorhandenen, günstigen Quellen:
-    _load_purge_preview(), dem In-Prozess-Zustand _storage_reconcile_last,
-    _count_stale_entities(), _last_scheduler_tick, _last_reconcile_tick,
-    _reconcile_in_progress(), _host_disk_usage_cached) statt hier selbst
-    gelesen zu werden — vermeidet zweite, abweichende Kopien dieser
-    main.py-spezifischen Zugriffe in diesem Modul. host_disk_usage ist
-    {"free": int, "total": int} in Bytes oder None (z. B. wenn der
-    Scheduler noch nicht gelaufen ist oder shutil.disk_usage fehlschlug)."""
+    reconcile_last_tick/reconcile_in_progress/host_disk_usage/
+    backup_worker_last_tick/backup_worker_in_progress kommen von main.py
+    (jeweils aus bereits vorhandenen, günstigen Quellen: _load_purge_preview(),
+    dem In-Prozess-Zustand _storage_reconcile_last, _count_stale_entities(),
+    _last_scheduler_tick, _last_reconcile_tick, _reconcile_in_progress(),
+    _host_disk_usage_cached, _last_backup_worker_tick, _backup_progress.running)
+    statt hier selbst gelesen zu werden — vermeidet zweite, abweichende
+    Kopien dieser main.py-spezifischen Zugriffe in diesem Modul.
+    host_disk_usage ist {"free": int, "total": int} in Bytes oder None (z. B.
+    wenn der Scheduler noch nicht gelaufen ist oder shutil.disk_usage
+    fehlschlug). backup_worker_last_tick ist None, solange noch nie ein
+    Backup gestartet wurde (dann kann auch backup_worker_in_progress nicht
+    True sein)."""
     notices: list[dict] = []
 
     latest_version = version_check.latest_known_version(index)
@@ -257,6 +269,28 @@ def build_notices(
             "meta": "Diagnose",
             "link": "/settings#diagnose",
         })
+
+    # Analog zu system.storage_reconcile_stalled oben, aber für den
+    # Backup-Hintergrund-Thread (siehe _last_backup_worker_tick in main.py) —
+    # dessen Hang bliebe anders als beim Wartungsplaner-Loop selbst vom
+    # Scheduler-Heartbeat unbemerkt, weil der Backup-Worker immer in einem
+    # eigenen, losgelösten Thread läuft. Nur relevant, während ein Backup
+    # laut _backup_progress.running tatsächlich noch laufen sollte.
+    if backup_worker_in_progress and backup_worker_last_tick is not None:
+        backup_worker_idle_seconds = time.time() - backup_worker_last_tick
+        if backup_worker_idle_seconds > BACKUP_WORKER_STALLED_SECONDS:
+            notices.append({
+                "id": "system.backup_worker_stalled",
+                "severity": "warn",
+                "title": "Backup reagiert nicht",
+                "detail": (
+                    f"Seit {round(backup_worker_idle_seconds / 60)} Minuten kein "
+                    "Fortschritt beim laufenden Backup — möglicherweise an einer "
+                    "Entitäts-Sperre hängengeblieben."
+                ),
+                "meta": "Diagnose",
+                "link": "/settings#diagnose",
+            })
 
     # IndexBusy-Vorkommen (siehe _TimeoutLock in index.py) — heilt sich
     # selbst, bliebe sonst aber unbemerkt. Bewusst nur info: ein einzelnes
@@ -438,6 +472,35 @@ def build_notices(
                 f"{pending_count} Zähler-Entität{'en holen' if pending_count != 1 else ' holt'} im "
                 "Energiedashboard gerade rückwirkend ihr Stunden-Rollup für bereits archivierte Monate "
                 "nach — das Tageslastprofil nach Wochentag kann bis dahin für ältere Monate unvollständig sein."
+            ),
+            "meta": "Energiedashboard",
+            "link": "/energiedashboard",
+        })
+
+    # Downgrade-Schutz (siehe ROADMAP.md "Neu seit 0.76.1", Punkt 3 /
+    # CONFIG_SCHEMA_VERSION in energiedashboard_routes.py): _load_config()
+    # behandelt eine Config mit unbekannt hoher schema_version bereits
+    # sicher als leer statt zu raten — diese Meldung erklärt nur, WARUM die
+    # Energiedashboard-Einstellungen gerade leer wirken, statt das wie
+    # stillen Datenverlust aussehen zu lassen.
+    try:
+        stored_energiedashboard_config = json.loads(index.get_setting(SETTING_CONFIG, "{}"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        stored_energiedashboard_config = {}
+    stored_config_schema_version = (
+        stored_energiedashboard_config.get("schema_version", 0)
+        if isinstance(stored_energiedashboard_config, dict) else 0
+    )
+    if isinstance(stored_config_schema_version, int) and stored_config_schema_version > CONFIG_SCHEMA_VERSION:
+        notices.append({
+            "id": "energiedashboard.config_from_newer_version",
+            "severity": "warn",
+            "title": "Energiedashboard-Konfiguration von neuerer Version",
+            "detail": (
+                "Die gespeicherte Energiedashboard-Konfiguration wurde von einer neueren "
+                "Zeitarchiv-Version geschrieben und wird von dieser Version sicherheitshalber "
+                "als leer behandelt, statt sie falsch zu interpretieren. Ein Update auf die "
+                "neuere Version stellt die eigentlichen Einstellungen wieder her."
             ),
             "meta": "Energiedashboard",
             "link": "/energiedashboard",
@@ -712,6 +775,8 @@ def collect_notices(
     reconcile_last_tick: float,
     reconcile_in_progress: bool,
     host_disk_usage: dict | None = None,
+    backup_worker_last_tick: float | None = None,
+    backup_worker_in_progress: bool = False,
 ) -> list[dict]:
     """Für die Anzeige in der Topnav — build_notices() abzüglich aktuell
     gültiger Stummschaltungen (beim Tipp bereits durch _current_tip_notice
@@ -722,6 +787,7 @@ def collect_notices(
         notice for notice in build_notices(
             index, index_path, tz, purge_totals, storage_reconcile, stale_entity_count,
             scheduler_last_tick, reconcile_last_tick, reconcile_in_progress, host_disk_usage,
+            backup_worker_last_tick, backup_worker_in_progress,
         )
         if not _is_muted(notice, mutes.get(notice["id"]), now)
     ]

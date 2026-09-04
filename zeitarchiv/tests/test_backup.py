@@ -197,6 +197,33 @@ def test_source_snapshot_contains_stable_backup_entries() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_source_snapshot_reports_progress_per_entity() -> None:
+    """on_entity_done ist das Lebenszeichen für _last_backup_worker_tick in
+    main.py (siehe Roadmap "Neu seit 0.76.1", Punkt 1) — muss nach jeder
+    Entität aufgerufen werden, nicht erst am Ende."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-backup-snapshot-test-"))
+    index = Index(tmp / "index.sqlite")
+    try:
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
+        index.get_or_create_entity("sensor.b", "sensor", "measurement", "°C")
+        _write(tmp / "archive" / "sensor.a" / "2024-01.parquet", "a")
+        _write(tmp / "archive" / "sensor.b" / "2024-01.parquet", "b")
+
+        calls: list[tuple[int, int]] = []
+        backup.create_source_snapshot(
+            tmp,
+            tmp / "snapshot",
+            ["sensor.a", "sensor.b"],
+            StorageCoordinator(),
+            on_entity_done=lambda done, total: calls.append((done, total)),
+        )
+
+        assert calls == [(1, 2), (2, 2)]
+    finally:
+        index.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_cleanup_stale_source_snapshots_only_removes_internal_directories() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-backup-cleanup-test-"))
     try:

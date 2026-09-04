@@ -9,6 +9,11 @@ from pathlib import Path
 
 from .storage.coordinator import StorageCoordinator
 
+# Default-Zeitbudget für storage_locked() — deutlich großzügiger als
+# INDEX_LOCK_TIMEOUT_SECONDS (8s), weil ein Coordinator-Lock legitim länger
+# von einem laufenden Backup/Import gehalten werden kann als das SQLite-Lock.
+STORAGE_LOCKED_TIMEOUT_SECONDS = 30.0
+
 
 class UploadLimitExceeded(ValueError):
     """Ein Upload überschreitet sein festgelegtes Größenlimit."""
@@ -51,8 +56,16 @@ def dir_size(path: Path) -> int:
 def storage_locked(
     coordinator: StorageCoordinator,
     entity_ids_getter: Callable[[dict], str | Iterable[str]],
+    timeout: float | None = STORAGE_LOCKED_TIMEOUT_SECONDS,
 ):
-    """Serialisiert einen synchronen Handler für seine betroffenen Entitäten."""
+    """Serialisiert einen synchronen Handler für seine betroffenen Entitäten.
+
+    timeout begrenzt hier bewusst, anders als bei den Hintergrund-Jobs
+    (Backup/Retention/Rotation/Purge/Import, die coordinator.entities()
+    weiterhin ohne timeout aufrufen): ein hängender Halter des Coordinator-
+    Locks würde sonst den anfragenden HTTP-Worker-Thread für immer blockieren
+    statt nach STORAGE_LOCKED_TIMEOUT_SECONDS mit CoordinatorBusy (503, siehe
+    main.py) sichtbar und wiederholbar zu scheitern."""
 
     def decorate(func):
         signature = inspect.signature(func)
@@ -63,7 +76,7 @@ def storage_locked(
             bound.apply_defaults()
             resolved = entity_ids_getter(bound.arguments)
             entity_ids = [resolved] if isinstance(resolved, str) else list(resolved)
-            with coordinator.entities(entity_ids):
+            with coordinator.entities(entity_ids, timeout=timeout):
                 return func(*args, **kwargs)
 
         return wrapped
