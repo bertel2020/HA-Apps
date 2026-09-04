@@ -2162,6 +2162,7 @@ class EnergieDashboardService:
                 {
                     "config": config,
                     "range": range,
+                    "offset": offset,
                     "range_label": RANGE_LABELS[range],
                     "period_title": period_title,
                     "period_range_text": period_range_text,

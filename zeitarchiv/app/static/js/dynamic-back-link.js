@@ -56,6 +56,12 @@
 
     container.appendChild(document.createTextNode(' · '));
     const a = document.createElement('a');
+    // document.referrer trägt inzwischen selbst den zuletzt gewählten
+    // Zeitraum/Offset, sofern die Herkunftsseite ihn in die URL spiegelt
+    // (siehe syncUrlWithPeriod() in energiedashboard.js) — ein normaler
+    // Link-Klick landet dadurch wieder genau dort, ohne auf Browser-
+    // Verlauf/bfcache angewiesen zu sein (funktioniert auch in einem neuen
+    // Tab oder nach einem harten Reload).
     a.href = document.referrer;
     a.textContent = '← zurück ' + match.text;
     container.appendChild(a);

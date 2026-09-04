@@ -190,11 +190,40 @@
   let lastSankeyIsNarrow = null;
   let currentRenderChart = null;
 
+  // Zeitraum/Offset spiegeln sich in der URL (?range=...&offset=...) statt
+  // nur im Alpine-Zustand — sonst würde ein "zurück zum Energiedashboard"-
+  // Link von einer Entitäts-Seite aus (siehe dynamic-back-link.js) immer auf
+  // der Standardansicht ('Tag', heute) landen, egal welchen Zeitraum man
+  // vorher gewählt hatte: der Link zeigt ja nur auf die URL, und die kannte
+  // bisher gar keinen Zeitraum. replaceState statt pushState — jeder
+  // Perioden-Klick soll die eine Dashboard-Seite im Verlauf ERSETZEN, nicht
+  // einen eigenen Schritt anlegen (sonst müsste man sich durch jede einzelne
+  // Vor/Zurück-Navigation zurückklicken, um die Seite zu verlassen).
+  const RANGE_KEYS = ['hour', 'day', 'month', 'year'];
+
+  function readInitialRangeOffset() {
+    const params = new URLSearchParams(window.location.search);
+    const range = params.get('range');
+    const offset = parseInt(params.get('offset'), 10);
+    return {
+      range: RANGE_KEYS.includes(range) ? range : 'day',
+      offset: Number.isInteger(offset) ? offset : 0,
+    };
+  }
+
+  function syncUrlWithPeriod(range, offset) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('range', range);
+    url.searchParams.set('offset', String(offset));
+    history.replaceState(null, '', url);
+  }
+
   window.energieFlow = function energieFlow() {
+    const initialPeriod = readInitialRangeOffset();
     return {
       ranges: [{key: 'hour', label: 'Stunde'}, {key: 'day', label: 'Tag'}, {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}],
-      range: 'day',
-      offset: 0,
+      range: initialPeriod.range,
+      offset: initialPeriod.offset,
       loading: false,
       loadError: false,
       kpi: {},
@@ -290,10 +319,16 @@
         if (key === this.range && this.offset === 0) return;
         this.range = key;
         this.offset = 0;
+        syncUrlWithPeriod(this.range, this.offset);
         this.load();
       },
-      goBack() { this.offset -= 1; this.load(); },
-      goForward() { if (this.canGoForward) { this.offset += 1; this.load(); } },
+      goBack() { this.offset -= 1; syncUrlWithPeriod(this.range, this.offset); this.load(); },
+      goForward() {
+        if (!this.canGoForward) return;
+        this.offset += 1;
+        syncUrlWithPeriod(this.range, this.offset);
+        this.load();
+      },
 
       fmt(value, decimals) {
         if (value == null) return '—';

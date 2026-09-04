@@ -161,7 +161,11 @@
 {% endmacro %}
 
 <div class="toolbar">
-  <a href="{{ base }}/energiedashboard">&larr; Zurück zum Energiedashboard</a>
+  {# range/offset mitgeben, damit das Dashboard beim Zurückspringen genau den
+     Zeitraum zeigt, aus dem heraus der Bericht geöffnet wurde (liest sie per
+     readInitialRangeOffset(), siehe energiedashboard.js), statt auf die
+     Standardansicht ('Tag', heute) zurückzufallen. #}
+  <a href="{{ base }}/energiedashboard?range={{ range }}&offset={{ offset }}">&larr; Zurück zum Energiedashboard</a>
   <button class="btn primary" onclick="window.print()">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <polyline points="6,9 6,2 18,2 18,9"/>
