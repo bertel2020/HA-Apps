@@ -314,6 +314,30 @@ def _speicher_link_entities(config: dict) -> list[dict]:
     return entities
 
 
+def entity_has_energiedashboard_role(index: Index, entity_id: str) -> bool:
+    """Ob entity_id irgendeiner Energiedashboard-Rolle zugeordnet ist — für
+    main.py: der statische "zurück zum Energiedashboard"-Link auf der
+    Entitäts-Detailseite wird nur gezeigt, wenn der Rücksprung dorthin
+    überhaupt sinnvoll ist. Bewusst NICHT referrer-basiert (siehe
+    dynamic-back-link.js) — unter Home-Assistant-Ingress fehlt
+    document.referrer beim Sprung aus der Sidebar-Kachel zuverlässig (vermutlich
+    Referrer-Policy/Ingress-Iframe-bedingt), ein rein clientseitiger Link wäre
+    dort also unzuverlässig. Leichtgewichtiger Mitgliedschafts-Check statt der
+    vollen _config_entity_roles()-Liste (die u. a. Anzeigenamen auflöst, hier
+    unnötig)."""
+    config = _load_config(index)
+    if entity_id in (config.get("netzbezug"), config.get("einspeisung")):
+        return True
+    if any(erz.get("entity_id") == entity_id for erz in config.get("erzeuger") or []):
+        return True
+    if any(v.get("entity_id") == entity_id for v in config.get("verbraucher") or []):
+        return True
+    return any(
+        entity_id in (sp.get("laden_entity_id"), sp.get("entladen_entity_id"))
+        for sp in config.get("speicher") or []
+    )
+
+
 def is_energiedashboard_configured(index: Index) -> bool:
     """Öffentlicher Zugriff für main.py (Dashboards-Übersicht: Status-Text der
     festen Energiedashboard-Kachel), ohne die interne Config-Struktur nach

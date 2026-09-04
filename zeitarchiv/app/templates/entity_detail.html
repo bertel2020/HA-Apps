@@ -125,6 +125,17 @@
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ base }}/entities">&larr; zurück zu Entitäten</a>
+      {% if used_in_energiedashboard %}
+      {# Statisch statt referrer-basiert (dynamic-back-link.js unten deckt
+         die übrigen Herkunftsseiten ab) — unter Home-Assistant-Ingress fehlt
+         document.referrer beim Sprung aus der Energiedashboard-Kachel in der
+         Sidebar zuverlässig, ein rein clientseitiger Link wäre dort also
+         unsichtbar. initial_range/initial_offset spiegeln den Zeitraum, mit
+         dem diese Seite aufgerufen wurde (siehe main.py) — ohne
+         Query-Parameter (Direktaufruf) fällt das auf 'day'/0 zurück, denselben
+         Standardwert wie das Energiedashboard selbst. #}
+      &middot; <a href="{{ base }}/energiedashboard?range={{ initial_range or 'day' }}&amp;offset={{ initial_offset }}">&larr; zurück zum Energiedashboard</a>
+      {% endif %}
     </p>
 
     <div class="toolbars">

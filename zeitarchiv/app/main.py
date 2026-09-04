@@ -132,6 +132,7 @@ from .energiedashboard_routes import (
     EnergieDashboardDependencies,
     EnergieDashboardService,
     energiedashboard_role_count,
+    entity_has_energiedashboard_role,
     is_energiedashboard_configured,
     process_pending_hourly_backfill,
     refresh_heatmap_weekday_cache_if_stale,
@@ -5120,6 +5121,13 @@ def entity_detail(
             "entity_chart_defaults": _get_entity_chart_defaults(),
             "initial_range": initial_range,
             "initial_offset": offset if initial_range else 0,
+            # Steuert den statischen "zurück zum Energiedashboard"-Link (nur
+            # gezeigt, wenn der Rücksprung dorthin überhaupt sinnvoll ist) —
+            # bewusst zusätzlich zum referrer-basierten dynamic-back-link.js,
+            # das unter Home-Assistant-Ingress beim Sprung aus der
+            # Sidebar-Kachel nicht zuverlässig funktioniert (document.referrer
+            # fehlt dort).
+            "used_in_energiedashboard": entity_has_energiedashboard_role(index, entity_id),
         },
     )
 
