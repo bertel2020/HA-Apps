@@ -39,6 +39,23 @@
   .dash-card h3 a{color:inherit;text-decoration:none;}
   .dash-card:hover h3 a{color:var(--accent-line);}
   .dash-card h3 a::after{content:'';position:absolute;inset:0;border-radius:inherit;}
+  /* Standard-Dashboard (Startseiten-Ziel "Übersicht", siehe STARTSEITE_LABELS
+     in main.py) bekommt denselben Farbverlauf-Kopfstreifen wie die feste
+     Energiedashboard-Kachel (.edash-pin-accent) — macht auf der Liste auf
+     einen Blick klar, welches der beiden möglichen Startseiten-Ziele das ist.
+     Eigene Zweifarb-Kombination aus den App-eigenen Akzentfarben
+     (--accent-line/--accent-bar, dieselben zwei Töne wie im App-Logo) statt
+     Energiedashboards PV/Netz/Einspeisung-Rollenfarben — die Übersicht ist an
+     keine einzelne Energie-Rolle gebunden. Als normaler Flow-::before mit
+     negativem Rand statt position:absolute, weil .dash-card (anders als
+     .edash-pin-card) sein Padding direkt auf der Karte selbst trägt, kein
+     ungepolstertes Wrapper-Element — der negative Rand zieht den Streifen bis
+     an den Kartenrand. */
+  .dash-card.is-default-home::before{
+    content:'';display:block;height:4px;margin:-16px -18px 12px;
+    border-radius:14px 14px 0 0;
+    background:linear-gradient(90deg, var(--accent-line), var(--accent-bar));
+  }
   .dash-grid-add{display:flex;align-items:center;justify-content:center;min-height:96px;border-style:dashed;text-decoration:none;}
   .dash-grid-add-btn{
     display:flex;align-items:center;justify-content:center;
@@ -105,6 +122,15 @@
      trotzdem unabhängig anklickbar. */
   .edash-pin-title a{color:inherit;text-decoration:none;}
   .edash-pin-title a::after{content:"";position:absolute;inset:0;border-radius:inherit;}
+  /* Startseiten-Abzeichen — nur sichtbar, wenn die Einstellung "Startseite"
+     (siehe _settings_darstellung_form.html) auf Energiedashboard steht.
+     Dezentes rundes Plättchen statt reinem Symbol, damit es neben Titel/
+     Toggle nicht wie ein weiterer klickbarer Button wirkt (rein informativ,
+     siehe data-tooltip). */
+  .edash-pin-home-badge{
+    flex:none;display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+    border-radius:50%;background:var(--accent-line-soft);color:var(--accent-line);
+  }
   .edash-pin-toggle{
     width:30px;height:17px;border-radius:999px;background:var(--border-strong);position:relative;z-index:2;flex:none;
     border:0;cursor:pointer;padding:0;
@@ -171,6 +197,14 @@
                   Energiedashboard
                   {% endif %}
                 </div>
+                {% if startseite == 'energiedashboard' %}
+                {# Gleicher Haus-Pfad wie nav_icon('home') in _topnav.html —
+                   dasselbe Symbol wie in der Seitenleiste für "Startseite",
+                   hier nur als kleines Abzeichen statt als Navigationslink. #}
+                <span class="edash-pin-home-badge" data-tooltip="Aktuelle Startseite" aria-label="Aktuelle Startseite">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h5v-6h2v6h5v-9"/></svg>
+                </span>
+                {% endif %}
               </div>
               <button type="button" class="edash-pin-toggle{{ ' is-on' if nav_energiedashboard_enabled }}"
                       aria-pressed="{{ 'true' if nav_energiedashboard_enabled else 'false' }}"
@@ -192,7 +226,7 @@
           </div>
         </div>
         {% for d in dashboards %}
-        <div class="card dash-card" id="dash-card-{{ d.id }}" data-name="{{ d.name }}"
+        <div class="card dash-card{{ ' is-default-home' if d.is_default else '' }}" id="dash-card-{{ d.id }}" data-name="{{ d.name }}"
              data-created="{{ d.position }}" data-favorite="{{ 1 if d.is_favorite else 0 }}"
              data-sort-first="{{ 1 if d.is_default else 0 }}">
           <div class="card-top-actions">

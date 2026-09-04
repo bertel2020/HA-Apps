@@ -4642,6 +4642,11 @@ def dashboards_list(request: Request) -> HTMLResponse:
             # global aus _nav_dashboards_context, "configured" nur hier.
             "energiedashboard_configured": is_energiedashboard_configured(index),
             "energiedashboard_role_count": energiedashboard_role_count(index),
+            # Für das Startseiten-Symbol an der Energiedashboard-Kachel unten
+            # (STARTSEITE_LABELS oben) — Default "uebersicht" spiegelt
+            # dieselbe Rückfallregel wie überall sonst, wo diese Einstellung
+            # gelesen wird.
+            "startseite": index.get_setting("startseite", "uebersicht"),
         }
     )
 
