@@ -11,12 +11,14 @@ Lizenztexte noch eine rechtliche Prüfung.
 
 | Komponente | Version | Lizenz |
 | --- | ---: | --- |
-| Zeitarchiv App | 0.30.1 | Apache-2.0 |
+| Zeitarchiv App | 0.81.0 | MIT |
 | Zeitarchiv Integration | 0.12.0 | Apache-2.0 |
-| Eigene Templates, Stylesheets und JavaScript-Dateien der App | 0.30.1 | Apache-2.0 |
+| Eigene Templates, Stylesheets und JavaScript-Dateien der App | 0.81.0 | MIT |
 
-App und Integration enthalten jeweils den vollständigen Apache-2.0-Lizenztext
-und einen NOTICE-Hinweis. Die Integration wird eigenständig veröffentlicht:
+Die App enthält den vollständigen MIT-Lizenztext (LICENSE); MIT kennt kein
+NOTICE-Konzept, entsprechend gibt es dafür keine eigene Datei. Die
+Integration wird eigenständig veröffentlicht und bleibt bei Apache-2.0
+samt NOTICE-Hinweis:
 
 - https://github.com/bertel2020/HA-Zeitarchiv/blob/main/LICENSE
 - https://github.com/bertel2020/HA-Zeitarchiv/blob/main/NOTICE
