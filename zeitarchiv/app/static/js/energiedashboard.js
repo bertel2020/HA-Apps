@@ -320,6 +320,22 @@
         return '≈ ' + this.fmt(km, 0) + ' km Autofahrt';
       },
 
+      // Netto-CO2 für die dritte KPI-Kachel im CO2-Dialog — negativ heißt
+      // "mehr vermieden als verursacht" (siehe .is-bilanz-win in
+      // energiedashboard.html) und wird dort bewusst als kleiner Erfolg
+      // hervorgehoben statt nur als weitere neutrale Zahl.
+      co2Bilanz() {
+        if (this.kpi.co2_ausstoss == null || this.kpi.co2_vermieden == null) return null;
+        return this.kpi.co2_ausstoss - this.kpi.co2_vermieden;
+      },
+
+      // Erfolgstext für die Saldo-Kachel im Kostenanalyse-Dialog, analog zum
+      // CO2-Pendant oben — nur bei negativem Saldo (Einspeisung-Erlös
+      // überwiegt die Netzbezug-Kosten).
+      costWinText() {
+        return this.kpi.net_cost != null && this.kpi.net_cost < 0 ? '💶 Mehr erlöst als bezahlt!' : '';
+      },
+
       // Eine Sparkline je Jahres-Zeile im Wirkungsgrad-Trend-Popup — 12
       // feste Monats-Slots (Jan..Dez), fehlende Monate (vor Inbetriebnahme
       // oder noch in der Zukunft beim laufenden Jahr) bleiben als Lücke im

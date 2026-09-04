@@ -262,6 +262,48 @@
      Zeile gesetzt (.edash-kpi-accent existiert nur dort im Markup), die
      übrigen .edash-kpi (Kosten-/CO2-Popups) bleiben unverändert ohne Balken. */
   .edash-kpi-accent{position:absolute;top:0;left:0;right:0;height:3px;}
+  /* Bilanz-Kacheln (CO2-Dialog "Bilanz", Kostenanalyse-Dialog "Saldo") —
+     dieselbe Rot/Grün-Logik wie .edash-cost-badge (negativ = lohnt sich =
+     --positive, positiv = kostet = --danger), hier zusätzlich mit einem
+     sanften Verlauf plus Stern + Erfolgszeile im negativen Fall, statt nur
+     die Zahl einzufärben — ein Nutzer, der über einen Zeitraum mehr
+     vermieden/erlöst als verursacht/bezahlt hat, darf das kurz als kleinen
+     Erfolg wahrnehmen, nicht nur als beiläufige Farbänderung. is-cost
+     (positiver Fall) bleibt bewusst OHNE Verlauf/Stern/Zeile — informieren,
+     nicht runtermachen. */
+  .edash-kpi.is-bilanz-win{
+    background:
+      radial-gradient(120% 140% at 15% 0%, color-mix(in srgb, var(--positive) 20%, transparent), transparent 60%),
+      color-mix(in srgb, var(--positive) 10%, var(--surface-alt));
+    border-color:color-mix(in srgb, var(--positive) 45%, var(--border));
+  }
+  .edash-kpi.is-bilanz-win .edash-kpi-val{color:var(--positive);}
+  .edash-kpi.is-bilanz-win .edash-kpi-label{color:color-mix(in srgb, var(--positive) 70%, var(--ink-faint));}
+  .edash-kpi.is-cost .edash-kpi-val{color:var(--danger);}
+  .edash-kpi.is-cost .edash-kpi-label{color:color-mix(in srgb, var(--danger) 65%, var(--ink-faint));}
+  .edash-kpi-sparkle{
+    position:absolute;top:-7px;right:-6px;width:20px;height:20px;border-radius:50%;
+    background:var(--positive);color:color-mix(in srgb, var(--positive) 12%, var(--surface));
+    display:flex;align-items:center;justify-content:center;font-size:calc(11px * var(--font-scale, 1));
+    box-shadow:0 3px 8px color-mix(in srgb, var(--positive) 45%, transparent);
+    animation:edash-sparkle-in .5s cubic-bezier(.2,1.4,.4,1) both;
+  }
+  @keyframes edash-sparkle-in{from{transform:scale(0) rotate(-25deg);opacity:0;}to{transform:scale(1) rotate(0);opacity:1;}}
+  @media (prefers-reduced-motion: reduce){.edash-kpi-sparkle{animation:none;}}
+  /* Erfolgszeile unter der Bilanz-/Saldo-Kachel — eigene, volle Grid-Zeile
+     (grid-column:1/-1) statt in eine der Kacheln hineingequetscht, da sie
+     sich auf die GANZE Reihe bezieht, nicht auf ein einzelnes Nachbarfeld. */
+  .edash-kpi-win-note{
+    grid-column:1 / -1;display:flex;align-items:center;gap:7px;margin-top:-2px;
+    font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--positive);
+  }
+  /* CO2-Chip: nur Farbe bei positiver Bilanz (co2Bilanz() < 0), bewusst OHNE
+     Stern — anders als die Kachel im Dialog bleibt der Chip ein ruhiger
+     Kennzahl-Anzeiger. */
+  .edash-co2-badge.is-win{
+    background:color-mix(in srgb, var(--positive) 16%, var(--surface));color:var(--positive);
+  }
+  .edash-co2-badge.is-win:hover{border-color:var(--positive);}
   .edash-kpi-head{display:flex;align-items:center;gap:6px;}
   .edash-kpi-icon{flex:none;display:flex;}
   .edash-kpi-label{font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
@@ -331,6 +373,33 @@
     background:
       radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--chart-3) 5%, transparent), transparent 55%),
       radial-gradient(140% 100% at 100% 100%, color-mix(in srgb, var(--chart-1) 5%, transparent), transparent 55%),
+      var(--surface);
+  }
+  /* Derselbe kaum wahrnehmbare Eck-Verlauf wie .edash-flow-card oben, jetzt
+     auch auf den übrigen drei Dashboard-Karten — bewusst DREI eigene Regeln
+     statt einer gemeinsamen Klasse: jede Karte bekommt EXAKT die Rollenfarbe
+     ihres eigenen Inhalts (Speicher-Ring = --chart-4 wie die Speicher-KPI-
+     Kachel, Verbraucheranteile/Tageslastprofil = --chart-7 wie die
+     Verbrauch-KPI-Kachel, beide zeigen Verbrauchsdaten). Eine geteilte
+     "irgendein Verlauf"-Klasse würde die Farbe zur reinen Deko machen —
+     genau die Bedeutungs-Kopplung, die die App bei Rollenfarben sonst
+     konsequent durchhält, ginge sonst verloren. Tageslastprofil bekommt eine
+     ANDERE Ecke als Verbraucheranteile (unten-links statt oben-rechts), damit
+     zwei direkt untereinander stehende Karten mit derselben Rollenfarbe
+     nicht wie eine einzige, versehentlich wiederholte Deko wirken. */
+  .edash-ring-card{
+    background:
+      radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--chart-4) 5%, transparent), transparent 55%),
+      var(--surface);
+  }
+  .edash-verbraucher-card{
+    background:
+      radial-gradient(140% 100% at 100% 0%, color-mix(in srgb, var(--chart-7) 5%, transparent), transparent 55%),
+      var(--surface);
+  }
+  .edash-tageslast-card{
+    background:
+      radial-gradient(140% 100% at 0% 100%, color-mix(in srgb, var(--chart-7) 5%, transparent), transparent 55%),
       var(--surface);
   }
   .edash-sankey-wrap{height:420px;}

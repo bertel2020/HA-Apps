@@ -29,8 +29,11 @@
       {% if config.show_co2 %}
       {# Eigenes, grün getöntes Badge statt einer Vollbreite-Kachel für nur 2
          Zahlen (siehe Diskussion). Details im selben <dialog>-Muster wie
-         Datenqualität. #}
-      <button type="button" class="edash-co2-badge"
+         Datenqualität. is-win: CO2-Bilanz (Ausstoß − Vermieden, siehe
+         co2Bilanz()) negativ — nur Farbe, bewusst OHNE Stern (anders als die
+         Bilanz-Kachel im Dialog) — der Chip bleibt ein ruhiger Kennzahl-
+         Anzeiger, kein zweiter Erfolgs-Moment neben der Kachel. #}
+      <button type="button" class="edash-co2-badge" :class="{'is-win': co2Bilanz() < 0}"
               x-show="kpi.co2_vermieden != null || kpi.co2_ausstoss != null"
               @click="$refs.co2Dialog.showModal()">
         <span>🌱</span>
@@ -163,8 +166,22 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.co2_vermieden, 2) + ' kg'"></div>
         <div class="edash-kpi-sub" x-show="co2VermiedenKmText()" x-text="co2VermiedenKmText()"></div>
       </div>
+      {# Dritte Kachel: Bilanz = Ausstoß − Vermieden (co2Bilanz(), siehe
+         energiedashboard.js) — beantwortet direkt "stehe ich im Plus?"
+         statt das selbst ausrechnen zu müssen. Negativ (mehr vermieden als
+         verursacht) wird bewusst als kleiner Erfolg gefeiert (Stern +
+         Erfolgszeile, .is-bilanz-win), positiv bleibt schlicht in
+         --danger-Ton ohne Kommentar — kein schlechtes Gewissen erzeugen,
+         nur neutral informieren. #}
+      <div class="edash-kpi" x-show="co2Bilanz() != null"
+           :class="{'is-bilanz-win': co2Bilanz() < 0, 'is-cost': co2Bilanz() >= 0}">
+        <div class="edash-kpi-sparkle" x-show="co2Bilanz() < 0">★</div>
+        <div class="edash-kpi-label">Bilanz</div>
+        <div class="edash-kpi-val" x-text="fmt(co2Bilanz(), 2) + ' kg'"></div>
+      </div>
+      <div class="edash-kpi-win-note" x-show="co2Bilanz() < 0">🌿 Mehr vermieden als verursacht.</div>
     </div>
-    <p class="hint" style="margin-top:10px;">Vermiedenes CO2 = PV-Eigenverbrauch × CO2-Faktor Netzbezug — was du für diese Energiemenge sonst an CO2 durch Netzbezug verursacht hättest.</p>
+    <p class="hint" style="margin-top:10px;">Vermiedenes CO2 = PV-Eigenverbrauch × CO2-Faktor Netzbezug — was du für diese Energiemenge sonst an CO2 durch Netzbezug verursacht hättest. Bilanz = Ausstoß − Vermieden.</p>
   </dialog>
   {% endif %}
 
@@ -191,10 +208,18 @@
         <div class="edash-kpi-label">Einsparung</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.vermiedene_kosten)"></div>
       </div>
-      <div class="edash-kpi" x-show="kpi.net_cost != null">
+      {# Dieselbe Farb-/Erfolgslogik wie die CO2-Bilanz-Kachel oben — Saldo
+         negativ (Einspeisung-Erlös übersteigt Netzbezug-Kosten) wird
+         gefeiert (Stern + Erfolgszeile), positiv bleibt schlicht in
+         --danger-Ton. Der Kosten-Chip in der Titelzeile hat diese
+         Rot/Grün-Logik schon länger — hier zieht die Kachel im Dialog nach. #}
+      <div class="edash-kpi" x-show="kpi.net_cost != null"
+           :class="{'is-bilanz-win': kpi.net_cost < 0, 'is-cost': kpi.net_cost >= 0}">
+        <div class="edash-kpi-sparkle" x-show="kpi.net_cost < 0">★</div>
         <div class="edash-kpi-label">Saldo</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.net_cost)"></div>
       </div>
+      <div class="edash-kpi-win-note" x-show="kpi.net_cost < 0" x-text="costWinText()"></div>
     </div>
     <p class="hint" style="margin-top:10px;">Einsparung durch Eigenverbrauch = PV-Eigenverbrauch × Netzbezug-Preis, nur rechnerisch (fließt nicht ins Saldo ein). Saldo = Netzbezug Kosten − Einspeisung Erlös.</p>
   </dialog>
@@ -563,7 +588,7 @@
     {% endif %}
 
     {% if config.show_verbraucheranteile %}
-    <div class="edash-card edash-span2" x-show="verbraucherBreakdown.length">
+    <div class="edash-card edash-span2 edash-verbraucher-card" x-show="verbraucherBreakdown.length">
       <div class="edash-card-head"><div class="edash-card-title">Verbraucheranteile</div></div>
       <div class="edash-share-wrap">
         <div class="edash-share-donut" x-ref="shareChartEl"></div>
@@ -592,7 +617,7 @@
     {% endif %}
 
     {% if config.show_tageslastprofil %}
-    <div class="edash-card edash-span3" x-show="heatmap.rows && heatmap.rows.length">
+    <div class="edash-card edash-span3 edash-tageslast-card" x-show="heatmap.rows && heatmap.rows.length">
       <div class="edash-card-head"><div class="edash-card-title">Tageslastprofil<span class="n" x-text="heatmapNote()"></span></div></div>
       <div class="edash-heatmap-wrap" x-ref="heatmapEl"></div>
     </div>

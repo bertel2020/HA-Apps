@@ -315,6 +315,17 @@
         <div class="stat-line"><span>Vermieden (Eigenverbrauch)</span><strong>{{ current.kpi.co2_vermieden | format_value(1) }} kg</strong></div>
         <div class="stat-subnote">&#8618; &#8776; {{ (current.kpi.co2_vermieden * 1000 / CAR_G_PER_KM) | format_value(0) }} km Autofahrt</div>
         {% endif %}
+        {% if current.kpi.co2_ausstoss is not none and current.kpi.co2_vermieden is not none %}
+        {# Dasselbe .stat-total-Muster wie der Kosten-Saldo links — "sauber"/
+           "belastet" statt "gespart"/"Kosten", CO2-eigene Sprache statt die
+           Geld-Begriffe unverändert zu übernehmen. Farbe (color, kein
+           Hintergrund) übersteht den Druck verlustfrei. #}
+        {% set co2_bilanz = current.kpi.co2_ausstoss - current.kpi.co2_vermieden %}
+        <div class="stat-total {{ 'is-surplus' if co2_bilanz < 0 else 'is-cost' }}">
+          <span>Bilanz &#8213; {{ "sauber" if co2_bilanz < 0 else "belastet" }}</span>
+          <span class="mono">{{ co2_bilanz | format_value(1) }} kg</span>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
