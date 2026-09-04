@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.80.3 - 2026-09-04
+
+### Verbessert
+
+- **`_storage_breakdown()` (ZP-011).** "Archiv" nutzte einen vollen
+  Dateisystem-Walk bei jedem Diagnose-Download statt der ohnehin schon
+  inkrementell gepflegten Index-Summe. Nutzt jetzt
+  `index.get_overview()["total_size_bytes"]`. "Rollup" bleibt bewusst ein
+  echter Walk — der Index führt keine Rollup-Dateigrößen, nur
+  Archiv-Parquet-Größen.
+- **`rotate_month_file()` (ZP-006).** Baute die drei Parquet-Spalten aus
+  einer materialisierten Tupel-Liste per dreifacher Listcomprehension.
+  Ein Durchlauf über `iter_records()` befüllt die Spalten jetzt direkt.
+- **`_read_rollup_rows()` (ZP-007).** Las Zellen einzeln
+  (`.as_py()` pro Zugriff) statt vektorisiert. Nutzt jetzt `to_pylist()`
+  je Spalte, analog zum bestehenden Muster in `rollup.append_completed_month`.
+- **Backup-Validierung (ZP-009).** `validate_backup()` hashte beim
+  internen Aufruf aus `create_backup()` jede gerade erst geschriebene
+  Datei ein zweites Mal komplett neu. Neuer `verify_checksums`-Parameter
+  (Default weiterhin `True` für Upload/Restore/manuellen Prüfen-Button);
+  `create_backup()` ruft intern mit `False` auf. `zf.testzip()` prüft
+  dabei weiterhin die (viel billigere) ZIP-eigene CRC32-Summe —
+  Strukturschutz bleibt erhalten.
+- **Hot-Buffer-Mehrfachlesen (ZP-012, teilweise).** Der eigentlich
+  heißeste Pfad (`ingestion._event_exists()`/`_timestamp_exists()`) war
+  bereits vor dieser Änderung für den Normalfall entschärft. Tatsächlich
+  behoben: `cleanup.iter_raw_rows()` wird über `analyze_raw_rows_page()`
+  zweimal pro Anfrage aufgerufen (Zwei-Pass-Streaming) — die zwei
+  betroffenen Aufrufstellen (Rohwerte-Ansicht, "Gesamt"-Kachel-Zähler)
+  teilen jetzt einen `QueryReadCache` über beide Durchläufe.
+- **CSV-Importvorschau (ZP-013, teilweise).** `csv_import.preview()` las
+  die komplette Datei als Liste, nur um ein 8-Zeilen-Sample anzuzeigen.
+  Liest jetzt streamend — `total_lines`/`column_count` brauchen weiterhin
+  einen vollständigen Durchlauf, aber nur die Sample-Zeilen bleiben im
+  Speicher.
+- **Tabellen-Formatierung (ZP-014, teilweise).** `_entities_table_response()`
+  formatierte immer alle Felder unabhängig von den tatsächlich sichtbaren
+  Spalten. Formatiert jetzt nur noch, was `visible_columns` auch zeigt.
+
 ## 0.80.2 - 2026-09-04
 
 ### Behoben
