@@ -328,14 +328,19 @@ def _read_rollup_rows(
         path,
         filters=[("bucket_start", ">=", start_ts), ("bucket_start", "<", end_ts)],
     )
-    rows = []
+    # to_pylist() statt .column(col)[i].as_py() pro Zelle (siehe
+    # PERFORMANCE.md, ZP-007) — eine vektorisierte Konvertierung je Spalte
+    # statt table.num_rows einzelner Zugriffe je Spalte, analog zum
+    # bestehenden Muster in rollup.append_completed_month().
     columns = table.column_names
-    for i in range(table.num_rows):
-        bucket_start = table.column("bucket_start")[i].as_py()
+    present = [col for col in ("value", "min_value", "max_value", "on_seconds") if col in columns]
+    bucket_starts = table.column("bucket_start").to_pylist()
+    values_by_col = {col: table.column(col).to_pylist() for col in present}
+    rows = []
+    for i, bucket_start in enumerate(bucket_starts):
         kwargs = {"bucket_start": bucket_start}
-        for col in ("value", "min_value", "max_value", "on_seconds"):
-            if col in columns:
-                kwargs[col] = table.column(col)[i].as_py()
+        for col in present:
+            kwargs[col] = values_by_col[col][i]
         rows.append(rollup.FineRow(**kwargs))
     return rows
 

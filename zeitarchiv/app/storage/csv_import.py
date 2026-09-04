@@ -73,21 +73,38 @@ def sniff_has_header(path: Path, delimiter: str) -> bool:
 
 
 def preview(path: Path, delimiter: str, has_header: bool, sample_size: int = 8) -> CsvPreview:
-    result = CsvPreview()
+    """Liest die Datei streamend statt sie komplett als Liste zu materialisieren
+    (siehe PERFORMANCE.md, ZP-013) — total_lines/column_count brauchen ohnehin
+    einen vollständigen Durchlauf (jede Zeile trägt zu beidem bei), aber nur
+    die ersten sample_size Datenzeilen müssen dabei im Speicher bleiben, nicht
+    die komplette Datei."""
+    header: list[str] | None = None
+    sample_rows: list[list[str]] = []
+    column_count = 0
+    total_lines = 0
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f, delimiter=delimiter)
-        rows = list(reader)
-    if not rows:
+        for i, row in enumerate(reader):
+            column_count = max(column_count, len(row))
+            if has_header and i == 0:
+                header = row
+                continue
+            total_lines += 1
+            if len(sample_rows) < sample_size:
+                sample_rows.append(row)
+
+    result = CsvPreview()
+    if column_count == 0:
         return result
-    result.column_count = max(len(r) for r in rows)
     if has_header:
-        result.columns = rows[0] + [f"Spalte {i + 1}" for i in range(len(rows[0]), result.column_count)]
-        data_rows = rows[1:]
+        result.columns = (header or []) + [
+            f"Spalte {i + 1}" for i in range(len(header or []), column_count)
+        ]
     else:
-        result.columns = [f"Spalte {i + 1}" for i in range(result.column_count)]
-        data_rows = rows
-    result.total_lines = len(data_rows)
-    result.sample_rows = data_rows[:sample_size]
+        result.columns = [f"Spalte {i + 1}" for i in range(column_count)]
+    result.column_count = column_count
+    result.total_lines = total_lines
+    result.sample_rows = sample_rows
     return result
 
 

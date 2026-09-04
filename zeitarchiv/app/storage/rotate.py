@@ -16,7 +16,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import rollup
-from .hotbuffer import find_stale_hot_files, read_records
+from .hotbuffer import find_stale_hot_files, iter_records
 from .index import Index
 from .paths import entity_dir
 
@@ -25,13 +25,25 @@ def rotate_month_file(
 ) -> None:
     """Wandelt eine einzelne Hot-CSV-Datei in eine Parquet-Archivdatei um
     und schreibt danach die Rollup-Dateien für den fertigen Monat fort."""
-    records = read_records(hot_csv_path)
+    # Ein Durchlauf, drei Spalten direkt befüllt statt erst eine Liste von
+    # Tupeln zu materialisieren und die dann noch dreimal per
+    # Listcomprehension abzulaufen (siehe PERFORMANCE.md, ZP-006). Kein
+    # direktes pyarrow.csv.read_csv: die Hot-CSV kann Zeilen mit und ohne
+    # event_id gemischt enthalten (siehe iter_records()-Docstring), was ein
+    # fixes CSV-Schema nicht ohne Weiteres abbildet.
+    ts_col: list[float] = []
+    value_col: list[float] = []
+    event_id_col: list[str | None] = []
+    for ts, value, event_id in iter_records(hot_csv_path):
+        ts_col.append(ts)
+        value_col.append(value)
+        event_id_col.append(event_id)
     table = pa.table(
         {
-            "ts": [row[0] for row in records],
-            "value": [row[1] for row in records],
+            "ts": ts_col,
+            "value": value_col,
             # Nullable: historische/importierte Hot-Zeilen besitzen keine ID.
-            "event_id": [row[2] for row in records],
+            "event_id": event_id_col,
         },
         schema=pa.schema(
             [("ts", pa.float64()), ("value", pa.float64()), ("event_id", pa.string())]

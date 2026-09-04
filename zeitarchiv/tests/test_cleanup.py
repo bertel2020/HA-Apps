@@ -15,7 +15,7 @@ try:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    from app.storage import cleanup, hotbuffer, rollup
+    from app.storage import cleanup, hotbuffer, query, rollup
     from app.storage.index import Index
 
     _PYARROW_AVAILABLE = True
@@ -227,6 +227,50 @@ def test_list_raw_rows_stops_at_configured_result_limit() -> None:
             assert False, "ResultLimitExceeded erwartet"
         except cleanup.ResultLimitExceeded:
             pass
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_iter_raw_rows_shares_hot_read_cache_across_streaming_passes() -> None:
+    """analyze_raw_rows_page() ruft rows_factory() zweimal auf (siehe
+    test_streaming_analysis_pages_complete_history_without_materializing_it)
+    — ohne geteilten hot_rows_loader würde das bei einem Fenster, das den
+    laufenden Monat einschließt, dieselbe Hot-CSV zweimal neu von Platte
+    lesen (PERFORMANCE.md, ZP-012). main.py teilt dafür einen
+    QueryReadCache über beide Durchläufe."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        entity_id = "sensor.a"
+        index = Index(tmp / "index.sqlite")
+        now = datetime(2026, 8, 20, 12, tzinfo=TZ)
+        ts = _ts(2026, 8, 20, 10)
+        hotbuffer.append(tmp, entity_id, ts, 1.0, TZ)
+
+        read_cache = query.QueryReadCache()
+        calls: list[Path] = []
+        original_read_rows = query.read_rows
+
+        def counting_read_rows(path):
+            calls.append(path)
+            return original_read_rows(path)
+
+        def rows_factory():
+            return cleanup.iter_raw_rows(
+                tmp, index, entity_id, ts - 10, now.timestamp(), TZ, now=now,
+                hot_rows_loader=read_cache.read_hot_rows,
+            )
+
+        query.read_rows = counting_read_rows
+        try:
+            # Simuliert die zwei Durchläufe von analyze_raw_rows_page().
+            first_pass = list(rows_factory())
+            second_pass = list(rows_factory())
+        finally:
+            query.read_rows = original_read_rows
+
+        assert first_pass == second_pass == [(ts, 1.0)]
+        assert len(calls) == 1
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

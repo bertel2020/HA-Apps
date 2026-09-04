@@ -3497,33 +3497,52 @@ def _entities_table_response(
         favorites_only=favorites_only,
         limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
     )
-    rows = [
-        {
+    # Nur die tatsächlich sichtbaren Spalten formatieren statt immer alle elf
+    # (siehe _entities_table.html, das jede optionale Spalte ohnehin schon per
+    # visible_columns ein-/ausblendet) — bei page_size=1000 sonst bis zu 1000
+    # unnötige format_*()-Aufrufe pro ausgeblendeter Spalte (PERFORMANCE.md,
+    # ZP-014). entity_id/friendly_name/display_name/has_custom_name/
+    # is_favorite werden immer gebraucht (Entität-Spalte, Favoriten-Stern).
+    rows = []
+    for row in page_matched:
+        entry = {
             "entity_id": row["entity_id"],
             "friendly_name": row["friendly_name"],
             "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
             "has_custom_name": bool(row["custom_name"]),
-            "aggregation_type": row["aggregation_type"],
-            "type_label": format_type(row["aggregation_type"]),
-            "resolution_label": format_resolution(row["resolution"]),
-            "retention_label": format_retention(row["retention"]),
-            "unit": row["unit"],
-            "row_count": _visible_row_count(row),
-            "first_ts": format_timestamp(row["first_ts"], TZ),
-            "first_ts_time": format_time(row["first_ts"], TZ),
-            "last_ts": format_timestamp(row["last_ts"], TZ),
-            "last_ts_time": format_time(row["last_ts"], TZ),
-            "size": format_size(row["size_bytes"]),
             "is_favorite": bool(row["is_favorite"]),
+        }
+        if "type" in visible_columns:
+            entry["aggregation_type"] = row["aggregation_type"]
+            entry["type_label"] = format_type(row["aggregation_type"])
+        if "first_ts" in visible_columns:
+            entry["first_ts"] = format_timestamp(row["first_ts"], TZ)
+            entry["first_ts_time"] = format_time(row["first_ts"], TZ)
+        if "last_ts" in visible_columns:
+            entry["last_ts"] = format_timestamp(row["last_ts"], TZ)
+            entry["last_ts_time"] = format_time(row["last_ts"], TZ)
+        if "resolution" in visible_columns:
+            entry["resolution_label"] = format_resolution(row["resolution"])
+        if "retention" in visible_columns:
+            entry["retention_label"] = format_retention(row["retention"])
+        if "unit" in visible_columns:
+            entry["unit"] = row["unit"]
+        if "rows" in visible_columns:
+            entry["row_count"] = _visible_row_count(row)
+        if "size" in visible_columns:
+            entry["size"] = format_size(row["size_bytes"])
+        if "value_filter" in visible_columns:
             # Kurzform statt der vollen Dropdown-Beschriftung ("Gleiche
             # gerundete Werte filtern") — die Spaltenüberschrift "Wertfilter"
             # gibt den Kontext schon vor, in der Tabellenzelle reicht An/Aus.
-            "value_filter_label": "An" if row["value_filter"] == "decimals" else "Aus",
-            "gap_threshold_label": GAP_THRESHOLD_LABELS.get(row["gap_threshold"], row["gap_threshold"]),
-            "outlier_threshold_label": OUTLIER_THRESHOLD_LABELS.get(row["outlier_threshold"], row["outlier_threshold"]),
-        }
-        for row in page_matched
-    ]
+            entry["value_filter_label"] = "An" if row["value_filter"] == "decimals" else "Aus"
+        if "gap_threshold" in visible_columns:
+            entry["gap_threshold_label"] = GAP_THRESHOLD_LABELS.get(row["gap_threshold"], row["gap_threshold"])
+        if "outlier_threshold" in visible_columns:
+            entry["outlier_threshold_label"] = OUTLIER_THRESHOLD_LABELS.get(
+                row["outlier_threshold"], row["outlier_threshold"]
+            )
+        rows.append(entry)
 
     def _next_dir(column: str) -> str:
         return "desc" if sort == column and direction == "asc" else "asc"
@@ -5205,11 +5224,16 @@ def _cleanup_alltime_counts(entity, now: datetime) -> dict:
     window_start, window_end = _rows_window("all", 0, now, entity["first_ts"])
     gap_threshold = entity["gap_threshold"]
     outlier_threshold = entity["outlier_threshold"]
+    # Siehe _rows_fragment(): analyze_raw_rows_page() ruft rows_factory()
+    # zweimal auf, ohne Cache liest das bei "Gesamt" die laufende Monats-CSV
+    # doppelt (PERFORMANCE.md, ZP-012).
+    read_cache = query_mod.QueryReadCache()
 
     def rows_factory():
         return cleanup.iter_raw_rows(
             DATA_DIR, index, entity_id,
             window_start.timestamp(), window_end.timestamp(), TZ, now=now,
+            hot_rows_loader=read_cache.read_hot_rows,
         )
 
     analysis = cleanup.analyze_raw_rows_page(
@@ -5271,6 +5295,11 @@ def _rows_fragment(
     if range_key in _STREAMING_RANGE_KEYS:
         # Können Millionen Rohwerte umfassen: materialisiert nur die angeforderte Seite (zwei Streaming-Durchläufe).
         effective_page_size = 1000 if page_size <= 0 else min(page_size, 1000)
+        # Beide Durchläufe lesen bei einem Fenster, das den laufenden Monat
+        # einschließt, sonst dieselbe Hot-CSV zweimal neu von Platte (siehe
+        # PERFORMANCE.md, ZP-012) — QueryReadCache ist request-lokal, macht
+        # daraus nur einen Lesevorgang.
+        read_cache = query_mod.QueryReadCache()
 
         def rows_factory():
             return cleanup.iter_raw_rows(
@@ -5281,6 +5310,7 @@ def _rows_fragment(
                 window_end.timestamp(),
                 TZ,
                 now=now,
+                hot_rows_loader=read_cache.read_hot_rows,
             )
 
         analysis = cleanup.analyze_raw_rows_page(

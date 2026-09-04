@@ -258,7 +258,17 @@ def create_backup(
                 BACKUP_MANIFEST_NAME,
                 json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True),
             )
-        validate_backup(tmp_path, check_sqlite=consistent_sqlite)
+        # verify_checksums=False: die SHA256-Summen wurden gerade erst beim
+        # Schreiben oben berechnet (siehe manifest_files) — ein zweiter voller
+        # SHA256-Durchlauf über dieselben, gerade selbst geschriebenen Bytes
+        # ist reine Doppelarbeit (siehe PERFORMANCE.md, ZP-009). zf.testzip()
+        # liest zwar ebenfalls jede Datei komplett, prüft aber nur die viel
+        # billigere CRC32-Prüfsumme des ZIP-Formats selbst — das genügt, um
+        # eine während des Schreibens beschädigte Datei zu erkennen, ohne den
+        # SHA256-Aufwand ein zweites Mal zu zahlen. Volle Re-Verifikation
+        # bleibt für fremde/importierte Backups Default (siehe
+        # backup_verify()/prepare_restore()/apply_pending_restore()).
+        validate_backup(tmp_path, check_sqlite=consistent_sqlite, verify_checksums=False)
         tmp_path.replace(dest_path)
         return manifest
     finally:
@@ -266,12 +276,18 @@ def create_backup(
         tmp_path.unlink(missing_ok=True)
 
 
-def validate_backup(path: Path, *, check_sqlite: bool = True) -> dict:
+def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: bool = True) -> dict:
     """Prüft ZIP-Struktur, Manifest, Prüfsummen und den SQLite-Schnappschuss.
 
     Ältere Zeitarchiv-ZIPs ohne Manifest bleiben lesbar und werden als
     Legacy-Backup ausgewiesen. Neu erzeugte Archive müssen das vollständige
     Manifest enthalten.
+
+    verify_checksums=False überspringt den vollen SHA256-Vergleich pro Datei
+    (nur Dateigröße wird dann noch gegen das Manifest geprüft) — gedacht für
+    ein Backup, das der Aufrufer im selben Atemzug selbst geschrieben hat
+    (siehe create_backup()) und dessen Prüfsummen deshalb schon bekannt sind.
+    Für alles andere (Upload, Restore) bleibt der Default True.
     """
     try:
         with zipfile.ZipFile(path) as zf:
@@ -308,14 +324,17 @@ def validate_backup(path: Path, *, check_sqlite: bool = True) -> dict:
                     name = entry.get("path") if isinstance(entry, dict) else None
                     if not name or name not in names:
                         raise ValueError(f"Datei aus Manifest fehlt: {name or '?'}")
-                    digest = hashlib.sha256()
-                    size = 0
-                    with zf.open(name) as source:
-                        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                            size += len(chunk)
-                            digest.update(chunk)
-                    if size != entry.get("size_bytes") or digest.hexdigest() != entry.get("sha256"):
-                        raise ValueError(f"Prüfsumme stimmt nicht: {name}")
+                    if verify_checksums:
+                        digest = hashlib.sha256()
+                        size = 0
+                        with zf.open(name) as source:
+                            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                                size += len(chunk)
+                                digest.update(chunk)
+                        if size != entry.get("size_bytes") or digest.hexdigest() != entry.get("sha256"):
+                            raise ValueError(f"Prüfsumme stimmt nicht: {name}")
+                    elif zf.getinfo(name).file_size != entry.get("size_bytes"):
+                        raise ValueError(f"Dateigröße stimmt nicht: {name}")
             else:
                 manifest = {
                     "format": "zeitarchiv-portable-backup",

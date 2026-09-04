@@ -309,6 +309,75 @@ def test_delete_backup_removes_only_valid_backup_filename() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_create_backup_hashes_each_file_exactly_once() -> None:
+    """create_backup() hasht jede Datei beim Schreiben für das Manifest —
+    die interne validate_backup()-Prüfung direkt danach darf dieselben Bytes
+    nicht ein zweites Mal hashen (siehe PERFORMANCE.md, ZP-009). zf.testzip()
+    prüft die ZIP-eigene (billigere) CRC32-Summe weiterhin, das zählt hier
+    nicht mit."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-backup-hash-test-"))
+    try:
+        _write(tmp / "index.sqlite", "sqlite-bytes")
+        _write(tmp / "archive" / "sensor.a" / "2024-01.parquet", "parquet-a")
+        _write(tmp / "rollup" / "sensor.a" / "monat.parquet", "rollup-a")
+
+        import hashlib as hashlib_mod
+
+        calls = []
+        original_sha256 = hashlib_mod.sha256
+
+        def counting_sha256(*args, **kwargs):
+            calls.append(1)
+            return original_sha256(*args, **kwargs)
+
+        backup.hashlib.sha256 = counting_sha256
+        try:
+            dest = tmp / "out" / "backup.zip"
+            backup.create_backup(tmp, dest)
+        finally:
+            backup.hashlib.sha256 = original_sha256
+
+        assert len(calls) == backup.estimate_file_count(tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_validate_backup_without_checksums_still_catches_size_mismatch() -> None:
+    """verify_checksums=False überspringt nur das SHA256-Nachrechnen, nicht
+    den (praktisch kostenlosen) Abgleich der im ZIP hinterlegten Dateigröße
+    gegen das Manifest."""
+    import json as json_mod
+
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-backup-hash-test-"))
+    try:
+        _write(tmp / "index.sqlite", "sqlite-bytes")
+        dest = tmp / "backup.zip"
+        backup.create_backup(tmp, dest)
+
+        with zipfile.ZipFile(dest) as zf:
+            manifest = json_mod.loads(zf.read("zeitarchiv-manifest.json"))
+            other_members = {
+                name: zf.read(name) for name in zf.namelist() if name != "zeitarchiv-manifest.json"
+            }
+        for entry in manifest["files"]:
+            if entry["path"] == "index.sqlite":
+                entry["size_bytes"] += 1
+        tampered = tmp / "tampered.zip"
+        with zipfile.ZipFile(tampered, "w") as zf:
+            for name, data in other_members.items():
+                zf.writestr(name, data)
+            zf.writestr("zeitarchiv-manifest.json", json_mod.dumps(manifest))
+
+        try:
+            backup.validate_backup(tampered, check_sqlite=False, verify_checksums=False)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Falsche Dateigröße wurde trotz verify_checksums=False akzeptiert")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_validate_backup_rejects_corruption() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-backup-test-"))
     try:

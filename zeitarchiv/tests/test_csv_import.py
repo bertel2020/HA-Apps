@@ -72,6 +72,44 @@ def test_preview_splits_header_from_sample_rows() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_preview_of_empty_file_returns_defaults() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "empty.csv"
+        _write(path, "")
+
+        result = csv_import.preview(path, ",", has_header=True, sample_size=8)
+        assert result.columns == []
+        assert result.column_count == 0
+        assert result.total_lines == 0
+        assert result.sample_rows == []
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_preview_column_count_accounts_for_ragged_rows_beyond_the_sample() -> None:
+    """column_count/total_lines müssen den ganzen Durchlauf abdecken, nicht
+    nur die materialisierten sample_rows (siehe PERFORMANCE.md, ZP-013 —
+    preview() liest jetzt streamend statt alles als Liste zu halten)."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "ragged.csv"
+        lines = ["Zeit,Wert\n"]
+        for i in range(20):
+            lines.append(f"{1700000000 + i},{i}\n")
+        # Eine breitere Zeile weit hinter dem sample_size-Fenster (sample_size=2).
+        lines.append("1700000999,99,extra\n")
+        _write(path, "".join(lines))
+
+        result = csv_import.preview(path, ",", has_header=True, sample_size=2)
+        assert result.total_lines == 21
+        assert result.column_count == 3
+        assert result.columns == ["Zeit", "Wert", "Spalte 3"]
+        assert len(result.sample_rows) == 2
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_parse_rows_unix_seconds_and_milliseconds() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
     try:
