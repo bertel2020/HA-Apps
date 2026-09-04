@@ -316,7 +316,7 @@ werden. Erstelle daher regelmäßig unabhängige Backups deiner Daten.
 
 ## Lizenz
 
-Dieses Projekt steht unter der [Apache License 2.0](LICENSE).
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
 Copyright 2026 bertel2020.
 
 Die verwendeten Drittanbieter-Komponenten und deren Lizenzen sind in
