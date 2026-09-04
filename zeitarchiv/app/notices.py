@@ -543,7 +543,7 @@ def build_notices(
                 f"{entities_affected} Entität{'en' if entities_affected != 1 else ''} "
                 "können endgültig entfernt werden."
             ),
-            "meta": "Speicherplatz",
+            "meta": "Housekeeping",
             "link": "/housekeeping#speicherplatz",
         })
 

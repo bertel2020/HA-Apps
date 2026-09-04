@@ -226,7 +226,12 @@
      Namensliste, dieselbe Idee wie .edash-item-dialog/.edash-gruppen-dialog
      oben. Eine gemeinsame Klasse statt dreier eigener, weil alle drei
      denselben Inhalt (Name-Liste) in derselben Größenordnung zeigen. */
-  .edash-entity-picker-dialog{width:min(280px, calc(100vw - 32px));padding:14px;}
+  /* Breit genug, dass der längste Titel ("Verbrauch — welche Entität?") ohne
+     Zeilenumbruch neben dem ×-Button passt — alle drei Auswahlfenster
+     bekommen dieselbe Breite (siehe Kommentar oben), unabhängig davon, wie
+     lang der jeweils EIGENE Titel ist, sonst wären sie sichtbar
+     unterschiedlich breit. */
+  .edash-entity-picker-dialog{width:min(340px, calc(100vw - 32px));padding:14px;}
   /* Kompaktere Kopfzeile als der .detail-dialog-Standard (16px-Titel,
      14px-Abstand, große "Schließen"-Pille) — für ein derart kurzes Popup
      (Titel + Namensliste) wirkte das schwer/unpassend groß, siehe
