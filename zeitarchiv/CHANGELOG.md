@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.80.5 - 2026-09-04
+## 0.81.0 - 2026-09-04
 
 ### Neu
 
@@ -45,7 +45,15 @@
   Bereinigung möglich“ verlinkten auf Entitäten statt auf den
   zugehörigen Housekeeping-Bereich.**
 
+### Dokumentation
 
+- **Backup-Import nachdokumentiert.** Das Hochladen einer vorhandenen
+  Backup-ZIP (Ziehen &amp; Ablegen oder Dateidialog unter System →
+  Backup/Restore, z. B. von einer anderen Installation oder nach einem
+  Geräteumzug) existierte bereits, fehlte aber in README.md und
+  docs/user-guide.md.
+
+## 0.80.4 - 2026-09-04
 
 ### Behoben
 

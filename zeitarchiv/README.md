@@ -255,10 +255,13 @@ unangetastet.
 
 Vollständige, portable ZIP-Backups (Index, Hot Buffer, Monatsarchive,
 Rollups) lassen sich erstellen, planen, prüfen und wiederherstellen —
-zusätzlich zu, nicht statt der automatischen Home-Assistant-Snapshots. Eine
-Wiederherstellung wird vor der Anwendung geprüft (Prüfsummen, ZIP-Struktur,
-Index-Integrität) und ist rollback-fähig: Der bisherige Datenbestand wird vor
-dem Überschreiben verschoben, nicht gelöscht.
+zusätzlich zu, nicht statt der automatischen Home-Assistant-Snapshots. Ein
+Backup von anderswo (z. B. einer anderen Installation oder vor einem
+Geräteumzug extern aufbewahrt) lässt sich per Ziehen &amp; Ablegen
+importieren. Eine Wiederherstellung wird vor der Anwendung geprüft
+(Prüfsummen, ZIP-Struktur, Index-Integrität) und ist rollback-fähig: Der
+bisherige Datenbestand wird vor dem Überschreiben verschoben, nicht
+gelöscht.
 
 ## Sicherheit und Netzwerk
 

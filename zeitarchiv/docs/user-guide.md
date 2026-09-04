@@ -1108,19 +1108,29 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   Home-Assistant-Snapshot sichert den Add-on-Zustand als Ganzes, ein
   Zeitarchiv-Backup ist unabhängig davon portabel und lässt sich auch
   außerhalb von Home Assistant aufbewahren.
+- **Vorhandenes Backup importieren:** eine Backup-ZIP-Datei per Ziehen &amp;
+  Ablegen oder über den Dateidialog hochladen — z. B. eines, das von einer
+  anderen Zeitarchiv-Installation stammt oder extern aufbewahrt wurde (Home-
+  Assistant-Neuinstallation, Geräteumzug). Die Datei wird vollständig
+  geprüft (Prüfsummen, ZIP-Struktur, Index-Integrität), bevor sie als
+  wiederherstellbares Backup in der Liste erscheint — bei einer zu großen
+  oder beschädigten Datei bleibt der bisherige Datenbestand unangetastet.
+  Obergrenzen: 2 GiB Upload, 5 GiB entpackt.
 - **Zeitplan:** automatisch nach Zeitplan (Intervall, Uhrzeit, ggf.
   Wochentag), mit automatischer Aufräumung älterer Backups nach Anzahl
   und/oder Alter, damit der Speicherplatz nicht unbegrenzt wächst.
 - **Prüfen:** Prüfsummen-Check eines vorhandenen Backups, ohne es
   anzuwenden — sinnvoll, um die Integrität eines Backups vor einem
-  tatsächlichen Wiederherstellungsbedarf zu bestätigen.
+  tatsächlichen Wiederherstellungsbedarf zu bestätigen. Gilt gleichermaßen
+  für selbst erstellte wie für importierte Backups.
 - **Wiederherstellen:** ersetzt den aktuellen Datenbestand vollständig
-  durch den Inhalt des gewählten Backups. Der bisherige Stand wird vor dem
-  Überschreiben in ein Rollback-Verzeichnis verschoben, nicht gelöscht —
-  bei Bedarf lässt sich der Zustand vor der Wiederherstellung also
-  zurückholen. Nach einer Wiederherstellung empfiehlt sich ein kurzer Blick
-  auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
-  Datensatzmengen wieder vorhanden sind.
+  durch den Inhalt des gewählten Backups (selbst erstellt oder importiert).
+  Der bisherige Stand wird vor dem Überschreiben in ein
+  Rollback-Verzeichnis verschoben, nicht gelöscht — bei Bedarf lässt sich
+  der Zustand vor der Wiederherstellung also zurückholen. Nach einer
+  Wiederherstellung empfiehlt sich ein kurzer Blick auf **Statistik**, um
+  zu prüfen, ob die erwarteten Entitäten und Datensatzmengen wieder
+  vorhanden sind.
 
 ## Einstellungen im Detail
 
