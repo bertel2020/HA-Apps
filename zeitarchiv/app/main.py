@@ -2893,13 +2893,16 @@ def api_stats_snapshots(range: str = "month") -> dict:
 
 
 def _storage_breakdown() -> list[dict]:
-    """Speicherbedarf nach Kategorie, direkt aus dem Dateisystem gezählt (nicht
-    aus dem Index) — als eigenständige, vom Index unabhängige Sicht auf den
-    tatsächlichen Plattenverbrauch, auch für Verzeichnisse (Hot Buffer, Import,
-    Backups), die der Index gar nicht mitführt."""
+    """Speicherbedarf nach Kategorie — für "archive" die bereits inkrementell
+    im Index gepflegte Summe (siehe Index.add_size_bytes(), aktualisiert bei
+    Rotation/Import/Retention/Purge) statt eines vollständigen Dateisystem-
+    Walks bei jedem Diagnose-Download (siehe ROADMAP.md, Performance ZP-011).
+    "rollup" bleibt ein echter Walk: der Index führt Rollup-Dateigrößen nicht
+    mit, nur Archiv-Parquet-Größen. Alle übrigen Kategorien (Hot Buffer,
+    Import, Backups) sind ohnehin nicht im Index abgebildet."""
     index_path = DATA_DIR / "index.sqlite"
     return [
-        {"key": "archive", "label": "Archiv", "bytes": dir_size(DATA_DIR / "archive")},
+        {"key": "archive", "label": "Archiv", "bytes": index.get_overview()["total_size_bytes"]},
         {"key": "rollup", "label": "Rollups", "bytes": dir_size(DATA_DIR / "rollup")},
         {"key": "hot", "label": "Laufender Monat (Hot Buffer)", "bytes": dir_size(DATA_DIR / "hot")},
         {"key": "index", "label": "Index", "bytes": index_path.stat().st_size if index_path.exists() else 0},
