@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.80.4 - 2026-09-04
+
+### Behoben
+
+- **„Vortag"/„Vorwoche"/„Vormonat"/„Vorjahr" in Vergleichstabellen zeigten
+  nur einen Teilzeitraum statt des kompletten.** Stand neben einer
+  Vergleichsspalte ihre laufende Basis-Spalte (z. B. „Tag" neben „Vortag"),
+  wurde die Vergleichsspalte serverseitig auf denselben Abstand vom
+  Periodenanfang gekappt wie die noch laufende aktuelle Periode — „Vortag"
+  zeigte dann z. B. nur 00:00 bis zur aktuellen Uhrzeit statt des ganzen
+  Tages. Betroffen war der tatsächlich angezeigte Zellwert selbst, nicht
+  nur ein Vergleichswert. Eine Vergleichsspalte liefert jetzt immer den
+  vollständigen Kalenderzeitraum; der faire, auf den bisherigen
+  Tagesverlauf gekappte Vergleich für die daneben angezeigte
+  Prozentzahl wird separat berechnet (kein zweiter Datenbank-Zugriff
+  nötig) und im Tooltip der Prozentzahl entsprechend erklärt.
+
+### Verbessert
+
+- **Keine Kompression, kein Cache-Control auf `/static/*`.** Weder
+  statische Assets noch HTML-Antworten wurden komprimiert
+  (`echarts.min.js`, ~1 MB, unkomprimiert ausgeliefert), und
+  `/static/*`-Antworten trugen kein `Cache-Control` — bei dieser
+  Multi-Page-App erzwang das bei jedem Seitenwechsel einen echten
+  Roundtrip für `htmx.min.js`/`echarts.min.js`/`alpine.min.js`/`app.css`/
+  jede Custom-JS-Datei. `GZipMiddleware` registriert, neue
+  `_CachedStaticFiles` setzt einen langen, "immutable" Cache-Control —
+  sicher, weil ausnahmslos jede `static/`-Referenz einen mtime-Cache-
+  Buster trägt (neu für die drei bisher unversionierten Vendor-Skripte:
+  `vendor_v`).
+
 ## 0.80.3 - 2026-09-04
 
 ### Verbessert
