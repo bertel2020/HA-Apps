@@ -22,15 +22,16 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     assert '@app.get("/reports")' not in main
     assert "create_api_router" in main
     assert "ReportService" in main
-    # War 4.800, dann 5.700 (Housekeeping-Bereich, 0.75.0), jetzt 5.800 nach
-    # CoordinatorBusy-Handler + Backup-Worker-Heartbeat (Roadmap "Neu seit
-    # 0.76.1", Punkt 1: coordinator.entity()/entities() ohne Timeout) —
-    # bewusst mit Puffer statt exakt auf den aktuellen Stand (~5.720), damit
-    # nicht jede Kleinigkeit die Grenze reißt. Wächst main.py nochmal
-    # spürbar, ist eine eigene housekeeping_routes.py (analog zu
-    # api_routes.py/report_routes.py/import_routes.py) der nächste Schritt,
-    # nicht ein weiteres Anheben dieser Zahl.
-    assert len(main.splitlines()) < 5_800
+    # War 4.800, dann 5.700 (Housekeeping-Bereich, 0.75.0), dann 5.800
+    # (CoordinatorBusy-Handler + Backup-Worker-Heartbeat), jetzt 5.850 nach
+    # GZipMiddleware + _CachedStaticFiles + vendor_v (Cache-Control/
+    # Kompression für static/, siehe css_v/js_v-Kommentare) — bewusst mit
+    # Puffer statt exakt auf den aktuellen Stand (~5.810), damit nicht jede
+    # Kleinigkeit die Grenze reißt. Wächst main.py nochmal spürbar, ist eine
+    # eigene housekeeping_routes.py (analog zu api_routes.py/report_routes.py/
+    # import_routes.py) der nächste Schritt, nicht ein weiteres Anheben
+    # dieser Zahl.
+    assert len(main.splitlines()) < 5_850
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

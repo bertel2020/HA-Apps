@@ -13,7 +13,7 @@
    unabhängig von der Verschachtelungstiefe (siehe oben), im Gegensatz zum
    uneinheitlichen base/relative-Pfad-Mix, den die einzelnen Seiten bisher
    für ihre Script-Tags nutzten. #}
-<script src="{{ app_root }}/static/vendor/alpine.min.js" defer></script>
+<script src="{{ app_root }}/static/vendor/alpine.min.js?v={{ vendor_v }}" defer></script>
 {% set _path = request.url.path %}
 {% set _rel = _path[(app_root|length):] if app_root and _path.startswith(app_root) else _path %}
 {% set nav_home = _rel in ('/', '', '/uebersicht') %}

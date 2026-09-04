@@ -41,6 +41,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from starlette.datastructures import MutableHeaders
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import Receive, Scope, Send
 
 from .formatting import (
@@ -424,9 +425,22 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_wrapper)
 
 
+class _CachedStaticFiles(StaticFiles):
+    """StaticFiles liefert nur Last-Modified/ETag, kein Cache-Control — sicher
+    lang cachebar, weil jede static/-Referenz einen mtime-Query-Parameter
+    trägt (css_v/js_v/vendor_v unten), der sich mit der Datei mitändert."""
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
-app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
+app.add_middleware(GZipMiddleware, minimum_size=500)  # bislang kein Content-Encoding irgendwo
+app.mount("/static", _CachedStaticFiles(directory=str(APP_DIR / "static")), name="static")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -435,11 +449,8 @@ def favicon() -> FileResponse:
     # immer unter dem Wurzelpfad an — ohne diese Route landet das als 404 im
     # Access-Log, obwohl das Addon-Icon längst existiert (addon/icon.png).
     return FileResponse(APP_DIR.parent / "icon.png", media_type="image/png")
-# Cache-Busting fürs geteilte Stylesheet (Design-System, siehe app/static/css/README.md):
-# der Browser cacht static/-Antworten sonst über Deploys hinweg, weil StaticFiles
-# keinen Cache-Control-Header setzt und nur Last-Modified/ETag liefert — je nach
-# Heuristik reicht das nicht für ein zuverlässiges Update. Ein an die Datei-mtime
-# gekoppelter Query-Parameter zwingt bei jeder Änderung eine frische Anfrage.
+# Cache-Busting fürs geteilte Stylesheet (siehe app/static/css/README.md),
+# macht das lange "immutable" Cache-Control von _CachedStaticFiles sicher.
 # format_int/format_value als Jinja-Filter statt jede Stelle einzeln in Python
 # vorzuformatieren: hier gerenderte Zahlen (Import-Vorschau/-Ergebnis, siehe
 # _import_dry_run.html/_import_result.html) stecken in Dataclass-Listen aus
@@ -458,6 +469,10 @@ templates.env.globals["css_v"] = int((APP_DIR / "static" / "css" / "app.css").st
 # einfacher als js_v-Kopien an jeder <script>-Stelle zu pflegen, und ändert sich
 # ohnehin bei jedem Deploy dieses Verzeichnisses.
 templates.env.globals["js_v"] = int(max(p.stat().st_mtime for p in (APP_DIR / "static" / "js").glob("*.js")))
+# Dieselbe Begründung wie js_v, für htmx/echarts/alpine — trugen bisher
+# keinen Cache-Buster, wären damit die einzige Lücke im langen Cache-Control
+# von _CachedStaticFiles gewesen.
+templates.env.globals["vendor_v"] = int(max(p.stat().st_mtime for p in (APP_DIR / "static" / "vendor").glob("*.js")))
 # Namenslänge für Dashboards/Charts/Tabellen: als maxlength in die
 # Eingabefelder, damit die Grenze schon beim Tippen gilt statt erst beim
 # Speichern. Die verbindliche Prüfung bleibt serverseitig
