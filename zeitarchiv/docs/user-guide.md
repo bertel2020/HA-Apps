@@ -118,7 +118,11 @@ hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
   **Standard-Dashboard** festlegen (dieses erscheint dann auf der
   Übersichtsseite und steht in der Dashboard-Übersicht immer an erster Stelle,
   unabhängig von Sortierung oder „Favoriten zuerst“) oder löschen.
-  Es gibt keine Obergrenze für die Anzahl der Dashboards.
+  Es gibt keine Obergrenze für die Anzahl der Dashboards. Das
+  Standard-Dashboard trägt einen farbigen Kopfstreifen zur leichteren
+  Wiedererkennung (dieselbe Idee wie bei der Energiedashboard-Kachel oben in
+  der Liste); steht **Einstellungen → Darstellung → Startseite** auf
+  Energiedashboard, zeigt dessen Kachel zusätzlich ein kleines Haus-Symbol.
 - Ein Klick auf die Kachel öffnet das Dashboard; „Bearbeiten“, „Duplizieren“,
   „Als Standard festlegen“ und „Löschen“ stehen im Kachelmenü (⋮).
   Suchfeld, Sortierung und der Schalter „Favoriten zuerst“ über den Kacheln
@@ -755,18 +759,29 @@ nur wieder gruppenlos, ihre Werte bleiben unverändert).
 Direkt unter dem Sankey stehen fünf KPI-Kacheln (Erzeugung, Verbrauch,
 Netzbezug, Speicher, Einspeisung) für den gewählten Zeitraum; bei mehreren
 Speichern oder Erzeugern zeigt ihr Tooltip zusätzlich die Aufschlüsselung je
-Gerät. Die Karte **„Autarkie & Speicher"** darunter zeigt vier Ringe —
-Autarkie, Eigenverbrauch, Speicher-Ladezustand und Speicher-Wirkungsgrad
-(bei mehreren Speichern jeweils kapazitätsgewichtet zusammengefasst, damit
-ein leerer und ein voller Speicher nicht fälschlich als „50 %“ erscheinen).
-Ein Klick auf einen Ring öffnet dessen Monatstrend der letzten drei
-Kalenderjahre.
+Gerät. Ein Klick auf eine Kachel führt zum Chart der zugrundeliegenden
+Entität, mit demselben Zeitraum, der gerade im Energiedashboard eingestellt
+ist; steckt mehr als eine Entität dahinter (mehrere Erzeuger/Verbraucher,
+oder ein Speicher mit getrennter Lade-/Entlade-Entität), öffnet sich
+stattdessen ein kurzes Auswahlfenster. Der Link „← zurück zum
+Energiedashboard“ auf der Entitätsseite (ebenso der aus dem Energiebericht,
+siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur
+Standardansicht. Die Karte **„Autarkie & Speicher"** darunter zeigt vier
+Ringe — Autarkie, Eigenverbrauch, Speicher-Ladezustand und
+Speicher-Wirkungsgrad (bei mehreren Speichern jeweils kapazitätsgewichtet
+zusammengefasst, damit ein leerer und ein voller Speicher nicht fälschlich
+als „50 %“ erscheinen). Ein Klick auf einen Ring öffnet dessen Monatstrend
+der letzten drei Kalenderjahre.
 
 Optionale Badges im Kopfbereich fassen die CO₂-Bilanz (🌱) und den
-Kosten-Saldo (💰) zusammen — je ein Klick öffnet die Details. Eine
-Kennzahlen-Leiste über dem Sankey bündelt zusätzlich Autarkie, vermiedenes
-CO₂, Kosten-Saldo und die PV-Ertragsprognose für „heute“ und „morgen“ auf
-einen Blick.
+Kosten-Saldo (💰) zusammen — je ein Klick öffnet die Details, darin jeweils
+zusätzlich eine dritte Kachel „Bilanz“ (CO₂-Ausstoß minus vermieden) bzw.
+der bereits bekannte Saldo, beide farblich hervorgehoben: steht die Bilanz
+im Plus (mehr vermieden bzw. erlöst als verursacht bzw. bezahlt), wird das
+eigens mit Stern und kurzem Hinweistext gefeiert statt nur als Zahl gezeigt.
+Eine Kennzahlen-Leiste über dem Sankey bündelt zusätzlich Autarkie,
+vermiedenes CO₂, Kosten-Saldo und die PV-Ertragsprognose für „heute“ und
+„morgen“ auf einen Blick.
 
 ### Status, Datenqualität und Auffälligkeiten
 

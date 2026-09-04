@@ -1,6 +1,51 @@
 # Changelog
 
-## 0.80.4 - 2026-09-04
+## 0.80.5 - 2026-09-04
+
+### Neu
+
+- **Energiedashboard-KPI-Kacheln verlinken auf den Entitäts-Chart.**
+  Erzeugung, Verbrauch, Netzbezug, Speicher und Einspeisung führen jetzt zum
+  Chart der jeweils zugrundeliegenden Entität, mit dem im Energiedashboard
+  gerade gewählten Zeitraum übernommen. Bei mehreren möglichen
+  Ziel-Entitäten (mehrere Erzeuger/Verbraucher, oder ein Speicher mit
+  getrennter Lade-/Entlade-Entität) öffnet ein kompaktes Auswahlfenster
+  statt eines uneindeutigen Links. Der Rücksprung („← zurück zum
+  Energiedashboard“ auf der Entitätsseite, ebenso aus dem Energiebericht)
+  zeigt danach wieder genau den vorher gewählten Zeitraum — Energiedashboard
+  spiegelt ihn dafür jetzt in seine eigene URL, statt ihn nur clientseitig
+  zu halten.
+- **CO₂-/Kosten-Bilanz mit Erfolgs-Hervorhebung.** Der CO₂-Dialog zeigt
+  jetzt zusätzlich eine „Bilanz"-Kachel (Ausstoß − Vermieden); steht sie
+  im Plus (mehr vermieden als verursacht), wird das mit Stern, sanftem
+  Grün-Verlauf und kurzem Erfolgstext hervorgehoben statt nur als Zahl
+  gezeigt — ebenso der Kosten-Saldo im Kostenanalyse-Dialog. Der
+  CO₂-Chip in der Kopfzeile färbt sich bei positiver Bilanz zusätzlich
+  grün. Dieselbe Bilanz erscheint jetzt auch im gedruckten Energiebericht.
+  Der dezente Eck-Farbverlauf der Energiefluss-Karte gilt jetzt auch für
+  die drei übrigen Dashboard-Karten (Autarkie & Speicher, Verbraucheranteile,
+  Tageslastprofil), je mit der eigenen Rollenfarbe.
+- **Dashboard-Übersicht: Standard-Dashboard und Startseite auf einen
+  Blick.** Das Standard-Dashboard trägt jetzt denselben farbigen
+  Kopfstreifen wie die Energiedashboard-Kachel (in den App-eigenen statt
+  den Energie-Rollenfarben). Steht **Einstellungen → Darstellung →
+  Startseite** auf Energiedashboard, zeigt dessen Kachel zusätzlich ein
+  kleines Haus-Symbol.
+
+### Behoben
+
+- **Abweichungs-Tooltip in Vergleichstabellen zeigte die vage Phrase „bis
+  zur aktuellen Uhrzeit" statt der tatsächlichen Uhrzeit** des
+  Vergleichs-Cutoffs (z. B. „Vortag bis 12:16 Uhr: 10,6 kWh"), und lief in
+  Dashboard-Kacheln sowie der vollen Tabellenbearbeitung in den
+  überlaufenen, abgeschnittenen Bereich der jeweiligen Scroll-Container.
+  Ein neues, gemeinsam genutztes Skript (`fixed-tooltip.js`) positioniert
+  den Tooltip jetzt über `position:fixed`, außerhalb jeder Beschneidung.
+- **„Lücken-Erkennung kann strukturell nicht zutreffen“ und „Endgültige
+  Bereinigung möglich“ verlinkten auf Entitäten statt auf den
+  zugehörigen Housekeeping-Bereich.**
+
+
 
 ### Behoben
 

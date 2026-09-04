@@ -143,11 +143,16 @@ Stunde-/Tag-/Monat-/Jahr-Navigation:
 
 - **Kennzahlen und Ringe:** Erzeugung, Verbrauch, Netzbezug, Speicher und
   Einspeisung als KPI-Kacheln (bei mehreren Speichern/Erzeugern als Summe mit
-  Aufschlüsselung im Tooltip); Autarkie-, Eigenverbrauchs-, Speicher-SOC- und
-  Wirkungsgrad-Ringe (bei mehreren Speichern kapazitätsgewichtet
-  zusammengefasst) mit anklickbarem Monatstrend über die letzten drei Jahre.
+  Aufschlüsselung im Tooltip) — ein Klick führt zum Chart der jeweiligen
+  Entität mit dem gerade gewählten Zeitraum, bei mehreren möglichen
+  Entitäten über ein kurzes Auswahlfenster; Autarkie-, Eigenverbrauchs-,
+  Speicher-SOC- und Wirkungsgrad-Ringe (bei mehreren Speichern
+  kapazitätsgewichtet zusammengefasst) mit anklickbarem Monatstrend über die
+  letzten drei Jahre.
 - **Kosten und CO₂:** Bilanz aus Strompreis- bzw. CO₂-Entität oder einem
-  eigenen Festpreis, falls keine passende Entität vorhanden ist.
+  eigenen Festpreis, falls keine passende Entität vorhanden ist — steht die
+  Bilanz im Plus (mehr erlöst/vermieden als bezahlt/verursacht), wird das
+  eigens hervorgehoben statt nur als Zahl gezeigt.
 - **PV-Ertragsprognose** und ein **Tageslastprofil** (stündlicher Verbrauch
   der letzten 7 Tage; bei Monat/Jahr stattdessen nach Wochentag gemittelt).
 - **Status-Check:** prüft die Energiebilanz auf Plausibilität, meldet
