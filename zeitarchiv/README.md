@@ -305,6 +305,218 @@ erleichtern die Fehlersuche ohne ein dauerhaftes Log pro Messwert. Details:
 - Manuelle Lösch- und Retention-Aktionen können endgültig sein. Vor größeren
   Eingriffen sollte ein geprüftes Backup erstellt werden.
 
+## Warum Zeitarchiv?
+
+<details>
+<summary>Warum gibt es Zeitarchiv – trotz Home-Assistant-Langzeitstatistik, Energiedashboard und InfluxDB/Grafana?</summary>
+
+Zeitarchiv ist nicht entstanden, weil ich die vorhandenen Lösungen nicht
+kannte. Im Gegenteil: Ich habe mich lange und intensiv mit InfluxDB,
+VictoriaMetrics und Grafana beschäftigt und verschiedene Ansätze
+ausprobiert. Diese Systeme sind sehr leistungsfähig, waren für meinen
+Anwendungsfall aber zu aufwendig und führten trotz des erheblichen
+Einrichtungsaufwands nicht zu dem Bedienkomfort, den ich gesucht habe.
+
+### Home-Assistant-Recorder und Langzeitstatistik
+
+Der Recorder von Home Assistant ist in erster Linie die Betriebsdatenbank
+des Systems. Er versorgt unter anderem die Verlaufsansicht, das Logbuch,
+Dashboard-Karten und die Langzeitstatistik.
+
+Die vollständige Zustandshistorie wird standardmäßig nur für einen
+begrenzten Zeitraum aufbewahrt. Dieser Zeitraum kann verlängert werden,
+dadurch wächst jedoch auch die operative Datenbank.
+
+Für geeignete numerische Sensoren bietet Home Assistant zusätzlich eine
+Langzeitstatistik. Diese ist für viele Anwendungen vollkommen ausreichend,
+speichert langfristig aber statistische Verdichtungen beziehungsweise
+Summen und nicht zwingend sämtliche ursprünglichen Zustandsänderungen in
+ihrer ursprünglichen zeitlichen Auflösung. Außerdem müssen Entitäten
+bestimmte Voraussetzungen erfüllen, beispielsweise eine passende
+`state_class`. Andere Sensoren und nicht numerische Zustände können nicht
+in gleicher Weise langfristig ausgewertet werden.
+
+Zeitarchiv verfolgt deshalb einen anderen Ansatz:
+
+- Es werden nur ausdrücklich ausgewählte Entitäten archiviert.
+- Die übertragenen Zustandsänderungen bleiben zunächst vollständig
+  erhalten.
+- Auflösung, Rundung und Aufbewahrung lassen sich pro Entität
+  konfigurieren.
+- Entitäten können bei Bedarf unbegrenzt aufbewahrt werden.
+- Das Archiv ist unabhängig von der Aufbewahrungsdauer des
+  Home-Assistant-Recorders.
+
+Ein wichtiger Schwerpunkt ist dabei die kompakte Speicherung großer
+Datenmengen. Abgeschlossene Monate werden spaltenorientiert mit Parquet
+und Zstandard komprimiert. Zusätzlich sorgen vorberechnete Rollups dafür,
+dass Auswertungen über Monate oder Jahre nicht jedes Mal sämtliche
+Rohdaten verarbeiten müssen. Dadurch ist Zeitarchiv auf Archive über viele
+Jahre und Datenbestände mit vielen Millionen bis hin zu mehreren hundert
+Millionen Messwerten ausgelegt.
+
+Zeitarchiv soll also keine zweite vollständige Home-Assistant-Datenbank
+sein, sondern ein bewusst ausgewähltes und langfristig nutzbares
+Messwertarchiv.
+
+### Visualisierung und langfristige Vergleiche
+
+Home Assistant bietet gute Standarddarstellungen für den aktuellen und
+kurzfristigen Verlauf. Auch die Langzeitstatistik kann für viele Sensoren
+sinnvoll visualisiert werden.
+
+Sobald ich jedoch komplexere und regelmäßig wiederkehrende Vergleiche
+erstellen wollte, wurde die Umsetzung deutlich aufwendiger. Dazu gehören
+beispielsweise:
+
+- aktueller Zeitraum im Vergleich zum Vorjahr
+- mehrere Jahre nebeneinander
+- Monatsvergleiche über unterschiedliche Jahre
+- mehrere Entitäten mit verschiedenen Einheiten in einem Chart
+- Tabellen mit frei wählbaren Zeitspalten
+- Summen aus mehreren Entitäten
+- berechnete Werte und eigene Formeln
+- dauerhaft gespeicherte, thematisch getrennte Auswertungen
+
+Genau an diesem Punkt hat mich auch Grafana nicht vollständig überzeugt.
+Grafana kann grundsätzlich Zeitverschiebungen und Vergleiche abbilden. Ein
+komfortabler Vorjahresvergleich ist jedoch kein allgemeines eingebautes
+Feature, das sich für beliebige Datenreihen einfach einschalten lässt. Je
+nach Datenquelle und gewünschter Darstellung benötigt man dafür angepasste
+Abfragen, Zeitverschiebungen, Transformationen oder mehrfach konfigurierte
+Datenreihen und Panels.
+
+Bei einfachen Abfragen ist das machbar. Sobald mehrere Entitäten,
+unterschiedliche Zeiträume, Summen oder wechselnde Auswertungen beteiligt
+sind, entsteht jedoch schnell erheblicher Konfigurations- und
+Pflegeaufwand.
+
+Mein Ziel war eine Bedienung, bei der ich einen Zeitraum auswähle und
+anschließend einfach „Vorjahr vergleichen" aktiviere. Die dafür benötigten
+Abfragen und Zeitverschiebungen soll die Anwendung selbst erzeugen.
+
+Zeitarchiv bietet deshalb:
+
+- Vergleich mit Vorperiode oder Vorjahr direkt in der Verlaufsansicht
+- Navigation von einer Stunde bis zu einer Dekade
+- Charts mit mehreren Entitäten und unterschiedlichen Einheiten
+- frei konfigurierbare Vergleichstabellen
+- Summengruppen und eigene Formeln
+- frei benennbare Dashboards
+- wiederverwendbare Charts und Tabellen
+- direkten Wechsel zwischen Kennzahl und Entitätsverlauf
+
+### Bereinigung und Pflege historischer Daten
+
+Ein weiterer wichtiger Punkt ist die Datenqualität. Sensoren liefern
+gelegentlich falsche Werte, springen kurzzeitig auf null oder erzeugen
+unplausible Zählerstände. Auch Duplikate, Datenlücken und dauerhaft
+wiederholte Werte kommen vor.
+
+Home Assistant besitzt Werkzeuge zur Prüfung und Korrektur bestimmter
+Statistikwerte. Es gibt jedoch keinen durchgängigen Arbeitsbereich, in dem
+sich die ursprüngliche Historie ausgewählter Entitäten systematisch
+untersuchen, korrigieren und bereinigen lässt.
+
+Auch InfluxDB oder VictoriaMetrics speichern Zeitreihen sehr effizient.
+Das gezielte Auffinden und komfortable Korrigieren einzelner
+Home-Assistant-Messwerte ist jedoch nicht ihr primärer Anwendungsfall.
+Dafür benötigt man Abfragen, Datenbankwerkzeuge oder eigene
+Wartungsprozesse. Grafana visualisiert die Daten, ist aber keine
+Oberfläche zur eigentlichen Datenpflege.
+
+Zeitarchiv stellt diese Aufgaben deshalb direkt in der Oberfläche bereit:
+
+- Ausreißer, Lücken und Duplikate erkennen
+- einzelne Messwerte nachträglich korrigieren
+- verdächtige Werte zunächst per Soft Delete ausblenden
+- Änderungen prüfen, bevor Daten endgültig entfernt werden
+- inaktive Entitäten erkennen
+- historische Lücken durch Importe schließen
+- vorhandene Zeitstempel beim Import nicht erneut anlegen
+- widersprüchliche Einstellungen und ungenutzte Auswertungen anzeigen
+- Import-, Backup- und Wartungsvorgänge nachvollziehbar dokumentieren
+
+Ein einzelner defekter Sensorwert soll nicht noch Jahre später Summen,
+Diagramme oder Vergleiche verfälschen.
+
+### Energiedashboard
+
+Das Energiedashboard von Home Assistant ist eine gute Standardlösung und
+für die meisten Installationen der richtige Ausgangspunkt. Zeitarchiv
+soll es nicht ersetzen.
+
+Das Zeitarchiv-Energiedashboard legt den Schwerpunkt stärker auf
+langfristige Vergleiche und zusätzliche Auswertungen:
+
+- Sankey-Darstellung mit mehreren Erzeugern und Speichern
+- frei benennbare Verbrauchergruppen
+- Autarkie und Eigenverbrauch
+- Speicherfüllstand und Wirkungsgrad
+- Kosten- und CO₂-Bilanz
+- PV-Ertragsprognose
+- Tageslastprofil
+- Navigation von der Stunde bis zum Jahr
+- Monatstrends über mehrere Jahre
+- direkter Wechsel von einer Kennzahl zum langfristigen Entitätsverlauf
+- Plausibilitätsprüfung der Energiebilanz
+- Hinweise auf veraltete Sensorwerte
+- Erkennung ungewöhnlich hoher Verbraucher
+
+Beide Energiedashboards können problemlos parallel verwendet werden.
+
+### Warum nicht InfluxDB, VictoriaMetrics und Grafana?
+
+InfluxDB, VictoriaMetrics und Grafana sind mächtige und bewährte Systeme.
+Wer sie bereits eingerichtet hat, die Abfragesprachen beherrscht und
+seine gewünschten Auswertungen damit komfortabel abbilden kann, benötigt
+Zeitarchiv möglicherweise nicht.
+
+Für meine Anforderungen bedeuteten diese Lösungen jedoch:
+
+- mehrere eigenständige Komponenten installieren und betreiben
+- Datenübertragung und Filter konfigurieren
+- Abfragen in InfluxQL, Flux, SQL, MetricsQL oder PromQL erstellen
+- Zeitverschiebungen und Vorjahresvergleiche selbst konstruieren
+- Panels und Dashboards einzeln konfigurieren und pflegen
+- Aufbewahrungsregeln festlegen
+- Datenbank, Benutzer und Zugriffsrechte verwalten
+- eigene Sicherungs- und Wiederherstellungsprozesse einrichten
+- für Datenkorrekturen zusätzliche Werkzeuge oder Abfragen verwenden
+
+Trotz langer Beschäftigung mit diesen Systemen erreichte ich damit nicht
+die Kombination aus einfacher Bedienung, langfristigen Vergleichen,
+Datenpflege und Home-Assistant-Integration, die ich mir vorgestellt hatte.
+
+Zeitarchiv ist bewusst weniger universell. Dafür sind Archivierung,
+Visualisierung, Vorjahresvergleich, Datenpflege, Import, Export, Backup
+und Wiederherstellung in einer auf Home Assistant zugeschnittenen
+Oberfläche zusammengefasst.
+
+### Mein persönlicher Hintergrund
+
+Ich nutze seit etwa 13 Jahren Symcon und habe dort inzwischen mehr als 130
+Millionen Messwerte aus den Bereichen Energie, Temperatur, Wetter und
+Betrieb gespeichert.
+
+Home Assistant verwende ich hauptsächlich für Steuerung, Automatisierungen
+und die Integration unterschiedlichster Systeme. Bei Symcon schätze ich
+dagegen die unkomplizierte Langzeitspeicherung, schnelle Vergleiche und
+die Möglichkeit, fehlerhafte historische Werte nachträglich zu
+korrigieren.
+
+Zeitarchiv ist aus dem Wunsch entstanden, diese Arbeitsweise direkt in
+Home Assistant zu ermöglichen – mit deutlich weniger Einrichtungs- und
+Pflegeaufwand als bei einer selbst zusammengestellten Lösung aus
+externer Zeitreihendatenbank und Grafana.
+
+Kurz gesagt: Zeitarchiv richtet sich an Anwender, die ausgewählte Daten
+nicht nur langfristig und platzsparend aufbewahren, sondern sie auch
+komfortabel vergleichen, visualisieren, kontrollieren, sichern und bei
+Bedarf korrigieren möchten.
+
+</details>
+
 ## Haftungsausschluss
 
 Zeitarchiv ist ein privat entwickeltes, kostenloses Open-Source-Projekt und
