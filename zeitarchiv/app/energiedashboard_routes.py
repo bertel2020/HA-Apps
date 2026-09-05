@@ -440,6 +440,20 @@ class EnergieDashboardService:
         z. B. am 1. eines Monats aussagekräftig."""
         if not entity_id:
             return {}, False
+        # Innerhalb EINES Requests fragen mehrere Bausteine dieselbe Kombination
+        # aus (Entität, Zeitraum, Offset) an — der Wirkungsgrad-Trend und
+        # _monthly_sum_by_year() etwa beide die Lade-/Entlade-Zähler über
+        # dieselben Jahres-Offsets. Gemessen waren so 23 von 76 Aufrufen pro
+        # compute_flow() reine Wiederholungen. read_cache allein half dagegen
+        # nicht: der cached nur die geparsten Hot-Buffer-Zeilen, die Rollup-
+        # Aggregation darüber lief trotzdem jedes Mal neu. Das Ergebnis ist für
+        # die Dauer des Requests unveränderlich (dieselbe Begründung wie beim
+        # Hot-Row-Cache), und keine Aufrufstelle verändert die zurückgegebene
+        # Serie — sonst wäre eine geteilte Referenz nicht zulässig.
+        memo_key = ("edash_entity_series", entity_id, range_key, offset, continuous)
+        cached = read_cache.memo.get(memo_key)
+        if cached is not None:
+            return cached
         result = query_mod.query_series(
             self.deps.data_dir, self.deps.index, entity_id, range_key,
             self.deps.tz, now, offset=offset, read_cache=read_cache, continuous=continuous,
@@ -460,6 +474,7 @@ class EnergieDashboardService:
         stale = True
         if entity is not None and entity["last_ts"]:
             stale = (now.timestamp() - entity["last_ts"]) > STALE_SECONDS
+        read_cache.memo[memo_key] = (series, stale)
         return series, stale
 
     @staticmethod
@@ -888,33 +903,9 @@ class EnergieDashboardService:
             else None
         )
 
-        # Trend fürs Popup (Klick auf den Speicher-SOC-Ring) — anders als
-        # Wirkungsgrad braucht SOC keine Ratio-Berechnung, der Monats-Bucket
-        # ist bei einem Gauge (%) schon der Ø-Wert dieses Monats. Über mehrere
-        # Speicher hinweg wird je Monat kapazitätsgewichtet gemittelt statt
-        # (wie bei Erzeuger/Verbraucher) summiert — dieselbe Begründung wie
-        # bei speicher_soc oben.
-        speicher_soc_trend: list[dict] = []
-        if not (continuous or skip_quality) and soc_period_pairs:
-            soc_weighted_sum: dict[float, float] = {}
-            soc_weight_sum: dict[float, float] = {}
-            for sp in speicher_list:
-                if not sp.get("soc_entity_id"):
-                    continue
-                sp_weight = sp.get("_resolved_capacity_kwh") or 1.0
-                sp_monthly = self._monthly_sum_by_year([sp["soc_entity_id"]], now, read_cache)
-                for ts, val in sp_monthly.items():
-                    soc_weighted_sum[ts] = soc_weighted_sum.get(ts, 0.0) + val * sp_weight
-                    soc_weight_sum[ts] = soc_weight_sum.get(ts, 0.0) + sp_weight
-            soc_monthly_avg = {ts: soc_weighted_sum[ts] / soc_weight_sum[ts] for ts in soc_weighted_sum}
-            by_year_soc: dict[str, list[float | None]] = {}
-            for ts in sorted(soc_monthly_avg):
-                dt = datetime.fromtimestamp(ts, self.deps.tz)
-                year_key = dt.strftime("%Y")
-                by_year_soc.setdefault(year_key, [None] * 12)[dt.month - 1] = round(soc_monthly_avg[ts], 1)
-            speicher_soc_trend = [
-                {"year": year_key, "months": by_year_soc[year_key]} for year_key in sorted(by_year_soc)
-            ]
+        # (Der Speicher-SOC-Trend fürs Popup steht jetzt in compute_trends() —
+        # siehe dort, warum die vier Ring-Trends nicht mehr bei jedem
+        # Perioden-Wechsel mitberechnet werden.)
 
         # PV-Prognose: dieselbe "aktueller Rohwert statt Perioden-Query"-Logik
         # wie beim Jetzt-Füllstand oben — eine Prognose-Entität (z. B.
@@ -940,7 +931,6 @@ class EnergieDashboardService:
                 prognose_morgen = round(raw_value, 1)
 
         speicher_efficiency = None
-        speicher_efficiency_trend: list[dict] = []
         speichers_with_both = [sp for sp in speicher_list if sp.get("laden_entity_id") and sp.get("entladen_entity_id")]
         if not (continuous or skip_quality) and speichers_with_both:
             # Selbst berechnet statt manuell im Setup einzutragen (vorher
@@ -960,8 +950,6 @@ class EnergieDashboardService:
             total_laden_all = 0.0
             total_entladen_all = 0.0
             total_corrected_laden = 0.0
-            monthly_laden: dict[float, float] = {}
-            monthly_entladen: dict[float, float] = {}
             for sp in speichers_with_both:
                 laden_all, _ = self._entity_series(sp["laden_entity_id"], "decade", 0, now, read_cache)
                 entladen_all, _ = self._entity_series(sp["entladen_entity_id"], "decade", 0, now, read_cache)
@@ -989,53 +977,10 @@ class EnergieDashboardService:
                         corrected = laden_all_total - delta_kwh
                 total_corrected_laden += corrected
 
-                # Trend fürs Popup (Klick auf den Wirkungsgrad-Ring): monatliche
-                # statt jährliche Auflösung — "decade" liefert nur Jahres-Buckets
-                # (siehe oben, weiterhin für die Momentaufnahme genutzt), für
-                # Monate braucht es stattdessen "year"-Abfragen (liefern
-                # Monats-Buckets, aber jeweils nur für EIN Kalenderjahr) über
-                # mehrere offsets. 3 Jahre zurück ist ein Kompromiss: genug
-                # für eine erkennbare Kurve, ohne beliebig viele
-                # Einzel-Abfragen zu brauchen. Bewusst OHNE die SOC-Korrektur
-                # von oben (lohnt sich vor allem bei kurzen Fenstern) — hält
-                # den Trend einfach statt pro Monat eine eigene Korrektur zu
-                # brauchen. += statt .update(), weil sich hier (anders als
-                # bei den Jahres-Offsets desselben Speichers) die Zeitstempel
-                # MEHRERER Speicher im selben Monat überschneiden können.
-                for year_offset in range(0, -3, -1):
-                    laden_year, _ = self._entity_series(sp["laden_entity_id"], "year", year_offset, now, read_cache)
-                    entladen_year, _ = self._entity_series(sp["entladen_entity_id"], "year", year_offset, now, read_cache)
-                    for ts, v in laden_year.items():
-                        monthly_laden[ts] = monthly_laden.get(ts, 0.0) + v
-                    for ts, v in entladen_year.items():
-                        monthly_entladen[ts] = monthly_entladen.get(ts, 0.0) + v
-
             if total_corrected_laden > 0:
                 speicher_efficiency = round(max(0.0, min(1.0, total_entladen_all / total_corrected_laden)) * 100, 1)
             elif total_laden_all > 0:
                 speicher_efficiency = round(max(0.0, min(1.0, total_entladen_all / total_laden_all)) * 100, 1)
-
-            # Eine Zeile je Jahr mit einer festen 12-Slot-Sparkline (Jan..Dez)
-            # statt einer einzigen durchgehenden Kurve über alle Monate —
-            # fehlende Monate (vor Speicher-Inbetriebnahme oder noch in der
-            # Zukunft, beim laufenden Jahr) bleiben als Lücke im jeweiligen
-            # Slot statt die Kurve zusammenzustauchen, damit sich Jahre direkt
-            # untereinander vergleichen lassen (Jan..Dez immer an derselben
-            # x-Position, wie beim Tageslastprofil mit den 24 Stunden-Zellen).
-            by_year: dict[str, list[float | None]] = {}
-            for ts in sorted(monthly_laden):
-                month_laden = monthly_laden.get(ts, 0.0)
-                month_entladen = monthly_entladen.get(ts, 0.0)
-                if month_laden <= 0:
-                    continue
-                dt = datetime.fromtimestamp(ts, self.deps.tz)
-                year_key = dt.strftime("%Y")
-                by_year.setdefault(year_key, [None] * 12)[dt.month - 1] = round(
-                    max(0.0, min(1.0, month_entladen / month_laden)) * 100, 1
-                )
-            speicher_efficiency_trend = [
-                {"year": year_key, "months": by_year[year_key]} for year_key in sorted(by_year)
-            ]
 
         # Verbraucher hängen im Sankey je nach Gruppen-Zuordnung ein- oder
         # zweistufig am Bus: mit Gruppe Bus -> Gruppenname (Summe der
@@ -1091,12 +1036,33 @@ class EnergieDashboardService:
         verbraucher_series_by_name: dict[str, dict[float, float]] = {}
         gruppen_totals: dict[str, float] = {}
         gruppen_baseline_totals: dict[str, float] = {}
+        # Eine Gruppe mit nur EINEM Mitglied ist keine Gruppierung, sondern eine
+        # Umbenennung: im Sankey entstand daraus eine zusätzliche Ebene mit
+        # einem Knoten, durch den derselbe Wert unverändert hindurchfloss
+        # ("Mobilität" -> "Wallbox", beide 44,9 kWh). Das kostete eine ganze
+        # Spalte Breite für ein langes, flaches Band ohne Aussage und drückte
+        # alle echten Verzweigungen zusammen. Solche Mitglieder hängen deshalb
+        # direkt am Bus, genau wie ein Gerät ohne Gruppe — die Gruppe bleibt in
+        # der Konfiguration bestehen und wirkt wieder, sobald ein zweites Gerät
+        # dazukommt. Gezählt wird über die KONFIGURATION, nicht über die Werte
+        # dieser Periode: eine Gruppe mit drei Geräten, von denen gerade nur
+        # eines lief, bleibt eine Gruppe (dieselbe Begründung wie beim
+        # ungefilterten Zählen für die Tooltip-Anteile).
+        gruppen_mitglieder: dict[str, int] = {}
+        for verbraucher in config.get("verbraucher") or []:
+            if not verbraucher.get("entity_id"):
+                continue
+            gruppe_name_cfg = (verbraucher.get("gruppe") or "").strip()
+            if gruppe_name_cfg:
+                gruppen_mitglieder[gruppe_name_cfg] = gruppen_mitglieder.get(gruppe_name_cfg, 0) + 1
         for verbraucher in config.get("verbraucher") or []:
             entity_id = verbraucher.get("entity_id")
             if not entity_id:
                 continue
             name = self._display_name(entity_id, verbraucher.get("name", ""))
             gruppe = (verbraucher.get("gruppe") or "").strip() or None
+            if gruppe and gruppen_mitglieder.get(gruppe, 0) < 2:
+                gruppe = None
             series, stale = entity_series(entity_id)
             val = self._series_total(series)
             display_val = max(val, 0.0)
@@ -1222,51 +1188,7 @@ class EnergieDashboardService:
         if erzeugung_total > 0:
             eigenverbrauch = round(max(0.0, min(1.0, (erzeugung_total - einspeisung_total) / erzeugung_total)) * 100, 1)
 
-        # Trends fürs Popup (Klick auf den Autarkie-/Eigenverbrauch-Ring) —
-        # dieselben Formeln wie oben, aber monatlich statt für die ganze
-        # Periode. Statt die komplette Bus-/Grundlast-Bilanz je Monat neu
-        # aufzubauen (aufwendig), wird dieselbe Erhaltungs-Identität wie oben
-        # genutzt: bus_in = Netzbezug + Erzeugung + Speicher-Entladung,
-        # Verbrauch = bus_in − Einspeisung − Speicherladung (genau das, was
-        # verbrauch_total oben auch ist — Verbraucher+Grundlast zusammen).
-        autarkie_trend: list[dict] = []
-        eigenverbrauch_trend: list[dict] = []
-        if not (continuous or skip_quality):
-            erzeuger_ids = [erz.get("entity_id") for erz in (config.get("erzeuger") or []) if erz.get("entity_id")]
-            netzbezug_monthly = self._monthly_sum_by_year([netzbezug_id], now, read_cache)
-            erzeugung_monthly = self._monthly_sum_by_year(erzeuger_ids, now, read_cache)
-            einspeisung_monthly = self._monthly_sum_by_year([config.get("einspeisung") or ""], now, read_cache)
-            speicher_entladen_ids = [sp.get("entladen_entity_id") for sp in speicher_list if sp.get("entladen_entity_id")]
-            speicher_laden_ids = [sp.get("laden_entity_id") for sp in speicher_list if sp.get("laden_entity_id")]
-            speicher_entladen_monthly = self._monthly_sum_by_year(speicher_entladen_ids, now, read_cache)
-            speicher_laden_monthly = self._monthly_sum_by_year(speicher_laden_ids, now, read_cache)
-            by_year_autarkie: dict[str, list[float | None]] = {}
-            by_year_eigenverbrauch: dict[str, list[float | None]] = {}
-            for ts in sorted(set(netzbezug_monthly) | set(erzeugung_monthly)):
-                netzbezug_month = max(netzbezug_monthly.get(ts, 0.0), 0.0)
-                erzeugung_month = erzeugung_monthly.get(ts, 0.0)
-                einspeisung_month = max(einspeisung_monthly.get(ts, 0.0), 0.0)
-                entladen_month = speicher_entladen_monthly.get(ts, 0.0)
-                laden_month = speicher_laden_monthly.get(ts, 0.0)
-                bus_in_month = netzbezug_month + erzeugung_month + entladen_month
-                verbrauch_month = bus_in_month - einspeisung_month - laden_month
-                dt = datetime.fromtimestamp(ts, self.deps.tz)
-                year_key = dt.strftime("%Y")
-                if verbrauch_month > 0:
-                    by_year_autarkie.setdefault(year_key, [None] * 12)[dt.month - 1] = round(
-                        max(0.0, min(1.0, 1 - netzbezug_month / verbrauch_month)) * 100, 1
-                    )
-                if erzeugung_month > 0:
-                    by_year_eigenverbrauch.setdefault(year_key, [None] * 12)[dt.month - 1] = round(
-                        max(0.0, min(1.0, (erzeugung_month - einspeisung_month) / erzeugung_month)) * 100, 1
-                    )
-            autarkie_trend = [
-                {"year": year_key, "months": by_year_autarkie[year_key]} for year_key in sorted(by_year_autarkie)
-            ]
-            eigenverbrauch_trend = [
-                {"year": year_key, "months": by_year_eigenverbrauch[year_key]}
-                for year_key in sorted(by_year_eigenverbrauch)
-            ]
+        # (Autarkie-/Eigenverbrauch-Trend fürs Popup: siehe compute_trends().)
 
         # Verbraucheranteile: dieselben Verbraucher-Werte wie im Sankey, plus
         # Grundlast als gleichwertiger Eintrag (beide zusammen ergeben immer
@@ -1564,10 +1486,8 @@ class EnergieDashboardService:
             "nodes": nodes,
             "links": links,
             "green_ratio": green_ratio,
-            "speicher_efficiency_trend": speicher_efficiency_trend,
-            "speicher_soc_trend": speicher_soc_trend,
-            "autarkie_trend": autarkie_trend,
-            "eigenverbrauch_trend": eigenverbrauch_trend,
+            # Die vier Ring-Trends stehen bewusst NICHT mehr hier, sondern
+            # unter /energiedashboard/trends — siehe compute_trends().
             "kpi": {
                 "erzeugung": erzeugung_total,
                 "verbrauch": verbrauch_total,
@@ -1621,6 +1541,134 @@ class EnergieDashboardService:
             "speicher_soc_now_breakdown": soc_now_breakdown,
             "anomalien": anomalien,
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
+        }
+
+    def compute_trends(
+        self, config: dict, read_cache: query_mod.QueryReadCache | None = None,
+    ) -> dict:
+        """Die vier Ring-Trends (Wirkungsgrad/Autarkie/Eigenverbrauch/
+        Speicher-SOC) als eigener, nachgeladener Datensatz.
+
+        Vorher liefen diese Berechnungen in compute_flow() mit und damit bei
+        JEDEM Laden des Dashboards — gemessen 74 % der Rechenzeit eines
+        /energiedashboard/data-Requests (Tag-Ansicht) für Zahlen, die man erst
+        nach einem Klick auf einen der Ringe überhaupt zu sehen bekommt.
+
+        Zusätzlich hängen sie gar nicht am gewählten Zeitraum: alle vier gehen
+        über die letzten drei KALENDERJAHRE (siehe _monthly_sum_by_year()),
+        unabhängig von range/offset. Sie bei jedem Umschalten zwischen Stunde/
+        Tag/Monat/Jahr und bei jedem Perioden-Schritt neu zu berechnen, war
+        also doppelt umsonst. Deshalb hier ohne range/offset-Parameter — ein
+        Aufruf je Seitenaufruf genügt.
+
+        Unterschied zum bisherigen Verhalten: der SOC-Trend hing vorher daran,
+        ob im ANGEZEIGTEN Zeitraum SOC-Werte vorlagen (soc_period_pairs). Das
+        war eine Kopplung ohne Grund — ob ein Drei-Jahres-Trend etwas zeigt,
+        sollte nicht davon abhängen, ob ausgerechnet der gewählte Tag Werte
+        hatte. Jetzt entscheidet allein, ob eine SOC-Entität zugeordnet ist."""
+        now = datetime.now(self.deps.tz)
+        if read_cache is None:
+            read_cache = query_mod.QueryReadCache()
+        speicher_list: list[dict] = config.get("speicher") or []
+
+        def by_year_rows(monthly: dict[float, float], to_pct) -> list[dict]:
+            """Gemeinsames Gerüst aller vier Trends: eine Zeile je Jahr mit
+            fester 12-Slot-Sparkline (Jan..Dez). Fehlende Monate (vor
+            Inbetriebnahme oder noch in der Zukunft) bleiben als Lücke im
+            jeweiligen Slot, statt die Kurve zusammenzustauchen — so stehen
+            Jan..Dez über alle Jahres-Zeilen an derselben x-Position und
+            lassen sich direkt vergleichen (wie die 24 Stunden-Zellen im
+            Tageslastprofil). to_pct(ts) gibt den Prozentwert oder None."""
+            rows: dict[str, list[float | None]] = {}
+            for ts in sorted(monthly):
+                value = to_pct(ts)
+                if value is None:
+                    continue
+                dt = datetime.fromtimestamp(ts, self.deps.tz)
+                rows.setdefault(dt.strftime("%Y"), [None] * 12)[dt.month - 1] = value
+            return [{"year": year_key, "months": rows[year_key]} for year_key in sorted(rows)]
+
+        # --- Speicher-SOC: kapazitätsgewichtetes Monatsmittel -------------
+        # Ein Gauge (%) braucht keine Ratio-Rechnung, der Monats-Bucket IST
+        # schon der Ø dieses Monats. Über mehrere Speicher hinweg gewichtet
+        # gemittelt statt summiert (sonst bis zu 200 %) — dieselbe Begründung
+        # wie bei speicher_soc in compute_flow().
+        soc_weighted_sum: dict[float, float] = {}
+        soc_weight_sum: dict[float, float] = {}
+        for sp in speicher_list:
+            if not sp.get("soc_entity_id"):
+                continue
+            sp_weight = self._resolve_speicher_capacity(sp, now, read_cache) or 1.0
+            for ts, val in self._monthly_sum_by_year([sp["soc_entity_id"]], now, read_cache).items():
+                soc_weighted_sum[ts] = soc_weighted_sum.get(ts, 0.0) + val * sp_weight
+                soc_weight_sum[ts] = soc_weight_sum.get(ts, 0.0) + sp_weight
+        speicher_soc_trend = by_year_rows(
+            soc_weighted_sum,
+            lambda ts: round(soc_weighted_sum[ts] / soc_weight_sum[ts], 1) if soc_weight_sum.get(ts) else None,
+        )
+
+        # --- Wirkungsgrad: Entladung/Ladung je Monat ----------------------
+        # Bewusst OHNE die SOC-Korrektur des Momentanwerts (die lohnt vor allem
+        # bei kurzen Fenstern) — hält den Trend einfach, statt je Monat eine
+        # eigene Korrektur zu brauchen. += statt .update(), weil sich die
+        # Zeitstempel MEHRERER Speicher im selben Monat überschneiden.
+        speicher_laden_ids = [sp["laden_entity_id"] for sp in speicher_list if sp.get("laden_entity_id")]
+        speicher_entladen_ids = [sp["entladen_entity_id"] for sp in speicher_list if sp.get("entladen_entity_id")]
+        speichers_with_both = [
+            sp for sp in speicher_list if sp.get("laden_entity_id") and sp.get("entladen_entity_id")
+        ]
+        monthly_laden = self._monthly_sum_by_year(
+            [sp["laden_entity_id"] for sp in speichers_with_both], now, read_cache,
+        )
+        monthly_entladen = self._monthly_sum_by_year(
+            [sp["entladen_entity_id"] for sp in speichers_with_both], now, read_cache,
+        )
+        speicher_efficiency_trend = by_year_rows(
+            monthly_laden,
+            lambda ts: (
+                round(max(0.0, min(1.0, monthly_entladen.get(ts, 0.0) / monthly_laden[ts])) * 100, 1)
+                if monthly_laden.get(ts, 0.0) > 0 else None
+            ),
+        )
+
+        # --- Autarkie / Eigenverbrauch ------------------------------------
+        # Dieselben Formeln wie in compute_flow(), nur monatlich. Statt die
+        # komplette Bus-/Grundlast-Bilanz je Monat neu aufzubauen (aufwendig),
+        # dieselbe Erhaltungs-Identität: bus_in = Netzbezug + Erzeugung +
+        # Speicher-Entladung, Verbrauch = bus_in − Einspeisung − Speicherladung.
+        erzeuger_ids = [erz["entity_id"] for erz in (config.get("erzeuger") or []) if erz.get("entity_id")]
+        netzbezug_monthly = self._monthly_sum_by_year([config.get("netzbezug") or ""], now, read_cache)
+        erzeugung_monthly = self._monthly_sum_by_year(erzeuger_ids, now, read_cache)
+        einspeisung_monthly = self._monthly_sum_by_year([config.get("einspeisung") or ""], now, read_cache)
+        entladen_monthly = self._monthly_sum_by_year(speicher_entladen_ids, now, read_cache)
+        laden_monthly = self._monthly_sum_by_year(speicher_laden_ids, now, read_cache)
+        alle_monate = {ts: 0.0 for ts in sorted(set(netzbezug_monthly) | set(erzeugung_monthly))}
+
+        def monatsbilanz(ts: float) -> tuple[float, float, float, float]:
+            netzbezug_month = max(netzbezug_monthly.get(ts, 0.0), 0.0)
+            erzeugung_month = erzeugung_monthly.get(ts, 0.0)
+            einspeisung_month = max(einspeisung_monthly.get(ts, 0.0), 0.0)
+            bus_in_month = netzbezug_month + erzeugung_month + entladen_monthly.get(ts, 0.0)
+            verbrauch_month = bus_in_month - einspeisung_month - laden_monthly.get(ts, 0.0)
+            return netzbezug_month, erzeugung_month, einspeisung_month, verbrauch_month
+
+        def autarkie_pct(ts: float) -> float | None:
+            netzbezug_month, _erz, _ein, verbrauch_month = monatsbilanz(ts)
+            if verbrauch_month <= 0:
+                return None
+            return round(max(0.0, min(1.0, 1 - netzbezug_month / verbrauch_month)) * 100, 1)
+
+        def eigenverbrauch_pct(ts: float) -> float | None:
+            _netz, erzeugung_month, einspeisung_month, _verbrauch = monatsbilanz(ts)
+            if erzeugung_month <= 0:
+                return None
+            return round(max(0.0, min(1.0, (erzeugung_month - einspeisung_month) / erzeugung_month)) * 100, 1)
+
+        return {
+            "speicher_efficiency_trend": speicher_efficiency_trend,
+            "speicher_soc_trend": speicher_soc_trend,
+            "autarkie_trend": by_year_rows(alle_monate, autarkie_pct),
+            "eigenverbrauch_trend": by_year_rows(alle_monate, eigenverbrauch_pct),
         }
 
     def compute_heatmap(
@@ -2206,6 +2254,18 @@ class EnergieDashboardService:
                     **deps.app_root_context(request),
                 },
             )
+
+        @router.get("/energiedashboard/trends")
+        def energiedashboard_trends() -> dict:
+            # Bewusst ohne range/offset: die vier Ring-Trends gehen immer über
+            # die letzten drei Kalenderjahre (siehe compute_trends()). Das
+            # Frontend holt sie deshalb erst beim ersten Öffnen eines der
+            # Trend-Popups und dann genau einmal je Seitenaufruf, statt sie
+            # bei jedem Perioden-Wechsel mitzuschleppen.
+            config = _load_config(deps.index)
+            if not _is_configured(config):
+                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+            return self.compute_trends(config)
 
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002

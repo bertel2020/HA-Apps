@@ -13,7 +13,13 @@
    Kommentar bei .edash-kpi-row weiter unten. #}
 {% set erzeuger_list = config.get('erzeuger') or [] %}
 {% set verbraucher_list = config.get('verbraucher') or [] %}
-<div x-data="energieFlow()" x-init="init()">
+{# Bewusst OHNE x-init="init()": Alpine ruft eine im x-data-Objekt vorhandene
+   init()-Methode bereits von sich aus auf. Zusammen mit x-init lief sie
+   zweimal — also zwei parallele /energiedashboard/data- UND /heatmap-Fetches
+   je Seitenaufruf (auf schwächerer Hardware doppelte Wartezeit), und der
+   zweite Durchlauf disposed die Chart-Instanz, die der erste gerade erst
+   erzeugt hatte. #}
+<div x-data="energieFlow()">
   <div class="edash-title-row">
     <h1>Energiedashboard</h1>
     <button type="button" class="edash-title-edit" title="Rollen bearbeiten"
@@ -250,11 +256,17 @@
       </div>
       <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
     </div>
-    <div x-show="{{ trend_expr }}.length" style="margin-bottom:16px;">
+    {# Die Trend-Daten kommen erst beim Öffnen dieses Popups vom Server
+       (openTrend() -> /energiedashboard/trends, siehe energiedashboard.js) —
+       bis dahin ein Ladehinweis statt des "keine Historie"-Textes, der sonst
+       kurz aufblitzen und etwas Falsches behaupten würde. #}
+    <p class="hint" x-show="trendsLoading">Trend wird geladen …</p>
+    <p class="hint" x-show="trendsError">Trend konnte nicht geladen werden.</p>
+    <div x-show="trendsLoaded && {{ trend_expr }}.length" style="margin-bottom:16px;">
       <div class="edash-kpi-label" style="margin-bottom:4px;">Gesamt</div>
       <div x-html="trendOverallSvg({{ trend_expr }})"></div>
     </div>
-    <div x-show="{{ trend_expr }}.length" style="display:flex;flex-direction:column;gap:12px;">
+    <div x-show="trendsLoaded && {{ trend_expr }}.length" style="display:flex;flex-direction:column;gap:12px;">
       <template x-for="row in reversedTrend({{ trend_expr }})" :key="row.year">
         <div style="display:flex;align-items:center;gap:14px;">
           <span style="width:40px;flex:none;font-weight:600;" x-text="row.year"></span>
@@ -263,7 +275,7 @@
         </div>
       </template>
     </div>
-    <p class="hint" x-show="!{{ trend_expr }}.length">{{ empty_hint }}</p>
+    <p class="hint" x-show="trendsLoaded && !{{ trend_expr }}.length">{{ empty_hint }}</p>
   </dialog>
   {% endmacro %}
 
@@ -511,6 +523,19 @@
       <div class="edash-sankey-empty" x-show="!hasFlow && !loading">Für diesen Zeitraum liegen keine Werte &gt; 0 vor.</div>
       <div x-ref="sankeyEl" style="width:100%;height:100%;" x-show="hasFlow || loading"></div>
     </div>
+    {# Farblegende: dasselbe .chart-legend/.chart-legend-item-Muster wie die
+       Chart-Legenden in entity_detail.html/dashboard_detail.html, Variante
+       .static (nicht klickbar — hier gibt es keine Serien zum Ein-/Ausblenden).
+       Einträge und Farben kommen aus buildLegend() in energiedashboard.js,
+       damit sie garantiert dieselbe Palette benutzen wie die Knoten. #}
+    <div class="chart-legend edash-sankey-legend" x-show="hasFlow && legendItems.length">
+      <template x-for="item in legendItems" :key="item.name">
+        <span class="chart-legend-item static">
+          <span class="dot" :style="{background: item.color}"></span>
+          <span class="name" x-text="item.name"></span>
+        </span>
+      </template>
+    </div>
   </div>
 
   <div class="edash-grid" style="margin-top:14px;">
@@ -530,7 +555,7 @@
       </div>
       <div class="edash-ring-panel">
         <div class="edash-ring-item edash-ring-clickable"
-             @click="$refs.autarkieDialog.showModal()" title="Autarkie-Trend anzeigen">
+             @click="openTrend($refs.autarkieDialog)" title="Autarkie-Trend anzeigen">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-autarkie" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -546,7 +571,7 @@
           </svg>
         </div>
         <div class="edash-ring-item edash-ring-clickable"
-             @click="$refs.eigenverbrauchDialog.showModal()" title="Eigenverbrauch-Trend anzeigen">
+             @click="openTrend($refs.eigenverbrauchDialog)" title="Eigenverbrauch-Trend anzeigen">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-eigenverbrauch" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -562,7 +587,7 @@
           </svg>
         </div>
         <div class="edash-ring-item edash-ring-clickable" x-show="kpi.speicher_soc != null"
-             @click="$refs.socDialog.showModal()" title="Speicher-SOC-Trend anzeigen">
+             @click="openTrend($refs.socDialog)" title="Speicher-SOC-Trend anzeigen">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-soc" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -578,7 +603,7 @@
           </svg>
         </div>
         <div class="edash-ring-item edash-ring-clickable" x-show="kpi.speicher_efficiency != null"
-             @click="$refs.efficiencyDialog.showModal()" title="Wirkungsgrad-Trend anzeigen">
+             @click="openTrend($refs.efficiencyDialog)" title="Wirkungsgrad-Trend anzeigen">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-effizienz" x1="0%" y1="0%" x2="100%" y2="100%">

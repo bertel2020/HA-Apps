@@ -1,5 +1,76 @@
 # Changelog
 
+## 0.81.2 - 2026-09-05
+
+### Behoben
+
+- **Das Energiedashboard hat bei jedem Aufruf alles doppelt geladen.** Die
+  Alpine-Komponente trug neben ihrer eigenen `init()`-Methode zusätzlich ein
+  `x-init="init()"` — Alpine ruft eine vorhandene `init()` aber bereits von
+  sich aus auf. Dadurch liefen zwei vollständige Datenabfragen UND zwei
+  Tageslastprofil-Abfragen parallel, und der zweite Durchlauf verwarf
+  nebenbei das Diagramm, das der erste gerade erst aufgebaut hatte. Auf
+  schwächerer Hardware war das schlicht die doppelte Wartezeit.
+- **Der Energiefluss war auf dem Smartphone unbrauchbar, sobald mehr als
+  drei, vier Verbraucher zugeordnet waren.** In der vertikalen Darstellung
+  teilen sich alle Knoten einer Ebene die Bildschirmbreite; der feste
+  Knotenabstand fraß sie bei sieben Senken vollständig auf (sechs Lücken à
+  36 px gegen 225 px nutzbare Breite). Die Balken fielen dadurch auf 0–4 px
+  zusammen — mehrere Knoten waren also weder sichtbar noch antippbar — und
+  die Namen lagen übereinander. Der Abstand richtet sich jetzt nach der
+  tatsächlich verfügbaren Breite, sodass den Balken immer derselbe Anteil
+  bleibt, egal wie viele Geräte zugeordnet sind.
+- **Der Anteilswert im Diagramm-Tooltip fehlte je nach Trefferfläche.** Fuhr
+  man über eine Flussbahn, stand dort „(19 % von Haus)"; fuhr man über den
+  Knoten daneben, nur die kWh-Zahl — dieselbe Frage, zwei verschiedene
+  Antworten. Beide nutzen jetzt dieselbe Regel. Ein rechnerisch auf 100 %
+  gerundeter Anteil wird dabei nicht mehr ausgegeben: er sagt nichts aus und
+  liest sich fälschlich so, als hätte eine Gruppe nur dieses eine Gerät.
+
+### Geändert
+
+- **Die Trend-Verläufe hinter den Ringen werden erst beim Öffnen geladen.**
+  Wirkungsgrad, Autarkie, Eigenverbrauch und Speicher-Ladezustand wurden
+  bisher bei jedem Seitenaufruf über drei Kalenderjahre mitberechnet,
+  obwohl man sie erst nach einem Klick auf einen der Ringe zu sehen bekommt
+  — gemessen rund drei Viertel der Rechenzeit einer Datenabfrage. Sie hängen
+  außerdem gar nicht am gewählten Zeitraum, wurden bei jedem Umschalten
+  zwischen Stunde/Tag/Monat/Jahr also doppelt umsonst neu ermittelt. Der
+  Zeitraum-Wechsel ist dadurch je nach Ansicht 27 bis 70 Prozent schneller.
+  Nebeneffekt: der Speicher-Trend hängt nicht mehr davon ab, ob im gerade
+  angezeigten Zeitraum Ladezustands-Werte vorlagen, sondern nur noch davon,
+  ob überhaupt ein Ladezustands-Sensor zugeordnet ist.
+- **Gleiche Abfragen laufen innerhalb eines Aufrufs nur noch einmal.**
+  Mehrere Bausteine fragten dieselbe Entität für denselben Zeitraum
+  unabhängig voneinander ab; von 76 Abfragen je Berechnung waren 23 reine
+  Wiederholungen. Der bestehende Lese-Cache half dagegen nicht, weil er nur
+  das erneute Einlesen der Dateien spart, nicht die Auswertung darüber.
+- **Der Energiefluss kreuzt sich nicht mehr.** Einspeisung, Grundlast,
+  Speicherladung und ungruppierte Geräte landeten bisher gemeinsam in der
+  letzten Diagramm-Ebene, obwohl sie nur einen Schritt vom Sammelknoten
+  entfernt sind — ihre Bänder mussten dafür quer durch die Gruppen-Ebene
+  laufen. Jetzt steht jeder Knoten eine Ebene hinter seiner Quelle; die
+  Bahnen sind dadurch spürbar kürzer und überschneiden sich nicht mehr.
+- **Eine Verbrauchergruppe mit nur einem Gerät bekommt keinen eigenen
+  Knoten mehr.** Sie war keine Gruppierung, sondern eine Umbenennung: der
+  Wert floss unverändert durch einen Zwischenknoten und kostete eine ganze
+  Spalte Breite für ein flaches Band ohne Aussage. Solche Geräte hängen
+  jetzt direkt am Sammelknoten; die Gruppe bleibt in der Konfiguration
+  bestehen und wirkt wieder, sobald ein zweites Gerät dazukommt.
+- **Auf dem Smartphone stehen die Knotennamen jetzt versetzt in zwei
+  Reihen.** Was sich danach immer noch überlagern würde, wird weggelassen
+  statt übereinandergedruckt — diese Knoten bleiben antippbar und zeigen
+  Name, Wert und Anteil im Tooltip, ihre Farbe erklärt die neue Legende.
+
+### Neu
+
+- **Farblegende unter dem Energiefluss.** Erklärt Erzeugung, Netzbezug,
+  Speicher-Ladung und -Entladung sowie Einspeisung — und vor allem den
+  Mischton der Verbrauchsbahnen, der ohne Erklärung am schwersten zu deuten
+  war: er zeigt an, welcher Anteil des Verbrauchs aus eigener Erzeugung kam,
+  und die Legende benennt diesen Prozentwert. Aufgeführt wird nur, was im
+  aktuellen Diagramm auch vorkommt.
+
 ## 0.81.1 - 2026-09-04
 
 ### Behoben

@@ -62,6 +62,17 @@ class QueryReadCache:
 
     def __init__(self) -> None:
         self._hot_rows: dict[Path, list[tuple[float, float]]] = {}
+        # Ablage für beliebige weitere request-lokale Zwischenergebnisse
+        # AUFRUFENDER Module — der Hot-Row-Cache oben spart nur das erneute
+        # Parsen einer Datei, nicht die darauf aufbauende Aggregation. Wer
+        # dieselbe (Entität, Zeitraum, Offset)-Kombination innerhalb eines
+        # Requests mehrfach braucht (siehe _entity_series() im
+        # Energiedashboard), legt das fertige Ergebnis hier ab. Schlüssel
+        # bitte mit einem Modul-Präfix versehen, damit sich zwei Nutzer
+        # dieses Caches nicht gegenseitig überschreiben. Lebensdauer und
+        # Invalidierung wie beim Hot-Row-Cache: genau ein Request, deshalb
+        # keine.
+        self.memo: dict = {}
 
     def read_hot_rows(self, path: Path) -> list[tuple[float, float]]:
         if path not in self._hot_rows:

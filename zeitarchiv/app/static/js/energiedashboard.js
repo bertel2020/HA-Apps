@@ -186,6 +186,20 @@
   // gerendert. matchMedia liefert exakt dasselbe Ergebnis wie die
   // @media(max-width:560px)-Regeln in energiedashboard.html.
   const sankeyIsNarrow = () => window.matchMedia(`(max-width:${SANKEY_NARROW_BREAKPOINT}px)`).matches;
+  // Seitlicher Rand der vertikalen (mobilen) Sankey-Serie — halbe Breite der
+  // 80px-Labels, die mittig über/unter dem äußersten Knoten sitzen. Steht hier
+  // oben, weil sowohl left/right der Serie als auch die Berechnung des
+  // Knotenabstands (narrowNodeGap in renderChart) denselben Wert brauchen.
+  const SANKEY_NARROW_INSET = 40;
+  // Platz über/unter den Knotenreihen für die (bis zu dreizeiligen) Labels
+  // plus die zweite, versetzte Reihe aus staggerNarrowLabels().
+  const SANKEY_NARROW_LABEL_RESERVE = 74;
+  // Vertikaler Versatz der zweiten Label-Reihe.
+  const SANKEY_NARROW_LABEL_STAGGER = 30;
+  // Mindestabstand zweier Label-Mittelpunkte IN DERSELBEN Reihe, ab dem sie
+  // sich nicht mehr überlappen — etwas weniger als die 80px Label-Breite, weil
+  // kaum ein Name die volle Breite ausnutzt.
+  const SANKEY_NARROW_LABEL_PITCH = 68;
   let lastSankeyData = null;
   let lastSankeyIsNarrow = null;
   let currentRenderChart = null;
@@ -232,15 +246,30 @@
       quality: {plausible: true, checks: []},
       periodText: '',
       hasFlow: false,
+      // Farblegende unter dem Sankey. Wird in renderChart() aus DERSELBEN
+      // palette/colorForNode-Quelle gefüllt wie die Knoten selbst — eine
+      // zweite, im Template gepflegte Farbliste würde beim nächsten
+      // Farbschema-Wechsel unbemerkt auseinanderlaufen.
+      legendItems: [],
       verbraucherBreakdown: [],
       erzeugerBreakdown: [],
       speicherBreakdown: [],
       speicherSocNowBreakdown: [],
       anomalien: [],
+      // Die vier Ring-Trends kommen NICHT mehr mit load() mit, sondern erst
+      // beim ersten Öffnen eines Trend-Popups (openTrend/loadTrends) — sie
+      // machten serverseitig den Großteil der Rechenzeit eines /data-Requests
+      // aus, obwohl man sie erst nach einem Klick zu sehen bekommt. Sie hängen
+      // außerdem gar nicht am gewählten Zeitraum (immer die letzten drei
+      // Kalenderjahre), müssen also auch beim Perioden-Wechsel nicht neu
+      // geholt werden — ein Fetch je Seitenaufruf genügt.
       speicherEfficiencyTrend: [],
       speicherSocTrend: [],
       autarkieTrend: [],
       eigenverbrauchTrend: [],
+      trendsLoaded: false,
+      trendsLoading: false,
+      trendsError: false,
       heatmap: {rows: [], max_value: 0},
       get canGoForward() { return this.offset < 0; },
 
@@ -565,10 +594,6 @@
           this.speicherBreakdown = data.speicher_breakdown || [];
           this.speicherSocNowBreakdown = data.speicher_soc_now_breakdown || [];
           this.anomalien = data.anomalien || [];
-          this.speicherEfficiencyTrend = data.speicher_efficiency_trend || [];
-          this.speicherSocTrend = data.speicher_soc_trend || [];
-          this.autarkieTrend = data.autarkie_trend || [];
-          this.eigenverbrauchTrend = data.eigenverbrauch_trend || [];
           this.renderChart(data);
           this.renderShareChart(this.verbraucherBreakdown);
           this.renderSparklines(data.kpi_series || {});
@@ -581,6 +606,41 @@
         // Fehlschlag hier soll die restliche Seite nicht als loadError
         // markieren, die Karte blendet sich per x-show einfach aus.
         this.loadHeatmap();
+      },
+
+      // Popup öffnen und die Trend-Daten dafür (einmalig) nachladen. Das
+      // Öffnen passiert sofort, der Fetch läuft daneben — das Popup zeigt
+      // solange "Trend wird geladen …" (siehe trend_dialog-Makro), statt auf
+      // die Antwort zu warten und dadurch den Klick träge wirken zu lassen.
+      openTrend(dialog) {
+        dialog.showModal();
+        this.loadTrends();
+      },
+
+      // Genau ein Fetch je Seitenaufruf: die vier Ring-Trends gehen immer über
+      // die letzten drei Kalenderjahre und ändern sich beim Umschalten von
+      // Stunde/Tag/Monat/Jahr nicht (siehe compute_trends() im Backend) —
+      // deshalb kein range/offset und kein erneutes Laden bei load().
+      // trendsLoading als Sperre gegen ein zweites paralleles Fetch, wenn man
+      // schnell hintereinander zwei Ring-Popups öffnet.
+      async loadTrends() {
+        if (this.trendsLoaded || this.trendsLoading) return;
+        this.trendsLoading = true;
+        this.trendsError = false;
+        try {
+          const res = await fetch('energiedashboard/trends');
+          if (!res.ok) { this.trendsError = true; return; }
+          const data = await res.json();
+          this.speicherEfficiencyTrend = data.speicher_efficiency_trend || [];
+          this.speicherSocTrend = data.speicher_soc_trend || [];
+          this.autarkieTrend = data.autarkie_trend || [];
+          this.eigenverbrauchTrend = data.eigenverbrauch_trend || [];
+          this.trendsLoaded = true;
+        } catch (e) {
+          this.trendsError = true;
+        } finally {
+          this.trendsLoading = false;
+        }
       },
 
       // Bei Tag/Stunde unverändert die letzten 7 Kalendertage (vom Zeitraum-
@@ -696,6 +756,110 @@
         });
       },
 
+      // Zweiter Durchgang, nur für die vertikale (mobile) Darstellung: dort
+      // stehen die Knoten einer Ebene NEBENEINANDER, und die 80px breiten,
+      // mittig gesetzten Labels überlappten sich bei mehr als drei, vier
+      // Knoten je Ebene. Welche Knoten nebeneinander landen, entscheidet aber
+      // erst ECharts' Layout — vorher ist die Reihenfolge innerhalb einer
+      // Ebene unbekannt. Deshalb einmal rendern, die Positionen auslesen und
+      // die Labels dann in ZWEI Reihen versetzen: das verdoppelt den
+      // waagerechten Platz je Label. Was sich danach immer noch überlappt,
+      // wird weggelassen statt übereinandergedruckt — der größte Wert einer
+      // Reihe gewinnt, weil er die Aussage des Diagramms trägt. Weggelassene
+      // Knoten bleiben antippbar und zeigen Name, Wert und Anteil im Tooltip
+      // (deshalb ist das Weglassen vertretbar, kein Informationsverlust).
+      staggerNarrowLabels(baseNodes) {
+        if (!chartInstance) return;
+        const graph = chartInstance.getModel().getSeriesByIndex(0).getGraph();
+        const proEbene = {};
+        graph.nodes.forEach((n) => {
+          const layout = n.getLayout();
+          if (!layout) return;
+          const meta = baseNodes.find((b) => b.name === n.id);
+          // Nur Labels über/unter den Knotenreihen können sich waagerecht
+          // überlappen. Der Bus ist der einzige Knoten seiner Ebene und trägt
+          // sein Label rechts daneben (narrowLabelFor) — für ihn ist weder
+          // Versatz noch Kollisionsprüfung nötig.
+          if (!meta || !meta.label || (meta.label.position !== 'top' && meta.label.position !== 'bottom')) return;
+          proEbene[layout.depth] = proEbene[layout.depth] || [];
+          proEbene[layout.depth].push({
+            id: n.id, mitte: layout.x + layout.dx / 2, wert: layout.value || 0,
+          });
+        });
+        const versatz = {};
+        const ausgeblendet = new Set();
+        Object.values(proEbene).forEach((knoten) => {
+          knoten.sort((a, b) => a.mitte - b.mitte);
+          knoten.forEach((k, i) => { versatz[k.id] = i % 2; });
+          // Je Reihe getrennt prüfen: absteigend nach Wert einsortieren und nur
+          // behalten, was zu allen bereits behaltenen Labels dieser Reihe
+          // genug Abstand hat.
+          [0, 1].forEach((reihe) => {
+            const behalten = [];
+            knoten
+              .filter((k) => versatz[k.id] === reihe)
+              .sort((a, b) => b.wert - a.wert)
+              .forEach((k) => {
+                if (behalten.some((m) => Math.abs(m - k.mitte) < SANKEY_NARROW_LABEL_PITCH)) {
+                  ausgeblendet.add(k.id);
+                } else {
+                  behalten.push(k.mitte);
+                }
+              });
+          });
+        });
+        chartInstance.setOption({series: [{
+          data: baseNodes.map((n) => {
+            if (versatz[n.name] === undefined) return n;
+            if (ausgeblendet.has(n.name)) return {...n, label: {...n.label, show: false}};
+            const richtung = n.label.position === 'top' ? -1 : 1;
+            return {...n, label: {
+              ...n.label,
+              offset: [0, richtung * versatz[n.name] * SANKEY_NARROW_LABEL_STAGGER],
+            }};
+          }),
+        }]});
+      },
+
+      // Nur Einträge, die im aktuellen Sankey wirklich vorkommen — eine
+      // Anlage ohne Speicher soll keine Speicherfarben erklärt bekommen.
+      // Deshalb aus data.nodes abgeleitet statt aus der Konfiguration: die
+      // Legende beschreibt genau das, was gerade gezeichnet ist.
+      buildLegend(data, palette) {
+        const nodes = data.nodes || [];
+        const hat = (pruef) => nodes.some(pruef);
+        const items = [];
+        if (hat(n => n.role === 'source' && n.name !== 'Netzbezug' && n.kind !== 'storage_out')) {
+          items.push({name: 'Erzeugung', color: palette.pv});
+        }
+        const netzbezug = nodes.find(n => n.name === 'Netzbezug');
+        if (netzbezug) items.push({name: netzbezug.label || 'Netzbezug', color: palette.grid});
+        if (hat(n => n.kind === 'storage_out')) {
+          items.push({name: 'Speicher-Entladung', color: palette.storageOut});
+        }
+        if (hat(n => n.kind === 'storage_in')) {
+          items.push({name: 'Speicher-Ladung', color: palette.storage});
+        }
+        const einspeisung = nodes.find(n => n.name === 'Einspeisung');
+        if (einspeisung) items.push({name: einspeisung.label || 'Einspeisung', color: palette.exportColor});
+        // Der Verbrauchs-Eintrag trägt den tatsächlichen Mischton der
+        // Bus→Verbraucher-Bahnen (siehe green_ratio/blendColors in
+        // renderChart) statt einer generischen Verbrauchsfarbe — genau dieser
+        // Farbton ist ohne Erklärung sonst am schwersten zu deuten, und der
+        // Prozentwert sagt direkt, woher die Mischung kommt.
+        if (hat(n => n.role === 'sink' && n.name !== 'Einspeisung' && n.kind !== 'storage_in')) {
+          if (data.green_ratio != null) {
+            items.push({
+              name: `Verbrauch (${this.fmt(data.green_ratio * 100, 0)} % aus eigener Erzeugung)`,
+              color: blendColors(palette.pv, palette.grid, data.green_ratio),
+            });
+          } else {
+            items.push({name: 'Verbrauch', color: palette.use});
+          }
+        }
+        this.legendItems = items;
+      },
+
       renderChart(data) {
         const el = this.$refs.sankeyEl;
         if (!el || typeof echarts === 'undefined') return;
@@ -703,6 +867,7 @@
         const isNarrow = sankeyIsNarrow();
         lastSankeyIsNarrow = isNarrow;
         const palette = colors();
+        this.buildLegend(data, palette);
         if (!chartInstance) chartInstance = echarts.init(el);
         const nodeByName = {};
         data.nodes.forEach(n => { nodeByName[n.name] = n; });
@@ -786,36 +951,115 @@
             },
             label: {color: palette.ink, formatter: n.label || n.name, ...(isNarrow ? narrowLabelFor(n) : {})},
           }));
+        // Vertikal (mobil) laufen die Werte-Balken HORIZONTAL — die nutzbare
+        // Breite teilen sich also alle Knoten EINER Ebene plus die Lücken
+        // dazwischen. Mit einem festen nodeGap fraßen die Lücken bei mehreren
+        // Verbrauchern die gesamte Breite auf: bei 305 px Gerätebreite und
+        // sieben Senken standen 6 × 36 px = 216 px Lücke gegen 225 px nutzbare
+        // Breite. Die Balken selbst fielen dadurch auf 0–4 px zusammen (mehrere
+        // Knoten damit unsichtbar UND nicht antippbar) und die Labels lagen
+        // übereinander. Deshalb kein fester Wert, sondern ein festes
+        // Lücken-BUDGET, das auf die Lücken der dichtesten Ebene verteilt wird
+        // — die Balken behalten so immer denselben Breitenanteil, egal wie
+        // viele Verbraucher zugeordnet sind.
+        //
+        // Ebenen-Belegung wie ECharts sie mit dem Default nodeAlign:'justify'
+        // aufbaut: Quellen links/oben, der Bus für sich, Gruppenknoten (Senken,
+        // die selbst noch weiterführen) dazwischen, und ALLE blattlosen Senken
+        // gemeinsam in der letzten Ebene.
+        const outgoingNames = new Set(links.map(l => l.source));
+        let sourceCount = 0;
+        let gruppenCount = 0;
+        let blattCount = 0;
+        nodes.forEach(n => {
+          const meta = nodeByName[n.name];
+          if (!meta || meta.role === 'bus') return;
+          if (meta.role === 'source') sourceCount += 1;
+          else if (outgoingNames.has(n.name)) gruppenCount += 1;
+          else blattCount += 1;
+        });
+        const dichtesteEbene = Math.max(sourceCount, gruppenCount, blattCount, 1);
+        // Untergrenze 120px: beim allerersten Rendern kann clientWidth noch 0
+        // sein (Layout noch nicht durch) — dann lieber ein enger, aber
+        // brauchbarer Wert als eine Division gegen 0.
+        const narrowExtent = Math.max(120, el.clientWidth - 2 * SANKEY_NARROW_INSET);
+        // 35 % Lücken / 65 % Balken, gedeckelt auf den bisherigen Wert (36):
+        // bei nur zwei, drei Knoten je Ebene soll der Abstand nicht ins
+        // Absurde wachsen, dort war 36 bereits stimmig.
+        const narrowNodeGap = Math.max(
+          4, Math.min(36, (narrowExtent * 0.35) / Math.max(1, dichtesteEbene - 1)),
+        );
         const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
+        const labelFor = (name) => (nodeByName[name] && nodeByName[name].label) || name;
+        // Der "X % von …"-Zusatz galt bisher NUR für Link-Tooltips; ein Knoten
+        // zeigte bloß "Spülmaschine: 17,5 kWh". Dieselbe Frage ("wie viel ist
+        // das im Verhältnis?") wurde also je nach Trefferfläche mal beantwortet
+        // und mal nicht. Jetzt EINE Regel für beides, hier zentral: Anteil
+        // bevorzugt am Ziel (Zufluss-Aufschlüsselung, z. B. "Haus" aus
+        // Netzbezug + Erzeugung), sonst an der Quelle — und nur, wenn die
+        // betreffende Seite tatsächlich mehrere Bahnen hat, sonst wären es
+        // immer triviale 100 %.
+        // Ein auf 100 % gerundeter Anteil wird unterdrückt: er sagt nichts aus
+        // und führt sogar in die Irre. Der Fall tritt auf, weil die Link-Zahlen
+        // bewusst aus den UNGEFILTERTEN data.links kommen (siehe oben) — eine
+        // Gruppe mit drei Geräten, von denen in dieser Periode nur eines lief,
+        // gilt weiterhin als mehrgliedrig, ihr einziger Beitrag ist dann aber
+        // rechnerisch 100 % und liest sich wie "die Gruppe hat nur dieses eine
+        // Gerät". Dieselbe Absicht wie beim Ausschluss von Knoten mit nur einer
+        // Bahn, nur zusätzlich für den periodenabhängigen Fall.
+        const anteil = (value, bezug, bezugName) => {
+          if (!(bezug > 0)) return '';
+          const pct = (value / bezug) * 100;
+          if (pct >= 99.5) return '';
+          return ` (${this.fmt(pct, 0)} % von ${labelFor(bezugName)})`;
+        };
+        const shareSuffix = (sourceName, targetName, value) => {
+          const target = nodeByName[targetName];
+          const source = nodeByName[sourceName];
+          if ((incomingLinkCount[targetName] || 0) > 1 && target) {
+            return anteil(value, target.value, targetName);
+          }
+          if ((outgoingLinkCount[sourceName] || 0) > 1 && source) {
+            return anteil(value, source.value, sourceName);
+          }
+          return '';
+        };
+        // Für den Knoten-Tooltip: ein Knoten hat keine eigene Quelle/Ziel-
+        // Beziehung, aber solange er GENAU EINE Bahn auf einer Seite hat, ist
+        // sein Wert identisch mit der dieser Bahn — dann lässt sich dieselbe
+        // Regel anwenden. Der Bus ("Haus") hat auf beiden Seiten mehrere und
+        // bekommt deshalb keinen Zusatz: er ist die Bezugsgröße selbst, "100 %
+        // von sich" wäre keine Information. Wie bei incomingLinkCount bewusst
+        // aus data.links (vor dem value>0.001-Filter) — die Struktur soll
+        // nicht je nach Periode wechseln.
+        const soleIncoming = {};
+        const soleOutgoing = {};
+        data.links.forEach(l => {
+          soleIncoming[l.target] = incomingLinkCount[l.target] === 1 ? l : null;
+          soleOutgoing[l.source] = outgoingLinkCount[l.source] === 1 ? l : null;
+        });
+        const nodeShareSuffix = (name, value) => {
+          if (soleIncoming[name]) return shareSuffix(soleIncoming[name].source, name, value);
+          if (soleOutgoing[name]) return shareSuffix(name, soleOutgoing[name].target, value);
+          return '';
+        };
         chartInstance.setOption({
           tooltip: {
             trigger: 'item',
             formatter: (p) => {
               if (p.dataType !== 'edge') {
                 const node = nodeByName[p.name];
-                const label = (node && node.label) || p.name;
+                const label = labelFor(p.name);
+                const head = `${label}: ${fmt(p.value)} kWh${nodeShareSuffix(p.name, p.value)}`;
                 if (node && node.anomaly) {
-                  return `${label}: ${fmt(p.value)} kWh<br/>`
+                  return `${head}<br/>`
                     + `<span style="color:${palette.warning}">+${node.anomaly_pct} % über dem Schnitt `
                     + `der letzten Perioden (${fmt(node.anomaly_baseline)} kWh)</span>`;
                 }
-                return `${label}: ${fmt(p.value)} kWh`;
+                return head;
               }
-              const target = nodeByName[p.data.target];
-              const source = nodeByName[p.data.source];
-              const targetLabel = (target && target.label) || p.data.target;
-              const sourceLabel = (source && source.label) || p.data.source;
-              let pct = null;
-              let shareOf = null;
-              if ((incomingLinkCount[p.data.target] || 0) > 1 && target && target.value > 0) {
-                pct = this.fmt((p.data.value / target.value) * 100, 0);
-                shareOf = targetLabel;
-              } else if ((outgoingLinkCount[p.data.source] || 0) > 1 && source && source.value > 0) {
-                pct = this.fmt((p.data.value / source.value) * 100, 0);
-                shareOf = sourceLabel;
-              }
-              const share = pct != null ? ` (${pct} % von ${shareOf})` : '';
-              return `${sourceLabel} → ${targetLabel}: ${fmt(p.data.value)} kWh${share}`;
+              return `${labelFor(p.data.source)} → ${labelFor(p.data.target)}: `
+                + `${fmt(p.data.value)} kWh${shareSuffix(p.data.source, p.data.target, p.data.value)}`;
             },
           },
           series: [{
@@ -826,6 +1070,18 @@
             // gequetschter horizontaler Sankey. (Zwischenzeitlich horizontal
             // getestet und auf Wunsch wieder auf vertikal zurückgestellt.)
             orient: isNarrow ? 'vertical' : 'horizontal',
+            // ECharts-Default wäre 'justify': das schiebt ALLE Knoten ohne
+            // weiterführenden Fluss gemeinsam in die letzte Ebene — also
+            // Einspeisung, Grundlast, Speicherladung und ungruppierte Geräte
+            // neben die Mitglieder der Verbrauchergruppen, obwohl sie nur
+            // EINEN Schritt vom Bus entfernt sind. Ihre Bänder mussten dadurch
+            // quer durch die Gruppen-Ebene laufen (gemessen: 5 Links über zwei
+            // Ebenen hinweg, u. a. "Haus → Trockner", der direkt am Bus hängt)
+            // — das waren die sichtbaren Überschneidungen. 'left' setzt jeden
+            // Knoten dorthin, wo er tatsächlich hingehört (eine Ebene hinter
+            // seiner Quelle): keine ebenenüberspringenden Links mehr, Summe
+            // der vertikalen Umlenkung von 2901 px auf 2137 px (−26 %).
+            nodeAlign: 'left',
             data: nodes,
             links,
             emphasis: {focus: 'adjacency'},
@@ -836,18 +1092,24 @@
             // überlappen.
             label: {fontFamily: 'IBM Plex Sans, sans-serif', fontSize: isNarrow ? 10 : 12},
             // Vertikal: Platz für die bis zu dreizeiligen Labels über der
-            // oberen und unter der unteren Knotenreihe (siehe narrowLabelFor).
-            top: isNarrow ? 44 : '5%',
-            bottom: isNarrow ? 44 : '5%',
-            // Seitlich 40px: die 80px breiten, mittig über/unter dem Knoten
-            // zentrierten Labels ragen sonst am äußersten Knoten aus der Karte.
-            left: isNarrow ? 40 : '5%',
-            right: isNarrow ? 40 : '20%',
+            // oberen und unter der unteren Knotenreihe (siehe narrowLabelFor)
+            // — und zusätzlich für die zweite, versetzte Label-Reihe
+            // (staggerNarrowLabels() unten). Der Wert steht schon im ERSTEN
+            // setOption(), damit der zweite Durchgang nur noch Labels ändert
+            // und das Layout nicht verschiebt.
+            top: isNarrow ? SANKEY_NARROW_LABEL_RESERVE : '5%',
+            bottom: isNarrow ? SANKEY_NARROW_LABEL_RESERVE : '5%',
+            // Seitlich SANKEY_NARROW_INSET: die 80px breiten, mittig über/unter
+            // dem Knoten zentrierten Labels ragen sonst am äußersten Knoten aus
+            // der Karte. Derselbe Wert geht in narrowExtent oben ein.
+            left: isNarrow ? SANKEY_NARROW_INSET : '5%',
+            right: isNarrow ? SANKEY_NARROW_INSET : '20%',
             nodeWidth: 14,
-            // Vertikal deutlich mehr Abstand zwischen nebeneinanderliegenden
-            // Knoten, damit sich die Labels dünner Nachbarknoten seltener
-            // überlagern.
-            nodeGap: isNarrow ? 36 : 10,
+            // Vertikal mehr Abstand zwischen nebeneinanderliegenden Knoten,
+            // damit sich die Labels dünner Nachbarknoten seltener überlagern —
+            // aber nur so viel, wie neben den Balken übrig bleibt (siehe
+            // narrowNodeGap oben).
+            nodeGap: isNarrow ? narrowNodeGap : 10,
           }],
         }, true);
         chartInstance.off('click');
@@ -858,6 +1120,10 @@
             window.location.href = `entities/${encodeURIComponent(node.entity_id)}`;
           }
         });
+        // Erst NACH dem Layout möglich (siehe staggerNarrowLabels) — und nur
+        // vertikal, horizontal stehen die Knoten einer Ebene untereinander und
+        // ihre Labels können sich gar nicht waagerecht überlagern.
+        if (isNarrow) this.staggerNarrowLabels(nodes);
       },
 
       // Dieselbe Donut-Gestaltung wie #storage-pie in statistik.html
