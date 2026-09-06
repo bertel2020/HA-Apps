@@ -17,6 +17,7 @@ hier gemittelt statt summiert und die Datenqualitäts-Prüfung anschlagen.
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import shutil
 import sys
 import tempfile
@@ -642,3 +643,105 @@ def test_farbumrechnung_wird_gemerkt() -> None:
     assert "rgbTripletCache.get(cssColor)" in body
     assert "if (gemerkt) return gemerkt;" in body
     assert "rgbTripletCache.set(cssColor, triplet);" in body
+
+
+# --- Wirkungsgrad-Cache -----------------------------------------------------
+
+
+def _speicheranlage(tmp: Path) -> tuple[_Anlage, dict]:
+    a, config = _beispielanlage(tmp)
+    config["speicher"] = [{
+        "name": "Heimspeicher",
+        "laden_entity_id": "sensor.laden", "entladen_entity_id": "sensor.entladen",
+    }]
+    a.zaehler("sensor.laden", (0, 0.0), (23, 10.0))
+    a.zaehler("sensor.entladen", (0, 0.0), (23, 9.0))
+    return a, config
+
+
+def _decade_zaehler(monkeypatch) -> list[int]:
+    """Zählt Abfragen über die gesamte Historie — genau die, die der Cache
+    einsparen soll."""
+    treffer = [0]
+    echt = query_mod.query_series
+
+    def wrap(data_dir, index, entity_id, range_key, tz, now, **kw):
+        if range_key == "decade":
+            treffer[0] += 1
+        return echt(data_dir, index, entity_id, range_key, tz, now, **kw)
+
+    monkeypatch.setattr(query_mod, "query_series", wrap)
+    return treffer
+
+
+def test_wirkungsgrad_wird_beim_zweiten_aufruf_nicht_neu_berechnet(monkeypatch, tmp: Path) -> None:
+    """Die Berechnung liest die GESAMTE Historie und kostete gemessen 15-19 %
+    eines Requests — für einen Wert, den ein weiterer Tag Messdaten nicht
+    sichtbar verschiebt."""
+    a, config = _speicheranlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    treffer = _decade_zaehler(monkeypatch)
+    try:
+        erst = a.service.compute_flow(config, "day", -1)["kpi"]["speicher_efficiency"]
+        kalt = treffer[0]
+        treffer[0] = 0
+        zweit = a.service.compute_flow(config, "day", -1)["kpi"]["speicher_efficiency"]
+        assert kalt > 0, "erster Aufruf muss tatsächlich rechnen"
+        assert treffer[0] == 0, "zweiter Aufruf darf die Historie nicht erneut lesen"
+        assert zweit == erst
+        assert erst == pytest.approx(90.0)  # 9 entladen / 10 geladen
+    finally:
+        a.close()
+
+
+def test_geaenderte_rollenzuordnung_verwirft_den_cache(monkeypatch, tmp: Path) -> None:
+    """Die Signatur aus den beteiligten Entitäten macht eine eigene
+    Invalidierung überflüssig — sonst zeigte eine korrigierte Zuordnung
+    stundenlang den alten Wert."""
+    a, config = _speicheranlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    treffer = _decade_zaehler(monkeypatch)
+    try:
+        a.service.compute_flow(config, "day", -1)
+        a.zaehler("sensor.entladen2", (0, 0.0), (23, 5.0))
+        config["speicher"][0]["entladen_entity_id"] = "sensor.entladen2"
+        treffer[0] = 0
+        neu = a.service.compute_flow(config, "day", -1)["kpi"]["speicher_efficiency"]
+        assert treffer[0] > 0, "geänderte Zuordnung muss neu rechnen"
+        assert neu == pytest.approx(50.0)  # 5 entladen / 10 geladen
+    finally:
+        a.close()
+
+
+def test_abgelaufener_cache_wird_neu_berechnet(monkeypatch, tmp: Path) -> None:
+    a, config = _speicheranlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    treffer = _decade_zaehler(monkeypatch)
+    try:
+        a.service.compute_flow(config, "day", -1)
+        eintrag = json.loads(a.index.get_setting(ed.SETTING_EFFICIENCY_CACHE, ""))
+        eintrag["checked_at"] -= ed.EFFICIENCY_CACHE_TTL_SECONDS + 1
+        a.index.set_setting(ed.SETTING_EFFICIENCY_CACHE, json.dumps(eintrag))
+        treffer[0] = 0
+        a.service.compute_flow(config, "day", -1)
+        assert treffer[0] > 0
+    finally:
+        a.close()
+
+
+def test_zeitstempel_aus_der_zukunft_gilt_als_abgelaufen(monkeypatch, tmp: Path) -> None:
+    """Wird die Systemuhr zurückgestellt, läge checked_at in der Zukunft — ohne
+    die Untergrenze bliebe ein falscher Wert bis zum Aufholen der Uhr hängen."""
+    a, config = _speicheranlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    treffer = _decade_zaehler(monkeypatch)
+    try:
+        a.service.compute_flow(config, "day", -1)
+        eintrag = json.loads(a.index.get_setting(ed.SETTING_EFFICIENCY_CACHE, ""))
+        eintrag["checked_at"] += 99999
+        a.index.set_setting(ed.SETTING_EFFICIENCY_CACHE, json.dumps(eintrag))
+        treffer[0] = 0
+        a.service.compute_flow(config, "day", -1)
+        assert treffer[0] > 0
+    finally:
+        a.close()

@@ -49,6 +49,13 @@ CONFIG_SCHEMA_VERSION = 1
 # hier auf ihren rückwirkenden Rollup-Backfill (bereits archivierte Monate),
 # bevor _wartungsplaner sie einzeln nachträgt — siehe process_pending_hourly_backfill().
 SETTING_HOURLY_BACKFILL_PENDING = "energiedashboard_hourly_backfill_pending"
+# Kurzlebiger Cache für den Speicher-Wirkungsgrad (siehe _speicher_efficiency).
+# Sechs Stunden: der Wert wird über die gesamte Historie gebildet und bewegt
+# sich innerhalb eines Tages nicht sichtbar, ein Nutzer soll eine korrigierte
+# Sensor-Zuordnung aber auch nicht erst am nächsten Tag wirken sehen — Letzteres
+# fängt ohnehin schon die Signatur ab, die Zeitspanne deckt nur neue Messdaten.
+SETTING_EFFICIENCY_CACHE = "energiedashboard_speicher_efficiency_cache"
+EFFICIENCY_CACHE_TTL_SECONDS = 6 * 60 * 60
 
 RANGE_LABELS = {"hour": "Stunde", "day": "Tag", "month": "Monat", "year": "Jahr"}
 RANGE_KEYS = tuple(RANGE_LABELS)
@@ -941,54 +948,7 @@ class EnergieDashboardService:
         speicher_efficiency = None
         speichers_with_both = [sp for sp in speicher_list if sp.get("laden_entity_id") and sp.get("entladen_entity_id")]
         if not (continuous or skip_quality) and speichers_with_both:
-            # Selbst berechnet statt manuell im Setup einzutragen (vorher
-            # "Wirkungsgrad"-Feld, ohne Auswirkung auf die Berechnung) —
-            # Entladung/Ladung über die GESAMTE bisherige Historie statt nur
-            # die angezeigte Periode, weil sich ein unterschiedlicher Start-/
-            # End-Füllstand über viele Lade-/Entladezyklen hinweg
-            # herausmittelt und so eine deutlich stabilere Schätzung ergibt.
-            # "decade" (10 Jahre) ist der größte vorhandene range_key in
-            # query.py und deckt die Speicher-Lebensdauer damit praktisch
-            # immer komplett ab. Über mehrere Speicher hinweg werden Ladung
-            # und (korrigierte) Entladung SUMMIERT statt als Schnitt der
-            # einzelnen Quoten gemittelt — ergibt denselben blended
-            # Wirkungsgrad, den man bekäme, behandelte man alle Speicher als
-            # einen einzigen großen (korrekt gewichtet nach tatsächlichem
-            # Energiedurchsatz statt nach Anzahl Speicher).
-            total_laden_all = 0.0
-            total_entladen_all = 0.0
-            total_corrected_laden = 0.0
-            for sp in speichers_with_both:
-                laden_all, _ = self._entity_series(sp["laden_entity_id"], "decade", 0, now, read_cache)
-                entladen_all, _ = self._entity_series(sp["entladen_entity_id"], "decade", 0, now, read_cache)
-                laden_all_total = self._series_total(laden_all)
-                entladen_all_total = self._series_total(entladen_all)
-                total_laden_all += laden_all_total
-                total_entladen_all += entladen_all_total
-
-                # Korrektur um den aktuell noch im Speicher steckenden
-                # Füllstand: ohne sie zählt "Ladung" auch Energie mit, die
-                # noch gar nicht wieder entladen wurde (verfälscht die Quote
-                # vor allem bei kurzer Historie oder kurz nach einer großen
-                # Ladung). Nötig dafür: SOC am Anfang UND am Ende der
-                # Historie plus eine hinterlegte Kapazität — fehlt eins
-                # davon, bleibt es bei der einfachen (unkorrigierten) Menge
-                # dieses Speichers als Fallback.
-                capacity_kwh = sp.get("_resolved_capacity_kwh")
-                corrected = laden_all_total
-                if capacity_kwh and sp.get("soc_entity_id"):
-                    soc_all, _ = self._entity_series(sp["soc_entity_id"], "decade", 0, now, read_cache)
-                    if len(soc_all) >= 2:
-                        soc_start = soc_all[min(soc_all)]
-                        soc_end = soc_all[max(soc_all)]
-                        delta_kwh = (soc_end - soc_start) / 100.0 * capacity_kwh
-                        corrected = laden_all_total - delta_kwh
-                total_corrected_laden += corrected
-
-            if total_corrected_laden > 0:
-                speicher_efficiency = round(max(0.0, min(1.0, total_entladen_all / total_corrected_laden)) * 100, 1)
-            elif total_laden_all > 0:
-                speicher_efficiency = round(max(0.0, min(1.0, total_entladen_all / total_laden_all)) * 100, 1)
+            speicher_efficiency = self._speicher_efficiency(speichers_with_both, now, read_cache)
 
         # Verbraucher hängen im Sankey je nach Gruppen-Zuordnung ein- oder
         # zweistufig am Bus: mit Gruppe Bus -> Gruppenname (Summe der
@@ -1563,6 +1523,111 @@ class EnergieDashboardService:
             "anomalien": anomalien,
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
         }
+
+    def _speicher_efficiency(
+        self, speichers_with_both: list[dict], now: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> float | None:
+        """Wirkungsgrad mit kurzlebigem Cache.
+
+        Die Berechnung darunter liest die GESAMTE Historie (range "decade") und
+        kostete damit bei jedem Seitenaufruf 71-72 ms — gemessen 15-19 % eines
+        /energiedashboard/data-Requests und damit mehr als die Trends, bevor die
+        ausgelagert wurden. Der Wert ändert sich dabei praktisch nicht: ein
+        weiterer Tag Messdaten verschiebt einen über Jahre gemittelten
+        Wirkungsgrad nicht sichtbar. Anders als die Trends lässt er sich aber
+        nicht nachladen — er steht im Ring auf der Hauptseite.
+
+        Deshalb on demand gecacht statt im Wartungsplaner vorberechnet
+        (dasselbe Muster wie is_cleanup_alltime_stats_stale in index.py): der
+        erste Aufruf nach Ablauf zahlt, alle folgenden sind kostenlos. Die
+        Signatur enthält die beteiligten Entitäten und die konfigurierte
+        Kapazität — ändert sich die Rollenzuordnung, ist der Cache sofort
+        ungültig, ohne dass jemand an eine Invalidierung denken muss. Bewusst
+        die KONFIGURIERTEN Kapazitätsfelder, nicht der aufgelöste Messwert:
+        sonst verwürfe ein schwankender Kapazitätssensor den Cache ständig.
+
+        Ein "checked_at" aus der Zukunft (Systemzeit zurückgestellt) gilt als
+        abgelaufen — sonst hinge ein falscher Wert bis zum Aufholen der Uhr fest.
+        """
+        signatur = json.dumps(
+            [
+                [
+                    sp.get("laden_entity_id"), sp.get("entladen_entity_id"),
+                    sp.get("soc_entity_id"), sp.get("capacity_entity_id"), sp.get("capacity_kwh"),
+                ]
+                for sp in speichers_with_both
+            ],
+            sort_keys=True,
+        )
+        raw = self.deps.index.get_setting(SETTING_EFFICIENCY_CACHE, "")
+        if raw:
+            try:
+                eintrag = json.loads(raw)
+            except (TypeError, ValueError):
+                eintrag = None
+            if isinstance(eintrag, dict) and eintrag.get("signatur") == signatur:
+                alter = now.timestamp() - (eintrag.get("checked_at") or 0)
+                if 0 <= alter < EFFICIENCY_CACHE_TTL_SECONDS:
+                    return eintrag.get("value")
+        wert = self._compute_speicher_efficiency(speichers_with_both, now, read_cache)
+        self.deps.index.set_setting(
+            SETTING_EFFICIENCY_CACHE,
+            json.dumps({"signatur": signatur, "checked_at": now.timestamp(), "value": wert}),
+        )
+        return wert
+
+    def _compute_speicher_efficiency(
+        self, speichers_with_both: list[dict], now: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> float | None:
+        # Selbst berechnet statt manuell im Setup einzutragen (vorher
+        # "Wirkungsgrad"-Feld, ohne Auswirkung auf die Berechnung) —
+        # Entladung/Ladung über die GESAMTE bisherige Historie statt nur
+        # die angezeigte Periode, weil sich ein unterschiedlicher Start-/
+        # End-Füllstand über viele Lade-/Entladezyklen hinweg
+        # herausmittelt und so eine deutlich stabilere Schätzung ergibt.
+        # "decade" (10 Jahre) ist der größte vorhandene range_key in
+        # query.py und deckt die Speicher-Lebensdauer damit praktisch
+        # immer komplett ab. Über mehrere Speicher hinweg werden Ladung
+        # und (korrigierte) Entladung SUMMIERT statt als Schnitt der
+        # einzelnen Quoten gemittelt — ergibt denselben blended
+        # Wirkungsgrad, den man bekäme, behandelte man alle Speicher als
+        # einen einzigen großen (korrekt gewichtet nach tatsächlichem
+        # Energiedurchsatz statt nach Anzahl Speicher).
+        total_laden_all = 0.0
+        total_entladen_all = 0.0
+        total_corrected_laden = 0.0
+        for sp in speichers_with_both:
+            laden_all, _ = self._entity_series(sp["laden_entity_id"], "decade", 0, now, read_cache)
+            entladen_all, _ = self._entity_series(sp["entladen_entity_id"], "decade", 0, now, read_cache)
+            laden_all_total = self._series_total(laden_all)
+            entladen_all_total = self._series_total(entladen_all)
+            total_laden_all += laden_all_total
+            total_entladen_all += entladen_all_total
+
+            # Korrektur um den aktuell noch im Speicher steckenden
+            # Füllstand: ohne sie zählt "Ladung" auch Energie mit, die
+            # noch gar nicht wieder entladen wurde (verfälscht die Quote
+            # vor allem bei kurzer Historie oder kurz nach einer großen
+            # Ladung). Nötig dafür: SOC am Anfang UND am Ende der
+            # Historie plus eine hinterlegte Kapazität — fehlt eins
+            # davon, bleibt es bei der einfachen (unkorrigierten) Menge
+            # dieses Speichers als Fallback.
+            capacity_kwh = sp.get("_resolved_capacity_kwh")
+            corrected = laden_all_total
+            if capacity_kwh and sp.get("soc_entity_id"):
+                soc_all, _ = self._entity_series(sp["soc_entity_id"], "decade", 0, now, read_cache)
+                if len(soc_all) >= 2:
+                    soc_start = soc_all[min(soc_all)]
+                    soc_end = soc_all[max(soc_all)]
+                    delta_kwh = (soc_end - soc_start) / 100.0 * capacity_kwh
+                    corrected = laden_all_total - delta_kwh
+            total_corrected_laden += corrected
+
+        if total_corrected_laden > 0:
+            return round(max(0.0, min(1.0, total_entladen_all / total_corrected_laden)) * 100, 1)
+        elif total_laden_all > 0:
+            return round(max(0.0, min(1.0, total_entladen_all / total_laden_all)) * 100, 1)
+        return None
 
     def compute_period_comparison(
         self, config: dict, range_key: str, offset: int, current: dict,
