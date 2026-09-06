@@ -2100,28 +2100,36 @@ class ImportService:
                     logger.exception("CSV-Import unerwartet fehlgeschlagen")
                     errors.append(f"Import abgebrochen: {exc}")
             try:
-                with self.deps.coordinator.exclusive():
-                    import_reports.create(
-                        self.deps.data_dir,
-                        source_type="csv",
-                        started_at=started_at,
-                        source={
-                            "filename": source_path.name if source_path else None,
-                            "size_bytes": source_path.stat().st_size if source_path and source_path.is_file() else 0,
-                        },
-                        configuration={
-                            "delimiter": delimiter,
-                            "has_header": has_header,
-                            "timestamp_column": ts_col,
-                            "value_column": value_col,
-                            "timestamp_format": ts_format,
-                            "custom_pattern": custom_pattern if ts_format == "custom" else "",
-                            "entity_id": entity_id,
-                        },
-                        results=[dataclasses.asdict(result) for result in results],
-                        errors=errors,
-                        reconciliation=reconciliation_report,
-                    )
+                # exclusive() wartet unbegrenzt, bis keine andere
+                # Speicheroperation mehr läuft. Im Event-Loop stünde
+                # während dieses Wartens der ganze Server still statt nur
+                # eines Threadpool-Workers — siehe backup_import() in
+                # main.py, wo dieselbe Stelle denselben Fehler hatte.
+                def write_csv_report() -> None:
+                    with self.deps.coordinator.exclusive():
+                        import_reports.create(
+                            self.deps.data_dir,
+                            source_type="csv",
+                            started_at=started_at,
+                            source={
+                                "filename": source_path.name if source_path else None,
+                                "size_bytes": source_path.stat().st_size if source_path and source_path.is_file() else 0,
+                            },
+                            configuration={
+                                "delimiter": delimiter,
+                                "has_header": has_header,
+                                "timestamp_column": ts_col,
+                                "value_column": value_col,
+                                "timestamp_format": ts_format,
+                                "custom_pattern": custom_pattern if ts_format == "custom" else "",
+                                "entity_id": entity_id,
+                            },
+                            results=[dataclasses.asdict(result) for result in results],
+                            errors=errors,
+                            reconciliation=reconciliation_report,
+                        )
+
+                await run_in_threadpool(write_csv_report)
             except Exception:
                 logger.exception("CSV-Importreport konnte nicht gespeichert werden")
             return self.deps.templates.TemplateResponse(request, "_import_result.html", {"results": results, "errors": errors})
@@ -2543,38 +2551,46 @@ class ImportService:
                         logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
                         errors.append(f"Import abgebrochen: {exc}")
             try:
-                with self.deps.coordinator.exclusive():
-                    report_results = []
-                    for item in items:
-                        result_payload = dataclasses.asdict(item["result"])
-                        result_payload["available_label"] = item["available_label"]
-                        if item.get("full_summary") is not None:
-                            result_payload["full_summary"] = item["full_summary"]
-                        report_results.append(result_payload)
-                    import_reports.create(
-                        self.deps.data_dir,
-                        source_type="ha",
-                        started_at=started_at,
-                        source={"filename": "Home Assistant", "size_bytes": 0},
-                        configuration={
-                            "entity_ids": raw_entity_ids,
-                            "range_preset": range_preset,
-                            "date_from": date_from,
-                            "date_to": date_to,
-                            "history_source": history_source,
-                            "period": period if history_source in ("stats", "full") else None,
-                            "stats_range_preset": (
-                                stats_range_preset if history_source == "full" else None
-                            ),
-                            "include_long_term_stats": (
-                                include_long_term_stats if history_source == "full" else None
-                            ),
-                            "include_existing_months": include_existing_months,
-                        },
-                        results=report_results,
-                        errors=errors,
-                        reconciliation=reconciliation_report,
-                    )
+                # exclusive() wartet unbegrenzt, bis keine andere
+                # Speicheroperation mehr läuft. Im Event-Loop stünde
+                # während dieses Wartens der ganze Server still statt nur
+                # eines Threadpool-Workers — siehe backup_import() in
+                # main.py, wo dieselbe Stelle denselben Fehler hatte.
+                def write_ha_report() -> None:
+                    with self.deps.coordinator.exclusive():
+                        report_results = []
+                        for item in items:
+                            result_payload = dataclasses.asdict(item["result"])
+                            result_payload["available_label"] = item["available_label"]
+                            if item.get("full_summary") is not None:
+                                result_payload["full_summary"] = item["full_summary"]
+                            report_results.append(result_payload)
+                        import_reports.create(
+                            self.deps.data_dir,
+                            source_type="ha",
+                            started_at=started_at,
+                            source={"filename": "Home Assistant", "size_bytes": 0},
+                            configuration={
+                                "entity_ids": raw_entity_ids,
+                                "range_preset": range_preset,
+                                "date_from": date_from,
+                                "date_to": date_to,
+                                "history_source": history_source,
+                                "period": period if history_source in ("stats", "full") else None,
+                                "stats_range_preset": (
+                                    stats_range_preset if history_source == "full" else None
+                                ),
+                                "include_long_term_stats": (
+                                    include_long_term_stats if history_source == "full" else None
+                                ),
+                                "include_existing_months": include_existing_months,
+                            },
+                            results=report_results,
+                            errors=errors,
+                            reconciliation=reconciliation_report,
+                        )
+
+                await run_in_threadpool(write_ha_report)
             except Exception:
                 logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")
             return self.deps.templates.TemplateResponse(

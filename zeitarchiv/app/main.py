@@ -2445,8 +2445,18 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
     try:
         await run_in_threadpool(copy_upload_limited, file.file, staging, MAX_ZIP_UPLOAD_BYTES)
         manifest = await run_in_threadpool(backup.validate_backup, staging)
-        with storage_coordinator.exclusive():
-            destination = backup.install_validated_backup(staging, BACKUPS_DIR, datetime.now(TZ))
+
+        def install_locked() -> Path:
+            # Gehört zwingend in den Threadpool, obwohl die Arbeit selbst nur
+            # ein replace() ist: exclusive() wartet unbegrenzt, bis keine
+            # Entitätsoperation und keine andere Wartung mehr läuft. Im
+            # Event-Loop ausgeführt hielte allein dieses Warten den gesamten
+            # Server an — auch /api/health —, solange z. B. ein Import oder
+            # ein Retention-Lauf den exklusiven Zugriff hält.
+            with storage_coordinator.exclusive():
+                return backup.install_validated_backup(staging, BACKUPS_DIR, datetime.now(TZ))
+
+        destination = await run_in_threadpool(install_locked)
     except UploadLimitExceeded as exc:
         logger.warning("Backup-Import abgelehnt · %s", exc)
         return templates.TemplateResponse(
