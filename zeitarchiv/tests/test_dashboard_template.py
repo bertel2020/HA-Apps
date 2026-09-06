@@ -217,3 +217,43 @@ def test_metric_section_labels_are_all_the_same_size() -> None:
     css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
     assert 'class="menu-row-label dtile-choice-head-label"' in menu
     assert ".dtile-choice-head-label{" in css
+
+
+def _tile_css_rules(template_name: str) -> set[str]:
+    """Die Kachel-Regeln einer Seite, ohne Kommentare und Formatierung."""
+    import re
+
+    source = (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
+    block = source[source.index(".dtile{") : source.index(".dtile-picker-search")]
+    block = re.sub(r"/\*.*?\*/", "", block, flags=re.S)
+    block = re.sub(r"\s+", " ", block)
+    return {part.strip() + "}" for part in block.split("}") if part.strip()}
+
+
+def test_tile_styles_stay_identical_in_both_pages() -> None:
+    """Die Kachel-Styles stehen doppelt: in dashboard_detail.html und in
+    entities.html, laut Kommentar dort absichtlich ("Identisch zu den
+    Dashboard-Kachel-Styles in entities.html").
+
+    Solange es zwei Kopien gibt, muss jede Regeländerung in beide — und genau
+    das geht unter. Beim Einbau der Kennzahlen-Zeile musste dieselbe Regel
+    zweimal geschrieben werden, während die zugehörigen Knopfreihen nur einmal
+    in app.css landeten; die Grenze zwischen "geteilt" und "doppelt" ist
+    willkürlich (siehe ZG-04 in CODE_ANALYSE.md).
+
+    Verglichen werden nur die Regeln, nicht die Kommentare: dashboard_detail.html
+    trägt die ausführlichen Begründungen, entities.html nicht. Diese Asymmetrie
+    besteht schon und ist kein Fehler in der Darstellung — sie hier
+    mitzuprüfen, würde den Test an einer Stelle scheitern lassen, die niemand
+    kaputt gemacht hat.
+    """
+    detail = _tile_css_rules("dashboard_detail.html")
+    uebersicht = _tile_css_rules("entities.html")
+
+    nur_detail = sorted(detail - uebersicht)
+    nur_uebersicht = sorted(uebersicht - detail)
+    assert not nur_detail, f"nur in dashboard_detail.html: {nur_detail}"
+    assert not nur_uebersicht, f"nur in entities.html: {nur_uebersicht}"
+    # Absicherung gegen einen still leer laufenden Vergleich, falls die
+    # Blockgrenzen sich einmal verschieben.
+    assert len(detail) > 30
