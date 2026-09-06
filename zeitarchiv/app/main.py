@@ -2796,6 +2796,11 @@ def statistik_view(request: Request) -> HTMLResponse:
             "table_count": index.count_saved_tables(),
             "dashboard_count": dashboard_count,
             "dashboard_pin_count": dashboard_pin_count,
+            # Dieselbe Messung wie events_per_hour, nur auf einen Tag gerechnet:
+            # der Zuwachs der letzten 24 Stunden als Anzahl statt als Rate. Erst
+            # dadurch steht neben dem 7-Tage-Schnitt (events_per_day) eine
+            # gleich benannte Zahl, die sich direkt mit ihm vergleichen lässt.
+            "new_rows_24h": format_int(round(rate_per_hour * 86400)) if rate_per_hour is not None else None,
             "events_per_hour": format_int(round(rate_per_hour * 3600)) if rate_per_hour is not None else None,
             "events_per_day": format_int(round(rate_per_day * 86400)) if rate_per_day is not None else None,
             "by_type": by_type,

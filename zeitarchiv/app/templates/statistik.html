@@ -85,16 +85,31 @@
 
     <div class="settings-panel">
 
+    {# Zuwachs steht ohne eigene Überschrift in derselben Reihe wie Bestand und
+       Größe: es sind Kennzahlen desselben Rangs, und eine <h2> für zwei
+       Kacheln wog schwerer als die Kacheln darüber, die ganz ohne auskommen.
+       "Neue Datensätze" (24 h) und "Ø/Tag" (7-Tage-Schnitt) tragen dieselbe
+       Einheit und lassen sich dadurch direkt vergleichen — vorher stand eine
+       Stunden- neben einer Tagesangabe, und dass beide dasselbe messen, sah
+       man nicht. Die Einheit steckt in der Beschriftung, das Fenster in der
+       Zeile darunter; "Ereignisse" ist draußen, weil die App diese Zeilen
+       überall sonst Datensätze nennt. #}
     <div class="stat-row">
       <div class="stat"><div class="label">Entitäten</div><div class="value">{{ entity_count }}</div></div>
       <div class="stat"><div class="label">Datensätze gesamt</div><div class="value">{{ total_rows }}</div></div>
       <div class="stat"><div class="label">Größe</div><div class="value">{{ total_size }}</div></div>
-    </div>
-
-    <h2>Ereignisrate</h2>
-    <div class="stat-row">
       <div class="stat">
-        <div class="label">Ø Ereignisse/Stunde</div>
+        <div class="label">Neue Datensätze</div>
+        {% if new_rows_24h is not none %}
+        <div class="value">{{ new_rows_24h }}</div>
+        <div class="sub-value">letzte 24 Stunden</div>
+        {% else %}
+        <div class="value">&mdash;</div>
+        <div class="sub-value">Noch nicht genug Verlaufsdaten</div>
+        {% endif %}
+      </div>
+      <div class="stat">
+        <div class="label">Ø/Stunde</div>
         {% if events_per_hour is not none %}
         <div class="value">{{ events_per_hour }}</div>
         <div class="sub-value">letzte 24 Stunden</div>
@@ -104,7 +119,7 @@
         {% endif %}
       </div>
       <div class="stat">
-        <div class="label">Ø Ereignisse/Tag</div>
+        <div class="label">Ø/Tag</div>
         {% if events_per_day is not none %}
         <div class="value">{{ events_per_day }}</div>
         <div class="sub-value">letzte 7 Tage</div>

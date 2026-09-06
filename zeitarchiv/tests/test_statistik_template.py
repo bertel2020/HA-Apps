@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import TEMPLATES
+from _paths import ADDON, TEMPLATES
 
 
 TEMPLATES_DIR = TEMPLATES
@@ -44,6 +44,9 @@ def _render_storage_table() -> str:
         entity_count=0,
         total_rows="0",
         total_size="0 B",
+        new_rows_24h="8.208",
+        events_per_hour="342",
+        events_per_day="305.391",
         has_growth_history=False,
         growth_range_options=[],
         growth_points=[],
@@ -221,3 +224,36 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_growth_figures_share_the_top_row_and_the_archive_vocabulary() -> None:
+    """Die drei Zuwachs-Kacheln standen unter einer eigenen <h2>, die schwerer
+    wog als die Kacheln darüber, die ganz ohne Überschrift auskommen. Und sie
+    hießen "Ereignisse" — ein Wort, das die App sonst nirgends für archivierte
+    Zeilen benutzt. Wichtiger als beides: "Neue Datensätze" (24 h) und "Ø/Tag"
+    (7-Tage-Schnitt) tragen jetzt dieselbe Einheit und lassen sich direkt
+    vergleichen; vorher stand eine Stunden- neben einer Tagesangabe."""
+    html = _render_storage_table()
+    assert "Ereignisrate" not in html
+    assert "Ereignisse/" not in html
+    # Alle sechs Kennzahlen in EINER Reihe — sonst steht der Zuwachs wieder als
+    # eigener Block darunter, nur ohne Überschrift.
+    kopf = html.split('<h2>', 1)[0]
+    assert kopf.count('class="stat-row"') == 1
+    for label in ("Entitäten", "Datensätze gesamt", "Größe", "Neue Datensätze", "Ø/Stunde", "Ø/Tag"):
+        assert f">{label}</div>" in kopf, label
+    # Reihenfolge: Bestand zuerst, dann der Zuwachs, dieser beginnend mit der
+    # Anzahl — die Raten sind ihre Herleitung, nicht die Hauptaussage.
+    positionen = [kopf.index(f">{label}</div>") for label in
+                  ("Entitäten", "Datensätze gesamt", "Größe", "Neue Datensätze", "Ø/Stunde", "Ø/Tag")]
+    assert positionen == sorted(positionen)
+
+
+def test_new_rows_are_measured_over_the_same_day_as_the_hourly_average() -> None:
+    """`new_rows_24h` ist dieselbe Messung wie `events_per_hour`, nur auf einen
+    Tag gerechnet. Aus `rate_per_day` (7-Tage-Fenster) abgeleitet stünde in der
+    Kachel etwas anderes, als ihre Unterzeile "letzte 24 Stunden" behauptet —
+    im Demo-Archiv ein Faktor 37."""
+    quelle = (ADDON / "app" / "main.py").read_text(encoding="utf-8")
+    zeile = next(z for z in quelle.splitlines() if '"new_rows_24h"' in z)
+    assert "rate_per_hour" in zeile and "86400" in zeile
