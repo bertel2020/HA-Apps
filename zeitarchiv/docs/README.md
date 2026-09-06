@@ -40,19 +40,27 @@ Release-Reihenfolge): [operations.md](operations.md).
 
 ```text
 app/
-  main.py              FastAPI-App, Ingress-Routen (~4300 Zeilen, Budget 4.800)
+  main.py              FastAPI-App, Ingress-Routen (Zeilenbudget: testing.md)
   api_routes.py         Öffentliche REST-API (/api/write, /api/health, /api/query*)
   import_routes.py       Ingress-Routen für Symcon-/CSV-/HA-Import
   report_routes.py        Ingress-Routen für Import-Reports
-  route_support.py         Gemeinsame Hilfsfunktionen für Ingress-Routen
-  backup_scheduler.py       Geplante Backups (Intervall, Aufräumung)
-  security.py                Token-Erzeugung/-Prüfung
-  formatting.py                Zahlen-/Datums-/Label-Formatierung (Jinja-Filter)
-  limits.py                     Zentrale Ressourcen-/Größenlimits
-  log_source.py, logging_setup.py   Log-Konfiguration und -Zugriff (Diagnose-Seite)
-  supervisor_stats.py            Supervisor-/Prozess-Kennzahlen
-  timezone_config.py              IANA-Zeitzonen-Handling
-  version.py                       Laufzeit-Versionsauskunft
+  energiedashboard_routes.py  Ingress-Routen des Energiedashboards
+  housekeeping_routes.py       Ingress-Routen der Housekeeping-Seite
+  route_support.py              Gemeinsame Hilfsfunktionen für Ingress-Routen
+  backup_scheduler.py            Geplante Backups (Intervall, Aufräumung)
+  index_optimization.py           Schwellwerte und Lauf der Index-Optimierung
+  ha_integration.py                Abfragen an die laufende HA-Instanz
+  healthcheck.py                    Selbsttest beim Start
+  notices.py                         Meldungen im Glocken-Panel
+  tips.py                             Praxis-Tipps im Meldungs-Center
+  version_check.py                     Update-Prüfung gegen GitHub
+  security.py                           Token-Erzeugung/-Prüfung
+  formatting.py                          Zahlen-/Datums-/Label-Formatierung (Jinja-Filter)
+  limits.py                               Zentrale Ressourcen-/Größenlimits
+  log_source.py, logging_setup.py          Log-Konfiguration und -Zugriff (Diagnose-Seite)
+  supervisor_stats.py                       Supervisor-/Prozess-Kennzahlen
+  timezone_config.py                         IANA-Zeitzonen-Handling
+  version.py                                  Laufzeit-Versionsauskunft
   storage/
     paths.py               Pfadvalidierung (Entity-ID, Symlink-Schutz)
     coordinator.py          Entitäts-/Exklusiv-Sperren
@@ -71,7 +79,8 @@ app/
     ha_import.py, ha_statistics.py     Datenübernahme aus laufender HA-Instanz
     import_reports.py                   Protokollierung ausgeführter Importe
   templates/               Jinja2-Seiten (Server-Side-Rendering + htmx-Fragmente)
-  static/js/                Alpine.js-Komponenten, ECharts-Wrapper
+  static/js/                Alpine.js-Komponenten, ECharts-Wrapper, mobile
+                            Listenansicht (siehe frontend.md)
 ```
 
 Die App ist ein einzelner FastAPI-Prozess (siehe [architecture.md](architecture.md));

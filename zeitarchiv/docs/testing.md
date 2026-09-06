@@ -65,15 +65,20 @@ gerenderten HTML-Output, nicht clientseitiges Verhalten.
 ## `main.py`-Zeilenbudget
 
 `test_route_modules.py::test_main_keeps_external_api_and_report_routes_out_of_the_monolith`
-erzwingt `len(main.py.splitlines()) < 5_800` als Architektur-Wächter gegen
+erzwingt `len(main.py.splitlines()) < 5_850` als Architektur-Wächter gegen
 unkontrolliertes Wachstum des Monolithen (angehoben von ursprünglich 4.800
-über 5.700 auf zuletzt 5.800, siehe Git-Historie des Tests). `/api/*`
+über 5.700 und 5.800 auf zuletzt 5.850, siehe Git-Historie des Tests). `/api/*`
 (`api_routes.py`), Import-Reports (`report_routes.py`) und seit 0.51.0 auch
 der komplette Symcon-/CSV-/Home-Assistant-Import (`import_routes.py`) sind
 dafür ausgelagert — jeweils ein `*Dependencies`-Frozen-Dataclass plus ein
 `*Service` mit `.router()`, der die Routen als verschachtelte Closures
 registriert (siehe `ReportService`/`ImportService` als Vorlage für weitere
-Extraktionen). Stand 0.80.2: **rund 5.720 Zeilen**, Test grün. Wächst
-`main.py` nochmal spürbar über das Budget, ist eine eigene
-`housekeeping_routes.py` (analog zu den bereits ausgelagerten Modulen) der
-nächste Schritt, nicht ein weiteres stillschweigendes Anheben der Zahl.
+Extraktionen). Seit 0.82.0 ist auch die Housekeeping-Seite ausgelagert
+(`housekeeping_routes.py`) — der Schritt, den dieser Abschnitt vorher als
+nächsten angekündigt hat.
+
+Stand 0.83.0: **rund 5.590 Zeilen**, Test grün. Wächst `main.py` nochmal
+spürbar über das Budget, ist die nächste Extraktion der richtige Schritt, nicht
+ein weiteres stillschweigendes Anheben der Zahl. Kandidaten sind die
+Einstellungs- und die Statistik-Routen; welche zuerst, entscheidet, wo dann
+tatsächlich die Zeilen liegen.

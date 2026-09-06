@@ -139,6 +139,60 @@ Kein eigener Chart-Renderer — ECharts-Instanzen werden direkt aus den
 `/api/query[-multi]`-Antworten befüllt. Mehrere Entitäten mit
 unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
 
+## Mobile Listenansicht
+
+Unter 640 px arbeiten zwei Module zusammen, die eine neue Seite nicht
+einbinden, sondern nur bedienen muss.
+
+**`table-cards.js` — aus jeder Tabellenzeile wird eine Karte.** Jeder Wert
+trägt seine Spaltenüberschrift als Etikett bei sich (`data-label` je `td`),
+die Kopfzeile verschwindet, und `app.css` macht daraus unter 640 px die
+Kartenform. Das gilt automatisch für jedes `table.dt` — eine neue Tabelle muss
+dafür nichts tun. Ausgenommen erkennt das Modul selbst: `colspan`/`rowspan`
+(in dieser App heißt das Vergleichstabelle, deren Raster die Aussage ist),
+mehrstufige Köpfe, weniger als drei Spalten, Chart-Legenden. Wer eine Tabelle
+bewusst herausnehmen will, setzt `data-cards="off"`.
+
+Die Karte startet **eingeklappt**: sichtbar bleiben Überschrift, ein Leitwert
+und die Bedienspalten davor (Favoriten-Stern, Auswahlkästchen). Leitwert ist
+die erste beschriftete Spalte nach dem Namen — die Listen dieser App stellen
+die wichtigste Angabe ohnehin nach vorn. Trifft das für eine Tabelle nicht zu,
+nennt sie ihre Spalte selbst: `data-card-lead="Letzter Wert"` am `<table>`,
+mit dem Spaltennamen aus der Kopfzeile. Greift der Name ins Leere, gilt wieder
+die erste Spalte. Eingeklappt wird ab zwei versteckten Werten.
+
+Ebenfalls von hier: der Scroll-Hinweis an den Rändern von `.tbl-wrap` hängt an
+der Klasse `.is-scrollable`, die das Modul aus `scrollWidth` gegen
+`clientWidth` setzt — ob ein Container überläuft, weiß nur das Layout.
+
+**`list-settings-menu.js` — die Werkzeugleiste wird ein Menü.** Filter,
+Spaltenauswahl und Sortierung stehen auf schmalen Bildschirmen zusammen in
+einem Menü „Ansicht" neben der Suche statt in mehreren Reihen darüber. Eine
+Seite bekommt das, wenn ihre Werkzeugleiste `#controls` oder `.card-browser`
+heißt **und** ein eigenes Suchfeld als direktes Kind trägt. Das Suchfeld ist
+die Bedingung, nicht Zierde: auf der Bereinigungs-Seite heißt `#controls` ein
+Container, in dem die Zeitraum-Leiste steckt — die Hauptbedienung der Seite,
+die nicht in ein Menü gehört.
+
+Zwei Eigenschaften sind beim Weiterbauen wichtig:
+
+- **Verschoben, nicht nachgebaut.** Die Bedienelemente wandern als dieselben
+  DOM-Knoten in ein Popover *innerhalb* der Leiste. Feldnamen, `hx-include`
+  und die Auswertung im Server bleiben dadurch unberührt; es gibt keine zweite
+  Fassung des Formulars, die auseinanderlaufen könnte. Auf breiten
+  Bildschirmen wandern sie zurück, ein Kommentarknoten je Element merkt sich
+  den Platz.
+- **Kein `MutationObserver`.** Ein Beobachter auf dem Dokument schaukelt sich
+  mit dem in `table-cards.js` auf — dieses Modul verschiebt Elemente, das
+  weckt den anderen, dessen Arbeit wiederum dieses. Die Werkzeugleiste steht
+  beim Laden da und wird von htmx nie ersetzt; `DOMContentLoaded` und
+  `htmx:afterSwap` genügen.
+
+Die Dropdowns, die die Bedienelemente mitbringen, klappen im Menü **an Ort und
+Stelle** auf statt als Popover darüber — ein Popover im Popover ist auf 375 px
+nicht unterzubringen. Dafür war kein Eingriff in `dd-picker.js` nötig: das
+Aufklappen hängt dort an der Klasse `.open`, nicht an der Positionierung.
+
 ## Wiederkehrende Muster, die neue Seiten übernehmen sollten
 
 - **`dd-picker`**: einheitliches Dropdown-Picker-Markup/-Verhalten

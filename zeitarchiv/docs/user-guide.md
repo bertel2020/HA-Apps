@@ -11,6 +11,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Erste Schritte](#erste-schritte)
 - [Die Übersichtsseite](#die-übersichtsseite)
 - [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)
+- [Auf dem Telefon](#auf-dem-telefon)
 - [Dashboards](#dashboards)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
 - [Entität konfigurieren](#entität-konfigurieren)
@@ -109,6 +110,38 @@ und Kleinschreibung sowie Leerzeichen am Rand keine Rolle: neben einem Chart
 „Wind“ lässt sich kein zweites „wind“ anlegen. Ein bereits vergebener Name
 wird beim Speichern mit einem Hinweis abgelehnt. Duplikate zählen selbst
 hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
+
+## Auf dem Telefon
+
+Zeitarchiv ist dieselbe Anwendung, ob im Browser am Schreibtisch oder auf dem
+Telefon — nur zeigen Listen dort weniger auf einmal. Drei Dinge sehen deshalb
+auf schmalen Bildschirmen anders aus.
+
+**Listen werden zu Karten.** Statt einer Tabelle, die seitwärts geschoben
+werden muss, bekommt jede Zeile eine eigene Karte, in der jeder Wert seine
+Spaltenüberschrift bei sich trägt. Die Karte ist zunächst **eingeklappt** und
+zeigt den Namen und einen Leitwert — in der Entitätenliste den letzten Wert,
+auf der Housekeeping-Seite ebenso. Der Pfeil rechts oben klappt den Rest auf
+und wieder zu; der Stern daneben schaltet den Favoriten um. Zugeklappt passen
+so rund sieben Einträge auf einen Bildschirm statt drei.
+
+**Alle Einstellungen einer Liste stehen im Menü „Ansicht".** Filter,
+Spaltenauswahl und Sortierung ziehen dort zusammen, neben dem Suchfeld. Die
+Suche bleibt sichtbar, weil sie die häufigste Handlung ist. Ist mindestens ein
+Filter gesetzt, steht die Zahl im Knopf: „Ansicht (2)". Das gilt für die
+Entitätenliste, den CSV-Export und die Übersichten für Dashboards, Charts und
+Tabellen.
+
+**Am Schreibtisch ändert sich nichts.** Alle drei Punkte gelten unterhalb von
+640 Pixeln Fensterbreite. Wer ein Browserfenster schmal zieht, sieht dieselbe
+Ansicht wie auf dem Telefon; beim Aufziehen kommt die gewohnte Tabelle mit
+ihrer Werkzeugleiste zurück.
+
+Zwei Kleinigkeiten am Rande: Lange Entitäts-IDs enden auf Karten mit
+Auslassungspunkten statt in einer zweiten Zeile umzubrechen — der vollständige
+Name steht darüber, die ganze ID auf der Detailseite der Entität. Und ein
+schmaler Verlauf am Rand einer Tabelle zeigt an, dass dort seitwärts noch
+etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
 
 ## Dashboards
 
