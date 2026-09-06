@@ -14,7 +14,11 @@
   {% for col, px in _col_widths.items() %}
     {% if col in visible_columns %}{% set ns.min_width = ns.min_width + px %}{% endif %}
   {% endfor %}
-  <table class="dt entities-dt" style="min-width:{{ ns.min_width }}px;">
+  <!-- data-card-lead: auf dem Telefon ist die Karte eingeklappt und zeigt neben
+       dem Namen einen Wert. Von selbst wäre das "Typ" (erste Spalte nach dem
+       Namen); gesucht wird hier aber danach, ob und wann eine Entität zuletzt
+       etwas geliefert hat. Siehe table-cards.js. -->
+  <table class="dt entities-dt" data-card-lead="Letzter Wert" style="min-width:{{ ns.min_width }}px;">
     <colgroup>
       <col class="col-fav">
       <col class="col-entity">

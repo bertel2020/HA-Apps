@@ -27,13 +27,38 @@ window.FixedTooltip = (() => {
     target = null;
   }
 
+  // Zwei Inhaltsformen: der gewöhnliche einzeilige Hinweis — und, wenn der
+  // Wert einen Zeilenumbruch enthält, die Entitäts-Variante aus Name und ID.
+  // Letztere bekommt Klasse und Aufbau der Tooltips in der Entitätenliste
+  // (.entity-tooltip mit <strong>/<code>), damit sie nicht wie ein zweiter,
+  // ähnlicher Tooltip aussieht, sondern wie derselbe. .entity-tooltip-floating
+  // ist die dafür vorgesehene Variante für per JS positionierte Kopien
+  // (app.css) — sie hängt an document.body, hat also keinen
+  // .entity-tooltip-host-Vorfahren, weshalb display hier als Inline-Stil
+  // gesetzt wird: die Mobilregel blendet .entity-tooltip sonst aus.
+  function bauen(text) {
+    const zeilen = text.split('\n');
+    const el = document.createElement('div');
+    if (zeilen.length < 2) {
+      el.className = 'dtile-tooltip-fixed';
+      el.textContent = text;
+      return el;
+    }
+    el.className = 'entity-tooltip entity-tooltip-floating';
+    const name = document.createElement('strong');
+    name.textContent = zeilen[0];
+    const id = document.createElement('code');
+    id.textContent = zeilen.slice(1).join(' ');
+    el.append(name, id);
+    el.style.display = 'block';
+    return el;
+  }
+
   function show(el) {
     const text = el.getAttribute('data-tooltip-fixed');
     if (!text) return;
     target = el;
-    tipEl = document.createElement('div');
-    tipEl.className = 'dtile-tooltip-fixed';
-    tipEl.textContent = text;
+    tipEl = bauen(text);
     document.body.appendChild(tipEl);
     const rect = el.getBoundingClientRect();
     const tipRect = tipEl.getBoundingClientRect();

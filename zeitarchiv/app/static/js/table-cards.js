@@ -73,6 +73,8 @@
       titleDone = true;
     }
 
+    if (titleIndex >= 0) addCollapsing(table, head, titleIndex, labels);
+
     // Die Kopfzeile bleibt als Sortierleiste stehen, wenn sie eine Bedienung
     // trägt — sonst wäre Sortieren auf dem Telefon nicht mehr erreichbar.
     // Ohne Sortierung ist sie in der Kartenform überflüssig: die Spaltennamen
@@ -87,6 +89,75 @@
     if (sortable) addSortMenu(head, table);
     table.classList.toggle('dt-cards-titled', titleDone);
     table.classList.add('dt-cards');
+  }
+
+  // Eine Karte trägt so viele Zeilen, wie die Tabelle Spalten hat — in der
+  // Entitätenliste acht, auf der Housekeeping-Seite fünf. Gemessen sind das
+  // 289px bzw. 207px je Karte: keine drei passen auf eine Schirmfüllung, und
+  // wer eine Zeile SUCHT, liest davon den Namen. Eingeklappt bleiben deshalb
+  // die Überschrift und ein Leitwert stehen, der Rest kommt auf Antippen.
+  //
+  // Leitwert ist die erste Spalte nach der Namensspalte. Das ist keine
+  // Verlegenheitswahl: die Listen dieser App stellen die wichtigste Angabe
+  // ohnehin nach vorn (Housekeeping "Letzter Wert", Statistik "Entitäten"),
+  // und eine Regel je Seite wäre genau die Inkonsistenz, die vermieden werden
+  // soll. Spalten VOR dem Namen (Favoriten-Stern, Auswahlkästchen) bleiben
+  // sichtbar — sie sind Bedienung, kein Wert.
+  const MIN_HIDDEN = 2;  // darunter lohnt der zusätzliche Griff nicht
+
+  function addCollapsing(table, head, titleIndex, labels) {
+    // Erste beschriftete Spalte nach dem Namen. Ohne sie (zwei Spalten, davon
+    // eine namenlos) bliebe eingeklappt nur die Überschrift — dann lieber gar
+    // nicht einklappen.
+    //
+    // data-card-lead nennt stattdessen eine Spalte beim Namen. Gedacht für die
+    // Fälle, in denen die erste Spalte nach dem Namen eine Einordnung ist und
+    // kein Wert: in der Entitätenliste steht dort "Typ", gesucht wird auf dem
+    // Telefon aber nach dem letzten Wert. Passt der Name auf keine Spalte,
+    // gilt wieder die erste — ein Tippfehler im Template darf das Einklappen
+    // nicht abschalten.
+    const gewuenscht = table.dataset.cardLead;
+    const benannt = gewuenscht ? labels.findIndex((text, i) => i > titleIndex && text === gewuenscht) : -1;
+    const leadIndex = benannt >= 0 ? benannt : labels.findIndex((text, i) => i > titleIndex && text !== '');
+    if (leadIndex < 0) return;
+    const versteckt = labels.length - titleIndex - 2;  // Name und Leitwert bleiben
+    if (versteckt < MIN_HIDDEN) return;
+
+    for (const row of table.rows) {
+      // Summenzeilen tragen keine Details, die sich verstecken ließen.
+      if (row === head || row.parentElement.tagName === 'TFOOT') continue;
+      if (row.classList.contains('dt-card-collapsible')) continue;
+      const title = row.cells[titleIndex];
+      if (!title) continue;
+      Array.from(row.cells).forEach((cell, index) => {
+        if (index < titleIndex) cell.classList.add('dt-card-pre');
+      });
+      row.cells[leadIndex].classList.add('dt-card-lead');
+      row.classList.add('dt-card-collapsible');
+      // VOR den Titeltext, nicht dahinter: ein Float sitzt auf der Höhe der
+      // Zeile, in der er im Fluss steht — angehängt landete der Pfeil unten
+      // neben der Entity-ID statt oben neben dem Namen.
+      title.insertBefore(toggleButton(row), title.firstChild);
+    }
+  }
+
+  function toggleButton(row) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'dt-card-toggle';
+    button.setAttribute('aria-expanded', 'false');
+    button.setAttribute('aria-label', 'Weitere Werte anzeigen');
+    button.textContent = '▾';
+    button.addEventListener('click', event => {
+      // Die Überschrift ist auf manchen Seiten selbst ein Link (Entitätenliste)
+      // — ohne das hier folgte der Klick auf den Pfeil ihm mit.
+      event.preventDefault();
+      event.stopPropagation();
+      const offen = row.classList.toggle('is-open');
+      button.setAttribute('aria-expanded', String(offen));
+      button.setAttribute('aria-label', offen ? 'Weitere Werte verbergen' : 'Weitere Werte anzeigen');
+    });
+    return button;
   }
 
   // Sortieren gehört auf dem Telefon in dieselbe Reihe wie "Typ", "Einheit" und
@@ -141,9 +212,32 @@
     link.click();
   }
 
+  // Wohin das Sortiermenü gehört: normalerweise über die Tabelle. Gibt es auf
+  // der Seite das Ansicht-Menü (list-settings-menu.js), zieht es dort ein —
+  // Sortieren ist eine Einstellung der Liste wie Filter und Spalten, und auf
+  // dem Telefon soll es genau eine Stelle dafür geben.
+  //
+  // Nur bei genau EINER Listentabelle auf der Seite: bei mehreren wäre im
+  // Ansicht-Menü nicht mehr erkennbar, welche Tabelle gemeint ist.
+  function sortHost(table) {
+    const menu = document.getElementById('list-settings-popover');
+    if (menu && document.querySelectorAll('table.dt').length === 1) return menu;
+    return table.closest('.tbl-wrap') || table.parentElement;
+  }
+
+  // Ein Menü im Ansicht-Menü überlebt den htmx-Austausch der Liste, seine
+  // Zeilen zeigen danach aber auf Spaltenköpfe, die nicht mehr im Dokument
+  // stehen — ein Klick sortierte dann ins Leere. Deshalb vor jedem Durchlauf
+  // die Menüs wegräumen, deren Kopfzeile weg ist; sie werden gleich neu
+  // gebaut.
+  function verwaisteSortmenues() {
+    document.querySelectorAll('.dt-cards-sort').forEach(menu => {
+      if (!menu._head || !menu._head.isConnected) menu.remove();
+    });
+  }
+
   function addSortMenu(head, table) {
-    const wrap = table.closest('.tbl-wrap');
-    const host = wrap || table.parentElement;
+    const host = sortHost(table);
     if (!host || host.querySelector(':scope > .dt-cards-sort')) return;
 
     const menu = document.createElement('div');
@@ -199,12 +293,26 @@
     document.addEventListener('click', () => popover.classList.remove('open'));
 
     menu.append(button, popover);
+    menu._head = head;
     host.insertBefore(menu, host.firstChild);
     mark();
   }
 
+  // Der Scroll-Hinweis an den Rändern von .tbl-wrap (app.css) soll nur da
+  // stehen, wo tatsächlich etwas außerhalb liegt. Rein in CSS geht das nicht:
+  // ob ein Container überläuft, weiß nur das Layout.
+  function scrollHinweis() {
+    document.querySelectorAll('.tbl-wrap').forEach(wrap => {
+      // +1px Toleranz: Bruchteile aus Zoom und Skalierung machen sonst aus
+      // einer bündig passenden Tabelle eine scrollende.
+      wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
+    });
+  }
+
   function scan() {
+    verwaisteSortmenues();
     document.querySelectorAll('table.dt').forEach(enhance);
+    scrollHinweis();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan);
@@ -212,5 +320,8 @@
   // Gleiche Nachrüst-Punkte wie in resizable-tables.js — Listen und Vorschauen
   // werden per htmx nachgeladen.
   document.addEventListener('htmx:afterSwap', scan);
+  // Ob eine Tabelle überläuft, hängt an der Fensterbreite — und daran, ob eine
+  // Spalte gerade breiter gezogen wurde (resizable-tables.js).
+  window.addEventListener('resize', scrollHinweis);
   new MutationObserver(scan).observe(document.documentElement, {childList: true, subtree: true});
 })();

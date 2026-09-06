@@ -24,6 +24,9 @@
   }
   .entity-picker-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);cursor:pointer;}
   .entity-picker-row:hover{background:var(--surface-alt);}
+  /* Die Zeile ist ein Kästchen zum Anklicken, kein Hilfetext — dieselbe
+     Ausnahme wie button[data-tooltip] in app.css. */
+  .entity-picker-row[data-tooltip-fixed]{cursor:pointer;}
   .entity-picker-row input{margin-top:3px;flex-shrink:0;}
   .entity-picker-row .names{display:flex;flex-direction:column;min-width:0;}
   .entity-picker-row .name{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -102,7 +105,20 @@
           <input type="search" class="search" placeholder="Entität oder Name suchen …" style="width:100%;" oninput="filterEntityPicker(this.value)">
           <div class="entity-picker" id="entity-picker">
             {% for opt in entity_options %}
-            <label class="entity-picker-row" data-search="{{ (opt.label ~ ' ' ~ opt.entity_id) | lower }}">
+            <!-- Name und ID sind hier auf je eine Zeile gekürzt (text-overflow),
+                 in der schmalsten Spalte bleibt von beiden wenig übrig; der
+                 Tooltip zeigt beides vollständig.
+
+                 data-tooltip-fixed statt des .entity-tooltip-Aufbaus aus der
+                 Entitätenliste: die Liste hier scrollt (max-height + overflow-y),
+                 und ein im Zeilenrahmen positionierter Tooltip wird davon
+                 abgeschnitten — in der obersten Zeile war er komplett
+                 unsichtbar, weil er über den oberen Containerrand hinausragt.
+                 FixedTooltip hängt sein Element an document.body, außerhalb
+                 jeder Beschneidung, und klappt nach unten, wenn oben kein
+                 Platz ist. -->
+            <label class="entity-picker-row" data-search="{{ (opt.label ~ ' ' ~ opt.entity_id) | lower }}"
+                   data-tooltip-fixed="{{ opt.label }}&#10;{{ opt.entity_id }}">
               <input type="checkbox" value="{{ opt.entity_id }}"
                      {% if opt.entity_id in selected_entity_ids %}checked{% endif %}
                      @change="toggleEntity('{{ opt.entity_id }}', $event.target.checked)">
@@ -373,6 +389,8 @@
   <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <!-- Tooltips in der scrollenden Entitätenauswahl, siehe data-tooltip-fixed dort. -->
+  <script src="{{ base }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
   <script>
     // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
     // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen

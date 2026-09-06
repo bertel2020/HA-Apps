@@ -395,6 +395,17 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 .card-browser-empty{
   width:100%;margin:0;font-size:calc(13px * var(--font-scale,1));color:var(--ink-faint);
 }
+/* Die Kacheln der Übersichten halten in ihrer Überschrift Platz für vier
+   Titelzeilen frei (min-height in dashboards/charts/tables.html), damit alle
+   Kacheln gleich hoch sind, egal wie lang der Name ist. Das ergibt nur Sinn,
+   solange mehrere nebeneinander stehen: auf dem Telefon ist das Raster
+   einspaltig, und die Reservierung wird zu drei leeren Zeilen unter jedem
+   kurzen Namen — die Kachel war damit rund 270px hoch statt 100px. Hier
+   zurückgenommen statt in jedem der drei Templates einzeln, damit die Regel
+   nicht ein viertes Mal auseinanderläuft. */
+@media (max-width:640px){
+  [data-card-grid] > .card h3{min-height:0;}
+}
 .filter-chip{display:inline-flex;}
 .filter-chip input{position:absolute;opacity:0;pointer-events:none;}
 .filter-chip span,.chip{
@@ -708,18 +719,26 @@ a.menu-row{text-decoration:none;}
      und wandern mit ihm, die beiden `scroll`-Schatten bleiben am Rand stehen:
      der Schatten ist dadurch nur zu sehen, solange in diese Richtung noch
      etwas kommt, und verschwindet am jeweiligen Ende von selbst. */
+  background-repeat:no-repeat;
+  background-attachment:local,local,scroll,scroll;
+}
+/* Nur an Tabellen, die tatsächlich breiter sind als ihr Platz. Die
+   local/scroll-Kombination allein blendet den Hinweis zwar an den Enden aus,
+   an einer gar nicht scrollenden Tabelle blieb aber je nach Rundung ein
+   Rest stehen — ein Hinweis auf etwas, das es nicht gibt. Die Klasse setzt
+   table-cards.js, gemessen an scrollWidth gegen clientWidth. */
+.tbl-wrap.is-scrollable{
   background-image:
     linear-gradient(to right,var(--surface),transparent),
     linear-gradient(to left,var(--surface),transparent),
-    linear-gradient(to right,var(--border-strong),transparent),
-    linear-gradient(to left,var(--border-strong),transparent);
+    linear-gradient(to right,var(--border-strong),transparent 85%),
+    linear-gradient(to left,var(--border-strong),transparent 85%);
   background-position:0 0,100% 0,0 0,100% 0;
   /* --border-strong statt --ink-faint: der Hinweis soll die Kante andeuten,
-     nicht sich über den Inhalt legen. Dafür etwas breiter (16 statt 14 px),
-     damit er trotz der helleren Farbe noch als Verlauf lesbar bleibt. */
-  background-size:22px 100%,22px 100%,16px 100%,16px 100%;
-  background-repeat:no-repeat;
-  background-attachment:local,local,scroll,scroll;
+     nicht sich über den Inhalt legen. 10px statt 16px und ein Verlauf, der
+     schon bei 85% ausläuft: schmal genug, um neben dem ersten Zeichen zu
+     stehen statt darüber, und noch als Kante lesbar. */
+  background-size:14px 100%,14px 100%,10px 100%,10px 100%;
 }
 table.dt{width:100%;border-collapse:collapse;font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));}
 table.dt th{
@@ -806,6 +825,11 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 /* Das Sortiermenü gehört zur Kartenform. In der Tabellenform sortiert man
    weiterhin über die Spaltenköpfe, die dort ja sichtbar sind. */
 .dt-cards-sort{display:none;}
+/* Ebenso der Aufklapper: table-cards.js hängt ihn an jede Zeile, ohne die
+   Fensterbreite zu kennen — sichtbar wird er erst in der Kartenform unten.
+   Ohne diese Regel stand er als Knopf mitten in der Namensspalte der
+   Tabelle. */
+.dt-card-toggle{display:none;}
 
 /* Zeilenkarten auf schmalen Bildschirmen (ZG-02 Stufe 2). Von der
    Entitätenliste sind bei 390px rund 35 % zu sehen — der Rest ist zwar
@@ -829,26 +853,60 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
      Klassen wie die Zellen und müssen ebenfalls zurück auf auto. */
   table.dt.dt-cards{display:block;width:100%;min-width:0!important;}
   table.dt.dt-cards th,table.dt.dt-cards td{width:auto;max-width:none;min-width:0;}
-  table.dt.dt-cards colgroup,table.dt.dt-cards thead,table.dt.dt-cards tbody{display:block;}
+  table.dt.dt-cards colgroup,table.dt.dt-cards thead,table.dt.dt-cards tbody,table.dt.dt-cards tfoot{display:block;}
   table.dt.dt-cards .table-column-resize-handle{display:none;}
   table.dt.dt-cards .dt-cards-head-hidden{display:none;}
+
+  /* Werkzeugleiste als ein Menü (list-settings-menu.js). Die Bedienelemente
+     stehen darin untereinander über die volle Menübreite; die Dropdowns, die
+     sie mitbringen (Typ, Einheit, Spalten, Sortieren), klappen dabei AN ORT
+     UND STELLE auf statt als eigenes Popover darüber — ein Popover im Popover
+     wäre auf 375px nicht unterzubringen. Möglich ist das ohne Eingriff in
+     dd-picker.js: das Aufklappen hängt dort an der Klasse .open, nicht an der
+     Positionierung. */
+  /* Suche und Menü bilden zusammen EINE Reihe. Dafür muss das Suchfeld seine
+     Mindestbreite von 250px aufgeben: mit ihr passt der Knopf daneben nicht
+     mehr auf 343px und rutscht in eine zweite Reihe — womit das Menü nur eine
+     von vier Reihen eingespart hätte statt drei. */
+  #controls:has(.list-settings) input[type="search"],
+  .card-browser:has(.list-settings) input[type="search"]{min-width:0;flex:1;}
+  .list-settings-popover{width:min(280px,calc(100vw - 40px));max-height:70vh;overflow-y:auto;}
+  .list-settings-popover > *{display:block;width:100%;margin:4px 0;}
+  .list-settings-popover .btn,.list-settings-popover .filter-chip span{
+    width:100%;justify-content:space-between;text-align:left;
+  }
+  .list-settings-popover .filter-chip{display:block;}
+  .list-settings-popover .dd-picker-wrap{position:static;}
+  .list-settings-popover .dd-picker-popover{
+    position:static;width:auto;padding:2px 0 6px 10px;margin:0;
+    border:0;border-left:1px solid var(--border);border-radius:0;box-shadow:none;background:none;
+  }
+  .list-settings .btn.is-active{color:var(--accent-line);border-color:var(--accent-line);}
 
   /* Sortieren steht in der Kartenform als Menü über der Tabelle statt als
      Chip-Leiste darin — dieselbe Optik wie die Filter-Dropdowns der
      Werkzeugleiste darüber (.dd-picker-*), weil es dieselbe Art von Bedienung
      ist: eine Einstellung der Liste, keine Tabellenkopfzeile. Aufgebaut wird
      es von table-cards.js. */
-  .dt-cards-sort{display:block;margin-bottom:10px;}
+  .dt-cards-sort{display:block;margin-bottom:10px;text-align:right;}
   .dt-cards-sort > .btn{background:var(--surface);}
   .dt-cards-sort > .btn.dt-cards-sort-active{color:var(--accent-line);border-color:var(--accent-line);}
-  .dt-cards-sort-popover{left:0;right:auto;width:min(230px,calc(100vw - 48px));}
+  /* Ohne left/right-Umkehr: das Popover hängt an der rechten Kante des
+     Knopfes (.dd-picker-popover{right:0}), und der steht jetzt selbst rechts. */
+  .dt-cards-sort-popover{width:min(230px,calc(100vw - 48px));text-align:left;}
   .dt-cards-sort-popover .dd-picker-row{justify-content:space-between;}
   .dt-cards-sort-dir{font-variant-numeric:tabular-nums;}
 
-  table.dt.dt-cards tbody tr{
+  /* Die Summenzeile ist eine Karte wie jede andere. Ohne diese Regel fällt
+     <tfoot> aus dem Block-Layout heraus und schrumpft auf die Breite seines
+     längsten Wertes (gemessen: 99px von 313px verfügbarer Breite), womit die
+     Beträge irgendwo in der Seitenmitte endeten statt an der rechten Kante
+     unter den Werten der Karten darüber. */
+  table.dt.dt-cards tbody tr,table.dt.dt-cards tfoot tr{
     display:block;padding:10px 12px;margin-bottom:8px;
     border:1px solid var(--border);border-radius:10px;background:var(--surface);
   }
+  table.dt.dt-cards tfoot tr{margin-top:8px;margin-bottom:0;}
   table.dt.dt-cards tbody tr:last-child{margin-bottom:0;}
   table.dt.dt-cards tbody tr:hover td{background:transparent;}
   table.dt.dt-cards tbody tr.flag{background:var(--danger-soft);}
@@ -863,6 +921,60 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
        die Seite seitwärts. overflow-wrap vererbt sich bis in die Spans. */
     min-width:0;overflow-wrap:anywhere;
   }
+  /* Eingeklappte Karte: Überschrift, ein Leitwert und die Bedienspalten davor
+     (Favoriten-Stern). Welche Zelle der Leitwert ist, entscheidet
+     table-cards.js — dort steht auch, warum es die erste Spalte nach dem Namen
+     ist. Ohne Einklappen sind es je nach Tabelle fünf bis acht Zeilen; die
+     Entitätenliste kam damit auf 289px je Karte, keine drei je Schirm. */
+  table.dt.dt-cards tbody tr.dt-card-collapsible:not(.is-open) td:not(.dt-card-title):not(.dt-card-lead):not(.dt-card-pre){
+    display:none;
+  }
+  /* Bedienspalten vor dem Namen (Favoriten-Stern) und der Aufklapper stehen
+     zusammen oben rechts in der Titelzeile — dieselbe Anordnung wie
+     .card-top-actions auf den Chart-/Dashboard-Kacheln. Als eigene Zeile über
+     dem Namen kostete der Stern volle 28px Kartenhöhe für ein einziges
+     Zeichen (135px statt 107px je Karte).
+
+     Absolut positioniert statt im DOM verschoben: in der Tabellenform am
+     Schreibtisch ist der Stern eine echte Spalte und muss dort bleiben. Den
+     Platz hält ein schwebender Platzhalter in der Überschrift frei — genau das
+     Muster, das .chart-card h3::before schon verwendet —, damit lange Namen
+     nicht unter die Knöpfe laufen. */
+  table.dt.dt-cards tbody tr:has(> td.dt-card-pre),
+  table.dt.dt-cards tbody tr.dt-card-collapsible{position:relative;}
+  table.dt.dt-cards tbody tr > td.dt-card-pre{
+    position:absolute;top:9px;right:12px;padding:0;
+  }
+  table.dt.dt-cards tbody tr:has(> td.dt-card-pre) > td.dt-card-title::before{
+    content:'';float:right;width:32px;height:1.4em;
+  }
+  /* Mit Aufklapper rückt der Stern eine Knopfbreite nach links. */
+  table.dt.dt-cards tbody tr.dt-card-collapsible > td.dt-card-pre{right:44px;}
+  table.dt.dt-cards tbody tr.dt-card-collapsible:has(> td.dt-card-pre) > td.dt-card-title::before{width:68px;}
+  /* Der Pager steht auf dem Telefon rechts, in beiden Zeilen: die Liste
+     darüber trägt ihre Werte ebenfalls an der rechten Kante, und "Seite 1 / 5"
+     und "20 / Seite" gehören sichtbar zusammen. justify-content steht als
+     Inline-Stil in acht Templates (space-between, für den Schreibtisch
+     richtig), deshalb hier !important statt acht Änderungen. */
+  .pager{justify-content:flex-end!important;}
+  .pager > div{flex-wrap:wrap;justify-content:flex-end;}
+
+  .dt-card-toggle{
+    position:absolute;top:7px;right:10px;width:28px;height:28px;padding:0;
+    display:flex;align-items:center;justify-content:center;
+    background:none;border:0;border-radius:8px;cursor:pointer;
+    color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));line-height:1;
+  }
+  /* Ohne Stern-Spalte reserviert die Überschrift nur die Pfeilbreite. */
+  table.dt.dt-cards tbody tr.dt-card-collapsible > td.dt-card-title::before{
+    content:'';float:right;width:32px;height:1.4em;
+  }
+  .dt-card-toggle:hover{background:var(--surface-alt);color:var(--ink);}
+  tr.is-open > .dt-card-title > .dt-card-toggle{transform:rotate(180deg);}
+  @media (prefers-reduced-motion:no-preference){
+    .dt-card-toggle{transition:transform .15s ease;}
+  }
+
   table.dt.dt-cards td::before{
     content:attr(data-label);flex:0 1 auto;text-align:left;white-space:nowrap;
     color:var(--ink-faint);font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;
@@ -877,6 +989,16 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
     padding-bottom:7px;margin-bottom:5px;border-bottom:1px solid var(--border);
   }
   table.dt.dt-cards td.dt-card-title::before{content:none;}
+  /* Die Entity-ID unter dem Namen bricht nicht mehr um, sondern endet mit
+     Auslassungspunkten. Sie ist ein einziges langes Wort; mit
+     overflow-wrap:anywhere (nötig für die Werte darunter) kostete sie in jeder
+     zweiten Karte eine zusätzliche Zeile, in der nur noch zwei, drei Zeichen
+     standen. Der abgeschnittene Teil ist verschmerzbar: gesucht wird über den
+     Namen darüber, und die vollständige ID steht auf der Detailseite. */
+  table.dt.dt-cards td.dt-card-title .ts-time,
+  table.dt.dt-cards td.dt-card-title .id{
+    display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
 }
 
 .flag-badge{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;background:var(--danger);color:var(--danger-contrast);margin-right:4px;}

@@ -215,3 +215,147 @@ def test_the_background_process_hint_gets_the_full_row_width_on_phones() -> None
     block = _inline_media_block(settings, "max-width:640px")
     assert re.search(r"\.bgproc-hint\{[^}]*grid-column:1 / -1", block)
     assert re.search(r"\.bgproc-right\{[^}]*grid-row:1", block)
+def test_row_cards_start_collapsed_and_keep_one_value_visible() -> None:
+    """Eine Zeilenkarte trägt so viele Zeilen, wie die Tabelle Spalten hat —
+    gemessen 289px in der Entitätenliste und 207px auf der Housekeeping-Seite,
+    keine drei je Schirmfüllung. Eingeklappt bleiben Überschrift, Leitwert und
+    die Bedienspalten davor (Favoriten-Stern); danach 135px bzw. 107px.
+
+    Der Test hält beide Hälften fest, weil die Wirkung nur aus ihrem
+    Zusammenspiel entsteht: JS vergibt die Klassen, CSS blendet aus. Fehlt eine
+    der drei :not()-Ausnahmen, verschwindet in der eingeklappten Karte genau
+    das, was sie noch zeigen soll.
+    """
+    js = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    css = APP_CSS.read_text(encoding="utf-8")
+
+    assert "dt-card-collapsible" in js and "dt-card-lead" in js and "dt-card-pre" in js
+    # Summenzeilen tragen keine Details — sie dürfen keinen Aufklapper bekommen.
+    assert "TFOOT" in js
+
+    block = _media_block(css, "max-width:640px")
+    regel = re.search(
+        r"tr\.dt-card-collapsible:not\(\.is-open\)([^{]*)\{([^}]*)\}", block
+    )
+    assert regel, "Regel für die eingeklappte Karte fehlt"
+    for behalten in ("dt-card-title", "dt-card-lead", "dt-card-pre"):
+        assert f":not(.{behalten})" in regel.group(1), f"{behalten} würde mit ausgeblendet"
+    assert "display:none" in regel.group(2)
+
+
+def test_the_lead_value_of_a_row_card_can_be_named_by_the_table() -> None:
+    """Von selbst ist der Leitwert die erste Spalte nach dem Namen. In der
+    Entitätenliste steht dort "Typ" — eine Einordnung, kein Wert; gesucht wird
+    auf dem Telefon danach, wann eine Entität zuletzt etwas geliefert hat.
+    Deshalb data-card-lead, und deshalb genau dort gesetzt."""
+    js = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    tabelle = (TEMPLATES / "_entities_table.html").read_text(encoding="utf-8")
+    assert "table.dataset.cardLead" in js
+    # Greift der Name ins Leere, gilt wieder die erste Spalte: ein Tippfehler im
+    # Template darf das Einklappen nicht abschalten.
+    assert "benannt >= 0 ? benannt :" in js
+    assert 'data-card-lead="Letzter Wert"' in tabelle
+def test_the_list_toolbar_collapses_into_one_menu_without_a_second_form() -> None:
+    """Sechs Bedienelemente über der Entitätenliste, auf 375px vier Reihen und
+    161px Höhe. Sie ziehen in ein Menü — aber als DIESELBEN Elemente und
+    innerhalb von #controls, sonst wären Feldnamen, hx-include und die
+    Auswertung im Server plötzlich doppelt gepflegt. Gemessen danach: eine
+    Reihe, 36px, erste Karte bei 315 statt 403px.
+
+    Der Test hält die drei Eigenschaften fest, an denen das hängt: verschoben
+    statt nachgebaut, Anker für den Rückweg auf breiten Bildschirmen, und kein
+    MutationObserver — mit einem lief das Skript gegen den in table-cards.js,
+    und die Seite blieb stehen.
+    """
+    js = (APP_JS / "list-settings-menu.js").read_text(encoding="utf-8")
+    liste = (TEMPLATES / "entities_list.html").read_text(encoding="utf-8")
+
+    assert "list-settings-menu.js" in liste
+    # Verschoben, nicht nachgebaut: die Elemente wandern in das Popover.
+    assert "popover.appendChild(el)" in js
+    # Und finden zurück, wenn der Bildschirm wieder breit ist.
+    assert "createComment" in js and "insertBefore(el, platz)" in js
+    # Auf den Aufruf geprüft, nicht auf das Wort: der Kommentar im Skript hält
+    # fest, warum dort keiner steht, und nennt ihn dabei zwangsläufig.
+    assert "new MutationObserver" not in js, (
+        "Ein Beobachter auf dem Dokument schaukelt sich mit dem in "
+        "table-cards.js auf — die Seite blieb dabei stehen."
+    )
+
+
+def test_the_search_field_gives_up_its_minimum_width_next_to_the_menu() -> None:
+    """Mit min-width:250px passt der Menü-Knopf auf 343px nicht mehr daneben
+    und rutscht in eine zweite Reihe — das Menü hätte dann eine von vier
+    Reihen gespart statt drei."""
+    block = _media_block(APP_CSS.read_text(encoding="utf-8"), "max-width:640px")
+    regel = re.search(
+        r'#controls:has\(\.list-settings\)[^{]*input\[type="search"\][^{]*\{([^}]*)\}', block
+    )
+    assert regel, "Regel für das Suchfeld neben dem Menü fehlt"
+    assert "min-width:0" in regel.group(1)
+    # Beide Bauformen von Werkzeugleiste, sonst bleibt die Kachel-Übersicht
+    # zweizeilig, während die Entitätenliste einzeilig ist.
+    assert ".card-browser:has(.list-settings)" in regel.group(0)
+def test_the_scroll_hint_only_appears_on_tables_that_actually_overflow() -> None:
+    """Der Hinweis an den Rändern von .tbl-wrap deutet an, dass seitlich noch
+    etwas kommt. Ob das so ist, weiß nur das Layout — deshalb hängt er an einer
+    Klasse, die table-cards.js aus scrollWidth gegen clientWidth setzt. Auf der
+    Housekeeping-Seite trägt danach 1 von 6 Tabellen den Hinweis statt aller
+    sechs."""
+    css = APP_CSS.read_text(encoding="utf-8")
+    js = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    assert "scrollWidth > wrap.clientWidth" in js
+    # Der Verlauf hängt an der Klasse, nicht an .tbl-wrap selbst: JEDE Regel,
+    # die einen Verlauf setzt und .tbl-wrap anspricht, muss ihn auf
+    # .is-scrollable einschränken. Nur zu prüfen, dass es die eine Regel gibt,
+    # übersieht eine zweite daneben, die ihn wieder allen gibt.
+    setzt_verlauf = False
+    for regel in re.finditer(r"([^{}]+)\{([^}]*)\}", css):
+        selektor, koerper = regel.group(1), regel.group(2)
+        if ".tbl-wrap" not in selektor or "background-image" not in koerper:
+            continue
+        if "none" in koerper.split("background-image")[1].split(";")[0]:
+            continue  # die Kartenform schaltet ihn ab, das ist der Sinn
+        # Je Teilselektor prüfen: ".tbl-wrap, .tbl-wrap.is-scrollable" enthält
+        # das Wort, gilt aber trotzdem für jede Tabelle.
+        for teil in selektor.split(","):
+            if ".tbl-wrap" not in teil:
+                continue
+            assert "is-scrollable" in teil, f"Verlauf ohne Messung: {teil.strip()}"
+            setzt_verlauf = True
+    assert setzt_verlauf, "gar keine Regel setzt den Hinweis"
+
+
+def test_the_sort_menu_moves_into_the_view_menu_when_there_is_one() -> None:
+    """Sortieren ist eine Einstellung der Liste wie Filter und Spalten; auf dem
+    Telefon soll es dafür eine Stelle geben. Zwei Fallstricke hält der Test
+    fest: bei mehreren Tabellen auf einer Seite wäre im Menü nicht mehr
+    erkennbar, welche gemeint ist — und ein Menü, das den htmx-Austausch der
+    Liste überlebt, zeigt danach auf Spaltenköpfe, die nicht mehr im Dokument
+    stehen."""
+    js = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    assert "list-settings-popover" in js
+    assert "querySelectorAll('table.dt').length === 1" in js
+    assert "_head.isConnected" in js
+
+
+def test_long_entity_ids_are_cut_instead_of_wrapped_on_cards() -> None:
+    """Die ID ist ein einziges langes Wort. Mit overflow-wrap:anywhere — nötig
+    für die Werte darunter — kostete sie in jeder zweiten Karte eine Zeile, in
+    der nur zwei, drei Zeichen standen."""
+    block = _media_block(APP_CSS.read_text(encoding="utf-8"), "max-width:640px")
+    regel = re.search(r"td\.dt-card-title \.ts-time,[^{]*\{([^}]*)\}", block, re.S)
+    assert regel, "Regel für die gekürzte Entity-ID fehlt"
+    assert "white-space:nowrap" in regel.group(1)
+    assert "text-overflow:ellipsis" in regel.group(1)
+    assert ".id" in regel.group(0), "die Entitätenliste setzt die ID als span.id"
+
+
+def test_the_view_menu_needs_a_search_field_to_appear() -> None:
+    """#controls heißt auf der Bereinigungs-Seite ein Container, in dem die
+    Zeitraum-Leiste steckt — die Hauptbedienung der Seite, nicht ihre
+    Einstellungen. Ohne eigenes Suchfeld daneben ist es keine Werkzeugleiste
+    dieser Bauart, und das Menü bleibt weg."""
+    js = (APP_JS / "list-settings-menu.js").read_text(encoding="utf-8")
+    assert "':scope > input[type=\"search\"]'" in js
+    assert "if (!suche) return;" in js
