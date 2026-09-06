@@ -791,7 +791,7 @@ def import_rows(
         if on_month_done is not None:
             on_month_done(label, len(new_rows))
 
-    for year, month, label, month_rows in to_update:
+    for _year, _month, label, month_rows in to_update:
         archive_path = archive_dir / f"{label}.parquet"
         new_rows = _new_rows_for_archive(archive_path, month_rows)
         result.duplicate_rows += len(month_rows) - len(new_rows)

@@ -143,7 +143,7 @@ def test_soft_delete_removes_only_one_duplicate_occurrence_not_both() -> None:
         hotbuffer.append(tmp, entity_id, dup_ts, 151.0, TZ)
         hotbuffer.append(tmp, entity_id, dup_ts, 151.0, TZ)  # exaktes Duplikat
         hotbuffer.append(tmp, entity_id, _ts(2024, 7, 1, 9), 138.0, TZ)
-        for ts, value in [(dup_ts, 151.0), (dup_ts, 151.0), (_ts(2024, 7, 1, 9), 138.0)]:
+        for ts, _value in [(dup_ts, 151.0), (dup_ts, 151.0), (_ts(2024, 7, 1, 9), 138.0)]:
             index.record_write(entity_id, ts)
 
         now = datetime(2024, 7, 1, 12, tzinfo=TZ)
@@ -222,7 +222,7 @@ def test_list_raw_rows_stops_at_configured_result_limit() -> None:
                 tmp, index, entity_id, _ts(2024, 8, 1, 0), _ts(2024, 9, 1, 0), TZ,
                 max_rows=2,
             )
-            assert False, "ResultLimitExceeded erwartet"
+            raise AssertionError("ResultLimitExceeded erwartet")
         except cleanup.ResultLimitExceeded:
             pass
         index.close()

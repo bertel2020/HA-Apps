@@ -19,4 +19,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
+      # Der Regelsatz steht in zeitarchiv/ruff.toml und ist bewusst eng —
+      # siehe die Begründung dort. Vor den Tests, weil ein undefinierter Name
+      # oder ein toter Import schneller gefunden ist als über einen Testlauf.
+      - run: ruff check .
       - run: pytest tests/ -v

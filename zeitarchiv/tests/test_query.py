@@ -213,7 +213,6 @@ def test_year_range_counter_uses_monat_rollup_plus_live_month() -> None:
 
         archive_dir = tmp / "archive" / entity_id
         archive_dir.mkdir(parents=True, exist_ok=True)
-        prev_value = 0.0
         for month in range(1, 4):  # Jan-März abgeschlossen
             table = pa.table({"ts": [_ts(2024, month, 15, 10)], "value": [float(month * 10)]})
             pq.write_table(table, archive_dir / f"2024-{month:02d}.parquet")
@@ -484,8 +483,11 @@ def test_month_continuous_gives_rolling_thirty_day_window_not_calendar_month() -
         # anteilig) unterschiedliche Ergebnisse liefern.
         hotbuffer.append(tmp, entity_id, _ts(2024, 8, 5, 8), 20.0, TZ)
 
-        calendar_result = query.query_series(tmp, index, entity_id, "month", TZ, now, continuous=False)
-        rolling_result = query.query_series(tmp, index, entity_id, "month", TZ, now, continuous=True)
+        # Beide Abfragen laufen weiterhin — sie sind die Rauchprobe, dass der
+        # Pfad überhaupt trägt. Geprüft wird darunter aber der Fensterschnitt,
+        # nicht ihr Ergebnis; deshalb ohne Zuweisung.
+        query.query_series(tmp, index, entity_id, "month", TZ, now, continuous=False)
+        query.query_series(tmp, index, entity_id, "month", TZ, now, continuous=True)
 
         # Kalendarisch (seit 1. August) sieht nur den August-Wert über den Rollup/Live-Pfad
         # der aktuellen Monatslogik — die eigentliche Prüfung hier ist der Fenster-Unterschied.

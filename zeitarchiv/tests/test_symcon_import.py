@@ -217,7 +217,7 @@ def test_import_variable_rejects_zero_or_non_finite_factor() -> None:
     for factor in (0, float("nan"), float("inf")):
         try:
             symcon_import._scaled_raw_rows(variable, factor)
-            assert False, f"Faktor {factor} hätte abgelehnt werden müssen"
+            raise AssertionError(f"Faktor {factor} hätte abgelehnt werden müssen")
         except ValueError:
             pass
 
@@ -507,7 +507,7 @@ def test_extract_zip_rejects_path_traversal() -> None:
 
         try:
             symcon_import.extract_zip(zip_path, dest)
-            assert False, "sollte ValueError werfen (Zip-Slip)"
+            raise AssertionError("sollte ValueError werfen (Zip-Slip)")
         except ValueError:
             pass
         # Zielverzeichnis darf durch den Versuch nicht (teilweise) beschrieben worden sein.
@@ -571,7 +571,7 @@ def test_import_variable_unknown_entity_raises() -> None:
         variables = symcon_import.scan_source(source)
         try:
             symcon_import.import_variable(tmp, index, variables[0], "sensor.unbekannt", TZ)
-            assert False, "sollte ValueError werfen"
+            raise AssertionError("sollte ValueError werfen")
         except ValueError:
             pass
         index.close()

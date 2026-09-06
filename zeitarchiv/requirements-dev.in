@@ -1,3 +1,4 @@
 -r requirements.in
 pytest
 httpx2
+ruff

@@ -17,7 +17,9 @@ siehe rollup.py) — kein eigener Subtraktions-/Aggregations-Code."""
 
 from __future__ import annotations
 
+import bisect
 import json
+import statistics
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -28,7 +30,6 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from .api_routes import _table_aggregates
 from .formatting import entity_display_name
 from .storage import cleanup as cleanup_mod
 from .storage import query as query_mod
@@ -769,6 +770,54 @@ class EnergieDashboardService:
         nodes: list[dict] = []
         links: list[dict] = []
         stale_labels: list[str] = []
+        factor_gap_entries: list[tuple[str, float, int]] = []
+
+        def _carry_limit(entity_id: str, stuetzstellen: list[float]) -> float | None:
+            """Wie lange ein Faktorwert fortgeschrieben werden darf, in Sekunden.
+
+            Unbegrenztes Fortschreiben wäre die nächste stille Lüge: ein seit
+            Wochen toter Preissensor legte seinen letzten Wert über den ganzen
+            Zeitraum. Die Grenze ist das Maximum aus zwei Größen, weil beide
+            für sich zu eng wären:
+
+            * die Lücken-Schwelle der Entität (``gap_threshold``, Minuten) —
+              die vorhandene Antwort der App auf "ab wann ist eine Lücke eine
+              echte Lücke". "off" heißt bewusst: unbegrenzt.
+            * der übliche Abstand der Stützstellen selbst. Ein Sensor, der
+              alle 15 Minuten sendet, hat auch bei bester Gesundheit
+              15-Minuten-Abstände; bei gröberen Zeiträumen sind es Stunden
+              oder Tage, weil die Abfrage dann gröber bucketet. Ohne diesen
+              Anteil gälte bei "Monat" jeder Tagesbucket als Lücke.
+
+            Der Abstand wird als Median genommen, nicht als Minimum oder
+            Mittel: ein einzelner dichter oder ein einzelner weiter Abstand
+            soll die Grenze nicht verschieben.
+            """
+            entity = self.deps.index.get_entity(entity_id)
+            schwelle = (entity["gap_threshold"] if entity else "15") or "15"
+            if schwelle == "off":
+                return None
+            abstaende = [b - a for a, b in zip(stuetzstellen, stuetzstellen[1:]) if b > a]
+            takt = statistics.median(abstaende) if abstaende else 0.0
+            minuten = int(schwelle) if str(schwelle).isdigit() else 15
+            return max(float(minuten) * 60.0, takt)
+
+        def add_factor_gap(label: str, ohne_faktor: float, gesamt: float) -> None:
+            """Merkt sich Energie, für die kein Preis/Faktor gilt.
+
+            Vorher verschwand sie stillschweigend aus der Summe. Gemeldet wird
+            erst ab einem Prozent, damit ein einzelner Bucket am
+            Periodenanfang — vor dem ersten bekannten Wert — keine Warnung
+            auslöst, die niemand abstellen kann.
+            """
+            if gesamt <= 0 or ohne_faktor <= 0:
+                return
+            anteil = ohne_faktor / gesamt
+            if anteil < 0.01:
+                return
+            eintrag = (label, round(ohne_faktor, 2), round(anteil * 100))
+            if eintrag not in factor_gap_entries:
+                factor_gap_entries.append(eintrag)
 
         def add_stale_issue(label: str, stale: bool) -> None:
             # Dieselbe Preis-Entität kann mehrfach durchlaufen ("Netzbezug
@@ -1319,9 +1368,41 @@ class EnergieDashboardService:
                     add_stale_issue(label, stale)
                     if not factor_series:
                         return None
-                    return round(
-                        sum(value * factor_series[ts] for ts, value in energy_series.items() if ts in factor_series), 3
-                    )
+                    # Der Faktor wird als ZUSTAND ausgewertet, nicht über
+                    # Schlüsselgleichheit: es gilt der letzte Preis bzw. die
+                    # letzte CO2-Intensität, die zum Bucket-Beginn bekannt war.
+                    #
+                    # Vorher stand hier `if ts in factor_series`. Das setzte
+                    # voraus, dass beide Reihen auf demselben Zeitraster
+                    # liegen — sie tun es nicht: ein Zähler bekommt bei
+                    # Zeitraum "Tag" Stunden-Buckets, ein Messwert
+                    # 5-Minuten-Buckets (LIVE_BUCKET_SECONDS in
+                    # storage/query.py). Getroffen hat es nur, wenn der
+                    # Preissensor zufällig in den ersten fünf Minuten einer
+                    # Stunde einen Wert hatte. Ein Sensor, der alle 15 Minuten
+                    # ab :07 sendet, lieferte NULL Treffer und damit 0,00 € —
+                    # bei gesunder Anlage und ohne Fehlermeldung. Betroffen
+                    # war ausgerechnet, wer eine Preis-Entität statt eines
+                    # festen Betrags nutzt, also dynamische Tarife.
+                    #
+                    # Ein Preis ist ohnehin kein Messpunkt, sondern gilt bis
+                    # zum nächsten Wert — dieselbe Annahme, mit der
+                    # query_series() für Messwert-Linien einen Randpunkt am
+                    # Fensteranfang setzt.
+                    stuetzstellen = sorted(factor_series)
+                    grenze = _carry_limit(factor_entity_id, stuetzstellen)
+                    summe = 0.0
+                    ohne_faktor = 0.0
+                    for ts, value in energy_series.items():
+                        stelle = bisect.bisect_right(stuetzstellen, ts) - 1
+                        if stelle < 0 or (grenze is not None and ts - stuetzstellen[stelle] > grenze):
+                            # Vor dem ersten bekannten Wert, oder die letzte
+                            # Angabe ist zu alt, um sie noch fortzuschreiben.
+                            ohne_faktor += value
+                            continue
+                        summe += value * factor_series[stuetzstellen[stelle]]
+                    add_factor_gap(label, ohne_faktor, sum(energy_series.values()))
+                    return round(summe, 3)
                 if fixed_factor is not None:
                     return round(sum(energy_series.values()) * fixed_factor, 3)
                 return None
@@ -1475,6 +1556,24 @@ class EnergieDashboardService:
                     "Veraltet (>2 Tage ohne neue Werte): " + ", ".join(stale_labels)
                     if stale_labels
                     else "Alle zugeordneten Sensoren melden aktuelle Werte."
+                ),
+            },
+            {
+                # Energie ohne gültigen Preis bzw. CO2-Faktor fiel früher
+                # ersatzlos aus der Summe — die Kachel zeigte dann einen zu
+                # niedrigen Betrag, ohne das kenntlich zu machen. Jetzt wird
+                # der Rest, der auch durch Fortschreiben nicht abgedeckt ist,
+                # ausgewiesen statt verschwiegen.
+                "label": "Preise und Faktoren vollständig",
+                "ok": not factor_gap_entries,
+                "detail": (
+                    "Ohne gültigen Wert: "
+                    + ", ".join(
+                        f"{bezeichnung} ({menge} kWh, {anteil} %)"
+                        for bezeichnung, menge, anteil in factor_gap_entries
+                    )
+                    if factor_gap_entries
+                    else "Für die gesamte Energie liegt ein Preis bzw. CO2-Faktor vor."
                 ),
             },
             {

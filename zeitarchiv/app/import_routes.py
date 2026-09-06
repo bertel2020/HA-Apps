@@ -22,7 +22,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
@@ -295,7 +294,7 @@ class ImportService:
 
 
 
-    def _symcon_import_rows(self, 
+    def _symcon_import_rows(self,
         variables: list[symcon_import.SymconVariable], names: dict[str, dict[str, str | None]]
     ) -> list[dict]:
         rows = []
@@ -640,7 +639,7 @@ class ImportService:
 
 
 
-    def _run_import_background(self, 
+    def _run_import_background(self,
         mapped: list[tuple[symcon_import.SymconVariable, str, float]]
     ) -> None:
         """Startet Planung und Schreibvorgang komplett im Hintergrund-Thread, damit
@@ -860,7 +859,7 @@ class ImportService:
 
 
 
-    def _csv_import_context(self, 
+    def _csv_import_context(self,
         delimiter: str | None = None,
         has_header: bool | None = None,
         ts_col: int | None = None,

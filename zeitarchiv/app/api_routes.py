@@ -291,7 +291,8 @@ def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None
 
 def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     router = APIRouter()
-    locked = lambda getter: storage_locked(deps.coordinator, getter)
+    def locked(getter):
+        return storage_locked(deps.coordinator, getter)
 
     def check_auth(
         authorization: str | None,

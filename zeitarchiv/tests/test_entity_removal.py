@@ -95,7 +95,7 @@ def test_delete_refuses_archive_symlink_outside_data_directory() -> None:
 
         try:
             entity_removal.delete_entity(root, index, entity_id)
-            assert False, "Unsicherer Symlink muss abgewiesen werden"
+            raise AssertionError("Unsicherer Symlink muss abgewiesen werden")
         except ValueError:
             pass
 

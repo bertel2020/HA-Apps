@@ -96,7 +96,6 @@ from .storage import (
     import_reports,
     retention as retention_mod,
     reconcile,
-    rotate,
 )
 from .storage import query as query_mod
 from .storage.index import (
@@ -2718,7 +2717,6 @@ def statistik_view(request: Request) -> HTMLResponse:
     """Allgemeine Statistik (Konzept Abschnitt 03/10) — Aufschlüsselung
     nach Typ/Auflösung/Aufbewahrung plus Wachstumsverlauf aus denselben
     Schnappschüssen wie die Sparklines auf der Startseite."""
-    now = datetime.now(TZ)
     overview = index.get_overview()
     by_type = [
         {

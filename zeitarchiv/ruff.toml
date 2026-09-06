@@ -1,0 +1,44 @@
+# Linter-Regelsatz für Zeitarchiv.
+#
+# Bewusst eng gehalten: Der Code war vor Einführung des Linters bereits
+# auffallend konsistent formatiert und durchgehend typannotiert — das ist
+# Disziplin, keine Automatik, und genau deshalb soll der Linter sie absichern
+# statt sie neu zu erfinden. Ein breiter Regelsatz hätte als Erstes eine
+# Massenkorrektur erzwungen, die keinen einzigen Fehler gefunden hätte.
+
+target-version = "py312"
+
+# Nur dokumentiert, nicht erzwungen: E501 ist unten NICHT ausgewählt. Der
+# Bestand hat 87 Zeilen über 120 und 1.831 über 88 Zeichen; die umzubrechen
+# wäre genau die Massenkorrektur. Der Wert steht hier, damit `ruff format`
+# (falls je eingeführt) nicht auf 88 zurückfällt.
+line-length = 120
+
+[lint]
+# E4  Importe an der falschen Stelle
+# E7  mehrdeutige Namen, Lambda-Zuweisungen, assert-Fallen
+# E9  Syntax- und IO-Fehler
+# F   pyflakes: ungenutzte Importe/Variablen, undefinierte Namen — echte Funde
+# B   bugbear: veränderliche Default-Argumente, Schleifenfallen
+# W   Whitespace-Reste
+select = ["E4", "E7", "E9", "F", "B", "W"]
+
+ignore = [
+    # FastAPI-Idiom: Query(...)/Depends() gehören in die Default-Position.
+    # Das ist genau der Aufruf-im-Default, vor dem B008 warnt — hier aber
+    # gewollt und die dokumentierte Schreibweise des Frameworks.
+    "B008",
+    # zip(...) ohne strict=: 15 Fundstellen, und jede ist eine eigene
+    # Entscheidung. strict=True lässt bei ungleich langen Folgen eine
+    # Ausnahme fliegen statt still abzuschneiden — richtig, wo die Längen
+    # gleich sein MÜSSEN, aber ein neues Laufzeitrisiko, wo sie es nur
+    # üblicherweise sind. Pauschal strict=False einzutragen wäre bloßes
+    # Abstempeln. Bleibt offen, bis die Stellen einzeln durchgesehen sind.
+    "B905",
+]
+
+# Nächste Ausbaustufen, bewusst noch nicht aktiv:
+#   "I"  Import-Sortierung — 95 automatische Korrekturen, rein mechanisch,
+#        aber als eigener Durchgang lesbarer als vermischt mit echten Funden.
+#   "UP" Modernisierungen — 51 Korrekturen, davon 43-mal timezone.utc -> UTC.
+#        Verhaltensneutral, aber ein Idiomwechsel quer durch die App.

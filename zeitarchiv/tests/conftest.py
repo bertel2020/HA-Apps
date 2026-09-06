@@ -22,8 +22,9 @@ import _paths  # noqa: F401
 _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="zeitarchiv-pytest-"))
 os.environ.setdefault("ZEITARCHIV_DATA_DIR", str(_TEST_DATA_DIR))
 
-import pytest
-from starlette.testclient import TestClient
+# Erst NACH os.environ.setdefault oben — siehe Modul-Docstring.
+import pytest  # noqa: E402
+from starlette.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture(scope="session")

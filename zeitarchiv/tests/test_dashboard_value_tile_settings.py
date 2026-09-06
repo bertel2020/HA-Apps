@@ -320,7 +320,7 @@ def test_the_tile_menu_offers_every_setting_the_endpoint_accepts() -> None:
         (APP / "templates/_dashboard_tile_menu.html")
     ).read_text(encoding="utf-8")
     for range_key in DASHBOARD_TILE_RANGES:
-        assert f"data-range=\"{{{{ value }}}}\"" in menu
+        assert "data-range=\"{{ value }}\"" in menu
         assert f"('{range_key}', " in menu, range_key
     for metric in DASHBOARD_TILE_STATS_METRICS:
         assert f"('{metric}', " in menu, metric

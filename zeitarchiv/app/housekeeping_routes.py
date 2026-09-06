@@ -427,7 +427,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, "Ungültige Lücken-Erkennung"),
             "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, "Ungültige Ausreißer-Erkennung"),
         }
-        for key, (value, labels, error) in fields.items():
+        for _key, (value, labels, error) in fields.items():
             if value is not None and value not in labels:
                 raise HTTPException(status_code=400, detail=error)
         for key, (value, _labels, _error) in fields.items():

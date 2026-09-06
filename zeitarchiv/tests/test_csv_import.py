@@ -200,7 +200,7 @@ def test_parse_rows_rejects_more_than_configured_row_limit() -> None:
             csv_import.parse_rows(
                 path, ",", False, 0, 1, "unix_s", "", TZ, max_rows=2
             )
-            assert False, "ValueError erwartet"
+            raise AssertionError("ValueError erwartet")
         except ValueError as exc:
             assert "2" in str(exc)
     finally:
