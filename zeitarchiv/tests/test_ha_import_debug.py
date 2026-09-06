@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 import urllib.parse
 import zipfile
 from datetime import datetime
@@ -13,12 +12,13 @@ from fastapi.responses import FileResponse
 from starlette.requests import Request
 
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import import_routes
 from app.storage import ha_import
 from app.storage.coordinator import StorageCoordinator
 from app.storage.index import Index
+
+from _paths import TEMPLATES
 
 
 TZ = ZoneInfo("Europe/Berlin")
@@ -77,7 +77,7 @@ def test_debug_zip_contains_json_and_no_implicit_auth_data(tmp_path: Path) -> No
 
 
 def test_ha_import_ui_uses_standard_button_and_readable_status_chip() -> None:
-    root = Path(__file__).resolve().parents[1] / "app" / "templates"
+    root = TEMPLATES
     section = (root / "_ha_import_section.html").read_text(encoding="utf-8")
     dry_run = (root / "_ha_import_dry_run.html").read_text(encoding="utf-8")
 

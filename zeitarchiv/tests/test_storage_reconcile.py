@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-import sys
 from zoneinfo import ZoneInfo
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 from jinja2 import Environment, FileSystemLoader
 
+from _paths import APP, TEMPLATES
+
+
 TZ = ZoneInfo("Europe/Berlin")
-ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT / "app" / "templates"
-sys.path.insert(0, str(ROOT))
 
 from app.storage import hotbuffer, reconcile  # noqa: E402
 from app.storage.index import Index  # noqa: E402
@@ -93,8 +92,8 @@ def test_storage_index_settings_fragment_has_preview_and_confirmed_repair() -> N
 
 
 def test_reconciliation_runs_after_restore_startup_and_both_import_paths() -> None:
-    main = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
-    import_routes = (ROOT / "app" / "import_routes.py").read_text(encoding="utf-8")
+    main = (APP / "main.py").read_text(encoding="utf-8")
+    import_routes = (APP / "import_routes.py").read_text(encoding="utf-8")
     restore = main.index("backup.apply_pending_restore(DATA_DIR, BACKUPS_DIR)")
     startup_repair = main.index("_run_storage_reconciliation(repair=True)")
     assert restore < startup_repair

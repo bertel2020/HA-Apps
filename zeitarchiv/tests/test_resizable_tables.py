@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+
+from _paths import TEMPLATES, APP_CSS, APP_JS
 
 
-ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT / "app" / "templates"
-SCRIPT = ROOT / "app" / "static" / "js" / "resizable-tables.js"
-STYLES = ROOT / "app" / "static" / "css" / "app.css"
+
+SCRIPT = APP_JS / "resizable-tables.js"
+STYLES = APP_CSS
 
 
 def test_all_technical_table_pages_load_resize_module() -> None:

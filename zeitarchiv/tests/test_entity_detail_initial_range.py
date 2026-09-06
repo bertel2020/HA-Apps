@@ -6,14 +6,13 @@ einen Fehler oder ungültigen Zeitraum."""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _paths import APP
 
-MAIN_SOURCE = (Path(__file__).resolve().parents[1] / "app/main.py").read_text(encoding="utf-8")
+
+MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
 ENTITY_DETAIL_SOURCE = (
-    Path(__file__).resolve().parents[1] / "app/templates/entity_detail.html"
+    (APP / "templates/entity_detail.html")
 ).read_text(encoding="utf-8")
 
 

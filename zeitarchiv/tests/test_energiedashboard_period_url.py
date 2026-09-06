@@ -9,9 +9,11 @@ liest sie beim Laden wieder ein."""
 
 from __future__ import annotations
 
-from pathlib import Path
 
-JS = (Path(__file__).resolve().parents[1] / "app/static/js/energiedashboard.js").read_text(encoding="utf-8")
+from _paths import APP
+
+
+JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
 
 
 def test_initial_range_and_offset_are_read_from_the_url() -> None:
@@ -46,9 +48,8 @@ def test_set_range_go_back_and_go_forward_all_sync_the_url() -> None:
     assert "syncUrlWithPeriod(this.range, this.offset);" in go_forward
 
 
-ROOT = Path(__file__).resolve().parents[1]
-REPORT_TEMPLATE = (ROOT / "app/templates/_energiedashboard_report.html").read_text(encoding="utf-8")
-ROUTES_SOURCE = (ROOT / "app/energiedashboard_routes.py").read_text(encoding="utf-8")
+REPORT_TEMPLATE = (APP / "templates/_energiedashboard_report.html").read_text(encoding="utf-8")
+ROUTES_SOURCE = (APP / "energiedashboard_routes.py").read_text(encoding="utf-8")
 
 
 def test_report_back_link_carries_its_own_range_and_offset() -> None:

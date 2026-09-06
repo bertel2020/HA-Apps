@@ -7,10 +7,11 @@ Verlauf DERSELBEN Entität, nicht zur gesamten Liste."""
 
 from __future__ import annotations
 
-from pathlib import Path
+
+from _paths import TEMPLATES
 
 
-TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "app" / "templates"
+TEMPLATES_DIR = TEMPLATES
 BACK_LINK = '<a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>'
 
 

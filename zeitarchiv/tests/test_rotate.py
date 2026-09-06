@@ -8,13 +8,11 @@ wenn pyarrow fehlt (z. B. außerhalb des addon/-venv).
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
     import pyarrow.parquet as pq

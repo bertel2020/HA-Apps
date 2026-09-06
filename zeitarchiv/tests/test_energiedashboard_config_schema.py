@@ -6,11 +6,9 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.energiedashboard_routes import (
     CONFIG_SCHEMA_VERSION,
@@ -20,6 +18,8 @@ from app.energiedashboard_routes import (
     _save_config,
 )
 from app.storage.index import Index
+
+from _paths import APP
 
 
 def _with_index(fn) -> None:
@@ -162,7 +162,7 @@ def test_view_blendet_die_legende_nur_bei_eingeschaltetem_schalter_ein() -> None
     """Serverseitig gegated, nicht per x-show: bei ausgeschalteter Legende soll
     das Markup gar nicht erst ausgeliefert werden. Der x-ref dient buildLegend()
     zusätzlich als Signal, die Einträge dann auch nicht zu berechnen."""
-    view = (Path(__file__).resolve().parents[1] / "app/templates/_energiedashboard_view.html").read_text(
+    view = (APP / "templates/_energiedashboard_view.html").read_text(
         encoding="utf-8"
     )
     start = view.index("{% if config.show_sankey_legende %}")
@@ -171,7 +171,7 @@ def test_view_blendet_die_legende_nur_bei_eingeschaltetem_schalter_ein() -> None
     assert 'class="chart-legend edash-sankey-legend"' in block
     assert 'x-ref="legendEl"' in block
 
-    js = (Path(__file__).resolve().parents[1] / "app/static/js/energiedashboard.js").read_text(
+    js = (APP / "static/js/energiedashboard.js").read_text(
         encoding="utf-8"
     )
     assert "if (!this.$refs.legendEl) { this.legendItems = []; return; }" in js

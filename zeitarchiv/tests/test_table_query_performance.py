@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.storage import hotbuffer, query
 from app.api_routes import (
@@ -23,12 +20,14 @@ from app.api_routes import (
 from app.storage.coordinator import StorageCoordinator
 from app.storage.index import Index
 
+from _paths import APP, TEMPLATES
+
 
 TZ = ZoneInfo("Europe/Berlin")
-COMPUTE = (ROOT / "app/static/js/table-compute.js").read_text(encoding="utf-8")
-DASHBOARD = (ROOT / "app/static/js/dashboard-tiles.js").read_text(encoding="utf-8")
-FIXED_TOOLTIP = (ROOT / "app/static/js/fixed-tooltip.js").read_text(encoding="utf-8")
-TABLE_EDITOR = (ROOT / "app/templates/table_editor.html").read_text(encoding="utf-8")
+COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
+DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+FIXED_TOOLTIP = (APP / "static/js/fixed-tooltip.js").read_text(encoding="utf-8")
+TABLE_EDITOR = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
 
 
 def test_query_read_cache_parses_current_hot_file_once(monkeypatch, tmp_path: Path) -> None:
@@ -173,7 +172,7 @@ def test_fixed_tooltip_script_loaded_wherever_data_tooltip_fixed_is_used() -> No
     data-tooltip-fixed dort ohne jede Wirkung (Regressionsschutz für genau
     diesen Bug: Tooltip verschwand komplett auf /tables/<id>)."""
     for name in ("entities.html", "dashboard_detail.html", "table_editor.html"):
-        html = (ROOT / f"app/templates/{name}").read_text(encoding="utf-8")
+        html = (TEMPLATES / name).read_text(encoding="utf-8")
         assert "static/js/fixed-tooltip.js" in html, name
 
 

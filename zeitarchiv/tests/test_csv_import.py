@@ -5,12 +5,10 @@ Zuordnung (Konzept "Offene Punkte": eigener CSV-Import neben Symcon)."""
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.storage import csv_import
 

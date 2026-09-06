@@ -8,14 +8,12 @@ beschriebenen und gegen echte Symcon-Exporte verifizierten Rohdatenformat
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
     import pyarrow as pa

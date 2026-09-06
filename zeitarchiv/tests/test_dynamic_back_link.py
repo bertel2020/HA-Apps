@@ -10,9 +10,10 @@ selbst bleibt ein einfacher Link auf genau diese URL."""
 
 from __future__ import annotations
 
-from pathlib import Path
 
-JS = (Path(__file__).resolve().parents[1] / "app/static/js/dynamic-back-link.js").read_text(encoding="utf-8")
+from _paths import APP
+
+JS = (APP / "static/js/dynamic-back-link.js").read_text(encoding="utf-8")
 
 
 def test_link_navigates_to_the_referrer_url_as_is() -> None:

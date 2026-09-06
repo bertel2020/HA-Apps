@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
+
+from _paths import APP
 
 
-ROOT = Path(__file__).resolve().parents[1]
-MAIN_SOURCE = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
-HOUSEKEEPING_SOURCE = (ROOT / "app" / "housekeeping_routes.py").read_text(encoding="utf-8")
+MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
+HOUSEKEEPING_SOURCE = (APP / "housekeeping_routes.py").read_text(encoding="utf-8")
 
 
 def _function(name: str, source: str = MAIN_SOURCE) -> ast.FunctionDef | ast.AsyncFunctionDef:

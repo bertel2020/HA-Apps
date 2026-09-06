@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import pytest
 
+from _paths import TEMPLATES
+
 PAGES = ["/", "/entities", "/statistik", "/housekeeping", "/settings", "/import"]
 
 
@@ -51,9 +53,8 @@ def test_housekeeping_form_targets_match_the_templates(client) -> None:
     tragen, das die Liste nicht kennt — sonst wächst die Seite um Knöpfe,
     die niemand prüft."""
     import re
-    from pathlib import Path
 
-    vorlagen = Path(__file__).resolve().parents[1] / "app/templates"
+    vorlagen = (TEMPLATES)
     ziele = set()
     for name in ("housekeeping.html", "_settings_storage_index_form.html",
                  "_settings_retention_form.html", "_settings_purge_form.html",

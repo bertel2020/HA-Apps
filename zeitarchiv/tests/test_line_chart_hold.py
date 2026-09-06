@@ -1,12 +1,12 @@
 """Regressionstests für geglättete Linien ohne künstliche Randlücken."""
 
-from pathlib import Path
+
+from _paths import APP, DOCS
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ENTITY = (ROOT / "app/templates/entity_detail.html").read_text(encoding="utf-8")
-EDITOR = (ROOT / "app/templates/chart_editor.html").read_text(encoding="utf-8")
-DASHBOARD = (ROOT / "app/static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+ENTITY = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+EDITOR = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 
 
 def test_all_line_chart_renderers_use_smooth_lines() -> None:
@@ -30,7 +30,7 @@ def test_line_charts_do_not_mix_smoothing_with_step_mode() -> None:
     assert ".step = 'end'" not in DASHBOARD
 
 
-SETTINGS_FORM = (ROOT / "app/templates/_settings_darstellung_form.html").read_text(encoding="utf-8")
+SETTINGS_FORM = (APP / "templates/_settings_darstellung_form.html").read_text(encoding="utf-8")
 
 
 def test_the_rolling_window_switch_is_not_described_as_a_drawing_option() -> None:
@@ -66,8 +66,8 @@ def test_the_chart_options_menu_uses_the_same_word_as_the_settings_page() -> Non
     Kachelmenü heißen alle "Rollierend". Vorher hieß dasselbe an zwei Stellen
     "Kontinuierlich" — das Handbuch behalf sich schon mit dem Doppelnamen
     "Kontinuierlich/Rollierend"."""
-    tile_menu = (ROOT / "app/templates/_dashboard_tile_menu.html").read_text(encoding="utf-8")
-    guide = (ROOT / "docs/user-guide.md").read_text(encoding="utf-8")
+    tile_menu = (APP / "templates/_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    guide = (DOCS / "user-guide.md").read_text(encoding="utf-8")
     assert ">Rollierend</span>" in ENTITY
     assert "Rollierend" in tile_menu
     assert "Kontinuierlich" not in guide

@@ -1,10 +1,10 @@
 """Regressionstest für reproduzierbare Add-on-Laufzeitabhängigkeiten."""
 
-from pathlib import Path
+
+from _paths import ADDON
 
 
-ROOT = Path(__file__).resolve().parents[1]
-ADDON = ROOT
+
 
 
 def test_runtime_requirements_are_fully_pinned_and_used_by_docker() -> None:

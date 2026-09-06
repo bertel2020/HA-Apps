@@ -6,12 +6,13 @@ import json
 import os
 import subprocess
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from _paths import APP_JS
 
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "app" / "static" / "js" / "period-navigation.js"
+
+
+SCRIPT = APP_JS / "period-navigation.js"
 TZ = ZoneInfo("Europe/Berlin")
 
 

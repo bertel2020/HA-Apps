@@ -1,18 +1,16 @@
 """Regression tests for the visual and semantic settings hierarchy."""
 
-from pathlib import Path
 
-import sys
 
 from jinja2 import Environment, FileSystemLoader
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.formatting import format_int, format_value
 
-ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT / "app" / "templates"
-CSS = (ROOT / "app" / "static" / "css" / "app.css").read_text(
+from _paths import TEMPLATES, APP_CSS
+
+
+CSS = (APP_CSS).read_text(
     encoding="utf-8"
 )
 

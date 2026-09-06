@@ -1,16 +1,14 @@
 """Regressionstest für den aktuellen Hinweis zum Symcon-Upload-Ablauf."""
 
-import sys
-from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.formatting import format_int, format_value
 
-TEMPLATES = ROOT / "app/templates"
+from _paths import TEMPLATES
+
+
 SOURCE = (TEMPLATES / "import.html").read_text(encoding="utf-8")
 
 

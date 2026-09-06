@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 import tempfile
 import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG
 from app.notices import (

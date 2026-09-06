@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.storage import import_reports
 
+from _paths import TEMPLATES
 
-TEMPLATES = Path(__file__).resolve().parents[1] / "app" / "templates"
+
 
 
 def _result(**overrides) -> dict:

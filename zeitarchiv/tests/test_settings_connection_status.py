@@ -1,15 +1,14 @@
 """Strukturtests für den app-konsistenten Verbindungsstatus."""
 
-from pathlib import Path
 
 import pytest
 from jinja2 import Environment, FileSystemLoader
 
+from _paths import APP, TEMPLATES
 
-ROOT = Path(__file__).resolve().parents[1]
-TEMPLATES = ROOT / "app/templates"
+
 SOURCE = (TEMPLATES / "_settings_verbindung_form.html").read_text(encoding="utf-8")
-CSS = (ROOT / "app/static/css/app.css").read_text(encoding="utf-8")
+CSS = (APP / "static/css/app.css").read_text(encoding="utf-8")
 
 
 def test_connection_status_uses_shared_status_cards() -> None:

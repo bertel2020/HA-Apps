@@ -5,12 +5,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from _paths import TEMPLATES, APP_CSS, APP_JS
 
-ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "app"
-TEMPLATES = APP / "templates"
-APP_CSS = APP / "static" / "css" / "app.css"
-APP_JS = APP / "static" / "js"
+
 
 
 def _full_page_templates() -> list[Path]:

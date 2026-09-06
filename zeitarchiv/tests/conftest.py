@@ -11,11 +11,14 @@ Testlauf — nie /data oder demo-data, damit Tests nichts Reales berühren.
 from __future__ import annotations
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Der Import allein genügt: _paths hängt das Verzeichnis, das `app/` enthält,
+# an sys.path — in beiden Baum-Layouts. conftest wird von pytest vor allen
+# Testmodulen geladen, damit gilt das für die ganze Suite.
+import _paths  # noqa: F401
+
 _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="zeitarchiv-pytest-"))
 os.environ.setdefault("ZEITARCHIV_DATA_DIR", str(_TEST_DATA_DIR))
 

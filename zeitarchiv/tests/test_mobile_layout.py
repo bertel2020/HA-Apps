@@ -11,14 +11,8 @@ Tooltip-Boxen, die versteckt trotzdem Fläche belegen.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-
-ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "app"
-APP_CSS = APP / "static" / "css" / "app.css"
-APP_JS = APP / "static" / "js"
-TEMPLATES = APP / "templates"
+from _paths import TEMPLATES, APP_CSS, APP_JS
 
 
 def _media_block(css: str, query: str) -> str:

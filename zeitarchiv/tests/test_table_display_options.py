@@ -1,13 +1,14 @@
 """Regressionstests für optionale Darstellungsmerkmale von Vergleichstabellen."""
 
-from pathlib import Path
+
+from _paths import APP
 
 
-ROOT = Path(__file__).resolve().parents[1]
-EDITOR = (ROOT / "app/templates/table_editor.html").read_text(encoding="utf-8")
-COMPUTE = (ROOT / "app/static/js/table-compute.js").read_text(encoding="utf-8")
-DASHBOARD = (ROOT / "app/static/js/dashboard-tiles.js").read_text(encoding="utf-8")
-MAIN = (ROOT / "app/main.py").read_text(encoding="utf-8")
+
+EDITOR = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
+DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+MAIN = (APP / "main.py").read_text(encoding="utf-8")
 
 
 def test_every_new_display_feature_is_an_independent_editor_option() -> None:

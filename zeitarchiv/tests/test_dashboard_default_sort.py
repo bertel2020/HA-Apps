@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.storage.index import Index
 
+from _paths import APP
 
-TEMPLATE = (ROOT / "app/templates/dashboards.html").read_text(encoding="utf-8")
-CARD_BROWSER = (ROOT / "app/static/js/card-browser.js").read_text(encoding="utf-8")
+
+
+TEMPLATE = (APP / "templates/dashboards.html").read_text(encoding="utf-8")
+CARD_BROWSER = (APP / "static/js/card-browser.js").read_text(encoding="utf-8")
 
 
 def test_default_dashboard_is_marked_as_fixed_first_for_browser_sorting() -> None:

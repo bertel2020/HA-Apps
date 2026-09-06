@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
     from app.storage.index import (

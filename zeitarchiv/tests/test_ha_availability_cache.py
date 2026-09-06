@@ -7,17 +7,13 @@ HA_AVAILABILITY_STALE_SECONDS."""
 from __future__ import annotations
 
 import asyncio
-import sys
 import urllib.parse
 from dataclasses import replace
-from datetime import datetime, timezone
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 from starlette.requests import Request
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import import_routes
 from app.storage import ha_import

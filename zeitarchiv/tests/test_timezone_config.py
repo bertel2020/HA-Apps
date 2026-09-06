@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.timezone_config import DEFAULT_TIMEZONE_NAME, load_timezone  # noqa: E402
+
+from _paths import ADDON
+
 
 
 def test_valid_option_is_used() -> None:
@@ -47,6 +46,6 @@ def test_non_string_manual_value_cannot_abort_startup() -> None:
 
 
 def test_supervisor_schema_rejects_arbitrary_timezone_strings() -> None:
-    config = (ROOT / "config.yaml").read_text(encoding="utf-8")
+    config = (ADDON / "config.yaml").read_text(encoding="utf-8")
     assert 'timezone: "match(' in config
     assert 'timezone: "str"' not in config

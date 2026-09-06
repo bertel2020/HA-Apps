@@ -7,14 +7,13 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+from _paths import APP
 
-TEMPLATE = (ROOT / "app/templates/dashboards.html").read_text(encoding="utf-8")
-MAIN_SOURCE = (ROOT / "app/main.py").read_text(encoding="utf-8")
+
+
+TEMPLATE = (APP / "templates/dashboards.html").read_text(encoding="utf-8")
+MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
 
 
 def test_default_dashboard_card_gets_the_accent_class() -> None:

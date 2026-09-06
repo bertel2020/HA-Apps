@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
+
+from _paths import APP
 
 
-ROOT = Path(__file__).resolve().parents[1]
-APP = ROOT / "app"
+
 
 
 def _source(name: str) -> str:

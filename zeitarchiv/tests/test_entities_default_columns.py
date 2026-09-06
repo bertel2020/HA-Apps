@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 import pytest
 
+from _paths import APP, TEMPLATES
 
-MAIN_PATH = Path(__file__).resolve().parents[1] / "app" / "main.py"
+
+MAIN_PATH = APP / "main.py"
 ENTITIES_TEMPLATE_PATH = (
-    Path(__file__).resolve().parents[1] / "app" / "templates" / "entities_list.html"
+    TEMPLATES / "entities_list.html"
 )
 ENTITIES_TABLE_PATH = ENTITIES_TEMPLATE_PATH.with_name("_entities_table.html")
 

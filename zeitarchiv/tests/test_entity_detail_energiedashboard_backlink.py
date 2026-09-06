@@ -9,18 +9,18 @@ unabhängig von der genauen Ursache."""
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.energiedashboard_routes import _empty_config, _save_config, entity_has_energiedashboard_role
 from app.storage.index import Index
 
-ROOT = Path(__file__).resolve().parents[1]
-MAIN_SOURCE = (ROOT / "app/main.py").read_text(encoding="utf-8")
-TEMPLATE = (ROOT / "app/templates/entity_detail.html").read_text(encoding="utf-8")
+from _paths import APP
+
+
+MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
+TEMPLATE = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
 
 
 def _with_index(fn) -> None:

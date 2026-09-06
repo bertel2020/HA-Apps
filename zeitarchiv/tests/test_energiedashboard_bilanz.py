@@ -7,16 +7,15 @@ restlichen drei Dashboard-Karten)."""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _paths import APP
 
-ROOT = Path(__file__).resolve().parents[1]
-JS = (ROOT / "app/static/js/energiedashboard.js").read_text(encoding="utf-8")
-VIEW = (ROOT / "app/templates/_energiedashboard_view.html").read_text(encoding="utf-8")
-DASHBOARD_HTML = (ROOT / "app/templates/energiedashboard.html").read_text(encoding="utf-8")
-REPORT = (ROOT / "app/templates/_energiedashboard_report.html").read_text(encoding="utf-8")
+
+
+JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
+VIEW = (APP / "templates/_energiedashboard_view.html").read_text(encoding="utf-8")
+DASHBOARD_HTML = (APP / "templates/energiedashboard.html").read_text(encoding="utf-8")
+REPORT = (APP / "templates/_energiedashboard_report.html").read_text(encoding="utf-8")
 
 
 def test_co2_bilanz_is_ausstoss_minus_vermieden() -> None:

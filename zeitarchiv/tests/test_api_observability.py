@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -11,8 +10,6 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.api_routes import (  # noqa: E402
     ApiDependencies,
@@ -26,6 +23,7 @@ from app.api_routes import (  # noqa: E402
 )
 from app.logging_setup import configure_logging, local_log_lines  # noqa: E402
 from app.storage.coordinator import StorageCoordinator  # noqa: E402
+
 
 
 class _FakeIngestion:

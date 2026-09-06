@@ -9,12 +9,10 @@ energiedashboard_routes.py)."""
 from __future__ import annotations
 
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
@@ -27,7 +25,9 @@ from app.energiedashboard_routes import (
 )
 from app.storage.index import Index
 
-TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "app" / "templates"
+from _paths import TEMPLATES
+
+TEMPLATES_DIR = TEMPLATES
 
 
 def _with_service(fn) -> None:

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.storage.index import Index
+
+from _paths import APP
 
 
 def test_new_value_tile_enables_sparkline_and_uses_raw_resolution(tmp_path: Path) -> None:
@@ -272,7 +272,7 @@ def test_the_label_tables_in_python_and_javascript_agree() -> None:
     from app.main import _TILE_METRIC_LABELS, _TILE_RANGE_LABELS
 
     script = (
-        Path(__file__).resolve().parents[1] / "app/static/js/dashboard-tiles.js"
+        (APP / "static/js/dashboard-tiles.js")
     ).read_text(encoding="utf-8")
     for range_key, (kalendarisch, rollierend) in _TILE_RANGE_LABELS.items():
         assert f"{range_key}: ['{kalendarisch}', '{rollierend}']" in script, range_key
@@ -317,7 +317,7 @@ def test_the_tile_menu_offers_every_setting_the_endpoint_accepts() -> None:
     )
 
     menu = (
-        Path(__file__).resolve().parents[1] / "app/templates/_dashboard_tile_menu.html"
+        (APP / "templates/_dashboard_tile_menu.html")
     ).read_text(encoding="utf-8")
     for range_key in DASHBOARD_TILE_RANGES:
         assert f"data-range=\"{{{{ value }}}}\"" in menu

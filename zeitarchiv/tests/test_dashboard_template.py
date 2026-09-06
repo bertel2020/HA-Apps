@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from _paths import TEMPLATES
 
-TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "app" / "templates"
+
+TEMPLATES_DIR = TEMPLATES
 
 
 class _FakeURL:

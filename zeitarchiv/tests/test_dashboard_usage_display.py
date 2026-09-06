@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.storage.index import Index
 
+from _paths import APP
 
-PARTIAL = (ROOT / "app/templates/_dashboard_usage.html").read_text(encoding="utf-8")
-CHART_EDITOR = (ROOT / "app/templates/chart_editor.html").read_text(encoding="utf-8")
-TABLE_EDITOR = (ROOT / "app/templates/table_editor.html").read_text(encoding="utf-8")
+
+
+PARTIAL = (APP / "templates/_dashboard_usage.html").read_text(encoding="utf-8")
+CHART_EDITOR = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+TABLE_EDITOR = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
 
 
 def test_usage_partial_follows_app_chip_and_popover_patterns() -> None:

@@ -5,12 +5,11 @@ _CachedStaticFiles, vendor_v in main.py)."""
 from __future__ import annotations
 
 import re
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _paths import TEMPLATES, APP_JS
 
-TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "app" / "templates"
+
+TEMPLATES_DIR = TEMPLATES
 VENDOR_SCRIPT_RE = re.compile(r'src="[^"]*vendor/(?:htmx|echarts|alpine)\.min\.js([^"]*)"')
 
 
@@ -40,7 +39,7 @@ def test_gzip_skips_small_responses(client) -> None:
     werden (Kompressions-Overhead lohnt sich dort nicht)."""
     resp = client.get("static/js/dd-picker.js", headers={"Accept-Encoding": "gzip"})
     assert resp.status_code == 200
-    content_length = (Path(__file__).resolve().parents[1] / "app" / "static" / "js" / "dd-picker.js").stat().st_size
+    content_length = (APP_JS / "dd-picker.js").stat().st_size
     if content_length < 500:
         assert resp.headers.get("Content-Encoding") != "gzip"
 

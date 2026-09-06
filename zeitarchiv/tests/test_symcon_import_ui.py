@@ -1,15 +1,16 @@
 """Regressionstests für die kompakte und bedienbare Symcon-Importtabelle."""
 
-from pathlib import Path
+
+from _paths import APP
 
 
-ROOT = Path(__file__).resolve().parents[1]
-IMPORT = (ROOT / "app/templates/import.html").read_text(encoding="utf-8")
-CSV_SECTION = (ROOT / "app/templates/_csv_import_section.html").read_text(encoding="utf-8")
-REPORTS_PANEL = (ROOT / "app/templates/_reports_panel.html").read_text(encoding="utf-8")
-NAV = (ROOT / "app/templates/_settings_nav.html").read_text(encoding="utf-8")
-MAIN = (ROOT / "app/import_routes.py").read_text(encoding="utf-8")
-CSS = (ROOT / "app/static/css/app.css").read_text(encoding="utf-8")
+
+IMPORT = (APP / "templates/import.html").read_text(encoding="utf-8")
+CSV_SECTION = (APP / "templates/_csv_import_section.html").read_text(encoding="utf-8")
+REPORTS_PANEL = (APP / "templates/_reports_panel.html").read_text(encoding="utf-8")
+NAV = (APP / "templates/_settings_nav.html").read_text(encoding="utf-8")
+MAIN = (APP / "import_routes.py").read_text(encoding="utf-8")
+CSS = (APP / "static/css/app.css").read_text(encoding="utf-8")
 
 
 def test_delete_action_precedes_filters_and_table() -> None:

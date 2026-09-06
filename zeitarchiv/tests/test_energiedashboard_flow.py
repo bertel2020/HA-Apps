@@ -19,12 +19,12 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _paths import APP
+
 
 try:
     import pyarrow as pa
@@ -408,7 +408,7 @@ def test_vergleichsregel_steht_nur_noch_an_einer_stelle() -> None:
     """Die Verzweigung stand wortgleich in /energiedashboard/data und im
     Energiebericht — die Konstellation, in der ein Fehler einmal behoben und
     beim zweiten Vorkommen vergessen wird."""
-    quelle = (Path(__file__).resolve().parents[1] / "app/energiedashboard_routes.py").read_text(
+    quelle = (APP / "energiedashboard_routes.py").read_text(
         encoding="utf-8"
     )
     assert quelle.count("continuous=True, read_cache=read_cache") == 2  # beide in der Helfermethode
@@ -588,7 +588,7 @@ def test_mehrere_speicher_werden_bei_energie_summiert(monkeypatch, tmp: Path) ->
 
 
 def _js() -> str:
-    return (Path(__file__).resolve().parents[1] / "app/static/js/energiedashboard.js").read_text(
+    return (APP / "static/js/energiedashboard.js").read_text(
         encoding="utf-8"
     )
 

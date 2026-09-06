@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
-import sys
 import tempfile
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
 
 from app.storage.index import Index
+
+from _paths import APP
+
 
 
 def test_existing_table_rows_are_migrated_with_automatic_unit_default() -> None:
@@ -65,8 +65,8 @@ def test_formula_unit_is_saved_and_loaded() -> None:
 
 
 def test_formula_unit_feature_is_wired_through_editor_and_compute_core() -> None:
-    editor = (ROOT / "app/templates/table_editor.html").read_text(encoding="utf-8")
-    compute = (ROOT / "app/static/js/table-compute.js").read_text(encoding="utf-8")
+    editor = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+    compute = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
 
     # Natives title auf das App-eigene data-tooltip-System umgestellt.
     assert 'data-tooltip="Einheit"' in editor

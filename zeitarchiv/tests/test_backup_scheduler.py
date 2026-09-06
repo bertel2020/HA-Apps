@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.backup_scheduler import next_scheduled_run, parse_schedule_time
 from app.storage.index import Index
