@@ -1,12 +1,7 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — {{ dashboard.name }}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — {{ dashboard.name }}{% endblock %}
+{% block root_vars %}--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;{% endblock %}
+{% block page_css %}
 <style>
   /* Identisch zu den Dashboard-Kachel-Styles in entities.html — dieselbe
      Kachel-Mechanik (Konzept "Offene Punkte"/"Dashboards"), nur auf einer
@@ -400,9 +395,9 @@
   .dash-rename-btn:hover{color:var(--accent-line);}
   .dash-locked-badge{font-size:calc(16px * var(--font-scale, 1));cursor:default;opacity:.75;}
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <div class="dash-title-row">
       <h1>{{ dashboard.name }}</h1>
@@ -426,5 +421,4 @@
   <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/dashboard-tiles.js?v={{ js_v }}"></script>
-</body>
-</html>
+{% endblock %}

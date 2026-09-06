@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — CSV-Export</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — CSV-Export{% endblock %}
+{% block page_css %}
 <style>
   th a{
     display:block;width:100%;padding:8px 0;text-align:left;font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);text-decoration:none;
@@ -45,9 +39,9 @@
 
   .export-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <h1>CSV-Export</h1>
     <p class="sub">Lädt die komplette Rohdaten-Historie einer Entität als CSV herunter &mdash; Hot Buffer und Archiv zusammengeführt, zur Löschung markierte Datensätze ausgeschlossen.</p>
@@ -144,5 +138,4 @@
       setExportPage(v);
     }
   </script>
-</body>
-</html>
+{% endblock %}

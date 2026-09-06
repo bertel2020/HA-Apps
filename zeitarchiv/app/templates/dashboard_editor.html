@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — {{ dashboard.name if dashboard else "Neues Dashboard" }}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — {{ dashboard.name if dashboard else "Neues Dashboard" }}{% endblock %}
+{% block page_css %}
 <style>
   [x-cloak]{display:none!important;}
   .dash-editor-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
@@ -22,9 +16,9 @@
   .switch input:focus-visible + .switch-track{outline:2px solid var(--accent-line);outline-offset:2px;}
   .switch input:disabled{cursor:default;}
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page" x-data="dashboardEditor()">
     <h1>Dashboards</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ base }}/dashboards">&larr; zurück zu Dashboards</a></p>
@@ -149,5 +143,4 @@
       };
     }
   </script>
-</body>
-</html>
+{% endblock %}

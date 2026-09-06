@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Import</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Import{% endblock %}
+{% block page_css %}
 <style>
   .callout{
     border:1px solid var(--border);border-left-width:4px;border-left-color:var(--accent-bar);
@@ -227,9 +221,9 @@
     font-weight:400;color:var(--ink);cursor:pointer;margin-top:8px;margin-bottom:0;text-transform:none;}
   .checkbox-label input{width:16px;height:16px;cursor:pointer;}
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <h1>Import</h1>
     <p class="sub">Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als CSV-Datei mit freier Spalten-/Format-Zuordnung.</p>
@@ -920,5 +914,4 @@
     }
     applyImportPaging();
   </script>
-</body>
-</html>
+{% endblock %}

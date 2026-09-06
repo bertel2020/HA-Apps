@@ -1,0 +1,50 @@
+{# Gemeinsamer Rahmen aller Vollseiten-Templates (ZG-04, Schritt 1).
+
+   Vorher baute sich jede der 23 Seiten ihren <head> selbst zusammen. Fünf der
+   acht Bestandteile waren dabei über alle 23 byte-identisch; die app.css-Zeile
+   unterschied sich ausschließlich im URL-Präfix, den die Seiten auf vier Arten
+   schrieben: bloß relativ, über die base-Variable mit ".." und mit "../..",
+   und einmal über app_root.
+
+   Hier steht sie einmal, und zwar mit app_root: absolut, aus dem
+   X-Ingress-Path-Header, unabhängig von der URL-Tiefe der Seite. Eine neue
+   Seite auf einer neuen Schachtelungstiefe kann ihren Präfix damit nicht mehr
+   vergessen. Abgesichert durch tests/test_ingress_prefix.py, das die AUFLÖSUNG
+   prüft und nicht die Schreibweise.
+
+   Das gilt vorerst NUR für das Stylesheet. Die <script src=…>-Tags stehen am
+   Körperende und tragen ihre Präfixe weiterhin selbst — Schritt 2 des Plans
+   holt sie nach. Bis dahin ist ZG-03 nur halb geschlossen.
+
+   Die Blöcke sind aus dem Bestand abgelesen, nicht auf Vorrat angelegt:
+
+   - title      jede Seite hat einen eigenen; 21 folgen "Zeitarchiv — X", zwei
+                nicht, deshalb trägt der Block den GANZEN Titel.
+   - root_vars  nur entities.html und dashboard_detail.html setzen neben
+                --font-scale noch --dashboard-row-height.
+   - page_css   die seitenlokalen <style>-Blöcke. Sie bleiben vorerst, wo sie
+                sind (Schritt 3 des Plans hebt sie nach app.css).
+   - topnav     nur _energiedashboard_report.html kommt ohne aus.
+   - content    der gesamte Seitenkörper einschließlich der <script>-Tags am
+                Ende. Kein Template hatte je ein <script> im <head>, deshalb
+                braucht es hier keinen eigenen Block dafür: die Ladereihenfolge
+                bleibt exakt die bisherige.
+
+   Kein <body> im Bestand trägt Attribute — geprüft über alle 23 —, deshalb
+   steht es hier ohne Block. #}
+<!doctype html>
+<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Zeitarchiv{% endblock %}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="{{ app_root }}/static/css/app.css?v={{ css_v }}">
+<style>:root{--font-scale:{{ font_scale_value }};{% block root_vars %}{% endblock %}}</style>
+{% block page_css %}{% endblock %}
+</head>
+<body>
+{% block topnav %}{% include "_topnav.html" %}{% endblock %}
+{% block content %}{% endblock %}
+</body>
+</html>

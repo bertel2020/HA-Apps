@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Energiedashboard</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Energiedashboard{% endblock %}
+{% block page_css %}
 <style>
   .edash-title-row{display:flex;align-items:center;gap:10px;}
   /* Mobil: die nowrap-Badges drückten den <h1> (word-break:break-word, app.css)
@@ -513,6 +507,34 @@
      Beschriftungsspalte noch reichlich Platz hatte. */
   .edash-share-table th:nth-child(2),.edash-share-table th:nth-child(3),.edash-share-table th:nth-child(4),
   .edash-share-table td:nth-child(2),.edash-share-table td:nth-child(3),.edash-share-table td:nth-child(4){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  /* Schmaler Container: auf dem Telefon (Karte 305px breit) und ebenso in
+     der zweispaltigen Rasterstufe ab 820px (Tabelle neben dem 220px-Donut,
+     dort nur 285px) war die Tabelle mit 350px breiter als ihr Platz — sie
+     scrollte seitlich UND brach lange Namen trotzdem um. Gemessen an der
+     Containerbreite statt an der Fensterbreite, weil beide Fälle dieselbe
+     Ursache haben und in @media zwei getrennte, gegenläufige Bereiche
+     wären. Wo @container fehlt, bleibt es beim bisherigen Verhalten. */
+  .edash-share-wrap .tbl-wrap{container-type:inline-size;}
+  @container (max-width:400px){
+    /* 6px statt 14px: bei vier Spalten sind 14px links und rechts zusammen
+       112px — auf 305px Containerbreite mehr als ein Drittel, das der
+       Namensspalte fehlt. */
+    table.edash-share-table th,table.edash-share-table td{padding-left:6px;padding-right:6px;}
+    /* Die Namensspalte bekommt den ganzen Rest. Die Zahlenspalten sind
+       nowrap und stehen damit ohnehin auf ihrer Mindestbreite; ohne
+       width:100% verteilt die automatische Tabellenaufteilung den freien
+       Platz anteilig auf alle vier, und der Name bricht um, obwohl rechts
+       noch Luft ist. */
+    table.edash-share-table th:first-child,table.edash-share-table td.label{width:100%;}
+    /* Farbpunkt aus dem Textfluss nehmen: inline belegt er mitsamt Abstand
+       17px am Zeilenanfang, und ein Name, der damit nicht mehr passt,
+       rutscht als Ganzes auf die zweite Zeile — der Punkt bleibt allein
+       oben stehen (genau der Umbruch im Screenshot). Absolut positioniert
+       steht er im linken Innenabstand, der Name hat die volle Zeilenbreite
+       und bricht erst um, wenn er wirklich zu lang ist. */
+    table.edash-share-table td.label{position:relative;padding-left:20px;}
+    .edash-share-table .edash-share-dot{position:absolute;left:6px;top:0;bottom:0;margin:auto 0;width:8px;height:8px;}
+  }
   /* Mobil: flex-basis (220px) ausschalten, sonst gewinnt sie gegen
      width:100% und der Donut hängt 220px breit links in der Kachel. Als
      zentrierter Block mit 260px (dieselbe Größe wie #storage-pie in
@@ -942,9 +964,9 @@
      ihnen bündig abzuschließen. */
   .edash-gruppen-add .edash-setup-add{flex:none;width:128px;justify-content:center;}
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <div id="energiedashboard-root">
       {% include "_energiedashboard_view.html" %}
@@ -959,5 +981,4 @@
   <script src="static/js/group-picker.js?v={{ js_v }}"></script>
   <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="static/js/energiedashboard.js?v={{ js_v }}"></script>
-</body>
-</html>
+{% endblock %}

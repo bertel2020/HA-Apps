@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Protokoll</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Protokoll{% endblock %}
+{% block page_css %}
 <style>
   /* Bewusst flacher/kompakter als eine reguläre .settings-section (kein
      Schatten, weniger Innenabstand, gedämpfter Hintergrund) — sichtbar
@@ -48,9 +42,9 @@
     .log-settings-section.is-collapsed{padding-top:14px;padding-bottom:14px;}
   }
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <h1>Protokoll</h1>
     <p class="sub">Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll.</p>
@@ -189,5 +183,4 @@
       refreshLogs();
     })();
   </script>
-</body>
-</html>
+{% endblock %}

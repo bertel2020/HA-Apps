@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — {{ entity_id }}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — {{ entity_id }}{% endblock %}
+{% block page_css %}
 <style>
   h1.raw{font-family:var(--font-mono);font-size:calc(18.4px * var(--font-scale, 1));}
   .h1-row{display:flex;align-items:center;gap:10px;}
@@ -111,10 +105,10 @@
     .card{padding:14px;}
   }
 </style>
-</head>
-<body>
+{% endblock %}
+{% block content %}
   {% from "_icons.html" import custom_name_icon %}
-  {% include "_topnav.html" %}
+  
   {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page" x-data="entityChart()">
     <div class="h1-row">
@@ -1200,5 +1194,4 @@
       };
     }
   </script>
-</body>
-</html>
+{% endblock %}

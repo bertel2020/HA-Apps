@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Housekeeping</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Housekeeping{% endblock %}
+{% block page_css %}
 <style>
   /* Chart/Tabelle-Unterscheidung in der ansonsten typübergreifenden Liste —
      dieselbe visuelle Sprache wie die Entitätstyp-Badges (.badge in
@@ -57,9 +51,8 @@
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;
   }
 </style>
-</head>
-<body>
-{% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
 <div class="page">
   <h1>Housekeeping</h1>
   <p class="sub">Dinge, die im Alltag leicht untergehen.</p>
@@ -325,5 +318,4 @@
 </script>
 <script src="static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
 <script src="static/js/table-cards.js?v={{ js_v }}"></script>
-</body>
-</html>
+{% endblock %}

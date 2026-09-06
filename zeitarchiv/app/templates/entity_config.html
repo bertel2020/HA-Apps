@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Konfiguration — {{ entity_id }}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Konfiguration — {{ entity_id }}{% endblock %}
+{% block page_css %}
 <style>
   h1.raw{font-family:var(--font-mono);font-size:calc(18.4px * var(--font-scale, 1));}
   .config-card{max-width:none;margin:20px 0 0;}
@@ -47,10 +41,10 @@
     .entity-data-action .btn{width:100%;}
   }
 </style>
-</head>
-<body>
+{% endblock %}
+{% block content %}
   {% from "_icons.html" import custom_name_icon %}
-  {% include "_topnav.html" %}
+  
   {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page">
     <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
@@ -158,5 +152,4 @@
       }
     }
   </script>
-</body>
-</html>
+{% endblock %}

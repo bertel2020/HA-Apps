@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Entitäten</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Entitäten{% endblock %}
+{% block page_css %}
 <style>
   /* .settings-panel sitzt in einer Grid-Spalte (1fr) — ohne min-width:0
      würde diese Spalte (und damit die ganze Seite) sich an den intrinsischen
@@ -125,9 +119,9 @@
   /* Spalten-Auswahl und Typ-Filter nutzen beide das gemeinsame Dropdown-
      Picker-Muster (.dd-picker-*, app.css) statt eigener Optik hier. */
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <h1>Entitäten</h1>
     <p class="sub">Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.</p>
@@ -294,5 +288,4 @@
       }
     }
   </script>
-</body>
-</html>
+{% endblock %}

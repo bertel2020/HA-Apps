@@ -1,19 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Energiebericht — {{ period_title }}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
-{# Eigenständige, druckoptimierte Seite (siehe ROADMAP.md 1.7) — bewusst
-   OHNE _topnav.html/App-Rahmen: sie soll wie ein Dokument wirken, das man
-   drucken/als PDF speichert, nicht wie eine weitere App-Unterseite. Nutzt
-   trotzdem app.css für die Farb-/Font-Variablen (--surface, --chart-*, …),
-   damit Hell/Dunkel und das gewählte Farbschema automatisch mitgelten,
-   statt sie hier (wie im ursprünglichen Mockup) ein zweites Mal fest zu
-   hinterlegen. #}
+{% extends "base.html" %}
+{% block title %}Energiebericht — {{ period_title }}{% endblock %}
+{% block page_css %}
 <style>
   *{box-sizing:border-box;}
   body{
@@ -149,9 +136,19 @@
     tr{page-break-inside:avoid;break-inside:avoid;}
   }
 </style>
-</head>
-<body>
-
+{% endblock %}
+{# Eigenständige, druckoptimierte Seite (siehe ROADMAP.md 1.7) — bewusst
+   OHNE _topnav.html/App-Rahmen: sie soll wie ein Dokument wirken, das man
+   drucken/als PDF speichert, nicht wie eine weitere App-Unterseite. Nutzt
+   trotzdem app.css für die Farb-/Font-Variablen (--surface, --chart-*, …),
+   damit Hell/Dunkel und das gewählte Farbschema automatisch mitgelten,
+   statt sie hier (wie im ursprünglichen Mockup) ein zweites Mal fest zu
+   hinterlegen. #}
+{# Logo links, Titel+Zeitraum rechtsbündig als eigene Spalte daneben —
+     align-items:center statt flex-start, damit "Energiebericht" auf
+     derselben Höhe wie das (jetzt größere) Logo sitzt, nicht darunter. #}
+{% block topnav %}{% endblock %}
+{% block content %}
 {% macro kpi_delta(compare) %}
   {%- if compare and compare.pct is not none -%}
     <div class="kpi-delta {{ 'up' if compare.pct >= 0 else 'down' }}">{{ '▲' if compare.pct >= 0 else '▼' }} {{ compare.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
@@ -446,6 +443,4 @@
     <span>Erstellt am {{ generated_at.day }}. {{ month_names[generated_at.month - 1] }} {{ generated_at.year }}</span>
   </div>
 </div>
-
-</body>
-</html>
+{% endblock %}

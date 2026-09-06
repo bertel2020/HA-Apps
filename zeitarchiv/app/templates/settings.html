@@ -1,13 +1,8 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — Einstellungen</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="static/css/app.css?v={{ css_v }}">
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — Einstellungen{% endblock %}
+{% block page_css %}
 <style>
-  :root{--font-scale:{{ font_scale_value }};}
+  
   /* "Diagnosebericht" (Diagnosedaten herunterladen) folgt im DOM direkt auf
      #debug-tools (_settings_debug_tools.html, htmx-Refresh-Wrapper um die
      beiden Werkzeug-Subsections "Nächsten Schreibvorgang aufzeichnen"/
@@ -107,9 +102,9 @@
     .about-card{flex-direction:column;align-items:flex-start;text-align:left;}
   }
 </style>
-</head>
-<body>
-  {% include "_topnav.html" %}
+{% endblock %}
+{% block content %}
+  
   <div class="page">
     <h1>Einstellungen</h1>
     <p class="sub">Globale Konfiguration &mdash; unabhängig von einzelnen Entitäten.</p>
@@ -355,5 +350,4 @@
   </script>
   <script src="static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
   <script src="static/js/table-cards.js?v={{ js_v }}"></script>
-</body>
-</html>
+{% endblock %}

@@ -55,13 +55,27 @@ def test_display_settings_offer_both_color_schemes() -> None:
 
 
 def test_all_full_pages_receive_the_persisted_color_scheme() -> None:
-    full_pages = list(TEMPLATES.glob("*.html"))
-    full_pages = [path for path in full_pages if '<html lang="de"' in path.read_text(encoding="utf-8")]
-    assert len(full_pages) >= 15
+    """Farbschema und Hell/Dunkel hängen am <html>-Element — und das gibt es
+    seit ZG-04 Schritt 1 nur noch einmal, in base.html.
+
+    Vorher trug jede der 23 Seiten die beiden Attribute selbst; eine neue
+    Seite, die sie vergisst, startete im Standardschema. Der Test prüft
+    deshalb jetzt beides: dass base.html sie trägt, und dass jede Vollseite
+    von base.html erbt statt sich ein eigenes <html> zu bauen."""
+    base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    assert 'data-color-scheme="{{ color_scheme' in base
+    assert 'data-color-mode="{{ color_mode' in base
+
+    full_pages = [
+        path
+        for path in TEMPLATES.glob("*.html")
+        if path.read_text(encoding="utf-8").startswith('{% extends "base.html" %}')
+    ]
+    assert len(full_pages) >= 20, f"nur {len(full_pages)} Templates erben von base.html"
     for path in full_pages:
-        source = path.read_text(encoding="utf-8")
-        assert 'data-color-scheme="{{ color_scheme' in source, path.name
-        assert 'data-color-mode="{{ color_mode' in source, path.name
+        assert '<html lang="de"' not in path.read_text(encoding="utf-8"), (
+            f"{path.name} baut sich ein eigenes <html> statt base.html zu erben"
+        )
 
 
 def test_home_assistant_scheme_has_light_dark_and_chart_tokens() -> None:

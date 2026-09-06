@@ -11,19 +11,32 @@ from _paths import TEMPLATES, APP_CSS, APP_JS
 
 
 def _full_page_templates() -> list[Path]:
+    """Seit ZG-04 Schritt 1 hat nur noch `base.html` einen eigenen `<head>`.
+    „Vollseite" heißt deshalb nicht mehr „enthält <!doctype>", sondern
+    „erbt von base.html"."""
     return [
         path
         for path in TEMPLATES.glob("*.html")
-        if "<!doctype html>" in path.read_text(encoding="utf-8")
+        if path.read_text(encoding="utf-8").startswith('{% extends "base.html" %}')
     ]
 
 
 def test_full_pages_load_all_used_ibm_plex_mono_weights() -> None:
+    """Die Schriftschnitte kommen aus einer einzigen Zeile in base.html —
+    und keine Seite bringt daneben noch einen eigenen Fonts-Link mit.
+
+    Die zweite Hälfte ist der eigentliche Wert: vorher stand derselbe Link
+    23-mal da und musste 23-mal stimmen. Jetzt wäre eine 24. Kopie eine
+    Regression, keine Pflicht."""
+    base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    assert "IBM+Plex+Mono:wght@400;500;600;700" in base
+    assert "IBM+Plex+Sans:wght@400;500;600;700" in base
+
     full_pages = _full_page_templates()
-    assert len(full_pages) >= 15
+    assert len(full_pages) >= 20, f"nur {len(full_pages)} Templates erben von base.html"
     for path in full_pages:
         source = path.read_text(encoding="utf-8")
-        assert "IBM+Plex+Mono:wght@400;500;600;700" in source, path.name
+        assert "fonts.googleapis.com" not in source, f"{path.name} lädt Schriften selbst"
 
 
 def test_code_and_icon_buttons_inherit_the_shared_fonts() -> None:

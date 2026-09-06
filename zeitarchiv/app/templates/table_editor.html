@@ -1,12 +1,6 @@
-<!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zeitarchiv — {{ table_name or "Neue Tabelle" }}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
-<style>:root{--font-scale:{{ font_scale_value }};}</style>
+{% extends "base.html" %}
+{% block title %}Zeitarchiv — {{ table_name or "Neue Tabelle" }}{% endblock %}
+{% block page_css %}
 <style>
   .chart-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
   .chart-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
@@ -519,10 +513,10 @@
   .tbl-style-align-numbers .tbl-number-separator{text-align:center;}
   .tbl-style-align-numbers .tbl-number-fraction{text-align:left;}
 </style>
-</head>
-<body>
+{% endblock %}
+{% block content %}
   {% from "_icons.html" import custom_name_icon %}
-  {% include "_topnav.html" %}
+  
   <div class="page" x-data="tableEditor()">
     <h1>Tabellen</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen. &middot; <a href="{{ base }}/tables">&larr; zurück zu Tabellen</a></p>
@@ -1862,5 +1856,4 @@
       };
     }
   </script>
-</body>
-</html>
+{% endblock %}
