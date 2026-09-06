@@ -533,7 +533,7 @@
         <template x-if="editing">
           <div>
             <h3 class="tbl-h">Spalten (Zeiträume)</h3>
-            <p class="tbl-hint">Jede Spalte ist ein Zeitraum, frei benannt (z. B. "Heute", "Aug VJ", "2026") — Bezeichnung und tatsächliche Berechnung (Zeitraum-Typ/Versatz) sind getrennt. Ohne eigene Beschriftung wird der vorgeschlagene Name (grau) übernommen. Der Versatz steuert, welche Periode gemeint ist: 0 = aktuell, -1 = eine Periode zurück, -2 = zwei Perioden zurück usw. (nie positiv) — für "Vorjahresmonat" bei Zeitraum-Typ "Monat" z. B. -12, die Einheit wird direkt im Feld angezeigt. Per Ziehen oder über die Pfeile lassen sich die Spalten neu anordnen.</p>
+            <p class="tbl-hint">Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ "Monat" also -12. Reihenfolge per Ziehen oder über die Pfeile.</p>
             <div class="tbl-columns">
               <template x-for="(col, idx) in columns" :key="col.uid">
                 <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid" :class="{'tbl-col-card-hidden': col.hidden}">
@@ -623,12 +623,7 @@
             </div>
 
             <h3 class="tbl-h">Zeilen (Größen)</h3>
-            <p class="tbl-hint">
-              <strong>Entität</strong>: eine einzelne Entität. <strong>Gruppe</strong>: mehrere Entitäten zu einer Summen-Zeile zusammengefasst.
-              <strong>Formel</strong>: referenziert andere Zeilen über ihr Buchstaben-Kürzel (links), z. B. <code>A / B * 100</code> — nur Zeilen OBERHALB der Formel-Zeile sind referenzierbar.
-              <strong>Trennlinie</strong>: trennt zwei Bereiche rein optisch und benötigt keine Daten.
-              Per Ziehen oder über die Pfeile neu anordnen.
-            </p>
+            <p class="tbl-hint"><strong>Entität</strong>: eine einzelne. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet über die Kürzel (links) mit Zeilen oberhalb, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.</p>
             <div class="tbl-rows" id="tbl-rows">
               <template x-for="(row, idx) in rows" :key="row.uid">
                 <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid" :class="{'tbl-row-card-hidden': row.hidden}">

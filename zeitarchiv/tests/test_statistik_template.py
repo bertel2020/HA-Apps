@@ -190,7 +190,7 @@ def test_index_details_explain_all_logical_database_areas() -> None:
     assert "SQLite-Struktur" in source
     assert "Fachdaten inkl. Indizes" in source
     assert "<th>Daten</th><th>Indizes</th><th>Gesamt</th>" in source
-    assert "zugehörige Indizes sind jeder Fachtabelle zugerechnet" in source
+    assert "Indizes sind der jeweiligen Tabelle zugerechnet" in source
     assert "Freier/reclaimbarer Speicher" in source
     assert ">Index optimieren</button>" in source
     assert "{% if index_optimization.can_optimize %}" in source

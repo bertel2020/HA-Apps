@@ -64,12 +64,16 @@
      bewusst gedeckt (var(--surface-alt), wie about-update-chip's Neutral-
      Zustand) — nur "ausstehend"/"Fehler" bekommen eine auffällige Farbe,
      dieselbe Konvention wie überall sonst in der App (Akzentfarbe ist kein
-     "es läuft alles"-Signal, sondern "hier gibt es etwas zu sehen"). */
-  .bgproc-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);}
+     "es läuft alles"-Signal, sondern "hier gibt es etwas zu sehen").
+     Grid statt Flex, damit der Hinweis ein eigenes Kind der Zeile ist: als
+     verschachteltes <div> neben dem rechten Block blieben auf 375 px nur noch
+     ~140 px für ihn übrig, also 13-19 Zeichen je Zeile. Unten (max-width:640px)
+     zieht er sich deshalb über die volle Breite unter Name und Status. */
+  .bgproc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
   .bgproc-row:last-of-type{border-bottom:none;}
-  .bgproc-name{font-size:calc(13px * var(--font-scale,1));color:var(--ink);}
-  .bgproc-hint{font-size:calc(11.5px * var(--font-scale,1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
-  .bgproc-right{display:flex;align-items:center;gap:10px;flex:none;}
+  .bgproc-name{grid-column:1;font-size:calc(13px * var(--font-scale,1));color:var(--ink);}
+  .bgproc-hint{grid-column:1;font-size:calc(11.5px * var(--font-scale,1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+  .bgproc-right{grid-column:2;grid-row:1 / span 2;display:flex;align-items:center;gap:10px;}
   .bgproc-lastrun{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale,1));color:var(--ink-muted);white-space:nowrap;}
   .bgproc-pill{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale,1));font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;color:var(--ink-faint);background:var(--surface-alt);border:1px solid var(--border);}
   .bgproc-pill.ok{color:var(--ink-muted);}
@@ -92,6 +96,13 @@
     letter-spacing:.04em;color:var(--ink-faint);margin-bottom:4px;
   }
   .about-meta-value{display:block;font-family:var(--font-mono);font-size:calc(13px * var(--font-scale,1));color:var(--ink);word-break:break-all;}
+  @media (max-width:640px){
+    /* Zeitstempel und Status bleiben rechts neben dem Namen, der Hinweis
+       bekommt die volle Zeilenbreite darunter. */
+    .bgproc-row{column-gap:12px;}
+    .bgproc-right{grid-row:1;}
+    .bgproc-hint{grid-column:1 / -1;}
+  }
   @media (max-width:520px){
     .about-card{flex-direction:column;align-items:flex-start;text-align:left;}
   }
@@ -117,7 +128,7 @@
 
         <section id="archivierung" class="settings-section">
           <h2 class="settings-section-title">Archivierung</h2>
-          <p>Standardwerte für neu erkannte Entitäten. Bestehende bleiben unverändert.</p>
+          <p>Standardwerte für neu erkannte Entitäten. Bestehende bleiben unverändert; je Entität änderbar in der Entität-Konfiguration.</p>
           <div id="archivierung-form">
             {% include "_settings_archivierung_form.html" %}
           </div>
@@ -134,7 +145,7 @@
               <div class="detail-dialog-header">
                 <div>
                   <h2 id="tips-list-title">Alle Tipps</h2>
-                  <p class="hint">Nur der heute fällige Tipp lässt sich für den Rest des Tages ausblenden — ab morgen ist ohnehin ein anderer dran.</p>
+                  <p class="hint">Nur der heutige Tipp lässt sich ausblenden — morgen ist ohnehin ein anderer dran.</p>
                 </div>
                 <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
               </div>
@@ -164,7 +175,7 @@
           {% include "_settings_debug_tools.html" %}
           <div class="settings-subsection">
             <h3 class="settings-subsection-title">Diagnosebericht</h3>
-            <p class="hint">Enthält Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.</p>
+            <p class="hint">Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.</p>
             <div class="actionbar" style="justify-content:flex-end;">
               <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
             </div>
@@ -188,18 +199,16 @@
           </div>
           <div class="settings-subsection">
             <h3 class="settings-subsection-title">Hintergrundprozesse</h3>
-            <p class="hint">Was der Wartungsplaner alle 30 Sekunden im Hintergrund prüft/berechnet, mit letztem Lauf und Status.</p>
+            <p class="hint">Was der Wartungsplaner alle 30 Sekunden prüft, mit letztem Lauf und Status.</p>
             <div>
               {% for proc in background_processes %}
               <div class="bgproc-row">
-                <div>
-                  <div class="bgproc-name">{{ proc.name }}</div>
-                  <div class="bgproc-hint">{{ proc.hint }}</div>
-                </div>
+                <div class="bgproc-name">{{ proc.name }}</div>
                 <div class="bgproc-right">
                   <span class="bgproc-lastrun">{{ proc.last_run }}</span>
                   <span class="bgproc-pill {{ proc.pill_class }}">{{ proc.pill_label }}</span>
                 </div>
+                <div class="bgproc-hint">{{ proc.hint }}</div>
               </div>
               {% endfor %}
             </div>

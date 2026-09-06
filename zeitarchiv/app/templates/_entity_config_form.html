@@ -3,7 +3,7 @@
   <input type="text" name="custom_name" value="{{ custom_name }}" maxlength="{{ custom_name_max_length }}"
          placeholder="{{ friendly_name or entity_id }}"
          hx-post="{{ base }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
-  <p class="hint">Überschreibt nur die Anzeige in dieser App (Listen, Dropdowns, Diagramme) — der HA-eigene Name bleibt unverändert. Leer lassen, um wieder den HA-Namen zu verwenden. Höchstens {{ custom_name_max_length }} Zeichen.</p>
+  <p class="hint">Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {{ custom_name_max_length }} Zeichen.</p>
 </div>
 <div class="field">
   <label>Auflösung</label>
@@ -17,7 +17,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Mindestabstand zum zuletzt gespeicherten Wert — "Rohdaten" heißt jede Zustandsänderung. Änderungen gelten nur für neue Werte; vorhandene Daten bleiben unverändert.</p>
+  <p class="hint">Mindestabstand zum zuletzt gespeicherten Wert; "Rohdaten" speichert jede Zustandsänderung. Gilt nur für neue Werte, vorhandene bleiben.</p>
 </div>
 <div class="field">
   <label>Aufbewahrung</label>
@@ -31,7 +31,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Überschreibt den globalen Standard für diese Entität. Die automatische Durchsetzung wird unter Einstellungen → Aufbewahrung konfiguriert.</p>
+  <p class="hint">Überschreibt den globalen Standard. Durchgesetzt wird sie unter Einstellungen → Aufbewahrung.</p>
 </div>
 <div class="field">
   <label>Nachkommastellen</label>
@@ -45,7 +45,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">„Automatisch“ zeigt bis zu drei Nachkommastellen und entfernt Nullen am Ende (z. B. 4 statt 4,000). Bei einer festen Auswahl werden Werte auf genau diese Stellenzahl gerundet und bei Bedarf mit Nullen ergänzt (z. B. 4,00 bei 2 Stellen).</p>
+  <p class="hint">„Automatisch“ zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt 4,000). Eine feste Auswahl rundet und füllt auf (4,00 bei 2 Stellen).</p>
 </div>
 <div class="field">
   <label>Wertänderungsfilter</label>
@@ -59,7 +59,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Überspringt aufeinanderfolgende Werte, die nach der gewählten Nachkommastellen-Regel gleich sind. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.</p>
+  <p class="hint">Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Alle 6 Stunden bleibt ein Lebenszeichen erhalten.</p>
 </div>
 <div class="field">
   <label>Lücken-Erkennung</label>
@@ -73,7 +73,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Ab welcher Pause seit dem vorherigen Wert die Bereinigungs-Seite eine Lücke markiert. "Aus" blendet den Lücken-Filter dort aus.</p>
+  <p class="hint">Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. "Aus" blendet den Filter dort aus.</p>
 </div>
 <div class="field">
   <label>Ausreißer-Erkennung</label>
@@ -87,7 +87,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Ab welchem prozentualen Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Wert als Ausreißer markiert. "Aus" blendet den Ausreißer-Filter dort aus.</p>
+  <p class="hint">Ab welchem Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Ausreißer markiert. "Aus" blendet den Filter dort aus.</p>
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">
@@ -102,7 +102,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Steuert, wie Charts diese Entität darstellen: "Zeit" formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-/Tür-/Bewegungssensoren. "AN/AUS" zeigt weiterhin den Rohwert.</p>
+  <p class="hint">"Zeit" formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. "AN/AUS" zeigt den Rohwert.</p>
 </div>
 {% endif %}
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

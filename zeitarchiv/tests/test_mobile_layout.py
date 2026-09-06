@@ -171,3 +171,47 @@ def test_the_sort_menu_uses_the_page_own_sorting_mechanism() -> None:
     assert "cell.click();" in cards
     # Clientseitig lädt nichts nach, also zieht die Beschriftung von Hand nach.
     assert "setTimeout(mark, 0);" in cards
+def _inline_media_block(source: str, query: str) -> str:
+    """Wie `_media_block`, aber für die `<style>`-Blöcke in den Templates: die
+    sind eingerückt, ihr schließendes `}` steht also nicht am Zeilenanfang.
+    Deshalb hier über Klammerzählung statt über die Spalte."""
+    marker = f"@media ({query}){{"
+    start = source.find(marker)
+    assert start != -1, f"kein @media ({query})-Block gefunden"
+    tiefe, i = 0, start + len(marker) - 1
+    while i < len(source):
+        if source[i] == "{":
+            tiefe += 1
+        elif source[i] == "}":
+            tiefe -= 1
+            if tiefe == 0:
+                return source[start:i]
+        i += 1
+    raise AssertionError(f"@media ({query}) wird nicht geschlossen")
+
+
+def test_the_background_process_hint_gets_the_full_row_width_on_phones() -> None:
+    """Der Hinweis je Wartungsplaner-Aufgabe steckte als verschachteltes <div>
+    zusammen mit dem Namen links neben Zeitstempel und Status. Auf 375px blieben
+    ihm dadurch 143px — im Browser gemessen 13-19 Zeichen je Zeile, ein Satz von
+    60 Zeichen brauchte vier davon. Der Abschnitt "Diagnose" bestand zu 40% aus
+    Hinweistext, obwohl die Texte kurz sind.
+
+    Der Hinweis ist jetzt ein eigenes Kind der Zeile (deshalb Grid statt Flex:
+    nur Geschwister lassen sich einzeln umbrechen) und zieht sich unter 640px
+    über beide Spalten. Gemessen danach: 293px statt 143px, 17 statt 35 Zeilen,
+    29% statt 40%. Der Test hängt an beidem — an der Geschwister-Struktur im
+    Markup und an der Regel, die sie mobil ausnutzt.
+    """
+    settings = (TEMPLATES / "settings.html").read_text(encoding="utf-8")
+    zeile = re.search(r'<div class="bgproc-row">(.*?)<div class="bgproc-hint">', settings, re.S)
+    assert zeile, ".bgproc-row mit Hinweis nicht gefunden"
+    assert "<div>" not in zeile.group(1), (
+        "Name/Status stecken wieder in einem Zwischen-<div> — dann kann der "
+        "Hinweis nicht mehr über die volle Zeilenbreite gehen"
+    )
+    assert re.search(r"\.bgproc-row\{[^}]*display:grid", settings)
+
+    block = _inline_media_block(settings, "max-width:640px")
+    assert re.search(r"\.bgproc-hint\{[^}]*grid-column:1 / -1", block)
+    assert re.search(r"\.bgproc-right\{[^}]*grid-row:1", block)

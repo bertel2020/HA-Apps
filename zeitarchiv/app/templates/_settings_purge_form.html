@@ -27,7 +27,7 @@
     </div>
     {% if totals.not_removable_rows %}
       <p class="hint" style="margin:0 0 14px;color:var(--danger);">
-        {{ totals.not_removable_rows | format_int }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} {% if totals.not_removable_rows == 1 %}konnte{% else %}konnten{% endif %} keiner vorhandenen Rohdatenzeile zugeordnet werden und {% if totals.not_removable_rows == 1 %}würde deshalb{% else %}würden deshalb{% endif %} nicht entfernt.
+        {{ totals.not_removable_rows | format_int }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} ohne passende Rohdatenzeile &mdash; {% if totals.not_removable_rows == 1 %}wird{% else %}werden{% endif %} nicht entfernt.
       </p>
     {% endif %}
     {% if purge_preview.rows %}

@@ -42,7 +42,7 @@
 
     <section class="index-maintenance">
       <h2>Index-Optimierung</h2>
-      <p class="hint">SQLite verwendet freie Seiten automatisch wieder. Eine Optimierung schreibt die Indexdatei nur dann kompakt neu, wenn du sie ausdrücklich startest.</p>
+      <p class="hint">SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn du eine Optimierung startest.</p>
       <div class="stat-row">
         <div class="stat index-status-stat {{ 'is-recommended' if index_optimization.recommended else '' }}"><div class="label">Status</div><div class="value">{{ index_optimization.status_label }}</div></div>
         <div class="stat"><div class="label">Freier/reclaimbarer Speicher</div><div class="value">{{ index_optimization.reclaimable_size }}</div><div class="sub-value">{{ index_optimization.reclaimable_percent }} % der Indexdatei</div></div>
@@ -76,7 +76,7 @@
 
     <section class="index-group">
       <h2>SQLite-Struktur</h2>
-      {% if index_sizes_available %}<p class="hint">Die Tabellenwerte beruhen auf tatsächlich belegten SQLite-Seiten; zugehörige Indizes sind jeder Fachtabelle zugerechnet. {{ index_overhead_size }} entfallen auf interne SQLite-Strukturen und aktuell freie Datenbankseiten.</p>{% else %}<p class="hint">Die Dateigröße umfasst Fachtabellen, Indizes, interne Strukturen und freie Datenbankseiten. Diese SQLite-Laufzeit stellt keine verlässliche Seitengröße je Tabelle bereit; die Aufschlüsselung zeigt deshalb bewusst die Eintragszahlen statt geschätzter Größen.</p>{% endif %}
+      {% if index_sizes_available %}<p class="hint">Die Werte beruhen auf belegten SQLite-Seiten, Indizes sind der jeweiligen Tabelle zugerechnet. {{ index_overhead_size }} entfallen auf interne Strukturen und freie Seiten.</p>{% else %}<p class="hint">Die Dateigröße enthält auch interne Strukturen und freie Seiten. Größen je Tabelle liefert diese SQLite-Laufzeit nicht — daher die Eintragszahlen.</p>{% endif %}
     </section>
   </div>
 </div>

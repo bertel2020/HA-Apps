@@ -2,7 +2,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Startseite</div>
-      <div class="settings-compact-hint">Was beim Öffnen von Zeitarchiv erscheint (z. B. über die HA-Sidebar) oder per Klick auf „Zeitarchiv"</div>
+      <div class="settings-compact-hint">Erste Seite beim Öffnen, z. B. über die HA-Sidebar</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="startseite-btn" onclick="toggleDDPicker('startseite')">{% for k, l in startseite_options %}{% if k == startseite %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -34,7 +34,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Darstellungsmodus</div>
-      <div class="settings-compact-hint">Automatisch folgt dem System, sonst dauerhaft fest</div>
+      <div class="settings-compact-hint">Folgt dem System oder dauerhaft fest</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="color-mode-btn" onclick="toggleDDPicker('color-mode')">{% for k, l in color_mode_options %}{% if k == color_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -50,7 +50,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Schriftgröße</div>
-      <div class="settings-compact-hint">Wirkt sofort hier, andere Seiten erst beim nächsten Laden</div>
+      <div class="settings-compact-hint">Andere Seiten erst beim nächsten Laden</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="font-scale-btn" onclick="toggleDDPicker('font-scale')">{% for k, l in font_scale_options %}{% if k == font_scale %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -66,7 +66,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Dashboard-Animation</div>
-      <div class="settings-compact-hint">Ein-/Ausblenden der Charts auf angehefteten Kacheln</div>
+      <div class="settings-compact-hint">Charts auf angehefteten Kacheln zeigen</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="dashboard-animation-btn" onclick="toggleDDPicker('dashboard-animation')">{% for k, l in dashboard_animation_options %}{% if k == dashboard_animation %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -83,11 +83,7 @@
 
 <div class="settings-minor-section">
   <h4 class="settings-minor-title">Chart-Optionen (Standardwerte)</h4>
-  <p class="hint" style="margin:0 0 10px;">
-    Startwerte für das Optionen-Menü der Entität-eigenen Chart-Seite. Ändert eine Entität dort selbst
-    etwas, merkt sie sich das dauerhaft für sich — spätere Änderungen hier wirken sich dann nicht mehr
-    auf sie aus, bis sie über "Auf Standard zurücksetzen" wieder auf diese Defaults zurückgesetzt wird.
-  </p>
+  <p class="hint" style="margin:0 0 10px;">Startwerte für das Optionen-Menü der Chart-Seite. Ändert eine Entität dort etwas, merkt sie sich das dauerhaft — bis „Auf Standard zurücksetzen“.</p>
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
@@ -97,8 +93,7 @@
            einen Treppenstufen-Modus (test_line_chart_hold.py wacht sogar
            darüber, dass keiner existiert). Der Schalter setzt in Wahrheit
            den Zeitraum der Abfrage. #}
-        <div class="settings-compact-hint">Zeitraum relativ zu jetzt statt ab Kalendergrenze —
-          „Tag“ heißt dann die letzten 24 Stunden statt ab Mitternacht</div>
+        <div class="settings-compact-hint">Zeitraum relativ zu jetzt statt ab Kalendergrenze: „Tag“ = letzte 24 Stunden</div>
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-continuous-btn" onclick="toggleDDPicker('entity-continuous')">{% for k, l in on_off_options %}{% if k == entity_continuous %}{{ l }}{% endif %}{% endfor %} ▾</button>

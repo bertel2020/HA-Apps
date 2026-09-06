@@ -194,7 +194,7 @@
        sondern nur ihre Mindestbreite behielten — sichtbar als Lücke rechts
        neben der dritten Kachel. #}
     <div class="edash-kpi-win-note" x-show="co2Bilanz() < 0">🌿 Mehr vermieden als verursacht.</div>
-    <p class="hint" style="margin-top:10px;">Vermiedenes CO2 = PV-Eigenverbrauch × CO2-Faktor Netzbezug — was du für diese Energiemenge sonst an CO2 durch Netzbezug verursacht hättest. Bilanz = Ausstoß − Vermieden.</p>
+    <p class="hint" style="margin-top:10px;">Vermiedenes CO2 = PV-Eigenverbrauch × CO2-Faktor Netzbezug, also das CO2, das der Netzbezug sonst verursacht hätte. Bilanz = Ausstoß − Vermieden.</p>
   </dialog>
   {% endif %}
 
@@ -237,7 +237,7 @@
        oben (grid-column:1/-1 verhindert sonst das Kollabieren ungenutzter
        auto-fit-Spalten). #}
     <div class="edash-kpi-win-note" x-show="kpi.net_cost < 0" x-text="costWinText()"></div>
-    <p class="hint" style="margin-top:10px;">Einsparung durch Eigenverbrauch = PV-Eigenverbrauch × Netzbezug-Preis, nur rechnerisch (fließt nicht ins Saldo ein). Saldo = Netzbezug Kosten − Einspeisung Erlös.</p>
+    <p class="hint" style="margin-top:10px;">Einsparung = PV-Eigenverbrauch × Netzbezug-Preis, rein rechnerisch (nicht im Saldo). Saldo = Kosten Netzbezug − Erlös Einspeisung.</p>
   </dialog>
   {% endif %}
 

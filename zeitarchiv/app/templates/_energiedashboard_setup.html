@@ -373,7 +373,7 @@
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="show_sankey_legende" {% if config.show_sankey_legende %}checked{% endif %}><span>Farblegende</span></label>
         </div>
-        <p class="hint">Blendet unter dem Energiefluss eine Legende der verwendeten Farben ein — inklusive des Mischtons der Verbrauchsbahnen, der anzeigt, welcher Anteil des Verbrauchs aus eigener Erzeugung kam.</p>
+        <p class="hint">Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.</p>
       </div>
     </section>
 
@@ -831,7 +831,7 @@
             <div class="field">
               <label>Entität</label>
               {{ entity_field('prognose_rest_heute_entity_id_draft', 'draft.prognoseHeute', "(id) => { draft.prognoseHeute = id; }", allow_units=['kWh']) }}
-              <p class="hint">kWh, die für den Rest des heutigen Tages noch erwartet werden (z. B. Forecast.Solar "Geschätzte Energieerzeugung – Resttag").</p>
+              <p class="hint">kWh, die heute noch erwartet werden (z. B. Forecast.Solar "Geschätzte Energieerzeugung – Resttag").</p>
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="prognoseHeute = draft.prognoseHeute; $el.closest('dialog').close();">Übernehmen</button>
@@ -892,7 +892,7 @@
               {% call entity_field('co2_faktor_netzbezug_entity_draft', 'draft.co2Entity', "(id) => { draft.co2Entity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('co2_faktor_netzbezug_fixed_draft', co2_fixed, '', 'x-show="!entityId" oninput="document.getElementById(\'co2_faktor_netzbezug_fixed_real\').value = event.target.value"', 'g/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              <p class="hint">g CO2/kWh, wird mit dem bezogenen Strom verrechnet — ergibt CO2-Ausstoß und, auf den PV-Eigenverbrauch angewendet, vermiedenes CO2.</p>
+              <p class="hint">g CO2/kWh &mdash; ergibt mit dem Netzbezug den Ausstoß, mit dem PV-Eigenverbrauch das vermiedene CO2.</p>
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; co2Fixed = readFixedInput('co2_faktor_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
@@ -918,7 +918,7 @@
     <div class="detail-dialog-header">
       <div>
         <h2 id="gruppen-dialog-title">Verbraucher-Gruppen</h2>
-        <p class="hint">Fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen, z. B. „Mobilität" oder „Haushaltsgeräte".</p>
+        <p class="hint">Fasst mehrere Verbraucher im Energiefluss zu einem Knoten zusammen, z. B. „Mobilität“.</p>
       </div>
       <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
     </div>

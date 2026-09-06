@@ -2,10 +2,7 @@
 
   <div class="settings-subsection">
     <h3 class="settings-subsection-title">Nächsten Schreibvorgang aufzeichnen</h3>
-    <p class="hint">
-      Zeichnet einmalig den nächsten Schreib-Request auf (ohne API-Token), dann automatisch aus.
-      Die Aufzeichnung enthält sensible Entity-IDs und Rohwerte und wird nach spätestens 60 Minuten automatisch gelöscht.
-    </p>
+    <p class="hint">Zeichnet einmalig den nächsten Schreib-Request auf (ohne API-Token), dann automatisch aus. Enthält sensible Entity-IDs und Rohwerte, wird nach spätestens 60 Minuten gelöscht.</p>
     {% if capture_armed %}
     <p class="save-status">⏳ Wartet auf den nächsten Schreibvorgang …</p>
     <div style="display:flex;justify-content:flex-end;">
@@ -30,9 +27,7 @@
 
   <div class="settings-subsection">
     <h3 class="settings-subsection-title">Entität verfolgen</h3>
-    <p class="hint">
-      Protokolliert 15 Minuten lang alle Werte und Ingest-Ergebnisse einer Entität, dann automatisch aus. Die Rohwerte können entsprechend der Supervisor-Aufbewahrung im Protokoll verbleiben.
-    </p>
+    <p class="hint">Protokolliert 15 Minuten lang Werte und Ingest-Ergebnisse einer Entität, dann automatisch aus. Die Rohwerte bleiben entsprechend der Supervisor-Aufbewahrung im Protokoll.</p>
     {% if trace_entity_id %}
     <p class="save-status">🔴 Verfolgt <code>{{ trace_entity_id }}</code> &middot; noch {{ trace_expires_in_minutes }} Minute(n)</p>
     <div style="display:flex;justify-content:flex-end;">
