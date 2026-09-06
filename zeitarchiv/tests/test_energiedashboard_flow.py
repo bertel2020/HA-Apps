@@ -311,3 +311,104 @@ def test_mischton_haengt_am_bus_anschluss_nicht_an_der_gruppierung(monkeypatch, 
         assert blend["Einspeisung"] is False
     finally:
         a.close()
+
+
+# --- Perioden-Vergleich ("vs. Vortag") -------------------------------------
+#
+# Diese Regel war schon einmal kaputt (CHANGELOG 0.80.x): der Vergleichswert
+# kam aus einem rollierenden, an "jetzt" verankerten Fenster statt aus der
+# angezeigten Kalenderperiode und konnte "+X %" zeigen, obwohl der Wert
+# gegenüber dem Vortag gesunken war. Der Fehlermodus ist still — eine falsche
+# Prozentzahl sieht plausibel aus.
+
+
+def _zwei_tage(tmp: Path, gestern: float, vorgestern: float) -> tuple[_Anlage, dict]:
+    """Netzbezug an zwei aufeinanderfolgenden Tagen, sonst nichts. Reicht, um
+    das Vorzeichen des Vergleichs zu prüfen, und hält die Erwartung im Kopf
+    nachrechenbar."""
+    a = _Anlage(tmp)
+    # NOW ist der 16.03., TAG der 15.03. — offset=-1 trifft also TAG selbst
+    # ("gestern"), offset=-2 den Tag davor ("vorgestern"). Bewusst ausgeschrieben
+    # statt über Offset-Arithmetik: die verschob die Tage beim ersten Versuch um
+    # eins, sodass am geprüften Tag 0 kWh standen.
+    vortag = _dt.datetime(*TAG, tzinfo=TZ) - _dt.timedelta(days=1)   # vorgestern
+    haupttag = _dt.datetime(*TAG, tzinfo=TZ)                          # gestern
+    folgetag = haupttag + _dt.timedelta(days=1)                       # NOW-Tag
+    stand_start = 100.0
+    werte = [
+        (vortag.timestamp(), stand_start),
+        ((vortag + _dt.timedelta(hours=23)).timestamp(), stand_start + vorgestern),
+        (haupttag.timestamp(), stand_start + vorgestern),
+        ((haupttag + _dt.timedelta(hours=23)).timestamp(), stand_start + vorgestern + gestern),
+        # Anker zu Beginn des NOW-Tages, damit der Haupttag sauber abschließt.
+        (folgetag.timestamp(), stand_start + vorgestern + gestern),
+    ]
+    a.index.get_or_create_entity("sensor.netz", "sensor", "total_increasing", "kWh")
+    for ts, wert in werte:
+        hotbuffer.append(tmp, "sensor.netz", ts, wert, TZ)
+        a.index.record_write("sensor.netz", ts)
+    config = ed._empty_config()
+    config.update({"netzbezug": "sensor.netz", "hub_name": "Haus"})
+    return a, config
+
+
+def test_abgeschlossene_periode_vergleicht_kalendarisch(monkeypatch, tmp: Path) -> None:
+    """Der Kern des alten Fehlers: gestern 4 kWh gegen vorgestern 10 kWh ist ein
+    RÜCKGANG. Zöge der Vergleich ein an "jetzt" verankertes Fenster heran, käme
+    hier ein positiver Wert heraus."""
+    a, config = _zwei_tage(tmp, gestern=4.0, vorgestern=10.0)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        rc = query_mod.QueryReadCache()
+        current = a.service.compute_flow(config, "day", -1, read_cache=rc)
+        vergleich, kpi_jetzt, kpi_vorher = a.service.compute_period_comparison(
+            config, "day", -1, current, rc,
+        )
+        assert current["kpi"]["netzbezug"] == pytest.approx(4.0)
+        assert kpi_vorher["netzbezug"] == pytest.approx(10.0)
+        # -60 %, und vor allem: negativ, so wie der angezeigte Wert gefallen ist.
+        assert vergleich["netzbezug"]["pct"] == pytest.approx(-60.0)
+    finally:
+        a.close()
+
+
+def test_abgeschlossene_periode_nutzt_kein_rollierendes_fenster(monkeypatch, tmp: Path) -> None:
+    """Für offset<0 muss der Vergleich denselben Wert als Basis nehmen, der auch
+    angezeigt wird — sonst driften Zahl und Prozentangabe auseinander."""
+    a, config = _zwei_tage(tmp, gestern=4.0, vorgestern=10.0)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        rc = query_mod.QueryReadCache()
+        current = a.service.compute_flow(config, "day", -1, read_cache=rc)
+        _v, kpi_jetzt, _p = a.service.compute_period_comparison(config, "day", -1, current, rc)
+        assert kpi_jetzt["netzbezug"] == pytest.approx(current["kpi"]["netzbezug"])
+    finally:
+        a.close()
+
+
+def test_laufende_periode_vergleicht_rollierend(monkeypatch, tmp: Path) -> None:
+    """Bei offset=0 dagegen bewusst rollierend: die laufende Periode ist noch
+    unvollständig, ein kalendarischer Vergleich gegen einen ganzen Vortag wäre
+    unfair. Erkennbar daran, dass die Vergleichsbasis hier NICHT der angezeigte
+    (noch wachsende) Periodenwert ist."""
+    a, config = _zwei_tage(tmp, gestern=4.0, vorgestern=10.0)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        rc = query_mod.QueryReadCache()
+        current = a.service.compute_flow(config, "day", 0, read_cache=rc)
+        _v, kpi_jetzt, _p = a.service.compute_period_comparison(config, "day", 0, current, rc)
+        assert kpi_jetzt is not current["kpi"]
+    finally:
+        a.close()
+
+
+def test_vergleichsregel_steht_nur_noch_an_einer_stelle() -> None:
+    """Die Verzweigung stand wortgleich in /energiedashboard/data und im
+    Energiebericht — die Konstellation, in der ein Fehler einmal behoben und
+    beim zweiten Vorkommen vergessen wird."""
+    quelle = (Path(__file__).resolve().parents[1] / "app/energiedashboard_routes.py").read_text(
+        encoding="utf-8"
+    )
+    assert quelle.count("continuous=True, read_cache=read_cache") == 2  # beide in der Helfermethode
+    assert quelle.count("def compute_period_comparison") == 1
+    assert quelle.count("self.compute_period_comparison(") == 2  # Daten-Route und Bericht

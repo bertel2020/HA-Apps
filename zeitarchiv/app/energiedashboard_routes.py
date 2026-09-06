@@ -1564,6 +1564,44 @@ class EnergieDashboardService:
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
         }
 
+    def compute_period_comparison(
+        self, config: dict, range_key: str, offset: int, current: dict,
+        read_cache: query_mod.QueryReadCache,
+    ) -> tuple[dict, dict, dict]:
+        """(kpi_compare, Kennzahlen aktuell, Kennzahlen Vorperiode) für den
+        "vs. Vorperiode"-Vergleich.
+
+        Rollierend (continuous=True, endet exakt "jetzt" statt an der
+        Kalendergrenze) NUR für die aktuell noch laufende Periode (offset=0) —
+        dort wäre ein kalendarischer Vergleich unfair, weil "heute bis 8 Uhr"
+        gegen "gestern komplett" anträte. Für eine bereits abgeschlossene
+        Periode (offset<0) dagegen kalendarisch, exakt wie der angezeigte Wert
+        selbst: sonst vergleicht die Prozentzahl ein an "jetzt" verankertes
+        Fenster, das mit der angezeigten Kalenderperiode nichts mehr zu tun hat
+        — beobachtet als "Tag N zeigt weniger kWh als Tag N-1, der Vergleich
+        aber +X %".
+
+        Diese Regel stand wortgleich in /energiedashboard/data UND im
+        Energiebericht. Genau die Konstellation, in der ein Fehler einmal
+        behoben und beim zweiten Vorkommen vergessen wird — deshalb hier an
+        einer Stelle, wo sie sich auch ohne laufende App testen lässt.
+        """
+        if offset == 0:
+            rolling_current = self.compute_flow(
+                config, range_key, offset, continuous=True, read_cache=read_cache,
+            )
+            rolling_previous = self.compute_flow(
+                config, range_key, offset - 1, continuous=True, read_cache=read_cache,
+            )
+        else:
+            rolling_current = current
+            rolling_previous = self.compute_flow(config, range_key, offset - 1, read_cache=read_cache)
+        return (
+            self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"]),
+            rolling_current["kpi"],
+            rolling_previous["kpi"],
+        )
+
     def compute_trends(
         self, config: dict, read_cache: query_mod.QueryReadCache | None = None,
     ) -> dict:
@@ -2180,23 +2218,12 @@ class EnergieDashboardService:
             # unabhängig neu ein.
             read_cache = query_mod.QueryReadCache()
             current = self.compute_flow(config, range, offset, read_cache=read_cache)
-            # Perioden-Vergleich: rollierend (continuous=True, endet exakt
-            # "jetzt" statt an der Kalendergrenze) NUR für die aktuell noch
-            # laufende Periode (offset=0) — dort wäre ein kalendarischer
-            # Vergleich unfair (z. B. "heute bis 8 Uhr" gegen "gestern
-            # komplett"). Für eine bereits abgeschlossene Periode (offset<0)
-            # dagegen kalendarisch, exakt wie der oben angezeigte Wert
-            # "current" — sonst vergleicht die Prozentzahl ein rollierendes,
-            # an "jetzt" verankertes Fenster, das mit der angezeigten
-            # Kalenderperiode gar nichts mehr zu tun hat (beobachtet: Tag N
-            # zeigt weniger kWh als Tag N-1, der Vergleich aber "+X %").
-            if offset == 0:
-                rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
-                rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
-            else:
-                rolling_current = current
-                rolling_previous = self.compute_flow(config, range, offset - 1, read_cache=read_cache)
-            current["kpi_compare"] = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
+            # Kalendarisch vs. rollierend — die Regel steht in
+            # compute_period_comparison(), damit sie nicht in zwei Routen
+            # auseinanderlaufen kann.
+            current["kpi_compare"], _cur_kpi, _prev_kpi = self.compute_period_comparison(
+                config, range, offset, current, read_cache,
+            )
             current["compare_label"] = COMPARE_LABELS[range]
             return current
 
@@ -2215,25 +2242,21 @@ class EnergieDashboardService:
             now = datetime.now(self.deps.tz)
             read_cache = query_mod.QueryReadCache()
             current = self.compute_flow(config, range, offset, read_cache=read_cache)
-            # Vorjahres-/Vormonatsvergleich: derselbe kalendarisch-vs-rollierend
-            # Split wie /energiedashboard/data (siehe dortiger Kommentar) — bei
-            # range=year ist die Vorperiode damit exakt "Vorjahr".
-            if offset == 0:
-                rolling_current = self.compute_flow(config, range, offset, continuous=True, read_cache=read_cache)
-                rolling_previous = self.compute_flow(config, range, offset - 1, continuous=True, read_cache=read_cache)
-            else:
-                rolling_current = current
-                rolling_previous = self.compute_flow(config, range, offset - 1, read_cache=read_cache)
-            kpi_compare = self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"])
+            # Dieselbe Regel wie /energiedashboard/data (siehe
+            # compute_period_comparison) — bei range=year ist die Vorperiode
+            # damit exakt "Vorjahr".
+            kpi_compare, rolling_current_kpi, rolling_previous_kpi = self.compute_period_comparison(
+                config, range, offset, current, read_cache,
+            )
             # Autarkie/Eigenverbrauch fehlen in _compare_kpi() (dort bewusst nur
             # Energiemengen, siehe dessen Docstring) — hier als einfache
             # Prozentpunkt-Differenz statt relativer %-Änderung, da es selbst
             # bereits ein Prozentwert ist.
-            autarkie_cur = rolling_current["kpi"].get("autarkie")
-            autarkie_prev = rolling_previous["kpi"].get("autarkie")
+            autarkie_cur = rolling_current_kpi.get("autarkie")
+            autarkie_prev = rolling_previous_kpi.get("autarkie")
             autarkie_delta_pkt = round(autarkie_cur - autarkie_prev, 1) if autarkie_cur is not None and autarkie_prev is not None else None
-            eigenverbrauch_cur = rolling_current["kpi"].get("eigenverbrauch")
-            eigenverbrauch_prev = rolling_previous["kpi"].get("eigenverbrauch")
+            eigenverbrauch_cur = rolling_current_kpi.get("eigenverbrauch")
+            eigenverbrauch_prev = rolling_previous_kpi.get("eigenverbrauch")
             eigenverbrauch_delta_pkt = (
                 round(eigenverbrauch_cur - eigenverbrauch_prev, 1)
                 if eigenverbrauch_cur is not None and eigenverbrauch_prev is not None else None
