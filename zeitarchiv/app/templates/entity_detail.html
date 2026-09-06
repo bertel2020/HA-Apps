@@ -114,11 +114,11 @@
     <div class="h1-row">
       <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
-              title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
+              title="Favorit" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ base }}/entities">&larr; zurück zu Entitäten</a>
+      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ app_root }}/entities">&larr; zurück zu Entitäten</a>
       {% if used_in_energiedashboard %}
       {# Statisch statt referrer-basiert (dynamic-back-link.js unten deckt
          die übrigen Herkunftsseiten ab) — unter Home-Assistant-Ingress fehlt
@@ -128,7 +128,7 @@
          dem diese Seite aufgerufen wurde (siehe main.py) — ohne
          Query-Parameter (Direktaufruf) fällt das auf 'day'/0 zurück, denselben
          Standardwert wie das Energiedashboard selbst. #}
-      &middot; <a href="{{ base }}/energiedashboard?range={{ initial_range or 'day' }}&amp;offset={{ initial_offset }}">&larr; zurück zum Energiedashboard</a>
+      &middot; <a href="{{ app_root }}/energiedashboard?range={{ initial_range or 'day' }}&amp;offset={{ initial_offset }}">&larr; zurück zum Energiedashboard</a>
       {% endif %}
     </p>
 
@@ -146,7 +146,7 @@
         </div>
         <div class="nav">
           <button class="btn navbtn" @click="goBack()" aria-label="Vorheriger Zeitraum">‹</button>
-          <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ base | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
+          <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ app_root | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
             <!-- Bei Zeitraum "Dekade" gibt es keinen sinnvollen Sprungziel-
                  Kalender (siehe pickerMode in calendar-picker.js, dort auch
                  "none") — der Button bleibt bestehen (für Layout-Konsistenz
@@ -283,8 +283,8 @@
             <div class="menu-divider"></div>
             <div class="menu-section-label">Aktionen</div>
             <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
-            <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
-            <a class="menu-row" href="{{ base }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
+            <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
+            <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
             <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
           </div>
         </div>
@@ -340,12 +340,12 @@
 
   </div>
 
-  <script src="{{ base }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/period-navigation.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
     // Vom Kalender-Widget (static/js/calendar-picker.js) beim Klick auf einen
     // Tag mit Daten aufgerufen — anders als auf der Bereinigungs-Seite (ein
@@ -375,7 +375,7 @@
     const LOCALE = 'de-DE';
     const ENTITY_ID = {{ entity_id | tojson }};
     const DISPLAY_NAME = {{ display_name | tojson }};
-    const BASE = {{ base | tojson }};
+    const BASE = {{ app_root | tojson }};
     const UNIT = {{ (unit or '') | tojson }};
     // null = "Automatisch" (Konzept Abschnitt 03) — sonst feste Anzahl Nachkommastellen.
     // Ausgangswert ist bereits der effektive Stand (main.py, entity_detail()):

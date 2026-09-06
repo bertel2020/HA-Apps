@@ -1,12 +1,11 @@
-{# base wird nur von tiefer verschachtelten Seiten (z. B. /charts/{id}, Tiefe 2)
-   gesetzt (".."), damit die Links hier relativ korrekt bleiben — wichtig unter
-   HA Ingress' dynamischem Pfad-Präfix, siehe base-Konvention in entity_detail.html.
-   Auf Tiefe-1-Seiten (Einstellungen, Statistik, ...) bleibt base leer.
+{# Die Links laufen über app_root — absolut und unabhängig davon, wie tief die
+   einbindende Seite liegt. Vorher musste jede Seite ab Tiefe 2 ein "base" (="..")
+   mitgeben, sonst zeigten die Links unter HA Ingress ins Leere (ZG-03).
    Enthält nur noch die Settings-internen Sprungmarken — Entitäten, Charts,
    Tabellen, Statistik, Protokoll, Import, Export und Backup stehen seit
    _topnav.html im System-Dropdown der globalen Menüleiste und wurden hier
    entfernt, um nicht zwei parallele Navigationsquellen zu pflegen. #}
-{% set prefix = (base ~ '/') if base else '' %}
+{% set prefix = app_root ~ '/' %}
 <nav class="settings-nav">
   <a href="{{ prefix }}settings#darstellung" {% if nav_active == 'darstellung' %}class="active"{% endif %}>Darstellung</a>
   <a href="{{ prefix }}settings#archivierung" {% if nav_active == 'archivierung' %}class="active"{% endif %}>Archivierung</a>

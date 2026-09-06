@@ -23,12 +23,12 @@
   </form>
   <div class="actionbar" style="margin-top:14px;">
     <button class="btn btn-danger"
-            hx-post="{{ base }}/entities/{{ entity_id }}/rows/delete"
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
             hx-include="#confirm-duplicates-form input, #controls" hx-target="#rows-table" hx-swap="innerHTML">
       Ja, {{ total_to_delete }} Zeile(n) entfernen
     </button>
     <button class="btn"
-            hx-get="{{ base }}/entities/{{ entity_id }}/rows"
+            hx-get="{{ app_root }}/entities/{{ entity_id }}/rows"
             hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
       Abbrechen
     </button>
@@ -36,7 +36,7 @@
   {% else %}
   <p style="margin:0 0 14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">Keine Duplikate im aktuellen Zeitraum gefunden.</p>
   <button class="btn"
-          hx-get="{{ base }}/entities/{{ entity_id }}/rows"
+          hx-get="{{ app_root }}/entities/{{ entity_id }}/rows"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Zurück
   </button>

@@ -167,7 +167,6 @@ def build_index_detail_context(
     overhead_bytes = max(0, file_bytes - allocated_bytes) if sizes_available else None
     entry_count = sum(row["rows"] for row in table_stats.values())
     return {
-        "base": "..",
         "index_file_size": format_size(file_bytes),
         "index_table_count": format_int(len(table_stats)),
         "index_entry_count": format_int(entry_count),

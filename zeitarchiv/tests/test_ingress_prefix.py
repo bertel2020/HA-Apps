@@ -8,14 +8,16 @@ gebildeter Asset-Pfad fällt deshalb nicht auf. Er fällt beim Nutzer auf.
 
 Vor dieser Datei hat **keine** Zeile der Suite jemals `X-Ingress-Path`
 geschickt. Die Templates schreiben denselben Präfix aber auf vier Arten
-(bloß relativ, `{{ base }}` mit `".."`, `{{ base }}` mit `"../.."`,
-`{{ app_root }}`) — siehe ZG-03 in CODE_ANALYSE.md. Welche Schreibweise
-richtig ist, hängt an der URL-Tiefe der jeweiligen Seite.
+(bloß relativ, ein `base` mit `".."`, eines mit `"../.."`, und `app_root`) —
+siehe ZG-03 in CODE_ANALYSE.md. Welche Schreibweise richtig war, hing an der
+URL-Tiefe der jeweiligen Seite.
 
 Deshalb prüft diese Datei nicht die **Schreibweise**, sondern die **Wirkung**:
-Was der Browser aus der Angabe macht, muss unter dem Präfix liegen. Damit
-bleibt der Test gültig, während ZG-04 die Schreibweise auf `{{ app_root }}`
-vereinheitlicht — er beschreibt vorher wie nachher dieselbe Zusage.
+Was der Browser aus der Angabe macht, muss unter dem Präfix liegen. Genau das
+hat sie über die Vereinheitlichung auf `app_root` hinweg gültig gehalten (ZG-04
+Schritt 2) — sie beschreibt vorher wie nachher dieselbe Zusage. Die
+Tiefenabdeckung unten bleibt aus demselben Grund wertvoll: dass `app_root`
+tiefenunabhängig ist, wird hier belegt statt behauptet.
 """
 
 from __future__ import annotations
@@ -34,17 +36,17 @@ ENTITY = "sensor.zg04_ingress_probe"
 # Deshalb je Tiefe mindestens eine Seite, und test_the_page_list_still_covers
 # _every_url_depth hält das fest.
 PAGES = [
-    "/uebersicht",                    # Tiefe 1, relativ
-    "/entities",                      # Tiefe 1, relativ
-    "/settings",                      # Tiefe 1, relativ
-    "/backup",                        # Tiefe 1, relativ
-    "/charts/new",                    # Tiefe 2, {{ base }} = ".."
-    "/tables/new",                    # Tiefe 2, {{ base }} = ".."
-    "/dashboards/new",                # Tiefe 2, {{ base }} = ".."
+    "/uebersicht",                    # Tiefe 1
+    "/entities",                      # Tiefe 1
+    "/settings",                      # Tiefe 1
+    "/backup",                        # Tiefe 1
+    "/charts/new",                    # Tiefe 2
+    "/tables/new",                    # Tiefe 2
+    "/dashboards/new",                # Tiefe 2
     "/statistik/index",               # Tiefe 2, {{ app_root }}
-    f"/entities/{ENTITY}",            # Tiefe 2, {{ base }} = ".."
-    f"/entities/{ENTITY}/config",     # Tiefe 3, {{ base }} = "../.."
-    f"/entities/{ENTITY}/cleanup",    # Tiefe 3, {{ base }} = "../.."
+    f"/entities/{ENTITY}",            # Tiefe 2
+    f"/entities/{ENTITY}/config",     # Tiefe 3
+    f"/entities/{ENTITY}/cleanup",    # Tiefe 3
 ]
 
 # href/src, die irgendwo static/ enthalten — egal in welcher Schreibweise.
@@ -106,3 +108,53 @@ def test_the_ingress_prefix_is_actually_reaching_the_templates(client) -> None:
     Mindestens eine Seite muss den Präfix wörtlich ausgeben."""
     resp = client.get("/statistik/index", headers={"X-Ingress-Path": INGRESS})
     assert INGRESS in resp.text, "app_root kommt nicht in der Ausgabe an"
+
+
+# --- Nach ZG-04 Schritt 2: die alten Schreibweisen dürfen nicht zurückkommen ---
+#
+# Die Prüfungen oben messen die WIRKUNG und bleiben deshalb auch dann grün,
+# wenn jemand eine neue Seite wieder relativ verlinkt und sie zufällig auf
+# Tiefe 1 liegt. Die folgenden zwei halten die SCHREIBWEISE fest — erst
+# zusammen decken sie den Fall ab, dass eine neue Seite auf einer neuen Tiefe
+# entsteht, für die noch niemand einen Testfall angelegt hat.
+
+def test_no_template_writes_a_url_prefix_of_its_own_any_more() -> None:
+    """`base` gab es in drei Ausprägungen: als `{{ base }}` im Markup, als
+    Jinja-Variable in `{% set %}`, und — am weitesten getragen — als
+    Query-Parameter, den die Kachel-Endpunkte entgegennahmen, damit das
+    zurückgelieferte Fragment wusste, auf welcher Seitentiefe es landet.
+    `app_root` kommt stattdessen aus dem Request-Header und ist überall gleich.
+    """
+    from _paths import TEMPLATES
+
+    fehler = []
+    for pfad in sorted(TEMPLATES.glob("*.html")):
+        quelle = pfad.read_text(encoding="utf-8")
+        if pfad.name == "base.html":  # heißt so, meint aber das Rahmen-Template
+            continue
+        for muster, was in (
+            ("{{ base }}", "{{ base }}"),
+            ("{{ base |", "{{ base | … }}"),
+            ("{% set base", "{% set base %}"),
+            ("base={{", "base= als Query-Parameter"),
+            ('data-base="', 'data-base (heißt jetzt data-app-root)'),
+            ('src="static/', 'relativer Skript-/Asset-Pfad'),
+            ('href="static/', 'relativer Asset-Pfad'),
+            ('"../static/', 'relativer Asset-Pfad'),
+        ):
+            if muster in quelle:
+                fehler.append(f"{pfad.name}: {was}")
+    assert not fehler, "alte Präfix-Schreibweise wieder aufgetaucht: " + "; ".join(fehler)
+
+
+def test_no_route_hands_a_url_prefix_to_a_template_any_more() -> None:
+    """Die Gegenseite: solange irgendeine Route noch ein `base` in den Kontext
+    legt, kann ein Template es auch wieder benutzen. 15 Stellen taten das."""
+    from _paths import APP
+
+    fehler = []
+    for pfad in sorted(APP.rglob("*.py")):
+        for nr, zeile in enumerate(pfad.read_text(encoding="utf-8").split("\n"), 1):
+            if re.search(r'"base":\s', zeile) or re.search(r'\bbase: str = "', zeile):
+                fehler.append(f"{pfad.name}:{nr}")
+    assert not fehler, "Route reicht wieder einen URL-Präfix durch: " + ", ".join(fehler)

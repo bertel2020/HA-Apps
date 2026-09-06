@@ -58,8 +58,12 @@ def test_empty_home_page_still_renders_dashboard_and_add_tile() -> None:
 def test_empty_dashboard_links_to_first_chart_and_table_editors() -> None:
     html = _render_empty_dashboard()
 
-    assert 'href="charts/new">+ Neuer Chart</a>' in html
-    assert 'href="tables/new">+ Neue Tabelle</a>' in html
+    # Absolut statt relativ seit ZG-04 Schritt 2: dasselbe Fragment hängt auf
+    # "/" und auf "/dashboards/{id}", also auf zwei Tiefen. Vorher musste der
+    # Aufrufer dafür ein "base" mitgeben; jetzt setzt app_root den Präfix, und
+    # der ist auf beiden Seiten derselbe.
+    assert 'href="/charts/new">+ Neuer Chart</a>' in html
+    assert 'href="/tables/new">+ Neue Tabelle</a>' in html
 
 
 def test_dashboard_tile_has_three_by_three_size_picker_and_grid_spans() -> None:

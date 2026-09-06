@@ -56,7 +56,7 @@ def test_report_back_link_carries_its_own_range_and_offset() -> None:
     """Nutzerwunsch: 'zurück zum Energiedashboard' aus dem Bericht heraus
     soll denselben Zeitraum zeigen, aus dem der Bericht geöffnet wurde —
     nicht die Standardansicht."""
-    assert '<a href="{{ base }}/energiedashboard?range={{ range }}&offset={{ offset }}">' in REPORT_TEMPLATE
+    assert '<a href="{{ app_root }}/energiedashboard?range={{ range }}&offset={{ offset }}">' in REPORT_TEMPLATE
 
 
 def test_report_route_passes_offset_into_the_template_context() -> None:

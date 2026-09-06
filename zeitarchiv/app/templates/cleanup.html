@@ -224,11 +224,11 @@
     <div class="h1-row">
       <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
-              title="Favorit" onclick="toggleFavorite('{{ base }}/entities/{{ entity_id }}/favorite', this)">★</button>
+              title="Favorit" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
+      <a href="{{ app_root }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
 
     <div class="entity-stats-groups" id="rows-summary" aria-live="polite">
@@ -256,7 +256,7 @@
     </div>
 
     <div x-show="tab === 'cleanup' || tab === 'correct'" x-cloak>
-    <div id="controls" hx-trigger="load, change" hx-get="{{ base }}/entities/{{ entity_id }}/rows"
+    <div id="controls" hx-trigger="load, change" hx-get="{{ app_root }}/entities/{{ entity_id }}/rows"
          hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML">
       <div class="toolbar">
         <div class="seg" id="range-seg">
@@ -314,17 +314,17 @@
     </div>
   </div>
 
-  <script src="{{ base }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/period-navigation.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/period-navigation.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
   <script>
-    const BASE = {{ base | tojson }};
+    const BASE = {{ app_root | tojson }};
     const ENTITY_ID = {{ entity_id | tojson }};
 
     // Reiter-Umschalter (Konzept-Erweiterung "Bearbeitungsbereich") — "tab"

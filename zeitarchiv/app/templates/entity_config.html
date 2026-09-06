@@ -62,7 +62,7 @@
     <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      <a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
+      <a href="{{ app_root }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
     </p>
 
     <div class="stat-row">
@@ -114,13 +114,13 @@
     </div>
   </div>
 
-  <script src="{{ base }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ base }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dd-picker.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
-    const BASE = {{ base | tojson }};
+    const BASE = {{ app_root | tojson }};
     const ENTITY_ID = {{ entity_id | tojson }};
 
     async function deleteAllValues() {

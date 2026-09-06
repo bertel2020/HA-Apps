@@ -404,7 +404,7 @@
       {% if dashboard.locked %}
       <span class="dash-locked-badge" title="Fixiert">🔒</span>
       {% else %}
-      <a class="dash-rename-btn" href="{{ base }}/dashboards/{{ dashboard.id }}/edit" title="Bearbeiten">✎</a>
+      <a class="dash-rename-btn" href="{{ app_root }}/dashboards/{{ dashboard.id }}/edit" title="Bearbeiten">✎</a>
       {% endif %}
     </div>
 
@@ -413,12 +413,12 @@
     </div>
   </div>
 
-  <script src="{{ base }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ base }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/entity-picker.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/table-compute.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dashboard-tiles.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/table-compute.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dashboard-tiles.js?v={{ js_v }}"></script>
 {% endblock %}

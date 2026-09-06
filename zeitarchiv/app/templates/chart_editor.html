@@ -82,7 +82,7 @@
   
   <div class="page" x-data="chartEditor()">
     <h1>Charts</h1>
-    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ base }}/charts">&larr; zurück zu Charts</a></p>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ app_root }}/charts">&larr; zurück zu Charts</a></p>
 
     <div class="settings-panel">
         <div class="chart-title-row">
@@ -379,19 +379,19 @@
     </div>
   </div>
 
-  <script src="{{ base }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <!-- Tooltips in der scrollenden Entitätenauswahl, siehe data-tooltip-fixed dort. -->
-  <script src="{{ base }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
   <script>
     // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
     // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
     // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
     // Sprach-Setting nur hier greifen muss.
     const LOCALE = 'de-DE';
-    const BASE = {{ base | tojson }};
+    const BASE = {{ app_root | tojson }};
     const CHART_ID = {{ chart_id | tojson }};
     const CHART_NAME = {{ chart_name | tojson }};
     const RANGE_KEY = {{ range_key | tojson }};

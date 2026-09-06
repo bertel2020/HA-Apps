@@ -2540,10 +2540,9 @@ class EnergieDashboardService:
                     "anomalien_report": anomalien_report,
                     "generated_at": now,
                     "month_names": _MONTH_NAMES_DE,
-                    # /energiedashboard/report liegt eine Ebene tiefer als die
-                    # übrigen Seiten (dieselbe Konvention wie dashboard_detail.html
-                    # u. a. — siehe main.py, "base": ".."/"../.." je Verschachtelungstiefe).
-                    "base": "..",
+                    # app_root deckt auch diese Seite ab, obwohl sie eine Ebene
+                    # tiefer liegt als die übrigen — genau dafür ist der Präfix
+                    # absolut statt relativ (ZG-03).
                     **deps.app_root_context(request),
                 },
             )

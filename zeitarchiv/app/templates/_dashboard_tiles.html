@@ -7,8 +7,9 @@
      (hx-target="#dashboard-grid" hx-swap="outerHTML") ersetzen, ohne die
      ganze Seite neu zu laden.
 
-     base ist der relative Rückweg zur App-Wurzel ("." auf "/", ".." auf
-     "/dashboards/{id}", siehe main.py _dashboard_tiles_context()) — nötig,
+     Die URLs laufen über app_root, absolut und tiefenunabhängig. Vorher stand
+     hier ein relativer Rückweg ("." auf "/", ".." auf "/dashboards/{id}"), den
+     der Aufrufer mitgeben musste — nötig,
      weil dieses Fragment auf zwei unterschiedlich tiefen Seiten eingehängt
      wird und htmx/relative Links sich sonst gegen den falschen Pfad
      auflösen. dashboard_id wandert als Query-Parameter mit, damit Pin/Unpin
@@ -28,10 +29,9 @@
      NICHT draggable, sie ist immer die letzte. Das Raster bleibt auch ohne
      gespeicherte Objekte sichtbar: Die leere "+"-Kachel führt dann direkt
      zum Anlegen des ersten Charts oder der ersten Tabelle. -->
-{% set base = base | default('.') %}
 {% set dashboard_id = dashboard_id | default(1) %}
-{% set href_base = '' if base == '.' else base + '/' %}
-<div id="dashboard-grid" class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}" data-base="{{ base }}" data-dashboard-id="{{ dashboard_id }}" data-precise="{{ 'true' if dashboard_precise else 'false' }}">
+{% set href_base = app_root ~ '/' %}
+<div id="dashboard-grid" class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}" data-app-root="{{ app_root }}" data-dashboard-id="{{ dashboard_id }}" data-precise="{{ 'true' if dashboard_precise else 'false' }}">
   {% for tile in tiles %}
   {% if tile.kind == 'chart' %}
   <div class="dtile" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="chart" data-item-id="{{ tile.id }}"
@@ -154,7 +154,7 @@
             {% for c in unpinned_charts %}
             <button type="button" class="dtile-picker-item"
                     x-show='!search || {{ c.name | lower | tojson }}.includes(search.toLowerCase())'
-                    hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                    hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}"
                     hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
               {{ c.name }}
             </button>
@@ -165,7 +165,7 @@
             {% for t in unpinned_tables %}
             <button type="button" class="dtile-picker-item"
                     x-show='!search || {{ t.name | lower | tojson }}.includes(search.toLowerCase())'
-                    hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                    hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}"
                     hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
               {{ t.name }}
             </button>
@@ -176,7 +176,7 @@
             {% for e in unpinned_entities %}
             <button type="button" class="dtile-picker-item"
                     x-show='!search || {{ (e.label ~ " " ~ e.entity_id) | lower | tojson }}.includes(search.toLowerCase())'
-                    hx-post="{{ href_base }}dashboard/pin-entity/{{ e.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                    hx-post="{{ href_base }}dashboard/pin-entity/{{ e.entity_id }}?dashboard_id={{ dashboard_id }}"
                     hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
               {{ e.label }}{% if e.is_custom %}{{ custom_name_icon() }}{% endif %}
             </button>

@@ -181,7 +181,7 @@ class ReportService:
             if report is None:
                 raise HTTPException(status_code=404, detail="Report nicht gefunden")
             return deps.templates.TemplateResponse(
-                request, "report_detail.html", {"report": self.view(report), "base": ".."}
+                request, "report_detail.html", {"report": self.view(report)}
             )
 
         @router.get("/reports/{report_id}/download")

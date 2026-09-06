@@ -6,7 +6,7 @@
      Element im Rest der Seite, statt es in #rows-table einzufügen. -->
 <div class="nav" id="rows-nav" hx-swap-oob="true">
   <button class="btn navbtn" {% if range == 'all' %}disabled{% endif %} onclick="stepOffset(-1)" aria-label="Vorheriger Zeitraum">‹</button>
-  <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ base | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
+  <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ app_root | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
     <button type="button" class="period-label" :disabled="range === 'all'" @click="toggle()" :title="range === 'all' ? '' : 'Zu einem bestimmten Zeitpunkt springen'">{{ period_label }}</button>
     {% include "_calendar_popover.html" %}
   </div>
@@ -134,7 +134,7 @@
     <button class="btn navbtn" onclick="setPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
   </div>
   <select name="page_size" title="Zeilen pro Seite"
-          hx-get="{{ base }}/entities/{{ entity_id }}/rows" hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML"
+          hx-get="{{ app_root }}/entities/{{ entity_id }}/rows" hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML"
           onchange="resetPage()">
     {% for size in [10, 20, 50, 100, 500, 1000] %}
     <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
@@ -149,20 +149,20 @@
   {% else %}
   <strong><span id="selected-count">0</span> ausgewählt</strong>
   <button class="btn btn-danger needs-selection" disabled
-          hx-post="{{ base }}/entities/{{ entity_id }}/rows/delete"
+          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
           hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
           hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
     Löschen
   </button>
   <button class="btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
-          hx-post="{{ base }}/entities/{{ entity_id }}/rows/undo-preview"
+          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Rückgängig (letzte Löschung)
   </button>
   {% if filter == 'duplicates' %}
   <button class="btn btn-danger-outline"
           {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"{% endif %}
-          hx-post="{{ base }}/entities/{{ entity_id }}/rows/duplicates-preview"
+          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/duplicates-preview"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Duplikate automatisch entfernen
   </button>
@@ -170,7 +170,7 @@
   {% if filter == 'repetitions' %}
   <button class="btn btn-danger-outline"
           {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"{% endif %}
-          hx-post="{{ base }}/entities/{{ entity_id }}/rows/repetitions-preview"
+          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/repetitions-preview"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Wiederholungen verdichten
   </button>

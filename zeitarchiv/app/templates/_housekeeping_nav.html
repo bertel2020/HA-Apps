@@ -1,7 +1,6 @@
-{# Dasselbe Muster wie _settings_nav.html: base wird nur von tiefer
-   verschachtelten Seiten gesetzt, auf Housekeeping selbst (Tiefe 1) bleibt es
-   leer. #}
-{% set prefix = (base ~ '/') if base else '' %}
+{# Dasselbe Muster wie _settings_nav.html: die Links laufen über app_root und
+   sind damit unabhängig von der Tiefe der einbindenden Seite. #}
+{% set prefix = app_root ~ '/' %}
 <nav class="settings-nav">
   <a href="{{ prefix }}housekeeping#entitaeten" {% if nav_active == 'entitaeten' %}class="active"{% endif %}>Inaktive Entitäten</a>
   <a href="{{ prefix }}housekeeping#duplikate" {% if nav_active == 'duplikate' %}class="active"{% endif %}>Duplikate</a>

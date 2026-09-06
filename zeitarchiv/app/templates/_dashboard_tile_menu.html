@@ -33,7 +33,7 @@
             <form class="dd-picker-wrap dtile-entity-picker"
                   x-data='entityPicker({{ entity_pin_options | tojson }}, {{ tile.entity_id | tojson }})'
                   x-ref="entityForm" @click.outside="open = false"
-                  hx-post="{{ href_base }}dashboard/entity/{{ tile.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                  hx-post="{{ href_base }}dashboard/entity/{{ tile.entity_id }}?dashboard_id={{ dashboard_id }}"
                   hx-target="#dashboard-grid" hx-swap="outerHTML">
               <input type="hidden" name="new_entity_id" :value="entityId">
               <button type="button" class="btn" @click="toggleOpen($refs.tileEntitySearch)"
@@ -180,7 +180,7 @@
       </div>
       <div class="dtile-settings-footer">
         <button type="button" class="btn danger btn-sm" draggable="false"
-                hx-post="{{ href_base }}dashboard/unpin-entity/{{ tile.entity_id }}?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+                hx-post="{{ href_base }}dashboard/unpin-entity/{{ tile.entity_id }}?dashboard_id={{ dashboard_id }}"
                 hx-target="#dashboard-grid" hx-swap="outerHTML"
                 hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?">Vom Dashboard entfernen</button>
         <button type="button" class="btn btn-sm" @click="menuOpen = false">Fertig</button>
@@ -224,7 +224,7 @@
     {% endif %}
     <div class="dtile-menu-divider"></div>
     <button type="button" class="dtile-menu-remove" role="menuitem" draggable="false"
-            hx-post="{{ href_base }}{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin?dashboard_id={{ dashboard_id }}&amp;base={{ base }}"
+            hx-post="{{ href_base }}{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin?dashboard_id={{ dashboard_id }}"
             hx-target="#dashboard-grid" hx-swap="outerHTML"
             hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?"
             @click="menuOpen = false">Vom Dashboard entfernen</button>

@@ -21,7 +21,7 @@
   
   <div class="page" x-data="dashboardEditor()">
     <h1>Dashboards</h1>
-    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ base }}/dashboards">&larr; zurück zu Dashboards</a></p>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ app_root }}/dashboards">&larr; zurück zu Dashboards</a></p>
 
     <div class="settings-panel">
       <div class="dash-editor-title-row">
@@ -71,7 +71,7 @@
 
       <div class="save-row">
         <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
-        <a class="btn" href="{{ base }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">Abbrechen</a>
+        <a class="btn" href="{{ app_root }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">Abbrechen</a>
         {% if dashboard and not dashboard.is_default %}
         <button type="button" class="btn btn-danger" @click="deleteDashboard()">Löschen</button>
         {% endif %}
@@ -80,10 +80,10 @@
     </div>
   </div>
 
-  <script src="{{ base }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
   <script>
-    const BASE = {{ base | tojson }};
+    const BASE = {{ app_root | tojson }};
     const DASHBOARD_ID = {{ dashboard.id | tojson if dashboard else 'null' }};
 
     function dashboardEditor() {

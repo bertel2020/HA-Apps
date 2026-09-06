@@ -3291,7 +3291,6 @@ def _entity_config_context(entity) -> dict:
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
         "display_mode_options": list(DISPLAY_MODE_LABELS.items()),
         "preview_rows": preview_rows,
-        "base": "../..",
     }
 
 
@@ -3636,7 +3635,6 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         # Charts kann sie daher überhaupt sinnvoll setzen.
         "compare": prefill.get("compare", False) if not chart else False,
         "compare_mode": prefill.get("compare_mode", "previous") if not chart else "previous",
-        "base": "..",
     }
 
 
@@ -3879,7 +3877,7 @@ def _tile_metric_context(pin, aggregation_type: str | None = None) -> dict:
 
 
 def _dashboard_tiles_context(
-    dashboard_id: int, base: str = ".", auto_open_entity_id: str | None = None
+    dashboard_id: int, auto_open_entity_id: str | None = None
 ) -> dict:
     """Für die Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene
     Punkte", erweitert um Vergleichstabellen UND um mehrere unabhängige
@@ -3890,10 +3888,15 @@ def _dashboard_tiles_context(
     die jeweilige Tabelle aufgelöst — ein verwaister Pin (Chart/Tabelle
     zwischenzeitlich gelöscht, sollte durch die Bereinigung in
     delete_saved_chart()/delete_saved_table() praktisch nie vorkommen) wird
-    dabei still übersprungen statt einen Fehler zu werfen. base ist der
-    relative Rückweg zur App-Wurzel (siehe "base"-Konvention in chart_editor()/
-    table_editor()) — "." auf "/", ".." auf "/dashboards/{id}", damit dasselbe
-    Fragment auf beiden Seitentiefen funktionierende Links erzeugt."""
+    dabei still übersprungen statt einen Fehler zu werfen.
+
+    URLs im Fragment laufen über app_root (Context-Processor, aus dem
+    X-Ingress-Path-Header). Vorher stand hier ein relativer Rückweg, den der
+    Aufrufer als "base" mitgeben musste — "." auf "/", ".." auf
+    "/dashboards/{id}" —, weil dasselbe Fragment auf zwei Seitentiefen
+    eingehängt wird und der Server die Tiefe sonst nicht kennt. Bei pin/unpin
+    reiste der Wert sogar als Query-Parameter durch die URL. Mit app_root
+    entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
     tiles = []
     for p in pins:
@@ -4012,7 +4015,6 @@ def _dashboard_tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
-        "base": base,
         "tiles": tiles,
         "auto_open_entity_id": auto_open_entity_id,
         "entity_pin_options": [
@@ -4053,20 +4055,20 @@ def _get_dashboard_or_404(dashboard_id: int) -> dict:
 
 
 @app.post("/charts/{chart_id}/pin", response_class=HTMLResponse)
-def charts_pin(request: Request, chart_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+def charts_pin(request: Request, chart_id: int, dashboard_id: int = 1) -> HTMLResponse:
     if index.get_saved_chart(chart_id) is None:
         raise HTTPException(status_code=404, detail="Chart nicht gefunden")
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "chart", chart_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.post("/charts/{chart_id}/unpin", response_class=HTMLResponse)
-def charts_unpin(request: Request, chart_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+def charts_unpin(request: Request, chart_id: int, dashboard_id: int = 1) -> HTMLResponse:
     _require_dashboard_unlocked(dashboard_id)
     index.unpin_item_from_dashboard(dashboard_id, "chart", chart_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 class _DashboardPinRef(BaseModel):
@@ -4146,20 +4148,20 @@ def dashboard_legend(body: _LegendDashboardTileBody) -> dict:
 # (TEXT) statt einer Integer-item_id identifiziert wird. ---------------------
 
 @app.post("/dashboard/pin-entity/{entity_id}", response_class=HTMLResponse)
-def dashboard_pin_entity(request: Request, entity_id: str, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+def dashboard_pin_entity(request: Request, entity_id: str, dashboard_id: int = 1) -> HTMLResponse:
     _require_entity(entity_id)
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_entity_to_dashboard(dashboard_id, entity_id)
     return templates.TemplateResponse(
         request, "_dashboard_tiles.html",
-        _dashboard_tiles_context(dashboard_id, base, auto_open_entity_id=entity_id),
+        _dashboard_tiles_context(dashboard_id, auto_open_entity_id=entity_id),
     )
 
 
 @app.post("/dashboard/entity/{entity_id}", response_class=HTMLResponse)
 async def dashboard_entity_change(
-    request: Request, entity_id: str, dashboard_id: int = 1, base: str = "."
+    request: Request, entity_id: str, dashboard_id: int = 1
 ) -> HTMLResponse:
     _require_dashboard_unlocked(dashboard_id)
     form = await request.form()
@@ -4173,15 +4175,15 @@ async def dashboard_entity_change(
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return templates.TemplateResponse(
         request, "_dashboard_tiles.html",
-        _dashboard_tiles_context(dashboard_id, base, auto_open_entity_id=new_entity_id),
+        _dashboard_tiles_context(dashboard_id, auto_open_entity_id=new_entity_id),
     )
 
 
 @app.post("/dashboard/unpin-entity/{entity_id}", response_class=HTMLResponse)
-def dashboard_unpin_entity(request: Request, entity_id: str, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+def dashboard_unpin_entity(request: Request, entity_id: str, dashboard_id: int = 1) -> HTMLResponse:
     _require_dashboard_unlocked(dashboard_id)
     index.unpin_entity_from_dashboard(dashboard_id, entity_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 class _ResizeDashboardEntityTileBody(BaseModel):
@@ -4389,7 +4391,7 @@ def dashboards_new(request: Request) -> HTMLResponse:
     # Muss VOR "/dashboards/{dashboard_id}" registriert sein, sonst würde
     # dieser Pfad zuerst dort landen und an der int-Konvertierung von "new"
     # scheitern (siehe dasselbe Muster bei /charts/new vor /charts/{chart_id}).
-    return templates.TemplateResponse(request, "dashboard_editor.html", {"dashboard": None, "base": ".."})
+    return templates.TemplateResponse(request, "dashboard_editor.html", {"dashboard": None})
 
 
 @app.get("/dashboards/{dashboard_id}", response_class=HTMLResponse)
@@ -4397,7 +4399,7 @@ def dashboard_detail(request: Request, dashboard_id: int) -> HTMLResponse:
     dashboard = _get_dashboard_or_404(dashboard_id)
     context = {
         "dashboard": dashboard,
-        **_dashboard_tiles_context(dashboard_id, base=".."),
+        **_dashboard_tiles_context(dashboard_id),
     }
     return templates.TemplateResponse(request, "dashboard_detail.html", context)
 
@@ -4406,7 +4408,7 @@ def dashboard_detail(request: Request, dashboard_id: int) -> HTMLResponse:
 def dashboards_edit(request: Request, dashboard_id: int) -> HTMLResponse:
     dashboard = _get_dashboard_or_404(dashboard_id)
     return templates.TemplateResponse(
-        request, "dashboard_editor.html", {"dashboard": dashboard, "base": "../.."}
+        request, "dashboard_editor.html", {"dashboard": dashboard}
     )
 
 
@@ -4656,7 +4658,6 @@ def _table_editor_context(table: dict | None) -> dict:
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("table", table["id"]) if table else [],
-        "base": "..",
     }
 
 
@@ -4779,20 +4780,20 @@ def tables_duplicate(table_id: int) -> dict:
 
 
 @app.post("/tables/{table_id}/pin", response_class=HTMLResponse)
-def tables_pin(request: Request, table_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+def tables_pin(request: Request, table_id: int, dashboard_id: int = 1) -> HTMLResponse:
     if index.get_saved_table(table_id) is None:
         raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "table", table_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.post("/tables/{table_id}/unpin", response_class=HTMLResponse)
-def tables_unpin(request: Request, table_id: int, dashboard_id: int = 1, base: str = ".") -> HTMLResponse:
+def tables_unpin(request: Request, table_id: int, dashboard_id: int = 1) -> HTMLResponse:
     _require_dashboard_unlocked(dashboard_id)
     index.unpin_item_from_dashboard(dashboard_id, "table", table_id)
-    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id, base))
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.get("/entities/{entity_id}", response_class=HTMLResponse)
@@ -4803,9 +4804,11 @@ def entity_detail(
     range_key: str | None = Query(None, alias="range"),
     offset: int = 0,
 ) -> HTMLResponse:
-    # "base" ist der relative Pfad zurück zur App-Wurzel — unter Ingress hat die Seite
-    # einen dynamischen Pfad-Präfix, ein absoluter Pfad ("/api/query") würde daran
-    # vorbeizeigen (Konzept Abschnitt 06). /entities/{id} liegt eine Ebene tief.
+    # URLs dieser Seite laufen über app_root: unter Ingress hat sie einen
+    # dynamischen Pfad-Präfix, ein fest absoluter Pfad ("/api/query") würde
+    # daran vorbeizeigen (Konzept Abschnitt 06). Früher stand hier ein
+    # relativer Rückweg je Verschachtelungstiefe; app_root ist tiefenunabhängig
+    # und muss deshalb beim Anlegen einer Route nicht mitgedacht werden.
     entity = _require_entity(entity_id)
     # range/offset optional per Query-Parameter — z. B. vom Energiedashboard
     # aus verlinkt, mit dem dort gerade gewählten Zeitraum. Ungültiger/
@@ -4835,7 +4838,6 @@ def entity_detail(
             "unit": entity["unit"],
             "decimals": decimals_to_int(effective_decimals),
             "display_mode": entity["display_mode"],
-            "base": "..",
             "first_date": first_date,
             "last_date": last_date,
             "is_favorite": bool(entity["is_favorite"]),
@@ -4872,7 +4874,6 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "entity_id": entity_id,
             "friendly_name": entity["friendly_name"],
             "custom_name": entity["custom_name"] or "",
-            "base": "../..",
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
@@ -5214,7 +5215,6 @@ def _rows_fragment(
             "undo_available": bool(index.get_last_deleted_batch(entity_id)),
             "first_date": first_date,
             "last_date": last_date,
-            "base": "../..",  # das Fragment wird immer in cleanup.html eingehängt, gleiche Tiefe
         },
     )
 
@@ -5365,7 +5365,6 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
             "offset": offset,
             "page": page,
             "page_size": page_size,
-            "base": "../..",
         },
     )
 
@@ -5433,7 +5432,6 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
             "offset": offset,
             "page": page,
             "page_size": page_size,
-            "base": "../..",
         },
     )
 
@@ -5487,7 +5485,6 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
             "offset": offset,
             "page": page,
             "page_size": page_size,
-            "base": "../..",
         },
     )
 

@@ -267,10 +267,10 @@
     </div>
   </div>
 </div>
-<script src="static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-<script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
-<script src="static/js/sortable-table.js?v={{ js_v }}"></script>
-<script src="static/js/dd-picker.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
+<script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
 <script>
   // table VOR dem .remove() der Zeile merken — danach hat die Zeile keinen
   // Elternknoten mehr, closest('table') liefe dann ins Leere und der Pager
@@ -316,6 +316,6 @@
     }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
   }
 </script>
-<script src="static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
-<script src="static/js/table-cards.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
 {% endblock %}

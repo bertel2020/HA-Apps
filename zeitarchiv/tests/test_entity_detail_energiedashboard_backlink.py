@@ -69,6 +69,6 @@ def test_entity_detail_route_passes_used_in_energiedashboard_into_context() -> N
 def test_template_renders_a_static_link_independent_of_the_referrer() -> None:
     assert "{% if used_in_energiedashboard %}" in TEMPLATE
     assert (
-        '<a href="{{ base }}/energiedashboard?range={{ initial_range or \'day\' }}&amp;offset={{ initial_offset }}">'
+        '<a href="{{ app_root }}/energiedashboard?range={{ initial_range or \'day\' }}&amp;offset={{ initial_offset }}">'
         "&larr; zurück zum Energiedashboard</a>"
     ) in TEMPLATE

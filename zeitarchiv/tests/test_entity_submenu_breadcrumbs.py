@@ -12,7 +12,7 @@ from _paths import TEMPLATES
 
 
 TEMPLATES_DIR = TEMPLATES
-BACK_LINK = '<a href="{{ base }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>'
+BACK_LINK = '<a href="{{ app_root }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>'
 
 
 def _source(name: str) -> str:

@@ -293,7 +293,7 @@
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
-    const base = el.closest('#dashboard-grid')?.dataset.base || '.';
+    const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
     const params = new URLSearchParams({
       entity_ids: entityIds.join(','), range, offset: '0', continuous: String(continuous),
       raw: String(timeline),
@@ -749,7 +749,7 @@
       previewEl.innerHTML = '<div class="dtile-loading">Keine sichtbaren Zeilen/Spalten</div>';
       return;
     }
-    const base = el.closest('#dashboard-grid')?.dataset.base || '.';
+    const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
     let values, windowStarts, elapsedSeconds;
     try {
       ({values, windowStarts, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, visibleRows));
@@ -1113,7 +1113,7 @@
   }
 
   async function loadEntityGroup(tiles) {
-    const base = document.getElementById('dashboard-grid')?.dataset.base || '.';
+    const base = document.getElementById('dashboard-grid')?.dataset.appRoot || '';
     const erste = tiles[0];
     const params = new URLSearchParams({
       range: erste.dataset.range || 'day',
@@ -1281,7 +1281,7 @@
 
   function setupSizePickers() {
     const grid = document.getElementById('dashboard-grid');
-    const base = grid?.dataset.base || '.';
+    const base = grid?.dataset.appRoot || '';
     const dashboardId = parseInt(grid?.dataset.dashboardId || '1', 10);
     // Präziser Modus verdoppelt Gitter/Zeilenhöhe (siehe .dashboard-grid.is-
     // precise) — die "ab wann passt eine Legende rein"-Schwelle muss deshalb
@@ -1793,7 +1793,7 @@
   }
 
   async function persistOrder(grid) {
-    const base = grid.dataset.base || '.';
+    const base = grid.dataset.appRoot || '';
     const dashboardId = parseInt(grid.dataset.dashboardId || '1', 10);
     const pins = Array.from(grid.querySelectorAll('.dtile[data-item-id]')).map(el => ({
       item_type: el.dataset.itemType, item_id: parseInt(el.dataset.itemId, 10),

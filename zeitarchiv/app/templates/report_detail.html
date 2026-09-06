@@ -23,5 +23,5 @@
     </div></section>{% endif %}
     {% if report.errors %}<section><h2>Fehler</h2>{% for error in report.errors %}<div class="detail-block error">{{ error }}</div>{% endfor %}</section>{% endif %}
   </div>
-</div><script src="../static/js/resizable-tables.js?v={{ js_v }}"></script><script src="../static/js/sortable-table.js?v={{ js_v }}"></script><script src="../static/js/dynamic-back-link.js?v={{ js_v }}"></script><script src="../static/js/table-cards.js?v={{ js_v }}"></script>
+</div><script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script><script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script><script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script><script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
 {% endblock %}

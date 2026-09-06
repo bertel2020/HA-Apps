@@ -267,12 +267,12 @@
     </div>
   </div>
 
-  <script src="static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="static/js/dd-picker.js?v={{ js_v }}"></script>
-  <script src="static/js/entity-picker.js?v={{ js_v }}"></script>
-  <script src="static/js/sortable-table.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
+  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
   <script>
     // Aus-/Einblenden des heutigen Tipps (im "Alle Tipps"-Dialog, siehe
     // _tips_list_body.html) wirkt sich auch auf das Glocken-Menü aus —
@@ -348,6 +348,6 @@
     }
 
   </script>
-  <script src="static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
-  <script src="static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
 {% endblock %}
