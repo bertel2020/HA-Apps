@@ -24,13 +24,11 @@ def test_display_settings_offer_both_color_schemes() -> None:
         color_mode_options=[("auto", "Automatisch"), ("light", "Hell"), ("dark", "Dunkel")],
         font_scale="2",
         font_scale_options=[
-            ("0", "Kleiner"),
             ("1", "Klein"),
             ("2", "Normal"),
             ("3", "Groß"),
-            ("4", "Größer"),
         ],
-        font_scale_values={"0": "0.9", "1": "1", "2": "1.125", "3": "1.25", "4": "1.4"},
+        font_scale_values={"1": "1", "2": "1.125", "3": "1.25"},
         saved=False,
     )
     assert 'type="hidden" name="color_scheme"' in html
@@ -41,16 +39,17 @@ def test_display_settings_offer_both_color_schemes() -> None:
     assert "selectDDOption('color-mode', 'dark', 'Dunkel')" in html
     assert 'id="font-scale-input" value="2"' in html
     for key, scale, label in (
-        ("0", "0.9", "Kleiner"),
         ("1", "1", "Klein"),
         ("2", "1.125", "Normal"),
         ("3", "1.25", "Groß"),
-        ("4", "1.4", "Größer"),
     ):
         assert f"selectDDOption('font-scale', '{key}', '{label}')" in html
         assert f"setProperty('--font-scale', '{scale}')" in html
-    for label in ("Kleiner", "Klein", "Normal", "Groß", "Größer"):
+    for label in ("Klein", "Normal", "Groß"):
         assert f">{label}</div>" in html
+    # Die entfallenen Randstufen dürfen nicht wieder auftauchen.
+    for label in ("Kleiner", "Größer"):
+        assert f">{label}</div>" not in html
     assert "document.documentElement.dataset.colorScheme = 'home_assistant'" in html
     assert "document.documentElement.dataset.colorMode = 'dark'" in html
 
