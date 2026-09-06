@@ -20,7 +20,7 @@
         <td>{{ b.created_at }}</td>
         <td>{{ b.size }}</td>
         <td style="text-align:right;">
-          <span style="display:inline-flex;align-items:center;gap:10px;">
+          <span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;">
             <button type="button" class="btn"
                     hx-post="backup/verify/{{ b.filename }}"
                     hx-target="#backup-status" hx-swap="outerHTML">

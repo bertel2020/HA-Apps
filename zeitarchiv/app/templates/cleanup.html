@@ -117,7 +117,12 @@
      Flex-Richtung, jede .toolbar-Zeile darin bleibt für sich genommen
      waagerecht (Regel aus app.css). */
   #controls{flex-direction:column;align-items:stretch;}
-  #controls > .toolbar{margin-bottom:0;}
+  /* width:100% statt sich auf align-items:stretch zu verlassen — die Leiste
+     wuchs sonst auf die Breite ihres breitesten Kindes (.seg, 396px) statt
+     sich auf die 358px der Seite zu beschränken, und die Seite ließ sich auf
+     dem Telefon um 21px seitwärts schieben. Mit fester Breite schrumpft .seg
+     mit und scrollt wie vorgesehen in sich selbst. */
+  #controls > .toolbar{margin-bottom:0;width:100%;}
   .seg{
     display:flex;border:1px solid var(--border);border-radius:8px;
     overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0;
@@ -323,6 +328,7 @@
   <script src="{{ base }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
   <script src="{{ base }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ base }}/static/js/table-cards.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ base | tojson }};
     const ENTITY_ID = {{ entity_id | tojson }};

@@ -800,6 +800,78 @@ td.mono{font-family:var(--font-mono);}
    vererbte Zellen-Regel (tr.tbl-bold td) sonst nicht überschreiben würde. */
 tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--ink);}
 
+/* Zeilenkarten auf schmalen Bildschirmen (ZG-02 Stufe 2). Von der
+   Entitätenliste sind bei 390px rund 35 % zu sehen — der Rest ist zwar
+   scrollbar, aber ohne seine Spaltenüberschrift nicht zuzuordnen. Als Karte
+   trägt jeder Wert sein Etikett bei sich, und nichts muss mehr seitwärts
+   gesucht werden.
+
+   Die Klasse .dt-cards und die data-label-Etiketten setzt static/js/table-cards.js
+   — dort steht auch, welche Tabellen bewusst NICHT umgestellt werden
+   (Vergleichstabellen mit Trenn-/Summenzeilen, mehrstufige Köpfe, weniger als
+   drei Spalten). Hier unten steht nur, ab welcher Breite Karten gelten. */
+@media (max-width:640px){
+  /* Nichts überläuft mehr, also auch kein Scroll-Hinweis. */
+  .tbl-wrap:has(table.dt-cards){overflow-x:visible;background-image:none;border:0;border-radius:0;background-color:transparent;}
+  .tbl-wrap:has(table.dt-cards) .table-resize-actions{display:none;}
+  /* Listentabellen tragen eine Mindestbreite als Inline-Style (z. B. 1.028px
+     in _entities_table.html), damit die Spalten am Schreibtisch nicht
+     zusammenfallen. In der Kartenform gibt es keine Spalten mehr — bliebe sie
+     stehen, schöbe sie die ganze Seite seitwärts. Inline-Style, daher
+     !important. Spaltenbreiten (.col-entity, .col-size …) hängen an denselben
+     Klassen wie die Zellen und müssen ebenfalls zurück auf auto. */
+  table.dt.dt-cards{display:block;width:100%;min-width:0!important;}
+  table.dt.dt-cards th,table.dt.dt-cards td{width:auto;max-width:none;min-width:0;}
+  table.dt.dt-cards colgroup,table.dt.dt-cards thead,table.dt.dt-cards tbody{display:block;}
+  table.dt.dt-cards .table-column-resize-handle{display:none;}
+  table.dt.dt-cards .dt-cards-head-hidden{display:none;}
+
+  /* Kopfzeile als Sortierleiste: nur dort, wo sie eine Bedienung trägt. Ohne
+     sie wäre Sortieren auf dem Telefon gar nicht mehr erreichbar, denn in der
+     Kartenform gibt es keine Spaltenköpfe zum Antippen mehr. */
+  table.dt.dt-cards .dt-cards-sortbar{
+    display:flex;flex-wrap:wrap;gap:6px;padding:0 0 10px;border:0;
+  }
+  table.dt.dt-cards .dt-cards-sortbar th{
+    display:block;padding:4px 9px;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);white-space:nowrap;
+  }
+  table.dt.dt-cards .dt-cards-sortbar th.dt-cards-label-empty{display:none;}
+
+  table.dt.dt-cards tbody tr{
+    display:block;padding:10px 12px;margin-bottom:8px;
+    border:1px solid var(--border);border-radius:10px;background:var(--surface);
+  }
+  table.dt.dt-cards tbody tr:last-child{margin-bottom:0;}
+  table.dt.dt-cards tbody tr:hover td{background:transparent;}
+  table.dt.dt-cards tbody tr.flag{background:var(--danger-soft);}
+  table.dt.dt-cards tbody tr.flag td{background:transparent;}
+  table.dt.dt-cards tbody tr.tbl-zebra-alt td{background:transparent;}
+
+  table.dt.dt-cards td{
+    display:flex;flex-wrap:wrap;gap:0 14px;align-items:baseline;justify-content:space-between;
+    padding:3px 0;border:0;text-align:right;white-space:normal;
+    /* Entity-IDs sind ein einziges langes Wort ohne Umbruchstelle. In der
+       Tabelle hat der Scroll-Container sie abgeschnitten; ohne ihn schöben sie
+       die Seite seitwärts. overflow-wrap vererbt sich bis in die Spans. */
+    min-width:0;overflow-wrap:anywhere;
+  }
+  table.dt.dt-cards td::before{
+    content:attr(data-label);flex:0 1 auto;text-align:left;white-space:nowrap;
+    color:var(--ink-faint);font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;
+  }
+  /* Spalten ohne Überschrift (Favoriten-Stern, Aktionsknöpfe) bekommen kein
+     leeres Etikett vorangestellt und stehen linksbündig für sich. */
+  table.dt.dt-cards td[data-label=""]{justify-content:flex-start;text-align:left;}
+  table.dt.dt-cards td[data-label=""]::before{content:none;}
+  /* Erste Spalte mit echtem Namen ist die Überschrift der Karte. */
+  table.dt.dt-cards td.dt-card-title{
+    display:block;text-align:left;color:var(--ink);
+    padding-bottom:7px;margin-bottom:5px;border-bottom:1px solid var(--border);
+  }
+  table.dt.dt-cards td.dt-card-title::before{content:none;}
+}
+
 .flag-badge{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;background:var(--danger);color:var(--danger-contrast);margin-right:4px;}
 /* Versalien statt Monospace: der Typ ist ein Kategoriewort, keine kopierbare
    Zeichenkette — Mono steht in dieser App für "maschinenlesbar" (Entity-IDs,

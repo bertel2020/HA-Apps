@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app"
 APP_CSS = APP / "static" / "css" / "app.css"
+APP_JS = APP / "static" / "js"
 TEMPLATES = APP / "templates"
 
 
@@ -84,3 +85,45 @@ def test_tooltips_leave_the_layout_on_narrow_viewports() -> None:
     assert "[data-tooltip]:hover::after" in block
     assert ".entity-tooltip-host:focus-within>.entity-tooltip" in block
     assert re.search(r"\.entity-tooltip-host:focus-within>\.entity-tooltip\{[^}]*display:block", block)
+
+
+def test_card_mode_neutralises_the_inline_table_min_width() -> None:
+    """Listentabellen tragen eine Mindestbreite als Inline-Style, damit ihre
+    Spalten am Schreibtisch nicht zusammenfallen (`_entities_table.html` rechnet
+    sich 1.028px aus). In der Kartenform gibt es keine Spalten mehr — bleibt die
+    Mindestbreite stehen, schiebt sie die ganze Seite seitwärts. Gemessen waren
+    das 654px Überlauf bei 390px Viewport. Inline-Style schlägt jede Regel ohne
+    !important, deshalb steht es hier."""
+    block = _media_block(APP_CSS.read_text(encoding="utf-8"), "max-width:640px")
+    rule = re.search(r"table\.dt\.dt-cards\{([^}]*)\}", block)
+    assert rule, "Basisregel für den Kartenmodus fehlt"
+    assert "min-width:0!important" in rule.group(1).replace(" ", "")
+
+
+def test_table_cards_skips_tables_whose_grid_carries_the_meaning() -> None:
+    """Nicht jede Tabelle darf zu Karten werden. Vergleichstabellen leben von
+    ihrem Raster (Trenn- und Summenzeilen, erkennbar an colspan), mehrstufige
+    Köpfe gäben je Wert zwei Etiketten, und eine Chart-Legende ist keine Liste,
+    sondern Beschriftung neben dem Diagramm."""
+    source = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    assert "[colspan],[rowspan]" in source
+    assert "chart-legend-table" in source
+    assert "head.rows.length === 1" in source
+    assert "MIN_COLUMNS" in source
+
+
+def test_every_page_with_cards_uses_its_own_url_prefix() -> None:
+    """Die App schreibt denselben Präfix auf drei Arten (ZG-03): relativ,
+    `{{ base }}` und `{{ app_root }}`. Wer beim Einfügen eines Skripts die
+    falsche Variante erwischt, merkt es nur auf der Seite, deren Pfadtiefe
+    abweicht — dort fiele der Kartenmodus still aus, ohne Fehlermeldung."""
+    pattern = re.compile(r'<script src="([^"]*?)static/js/([^"]+)\.js\?v=\{\{ js_v \}\}"></script>')
+    pages = 0
+    for path in TEMPLATES.glob("*.html"):
+        found = pattern.findall(path.read_text(encoding="utf-8"))
+        if "table-cards" not in {name for _, name in found}:
+            continue
+        pages += 1
+        prefixes = {prefix for prefix, _ in found}
+        assert len(prefixes) == 1, f"{path.name}: uneinheitliche Präfixe {sorted(prefixes)}"
+    assert pages >= 9, f"nur {pages} Seiten laden table-cards.js"
