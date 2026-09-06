@@ -58,14 +58,29 @@
   // getComputedStyle(...).color normalisiert JEDE gültige CSS-Farbe
   // (Hex/rgb/named) zuverlässig auf "rgb(r, g, b)", ohne selbst einen
   // Hex-Parser zu brauchen.
+  // Ergebnisse gemerkt: die Umrechnung hängt ein Element in den DOM und ruft
+  // getComputedStyle() — beides erzwingt ein Style-Recalc, und das mitten im
+  // Render-Pfad. Aufgerufen wird sie zweimal je Farbmischung, also für jede
+  // blend-Bahn im Sankey plus den Legenden-Eintrag; bei einer Anlage mit
+  // vielen Verbrauchern summiert sich das auf Dutzende erzwungene Recalcs pro
+  // Neuzeichnung. Der Cache braucht keine Invalidierung: Schlüssel ist die
+  // bereits AUFGELÖSTE Farbe (z. B. "#8B5FBF"), nicht der CSS-Variablenname —
+  // dieselbe Zeichenkette ergibt immer dasselbe Tripel, auch nach einem
+  // Themenwechsel. Der liefert dann schlicht andere Zeichenketten.
+  const rgbTripletCache = new Map();
+
   function toRgbTriplet(cssColor) {
+    const gemerkt = rgbTripletCache.get(cssColor);
+    if (gemerkt) return gemerkt;
     const probe = document.createElement('div');
     probe.style.color = cssColor;
     document.body.appendChild(probe);
     const rgb = getComputedStyle(probe).color;
     document.body.removeChild(probe);
     const m = rgb.match(/\d+/g);
-    return m ? [parseInt(m[0], 10), parseInt(m[1], 10), parseInt(m[2], 10)] : [0, 0, 0];
+    const triplet = m ? [parseInt(m[0], 10), parseInt(m[1], 10), parseInt(m[2], 10)] : [0, 0, 0];
+    rgbTripletCache.set(cssColor, triplet);
+    return triplet;
   }
 
   function blendColors(colorA, colorB, ratioA) {

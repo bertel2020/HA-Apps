@@ -627,3 +627,18 @@ def test_narrow_node_gap_ist_deklariert_bevor_die_serie_ihn_nutzt() -> None:
     deklaration = js.index("const narrowNodeGap =")
     nutzung = js.index("nodeGap: isNarrow ? narrowNodeGap")
     assert deklaration < nutzung
+
+
+def test_farbumrechnung_wird_gemerkt() -> None:
+    """toRgbTriplet() hängt ein Element in den DOM und ruft getComputedStyle —
+    beides erzwingt ein Style-Recalc, mitten im Render-Pfad. Ohne Cache waren
+    das bei 30 Verbrauchern 62 Recalcs je Neuzeichnung (zwei pro Farbmischung),
+    mit Cache 4 beim ersten Render und danach keine mehr. Der Schlüssel ist die
+    bereits aufgelöste Farbe, deshalb ist keine Invalidierung nötig."""
+    js = _js()
+    assert "const rgbTripletCache = new Map();" in js
+    start = js.index("function toRgbTriplet(")
+    body = js[start:start + 700]
+    assert "rgbTripletCache.get(cssColor)" in body
+    assert "if (gemerkt) return gemerkt;" in body
+    assert "rgbTripletCache.set(cssColor, triplet);" in body
