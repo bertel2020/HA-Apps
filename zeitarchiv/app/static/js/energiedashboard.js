@@ -13,6 +13,33 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  // Diagrammbeschriftungen an die Schriftgrößen-Einstellung koppeln, genau wie
+  // scaledFont() in static/js/dashboard-tiles.js. ECharts rendert seine Labels
+  // ins Canvas, wo --font-scale aus dem Stylesheet nicht greift — ohne diese
+  // Umrechnung blieben ausgerechnet die kleinsten Schriften der App (Heatmap-
+  // Achse, Sankey-Knoten) als einzige unskaliert.
+  //
+  // Anders als dort bei jedem Aufruf neu gelesen statt einmalig beim
+  // Skriptstart: dieselbe Begründung wie bei colors() unten — die Auswahl in
+  // Einstellungen → Darstellung setzt --font-scale sofort am Wurzelelement,
+  // ein beim Laden gecachter Wert würde das erst beim nächsten Seitenaufruf
+  // mitbekommen.
+  function scaledFont(size) {
+    const scale = parseFloat(cssVar('--font-scale')) || 1;
+    return Math.round(size * scale * 10) / 10;
+  }
+
+  // Schriftfamilien aus denselben Tokens wie der Rest der Oberfläche, statt
+  // die Stacks hier zu wiederholen — sonst zieht ein Wechsel der Schriftart
+  // (z. B. beim Selbsthosten) an diesen zwei Stellen lautlos nicht mit.
+  function fontMono() {
+    return cssVar('--font-mono');
+  }
+
+  function fontDisplay() {
+    return cssVar('--font-display');
+  }
+
   // Wird bei jedem load() neu gelesen (nicht einmalig beim Skriptstart) --
   // ein Hell/Dunkel- oder Farbschema-Wechsel ändert die Werte sonst nicht in
   // den bereits gecachten Strings hier.
@@ -725,14 +752,14 @@
             type: 'category', data: hourLabels, position: 'top',
             splitArea: {show: false}, axisLine: {show: false}, axisTick: {show: false},
             axisLabel: {
-              color: palette.ink, fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, interval: 2, margin: 4,
+              color: palette.ink, fontFamily: fontMono(), fontSize: scaledFont(9), interval: 2, margin: 4,
               formatter: (value) => value + ':00',
             },
           },
           yAxis: {
             type: 'category', data: dayLabels, inverse: true,
             axisLine: {show: false}, axisTick: {show: false},
-            axisLabel: {color: palette.ink, fontSize: 10.5},
+            axisLabel: {color: palette.ink, fontSize: scaledFont(10.5)},
           },
           visualMap: {show: false, min: 0, max: data.max_value || 1, inRange: {color: [surfaceAlt, accent]}},
           series: [{
@@ -1134,7 +1161,7 @@
             // (statt untereinander wie horizontal) — kleinere Schrift und
             // mehr nodeGap geben den Labels dort mehr Luft, bevor sie sich
             // überlappen.
-            label: {fontFamily: 'IBM Plex Sans, sans-serif', fontSize: isNarrow ? 10 : 12},
+            label: {fontFamily: fontDisplay(), fontSize: scaledFont(isNarrow ? 10 : 12)},
             // Vertikal: Platz für die bis zu dreizeiligen Labels über der
             // oberen und unter der unteren Knotenreihe (siehe narrowLabelFor)
             // — und zusätzlich für die zweite, versetzte Label-Reihe

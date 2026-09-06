@@ -635,6 +635,22 @@ a.menu-row{text-decoration:none;}
 .tbl-wrap{
   max-width:100%;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
   border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  /* Scroll-Hinweis: overflow-x:auto allein zeigt auf Touch nichts an —
+     Overlay-Scrollbalken erscheinen erst beim Scrollen, und eine 1.028px breite
+     Tabelle in 356px sichtbarer Breite sieht dadurch aus wie eine Tabelle mit
+     zwei Spalten. Die beiden `local`-Verläufe in Flächenfarbe hängen am Inhalt
+     und wandern mit ihm, die beiden `scroll`-Schatten bleiben am Rand stehen:
+     der Schatten ist dadurch nur zu sehen, solange in diese Richtung noch
+     etwas kommt, und verschwindet am jeweiligen Ende von selbst. */
+  background-image:
+    linear-gradient(to right,var(--surface),transparent),
+    linear-gradient(to left,var(--surface),transparent),
+    linear-gradient(to right,var(--ink-faint),transparent),
+    linear-gradient(to left,var(--ink-faint),transparent);
+  background-position:0 0,100% 0,0 0,100% 0;
+  background-size:22px 100%,22px 100%,14px 100%,14px 100%;
+  background-repeat:no-repeat;
+  background-attachment:local,local,scroll,scroll;
 }
 table.dt{width:100%;border-collapse:collapse;font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));}
 table.dt th{
@@ -694,6 +710,29 @@ table.dt th:hover .table-column-resize-handle::after,.table-column-resize-handle
 body.table-column-resizing{cursor:col-resize;user-select:none;}
 td.label,td.strong{color:var(--ink);font-weight:600;}
 td.mono{font-family:var(--font-mono);}
+
+/* Abschnitts-Trennzeilen in Tabellen und Kachel-Tabellen (die Struktur erzeugt
+   dashboard-tiles.js, siehe dort die Kachel-Tabelle) — vorher dreifach in
+   dashboard_detail.html/entities.html/table_editor.html kopiert und bereits
+   auseinandergelaufen.
+   Gewichte 600/700 statt vorher 650/800: geladen sind nur 400/500/600/700, also
+   fiel 650 auf 700 hoch und 800 mangels fetterem Schnitt auf 700 zurück — die
+   als "fett" markierte Trennzeile war von der normalen nicht zu unterscheiden. */
+.tbl-separator-content{display:flex;align-items:center;gap:8px;width:100%;}
+.tbl-separator-line{display:block;flex:1;height:1px;background:var(--border);}
+.tbl-separator-label{
+  color:var(--ink-muted);font-size:calc(11px * var(--font-scale, 1));font-weight:600;
+  letter-spacing:.035em;text-transform:uppercase;white-space:nowrap;
+}
+/* Kachel-Tabellen sind insgesamt kleiner gesetzt — die Beschriftung folgt dort
+   dem lokalen Kleinmaß von .tbl-group-header (9,5 px) statt dem der
+   Vorschau-Tabelle im Tabellen-Editor (11 px). Das ist keine Drift, sondern
+   die Anpassung an zwei verschiedene Tabellengrößen. */
+.dtile-mini-table .tbl-separator-label{font-size:calc(9.5px * var(--font-scale, 1));}
+/* "Fett" (row.bold) wirkt bei einer Trennlinie auf den Abschnittsnamen — der
+   steht als <span> in der Zelle und hat ein eigenes font-weight, das die
+   vererbte Zellen-Regel (tr.tbl-bold td) sonst nicht überschreiben würde. */
+tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--ink);}
 
 .flag-badge{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;background:var(--danger);color:var(--danger-contrast);margin-right:4px;}
 /* Versalien statt Monospace: der Typ ist ein Kategoriewort, keine kopierbare
@@ -794,6 +833,20 @@ button[data-tooltip]{cursor:pointer;}
 .entity-tooltip strong,.entity-tooltip code{display:block;white-space:nowrap;line-height:1.4;}
 .entity-tooltip strong{font-family:var(--font-display);font-size:calc(11.5px * var(--font-scale, 1));font-weight:700;}
 .entity-tooltip code{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:inherit;}
+/* visibility:hidden versteckt, nimmt die Box aber nicht aus dem Layout: eine
+   bis zu 342px breite Sprechblase an einem weit rechts stehenden Host schiebt
+   das Dokument über den rechten Rand (gemessen auf /tables/new: 666px
+   Dokumentbreite bei 390px Viewport). display:none nimmt sie heraus, Hover und
+   Tastaturfokus holen sie zurück — auf Touch gibt es keinen Hover, dort ist
+   die Blase damit ganz weg, ohne dass ein schmales Desktop-Fenster die
+   Erklärungen verliert. Die per JS geteleportete .entity-tooltip-floating
+   bleibt unberührt, sie setzt ihr display als Inline-Style. */
+@media (max-width:640px){
+  [data-tooltip]::after,.entity-tooltip{display:none;}
+  [data-tooltip]:hover::after,
+  .entity-tooltip-host:hover>.entity-tooltip,
+  .entity-tooltip-host:focus-within>.entity-tooltip{display:block;}
+}
 /* Markiert einen app-eigenen Anzeigenamen (custom_name-Override), der vom
    HA-friendly_name abweicht — überall dort, wo der Name allein noch nicht
    erkennen lässt, dass hier jemand manuell umbenannt hat (Entitätenliste,
@@ -832,7 +885,11 @@ button[data-tooltip]{cursor:pointer;}
    überwiegend Text ("1–50 von 86", "Seite X / Y"), nur die Zahlen darin sollen
    beim Blättern nicht springen — genau das leistet font-variant-numeric, ohne
    die Wörter drumherum wie Terminalausgabe wirken zu lassen. */
-.pager{display:flex;align-items:center;gap:10px;margin-top:10px;font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+/* flex-wrap: der Pager trägt zwei Gruppen (Blättern links, Zeilen/Seite
+   rechts), die zusammen 402px brauchen — auf dem Telefon stehen 358px zur
+   Verfügung, und ohne Umbruch schob die rechte Gruppe die Seite seitwärts.
+   Wirkt nur, wenn es eng wird; am Schreibtisch bleibt der Pager einzeilig. */
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
 .pager-page{white-space:nowrap;}
 .pager-range{color:var(--ink-faint);}
 /* Zeilen/Seite-Auswahl direkt im Pager statt oben im Toolbar (Konzept-
@@ -1068,6 +1125,12 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 
 @media (max-width:480px){
   body{padding:20px 16px 48px;}
+  /* .topnav zieht sich per negativem Rand über das body-Padding hinaus, damit
+     die Leiste randlos sitzt — die Werte oben (-32px/-24px) gehören zum
+     Basis-Padding (32px 24px). Hier unten ist das Padding kleiner, also muss
+     der Rand mitziehen; sonst ragt die Leiste je Seite um 24-16=8px hinaus und
+     erzeugt auf JEDER Seite der App genau diese 8px Seitwärts-Scrollweg. */
+  .topnav{margin:-20px -16px 28px;padding:0 16px;}
   .stat-row{gap:8px;}
 }
 

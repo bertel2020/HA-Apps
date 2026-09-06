@@ -224,7 +224,9 @@
      Aufblitzen vor Alpines Initialisierung. */
   .dd-picker-popover-alpine{display:block;}
 
-  .tbl-add-row-bar{display:flex;gap:8px;margin-top:10px;}
+  /* flex-wrap: fünf Buttons brauchen 650px, auf dem Telefon stehen 358px zur
+     Verfügung — ohne Umbruch schoben sie die ganze Seite seitwärts. */
+  .tbl-add-row-bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
 
   /* Live-Vorschau — Beschriftungs-Spalte ist strukturell IMMER die erste
      (Buchstaben-Kürzel leben NICHT in dieser Tabelle, siehe
@@ -317,14 +319,6 @@
   table.dt.compact tr.tbl-separator-row td{
     padding:4px 8px;border:0;background:transparent !important;box-shadow:none !important;
   }
-  .tbl-separator-content{display:flex;align-items:center;gap:9px;width:100%;}
-  .tbl-separator-line{display:block;flex:1;height:1px;background:var(--border);}
-  .tbl-separator-label{color:var(--ink-muted);font-size:calc(11px * var(--font-scale, 1));font-weight:650;letter-spacing:.035em;text-transform:uppercase;white-space:nowrap;}
-  /* "Fett" (row.bold) wirkt bei Trennlinie auf den Abschnittsname-Text —
-     der ist als <span> in der Zelle verschachtelt und hat bereits ein
-     eigenes font-weight (650), das die vererbte Zellen-Regel oben
-     (tr.tbl-bold td) sonst nicht überschreiben würde. */
-  tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:800;color:var(--ink);}
 
   /* Buchstaben-Kürzel (A/B/C, dasselbe Rund-Badge wie .tbl-row-letter bei den
      Zeilen-Kärtchen oben) — bewusst AUSSERHALB von .tbl-wrap (eigenes
