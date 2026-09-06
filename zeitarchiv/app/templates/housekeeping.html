@@ -1,56 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Housekeeping{% endblock %}
 {% block page_css %}
-<style>
-  /* Chart/Tabelle-Unterscheidung in der ansonsten typübergreifenden Liste —
-     dieselbe visuelle Sprache wie die Entitätstyp-Badges (.badge in
-     app.css), nur zwei neue Farbvarianten statt die vorhandenen (counter/
-     standard/switch) sachfremd wiederzuverwenden. */
-  .hk-badge{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border);}
-  .hk-badge.chart{color:var(--accent-bar);border-color:var(--accent-bar);}
-  .hk-badge.table{color:var(--accent-line);border-color:var(--accent-line);}
-  /* Höhere Spezifität als das app.css-Standardpaar table.dt th/table.dt td
-     nötig (0-1-2 bzw. 0-1-1) — eine einzelne .hk-col-typ-Klasse (0-1-0) würde
-     sonst von deren text-align:left überstimmt, exakt dasselbe
-     Spezifitätsmuster wie der Sticky-Header-Bug in table_editor.html. */
-  table.dt th.hk-col-typ,table.dt td.hk-col-typ{text-align:center;}
-  .hk-row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap;}
-  /* Duplikat-Tabelle hat nur 2 Spalten (Entität + Anzahl) — dieselbe
-     78%/22%-Aufteilung wie zuvor auf der Statistik-Seite, damit die
-     Wert-Spalte nicht unnötig breit wirkt. */
-  table.stats-dt{table-layout:fixed;min-width:420px;}
-  .stats-col-entity{width:78%;}
-  .stats-col-value{width:22%;}
-  /* Abschnittstitel + Schwellwert-Dropdown ("Inaktive Entitäten") in
-     einer Zeile, statt wie die übrigen Abschnitte nur eine Überschrift zu
-     tragen — .settings-panel .hk-section-head .settings-section-title ist
-     bewusst spezifischer als app.css' .settings-panel .settings-section-title
-     (margin-bottom:8px), damit hier zuverlässig margin:0 gewinnt, unabhängig
-     von der Reihenfolge im Stylesheet. */
-  .hk-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
-  .settings-panel .hk-section-head .settings-section-title{margin:0;}
-  .hk-section-head .dd-picker-wrap{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
-  /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
-     Untertext auch dann bündig, wenn nur einzelne Titel umbrechen. */
-  .retention-summary .stat .label{min-height:3em;}
-  /* Inaktive-Entitäten-Tabelle (_stale_entities_body.html): Name und ID
-     hatten keine eigene Breitenbegrenzung (anders als z. B. in
-     entities_list.html/statistik.html) — bei langen Namen/IDs wuchs die
-     Entität-Spalte unbegrenzt und drängte "Letzter Wert"/"Vor" in den
-     Zeilenumbruch. display:block trennt Name/ID zusätzlich sauber in zwei
-     Zeilen (liefen vorher ohne Trenner zusammen), max-width+Ellipsis
-     begrenzt die Spaltenbreite. Auf #stale-entities-body statt global
-     gescopt, da table.dt/td.entity auch auf vielen anderen Seiten ohne
-     diese Begrenzung verwendet wird. */
-  #stale-entities-body td.entity .name{
-    display:block;max-width:260px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  }
-  #stale-entities-body td.entity .id{
-    display:block;max-width:260px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;
-  }
-</style>
+<link rel="stylesheet" href="{{ app_root }}/static/css/pages/housekeeping.css?v={{ css_v }}">
 {% endblock %}
 {% block content %}
 <div class="page">

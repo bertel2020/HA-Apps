@@ -1,11 +1,11 @@
 """Regressionstests für rein optische Trennzeilen in gespeicherten Tabellen."""
 
 
-from _paths import APP
+from _paths import APP, page_text
 
 
 
-EDITOR = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+EDITOR = page_text("table_editor.html")
 COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 MAIN = (APP / "main.py").read_text(encoding="utf-8")

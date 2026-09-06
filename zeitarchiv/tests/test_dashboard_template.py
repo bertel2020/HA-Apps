@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import TEMPLATES
+from _paths import TEMPLATES, page_text
 
 
 TEMPLATES_DIR = TEMPLATES
@@ -105,7 +105,7 @@ def test_dashboard_tile_has_three_by_three_size_picker_and_grid_spans() -> None:
 
 
 def test_dashboard_css_and_script_support_variable_tile_sizes() -> None:
-    template = (TEMPLATES_DIR / "entities.html").read_text(encoding="utf-8")
+    template = page_text("entities.html")
     script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
     assert "grid-auto-rows:var(--dashboard-row-height)" in template
     assert "--dashboard-row-height:{{ dashboard_row_height | default(218) }}px" in template
@@ -117,7 +117,7 @@ def test_dashboard_css_and_script_support_variable_tile_sizes() -> None:
 
 
 def test_dashboard_tile_title_only_reserves_space_for_one_menu_button() -> None:
-    template = (TEMPLATES_DIR / "entities.html").read_text(encoding="utf-8")
+    template = page_text("entities.html")
     assert "padding-right:30px" in template
     assert ".dtile-menu-btn{" in template
     assert ".dtile-size-btn{" not in template
@@ -150,7 +150,7 @@ def test_value_tile_editor_and_sparkline_defaults_are_exposed() -> None:
 
 def test_value_tile_layout_bottom_aligns_age_and_moves_title_only_when_roomy() -> None:
     for template_name in ("entities.html", "dashboard_detail.html"):
-        source = (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
+        source = page_text(template_name)
         assert "display:flex;align-content:center;align-items:baseline;justify-content:space-between" in source
         assert ".dtile-entity[data-grid-rows=\"1\"] .dtile-title{padding-top:0;}" in source
 
@@ -158,7 +158,7 @@ def test_value_tile_layout_bottom_aligns_age_and_moves_title_only_when_roomy() -
 def test_table_tile_sticky_corner_stays_above_header_and_first_column() -> None:
     selector = ".tbl-style-sticky-header.tbl-style-sticky-first-col tr.tbl-header-row th:first-child{z-index:4;}"
     for template_name in ("entities.html", "dashboard_detail.html"):
-        source = (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
+        source = page_text(template_name)
         assert selector in source
 
 
@@ -172,7 +172,7 @@ def test_table_tile_keeps_saved_widths_scrollable_and_sticky_borders_attached() 
     assert "width:max(100%,${savedTableWidth}px);min-width:${savedTableWidth}px;table-layout:fixed;" in script
     assert '<colgroup>${layoutWidths.map(width => `<col style="width:${width}px">`)' in script
     for template_name in ("entities.html", "dashboard_detail.html"):
-        source = (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
+        source = page_text(template_name)
         assert "table.dt.dtile-mini-table{width:100%;table-layout:auto;}" in source
         assert "table.dt.dtile-mini-table.tbl-style-sticky-header tr.tbl-header-row th{border-bottom:0;}" in source
         assert "table.dt.dtile-mini-table.tbl-style-sticky-header{border-collapse:separate" not in source
@@ -227,7 +227,7 @@ def _tile_css_rules(template_name: str) -> set[str]:
     """Die Kachel-Regeln einer Seite, ohne Kommentare und Formatierung."""
     import re
 
-    source = (TEMPLATES_DIR / template_name).read_text(encoding="utf-8")
+    source = page_text(template_name)
     block = source[source.index(".dtile{") : source.index(".dtile-picker-search")]
     block = re.sub(r"/\*.*?\*/", "", block, flags=re.S)
     block = re.sub(r"\s+", " ", block)

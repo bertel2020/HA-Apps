@@ -25,7 +25,7 @@ from app.energiedashboard_routes import (
 )
 from app.storage.index import Index
 
-from _paths import TEMPLATES
+from _paths import TEMPLATES, page_text
 
 TEMPLATES_DIR = TEMPLATES
 
@@ -195,7 +195,7 @@ def test_picker_dialogs_share_one_compact_uniform_size() -> None:
     .detail-dialog-Standardbreite (bis 860px, für Datenqualität/Kosten-
     Tabellen gedacht) — eine kurze Namensliste braucht deutlich weniger."""
     assert _VIEW_TEMPLATE.count('class="detail-dialog edash-entity-picker-dialog"') == 3
-    energiedashboard_html = (TEMPLATES_DIR / "energiedashboard.html").read_text(encoding="utf-8")
+    energiedashboard_html = page_text("energiedashboard.html")
     assert ".edash-entity-picker-dialog{width:" in energiedashboard_html
 
 

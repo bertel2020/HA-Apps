@@ -8,30 +8,56 @@ und keine Garantie, dass z. B. die Spalte "Datensätze" auf der Startseite und a
 der Statistik-Seite an derselben Stelle landet. `app.css` ist die einzige Quelle
 der Wahrheit für Farben, Typografie, Seitenbreite und die wiederkehrenden
 Bausteine (Kacheln, Tabellen, Chips, Buttons) — jede Seite verlinkt es und fügt
-in ihrem eigenen `<style>`-Block nur noch das hinzu, was wirklich seitenspezifisch
-ist (z. B. der Chart-Container auf der Verlaufsseite, die Dropzone beim Import).
+nur noch das hinzu, was wirklich seitenspezifisch ist (z. B. der Chart-Container
+auf der Verlaufsseite, die Dropzone beim Import).
+
+Dieses Seitenspezifische stand bis September 2026 als `<style>`-Block im
+jeweiligen Template. Seit ZG-04 Schritt 3 liegt es als eigene Datei in
+`pages/` — siehe unten „Seitenlokales CSS".
 
 ## Einbinden
 
 ```html
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="{{ base }}/static/css/app.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ app_root }}/static/css/app.css?v={{ css_v }}">
 ```
 
-`{{ css_v }}` ist ein Jinja-Global (`templates.env.globals["css_v"]` in `main.py`,
-an die mtime von `app.css` beim Start gekoppelt) — reines Cache-Busting, weil
-`StaticFiles` keinen `Cache-Control`-Header setzt und Browser die Datei sonst
-über einen Neustart/Deploy hinweg aus dem Cache weiterverwenden können. Beim
-Hinzufügen eines neuen `<link>` auf `app.css` immer `?v={{ css_v }}` mitführen.
+Beides steht seit ZG-04 Schritt 1 nur noch **einmal**, in `base.html`. Eine
+neue Seite erbt es über `{% extends "base.html" %}` und schreibt es nicht selbst.
 
-`{{ base }}` ist der bestehende relative Rückpfad zur App-Wurzel (Ingress hat
-einen dynamischen Pfad-Präfix, ein absoluter Pfad würde daran vorbeizeigen):
+`{{ app_root }}` ist der Präfix aus dem `X-Ingress-Path`-Header (siehe
+`_app_root_context()` in `main.py`) und damit unabhängig davon, wie tief die
+Seite in der URL liegt. Vorher trugen die Seiten dafür eine `base`-Variable mit
+je nach Tiefe `""`, `".."` oder `"../.."` — dieser Mechanismus ist mit ZG-03
+ersatzlos entfallen. `tests/test_ingress_prefix.py` prüft die Auflösung, nicht
+die Schreibweise.
 
-| Route-Tiefe | Beispiel | `base` |
-|---|---|---|
-| Wurzel | `/`, `/statistik`, `/import`, `/settings` | kein `base` nötig — einfach `static/css/app.css` |
-| 1 Ebene | `/entities/{id}` | `".."` |
-| 2 Ebenen | `/entities/{id}/cleanup`, `/entities/{id}/config` | `"../.."` |
+`{{ css_v }}` ist ein Jinja-Global (`templates.env.globals["css_v"]` in
+`main.py`, die jüngste mtime über **alle** Dateien unter `static/css/`) — es
+macht das lange `Cache-Control: public, max-age=31536000, immutable` sicher, das
+`_CachedStaticFiles` auf `/static/*` setzt. Ohne Cache-Buster bliebe eine
+geänderte Datei ein Jahr lang unsichtbar. Bei jedem neuen `<link>` auf ein
+eigenes Stylesheet deshalb immer `?v={{ css_v }}` mitführen.
+
+## Seitenlokales CSS
+
+Was nur eine Seite braucht, liegt als `pages/<seite>.css` neben dieser Datei und
+wird im `page_css`-Block des Templates verlinkt:
+
+```html
+{% block page_css %}
+<link rel="stylesheet" href="{{ app_root }}/static/css/pages/statistik.css?v={{ css_v }}">
+{% endblock %}
+```
+
+Der Dateiname folgt dem Template (`statistik.html` → `pages/statistik.css`);
+`tests/test_page_css.py` hält das fest. Der Grund für die eigene Datei ist nicht
+Ordnung, sondern Übertragung: als `<style>`-Block reisten diese Regeln bei
+**jedem** Seitenaufruf erneut mit (ZG-22: 62 KB allein auf dem
+Energiedashboard), als Datei genau einmal.
+
+Eine Regel, die zwei Seiten brauchen, gehört nicht in zwei `pages/`-Dateien,
+sondern nach `app.css`.
 
 Fragmente, die per htmx in eine bereits geladene Seite eingehängt werden
 (`_entities_table.html`, `_rows_table.html`, `_duplicates_preview.html`,
@@ -96,7 +122,7 @@ Jede Seite folgt demselben Kopfbereich:
 
 ```html
 <div class="page">
-  <p class="crumb"><a href="{{ base }}/">Zeitarchiv</a> / … </p>
+  <p class="crumb"><a href="{{ app_root }}/">Zeitarchiv</a> / … </p>
   <h1>…</h1>
   <p class="sub">… &middot; <a href="…">Kontextlink →</a></p>
   …
@@ -197,9 +223,9 @@ Groß-Datei, die dieses Redesign eigentlich vermeiden sollte.
 
 ## Neue Seite hinzufügen — Checkliste
 
-1. `<link>` auf Google Fonts + `{{ base }}/static/css/app.css` (Tiefe siehe Tabelle oben).
+1. `{% extends "base.html" %}` — Schriften, `app.css` und Topnav kommen von dort.
 2. `<div class="page">` mit `.crumb` → `h1` → `.sub`.
 3. Tabellen bekommen `class="dt"` (oder `class="dt compact"` bei vielen Zeilen) statt eigener `table`/`th`/`td`-Regeln.
 4. Kacheln nutzen `.stat-row`/`.stat` (als `<a>`, falls klickbar).
 5. Buttons/Chips nutzen `.btn`/`.chip`/`.filter-chip` statt neu erfundener Klassen.
-6. Nur wirklich seitenspezifische Regeln in den lokalen `<style>`-Block — bei allem anderen erst prüfen, ob `app.css` es schon anbietet.
+6. Nur wirklich seitenspezifische Regeln nach `pages/<seite>.css` — bei allem anderen erst prüfen, ob `app.css` es schon anbietet.

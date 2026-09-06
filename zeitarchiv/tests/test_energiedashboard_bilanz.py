@@ -8,14 +8,14 @@ restlichen drei Dashboard-Karten)."""
 from __future__ import annotations
 
 
-from _paths import APP
+from _paths import APP, page_text
 
 
 
 JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
 VIEW = (APP / "templates/_energiedashboard_view.html").read_text(encoding="utf-8")
-DASHBOARD_HTML = (APP / "templates/energiedashboard.html").read_text(encoding="utf-8")
-REPORT = (APP / "templates/_energiedashboard_report.html").read_text(encoding="utf-8")
+DASHBOARD_HTML = page_text("energiedashboard.html")
+REPORT = page_text("_energiedashboard_report.html")
 
 
 def test_co2_bilanz_is_ausstoss_minus_vermieden() -> None:

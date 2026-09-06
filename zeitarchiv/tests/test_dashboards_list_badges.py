@@ -8,11 +8,11 @@
 from __future__ import annotations
 
 
-from _paths import APP
+from _paths import APP, page_text
 
 
 
-TEMPLATE = (APP / "templates/dashboards.html").read_text(encoding="utf-8")
+TEMPLATE = page_text("dashboards.html")
 MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import ADDON, TEMPLATES
+from _paths import ADDON, TEMPLATES, page_text
 
 
 TEMPLATES_DIR = TEMPLATES
@@ -88,7 +88,7 @@ def test_index_precedes_the_two_linked_categories() -> None:
 
 
 def test_storage_category_stays_on_one_line_at_normal_font_size() -> None:
-    source = (TEMPLATES_DIR / "statistik.html").read_text(encoding="utf-8")
+    source = page_text("statistik.html")
     assert 'class="dt stats-dt storage-usage-table"' in source
     assert "table.storage-usage-table{min-width:600px;}" in source
     assert ".storage-usage-table td:first-child{white-space:nowrap;}" in source
@@ -105,12 +105,12 @@ def test_storage_usage_table_is_sortable_with_numeric_values_and_fixed_total() -
 
 
 def test_growth_chart_uses_dynamic_y_axes() -> None:
-    source = (TEMPLATES_DIR / "statistik.html").read_text(encoding="utf-8")
+    source = page_text("statistik.html")
     assert source.count("{type: 'value', scale: true") == 2
 
 
 def test_all_statistics_data_tables_use_standard_sorting() -> None:
-    source = (TEMPLATES_DIR / "statistik.html").read_text(encoding="utf-8")
+    source = page_text("statistik.html")
     css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
     # War 4, bevor die Bestand-und-Fälligkeit-Tabelle mit Aufbewahrung/Rotation
     # nach Housekeeping zog (siehe _settings_retention_form.html).
@@ -165,7 +165,7 @@ def test_ui_typography_and_field_colors_follow_shared_semantics() -> None:
 
 def test_retention_breakdown_is_located_with_retention_settings() -> None:
     settings = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
-    statistics = (TEMPLATES_DIR / "statistik.html").read_text(encoding="utf-8")
+    statistics = page_text("statistik.html")
     assert "Bestand und Fälligkeit nach Aufbewahrungsfrist" in settings
     assert "retention_preview_generated_at" in settings
     assert "Bestand und Fälligkeit nach Aufbewahrungsfrist" not in statistics
@@ -176,13 +176,13 @@ def test_retention_summary_values_align_below_two_line_titles() -> None:
     # Markup in _settings_retention_form.html, die CSS-Regel (kein eigener
     # app.css-Eintrag, siehe .seg-Kommentar dort) inline in housekeeping.html.
     retention = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
-    housekeeping = (TEMPLATES_DIR / "housekeeping.html").read_text(encoding="utf-8")
+    housekeeping = page_text("housekeeping.html")
     assert 'class="stat-row retention-summary"' in retention
     assert ".retention-summary .stat .label{min-height:3em;}" in housekeeping
 
 
 def test_index_details_explain_all_logical_database_areas() -> None:
-    source = (TEMPLATES_DIR / "statistik_index.html").read_text(encoding="utf-8")
+    source = page_text("statistik_index.html")
     main = (TEMPLATES_DIR.parent / "main.py").read_text(encoding="utf-8")
     assert "Entitäten und Archivstatus" in main
     assert "Schreibsicherheit und Bereinigung" in main

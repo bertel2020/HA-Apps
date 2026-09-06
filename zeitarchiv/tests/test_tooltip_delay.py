@@ -1,5 +1,5 @@
 
-from _paths import APP
+from _paths import APP, page_text
 
 
 
@@ -9,8 +9,8 @@ def test_hover_tooltips_use_consistent_600ms_delay() -> None:
     css = (APP / "static/css/app.css").read_text()
     entity_picker = (APP / "static/js/entity-picker.js").read_text()
     map_picker = (APP / "static/js/map-entity-picker.js").read_text()
-    import_template = (APP / "templates/import.html").read_text()
-    cleanup_template = (APP / "templates/cleanup.html").read_text()
+    import_template = page_text("import.html")
+    cleanup_template = page_text("cleanup.html")
 
     assert "[data-tooltip]:hover::after{opacity:1;visibility:visible;transition-delay:.6s;}" in css
     assert ".entity-tooltip-host:hover>.entity-tooltip{visibility:visible;transition-delay:.6s;}" in css
@@ -24,7 +24,7 @@ def test_hover_tooltips_use_consistent_600ms_delay() -> None:
 
 def test_keyboard_focused_tooltips_remain_immediate() -> None:
     css = (APP / "static/css/app.css").read_text()
-    import_template = (APP / "templates/import.html").read_text()
+    import_template = page_text("import.html")
 
     assert ".entity-tooltip-host:focus-within>.entity-tooltip{visibility:visible;}" in css
     assert ".ha-archive-help:focus .ha-archive-help-popover" in import_template
@@ -40,7 +40,7 @@ def test_the_chart_entity_picker_tooltip_escapes_its_scrolling_list() -> None:
     Nachgemessen bei 1280px: Zeile 1 zeigt den Tooltip bei y=333 über dem
     Container (y=385), vollständig im Viewport.
     """
-    editor = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+    editor = page_text("chart_editor.html")
     css = (APP / "static/css/app.css").read_text(encoding="utf-8")
 
     assert "fixed-tooltip.js" in editor, "ohne das Skript passiert gar nichts"

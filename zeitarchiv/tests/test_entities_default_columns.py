@@ -6,7 +6,7 @@ import ast
 
 import pytest
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, page_text
 
 
 MAIN_PATH = APP / "main.py"
@@ -38,7 +38,7 @@ def test_visible_data_columns_are_left_aligned() -> None:
     # spalten linksbündig, alles ab Auflösung (inkl. Größe/Datensätze)
     # rechtsbündig — in EINER konsolidierten Selektorliste statt einzeln je
     # Spalte, damit Kopf- und Datenzeile nie auseinanderlaufen.
-    template = ENTITIES_TEMPLATE_PATH.read_text(encoding="utf-8")
+    template = page_text("entities_list.html")
     assert (
         ".entities-dt th.col-fav,.entities-dt td.col-fav,\n"
         "  .entities-dt th.col-type,.entities-dt td.col-type,\n"
@@ -75,8 +75,8 @@ def test_export_table_entity_tooltip_includes_both_names() -> None:
 )
 def test_other_entity_tooltips_also_include_both_names() -> None:
     templates = ENTITIES_TEMPLATE_PATH.parent
-    statistik = (templates / "statistik.html").read_text(encoding="utf-8")
-    charts = (templates / "charts.html").read_text(encoding="utf-8")
+    statistik = page_text("statistik.html")
+    charts = page_text("charts.html")
     main = MAIN_PATH.read_text(encoding="utf-8")
     assert 'class="entity-tooltip-host"' in statistik
     assert 'class="entity-tooltip-host" tabindex="0"' in charts

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from _paths import TEMPLATES, APP_CSS, APP_JS
+from _paths import APP_CSS, APP_JS, TEMPLATES, page_text
 
 
 
@@ -58,7 +58,7 @@ def test_template_font_sizes_use_the_global_scale() -> None:
 
 
 def test_both_statistic_charts_scale_their_canvas_typography() -> None:
-    source = (TEMPLATES / "statistik.html").read_text(encoding="utf-8")
+    source = page_text("statistik.html")
     scaled_text_style = "fontSize: Math.round(12 * uiFontScale * 10) / 10"
     assert source.count(scaled_text_style) == 2
 
@@ -159,6 +159,6 @@ def test_real_values_keep_the_mono_font() -> None:
     0/1/2/3 bei den Nachkommastellen. Sonst wäre die Unterscheidung nicht
     geschärft, sondern abgeschafft."""
     for name in ("dashboard_detail.html", "entities.html"):
-        quelle = (TEMPLATES / name).read_text(encoding="utf-8")
+        quelle = page_text(name)
         assert "var(--font-mono)" in _regel(quelle, ".dtile-size-picker-head strong"), name
         assert "var(--font-mono)" in _regel(quelle, ".dtile-decimals-cell"), name

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from _paths import TEMPLATES, APP_CSS, APP_JS
+from _paths import APP_CSS, APP_JS, TEMPLATES, page_text
 
 
 def _media_block(css: str, query: str) -> str:
@@ -62,7 +62,7 @@ def test_pager_wraps_instead_of_pushing_the_page_sideways() -> None:
 
 def test_the_table_editor_action_bar_wraps() -> None:
     """Fünf Buttons brauchen 650px Inhaltsbreite in einem 358px-Container."""
-    source = (TEMPLATES / "table_editor.html").read_text(encoding="utf-8")
+    source = page_text("table_editor.html")
     rule = re.search(r"\.tbl-add-row-bar\{([^}]*)\}", source)
     assert rule and "flex-wrap:wrap" in rule.group(1)
 
@@ -203,7 +203,7 @@ def test_the_background_process_hint_gets_the_full_row_width_on_phones() -> None
     29% statt 40%. Der Test hängt an beidem — an der Geschwister-Struktur im
     Markup und an der Regel, die sie mobil ausnutzt.
     """
-    settings = (TEMPLATES / "settings.html").read_text(encoding="utf-8")
+    settings = page_text("settings.html")
     zeile = re.search(r'<div class="bgproc-row">(.*?)<div class="bgproc-hint">', settings, re.S)
     assert zeile, ".bgproc-row mit Hinweis nicht gefunden"
     assert "<div>" not in zeile.group(1), (
@@ -268,7 +268,7 @@ def test_the_list_toolbar_collapses_into_one_menu_without_a_second_form() -> Non
     und die Seite blieb stehen.
     """
     js = (APP_JS / "list-settings-menu.js").read_text(encoding="utf-8")
-    liste = (TEMPLATES / "entities_list.html").read_text(encoding="utf-8")
+    liste = page_text("entities_list.html")
 
     assert "list-settings-menu.js" in liste
     # Verschoben, nicht nachgebaut: die Elemente wandern in das Popover.
@@ -370,7 +370,7 @@ def test_the_consumer_share_table_stays_on_one_line_in_a_narrow_container() -> N
     darf keine Zeilenbreite belegen, sonst rutscht der Name als Ganzes in die
     zweite Zeile und der Punkt bleibt allein oben stehen — und die Namensspalte
     muss den Rest bekommen, den die nowrap-Zahlenspalten übrig lassen."""
-    html = (TEMPLATES / "energiedashboard.html").read_text(encoding="utf-8")
+    html = page_text("energiedashboard.html")
     assert re.search(
         r"\.edash-share-wrap \.tbl-wrap\{[^}]*container-type:\s*inline-size", html
     ), "ohne container-type auf .tbl-wrap ist der @container-Block wirkungslos"
@@ -465,7 +465,7 @@ def test_the_timestamp_tiles_use_the_two_line_form_on_phones() -> None:
     es brach mitten in der Uhrzeit um. Dort trägt die Reihe ohnehin nur die
     beiden Zeitstempel-Kacheln, der Grund für die Regel entfällt also genau da,
     wo sie schadet."""
-    html = (TEMPLATES / "entity_config.html").read_text(encoding="utf-8")
+    html = page_text("entity_config.html")
     assert re.search(r"@media \(min-width:641px\)\{\s*\.stat \.ts-time\{", html), (
         "die Inline-Uhrzeit gilt nicht mehr nur am Schreibtisch"
     )

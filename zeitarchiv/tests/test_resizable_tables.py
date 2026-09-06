@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from _paths import TEMPLATES, APP_CSS, APP_JS
+from _paths import APP_CSS, APP_JS, TEMPLATES, page_text
 
 
 
@@ -61,7 +61,7 @@ def test_entity_config_preview_uses_shared_scroll_wrapper() -> None:
 
 def test_csv_export_unit_and_rows_are_left_aligned() -> None:
     source = (TEMPLATES / "_export_table.html").read_text(encoding="utf-8")
-    page = (TEMPLATES / "export.html").read_text(encoding="utf-8")
+    page = page_text("export.html")
     assert "'centered' if col.key == 'type'" in source
     assert '<td>{{ row.unit or "—" }}</td>' in source
     assert "<td>{{ row.row_count | format_int }}</td>" in source

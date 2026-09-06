@@ -1,0 +1,132 @@
+  /* Schmalere Karten als früher (300px): seit "Öffnen"/"Bearbeiten" aus der
+     Karte heraus sind (Titel öffnet, Kachelmenü bearbeitet), trägt sie nur
+     noch Titel + Kennzahlenzeile und braucht die alte Breite nicht mehr. */
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px;}
+  .dash-card{display:flex;flex-direction:column;gap:6px;position:relative;padding:16px 18px;}
+  .dash-card h3{
+    overflow-wrap:anywhere;margin:0;font-size:calc(15px * var(--font-scale, 1));line-height:1.35;
+    /* Platz für vier Titelzeilen freihalten: so viele braucht der längste
+       erlaubte Name (MAX_SAVED_NAME_LENGTH = 50 Zeichen) selbst in der
+       schmalsten Kachel (240px). Dadurch sind alle Kacheln gleich hoch,
+       unabhängig von der Namenslänge, statt zeilenweise zu wachsen. */
+    min-height:calc(4 * 1.35em);
+  }
+  /* Stern und Kachelmenü sitzen oben rechts über dem Titel. Statt auf JEDER
+     Zeile Platz für sie freizuhalten (früher padding-right:60px) weicht nur
+     die erste Zeile aus — ein schwebender Platzhalter in ihrer Größe. Das
+     spart bei langen Namen eine ganze Zeile. */
+  .dash-card h3::before{content:'';float:right;width:44px;height:1.35em;}
+  /* margin-top:auto schiebt die Infozeile an den unteren Kachelrand —
+     die Karten einer Reihe sind gleich hoch (Grid-Stretch), die Angaben
+     stehen dadurch über alle Karten hinweg auf einer Linie. */
+  .dash-card .meta{margin-top:auto;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  /* Die ganze Karte öffnet das Dashboard, nicht nur der Titeltext — ohne
+     "Öffnen"-Button bliebe sonst nur ein schmales Klickziel übrig. Stern und
+     Kachelmenü liegen über dieser Fläche (.card-top-actions, z-index 2).
+     color:inherit, weil der Titel eine Überschrift bleiben soll: mit der
+     Standard-Linkfarbe sähen besuchte und unbesuchte Karten unterschiedlich
+     aus (violett/blau nebeneinander). */
+  .dash-card h3 a{color:inherit;text-decoration:none;}
+  .dash-card:hover h3 a{color:var(--accent-line);}
+  .dash-card h3 a::after{content:'';position:absolute;inset:0;border-radius:inherit;}
+  /* Standard-Dashboard (Startseiten-Ziel "Übersicht", siehe STARTSEITE_LABELS
+     in main.py) bekommt denselben Farbverlauf-Kopfstreifen wie die feste
+     Energiedashboard-Kachel (.edash-pin-accent) — macht auf der Liste auf
+     einen Blick klar, welches der beiden möglichen Startseiten-Ziele das ist.
+     Eigene Zweifarb-Kombination aus den App-eigenen Akzentfarben
+     (--accent-line/--accent-bar, dieselben zwei Töne wie im App-Logo) statt
+     Energiedashboards PV/Netz/Einspeisung-Rollenfarben — die Übersicht ist an
+     keine einzelne Energie-Rolle gebunden. Als normaler Flow-::before mit
+     negativem Rand statt position:absolute, weil .dash-card (anders als
+     .edash-pin-card) sein Padding direkt auf der Karte selbst trägt, kein
+     ungepolstertes Wrapper-Element — der negative Rand zieht den Streifen bis
+     an den Kartenrand. */
+  .dash-card.is-default-home::before{
+    content:'';display:block;height:4px;margin:-16px -18px 12px;
+    border-radius:14px 14px 0 0;
+    background:linear-gradient(90deg, var(--accent-line), var(--accent-bar));
+  }
+  .dash-grid-add{display:flex;align-items:center;justify-content:center;min-height:96px;border-style:dashed;text-decoration:none;}
+  .dash-grid-add-btn{
+    display:flex;align-items:center;justify-content:center;
+    width:44px;height:44px;border-radius:999px;border:1px solid var(--border);background:var(--surface-alt);
+    color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));line-height:1;
+  }
+  .dash-grid-add:hover .dash-grid-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  [x-cloak]{display:none!important;}
+  /* Favorit links, Kachelmenü rechts davon — dieselbe Optik/Struktur wie auf
+     der Tabellen-/Chart-Übersicht (tables.html/charts.html), hier unter
+     .dash-card statt .chart-card. */
+  .card-top-actions{position:absolute;top:10px;right:10px;display:flex;align-items:center;gap:2px;z-index:2;}
+  /* Karte mit offenem Menü über ihre Nachbarn heben — dieselbe Regel wie
+     .dtile:has(.dtile-menu.is-open) auf den Dashboard-Seiten. Ohne sie malt
+     die NÄCHSTE Karte ihr eigenes .card-top-actions (z-index 2, eigener
+     Stapelkontext) über das darüber liegende Popover der vorigen Karte, weil
+     bei gleichem z-index die spätere DOM-Reihenfolge gewinnt. */
+  .dash-card:has(.card-menu.is-open){z-index:20;}
+  .fav-star{
+    background:none;border:none;cursor:pointer;
+    font-size:calc(17px * var(--font-scale, 1));line-height:1;padding:2px;color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+  .card-menu{position:relative;}
+  .card-menu-btn{
+    width:24px;height:24px;padding:0;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);color:var(--ink-faint);font-size:calc(17px * var(--font-scale, 1));line-height:1;cursor:pointer;
+  }
+  .card-menu-btn:hover,.card-menu.is-open .card-menu-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  .card-menu-popover{
+    position:absolute;top:30px;right:0;width:180px;padding:6px;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);cursor:default;z-index:5;
+  }
+  /* text-decoration/box-sizing wegen "Bearbeiten": der einzige Eintrag, der
+     ein <a> statt eines <button> ist (echter Link, damit Mittelklick/neuer
+     Tab funktionieren). */
+  .card-menu-item{
+    display:block;width:100%;box-sizing:border-box;padding:7px 8px;border:0;border-radius:6px;background:transparent;
+    color:var(--ink);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));text-align:left;cursor:pointer;
+    text-decoration:none;
+  }
+  .card-menu-item:hover{background:var(--surface-alt);}
+  .card-menu-item-danger{color:var(--danger);}
+  .card-menu-item-danger:hover{background:var(--danger-soft);}
+  .card-menu-divider{height:1px;background:var(--border);margin:6px -2px;}
+
+  /* Feste Energiedashboard-Kachel — kein echtes Dashboard (keine Zeile in
+     dashboards), deshalb immer an erster Stelle vor der Schleife, ohne
+     Favoriten-Stern/Kachelmenü/Sortierung. Erkennungsmerkmal: ein kleiner
+     Fluss-Farbverlauf (PV/Netz/Einspeisung-Töne) als Kopfleiste plus ein
+     winziges Sankey-Symbol (zwei Quellen fließen in einen Knoten) — dieselbe
+     Formsprache wie das große Diagramm, hier nur als Icon verdichtet. */
+  .edash-pin-card{display:flex;flex-direction:column;padding:0;overflow:hidden;position:relative;}
+  .edash-pin-accent{height:4px;flex:none;background:linear-gradient(90deg, var(--chart-3), var(--chart-1) 55%, var(--chart-2));}
+  .edash-pin-card.is-off .edash-pin-accent,.edash-pin-card.is-off .edash-pin-glyph{filter:grayscale(1);opacity:.4;}
+  .edash-pin-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
+  .edash-pin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .edash-pin-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
+  .edash-pin-title{font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
+  /* Ganze Karte klickbar (dieselbe "Stretched Link"-Technik wie .dash-card
+     h3 a::after oben) — der Titel-Link bekommt eine Vollflächen-::after-
+     Ebene; der Toggle bleibt per z-index:2 (wie .card-top-actions oben)
+     trotzdem unabhängig anklickbar. */
+  .edash-pin-title a{color:inherit;text-decoration:none;}
+  .edash-pin-title a::after{content:"";position:absolute;inset:0;border-radius:inherit;}
+  /* Startseiten-Abzeichen — nur sichtbar, wenn die Einstellung "Startseite"
+     (siehe _settings_darstellung_form.html) auf Energiedashboard steht.
+     Dezentes rundes Plättchen statt reinem Symbol, damit es neben Titel/
+     Toggle nicht wie ein weiterer klickbarer Button wirkt (rein informativ,
+     siehe data-tooltip). */
+  .edash-pin-home-badge{
+    flex:none;display:flex;align-items:center;justify-content:center;width:20px;height:20px;
+    border-radius:50%;background:var(--accent-line-soft);color:var(--accent-line);
+  }
+  .edash-pin-toggle{
+    width:30px;height:17px;border-radius:999px;background:var(--border-strong);position:relative;z-index:2;flex:none;
+    border:0;cursor:pointer;padding:0;
+  }
+  .edash-pin-toggle::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:999px;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s;}
+  .edash-pin-toggle.is-on{background:var(--accent-line);}
+  .edash-pin-toggle.is-on::after{left:15px;background:var(--accent-contrast);}
+  .edash-pin-desc{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.45;margin:0;}
+  .edash-pin-meta{margin-top:auto;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}

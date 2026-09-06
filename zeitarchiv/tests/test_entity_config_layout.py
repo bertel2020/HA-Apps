@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from _paths import TEMPLATES
+from _paths import TEMPLATES, page_text
 
 
 
@@ -11,7 +11,7 @@ TEMPLATE = TEMPLATES / "entity_config.html"
 
 
 def test_entity_configuration_uses_the_full_app_width() -> None:
-    source = TEMPLATE.read_text(encoding="utf-8")
+    source = page_text("entity_config.html")
     assert ".config-card{max-width:none;margin:20px 0 0;}" in source
     assert "#config-form{" in source
     assert "grid-template-columns:repeat(2,minmax(0,1fr))" in source
@@ -19,7 +19,7 @@ def test_entity_configuration_uses_the_full_app_width() -> None:
 
 
 def test_entity_data_actions_are_equal_and_responsive() -> None:
-    source = TEMPLATE.read_text(encoding="utf-8")
+    source = page_text("entity_config.html")
     assert '<div class="entity-data-actions">' in source
     assert ".entity-data-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}" in source
     assert "#config-form,.entity-data-actions{grid-template-columns:1fr;}" in source

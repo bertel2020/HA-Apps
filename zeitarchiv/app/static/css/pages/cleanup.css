@@ -1,0 +1,204 @@
+  h1.raw{font-family:var(--font-mono);font-size:calc(18.4px * var(--font-scale, 1));}
+  .h1-row{display:flex;align-items:center;gap:10px;}
+  .h1-row h1{margin:0;}
+  .fav-star{
+    background:none;border:none;cursor:pointer;font-size:calc(22px * var(--font-scale, 1));line-height:1;padding:2px;
+    color:var(--ink-faint);opacity:.5;
+  }
+  .fav-star.active{color:#D9A22B;opacity:1;}
+  .fav-star:hover{color:#D9A22B;opacity:1;}
+
+  /* Kompakte Entitäts-Kennzahlen zwischen Kopf und Werkzeug-Tabs, als
+     Tabelle mit ZWEI Zeilen: "Gesamter Zeitraum" (komplette Historie, ändert
+     sich nicht mit dem Zeitraum-Chip) und der gerade gewählte Zeitraum
+     darunter — vorher beides in einer Zeile vermischt, wodurch unklar war,
+     was "insgesamt" eigentlich bedeutet. Als Tabelle statt frei umbrechender
+     Zeile (Konzept-Erweiterung "Bereinigung: Kennzahlen ohne Zeilenumbruch"),
+     damit größere Zahlen/lange Zeitraum-Labels nicht mehr umbrechen — jede
+     Spalte bleibt rechtsbündig fest, bei zu schmalem Fenster scrollt nur die
+     Tabelle selbst (.tbl-wrap), wie jede andere Tabelle in der App. Das
+     äußere Element wird bei jedem Tabellen-Request per htmx OOB komplett
+     ersetzt, bleibt optisch aber ein stabiler Teil des Seitenkopfs. */
+  .entity-stats-groups{margin:14px 0 2px;}
+  .entity-stats-table{table-layout:fixed;}
+  .entity-stats-table th.num,.entity-stats-table td.num{text-align:right;}
+  .entity-stats-table td{white-space:nowrap;}
+  .entity-stats-table td.label{color:var(--ink);font-weight:600;}
+  .entity-stats-table td.val{color:var(--ink);font-weight:600;font-family:var(--font-mono);}
+  .entity-stats-table td.val.has-issues{color:var(--danger);}
+  .entity-stats-loading{padding:9px 13px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  /* Drei Reiter für die drei bisher getrennten Werkzeuge (Bereinigen/
+     Hinzufügen/Korrigieren, Konzept-Erweiterung "Bearbeitungsbereich") — eine
+     Seite, ein Datenmodell (Rohwerte derselben Entität), statt drei separate
+     Unterseiten. "Bereinigen"/"Korrigieren" teilen sich #controls/#rows-table
+     komplett (nur der "mode"-Wert im Formular unterscheidet, welche
+     Zeilen-Aktion _rows_table.html rendert, siehe dortiger Kommentar),
+     "Hinzufügen" ist ein eigenständiges, schlankes Formular ohne Tabelle. */
+  .edit-tabs{display:flex;gap:8px;margin:18px 0 4px;border-bottom:1px solid var(--border);}
+  .edit-tabs button{
+    font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
+    background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;margin-bottom:-1px;
+    cursor:pointer;
+  }
+  .edit-tabs button.active{color:var(--accent-line);border-bottom-color:var(--accent-line);}
+  .edit-tabs button:hover:not(.active){color:var(--ink);}
+
+  .add-value-card{max-width:480px;margin-top:16px;}
+  .add-value-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;}
+  .add-value-row label{display:flex;flex-direction:column;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .add-value-row input{
+    font-family:inherit;font-size:calc(13.5px * var(--font-scale, 1));padding:8px 10px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+  }
+  .add-value-status{margin-top:10px;font-size:calc(12.5px * var(--font-scale, 1));}
+  .add-value-status.ok{color:var(--accent-line);}
+  .add-value-status.err{color:var(--danger);}
+
+  /* Korrigieren-Modus: Stift-Button statt Checkbox, Wert-Zelle wird per Klick
+     zu einem Inline-Formular (Zahl-Feld + ✓/✗) — siehe startCorrect() unten.
+     Die native Checkbox im Bereinigen-Modus und dieser Button hatten trotz
+     gleich großer eigener Box (18px) noch minimal unterschiedliche Zeilenhöhen
+     zur Folge (Browser-Zeilenbox-Berechnung reagiert nicht bei beiden Element-
+     Typen identisch) — deshalb zusätzlich eine EXPLIZITE, für #rows-table fest
+     vorgegebene Zeilenhöhe weiter unten, die für beide Modi gleichermaßen gilt
+     und Restunterschiede eliminiert statt sie nur anzunähern. */
+  .correct-edit-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:calc(18px * var(--font-scale, 1));height:calc(18px * var(--font-scale, 1));
+    background:none;border:none;cursor:pointer;color:var(--ink-faint);
+    font-size:calc(12.5px * var(--font-scale, 1));padding:0;
+  }
+  .correct-edit-btn:hover{color:var(--accent-line);}
+  table.dt.compact td input[type="checkbox"]{
+    width:calc(14px * var(--font-scale, 1));height:calc(14px * var(--font-scale, 1));
+    margin:calc(2px * var(--font-scale, 1));vertical-align:middle;
+  }
+  /* Feste Zeilenhöhe für #rows-table (Bereinigen UND Korrigieren teilen sich
+     dieselbe _rows_table.html, siehe dortiger Kommentar) statt sie aus dem
+     jeweils höchsten Kind ableiten zu lassen — macht die Höhe unabhängig
+     davon, ob die erste Spalte eine Checkbox oder den Korrigieren-Button
+     enthält, und ist damit robuster als nur beide Kontrollelemente gleich
+     groß zu machen. 30px liegt bewusst über dem, was Text/Checkbox/Button je
+     für sich bräuchten (~24–28px) — sonst bliebe height nur ein wirkungsloser
+     Mindestwert (CSS-Tabellenzellen wachsen bei Bedarf immer über eine zu
+     knapp bemessene height hinaus), und beide Modi würden wieder mit ihrer je
+     eigenen, leicht unterschiedlichen Inhaltsgröße rendern. */
+  #rows-table table.dt.compact td{height:calc(30px * var(--font-scale, 1));vertical-align:middle;}
+  .value-unit{color:var(--ink-faint);font-size:calc(11.5px * var(--font-scale, 1));}
+  .correct-inline{display:flex;align-items:center;gap:6px;}
+  .correct-inline input{
+    width:110px;font-family:inherit;font-size:inherit;padding:4px 6px;border-radius:6px;
+    border:1px solid var(--accent-line);background:var(--surface);color:var(--ink);
+  }
+  .correct-inline button{background:none;border:none;cursor:pointer;font-size:calc(14px * var(--font-scale, 1));padding:2px 4px;}
+  .correct-confirm{color:var(--accent-line);}
+  .correct-cancel{color:var(--ink-faint);}
+  /* Alarm-Filter (Ausreißer/Lücken/Duplikate) heben sich im Auswahlzustand
+     rot statt teal ab — anders als z. B. die Typ-Filter auf der Startseite,
+     weil diese Chips tatsächlich problematische Werte markieren. */
+  .filter-chip input:checked + span{background:var(--danger-soft);border-color:var(--danger);color:var(--danger);}
+  /* Zeitraum-Auswahl (Segmented Control) und Perioden-Navigation — identischer
+     Aufbau wie auf entity_detail.html, damit sich beide Werkzeuge gleich
+     bedienen: ein Zeitraum-Typ (Stunde/Tag/…/Gesamt) statt eines Dropdowns
+     mit festen Rollfenstern, davor/danach navigiert per ‹/›/Jetzt — beide in
+     einer Zeile, die Filter/Seitengröße eine Zeile darunter. #controls trägt
+     dafür (anders als die generische Regel in app.css) eine SENKRECHTE
+     Flex-Richtung, jede .toolbar-Zeile darin bleibt für sich genommen
+     waagerecht (Regel aus app.css). */
+  #controls{flex-direction:column;align-items:stretch;}
+  /* width:100% statt sich auf align-items:stretch zu verlassen — die Leiste
+     wuchs sonst auf die Breite ihres breitesten Kindes (.seg, 396px) statt
+     sich auf die 358px der Seite zu beschränken, und die Seite ließ sich auf
+     dem Telefon um 21px seitwärts schieben. Mit fester Breite schrumpft .seg
+     mit und scrollt wie vorgesehen in sich selbst. */
+  #controls > .toolbar{margin-bottom:0;width:100%;}
+  .seg{
+    display:flex;border:1px solid var(--border);border-radius:8px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;min-width:0;
+    scrollbar-width:none;
+  }
+  .seg::-webkit-scrollbar{display:none;}
+  .seg button{
+    flex:none;padding:7px 12px;font-size:calc(12.5px * var(--font-scale, 1));font-family:var(--font-mono);border:none;border-right:1px solid var(--border);
+    background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  .nav{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .period-label{
+    min-width:130px;text-align:center;white-space:nowrap;
+    font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;border-radius:6px;
+  }
+  .period-label:hover:not(:disabled){color:var(--accent-line);}
+  .period-label:disabled{cursor:default;opacity:.5;}
+
+  /* Kalender-Widget für den Datums-Sprung (Konzept "Offene Punkte": ein
+     natives <input type="date"> konnte einzelne Tage MIT Lücke innerhalb des
+     Entität-Zeitraums nicht ausschließen, nur den Gesamtzeitraum eingrenzen). */
+  [x-cloak]{display:none!important;}
+  .cal-wrap{position:relative;display:inline-block;}
+  .calendar-popover{
+    /* left ist nur ein Platzhalter bis calendar-picker.js beim Öffnen die an
+       den Viewport geklemmte Position einträgt (siehe reposition() dort) —
+       ohne Klemmung ragt das Popover bei einem Anker nahe am Fensterrand
+       (schmale/mobile Fenster) über <html>s overflow-x:hidden hinaus,
+       wodurch ein Teil der Tage unklickbar wird, nicht nur abgeschnitten
+       aussieht. */
+    position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:10px;
+  }
+  .calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+  .calendar-header .navbtn{flex:none;}
+  .calendar-month-select,.calendar-year-select{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  }
+  .calendar-month-select{flex:1.4;min-width:0;}
+  .calendar-year-select{flex:1;min-width:0;}
+  /* CSS Grid statt Flexbox für Wochentag-Kopf/Tage-Raster: eine frühere
+     Flexbox-Variante (flex-wrap + feste %-Breite je Zelle) zerstückelte die
+     Wochen in mehrere, teils leere Zeilen sobald der Monat mit "leeren"
+     Füllzellen begann (jeder Monat, dessen 1. kein Montag ist — praktisch
+     jeder zweite) — sichtbar als große Lücken zwischen den Wochenreihen.
+     display:grid mit einer festen Spaltenzahl kennt dieses Wrap-Verhalten gar
+     nicht erst: jede Zelle landet unabhängig von ihrem Inhalt exakt in ihrer
+     Raster-Position. (Grid wurde früher wegen eines anderen, inzwischen
+     behobenen Bugs gemieden — CSS "zoom" brach die fr-Einheit-Berechnung in
+     Kombination mit aspect-ratio; seit die Schriftgröße-Einstellung kein
+     "zoom" mehr nutzt, siehe app.css, betrifft das nicht mehr.) */
+  .calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7, 1fr);}
+  .calendar-weekdays{margin-bottom:4px;}
+  .calendar-weekdays span{text-align:center;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+  .calendar-day{
+    height:32px;box-sizing:border-box;border:none;border-radius:6px;font-size:calc(12px * var(--font-scale, 1));background:transparent;color:var(--ink);
+    cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+  }
+  .calendar-day:hover:not(:disabled){background:var(--surface-alt);}
+  .calendar-day.blank{visibility:hidden;cursor:default;}
+  .calendar-day.out-of-range{color:var(--ink-faint);opacity:.3;}
+  .calendar-day.no-data{color:var(--ink-faint);text-decoration:line-through;opacity:.55;}
+  .calendar-day.has-data{color:var(--ink);font-weight:600;}
+  .calendar-day:disabled{cursor:default;}
+  .calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
+  .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+
+  /* Status-Badge-Tooltips (Ausreißer/Lücke/Duplikat/Wiederholung) brauchen
+     eigenes JS statt der generischen [data-tooltip]::after-Regel (app.css):
+     die Badges sitzen in der scrollbaren Rohwert-Tabelle (.tbl-wrap,
+     overflow-x:auto), die jeden absolut positionierten Nachfahren an ihrer
+     eigenen Box kappt statt ihn umbrechen zu lassen, sobald er über den
+     sichtbaren Ausschnitt hinausragt — sichtbar als mittendrin abgeschnittener
+     Text. Ein an <body> gehängtes, per JS positioniertes .js-tooltip-Element
+     (position:fixed) entkommt dieser Klemme vollständig. */
+  .flag-badge[data-tooltip]:hover::after{content:none;}
+  .js-tooltip{
+    position:fixed;z-index:50;display:none;
+    background:var(--ink);color:var(--bg);padding:6px 10px;border-radius:6px;
+    font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;
+    white-space:normal;width:max-content;max-width:min(420px,calc(100vw - 24px));
+    overflow-wrap:anywhere;line-height:1.4;pointer-events:none;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);
+  }
+  .js-tooltip.open{display:block;}

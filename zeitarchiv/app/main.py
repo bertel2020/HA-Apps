@@ -527,8 +527,13 @@ class _AssetVersion:
 # *_label-Kopien übersetzen) hier mehr Code für denselben Zweck wäre.
 templates.env.filters["format_int"] = format_int
 templates.env.filters["format_value"] = format_value
+# Alle CSS-Dateien, nicht nur app.css: seit ZG-04 Schritt 3 liegen die
+# seitenlokalen Regeln als static/css/pages/<seite>.css daneben (vorher als
+# <style>-Block im jeweiligen Template). Eine gemeinsame mtime über alle,
+# aus demselben Grund wie bei js_v darunter — einfacher als ein eigener
+# Cache-Buster je Seite, und ändert sich beim Deploy ohnehin.
 templates.env.globals["css_v"] = _AssetVersion(
-    lambda: [APP_DIR / "static" / "css" / "app.css"]
+    lambda: (APP_DIR / "static" / "css").glob("**/*.css")
 )
 # Dieselbe Cache-Busting-Begründung wie oben, nur fürs JS (calendar-picker.js,
 # confirm-dialog.js, …) — ohne das blieb z. B. ein Fix in calendar-picker.js im
