@@ -412,3 +412,167 @@ def test_vergleichsregel_steht_nur_noch_an_einer_stelle() -> None:
     assert quelle.count("continuous=True, read_cache=read_cache") == 2  # beide in der Helfermethode
     assert quelle.count("def compute_period_comparison") == 1
     assert quelle.count("self.compute_period_comparison(") == 2  # Daten-Route und Bericht
+
+
+# --- Speicher ---------------------------------------------------------------
+#
+# Der Bereich mit der meisten Eigenlogik und durchweg stillen Fehlern: eine
+# falsch gewichtete Prozentzahl oder ein verrutschter Faktor 1000 sehen im
+# Diagramm völlig plausibel aus.
+
+
+def _gauge(a: _Anlage, entity_id: str, einheit: str, *werte: tuple[float, float]) -> None:
+    """Messgröße (Ladezustand in %, Kapazität in kWh/Wh) — anders als die
+    Zähler kein total_increasing, sonst würde compute_flow Differenzen statt
+    Momentanwerten bilden."""
+    a.index.get_or_create_entity(entity_id, "sensor", "measurement", einheit)
+    for stunde, wert in werte:
+        hotbuffer.append(a.tmp, entity_id, _ts(stunde), wert, TZ)
+        a.index.record_write(entity_id, _ts(stunde))
+
+
+def _mit_speicher(tmp: Path, speicher: list[dict]) -> tuple[_Anlage, dict]:
+    a, config = _beispielanlage(tmp)
+    config["speicher"] = speicher
+    return a, config
+
+
+def test_ladung_und_entladung_werden_als_eigene_knoten_gefuehrt(monkeypatch, tmp: Path) -> None:
+    """Entladung speist den Bus (Quelle), Ladung entnimmt ihm (Senke) — die
+    beiden "kind"-Werte steuern im Frontend außerdem die Farbe."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "Heimspeicher",
+        "laden_entity_id": "sensor.laden", "entladen_entity_id": "sensor.entladen",
+    }])
+    a.zaehler("sensor.laden", (0, 200.0), (23, 205.0))      # +5 geladen
+    a.zaehler("sensor.entladen", (0, 300.0), (23, 303.0))   # +3 entladen
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        knoten = {n["name"]: n for n in flow["nodes"]}
+        assert knoten["Heimspeicher (Entladung)"]["role"] == "source"
+        assert knoten["Heimspeicher (Entladung)"]["kind"] == "storage_out"
+        assert knoten["Heimspeicher (Ladung)"]["role"] == "sink"
+        assert knoten["Heimspeicher (Ladung)"]["kind"] == "storage_in"
+        # Netto = Ladung minus Entladung, hier also +2 kWh in den Speicher.
+        assert flow["kpi"]["speicher_netto"] == pytest.approx(2.0)
+        assert flow["kpi"]["speicher_laden"] == pytest.approx(5.0)
+        assert flow["kpi"]["speicher_entladen"] == pytest.approx(3.0)
+    finally:
+        a.close()
+
+
+def test_ohne_speicherrolle_bleibt_netto_none_statt_null(monkeypatch, tmp: Path) -> None:
+    """None und 0.0 bedeuten Verschiedenes: "kein Speicher konfiguriert" gegen
+    "Speicher da, aber diese Periode ohne Bewegung". Das Frontend blendet die
+    Kachel nur im ersten Fall aus."""
+    flow, a, _ = _flow(monkeypatch, tmp)
+    try:
+        assert flow["kpi"]["speicher_netto"] is None
+        assert flow["kpi"]["speicher_laden"] is None
+    finally:
+        a.close()
+
+
+def test_ladezustand_wird_kapazitaetsgewichtet_gemittelt(monkeypatch, tmp: Path) -> None:
+    """Der Fall, den der Code-Kommentar als Grund nennt: ein kleiner Speicher
+    voll, ein großer leer. Ein einfacher Mittelwert ergäbe 50 %, tatsächlich
+    ist die Anlage aber fast leer — 2 kWh von 12 kWh, also rund 17 %."""
+    a, config = _mit_speicher(tmp, [
+        {"name": "Klein", "soc_entity_id": "sensor.soc_klein", "capacity_kwh": 2.0},
+        {"name": "Gross", "soc_entity_id": "sensor.soc_gross", "capacity_kwh": 10.0},
+    ])
+    _gauge(a, "sensor.soc_klein", "%", (0, 100.0), (12, 100.0), (23, 100.0))
+    _gauge(a, "sensor.soc_gross", "%", (0, 0.0), (12, 0.0), (23, 0.0))
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        # (100*2 + 0*10) / 12 = 16,67 — NICHT 50.
+        assert flow["kpi"]["speicher_soc"] == pytest.approx(16.7, abs=0.1)
+        # Gesamtkapazität 12 kWh, davon 16,67 % -> 2 kWh.
+        assert flow["kpi"]["speicher_soc_kwh"] == pytest.approx(2.0, abs=0.1)
+    finally:
+        a.close()
+
+
+def test_kapazitaet_aus_wh_sensor_wird_umgerechnet(monkeypatch, tmp: Path) -> None:
+    """BMS-Integrationen melden die Kapazität häufig in Wh. Ein verrutschter
+    Faktor 1000 fiele in einer Prozentanzeige nicht auf, in der kWh-Angabe
+    daneben aber sehr wohl."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "BMS", "soc_entity_id": "sensor.soc",
+        "capacity_entity_id": "sensor.kapazitaet_wh",
+    }])
+    _gauge(a, "sensor.soc", "%", (0, 50.0), (23, 50.0))
+    _gauge(a, "sensor.kapazitaet_wh", "Wh", (0, 8000.0), (23, 8000.0))
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        # 8000 Wh = 8 kWh, davon 50 % -> 4 kWh (nicht 4000).
+        assert flow["kpi"]["speicher_soc_kwh"] == pytest.approx(4.0, abs=0.1)
+    finally:
+        a.close()
+
+
+def test_kwh_angabe_entfaellt_wenn_eine_kapazitaet_fehlt(monkeypatch, tmp: Path) -> None:
+    """Bei nur teilweise bekannten Kapazitäten wäre die kWh-Summe irreführend
+    niedrig — der Speicher ohne Angabe zählt in der Summe nicht mit, ging aber
+    mit Gewicht 1 in den Prozentschnitt ein. Dann lieber gar keine kWh-Zahl."""
+    a, config = _mit_speicher(tmp, [
+        {"name": "Mit", "soc_entity_id": "sensor.soc_a", "capacity_kwh": 10.0},
+        {"name": "Ohne", "soc_entity_id": "sensor.soc_b"},
+    ])
+    _gauge(a, "sensor.soc_a", "%", (0, 80.0), (23, 80.0))
+    _gauge(a, "sensor.soc_b", "%", (0, 80.0), (23, 80.0))
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        assert flow["kpi"]["speicher_soc"] == pytest.approx(80.0, abs=0.5)
+        assert flow["kpi"]["speicher_soc_kwh"] is None
+    finally:
+        a.close()
+
+
+def test_vertauschte_lade_und_entladerolle_wird_gemeldet(monkeypatch, tmp: Path) -> None:
+    """Über einen längeren Zeitraum kann nicht mehr entladen als geladen worden
+    sein. Ohne diese Prüfung geht das Diagramm scheinbar sauber auf, obwohl die
+    beiden Sensoren vertauscht zugeordnet sind."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "Verdreht",
+        "laden_entity_id": "sensor.wenig", "entladen_entity_id": "sensor.viel",
+    }])
+    a.zaehler("sensor.wenig", (0, 10.0), (23, 11.0))   # +1 "geladen"
+    a.zaehler("sensor.viel", (0, 20.0), (23, 29.0))    # +9 "entladen"
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        pruefung = next(c for c in flow["quality"]["checks"]
+                        if c["label"] == "Speicher-Wirkungsgrad plausibel")
+        assert pruefung["ok"] is False
+        assert "Verdreht" in pruefung["detail"]
+        assert flow["quality"]["plausible"] is False
+    finally:
+        a.close()
+
+
+def test_mehrere_speicher_werden_bei_energie_summiert(monkeypatch, tmp: Path) -> None:
+    """Energiemengen addieren sich über Speicher hinweg — anders als der
+    Ladezustand, der gemittelt wird. Die Aufschlüsselung erscheint erst ab zwei
+    Speichern, bei einem wäre sie nur eine Wiederholung der Summe."""
+    a, config = _mit_speicher(tmp, [
+        {"name": "A", "laden_entity_id": "sensor.a_lad", "entladen_entity_id": "sensor.a_ent"},
+        {"name": "B", "laden_entity_id": "sensor.b_lad", "entladen_entity_id": "sensor.b_ent"},
+    ])
+    a.zaehler("sensor.a_lad", (0, 0.0), (23, 4.0))
+    a.zaehler("sensor.a_ent", (0, 0.0), (23, 1.0))
+    a.zaehler("sensor.b_lad", (0, 0.0), (23, 6.0))
+    a.zaehler("sensor.b_ent", (0, 0.0), (23, 2.0))
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        assert flow["kpi"]["speicher_laden"] == pytest.approx(10.0)
+        assert flow["kpi"]["speicher_entladen"] == pytest.approx(3.0)
+        aufschluesselung = {s["name"]: s["value"] for s in flow["speicher_breakdown"]}
+        assert aufschluesselung == {"A": pytest.approx(3.0), "B": pytest.approx(4.0)}
+    finally:
+        a.close()
