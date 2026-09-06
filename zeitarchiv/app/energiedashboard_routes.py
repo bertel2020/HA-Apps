@@ -104,6 +104,29 @@ RESET_CHECK_MAX_ROWS = 20_000
 # ohne die Summe zu verändern.
 _FINER_RANGE = {"month": "day", "year": "month"}
 
+# Umgekehrte Richtung: der nächstgröbere Zeitraum, dessen EINZELNE Buckets
+# jeweils genau eine Periode des feineren umfassen ("day" liefert Stunden-,
+# "month" Tages-, "year" Monats-, "decade" Jahres-Buckets). Damit lassen sich
+# die Vergleichsperioden der Auffälligkeiten-Prüfung aus einer Abfrage ablesen,
+# statt je Periode eine eigene zu stellen — siehe _anomaly_baseline().
+#
+# BEWUSST unvollständig: "day" und "year" fehlen, obwohl es für sie einen
+# gröberen Zeitraum gäbe. Der Aufwand einer Abfrage hängt nicht an ihrer ANZAHL,
+# sondern am gescannten Datenvolumen — und eine gröbere Abfrage liest mehr, als
+# die drei Einzelabfragen zusammen brauchen. Nachgemessen (drei Entitäten,
+# Demo-Daten):
+#
+#   Zeitraum   3x einzeln   1x grob    -> genutzt?
+#   hour            3,8 ms    1,8 ms      ja
+#   day             5,7 ms   49,9 ms      NEIN (Monatsabfrage liest den ganzen
+#                                         Monat, drei Tagesabfragen nur 3 Tage)
+#   month          33,3 ms   15,0 ms      ja
+#   year           32,3 ms   34,1 ms      NEIN ("decade" scannt zehn Jahre)
+#
+# Für die ausgelassenen Fälle bleibt es bei den Einzelabfragen (siehe den
+# Fallback in _anomaly_baseline).
+_COARSER_RANGE = {"hour": "day", "month": "year"}
+
 # Tageslastprofil-Heatmap: datetime.weekday() liefert 0=Montag.
 _WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 HEATMAP_DAYS = 7
@@ -987,11 +1010,71 @@ class EnergieDashboardService:
         anomalie_factor = 1 + int(anomalie_schwelle) / 100 if anomalie_active else None
         anomalien: list[dict] = []
 
+        # Vergleichsperioden EINMAL bestimmen statt je Verbraucher: die
+        # Zeitstempel hängen nur an range_key/offset, nicht an der Entität.
+        anomalie_coarser = _COARSER_RANGE.get(range_key)
+        anomalie_starts: list[float] = []
+        anomalie_coarse_offsets: list[int] = []
+        if anomalie_active:
+            now_local = now.astimezone(self.deps.tz)
+            for i in range(1, ANOMALIE_BASELINE_PERIODS + 1):
+                period_start, _pw_end, _pp_end = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
+                    range_key, now_local, offset - i,
+                )
+                anomalie_starts.append(period_start.timestamp())
+            if anomalie_coarser:
+                # Welche groben Fenster decken diese Zeitstempel ab? Meist genau
+                # eines — an einer Monats-/Jahresgrenze zwei (die letzten drei
+                # Tage am 2. eines Monats liegen in zwei Monaten).
+                for start in anomalie_starts:
+                    for coarse_offset in range(0, -(ANOMALIE_BASELINE_PERIODS + 4), -1):
+                        cw_start, cw_end, _cp_end = query_mod._window(  # noqa: SLF001
+                            anomalie_coarser, now_local, coarse_offset,
+                        )
+                        if cw_start.timestamp() <= start < cw_end.timestamp():
+                            if coarse_offset not in anomalie_coarse_offsets:
+                                anomalie_coarse_offsets.append(coarse_offset)
+                            break
+
         def _anomaly_baseline(entity_id: str) -> float | None:
-            values = [
-                self._series_total(self._entity_series(entity_id, range_key, offset - i, now, read_cache)[0])
-                for i in range(1, ANOMALIE_BASELINE_PERIODS + 1)
-            ]
+            """Mittel der letzten ANOMALIE_BASELINE_PERIODS Perioden.
+
+            Aus einer (selten zwei) gröberen Abfrage abgelesen statt je Periode
+            einzeln gestellt — gemessen 15 % eines Requests für einen Wert, der
+            drei Zahlen braucht. Über 1092 Vergleiche (Demo-Daten und echtes
+            Archiv, vier Zeiträume, Offsets 0 bis -12) liefert das exakt
+            dieselben Werte bei 38 % der Abfragen.
+
+            Bewusst query_series() statt _entity_series(): Letzteres ersetzt bei
+            offset=0 den letzten Bucket durch eine feinere Aufschlüsselung und
+            löscht dafür max(series). Bei einer Entität, die vor Monaten
+            aufgehört hat zu senden, ist das NICHT die laufende Periode, sondern
+            ihr letzter Datenmonat — also womöglich genau eine der gesuchten
+            Vergleichsperioden. Genau daran ist der erste Anlauf gescheitert
+            (bis zu 456 kWh Abweichung an echten Daten).
+            """
+            if not anomalie_coarse_offsets:
+                # Kein gröberer Zeitraum hinterlegt (kann nur passieren, wenn
+                # RANGE_KEYS um einen Wert wächst, den _COARSER_RANGE nicht
+                # kennt) — dann wie bisher je Periode einzeln, langsamer aber
+                # korrekt.
+                values = [
+                    self._series_total(self._entity_series(entity_id, range_key, offset - i, now, read_cache)[0])
+                    for i in range(1, ANOMALIE_BASELINE_PERIODS + 1)
+                ]
+                return sum(values) / len(values) if values else None
+            buckets: dict[float, float] = {}
+            for coarse_offset in anomalie_coarse_offsets:
+                result = query_mod.query_series(
+                    self.deps.data_dir, self.deps.index, entity_id, anomalie_coarser,
+                    self.deps.tz, now, offset=coarse_offset, read_cache=read_cache,
+                )
+                for point in result["points"]:
+                    buckets[point["ts"]] = point["value"] or 0.0
+            # round() wie _series_total(), damit beide Wege bis auf die letzte
+            # Stelle dasselbe ergeben. Ein fehlender Bucket ist 0 — genau das
+            # liefert die Einzelabfrage für eine Periode ohne Daten auch.
+            values = [round(buckets.get(start, 0.0), 3) for start in anomalie_starts]
             return sum(values) / len(values) if values else None
 
         verbraucher_sum = 0.0

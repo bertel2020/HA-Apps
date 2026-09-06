@@ -27,10 +27,11 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 try:
-    import pyarrow  # noqa: F401 — nur Verfügbarkeitsprüfung, wie in test_query.py
+    import pyarrow as pa
+    import pyarrow.parquet as pq
 
     from app import energiedashboard_routes as ed
-    from app.storage import hotbuffer
+    from app.storage import hotbuffer, rollup
     from app.storage import query as query_mod
     from app.storage.index import Index
 
@@ -743,5 +744,115 @@ def test_zeitstempel_aus_der_zukunft_gilt_als_abgelaufen(monkeypatch, tmp: Path)
         treffer[0] = 0
         a.service.compute_flow(config, "day", -1)
         assert treffer[0] > 0
+    finally:
+        a.close()
+
+
+# --- Auffälligkeiten-Baseline ----------------------------------------------
+
+
+def _anomalie_anlage(tmp: Path) -> tuple[_Anlage, dict]:
+    """Ein Verbraucher, dessen Verbrauch im ANGEZEIGTEN Monat deutlich über den
+    drei Vormonaten liegt — nur dann feuert die Auffälligkeit, nur dann steht
+    überhaupt eine Baseline im Ergebnis, und nur dann fällt ein falsch gelesener
+    Vergleichswert auf.
+
+    Die Monate sind bewusst so gelegt, dass die drei Vergleichsperioden über
+    eine JAHRESGRENZE reichen: angezeigt wird Februar 2024, verglichen wird mit
+    Januar 2024 sowie Dezember und November 2023. Die Fensterauswahl muss dafür
+    zwei grobe Abfragen anfordern statt einer — sonst fehlen zwei der drei Werte
+    unbemerkt.
+
+    Anders als die übrigen Fixtures hier reicht der Hot Buffer nicht: eine
+    Monatsabfrage liest abgeschlossene Tage aus dem Rollup. Die Monate werden
+    deshalb wie in test_query.py als archivierte Monate samt Rollup angelegt.
+    """
+    a = _Anlage(tmp)
+    a.zaehler("sensor.netz", (0, 0.0), (23, 100.0))
+    a.index.get_or_create_entity("sensor.geraet", "sensor", "total_increasing", "kWh")
+    # (Jahr, Monat, Zählerstand am Monatsanfang, Verbrauch im Monat)
+    monate = [(2023, 11, 0.0, 10.0), (2023, 12, 10.0, 10.0),
+              (2024, 1, 20.0, 10.0), (2024, 2, 30.0, 40.0)]
+    archiv = tmp / "archive" / "sensor.geraet"
+    archiv.mkdir(parents=True, exist_ok=True)
+    for jahr, monat, start, menge in monate:
+        erster = _dt.datetime(jahr, monat, 1, 6, tzinfo=TZ)
+        letzter = _dt.datetime(jahr, monat, 28, 18, tzinfo=TZ)
+        tabelle = pa.table({
+            "ts": [erster.timestamp(), letzter.timestamp()],
+            "value": [start, start + menge],
+        })
+        pq.write_table(tabelle, archiv / f"{jahr}-{monat:02d}.parquet")
+        rollup.append_completed_month(tmp, "sensor.geraet", "counter", tabelle, jahr, monat, TZ)
+        a.index.record_write("sensor.geraet", letzter.timestamp())
+    config = ed._empty_config()
+    config.update({
+        "netzbezug": "sensor.netz", "hub_name": "Haus",
+        "verbraucher": [{"entity_id": "sensor.geraet", "name": "Gerät"}],
+    })
+    return a, config
+
+
+def test_anomalie_feuert_im_testaufbau_ueberhaupt(monkeypatch, tmp: Path) -> None:
+    """Absicherung der Absicherung: ohne ausgelöste Auffälligkeit wären die
+    Baselines unten auf beiden Wegen None und der Vergleich wertlos."""
+    a, config = _anomalie_anlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        knoten = next(n for n in flow["nodes"] if n["name"] == "Gerät")
+        assert knoten.get("anomaly") is True, "Testaufbau löst keine Auffälligkeit aus"
+        assert knoten["anomaly_baseline"] == pytest.approx(10.0)
+    finally:
+        a.close()
+
+
+@pytest.mark.parametrize("range_key", ["hour", "day", "month", "year"])
+def test_baseline_ueber_groebere_abfrage_ergibt_dieselben_werte(monkeypatch, tmp: Path, range_key) -> None:
+    """Der eigentliche Nachweis: die Abkürzung über eine gröbere Abfrage muss
+    exakt dieselben Auffälligkeiten liefern wie die Einzelabfragen. Geprüft,
+    indem _COARSER_RANGE geleert wird — dann greift der Fallback-Zweig."""
+    a, config = _anomalie_anlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        mit = a.service.compute_flow(config, range_key, -1)
+        monkeypatch.setattr(ed, "_COARSER_RANGE", {})
+        ohne = a.service.compute_flow(config, range_key, -1)
+        assert mit["anomalien"] == ohne["anomalien"]
+        knoten_mit = {n["name"]: n.get("anomaly_baseline") for n in mit["nodes"]}
+        knoten_ohne = {n["name"]: n.get("anomaly_baseline") for n in ohne["nodes"]}
+        assert knoten_mit == knoten_ohne
+    finally:
+        a.close()
+
+
+def test_groebere_abfrage_nur_wo_sie_nachweislich_hilft() -> None:
+    """"day" und "year" sind bewusst NICHT abgebildet: der Aufwand hängt am
+    gescannten Datenvolumen, nicht an der Anzahl der Abfragen. Eine
+    Monatsabfrage liest den ganzen Monat (gemessen 49,9 ms gegenüber 5,7 ms für
+    drei Tagesabfragen), "decade" scannt zehn Jahre. Wer die Abbildung
+    "vervollständigt", macht den Tages-Request rund zehnmal langsamer."""
+    assert ed._COARSER_RANGE == {"hour": "day", "month": "year"}
+
+
+def test_groebere_abfrage_spart_bei_monat_tatsaechlich_abfragen(monkeypatch, tmp: Path) -> None:
+    a, config = _anomalie_anlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    gezaehlt = [0]
+    echt = query_mod.query_series
+
+    def wrap(*args, **kw):
+        gezaehlt[0] += 1
+        return echt(*args, **kw)
+
+    monkeypatch.setattr(query_mod, "query_series", wrap)
+    try:
+        gezaehlt[0] = 0
+        a.service.compute_flow(config, "month", -1)
+        mit = gezaehlt[0]
+        monkeypatch.setattr(ed, "_COARSER_RANGE", {})
+        gezaehlt[0] = 0
+        a.service.compute_flow(config, "month", -1)
+        assert mit < gezaehlt[0], "gröbere Abfrage muss weniger Abfragen brauchen"
     finally:
         a.close()
