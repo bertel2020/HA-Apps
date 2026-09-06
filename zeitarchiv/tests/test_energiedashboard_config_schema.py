@@ -119,3 +119,59 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_sankey_legende_ist_standardmaessig_aus() -> None:
+    """Anders als die Kachel-Schalter (alle per Default an): der Energiefluss
+    ist auch ohne Legende lesbar, deshalb soll die zusätzliche Zeile unter dem
+    Diagramm niemandem ungefragt erscheinen."""
+    assert _empty_config()["show_sankey_legende"] is False
+
+
+def test_bestehende_config_ohne_legenden_schluessel_bleibt_aus() -> None:
+    """_load_config() übernimmt nur Schlüssel, die in _empty_config() stehen —
+    eine vor dieser Version gespeicherte Konfiguration kennt den Schalter nicht
+    und darf die Legende deshalb nicht plötzlich einblenden."""
+
+    def check(index: Index) -> None:
+        gespeichert = _empty_config()
+        del gespeichert["show_sankey_legende"]
+        gespeichert["netzbezug"] = "sensor.netz"
+        index.set_setting(
+            SETTING_CONFIG,
+            json.dumps({**gespeichert, "schema_version": CONFIG_SCHEMA_VERSION}),
+        )
+        geladen = _load_config(index)
+        assert geladen["show_sankey_legende"] is False
+        assert geladen["netzbezug"] == "sensor.netz"
+
+    _with_index(check)
+
+
+def test_eingeschaltete_legende_ueberlebt_speichern_und_laden() -> None:
+    def check(index: Index) -> None:
+        config = _empty_config()
+        config["show_sankey_legende"] = True
+        _save_config(index, config)
+        assert _load_config(index)["show_sankey_legende"] is True
+
+    _with_index(check)
+
+
+def test_view_blendet_die_legende_nur_bei_eingeschaltetem_schalter_ein() -> None:
+    """Serverseitig gegated, nicht per x-show: bei ausgeschalteter Legende soll
+    das Markup gar nicht erst ausgeliefert werden. Der x-ref dient buildLegend()
+    zusätzlich als Signal, die Einträge dann auch nicht zu berechnen."""
+    view = (Path(__file__).resolve().parents[1] / "app/templates/_energiedashboard_view.html").read_text(
+        encoding="utf-8"
+    )
+    start = view.index("{% if config.show_sankey_legende %}")
+    ende = view.index("{% endif %}", start)
+    block = view[start:ende]
+    assert 'class="chart-legend edash-sankey-legend"' in block
+    assert 'x-ref="legendEl"' in block
+
+    js = (Path(__file__).resolve().parents[1] / "app/static/js/energiedashboard.js").read_text(
+        encoding="utf-8"
+    )
+    assert "if (!this.$refs.legendEl) { this.legendItems = []; return; }" in js
