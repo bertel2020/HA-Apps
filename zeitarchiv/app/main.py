@@ -20,6 +20,7 @@ import secrets
 import shutil
 import threading
 import time
+from collections.abc import Callable, Iterable
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -125,6 +126,10 @@ from .index_optimization import (
     build_index_detail_context,
     get_index_optimization_state,
     optimize_index,
+)
+from .housekeeping_routes import (
+    HousekeepingDependencies,
+    create_housekeeping_router,
 )
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -465,6 +470,52 @@ def favicon() -> FileResponse:
     # immer unter dem Wurzelpfad an — ohne diese Route landet das als 404 im
     # Access-Log, obwohl das Addon-Icon längst existiert (addon/icon.png).
     return FileResponse(APP_DIR.parent / "icon.png", media_type="image/png")
+class _AssetVersion:
+    """Cache-Buster, der beim Rendern nachsieht statt einmal beim Import.
+
+    Vorher standen css_v/js_v/vendor_v als Konstanten hier. Nach einem
+    Serverstart änderte sich ?v= dadurch nicht mehr, auch wenn die Datei sich
+    änderte — der Browser lieferte weiter seine zwischengespeicherte Fassung
+    aus, und eine CSS- oder JS-Änderung wirkte scheinbar nicht. Im Betrieb
+    fiel das nie auf, weil ein Update ohnehin neu startet; in der Entwicklung
+    kostet es jedes Mal die Zeit, bis man auf den Cache statt auf den eigenen
+    Code kommt.
+
+    Jinja ruft __str__ beim Rendern auf, deshalb bleiben die 139 Stellen
+    "?v={{ css_v }}" in den Templates unverändert.
+
+    Ein Sekunden-Fenster, weil {{ js_v }} in einer einzigen Seite bis zu
+    zehnmal vorkommt (ein <script>-Tag je Datei): ohne das würde jede dieser
+    Stellen den Ordner erneut durchsehen. Gemessen kostet ein Durchgang über
+    css + js + vendor (24 Dateien) 0,13 ms — vernachlässigbar gegen einen
+    Seitenaufbau, aber zehnmal je Seite ist es unnötig. Eine Sekunde ist beim
+    Entwickeln nicht spürbar und macht den wiederholten Zugriff kostenlos.
+    """
+
+    _FENSTER_SEKUNDEN = 1.0
+
+    def __init__(self, dateien: Callable[[], Iterable[Path]]) -> None:
+        self._dateien = dateien
+        self._wert = 0
+        self._geprueft = 0.0
+
+    def _aktuell(self) -> int:
+        jetzt = time.monotonic()
+        if self._wert and jetzt - self._geprueft < self._FENSTER_SEKUNDEN:
+            return self._wert
+        try:
+            self._wert = int(max(datei.stat().st_mtime for datei in self._dateien()))
+        except (OSError, ValueError):
+            # Ordner fehlt oder ist leer: den zuletzt bekannten Wert behalten,
+            # statt den Seitenaufbau an einem Cache-Buster scheitern zu lassen.
+            pass
+        self._geprueft = jetzt
+        return self._wert
+
+    def __str__(self) -> str:
+        return str(self._aktuell())
+
+
 # Cache-Busting fürs geteilte Stylesheet (siehe app/static/css/README.md),
 # macht das lange "immutable" Cache-Control von _CachedStaticFiles sicher.
 # format_int/format_value als Jinja-Filter statt jede Stelle einzeln in Python
@@ -477,18 +528,24 @@ def favicon() -> FileResponse:
 # *_label-Kopien übersetzen) hier mehr Code für denselben Zweck wäre.
 templates.env.filters["format_int"] = format_int
 templates.env.filters["format_value"] = format_value
-templates.env.globals["css_v"] = int((APP_DIR / "static" / "css" / "app.css").stat().st_mtime)
+templates.env.globals["css_v"] = _AssetVersion(
+    lambda: [APP_DIR / "static" / "css" / "app.css"]
+)
 # Dieselbe Cache-Busting-Begründung wie oben, nur fürs JS (calendar-picker.js,
 # confirm-dialog.js, …) — ohne das blieb z. B. ein Fix in calendar-picker.js im
 # Browser-Cache unbemerkt hängen, obwohl der Server längst die neue Version
 # ausliefert. Eine gemeinsame mtime über alle JS-Dateien statt einer pro Datei:
 # einfacher als js_v-Kopien an jeder <script>-Stelle zu pflegen, und ändert sich
 # ohnehin bei jedem Deploy dieses Verzeichnisses.
-templates.env.globals["js_v"] = int(max(p.stat().st_mtime for p in (APP_DIR / "static" / "js").glob("*.js")))
+templates.env.globals["js_v"] = _AssetVersion(
+    lambda: (APP_DIR / "static" / "js").glob("*.js")
+)
 # Dieselbe Begründung wie js_v, für htmx/echarts/alpine — trugen bisher
 # keinen Cache-Buster, wären damit die einzige Lücke im langen Cache-Control
 # von _CachedStaticFiles gewesen.
-templates.env.globals["vendor_v"] = int(max(p.stat().st_mtime for p in (APP_DIR / "static" / "vendor").glob("*.js")))
+templates.env.globals["vendor_v"] = _AssetVersion(
+    lambda: (APP_DIR / "static" / "vendor").glob("*.js")
+)
 # Namenslänge für Dashboards/Charts/Tabellen: als maxlength in die
 # Eingabefelder, damit die Grenze schon beim Tippen gilt statt erst beim
 # Speichern. Die verbindliche Prüfung bleibt serverseitig
@@ -1051,36 +1108,8 @@ def _refresh_host_disk_usage() -> None:
     _host_disk_usage_cached = {"free": usage.free, "total": usage.total}
 
 
-def _host_disk_usage_context() -> dict:
-    """Für die immer sichtbare Host-Speicherplatz-Zeile in housekeeping.html —
-    andere Frage als Zeitarchivs eigene interne Aufschlüsselung (Speicherindex,
-    Bereinigung), siehe notices.py housekeeping.host_disk_space_low."""
-    usage = _host_disk_usage_cached
-    if not usage or not usage.get("total"):
-        return {"host_disk_usage": None}
-    free_ratio = usage["free"] / usage["total"]
-    # Dieselben Schwellwerte wie housekeeping.host_disk_space_low (notices.py)
-    # — der Balken wechselt die Farbe genau dann, wenn auch die Notice
-    # anspringen würde, statt eine unabhängige zweite Meinung zu sein.
-    if free_ratio < notices_mod.HOST_DISK_ERROR_RATIO:
-        severity = "danger"
-    elif free_ratio < notices_mod.HOST_DISK_WARN_RATIO:
-        severity = "warning"
-    else:
-        severity = "positive"
-    return {
-        "host_disk_usage": {
-            "free_label": format_size(usage["free"]),
-            "total_label": format_size(usage["total"]),
-            "free_percent": round(free_ratio * 100),
-            "used_percent": round((1 - free_ratio) * 100),
-            "severity": severity,
-        }
-    }
 
 
-def _settings_rotation_context(result: str | None = None) -> dict:
-    return {"stale_count": _count_stale_entities(), "result": result}
 
 
 _PURGE_PREVIEW_SETTING = "purge_preview_snapshot"
@@ -1163,154 +1192,10 @@ def _refresh_purge_preview_if_stale(*, force: bool = False) -> dict:
     return preview
 
 
-def _settings_purge_context(result: str | None = None) -> dict:
-    """Liefert die stets sichtbare, rein lesende Bereinigungsvorschau — aus
-    dem Zwischenspeicher (siehe _refresh_purge_preview_if_stale()), NICHT bei
-    jedem Aufruf neu berechnet. Die Aktualisierung übernimmt der
-    Wartungsplaner (_maintenance_scheduler_loop()) im Hintergrund; nach einem
-    tatsächlichen Purge-Klick erzwingt settings_purge() zusätzlich eine
-    sofortige Aktualisierung, damit das Ergebnis nicht die alten Zahlen zeigt."""
-    return {"result": result, "purge_preview": _load_purge_preview()}
 
 
-def _settings_storage_index_context(report: dict | None = None) -> dict:
-    report = report if report is not None else _storage_reconcile_last
-    if report is None:
-        return {"storage_audit": None}
-    rows = []
-    for row in report["mismatches"]:
-        rows.append({
-            **row,
-            "indexed_visible_rows_label": format_int(row['indexed_visible_rows']),
-            "actual_visible_rows_label": format_int(row['actual_visible_rows']),
-            "difference_label": format_int(row['actual_visible_rows'] - row['indexed_visible_rows'], signed=True),
-            "indexed_size_label": format_size(row["indexed_size_bytes"]),
-            "actual_size_label": format_size(row["actual_size_bytes"]),
-        })
-    checked_at = report.get("checked_at")
-    return {
-        "storage_audit": {
-            **report,
-            "rows": rows,
-            "checked_at_label": (
-                f"{format_timestamp(checked_at, TZ)} {format_time(checked_at, TZ)}"
-                if checked_at else "—"
-            ),
-        }
-    }
 
 
-def _settings_retention_context(result: str | None = None) -> dict:
-    limited_count = sum(1 for entity in index.list_entities() if entity["retention"] != "unlimited")
-    schedule = index.get_setting("retention_enforcement", "off")
-    if schedule not in BACKUP_SCHEDULE_LABELS:
-        schedule = "off"
-    enabled = schedule in ("daily", "weekly")
-    next_raw = index.get_setting("retention_enforcement_next_run", "")
-    try:
-        next_ts = float(next_raw) if next_raw else None
-    except ValueError:
-        next_ts = None
-    if enabled and next_ts is None:
-        next_ts = _set_next_retention_run(datetime.now(TZ))
-
-    retention_overview = _load_retention_overview()
-    retention_totals = retention_overview.get("totals", {})
-    retention_history_30d = index.get_retention_job_totals(time.time() - 30 * 86400)
-    retention_history_all = index.get_retention_job_totals(0.0)
-    retention_groups = {
-        row["retention"]: row for row in retention_overview.get("groups", [])
-        if isinstance(row, dict) and row.get("retention")
-    }
-    by_retention = []
-    for row in index.get_stats_by_retention():
-        due = retention_groups.get(row["retention"], {})
-        rows_due = int(due.get("rows_due", 0) or 0)
-        months_due = int(due.get("months_due", 0) or 0)
-        next_expiration_ts = due.get("next_expiration_ts")
-        if rows_due or months_due:
-            next_expiration = "Jetzt fällig"
-        elif isinstance(next_expiration_ts, (int, float)):
-            next_expiration = (
-                f"{format_timestamp(next_expiration_ts, TZ)} "
-                f"{format_time(next_expiration_ts, TZ)}"
-            )
-        else:
-            next_expiration = "—"
-        by_retention.append({
-            "label": format_retention(row["retention"]),
-            "entity_count": format_int(row["entity_count"]),
-            "total_rows": format_int(row['total_rows']),
-            "total_size": format_size(row["total_size_bytes"]),
-            "rows_due": format_int(rows_due),
-            "months_due": months_due,
-            "entities_due": int(due.get("entities_due", 0) or 0),
-            "bytes_due": format_size(int(due.get("bytes_due", 0) or 0)),
-            "next_expiration": next_expiration,
-        })
-
-    def display_ts(raw: str | None) -> str:
-        try:
-            ts = float(raw) if raw else None
-        except ValueError:
-            ts = None
-        return f"{format_timestamp(ts, TZ)} {format_time(ts, TZ)}" if ts else "—"
-
-    status_labels = {
-        "queued": "Geplant", "running": "Läuft", "success": "Erfolgreich",
-        "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen", "skipped": "Übersprungen",
-    }
-    jobs = []
-    for job in index.list_retention_jobs(8):
-        jobs.append({
-            "created_at": f"{format_timestamp(job['created_at'], TZ)} {format_time(job['created_at'], TZ)}",
-            "created_at_ts": job["created_at"],
-            "trigger": "Zeitplan" if job["trigger"] == "scheduled" else "Manuell",
-            "status": status_labels.get(job["status"], job["status"]),
-            "status_key": job["status"],
-            "rows_deleted": format_int(job["rows_deleted"]) if job["rows_deleted"] is not None else "—",
-            "months_deleted": job["months_deleted"] if job["months_deleted"] is not None else "—",
-            "entities_affected": format_int(job["entities_affected"]) if job["entities_affected"] is not None else "—",
-            "bytes_freed": format_size(job["bytes_freed"] or 0) if job["bytes_freed"] else "—",
-            "error": job["error"],
-        })
-    with _retention_progress.lock:
-        running = _retention_progress.running
-    last_success_raw = index.get_setting("retention_last_success", "")
-    return {
-        "retention_enforcement_enabled": enabled,
-        "retention_enforcement_schedule": schedule,
-        "retention_enforcement_options": list(BACKUP_SCHEDULE_LABELS.items()),
-        "retention_enforcement_time": index.get_setting("retention_enforcement_time", RETENTION_DEFAULT_TIME),
-        "retention_enforcement_weekday": int(
-            index.get_setting("retention_enforcement_weekday", str(RETENTION_DEFAULT_WEEKDAY))
-        ),
-        "retention_weekday_options": BACKUP_WEEKDAY_OPTIONS,
-        "retention_timezone": str(TZ),
-        "retention_next_run": display_ts(str(next_ts) if next_ts is not None else None),
-        "retention_last_success": display_ts(last_success_raw),
-        "retention_last_failure": display_ts(index.get_setting("retention_last_failure", "")),
-        "last_run": display_ts(last_success_raw) if last_success_raw else None,
-        "retention_jobs": jobs,
-        "retention_running": running,
-        "limited_retention_count": format_int(limited_count),
-        "retention_due_rows": format_int(int(retention_totals.get('rows_deleted', 0) or 0)),
-        "retention_due_entities": int(retention_totals.get("entities_affected", 0) or 0),
-        "retention_due_months": int(retention_totals.get("months_deleted", 0) or 0),
-        "retention_due_size": format_size(int(retention_totals.get("bytes_freed", 0) or 0)),
-        "retention_history_30d_rows": format_int(retention_history_30d['rows_deleted']),
-        "retention_history_30d_size": format_size(retention_history_30d["bytes_freed"]),
-        "retention_history_all_rows": format_int(retention_history_all['rows_deleted']),
-        "retention_history_all_size": format_size(retention_history_all["bytes_freed"]),
-        "by_retention": by_retention,
-        "retention_preview_generated_at": (
-            f"{format_timestamp(retention_overview['generated_at'], TZ)} "
-            f"{format_time(retention_overview['generated_at'], TZ)}"
-            if isinstance(retention_overview.get("generated_at"), (int, float))
-            else "Wird berechnet …"
-        ),
-        "result": result,
-    }
 
 
 def _settings_darstellung_context(saved: bool = False) -> dict:
@@ -1964,224 +1849,6 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "_settings_debug_tools.html", _debug_tools_context())
 
 
-@app.post("/settings/archivierung", response_class=HTMLResponse)
-async def settings_archivierung(request: Request) -> HTMLResponse:
-    """Speichert die globalen Standardwerte für neu erkannte Entitäten
-    (Einstellungen-Bereich, Konzept Abschnitt 03) — wirkt nur auf Entitäten,
-    die AB JETZT zum ersten Mal einen Wert senden; bereits archivierte
-    Entitäten behalten ihre individuelle Einstellung aus der jeweiligen
-    Konfigurationsseite unverändert (Index.get_or_create_entity() greift nur
-    beim Neuanlegen auf diese Standardwerte zu)."""
-    form = await request.form()
-    fields = {
-        "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, "Ungültige Auflösung"),
-        "default_retention": (form.get("default_retention"), RETENTION_LABELS, "Ungültige Aufbewahrung"),
-        "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, "Ungültige Nachkommastellen"),
-        "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, "Ungültiger Wertänderungsfilter"),
-        "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, "Ungültige Lücken-Erkennung"),
-        "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, "Ungültige Ausreißer-Erkennung"),
-    }
-    for key, (value, labels, error) in fields.items():
-        if value is not None and value not in labels:
-            raise HTTPException(status_code=400, detail=error)
-    for key, (value, _labels, _error) in fields.items():
-        if value is not None:
-            index.set_setting(key, str(value))
-    # Wie update_entity_config unten — nur bei ÄNDERUNG von default_resolution/default_value_filter auslösen.
-    gap_threshold_auto_adjusted = False
-    gap_threshold_auto_adjusted_message = None
-    default_resolution = fields["default_resolution"][0]
-    default_value_filter = fields["default_value_filter"][0]
-    if default_value_filter == "decimals" or default_resolution is not None:
-        current_resolution = index.get_setting("default_resolution", DEFAULT_RESOLUTION)
-        current_value_filter = index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER)
-        current_gap = index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
-        should_raise, new_gap = should_raise_gap_threshold(
-            current_gap, current_resolution, current_value_filter, _GAP_THRESHOLD_MINUTE_TIERS
-        )
-        if should_raise:
-            index.set_setting("default_gap_threshold", new_gap)
-            gap_threshold_auto_adjusted = True
-            reason = "value_filter" if current_value_filter == "decimals" else "resolution"
-            gap_threshold_auto_adjusted_message = _gap_threshold_auto_adjust_message(
-                reason, new_gap, current_resolution, label="Standard-Lücken-Erkennung")
-    context = _settings_archivierung_context(saved=True)
-    context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
-    context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
-    return templates.TemplateResponse(request, "_settings_archivierung_form.html", context)
-
-
-@app.post("/settings/rotation", response_class=HTMLResponse)
-def settings_rotation(request: Request) -> HTMLResponse:
-    """Manueller Rotations-Anstoß (Konzept "Offene Punkte": Rotation läuft sonst
-    nur lazy beim nächsten Schreibvorgang einer Entität — eine Entität, die
-    komplett aufhört zu senden, würde ihre letzte Hot-Datei sonst nie von
-    selbst archivieren)."""
-    with storage_coordinator.exclusive():
-        rotated = rotate.rotate_all_stale(DATA_DIR, index, TZ)
-    if rotated == 0:
-        result = "Nichts zu tun — alle Entitäten sind bereits aktuell rotiert."
-    else:
-        result = f"{rotated} Monatsdatei{'en' if rotated != 1 else ''} archiviert."
-    logger.info(
-        "Manuelle Rotation abgeschlossen · event=manual_rotation_completed files=%d",
-        rotated,
-    )
-    return templates.TemplateResponse(
-        request, "_settings_rotation_form.html", _settings_rotation_context(result=result)
-    )
-
-
-@app.post("/settings/storage-index/check", response_class=HTMLResponse)
-def settings_storage_index_check(request: Request) -> HTMLResponse:
-    """Erstellt eine rein lesende Vorschau möglicher Indexabweichungen."""
-    with storage_coordinator.exclusive():
-        report = _run_storage_reconciliation(repair=False)
-    return templates.TemplateResponse(
-        request, "_settings_storage_index_form.html", _settings_storage_index_context(report)
-    )
-
-
-@app.post("/settings/storage-index/repair", response_class=HTMLResponse)
-def settings_storage_index_repair(request: Request) -> HTMLResponse:
-    """Prüft erneut und ersetzt nur abgeleitete Metadaten atomar."""
-    with storage_coordinator.exclusive():
-        report = _run_storage_reconciliation(repair=True)
-    return templates.TemplateResponse(
-        request, "_settings_storage_index_form.html", _settings_storage_index_context(report)
-    )
-
-
-@app.post("/settings/purge", response_class=HTMLResponse)
-def settings_purge(request: Request) -> HTMLResponse:
-    """Manueller Anstoß, der zur Löschung markierte Datensätze überall
-    physisch entfernt — sowohl im laufenden Monat (Hot Buffer, purge_hot_buffer())
-    als auch in bereits archivierten Monaten (Parquet-Rewrite + Rollup-
-    Neuberechnung, purge_archived_months()). Konzept "Offene Punkte"."""
-    with storage_coordinator.exclusive():
-        hot_purged = cleanup.purge_hot_buffer(DATA_DIR, index, TZ)
-        archive_result = cleanup.purge_archived_months(DATA_DIR, index, TZ)
-    total_rows = hot_purged + archive_result["rows_purged"]
-    months = archive_result["months_purged"]
-    if total_rows == 0:
-        result = "Nichts zu bereinigen — aktuell keine entfernbaren Datensätze gefunden."
-    elif months == 0:
-        result = f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt."
-    else:
-        result = (
-            f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt, "
-            f"davon {months} bereits archivierte{'r' if months == 1 else ''} Monat{'e' if months != 1 else ''} neu berechnet."
-        )
-    logger.info(
-        "Manuelle Bereinigung abgeschlossen · event=manual_cleanup_completed "
-        "rows=%d months=%d",
-        total_rows,
-        months,
-    )
-    _refresh_purge_preview_if_stale(force=True)
-    return templates.TemplateResponse(
-        request, "_settings_purge_form.html", _settings_purge_context(result=result)
-    )
-
-
-@app.get("/settings/purge/marked", response_class=HTMLResponse)
-def settings_purge_marked(
-    request: Request,
-    search: str = Query(default="", max_length=200),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=50, ge=10, le=200),
-) -> HTMLResponse:
-    """On-demand-Detailansicht der einzelnen Soft-Delete-Markierungen."""
-    result = index.list_deleted_points(search=search, page=page, page_size=page_size)
-    rows = [
-        {
-            **row,
-            "measured_at": datetime.fromtimestamp(row["ts"], TZ).strftime("%d.%m.%Y %H:%M:%S"),
-            "marked_at": datetime.fromtimestamp(row["deleted_at"], TZ).strftime("%d.%m.%Y %H:%M:%S"),
-        }
-        for row in result["rows"]
-    ]
-    return templates.TemplateResponse(
-        request,
-        "_settings_marked_points.html",
-        {"rows": rows, "pagination": result["pagination"]},
-    )
-
-
-@app.post("/settings/retention-enforcement", response_class=HTMLResponse)
-async def settings_retention_enforcement_toggle(request: Request) -> HTMLResponse:
-    """Schaltet die automatische, tägliche Anwendung der Aufbewahrungsfrist
-    an/aus (Konzept "Offene Punkte": Aufbewahrung wurde bisher nur
-    gespeichert, nie angewendet) — bewusst standardmäßig aus, weil das anders
-    als der Purge im Bereinigungs-Werkzeug ganze, nie zuvor markierte
-    Zeiträume endgültig löscht."""
-    form = await request.form()
-    schedule = form.get("retention_enforcement")
-    schedule_time = str(form.get("retention_enforcement_time", RETENTION_DEFAULT_TIME))
-    weekday_raw = str(form.get("retention_enforcement_weekday", RETENTION_DEFAULT_WEEKDAY))
-    if schedule not in BACKUP_SCHEDULE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitplan")
-    try:
-        parse_schedule_time(schedule_time)
-        weekday = int(weekday_raw)
-        if weekday not in range(7):
-            raise ValueError
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Ungültige Uhrzeit") from exc
-    index.set_setting("retention_enforcement", schedule)
-    index.set_setting("retention_enforcement_time", schedule_time)
-    index.set_setting("retention_enforcement_weekday", str(weekday))
-    _set_next_retention_run(datetime.now(TZ))
-    return templates.TemplateResponse(
-        request, "_settings_retention_form.html", _settings_retention_context()
-    )
-
-
-def _retention_result_text(totals: dict, *, preview: bool = False) -> str:
-    if totals["rows_deleted"] == 0:
-        return (
-            "Vorschau: Aktuell würden keine Werte gelöscht."
-            if preview else
-            "Nichts zu tun — keine Werte jenseits der konfigurierten Aufbewahrungsfrist gefunden."
-        )
-    action = "würden endgültig gelöscht" if preview else "endgültig gelöscht"
-    storage_action = "würden frei" if preview else "wurden frei"
-    prefix = "Vorschau: " if preview else ""
-    return (
-        f"{prefix}{totals['rows_deleted']} Zeile{'n' if totals['rows_deleted'] != 1 else ''} in "
-        f"{totals['months_deleted']} Monatsdatei{'en' if totals['months_deleted'] != 1 else ''} über "
-        f"{totals['entities_affected']} Entität{'en' if totals['entities_affected'] != 1 else ''} {action}; "
-        f"etwa {format_size(totals['bytes_freed'])} Archivspeicher {storage_action}."
-    )
-
-
-@app.post("/settings/retention-enforcement/preview", response_class=HTMLResponse)
-def settings_retention_enforcement_preview(request: Request) -> HTMLResponse:
-    overview = _refresh_retention_overview_if_stale(force=True)
-    totals = overview["totals"]
-    return templates.TemplateResponse(
-        request,
-        "_settings_retention_form.html",
-        _settings_retention_context(result=_retention_result_text(totals, preview=True)),
-    )
-
-
-@app.post("/settings/retention-enforcement/run", response_class=HTMLResponse)
-def settings_retention_enforcement_run(request: Request) -> HTMLResponse:
-    """Manueller Anstoß, unabhängig vom Automatik-Schalter — läuft sofort,
-    unabhängig davon ob/wann der tägliche Automatik-Lauf zuletzt lief."""
-    job_id = _begin_retention_job("manual")
-    if job_id is None:
-        result = "Retention läuft bereits — es wurde kein zweiter Lauf gestartet."
-    else:
-        outcome = _finish_retention_job(job_id)
-        if outcome["status"] == "success":
-            result = _retention_result_text(outcome["totals"])
-        else:
-            result = f"Retention fehlgeschlagen: {outcome['error']}"
-    return templates.TemplateResponse(
-        request, "_settings_retention_form.html", _settings_retention_context(result=result)
-    )
 
 
 class _BackupProgress:
@@ -3044,24 +2711,6 @@ def _ingestion_rate_per_second(snapshots: list[dict], window_seconds: float) -> 
     return max(0.0, (latest["total_rows"] - baseline["total_rows"]) / elapsed)
 
 
-def _duplicate_rows_for_display() -> tuple[list[dict], list[dict], str]:
-    """Liest den gecachten globalen Duplikat-Schnappschuss (siehe
-    _refresh_duplicate_snapshot_if_stale, stündlich, 30-Tage-Fenster über alle
-    Entitäten) und bereitet ihn für die Anzeige im Housekeeping-Bereich auf —
-    eigene Funktion statt Inline-Code in housekeeping_view(), damit die
-    Aufbereitung unabhängig von der Route testbar/lesbar bleibt."""
-    duplicate_rows = (index.get_duplicate_snapshot() or {}).get("rows", [])
-    duplicates_by_entity = [
-        {
-            "entity_id": row["entity_id"],
-            "friendly_name": row["friendly_name"],
-            "count": format_int(row['count']),
-            "count_raw": row["count"],
-        }
-        for row in duplicate_rows
-    ]
-    duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
-    return duplicate_rows, duplicates_by_entity, duplicates_total
 
 @app.get("/statistik", response_class=HTMLResponse)
 @_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
@@ -3152,112 +2801,6 @@ def statistik_view(request: Request) -> HTMLResponse:
     )
 
 
-_STALE_ENTITIES_DAY_OPTIONS = [("1", "1 Tag"), ("3", "3 Tage"), ("7", "7 Tage"), ("14", "14 Tage"), ("30", "30 Tage")]
-_STALE_ENTITIES_DEFAULT_DAYS = "3"
-
-
-def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> dict:
-    """Entitäten, deren letzter Wert (entities.last_ts, ohnehin vorhanden —
-    kein neuer Hintergrundjob nötig) länger als der gewählte Schwellwert
-    zurückliegt. Meist harmlos (Gerät im Standby, seltener Sensor), aber ein
-    früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte
-    HA-Entität. Nie empfangene Entitäten (last_ts NULL) erscheinen unabhängig
-    vom gewählten Schwellwert immer — für sie gibt es kein sinnvolles "seit
-    wann", das sich unter- oder überschreiten ließe."""
-    if days not in dict(_STALE_ENTITIES_DAY_OPTIONS):
-        days = _STALE_ENTITIES_DEFAULT_DAYS
-    threshold_seconds = int(days) * 86400
-    now_ts = time.time()
-    rows = []
-    for entity in index.list_entities():
-        last_ts = entity["last_ts"]
-        if last_ts is None:
-            days_ago = None
-        else:
-            age_seconds = now_ts - last_ts
-            if age_seconds < threshold_seconds:
-                continue
-            days_ago = age_seconds / 86400
-        has_name = bool(entity["custom_name"] or entity["friendly_name"])
-        rows.append({
-            "entity_id": entity["entity_id"],
-            "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
-            "has_name": has_name,
-            "last_value_label": (
-                datetime.fromtimestamp(last_ts, TZ).strftime("%d.%m.%Y, %H:%M") if last_ts is not None else "Nie empfangen"
-            ),
-            # 10**6 Tage statt float('inf') — sortiert serverseitig genauso
-            # zuverlässig an die Spitze, ist aber über data-sort auch für
-            # sortable-table.js' parseFloat() im Client ein gültiger Wert
-            # ("inf" wird dort zu NaN).
-            "days_ago_raw": days_ago if days_ago is not None else 10**6,
-            "days_ago_label": f"{format_value(days_ago, 1)} Tage" if days_ago is not None else "—",
-            "row_count": format_int(entity["row_count"]),
-            "row_count_raw": entity["row_count"],
-        })
-    rows.sort(key=lambda r: r["days_ago_raw"], reverse=True)
-    return {
-        "stale_entities": rows,
-        "stale_entities_days": days,
-        "stale_entities_day_options": _STALE_ENTITIES_DAY_OPTIONS,
-    }
-
-
-@app.get("/housekeeping/stale-entities", response_class=HTMLResponse)
-def housekeeping_stale_entities(request: Request, days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> HTMLResponse:
-    """Von refreshStaleEntities() bzw. dem hx-trigger="change" auf
-    #stale-entities-form (housekeeping.html) abgerufen, wenn der Schwellwert
-    im Dropdown geändert wird — rendert nur die Tabelle neu, nicht die ganze
-    Seite."""
-    return templates.TemplateResponse(request, "_stale_entities_body.html", _stale_entities_context(days))
-
-
-@app.get("/housekeeping", response_class=HTMLResponse)
-@_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
-def housekeeping_view(request: Request) -> HTMLResponse:
-    """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
-    sucht: ungenutzte Charts/Tabellen (kein Dashboard-Pin), Entitäten mit
-    erkannten Duplikaten (bestehender globaler Schnappschuss, siehe
-    _duplicate_rows_for_display), Entitäten ohne neue Werte und mit
-    unwirksamer Lücken-Erkennung. Wiederholungen sind bewusst noch nicht
-    enthalten (siehe Diskussion zu Schwellwert/Kalibrierung)."""
-    aggregation_types = {
-        row["entity_id"]: row["aggregation_type"] for row in index.list_entities()
-    }
-    unused_charts = [
-        {
-            "id": c["id"],
-            "name": c["name"],
-            "entity_count": len(c["entity_ids"]),
-            "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
-            "type_label": _chart_type_label(c, aggregation_types),
-        }
-        for c in index.list_unused_saved_charts()
-    ]
-    unused_tables = [
-        {"id": t["id"], "name": t["name"], "row_count": t["row_count"], "column_count": t["column_count"]}
-        for t in index.list_unused_saved_tables()
-    ]
-    _, duplicates_by_entity, duplicates_total = _duplicate_rows_for_display()
-    return templates.TemplateResponse(
-        request,
-        "housekeeping.html",
-        {
-            "unused_charts": unused_charts,
-            "unused_tables": unused_tables,
-            "chart_count": index.count_saved_charts(),
-            "table_count": index.count_saved_tables(),
-            "duplicates_by_entity": duplicates_by_entity,
-            "duplicates_total": duplicates_total,
-            "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(index),
-            **_stale_entities_context(),
-            **_host_disk_usage_context(),
-            **_settings_storage_index_context(),
-            **_settings_purge_context(),
-            **_settings_retention_context(),
-            **_settings_rotation_context(),
-        },
-    )
 
 
 _INDEX_DETAIL_GROUPS = [
@@ -4233,6 +3776,95 @@ def charts_duplicate(chart_id: int) -> dict:
     return {"id": new_id}
 
 
+# Der Zeitraum-Text einer Werte-Kachel — je Zeitraum eine kalendarische und
+# eine rollierende Beschriftung. Der Text ist die einzige Auskunft darüber,
+# welche der beiden Varianten läuft; ein zusätzliches Symbol braucht es damit
+# nicht. Die rollierenden Namen sind bewusst das TATSÄCHLICHE Fenster aus
+# _window() in storage/query.py und nicht "Monat rollierend": dort sind es
+# genau 30 Tage, kein Kalendermonat (Begründung steht als Kommentar an der
+# Stelle). "30 Tage" macht diese Vereinfachung sichtbar, statt sie unter dem
+# Wort "Monat" zu verstecken.
+#
+# Dieselbe Tabelle steht ein zweites Mal in static/js/dashboard-tiles.js —
+# der Server beschriftet die erste Anzeige, der Browser beschriftet nach einer
+# Änderung im Kachelmenü neu, ohne die Seite neu zu laden. Ein Test hält beide
+# Kopien deckungsgleich (test_dashboard_value_tile_settings.py).
+_TILE_RANGE_LABELS = {
+    "hour": ("Std.", "60 Min."),
+    "day": ("Tag", "24 Std."),
+    "week": ("Woche", "7 Tage"),
+    "month": ("Monat", "30 Tage"),
+    "year": ("Jahr", "12 Monate"),
+}
+# Kennzeichen vor der großen Zahl, sobald diese nicht der aktuelle Wert ist —
+# ohne das wäre "16,8 °C" nicht von einem Momentanwert zu unterscheiden.
+# "last" trägt bewusst keins: der aktuelle Wert ist der Normalfall und braucht
+# keine Erklärung.
+_TILE_METRIC_LABELS = {"last": "", "min": "Min", "avg": "Ø", "max": "Max", "sum": "Σ"}
+
+
+def _tile_available_metrics(aggregation_type: str | None) -> list[str]:
+    """Welche Kennzahlen für diesen Entitätstyp überhaupt eine Aussage sind.
+
+    Dieselbe Regel wie in der Chart-Legende (``hasSum`` in entity_detail.html)
+    und in _tile_aggregates() in api_routes.py, das die nicht angebotenen
+    Werte gar nicht erst mitschickt:
+
+    * Summe nur bei Zählern und Schaltern — 20 °C + 21 °C + … ist keine
+      Temperatur.
+    * Min/Max nicht bei Schaltern — deren Bucket-Werte sind Einschaltsekunden,
+      "kleinster Wert" hieße dort "kürzeste Stunde".
+
+    Das Menü zeigt die übrigen durchgestrichen und unklickbar an, statt sie
+    wegzulassen: eine Reihe, die je nach Entität mal drei und mal vier Knöpfe
+    hat, wirkt wie ein Fehler, ein durchgestrichener Knopf erklärt sich.
+    """
+    if aggregation_type == "switch":
+        return ["sum"]
+    if aggregation_type == "counter":
+        return ["min", "avg", "max", "sum"]
+    return ["min", "avg", "max"]
+
+
+def _tile_metric_context(pin, aggregation_type: str | None = None) -> dict:
+    """Zeitraum und Kennzahlen einer Werte-Kachel für das Template.
+
+    Der als Hauptwert gewählte Eintrag fällt hier aus der Kennzahlen-Zeile
+    heraus — derselbe Wert zweimal auf einer Kachel wäre nur Rauschen. Die
+    Nachschläge sind absichtlich fehlertolerant: ein von Hand verbogener
+    Datenbankwert soll die Dashboard-Seite nicht mit einem KeyError
+    abschießen, sondern auf den Standard zurückfallen.
+    """
+    range_key = pin["range_key"] if pin["range_key"] in _TILE_RANGE_LABELS else "day"
+    primary = pin["primary_metric"] if pin["primary_metric"] in _TILE_METRIC_LABELS else "last"
+    verfuegbar = _tile_available_metrics(aggregation_type)
+    # Auch gegen den Entitätstyp gefiltert, nicht nur gegen den Hauptwert: ein
+    # Wechsel der Entität (dashboard/entity/{id}) lässt die gespeicherten
+    # Kennzahlen stehen, und ein Σ, das für einen Messwert gespeichert wurde,
+    # soll danach nicht als "–" auf der Kachel kleben bleiben.
+    metrics = [
+        m for m in (pin["stats_metrics"] or "").split(",")
+        if m and m != primary and m in verfuegbar
+    ]
+    return {
+        "range_key": range_key,
+        "continuous": bool(pin["continuous"]),
+        "range_label": _TILE_RANGE_LABELS[range_key][1 if pin["continuous"] else 0],
+        "primary_metric": primary,
+        "primary_label": _TILE_METRIC_LABELS[primary],
+        "stats_metrics": metrics,
+        # Der Zeitraum steht genau einmal auf der Kachel: in der
+        # Kennzahlen-Zeile, wenn es sie gibt, sonst im Wert-Bereich an der
+        # Stelle des Alters. Bei einem Hauptwert, der kein Momentanwert ist,
+        # sagt das Alter des letzten Rohpunkts ohnehin nichts über einen
+        # Monatsdurchschnitt aus — dort tritt der Zeitraum an seine Stelle.
+        "show_period_in_value_row": not metrics and primary != "last",
+        # Fürs Kachelmenü: nicht anwendbare Kennzahlen werden durchgestrichen
+        # gezeigt statt weggelassen (siehe _tile_available_metrics()).
+        "available_metrics": verfuegbar,
+    }
+
+
 def _dashboard_tiles_context(
     dashboard_id: int, base: str = ".", auto_open_entity_id: str | None = None
 ) -> dict:
@@ -4291,7 +3923,16 @@ def _dashboard_tiles_context(
             # "auto" (Feld-Default) bedeutet ausdrücklich "entity-eigenen Wert
             # übernehmen" statt selbst "auto" an format_value() zu reichen.
             effective_decimals = p["decimals"] if p["decimals"] != "auto" else (e["decimals"] or "auto")
-            if e["last_value"] is None:
+            metric_context = _tile_metric_context(p, e["aggregation_type"])
+            if metric_context["primary_metric"] != "last":
+                # Der Hauptwert ist eine Aggregation über den Zeitraum, die
+                # der Server hier ohne eigene Abfrage nicht kennt. Platzhalter
+                # statt des aktuellen Werts: sonst stünde für den Bruchteil
+                # einer Sekunde ein sichtbar falscher Wert auf der Kachel
+                # (Momentanwert statt Monatsdurchschnitt), bis der erste
+                # Fetch ihn ersetzt.
+                value_text = "–"
+            elif e["last_value"] is None:
                 value_text = "–"
             elif is_switch:
                 # Momentaner Zustand — anders als der chart-eigene
@@ -4330,6 +3971,7 @@ def _dashboard_tiles_context(
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
                 "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),
                 "sparkline_resolution": p["sparkline_resolution"],
+                **metric_context,
             })
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
@@ -4631,6 +4273,58 @@ def dashboard_entity_title(body: _TitleDashboardTileBody) -> dict:
     if not index.set_dashboard_entity_pin_title(body.dashboard_id, body.entity_id, title or None):
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "title": title}
+
+
+class _MetricsDashboardTileBody(BaseModel):
+    """Zeitraum und Kennzahlen einer Werte-Kachel.
+
+    Alle vier Felder optional, None heißt "unverändert lassen" — anders als
+    bei den übrigen Kachel-Einstellungen bewusst EIN Endpunkt für vier Werte:
+    sie hängen voneinander ab (der Hauptwert fällt aus der Kennzahlen-Zeile
+    heraus, ein Entitätswechsel kann eine Kennzahl unanwendbar machen), und
+    getrennte Endpunkte bräuchten dafür zwei Runden.
+    """
+
+    dashboard_id: int = 1
+    entity_id: str
+    range_key: str | None = None
+    continuous: bool | None = None
+    primary_metric: str | None = None
+    stats_metrics: list[str] | None = None
+
+
+@app.post("/dashboard/entity-metrics")
+def dashboard_entity_metrics(body: _MetricsDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        geaendert = index.set_dashboard_entity_pin_metrics(
+            body.dashboard_id,
+            body.entity_id,
+            range_key=body.range_key,
+            continuous=body.continuous,
+            primary_metric=body.primary_metric,
+            stats_metrics=body.stats_metrics,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not geaendert:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    pin = next(
+        (p for p in index.list_dashboard_pins(body.dashboard_id)
+         if p["item_type"] == "entity" and p["item_entity_id"] == body.entity_id),
+        None,
+    )
+    if pin is None:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    entity = index.get_entity(body.entity_id)
+    # Den fertigen Anzeigezustand zurückgeben statt nur "ok": der Browser muss
+    # das Zeitraum-Etikett und die um Hauptwert und Entitätstyp bereinigte
+    # Kennzahlen-Liste sonst selbst nachbilden — genau die Regeln, die hier
+    # schon stehen.
+    return {
+        "ok": True,
+        **_tile_metric_context(pin, entity["aggregation_type"] if entity else None),
+    }
 
 
 # -- Dashboards (Konzept "Dashboards"-Menüpunkt: mehrere, unabhängige
@@ -5846,3 +5540,39 @@ _import_service = ImportService(ImportDependencies(
     symcon_scan_cache_path=SYMCON_SCAN_CACHE_PATH,
 ))
 app.include_router(_import_service.router())
+
+# Housekeeping-Bereich (Aufbewahrung, Rotation, Speicherplatz, Duplikate) —
+# ganz am Ende eingehängt wie die übrigen ausgelagerten Router. Die
+# hereingereichten Funktionen bleiben bewusst hier: sie werden auch vom
+# Hintergrund-Scheduler und von der Einstellungsseite gebraucht (siehe
+# Modul-Docstring in housekeeping_routes.py).
+app.include_router(create_housekeeping_router(HousekeepingDependencies(
+    data_dir=DATA_DIR,
+    tz=TZ,
+    index=index,
+    coordinator=storage_coordinator,
+    templates=templates,
+    retention_default_time=RETENTION_DEFAULT_TIME,
+    retention_default_weekday=RETENTION_DEFAULT_WEEKDAY,
+    chart_range_options=_CHART_RANGE_OPTIONS,
+    gap_threshold_minute_tiers=_GAP_THRESHOLD_MINUTE_TIERS,
+    backup_weekday_options=BACKUP_WEEKDAY_OPTIONS,
+    retention_progress=_retention_progress,
+    storage_locked=_storage_locked,
+    settings_archivierung_context=_settings_archivierung_context,
+    refresh_purge_preview_if_stale=_refresh_purge_preview_if_stale,
+    refresh_retention_overview_if_stale=_refresh_retention_overview_if_stale,
+    begin_retention_job=_begin_retention_job,
+    finish_retention_job=_finish_retention_job,
+    run_storage_reconciliation=_run_storage_reconciliation,
+    gap_threshold_auto_adjust_message=_gap_threshold_auto_adjust_message,
+    set_next_retention_run=_set_next_retention_run,
+    chart_type_label=_chart_type_label,
+    count_stale_entities=_count_stale_entities,
+    load_purge_preview=_load_purge_preview,
+    load_retention_overview=_load_retention_overview,
+    # Lambdas statt der Werte: beide werden per global neu gebunden,
+    # ein Feldwert wäre für immer das None vom Programmstart.
+    host_disk_usage_cached=lambda: _host_disk_usage_cached,
+    storage_reconcile_last=lambda: _storage_reconcile_last,
+)))

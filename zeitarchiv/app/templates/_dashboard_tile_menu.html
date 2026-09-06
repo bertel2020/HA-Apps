@@ -86,6 +86,59 @@
           <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
         </div>
 
+        {# Zeitraum, Hauptwert und Kennzahlen-Zeile — bewusst ein Abschnitt
+           und ein Endpunkt (/dashboard/entity-metrics): die vier Werte hängen
+           voneinander ab, der Hauptwert fällt aus der Zeile heraus. #}
+        <div class="dtile-settings-section">
+          <div class="dtile-decimals-picker-head">Zeitraum<strong data-head="range">{{ tile.range_label }} · {{ 'Rollierend' if tile.continuous else 'Laufend' }}</strong></div>
+          <div class="dtile-choice-row dtile-range-row" role="group" aria-label="Zeitraum wählen">
+            {% for value, label in [('hour', 'Std.'), ('day', 'Tag'), ('week', 'Woche'), ('month', 'Monat'), ('year', 'Jahr')] %}
+            <button type="button" class="dtile-choice-cell dtile-range-cell{% if tile.range_key == value %} is-selected{% endif %}"
+                    draggable="false" data-range="{{ value }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+          {# Zwei benannte Pole statt eines An/Aus-Schalters: bei "aus" müsste
+             man erraten, was das Gegenteil ist. Die Wörter sind die des
+             Handbuchs (docs/user-guide.md). #}
+          <div class="dtile-choice-row dtile-choice-row-sub dtile-continuous-row" role="group" aria-label="Kalendergrenze oder rollierendes Fenster">
+            <button type="button" class="dtile-choice-cell dtile-continuous-cell{% if not tile.continuous %} is-selected{% endif %}"
+                    draggable="false" data-continuous="false"
+                    title="Angefangene Kalenderperiode — „Tag“ heißt ab Mitternacht">Laufend</button>
+            <button type="button" class="dtile-choice-cell dtile-continuous-cell{% if tile.continuous %} is-selected{% endif %}"
+                    draggable="false" data-continuous="true"
+                    title="Festes Fenster relativ zu jetzt — „Tag“ heißt die letzten 24 Stunden">Rollierend</button>
+          </div>
+          <p class="dtile-settings-hint">Gilt für Kennzahlen und Sparkline.</p>
+
+          <div class="dtile-decimals-picker-head dtile-choice-head-gap">Hauptwert<strong data-head="primary">{{ tile.primary_label or 'Aktuell' }}</strong></div>
+          <div class="dtile-choice-row dtile-primary-row" role="group" aria-label="Hauptwert wählen">
+            <button type="button" class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == 'last' %} is-selected{% endif %}"
+                    draggable="false" data-primary="last">Aktuell</button>
+            {% for value, label in [('min', 'Min'), ('avg', 'Ø'), ('max', 'Max'), ('sum', 'Σ')] %}
+            <button type="button" draggable="false" data-primary="{{ value }}"
+                    class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == value %} is-selected{% endif %}{% if value not in tile.available_metrics %} is-off{% endif %}"
+                    {% if value not in tile.available_metrics %}disabled title="Für diese Entität keine sinnvolle Kennzahl"{% endif %}>{{ label }}</button>
+            {% endfor %}
+          </div>
+
+          <label class="menu-row dtile-stats-toggle-row">
+            <span class="menu-row-label dtile-choice-head-label">Kennzahlen-Zeile</span>
+            <span class="menu-toggle">
+              <input type="checkbox" class="dtile-stats-checkbox" {% if tile.stats_metrics %}checked{% endif %}>
+              <span class="track"><span class="thumb"></span></span>
+            </span>
+          </label>
+          <div class="dtile-choice-row dtile-stats-row" role="group" aria-label="Kennzahlen wählen"
+               {% if not tile.stats_metrics %}hidden{% endif %}>
+            {% for value, label in [('min', 'Min'), ('avg', 'Ø'), ('max', 'Max'), ('sum', 'Σ')] %}
+            {% set gesperrt = value not in tile.available_metrics or value == tile.primary_metric %}
+            <button type="button" draggable="false" data-metric="{{ value }}"
+                    class="dtile-choice-cell dtile-stats-cell{% if value in tile.stats_metrics %} is-selected{% endif %}{% if gesperrt %} is-off{% endif %}"
+                    {% if gesperrt %}disabled title="{{ 'Steht schon als Hauptwert' if value == tile.primary_metric else 'Für diese Entität keine sinnvolle Kennzahl' }}"{% endif %}>{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
         <div class="dtile-settings-section">
           <label class="menu-row dtile-sparkline-row">
             <span class="menu-row-label">Sparkline</span>

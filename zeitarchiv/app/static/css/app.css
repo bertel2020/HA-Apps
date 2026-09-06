@@ -305,11 +305,22 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 @media (max-width:820px){
   .topnav-links{display:none;}
   .topnav-burger{display:flex;}
+  /* Glocke und Hamburger bilden rechts EINE Gruppe. Der Auto-Rand darf
+     deshalb nur am ersten der beiden sitzen: trügen ihn beide (so war es),
+     teilt Flexbox den freien Platz gleichmäßig auf sie auf und die Glocke
+     landet mitten in der leeren Leiste statt neben dem Hamburger. */
   .topnav-notice{margin-left:auto;}
-  /* Mobil sitzt die Glocke mittig (rechts folgt noch der Burger) — ein an
-     der Glocke rechtsbündig verankertes 340px-Panel ragte dadurch links aus
-     dem Viewport. Stattdessen am Viewport selbst ausrichten: direkt unter
-     der 56px-Kopfzeile, mit demselben 16px-Seitenabstand wie das mobile
+  .topnav-burger{margin-left:0;}
+  /* Der 28px-Abstand der Leiste ist für Menüpunkte gedacht; zwischen zwei
+     nebeneinanderliegenden Icon-Knöpfen reißt er die Gruppe wieder
+     auseinander. Auf den Abstand zum Logo wirkt sich das nicht aus, den
+     bestimmt ohnehin der Auto-Rand oben. */
+  .topnav-bar{gap:6px;}
+  /* Das Panel bleibt am Viewport ausgerichtet statt an der Glocke: 340px
+     unter einem 34px-Knopf am rechten Rand wären zwar unterzubringen, aber
+     ein über die volle Breite laufendes Panel ist auf dem Telefon besser zu
+     treffen und kann an keinem Rand abgeschnitten werden. Direkt unter der
+     56px-Kopfzeile, mit demselben 16px-Seitenabstand wie das mobile
      body-Padding. position:fixed funktioniert hier, weil kein Vorfahre
      einen transform trägt (.topnav ist nur sticky). */
   .notice-panel{position:fixed;top:62px;left:16px;right:16px;width:auto;max-width:none;}
@@ -468,7 +479,7 @@ button.dd-picker-clear{
 .dd-time-popover{width:auto;}
 
 /* Optionen-Menü — Dropdown für seltener geänderte Chart-Einstellungen
-   (Auflösung, Punkte, Kontinuierlich, Rohwerte, Y-Achse, Statistik in
+   (Auflösung, Punkte, Rollierend, Rohwerte, Y-Achse, Statistik in
    Legende/Linie-Balken), damit die Haupt-Toolbar auf Zeitraum + Vergleichen
    beschränkt bleibt statt über mehrere Zeilen zu wachsen. Dasselbe
    Positionierungsmuster wie der Gruppen-Picker (table_editor.html,
@@ -535,13 +546,68 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
 .dtile-entity-picker-list{max-height:220px;overflow-y:auto;}
 /* Gleich breite Spalten statt flex:1 — bei fünf Stufen (Roh … 1 Std) würden
    sich die Zellen sonst nach Textlänge unterschiedlich breit verteilen. */
+/* Generische Knopfreihe für die Kachel-Einstellungen (Zeitraum, Laufend/
+   Rollierend, Hauptwert, Kennzahlen). Bewusst EIN Paar Klassen für vier
+   Reihen statt vier Paaren nach dem Muster von .dtile-decimals-cell /
+   .dtile-sparkline-resolution-cell — dieselbe Optik, aber ohne feste
+   Spaltenzahl, damit auch die zweispaltige Laufend/Rollierend-Reihe
+   hineinpasst. */
+.dtile-choice-row{display:flex;gap:4px;flex-wrap:wrap;}
+.dtile-choice-cell{
+  flex:1;min-width:38px;padding:5px 4px;border:1px solid var(--border);border-radius:6px;
+  background:var(--surface-alt);color:var(--ink);
+  /* Display, nicht Mono: "Woche", "Rollierend", "Aktuell" sind Beschriftungen,
+     keine maschinenlesbaren Werte (docs/frontend.md). Mono auf Wörtern
+     entwertet die Unterscheidung, die sie in dieser App sonst trägt. */
+  font-family:var(--font-display);
+  font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
+}
+.dtile-choice-cell:hover:not(:disabled){border-color:var(--accent-line);}
+.dtile-choice-cell.is-selected{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
+/* Nicht anwendbar für diesen Entitätstyp (Σ bei einem Messwert, Min/Max bei
+   einem Schalter) oder schon als Hauptwert vergeben. Durchgestrichen statt
+   weggelassen: eine Reihe, die je nach Entität mal drei und mal vier Knöpfe
+   hat, wirkt wie ein Fehler — ein durchgestrichener Knopf erklärt sich. */
+.dtile-choice-cell.is-off{opacity:.38;cursor:not-allowed;text-decoration:line-through;}
+/* Zweite Reihe derselben Gruppe (Laufend/Rollierend unter dem Zeitraum): nur
+   ein kleinerer Abstand als zwischen zwei Gruppen. Die Knöpfe teilen sich die
+   volle Breite wie in der Reihe darüber — ein Zwischenschritt mit
+   inhaltsbreiten, linksbündigen Knöpfen wirkte angeschnitten. */
+.dtile-choice-row-sub{margin-top:4px;}
+/* Abstand zur vorigen Gruppe innerhalb desselben Abschnitts — die Abschnitte
+   selbst trennt schon .dtile-settings-section + .dtile-settings-section. */
+.dtile-choice-head-gap{margin-top:15px;}
+/* .dtile-decimals-picker-head strong setzt Mono (dashboard_detail.html/
+   entities.html) — richtig für einen Wert wie "1×1", falsch für "Tag ·
+   Laufend" und "Aktuell". Attribut-Selektor, damit die Regel unabhängig von
+   der Ladereihenfolge der Seiten-Stylesheets gewinnt. */
+.dtile-decimals-picker-head strong[data-head]{font-family:var(--font-display);}
+/* Die Zeile mit dem Schalter trägt links dieselbe Beschriftung wie die
+   Überschriften darüber. .menu-row-label erbt sonst die größere Schrift der
+   Zeile und ließe den Abschnitt nach zwei kleinen Überschriften plötzlich
+   groß weiterlaufen. */
+.dtile-choice-head-label{
+  font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);
+}
+.dtile-stats-toggle-row{margin-top:15px;padding-bottom:2px;}
+.dtile-settings-hint{
+  margin:7px 0 0;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.45;
+}
 .dtile-sparkline-resolution-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;}
+/* Wie .dtile-choice-cell Display statt Mono: "Roh"/"5 Min"/"1 Std" sind
+   Beschriftungen. Die Nachkommastellen-Reihe daneben behält Mono, weil sie
+   überwiegend Ziffern zeigt (0/1/2/3) — dort ist der Text der Wert selbst. */
 .dtile-sparkline-resolution-cell{
   padding:5px 3px;border:1px solid var(--border);border-radius:6px;background:var(--surface-alt);
-  color:var(--ink);font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
+  color:var(--ink);font-family:var(--font-display);font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
   white-space:nowrap;
 }
 .dtile-sparkline-resolution-cell:hover{border-color:var(--accent-line);}
+/* Zeitraum Monat/Jahr: die Sparkline zeichnet dort die Buckets der Abfrage,
+   eine feinere Auflösung gibt es nicht. Ausgegraut statt ausgeblendet, damit
+   die Reihe nicht springt und erkennbar bleibt, dass es sie gibt. */
+.dtile-sparkline-resolution-row.is-disabled{opacity:.4;}
+.dtile-sparkline-resolution-row.is-disabled .dtile-sparkline-resolution-cell{cursor:not-allowed;}
 .dtile-sparkline-resolution-cell.is-selected{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
 /* Menü-Zeilen können auch reine Navigations-Links sein (a.menu-row) statt
    Einstellungen — Browser-Standard für Links zurückgesetzt, damit sie sich

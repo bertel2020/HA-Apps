@@ -119,3 +119,36 @@ def test_only_loaded_font_weights_are_used() -> None:
             if weight
         }
         assert used <= loaded, f"{name}: {sorted(used - loaded)} nicht geladen (geladen: {sorted(loaded)})"
+
+
+def _regel(css: str, selektor: str) -> str:
+    """Der Rumpf einer CSS-Regel, ohne verschachtelte Blöcke."""
+    start = css.index(selektor + "{") + len(selektor) + 1
+    return css[start : css.index("}", start)]
+
+
+def test_choice_buttons_use_the_display_font_not_mono() -> None:
+    """docs/frontend.md: --font-mono steht in dieser App für maschinenlesbar
+    (Entity-IDs, Zeitstempel, Rohwerte). Beschriftungen bekommen --font-display.
+
+    Die Knopfreihen der Kachel-Einstellungen zeigen Wörter — "Woche",
+    "Rollierend", "Aktuell", "Roh", "1 Std". Sie standen zunächst in Mono, weil
+    die Klasse von der Nachkommastellen-Reihe abgeschrieben war. Mono auf
+    Wörtern entwertet die Unterscheidung, die sie sonst trägt: "liegt Mono auch
+    auf Fließtext, sagt sie nichts mehr aus".
+    """
+    css = APP_CSS.read_text(encoding="utf-8")
+    for selektor in (".dtile-choice-cell", ".dtile-sparkline-resolution-cell"):
+        assert "var(--font-display)" in _regel(css, selektor), selektor
+        assert "var(--font-mono)" not in _regel(css, selektor), selektor
+
+
+def test_real_values_keep_the_mono_font() -> None:
+    """Gegenprobe: die Umstellung darf nicht durchschlagen, wo der Text
+    tatsächlich der Wert ist — "1×1" bei der Kachelgröße und die Ziffern
+    0/1/2/3 bei den Nachkommastellen. Sonst wäre die Unterscheidung nicht
+    geschärft, sondern abgeschafft."""
+    for name in ("dashboard_detail.html", "entities.html"):
+        quelle = (TEMPLATES / name).read_text(encoding="utf-8")
+        assert "var(--font-mono)" in _regel(quelle, ".dtile-size-picker-head strong"), name
+        assert "var(--font-mono)" in _regel(quelle, ".dtile-decimals-cell"), name

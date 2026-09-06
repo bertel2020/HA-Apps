@@ -8,11 +8,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN_SOURCE = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
+HOUSEKEEPING_SOURCE = (ROOT / "app" / "housekeeping_routes.py").read_text(encoding="utf-8")
 
 
-def _function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
-    tree = ast.parse(MAIN_SOURCE)
-    for node in tree.body:
+def _function(name: str, source: str = MAIN_SOURCE) -> ast.FunctionDef | ast.AsyncFunctionDef:
+    """Sucht die Funktion im ganzen Baum, nicht nur auf Modulebene — die
+    Housekeeping-Routen liegen als verschachtelte Definitionen in
+    create_housekeeping_router() (Muster von create_api_router())."""
+    for node in ast.walk(ast.parse(source)):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
             return node
     raise AssertionError(f"Funktion {name} fehlt")
@@ -78,7 +81,7 @@ def test_statistik_view_reads_duplicate_snapshot_not_live_scan() -> None:
     (cleanup.count_duplicate_rows_by_entity) nicht selbst aufrufen, sondern
     nur noch den vom Wartungsplaner zwischengespeicherten Stand lesen
     (index.get_duplicate_snapshot)."""
-    helper = _function("_duplicate_rows_for_display")
+    helper = _function("_duplicate_rows_for_display", HOUSEKEEPING_SOURCE)
     calls = {
         node.func.attr
         for node in ast.walk(helper)
@@ -87,7 +90,7 @@ def test_statistik_view_reads_duplicate_snapshot_not_live_scan() -> None:
     assert "count_duplicate_rows_by_entity" not in calls
     assert "get_duplicate_snapshot" in calls
 
-    housekeeping = _function("housekeeping_view")
+    housekeeping = _function("housekeeping_view", HOUSEKEEPING_SOURCE)
     housekeeping_calls = {
         node.func.id
         for node in ast.walk(housekeeping)

@@ -544,7 +544,7 @@ def _query_year_level(
 ) -> list[rollup.FineRow]:
     """Für year: immer Monatswerte aus monat.parquet + der laufende Monat live
     aus dem Hot Buffer — jahr.parquet wird hier NIE konsultiert, auch nicht für
-    Monate aus einem vorherigen Kalenderjahr. Grund: "Kontinuierlich" liefert ein
+    Monate aus einem vorherigen Kalenderjahr. Grund: "Rollierend" liefert ein
     rollierendes Fenster, das über eine Jahresgrenze hinausreichen kann (z. B.
     Aug 2025–Aug 2026) — jahr.parquet kennt aber nur GANZE Kalenderjahre und
     kann so ein angeschnittenes Vorjahr nicht liefern, die betroffenen Monate
@@ -553,7 +553,7 @@ def _query_year_level(
     Für decade-Balken sowie decade-Zähler ein Wert pro Kalenderjahr: ein Jahr, das VOLLSTÄNDIG
     im Fenster liegt, kommt aus jahr.parquet (schneller Pfad für abgeschlossene
     Jahre). Ein nur teilweise abgedecktes Jahr — das laufende Jahr am aktuellen
-    Ende des Fensters, oder bei "Kontinuierlich" auch ein angeschnittenes Jahr am
+    Ende des Fensters, oder bei "Rollierend" auch ein angeschnittenes Jahr am
     Fenster-Anfang — wird stattdessen aus den vorhandenen Monats-Rollups (+ live
     laufender Monat) zu einem einzigen Jahres-Balken aufsummiert, statt als
     mehrere schmale Monats-Balken neben den jahresbreiten Balken zu stehen (sah
@@ -766,7 +766,7 @@ def query_raw_series(
     """Ungebucketes Gegenstück zu query_series() — "Hohe Dichte (raw)" (Konzept
     Abschnitt 06/10): liefert jeden einzelnen Rohwert im Fenster statt ihn in
     Buckets zu verdichten. Nutzt dieselbe Fenster-Berechnung (Navigation/
-    Kontinuierlich-Modus verhalten sich identisch zur gebucketen Ansicht), aber
+    Rollierend-Modus verhalten sich identisch zur gebucketen Ansicht), aber
     immer als Linie — Balken pro Rohwert würden bei tausenden Punkten nur noch
     als flächige Masse erscheinen, nicht als lesbares Diagramm."""
     if range_key not in RANGE_KEYS:

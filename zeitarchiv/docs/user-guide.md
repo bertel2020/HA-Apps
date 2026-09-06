@@ -198,9 +198,11 @@ Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
   Zeitraum, z. B. "diese Woche bis jetzt" — auch bevor für die restliche
   Periode überhaupt Daten vorliegen, reicht die Achse bis zur vollen
   Kalendergrenze (z. B. bis Sonntag bei "Woche").
-- **Rollierend** zeigt stattdessen ein festes Zeitfenster relativ zu jetzt,
-  z. B. "letzte 24 Stunden" oder "letzte 30 Tage", unabhängig von
-  Kalendergrenzen.
+- **Rollierend** (Schalter im Optionen-Menü) zeigt stattdessen ein festes
+  Zeitfenster relativ zu jetzt, z. B. "letzte 24 Stunden" oder "letzte
+  30 Tage", unabhängig von Kalendergrenzen. Bei "Monat" sind das genau
+  30 Tage, kein Kalendermonat — "ein Monat vor dem 31. Januar" wäre
+  nicht eindeutig.
 
 ### Darstellung
 
@@ -250,7 +252,7 @@ Chart bearbeiten und auf ein Dashboard anheften lässt.
 
 ### Gespeicherte Optionen
 
-Alle Optionen im Optionen-Menü (Kontinuierlich/Rollierend, Rohwerte,
+Alle Optionen im Optionen-Menü (Rollierend, Rohwerte,
 Diagrammtyp, Punkte anzeigen, Werte anzeigen, Dynamische Y-Achse,
 Legenden-Statistik und -Kennzahlen, Legenden-Stil) werden **pro Entität**
 dauerhaft gespeichert und beim nächsten Aufruf automatisch wieder
@@ -550,7 +552,7 @@ eines bestehenden (Kachelmenü ⋮):
   steht zusätzlich die Auflösung "Tag" zur Verfügung: sie fasst den ganzen
   Tag zu einem einzigen Balken je Entität zusammen — praktisch, um z. B.
   Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt
-  zu vergleichen. Vergleichen, Kontinuierlich und Dynamische Y-Achse sind
+  zu vergleichen. Vergleichen, Rollierend und Dynamische Y-Achse sind
   bei dieser Auflösung deaktiviert, da sie für einen einzelnen
   Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
 - Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,

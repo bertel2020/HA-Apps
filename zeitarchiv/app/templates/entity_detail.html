@@ -142,7 +142,7 @@
       <!-- Zeitraum + Navigation zuerst (bestimmt WELCHER Ausschnitt gezeigt
            wird), Vergleichen + Optionen-Menü ans Ende der Zeile — alles
            Weitere (wie er gezeichnet wird: Linie/Balken, Punkte,
-           Kontinuierlich, Rohwerte) sitzt im Menü, damit hier nur eine
+           Rollierend, Rohwerte) sitzt im Menü, damit hier nur eine
            einzige, kompakte Zeile bleibt. -->
       <div class="toolbar">
         <div class="seg">
@@ -183,7 +183,14 @@
                x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
             <div class="menu-section-label">Daten</div>
             <label class="menu-row">
-              <span class="menu-row-label">Kontinuierlich</span>
+              {# "Rollierend", nicht "Kontinuierlich": der Schalter ändert das
+                 abgefragte ZEITFENSTER (siehe _window() in storage/query.py),
+                 nicht das Aussehen der Linie. Der alte Name klang nach einer
+                 Eigenschaft der Kurve — daraus war in den Einstellungen sogar
+                 ein falscher Hilfetext geworden. Feldname und API-Parameter
+                 heißen weiterhin "continuous", das ist der dokumentierte
+                 Vertrag (docs/api-reference.md). #}
+              <span class="menu-row-label">Rollierend</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="continuous" @change="toggleContinuous()">
                 <span class="track"><span class="thumb"></span></span>

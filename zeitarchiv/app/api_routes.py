@@ -23,7 +23,7 @@ from .logging_setup import log_rate_limited
 from .route_support import storage_locked
 from .storage import query as query_mod
 from .storage.coordinator import StorageCoordinator
-from .storage.index import Index
+from .storage.index import DASHBOARD_TILE_RANGES, Index
 from .storage.ingestion import IngestEvent, IngestionService, legacy_event_id
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
 
@@ -177,6 +177,98 @@ def _table_aggregates(result: dict) -> dict[str, float | None]:
         "min": min(minima) if minima else None,
         "max": max(maxima) if maxima else None,
         "sum": total,
+    }
+
+
+#: Sparkline-Auflösungen der Werte-Kachel als Bucket-Länge in Sekunden.
+#: Spiegelt resampleSparklinePoints() in static/js/dashboard-tiles.js — das
+#: Ausdünnen wandert mit /api/entity-stats auf den Server, damit nicht mehr
+#: jeder Rohpunkt eines Tages zum Browser übertragen wird, nur um dort
+#: verworfen zu werden.
+_SPARKLINE_BUCKET_SECONDS = {"raw": 0, "5min": 300, "15min": 900, "30min": 1800, "1h": 3600}
+
+#: Zeiträume, für die Rohwerte überhaupt abgefragt werden. Dieselbe Grenze wie
+#: im Optionen-Menü der Entitätsseite (entity_detail.html): darüber sprengt die
+#: Punktzahl MAX_RAW_QUERY_POINTS, und ein Monat als Sparkline braucht ohnehin
+#: keine Sekundenauflösung — dort sind die Buckets der Abfrage (1 Tag bzw.
+#: 1 Monat) die richtige Dichte.
+_RAW_CAPABLE_RANGES = ("hour", "day", "week")
+
+
+def _resample_sparkline(points: list[dict], resolution: str) -> list[dict]:
+    """Dünnt Rohpunkte auf einen Punkt je Bucket aus — der jeweils LETZTE des
+    Buckets, wie im Browser bisher: er passt gleichermaßen für Messwerte,
+    kumulative Zähler und Schalter und lässt den aktuellen Stand intakt."""
+    bucket_seconds = _SPARKLINE_BUCKET_SECONDS.get(resolution, 0)
+    if not bucket_seconds or len(points) < 2:
+        return points
+    buckets: dict[int, dict] = {}
+    for point in points:
+        buckets[int(point["ts"] // bucket_seconds)] = point
+    return [buckets[key] for key in sorted(buckets)]
+
+
+def _duration_noun(seconds: int) -> str:
+    """"Stunde", "5 Minuten", "2 Stunden" — für Tooltip-Text, nicht für Rechnen."""
+    if seconds % 3600 == 0:
+        hours = seconds // 3600
+        return "Stunde" if hours == 1 else f"{hours} Stunden"
+    minutes = max(1, seconds // 60)
+    return "Minute" if minutes == 1 else f"{minutes} Minuten"
+
+
+_ROLLUP_LEVEL_NOUNS = {"minute": "Minute", "stunde": "Stunde", "tag": "Tag", "monat": "Monat", "jahr": "Jahr"}
+
+
+def _counter_bucket_label(range_key: str) -> str | None:
+    """Wie lang ein Bucket bei einem ZÄHLER ist, als Wort für den Tooltip.
+
+    Nur bei Zählern nötig, und nur dort ehrlich: dessen Min/Ø/Max beziehen
+    sich auf Bucket-Deltas, "Max" heißt also "stärkster Tag" und nicht
+    "größter Messwert". Bei Messwerten wäre der Hinweis irreführend — deren
+    Bucket-Min/-Max sind die echten Extremwerte der Rohdaten (das Rollup führt
+    min_value/max_value mit), und nur der Durchschnitt hängt überhaupt an der
+    Bucket-Größe.
+
+    Aus LIVE_BUCKET_SECONDS/BAR_RESOLUTION abgeleitet statt danebengeschrieben:
+    eine zweite Tabelle würde beim nächsten Auflösungswechsel unbemerkt
+    veralten und dann etwas Falsches erklären.
+    """
+    live_seconds = query_mod.LIVE_BUCKET_SECONDS["counter"].get(range_key)
+    if live_seconds is not None:
+        return _duration_noun(live_seconds)
+    return _ROLLUP_LEVEL_NOUNS.get(query_mod.BAR_RESOLUTION.get(range_key, ""))
+
+
+def _tile_aggregates(result: dict) -> dict[str, float | None]:
+    """Die Kennzahlen einer Werte-Kachel aus einer gebucketen Serie.
+
+    Aufsatz auf _table_aggregates(), aber mit zwei Nullungen: was für den
+    Entitätstyp keine Aussage ist, kommt gar nicht erst beim Browser an, statt
+    dort noch einmal ausgeblendet zu werden.
+
+    * ``sum`` nur bei Zählern und Schaltern — dieselbe Regel wie in der
+      Chart-Legende (``hasSum`` in entity_detail.html). Die Summe von
+      Momentanwerten (20 °C + 21 °C + …) ist keine Temperatur.
+    * ``min``/``max`` nicht bei Schaltern — deren Bucket-Werte sind
+      Einschaltsekunden, "kleinster Wert" hieße dort "kürzeste Stunde" und
+      wäre als bloße Zahl neben dem Zustand nicht lesbar.
+
+    Bewusst NICHT aus den Rohwerten gerechnet, auch wo diese für die Sparkline
+    ohnehin vorliegen: Rohwerte eines Zählers sind Zählerstände, ihre Summe
+    wäre eine sinnlose Zahl in der Größenordnung "Zählerstand × Messpunkte".
+    Erst query_series() bildet daraus die Bucket-Deltas, deren Summe den
+    Verbrauch der Periode ergibt.
+    """
+    aggregation_type = result.get("aggregation_type")
+    values = _table_aggregates(result)
+    has_sum = aggregation_type in ("counter", "switch")
+    is_switch = aggregation_type == "switch"
+    return {
+        "min": None if is_switch else values["min"],
+        "avg": values["avg"],
+        "max": None if is_switch else values["max"],
+        "sum": values["sum"] if has_sum else None,
     }
 
 
@@ -489,6 +581,124 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         return {
             "series": series, "window_start": window_start, "window_end": window_end,
             "period_end": period_end, "is_current": is_current,
+        }
+
+    @router.get("/api/entity-stats")
+    @locked(limited_multi_entity_ids)
+    def api_entity_stats(
+        entity_ids: str,
+        range: str = Query("day", alias="range"),
+        continuous: bool = False,
+        resolution: str = "raw",
+        stats: bool = False,
+    ) -> dict:
+        """Alles, was eine Werte-Kachel anzeigt, in einer Runde — für mehrere
+        Kacheln gleichzeitig.
+
+        Der Browser holte bisher je Kachel die kompletten Rohpunkte des Tages
+        und rechnete daraus aktuellen Wert, Alter und Sparkline. Das skaliert
+        weder auf viele Kacheln (ein Request je Kachel) noch auf Zeiträume
+        jenseits einer Woche (Rohpunkte eines Jahres). Hier gruppiert der
+        Client stattdessen nach (Zeitraum, rollierend, Auflösung) und holt je
+        Gruppe einen Request; alle Entitäten einer Gruppe teilen sich denselben
+        request-lokalen Lese-Cache, sodass eine gemeinsam genutzte Monats-CSV
+        nur einmal geparst wird.
+
+        ``stats=false`` (der Normalfall: Kachel ohne Kennzahlen) macht genau
+        das, was der bisherige Roh-Request tat — die gebucketete Zweitabfrage
+        entsteht nur für Kacheln, die auch wirklich eine Kennzahl zeigen.
+        """
+        if range not in DASHBOARD_TILE_RANGES:
+            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        if resolution not in _SPARKLINE_BUCKET_SECONDS:
+            raise HTTPException(status_code=400, detail="Ungültige Sparkline-Auflösung")
+        ids = list(dict.fromkeys(limited_multi_entity_ids({"entity_ids": entity_ids})))
+        for entity_id in ids:
+            _validate_entity_id_or_400(entity_id)
+
+        now = datetime.now(deps.tz)
+        read_cache = query_mod.QueryReadCache()
+        # Rohwerte liefern zwei Dinge auf einmal: die Sparkline-Punkte und den
+        # aktuellen Wert samt Alter. Jenseits einer Woche gibt es sie nicht,
+        # dort übernehmen die Buckets die Sparkline — der aktuelle Wert kommt
+        # dann aus einem eigenen, kleinen rollierenden 24-Stunden-Fenster.
+        raw_capable = range in _RAW_CAPABLE_RANGES
+        series = []
+        window_start = window_end = None
+        for entity_id in ids:
+            entity = deps.index.get_entity(entity_id)
+            aggregation_type = entity["aggregation_type"] if entity else None
+            points: list[dict] = []
+            last_value = last_ts = None
+
+            if raw_capable:
+                raw = query_mod.query_raw_series(
+                    deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                    continuous=continuous,
+                )
+                points = _resample_sparkline(
+                    [p for p in raw["points"] if p["value"] is not None], resolution
+                )
+                if window_start is None:
+                    window_start, window_end = raw["window_start"], raw["window_end"]
+
+            aggregates = None
+            if stats or not raw_capable:
+                bucketed = query_mod.query_series(
+                    deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                    continuous=continuous, read_cache=read_cache,
+                )
+                if stats:
+                    aggregates = _tile_aggregates(bucketed)
+                if not raw_capable:
+                    points = [p for p in bucketed["points"] if p["value"] is not None]
+                    if window_start is None:
+                        window_start, window_end = bucketed["window_start"], bucketed["window_end"]
+
+            if points and raw_capable:
+                last_value, last_ts = points[-1]["value"], points[-1]["ts"]
+            else:
+                # Bei Monat/Jahr wäre der letzte Bucket-Wert bei einem Zähler
+                # ein Tages-/Monatsdelta, kein Zählerstand — der "aktuelle
+                # Wert" muss deshalb immer aus Rohwerten kommen. Rollierend,
+                # damit die Kachel nicht kurz nach Mitternacht ohne Wert
+                # dasteht, nur weil der Kalendertag noch fast leer ist.
+                recent = query_mod.query_raw_series(
+                    deps.data_dir, deps.index, entity_id, "day", deps.tz, now, continuous=True,
+                )
+                fresh = [p for p in recent["points"] if p["value"] is not None]
+                if fresh:
+                    last_value, last_ts = fresh[-1]["value"], fresh[-1]["ts"]
+
+            series.append({
+                "entity_id": entity_id,
+                "unit": (entity["unit"] if entity else None) or "",
+                "decimals": decimals_to_int(entity["decimals"]) if entity else None,
+                "aggregation_type": aggregation_type,
+                # Nur bei Zählern gesetzt — dort erklärt der Kachel-Tooltip
+                # damit, worauf sich Min/Ø/Max beziehen ("Ø je Tag").
+                "bucket_label": (
+                    _counter_bucket_label(range) if aggregation_type == "counter" else None
+                ),
+                "last": last_value,
+                "last_ts": last_ts,
+                "aggregates": aggregates,
+                # Nur ts/value — min/max je Bucket trägt die Sparkline nicht,
+                # und bei einem Monat wären es sonst 30 überflüssige Paare.
+                "points": [{"ts": p["ts"], "value": p["value"]} for p in points],
+            })
+
+        return {
+            "range": range,
+            "continuous": continuous,
+            # Womit die Sparkline tatsächlich gezeichnet wird: "raw" ist durch
+            # resolution ausgedünnt, "buckets" kommt aus der gebucketen
+            # Abfrage und ignoriert resolution. Die Kachel-Einstellungen grauen
+            # die Auflösungs-Reihe danach aus, statt die Regel zu kennen.
+            "sparkline_source": "raw" if raw_capable else "buckets",
+            "window_start": window_start,
+            "window_end": window_end,
+            "series": series,
         }
 
     @router.post("/api/query-table")

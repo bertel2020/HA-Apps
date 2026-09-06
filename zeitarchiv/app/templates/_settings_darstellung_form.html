@@ -91,8 +91,14 @@
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Kontinuierlich</div>
-        <div class="settings-compact-hint">Linie statt Treppenstufen zwischen Punkten</div>
+        <div class="settings-compact-label">Rollierend</div>
+        {# Der Hinweis lautete "Linie statt Treppenstufen zwischen Punkten"
+           und beschrieb damit etwas, das es in dieser App gar nicht gibt:
+           einen Treppenstufen-Modus (test_line_chart_hold.py wacht sogar
+           darüber, dass keiner existiert). Der Schalter setzt in Wahrheit
+           den Zeitraum der Abfrage. #}
+        <div class="settings-compact-hint">Zeitraum relativ zu jetzt statt ab Kalendergrenze —
+          „Tag“ heißt dann die letzten 24 Stunden statt ab Mitternacht</div>
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-continuous-btn" onclick="toggleDDPicker('entity-continuous')">{% for k, l in on_off_options %}{% if k == entity_continuous %}{{ l }}{% endif %}{% endfor %} ▾</button>

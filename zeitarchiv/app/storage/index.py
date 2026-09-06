@@ -34,6 +34,24 @@ DEFAULT_GAP_THRESHOLD = "15"
 DEFAULT_OUTLIER_THRESHOLD = "25"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 
+# Zeitraum und Kennzahlen einer Werte-Kachel (dashboard_pins, siehe die
+# Spaltenkommentare dort). Hier statt in query.py, weil der Setter unten
+# dagegen prüft und query.py umgekehrt schon von index.py abhängt.
+#
+# Bewusst OHNE "decade": eine Kachel zeigt immer die laufende Periode, und
+# zehn Jahre als Bezugsrahmen für einen Momentanwert ergeben keine Aussage,
+# kosten aber den teuersten Scan, den die Abfrage kennt.
+DASHBOARD_TILE_RANGES = ("hour", "day", "week", "month", "year")
+# Reihenfolge = Anzeigereihenfolge in der Kennzahlen-Zeile, nicht die
+# Eingabereihenfolge des Nutzers (siehe set_dashboard_entity_pin_metrics()).
+# Die Schlüssel sind die von _table_aggregates() in api_routes.py, weil
+# dieselbe Funktion die Werte berechnet.
+DASHBOARD_TILE_STATS_METRICS = ("min", "avg", "max", "sum")
+# "last" ist der aktuelle Wert und damit der einzige Hauptwert, der keine
+# Aggregation über den Zeitraum ist — Standard, weil es das bisherige,
+# einzige Verhalten der Kachel war.
+DASHBOARD_TILE_PRIMARY_METRICS = ("last", *DASHBOARD_TILE_STATS_METRICS)
+
 _RESOLUTION_SECONDS = {
     "30s": 30,
     "1min": 60,
@@ -431,6 +449,27 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     -- Nur bei Werte-Kacheln: "vor X"-Alter neben dem Wert ein-/ausblendbar —
     -- Standard an, da das bisherige (einzige) Verhalten.
     show_age INTEGER NOT NULL DEFAULT 1,
+    -- Nur bei Werte-Kacheln: abgefragter Zeitraum für Sparkline UND
+    -- Kennzahlen. Beides folgt bewusst demselben Fenster — zwei
+    -- verschiedene Zeiträume in einer Kachel wären nicht erklärbar.
+    -- 'day' ist das bisherige, fest verdrahtete Verhalten.
+    range_key TEXT NOT NULL DEFAULT 'day',
+    -- Nur bei Werte-Kacheln: rollierendes Fenster statt Kalendergrenze
+    -- (siehe _window() in storage/query.py). 0 = "laufend", also die
+    -- angefangene Kalenderperiode — das bisherige Verhalten: "Tag" meint
+    -- damit ab Mitternacht, nicht die letzten 24 Stunden.
+    continuous INTEGER NOT NULL DEFAULT 0,
+    -- Nur bei Werte-Kacheln: welche Kennzahl die große Zahl der Kachel ist.
+    -- 'last' (Standard) = aktueller Wert wie bisher, sonst eine Aggregation
+    -- über range_key ('min'/'avg'/'max'/'sum'). Die Schlüssel sind die von
+    -- _table_aggregates() in api_routes.py, weil dieselbe Funktion die Werte
+    -- berechnet — NICHT die der Chart-Legende, die 'average' statt 'avg'
+    -- schreibt (_ENTITY_LEGEND_METRIC_LABELS in main.py).
+    primary_metric TEXT NOT NULL DEFAULT 'last',
+    -- Nur bei Werte-Kacheln: zusätzliche Kennzahlen-Zeile unter dem Wert,
+    -- als kommagetrennte Teilmenge von min/avg/max/sum in dieser
+    -- Reihenfolge. Leer = keine Zeile, also das bisherige Verhalten.
+    stats_metrics TEXT NOT NULL DEFAULT '',
     UNIQUE(dashboard_id, item_type, item_id, item_entity_id)
 );
 
@@ -927,6 +966,30 @@ class Index:
         if "sparkline_resolution" not in dashboard_columns:
             self._conn.execute(
                 "ALTER TABLE dashboard_pins ADD COLUMN sparkline_resolution TEXT NOT NULL DEFAULT 'raw'"
+            )
+        # Zeitraum + Kennzahlen der Werte-Kacheln (siehe Spaltenkommentare im
+        # CREATE TABLE oben). Alle vier Defaults ergeben zusammen genau die
+        # Kachel, wie sie vor dieser Erweiterung aussah: Kalendertag,
+        # aktueller Wert, keine Kennzahlen-Zeile — bestehende Dashboards
+        # ändern sich durch die Migration also nicht sichtbar. Wie die vier
+        # Ergänzungen darüber je Spalte einzeln geprüft, nicht gesammelt an
+        # einer: die vier gehören zwar zu einer Version, aber eine abgebrochene
+        # Migration soll beim nächsten Start genau die fehlenden nachziehen.
+        if "range_key" not in dashboard_columns:
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN range_key TEXT NOT NULL DEFAULT 'day'"
+            )
+        if "continuous" not in dashboard_columns:
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN continuous INTEGER NOT NULL DEFAULT 0"
+            )
+        if "primary_metric" not in dashboard_columns:
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN primary_metric TEXT NOT NULL DEFAULT 'last'"
+            )
+        if "stats_metrics" not in dashboard_columns:
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN stats_metrics TEXT NOT NULL DEFAULT ''"
             )
 
         dashboards_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboards)")}
@@ -1912,21 +1975,24 @@ class Index:
             new_id = cursor.lastrowid
             pins = self._conn.execute(
                 "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, sparkline_resolution, decimals, title, show_age "
+                "show_sparkline, sparkline_resolution, decimals, title, show_age, "
+                "range_key, continuous, primary_metric, stats_metrics "
                 "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
                 (dashboard_id,),
             ).fetchall()
             self._conn.executemany(
                 "INSERT INTO dashboard_pins "
                 "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, sparkline_resolution, decimals, title, show_age) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "show_sparkline, sparkline_resolution, decimals, title, show_age, "
+                "range_key, continuous, primary_metric, stats_metrics) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
                         p["grid_cols"], p["grid_rows"], p["show_legend"], p["show_sparkline"],
                         p["sparkline_resolution"],
                         p["decimals"], p["title"], p["show_age"],
+                        p["range_key"], p["continuous"], p["primary_metric"], p["stats_metrics"],
                     )
                     for p in pins
                 ],
@@ -2201,6 +2267,60 @@ class Index:
                 "UPDATE dashboard_pins SET decimals = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
                 (decimals, dashboard_id, entity_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_metrics(
+        self,
+        dashboard_id: int,
+        entity_id: str,
+        *,
+        range_key: str | None = None,
+        continuous: bool | None = None,
+        primary_metric: str | None = None,
+        stats_metrics: list[str] | None = None,
+    ) -> bool:
+        """Zeitraum und Kennzahlen einer Werte-Kachel — anders als die übrigen
+        Kachel-Einstellungen bewusst ein gemeinsamer Setter statt vier
+        einzelner: die vier Werte hängen voneinander ab (der als Hauptwert
+        gewählte Eintrag fällt aus der Kennzahlen-Zeile heraus, und ein
+        Zeitraum-Wechsel kann eine unpassende Kennzahl mitnehmen), und vier
+        getrennte Aufrufe würden dafür zwei Schreibrunden brauchen. None
+        bedeutet je Feld "unverändert lassen".
+
+        stats_metrics wird auf die gültigen Kennzahlen gefiltert, dedupliziert
+        und in eine feste Reihenfolge gebracht — die Anzeige liest die Liste
+        unbesehen, die Reihenfolge auf der Kachel soll aber nicht davon
+        abhängen, in welcher Reihenfolge der Nutzer die Knöpfe gedrückt hat."""
+        fields: list[str] = []
+        values: list[object] = []
+        if range_key is not None:
+            if range_key not in DASHBOARD_TILE_RANGES:
+                raise ValueError("Ungültiger Zeitraum")
+            fields.append("range_key = ?")
+            values.append(range_key)
+        if continuous is not None:
+            fields.append("continuous = ?")
+            values.append(int(continuous))
+        if primary_metric is not None:
+            if primary_metric not in DASHBOARD_TILE_PRIMARY_METRICS:
+                raise ValueError("Ungültiger Hauptwert")
+            fields.append("primary_metric = ?")
+            values.append(primary_metric)
+        if stats_metrics is not None:
+            unknown = set(stats_metrics) - set(DASHBOARD_TILE_STATS_METRICS)
+            if unknown:
+                raise ValueError("Ungültige Kennzahl")
+            ordered = [m for m in DASHBOARD_TILE_STATS_METRICS if m in stats_metrics]
+            fields.append("stats_metrics = ?")
+            values.append(",".join(ordered))
+        if not fields:
+            return False
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                f"UPDATE dashboard_pins SET {', '.join(fields)} "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_entity_id = ?",
+                (*values, dashboard_id, entity_id),
             )
             return cursor.rowcount > 0
 

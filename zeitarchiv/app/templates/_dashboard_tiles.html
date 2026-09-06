@@ -82,15 +82,44 @@
        data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
        data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"
        data-show-age="{{ 'true' if tile.show_age else 'false' }}"
-       data-sparkline-resolution="{{ tile.sparkline_resolution }}">
+       data-sparkline-resolution="{{ tile.sparkline_resolution }}"
+       data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
+       data-primary-metric="{{ tile.primary_metric }}"
+       data-stats-metrics="{{ tile.stats_metrics | join(',') }}">
       <div class="dtile-title">{{ tile.name }}</div>
       <div class="dtile-entity-value">
         <span class="dtile-entity-main">
+          {# Kennzeichen nur, wenn die große Zahl NICHT der aktuelle Wert ist —
+             sonst wäre "16,8 °C" nicht von einem Momentanwert zu
+             unterscheiden. #}
+          {% if tile.primary_label %}<span class="dtile-entity-metric">{{ tile.primary_label }}</span>{% endif %}
           <span class="dtile-entity-number">{{ tile.value_text }}</span>
           {% if tile.unit %}<span class="dtile-entity-unit">{{ tile.unit }}</span>{% endif %}
         </span>
-        {% if tile.show_age %}<span class="dtile-entity-age" title="Letzte Aktualisierung">{{ tile.age_text }}</span>{% endif %}
+        {# Der Zeitraum steht genau einmal auf der Kachel (siehe
+           _tile_metric_context() in main.py): hier nur, wenn es keine
+           Kennzahlen-Zeile gibt, die ihn sonst trägt. #}
+        {% if tile.show_period_in_value_row %}
+        <span class="dtile-entity-period">{{ tile.range_label }}</span>
+        {% elif tile.show_age %}
+        <span class="dtile-entity-age" title="Letzte Aktualisierung">{{ tile.age_text }}</span>
+        {% endif %}
       </div>
+      {% if tile.stats_metrics %}
+      {# Werte füllt renderEntityTile() nach — serverseitig stünden sie nur mit
+         einer zweiten Abfrage je Kachel zur Verfügung. Die Zeile wird hier
+         trotzdem schon aufgebaut, damit die Kachel beim Nachfüllen nicht in
+         der Höhe springt. #}
+      <div class="dtile-entity-stats">
+        {% for metric in tile.stats_metrics %}
+        {% if not loop.first %}<span class="sep">&middot;</span>{% endif %}
+        <span class="dtile-entity-stat" data-metric="{{ metric }}">
+          <span class="k">{{ {'min': 'Min', 'avg': 'Ø', 'max': 'Max', 'sum': 'Σ'}[metric] }}</span><span class="v">&ndash;</span>
+        </span>
+        {% endfor %}
+        <span class="dtile-entity-period">{{ tile.range_label }}</span>
+      </div>
+      {% endif %}
       {% if tile.show_sparkline %}
       <div class="dtile-entity-sparkline"><div class="dtile-loading">&hellip;</div></div>
       {% endif %}

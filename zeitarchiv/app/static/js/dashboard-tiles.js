@@ -1010,18 +1010,6 @@
     return {line, area};
   }
 
-  function resampleSparklinePoints(points, resolution) {
-    const bucketSeconds = {raw: 0, '5min': 5 * 60, '15min': 15 * 60, '30min': 30 * 60, '1h': 60 * 60}[resolution] || 0;
-    if (!bucketSeconds || points.length < 2) return points;
-    const buckets = new Map();
-    points.forEach(point => {
-      // Der letzte Punkt je Bucket eignet sich gleichermaßen für Sensoren,
-      // kumulative Zähler und Schalter und lässt den aktuellen Stand intakt.
-      buckets.set(Math.floor(point.ts / bucketSeconds), point);
-    });
-    return Array.from(buckets.values()).sort((a, b) => a.ts - b.ts);
-  }
-
   // Aktueller Wert + Alter + optionale Sparkline einer Werte-Kachel — ein
   // einziger Roh-Query-Fetch (letzte 24h) deckt alle drei ab. Bewusst NICHT
   // auf entities.last_value/last_ts (die Datenbankspalten) verlassen: die
@@ -1032,46 +1020,202 @@
   // Sparkline-Kurve). Der servergerenderte Anfangszustand (siehe
   // _dashboard_tiles_context() in main.py) bleibt als Platzhalter stehen,
   // falls dieser Fetch fehlschlägt oder keine Punkte liefert.
-  async function renderEntityTile(el) {
-    const base = document.getElementById('dashboard-grid')?.dataset.base || '.';
-    const entityId = el.dataset.entityId;
-    const sparklineEl = el.querySelector('.dtile-entity-sparkline');
-    let data;
-    try {
-      const res = await fetch(`${base}/api/query?entity_id=${encodeURIComponent(entityId)}&range=day&raw=true`);
-      data = await res.json();
-    } catch (e) {
-      return;
-    }
-    const points = (data.points || []).filter(p => Number.isFinite(p.value));
-    if (!points.length) return;  // kein besseres Ergebnis als der Server-Platzhalter
+  // Zeitraum-Beschriftung einer Werte-Kachel — zweite Kopie von
+  // _TILE_RANGE_LABELS in main.py: der Server beschriftet die erste Anzeige,
+  // hier wird nach einer Änderung im Kachelmenü neu beschriftet, ohne die
+  // Seite neu zu laden. Ein Test hält beide Kopien deckungsgleich.
+  // [kalendarisch, rollierend]
+  const TILE_RANGE_LABELS = {
+    hour: ['Std.', '60 Min.'], day: ['Tag', '24 Std.'], week: ['Woche', '7 Tage'],
+    month: ['Monat', '30 Tage'], year: ['Jahr', '12 Monate'],
+  };
+  // Dasselbe Fenster ausgeschrieben, für den Tooltip: "Max 23,1" allein sagt
+  // nicht, worüber.
+  const TILE_RANGE_WINDOW = {
+    hour: ['in der laufenden Stunde', 'in den letzten 60 Minuten'],
+    day: ['heute seit Mitternacht', 'in den letzten 24 Stunden'],
+    week: ['in der laufenden Kalenderwoche', 'in den letzten 7 Tagen'],
+    month: ['im laufenden Monat', 'in den letzten 30 Tagen'],
+    year: ['im laufenden Jahr', 'in den letzten 12 Monaten'],
+  };
+  const TILE_METRIC_LABELS = {last: '', min: 'Min', avg: 'Ø', max: 'Max', sum: 'Σ'};
 
-    const last = points[points.length - 1];
-    const numberEl = el.querySelector('.dtile-entity-number');
-    const ageEl = el.querySelector('.dtile-entity-age');
-    if (numberEl) {
-      numberEl.textContent = el.dataset.isSwitch === 'true'
-        ? (last.value ? 'An' : 'Aus')
-        : NumberFormat.fmt(last.value, el.dataset.decimals === 'auto' ? null : parseInt(el.dataset.decimals, 10));
+  function tileRangeLabel(el) {
+    const pair = TILE_RANGE_LABELS[el.dataset.range] || TILE_RANGE_LABELS.day;
+    return pair[el.dataset.continuous === 'true' ? 1 : 0];
+  }
+
+  // Erklärt eine Kennzahl im Klartext. Der heikle Fall ist der Zähler: dessen
+  // Min/Ø/Max beziehen sich auf Bucket-Deltas, "Max" heißt dort "stärkster
+  // Tag" und nicht "größter Messwert". Die Bucket-Größe kommt vom Server
+  // (bucket_label), damit hier keine zweite Tabelle mit den Auflösungen des
+  // Speichers entsteht, die still veralten könnte.
+  function tileMetricTooltip(el, metric, serie) {
+    const fenster = (TILE_RANGE_WINDOW[el.dataset.range] || TILE_RANGE_WINDOW.day)[
+      el.dataset.continuous === 'true' ? 1 : 0
+    ];
+    const bucket = serie && serie.bucket_label;
+    if (bucket) {
+      const jeBucket = {
+        min: `schwächster ${bucket}`, avg: `Ø je ${bucket}`,
+        max: `stärkster ${bucket}`, sum: 'Summe',
+      }[metric];
+      return `${jeBucket} · ${fenster}`;
     }
-    const secondsAgo = Date.now() / 1000 - last.ts;
-    if (ageEl) ageEl.textContent = `vor ${NumberFormat.fmtDuration(secondsAgo)}`;
+    const messwert = {
+      min: 'kleinster Messwert', avg: 'Durchschnitt',
+      max: 'größter Messwert', sum: 'Summe',
+    }[metric];
+    return `${messwert} · ${fenster}`;
+  }
+
+  // ---- Bündelung -----------------------------------------------------
+  // Statt eines Requests je Kachel: alle Kacheln, die im selben Durchgang
+  // sichtbar werden, sammeln und nach (Zeitraum, rollierend, Auflösung,
+  // Kennzahlen) gruppieren — je Gruppe ein Request an /api/entity-stats.
+  // Das faule Nachladen bleibt erhalten: Kacheln unterhalb des Falzes bilden
+  // beim Scrollen ihre eigene Gruppe.
+  const pendingEntityTiles = new Set();
+  let entityFlushScheduled = false;
+
+  function renderEntityTile(el) {
+    pendingEntityTiles.add(el);
+    if (entityFlushScheduled) return;
+    entityFlushScheduled = true;
+    // setTimeout(0) statt eines Microtasks: der IntersectionObserver liefert
+    // zwar alle gleichzeitig sichtbaren Kacheln in EINEM Callback, der
+    // Auto-Refresh ruft aber je Kachel einzeln in einer forEach-Schleife.
+    // Beide Fälle landen so im selben Sammelfenster.
+    setTimeout(flushEntityTiles, 0);
+  }
+
+  function tileGroupKey(el) {
+    return [
+      el.dataset.range || 'day',
+      el.dataset.continuous === 'true' ? '1' : '0',
+      el.dataset.sparklineResolution || 'raw',
+      el.dataset.statsMetrics ? '1' : '0',
+    ].join('|');
+  }
+
+  async function flushEntityTiles() {
+    entityFlushScheduled = false;
+    const tiles = [...pendingEntityTiles].filter(el => el.isConnected);
+    pendingEntityTiles.clear();
+    if (!tiles.length) return;
+    const groups = new Map();
+    tiles.forEach(el => {
+      const key = tileGroupKey(el);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(el);
+    });
+    await Promise.all([...groups.values()].map(loadEntityGroup));
+  }
+
+  async function loadEntityGroup(tiles) {
+    const base = document.getElementById('dashboard-grid')?.dataset.base || '.';
+    const erste = tiles[0];
+    const params = new URLSearchParams({
+      range: erste.dataset.range || 'day',
+      continuous: erste.dataset.continuous === 'true' ? 'true' : 'false',
+      resolution: erste.dataset.sparklineResolution || 'raw',
+      stats: erste.dataset.statsMetrics ? 'true' : 'false',
+    });
+    // MAX_MULTI_QUERY_ENTITIES (25, siehe limits.py) — ein großes Dashboard
+    // überschreitet das sonst und bekäme statt Daten eine 413.
+    for (let i = 0; i < tiles.length; i += 25) {
+      const stueck = tiles.slice(i, i + 25);
+      // Dieselbe Entität kann mehrfach angeheftet sein (verschiedene
+      // Dashboards teilen dieses Skript nicht, aber Größenvarianten auf einer
+      // Seite schon) — die API liefert je Entität EINE Serie, deshalb hier
+      // deduplizieren und unten wieder auf alle Kacheln verteilen.
+      const ids = [...new Set(stueck.map(el => el.dataset.entityId))];
+      let daten;
+      try {
+        const res = await fetch(
+          `${base}/api/entity-stats?entity_ids=${encodeURIComponent(ids.join(','))}&${params}`
+        );
+        if (!res.ok) continue;
+        daten = await res.json();
+      } catch (e) {
+        continue;  // Netzwerkfehler: der servergerenderte Platzhalter bleibt stehen
+      }
+      const nachId = new Map((daten.series || []).map(s => [s.entity_id, s]));
+      stueck.forEach(el => {
+        const serie = nachId.get(el.dataset.entityId);
+        if (serie) applyEntityTile(el, serie);
+      });
+    }
+  }
+
+  // ---- Darstellung ---------------------------------------------------
+  // Bewusst NICHT auf entities.last_value/last_ts (die Datenbankspalten)
+  // verlassen: die werden nur über den echten Ingestion-Pfad gepflegt
+  // (complete_ingest_event()) — Demo-/Importdaten, die diesen Pfad umgehen,
+  // lassen last_value dauerhaft NULL, obwohl echte archivierte Werte
+  // existieren (genau der gemeldete Bug: Kachel zeigt "–" trotz sichtbarer
+  // Sparkline-Kurve). Der servergerenderte Anfangszustand (siehe
+  // _dashboard_tiles_context() in main.py) bleibt als Platzhalter stehen,
+  // falls der Fetch fehlschlägt oder keine Daten liefert.
+  function applyEntityTile(el, serie) {
+    const primary = el.dataset.primaryMetric || 'last';
+    const dezimal = el.dataset.decimals === 'auto' ? null : parseInt(el.dataset.decimals, 10);
+    const istSchalter = el.dataset.isSwitch === 'true';
+    const wert = primary === 'last'
+      ? serie.last
+      : (serie.aggregates ? serie.aggregates[primary] : null);
+
+    const numberEl = el.querySelector('.dtile-entity-number');
+    if (numberEl && wert != null) {
+      // "An"/"Aus" nur für den Momentanwert — eine Summe über Schalter ist
+      // eine Einschaltdauer in Sekunden, kein Zustand.
+      numberEl.textContent = istSchalter && primary === 'last'
+        ? (wert ? 'An' : 'Aus')
+        : (istSchalter && primary === 'sum'
+            ? NumberFormat.fmtDuration(wert)
+            : NumberFormat.fmt(wert, dezimal));
+    } else if (numberEl && serie.aggregates && primary !== 'last') {
+      numberEl.textContent = '–';
+    }
+
+    const ageEl = el.querySelector('.dtile-entity-age');
+    const secondsAgo = serie.last_ts == null ? null : Date.now() / 1000 - serie.last_ts;
+    if (ageEl) {
+      ageEl.textContent = secondsAgo == null ? 'nie' : `vor ${NumberFormat.fmtDuration(secondsAgo)}`;
+    }
     // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
-    // is-stale in dashboard_detail.html/entities.html), der Wert bleibt immer
-    // schwarz — dieselben zwei Schwellen (15 Min./1 Std.) wie beim
-    // Server-Rendern (main.py _dashboard_tiles_context()), hier maßgeblich
-    // seit last_value/last_ts als Datenquelle unzuverlässig sind.
+    // is-stale), der Wert bleibt immer schwarz — dieselben zwei Schwellen
+    // (15 Min./1 Std.) wie beim Server-Rendern. Hängt weiterhin am letzten
+    // ROHWERT, auch wenn die große Zahl eine Aggregation ist: "veraltet"
+    // meint die Entität, nicht die Kennzahl.
     const tileEl = el.closest('.dtile');
-    if (tileEl) {
+    if (tileEl && secondsAgo != null) {
       tileEl.classList.toggle('is-warn', secondsAgo > 900 && secondsAgo <= 3600);
       tileEl.classList.toggle('is-stale', secondsAgo > 3600);
     }
 
+    el.querySelectorAll('.dtile-entity-stat').forEach(statEl => {
+      const metric = statEl.dataset.metric;
+      const v = statEl.querySelector('.v');
+      const zahl = serie.aggregates ? serie.aggregates[metric] : null;
+      if (v) {
+        v.textContent = zahl == null
+          ? '–'
+          : (istSchalter && metric === 'sum'
+              ? NumberFormat.fmtDuration(zahl)
+              : NumberFormat.fmt(zahl, dezimal));
+      }
+      // data-tooltip-fixed statt data-tooltip: .dtile-body hat
+      // overflow:hidden, ein ::after-Tooltip würde am Kachelrand
+      // abgeschnitten (siehe fixed-tooltip.js).
+      statEl.setAttribute('data-tooltip-fixed', tileMetricTooltip(el, metric, serie));
+    });
+
+    const sparklineEl = el.querySelector('.dtile-entity-sparkline');
     if (sparklineEl) {
-      const sparklinePoints = resampleSparklinePoints(
-        points, el.dataset.sparklineResolution || 'raw'
-      );
-      const paths = sparklinePaths(sparklinePoints.map(p => p.value));
+      // Das Ausdünnen ist serverseitig passiert (resolution), hier nur noch
+      // zeichnen.
+      const paths = sparklinePaths((serie.points || []).map(p => p.value));
       sparklineEl.innerHTML = paths
         ? `<svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">`
           + `<path class="area" d="${paths.area}"/><path class="line" d="${paths.line}"/></svg>`
@@ -1375,6 +1519,181 @@
       // Zellen-Reihe wie die Kachelgröße oben, statt eines nativen <select>:
       // passt optisch besser in den schmalen Popover und fügt sich neben dem
       // Größen-Picker als "noch eine Reihe kleiner Kacheln" nahtlos ein.
+      // Zeitraum, Laufend/Rollierend, Hauptwert und Kennzahlen-Zeile teilen
+      // sich EINEN Endpunkt: der Server rechnet die Abhängigkeiten aus (der
+      // Hauptwert fällt aus der Zeile, nicht anwendbare Kennzahlen fliegen
+      // raus) und schickt den fertigen Anzeigezustand zurück. Der Browser
+      // baut die Kachel daraus neu auf, statt dieselben Regeln ein zweites
+      // Mal zu implementieren.
+      const rangeCells = Array.from(control.querySelectorAll('.dtile-range-cell'));
+      const continuousCells = Array.from(control.querySelectorAll('.dtile-continuous-cell'));
+      const primaryCells = Array.from(control.querySelectorAll('.dtile-primary-cell'));
+      const statsCells = Array.from(control.querySelectorAll('.dtile-stats-cell'));
+      const statsRow = control.querySelector('.dtile-stats-row');
+      const statsCheckbox = control.querySelector('.dtile-stats-checkbox');
+      const resolutionRow = control.querySelector('.dtile-sparkline-resolution-row');
+
+      if (rangeCells.length) {
+        // Rohwerte gibt es nur bis "Woche" (MAX_RAW_QUERY_POINTS) — darüber
+        // kommen die Sparkline-Punkte aus den Buckets der Abfrage und die
+        // Auflösungs-Reihe hat keine Wirkung mehr. Ausgrauen statt
+        // verschwinden lassen, wie beim Legenden-Schalter der Chart-Kacheln.
+        const rawFaehig = ['hour', 'day', 'week'];
+        const zeigeAufloesung = () => {
+          if (!resolutionRow) return;
+          const aus = !rawFaehig.includes(tile.querySelector('.dtile-entity-body')?.dataset.range || 'day');
+          resolutionRow.classList.toggle('is-disabled', aus);
+          resolutionRow.querySelectorAll('button').forEach(b => { b.disabled = aus; });
+          resolutionRow.title = aus
+            ? 'Bei Monat und Jahr zeichnet die Sparkline die Buckets der Abfrage — eine feinere Auflösung gibt es dort nicht.'
+            : '';
+        };
+
+        // Baut Kennzeichen, Kennzahlen-Zeile und Zeitraum-Text neu auf. Die
+        // Werte selbst bleiben leer; sie kommen aus dem anschließenden
+        // renderEntityTile(), das ohnehin neu laden muss (anderer Zeitraum =
+        // andere Daten).
+        const uebernehmen = (ctx) => {
+          const body = tile.querySelector('.dtile-entity-body');
+          if (!body) return;
+          body.dataset.range = ctx.range_key;
+          body.dataset.continuous = String(ctx.continuous);
+          body.dataset.primaryMetric = ctx.primary_metric;
+          body.dataset.statsMetrics = ctx.stats_metrics.join(',');
+
+          const main = body.querySelector('.dtile-entity-main');
+          let badge = body.querySelector('.dtile-entity-metric');
+          if (ctx.primary_label) {
+            if (!badge) {
+              badge = document.createElement('span');
+              badge.className = 'dtile-entity-metric';
+              main?.prepend(badge);
+            }
+            badge.textContent = ctx.primary_label;
+          } else if (badge) {
+            badge.remove();
+          }
+
+          body.querySelector('.dtile-entity-stats')?.remove();
+          if (ctx.stats_metrics.length) {
+            const zeile = document.createElement('div');
+            zeile.className = 'dtile-entity-stats';
+            ctx.stats_metrics.forEach((metric, i) => {
+              if (i) {
+                const sep = document.createElement('span');
+                sep.className = 'sep';
+                sep.textContent = '·';
+                zeile.appendChild(sep);
+              }
+              const stat = document.createElement('span');
+              stat.className = 'dtile-entity-stat';
+              stat.dataset.metric = metric;
+              stat.innerHTML = `<span class="k"></span><span class="v">–</span>`;
+              stat.querySelector('.k').textContent = TILE_METRIC_LABELS[metric] || metric;
+              zeile.appendChild(stat);
+            });
+            const periode = document.createElement('span');
+            periode.className = 'dtile-entity-period';
+            periode.textContent = ctx.range_label;
+            zeile.appendChild(periode);
+            body.querySelector('.dtile-entity-sparkline')
+              ? body.insertBefore(zeile, body.querySelector('.dtile-entity-sparkline'))
+              : body.appendChild(zeile);
+          }
+
+          // Der Zeitraum steht genau einmal — in der Wert-Zeile nur dann,
+          // wenn es keine Kennzahlen-Zeile gibt, die ihn trägt.
+          const wertZeile = body.querySelector('.dtile-entity-value');
+          wertZeile?.querySelector('.dtile-entity-period')?.remove();
+          const alter = wertZeile?.querySelector('.dtile-entity-age');
+          if (ctx.show_period_in_value_row) {
+            if (alter) alter.hidden = true;
+            const periode = document.createElement('span');
+            periode.className = 'dtile-entity-period';
+            periode.textContent = ctx.range_label;
+            wertZeile?.appendChild(periode);
+          } else if (alter) {
+            alter.hidden = body.dataset.showAge !== 'true';
+          }
+
+          // Aktueller Wert rechts in der Überschrift — dieselbe Konvention
+          // wie bei Kachelgröße und Nachkommastellen: was gerade gilt, steht
+          // ablesbar da, statt aus den eingefärbten Knöpfen erschlossen zu
+          // werden. Der Zeitraum nennt beide Achsen ("Tag · Laufend"), weil
+          // sie zusammen erst die Aussage ergeben.
+          const kopfZeitraum = control.querySelector('[data-head="range"]');
+          const kopfHauptwert = control.querySelector('[data-head="primary"]');
+          if (kopfZeitraum) {
+            kopfZeitraum.textContent = `${ctx.range_label} · ${ctx.continuous ? 'Rollierend' : 'Laufend'}`;
+          }
+          if (kopfHauptwert) kopfHauptwert.textContent = ctx.primary_label || 'Aktuell';
+
+          // Popup-Zustand nachziehen: der Hauptwert sperrt seinen Eintrag in
+          // der Kennzahlen-Zeile, deshalb reicht kein reines Umfärben.
+          rangeCells.forEach(c => c.classList.toggle('is-selected', c.dataset.range === ctx.range_key));
+          continuousCells.forEach(c => c.classList.toggle('is-selected', (c.dataset.continuous === 'true') === ctx.continuous));
+          primaryCells.forEach(c => c.classList.toggle('is-selected', c.dataset.primary === ctx.primary_metric));
+          statsCells.forEach(c => {
+            const gesperrt = !ctx.available_metrics.includes(c.dataset.metric) || c.dataset.metric === ctx.primary_metric;
+            c.classList.toggle('is-selected', ctx.stats_metrics.includes(c.dataset.metric));
+            c.classList.toggle('is-off', gesperrt);
+            c.disabled = gesperrt;
+            c.title = gesperrt
+              ? (c.dataset.metric === ctx.primary_metric ? 'Steht schon als Hauptwert' : 'Für diese Entität keine sinnvolle Kennzahl')
+              : '';
+          });
+          if (statsRow) statsRow.hidden = !statsCheckbox?.checked;
+          zeigeAufloesung();
+          renderEntityTile(body);
+        };
+
+        const senden = async (aenderung) => {
+          try {
+            const response = await fetch(`${base}/dashboard/entity-metrics`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, entity_id: tile.dataset.itemEntityId, ...aenderung,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            uebernehmen(await response.json());
+          } catch (e) {
+            trigger.title = 'Kennzahlen konnten nicht gespeichert werden';
+          }
+        };
+
+        rangeCells.forEach(c => c.addEventListener('click', () => senden({range_key: c.dataset.range})));
+        continuousCells.forEach(c => c.addEventListener('click', () => senden({continuous: c.dataset.continuous === 'true'})));
+        primaryCells.forEach(c => c.addEventListener('click', () => senden({primary_metric: c.dataset.primary})));
+        statsCells.forEach(c => c.addEventListener('click', () => {
+          const gewaehlt = statsCells.filter(x => x.classList.contains('is-selected')).map(x => x.dataset.metric);
+          const neu = c.classList.contains('is-selected')
+            ? gewaehlt.filter(m => m !== c.dataset.metric)
+            : [...gewaehlt, c.dataset.metric];
+          senden({stats_metrics: neu});
+        }));
+        if (statsCheckbox) {
+          statsCheckbox.addEventListener('change', () => {
+            if (statsRow) statsRow.hidden = !statsCheckbox.checked;
+            if (statsCheckbox.checked) {
+              // Beim Einschalten eine sinnvolle Vorbelegung statt einer leeren
+              // Zeile: die verfügbaren Kennzahlen ohne den Hauptwert.
+              const body = tile.querySelector('.dtile-entity-body');
+              const primary = body?.dataset.primaryMetric || 'last';
+              const moeglich = statsCells
+                .filter(x => !x.classList.contains('is-off') || x.dataset.metric !== primary)
+                .filter(x => x.dataset.metric !== primary && !x.disabled)
+                .map(x => x.dataset.metric);
+              senden({stats_metrics: moeglich});
+            } else {
+              senden({stats_metrics: []});
+            }
+          });
+        }
+        zeigeAufloesung();
+      }
+
       const decimalsCells = Array.from(control.querySelectorAll('.dtile-decimals-cell'));
       const decimalsHead = control.querySelector('.dtile-decimals-picker-head strong');
       const DECIMALS_HEAD_LABELS = {auto: 'Auto', '0': '0', '1': '1', '2': '2', '3': '3'};

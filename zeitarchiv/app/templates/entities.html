@@ -57,6 +57,46 @@
   /* .sparkline/.area/.line selbst kommen aus app.css (dieselbe Optik wie die
      Statistik-Kacheln dieser Seite) — dieser Wrapper regelt nur den Abstand
      zur Werte-Zeile darüber. */
+  /* Kennzahlen-Zeile (Min/Ø/Max/Σ) zwischen Wert und Sparkline. Eine Zeile
+     mit Trennpunkten statt Chips oder Spalten: Chips verdoppeln bei drei
+     Kennzahlen die Zeilenhöhe und konkurrieren optisch mit dem Hauptwert,
+     Spalten sind auf 1x1 unbrauchbar. Etikett in --ink-faint, Wert in
+     --ink-muted — dieselbe Zweiteilung wie .stat .label / .sub-value, keine
+     neuen Farbwerte. cursor:help, weil jede Kennzahl einen erklärenden
+     Tooltip trägt (data-tooltip-fixed, siehe unten). */
+  .dtile-entity-stats{
+    flex:none;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 9px;margin-top:2px;
+    font-size:calc(11.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;line-height:1.35;
+  }
+  .dtile-entity-stat{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap;cursor:help;}
+  .dtile-entity-stat .k{color:var(--ink-faint);font-weight:500;}
+  .dtile-entity-stat .v{color:var(--ink-muted);font-weight:600;}
+  .dtile-entity-stats .sep{color:var(--border-strong);}
+  /* Zeitraum-Text ("Tag", "24 Std.", "30 Tage") — steht je Kachel genau
+     einmal: in der Kennzahlen-Zeile rechtsbündig, oder ersatzweise im
+     Wert-Bereich an der Stelle des Alters (siehe _tile_metric_context() in
+     main.py). Dort trägt ihn der Flex-Container schon rechts, deshalb dort
+     kein margin-left:auto. */
+  .dtile-entity-period{
+    margin-left:auto;color:var(--ink-faint);font-weight:500;white-space:nowrap;
+    font-size:calc(11.5px * var(--font-scale, 1));
+  }
+  .dtile-entity-value .dtile-entity-period{margin-left:0;font-size:calc(12px * var(--font-scale, 1));}
+  /* Kennzeichen vor der großen Zahl, sobald diese eine Aggregation ist
+     ("Ø 16,8 °C"). Deutlich kleiner und in --ink-faint, damit es die Zahl
+     einordnet, statt mit ihr zu konkurrieren. */
+  .dtile-entity-metric{
+    font-size:calc(16px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
+  }
+  /* Einzeilige Kachel: die Kennzahlen treten an die Stelle des Alters und
+     dürfen nicht umbrechen — der Zeitraum entfällt dort, er steht dann nur
+     noch im Tooltip. overflow als Notbremse, falls drei Kennzahlen mit
+     großen Zahlen doch breiter werden als die Kachel. */
+  .dtile-entity[data-grid-rows="1"] .dtile-entity-stats{
+    margin-top:0;font-size:calc(10.5px * var(--font-scale, 1));flex-wrap:nowrap;overflow:hidden;
+  }
+  .dtile-entity[data-grid-rows="1"] .dtile-entity-stats .dtile-entity-period{display:none;}
+  .dtile-entity[data-grid-rows="1"] .dtile-entity-metric{font-size:calc(13px * var(--font-scale, 1));}
   .dtile-entity-sparkline{flex:none;width:100%;margin-top:6px;}
   /* siehe identische Regel/Begründung in dashboard_detail.html — nur an
      data-grid-rows geknüpft, nicht zusätzlich an data-grid-cols. */

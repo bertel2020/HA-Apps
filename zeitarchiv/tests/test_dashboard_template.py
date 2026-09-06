@@ -133,8 +133,14 @@ def test_value_tile_editor_and_sparkline_defaults_are_exposed() -> None:
     assert "Nachkommastellen <strong>" not in menu
     assert 'data-sparkline-resolution="{{ tile.sparkline_resolution }}"' in tiles
     assert "dashboard/sparkline-resolution" in script
-    assert "resampleSparklinePoints" in script
-    assert "range=day&raw=true" in script
+    # Das Ausdünnen der Sparkline und der Datenabruf sind auf den Server
+    # gewandert (/api/entity-stats): der Browser reicht die Auflösung nur noch
+    # als Parameter durch, statt jeden Rohpunkt eines Tages zu holen und
+    # dort zu verwerfen.
+    assert "resampleSparklinePoints" not in script
+    assert "range=day&raw=true" not in script
+    assert "/api/entity-stats?entity_ids=" in script
+    assert "resolution: erste.dataset.sparklineResolution" in script
 
 
 def test_value_tile_layout_bottom_aligns_age_and_moves_title_only_when_roomy() -> None:
@@ -183,3 +189,30 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_metric_section_follows_the_popup_heading_convention() -> None:
+    """Die Kachel-Einstellungen beschriften jede Gruppe nach demselben Muster:
+    Titel links, aktueller Wert rechts in Monospace (.dtile-size-picker-head
+    strong, siehe Kachelgröße und Nachkommastellen). Ohne das müsste man den
+    aktuellen Stand aus den eingefärbten Knöpfen erschließen."""
+    menu = (TEMPLATES_DIR / "_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    assert '<strong data-head="range">' in menu
+    assert '<strong data-head="primary">' in menu
+    # Der Zeitraum nennt beide Achsen — erst zusammen ergeben sie die Aussage.
+    assert "{{ 'Rollierend' if tile.continuous else 'Laufend' }}" in menu
+
+    script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    assert "[data-head=\"range\"]" in script
+    assert "[data-head=\"primary\"]" in script
+
+
+def test_metric_section_labels_are_all_the_same_size() -> None:
+    """Die Zeile mit dem Schalter trägt links dieselbe Beschriftung wie die
+    Überschriften darüber. Ohne eigene Regel erbt .menu-row-label die größere
+    Schrift der Zeile — der Abschnitt liefe nach zwei kleinen Überschriften
+    plötzlich groß weiter (genau so sah es zuerst aus)."""
+    menu = (TEMPLATES_DIR / "_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert 'class="menu-row-label dtile-choice-head-label"' in menu
+    assert ".dtile-choice-head-label{" in css
