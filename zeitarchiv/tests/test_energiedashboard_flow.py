@@ -286,3 +286,28 @@ def test_doppelt_zugeordnete_entitaet_wird_erkannt(monkeypatch, tmp: Path) -> No
         assert pruefung["ok"] is False
     finally:
         a.close()
+
+
+def test_mischton_haengt_am_bus_anschluss_nicht_an_der_gruppierung(monkeypatch, tmp: Path) -> None:
+    """Der PV/Netz-Mischton ("wie grün war dieser Verbrauch") gehört an jede
+    Bahn, die direkt vom Sammelknoten kommt — Gruppe, Grundlast UND einzelnes
+    Gerät. Vorher trugen ihn nur Gruppen und Grundlast, ein ungruppiertes Gerät
+    bekam einen bedeutungslosen Grauverlauf. Damit hing die Farbe eines Geräts
+    davon ab, ob es zufällig gruppiert ist — eine reine Darstellungsfrage hätte
+    die Bedeutung der Farbe bestimmt. Besonders schief seit dem Auflösen der
+    Ein-Mitglied-Gruppen: die Wallbox verlor den Mischton allein durch eine
+    Layout-Optimierung."""
+    flow, a, _ = _flow(monkeypatch, tmp)
+    try:
+        blend = {n["name"]: bool(n.get("blend")) for n in flow["nodes"] if n.get("role") == "sink"}
+        # Direkt am Bus: Gruppe, aufgelöstes Einzelgerät, rechnerischer Rest.
+        assert blend["Haushalt"] is True
+        assert blend["Wallbox"] is True
+        assert blend["Grundlast"] is True
+        # Innerhalb der Gruppe nicht — dort trägt ihn schon Bus -> Haushalt.
+        assert blend["Waschmaschine"] is False
+        assert blend["Trockner"] is False
+        # Rollen mit eigener Farbbedeutung bleiben unangetastet.
+        assert blend["Einspeisung"] is False
+    finally:
+        a.close()

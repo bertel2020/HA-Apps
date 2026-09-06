@@ -1077,6 +1077,19 @@ class EnergieDashboardService:
             node = {
                 "name": name, "entity_id": entity_id, "role": "sink",
                 "value": display_val, "stale": stale,
+                # Hängt das Gerät direkt am Bus (ohne Gruppe, oder weil seine
+                # Ein-Mitglied-Gruppe oben aufgelöst wurde), bekommt seine Bahn
+                # den PV/Netz-Mischton — genau wie Gruppen und Grundlast. Die
+                # Begründung im Kommentar oben gilt symmetrisch: nach der
+                # Vermischung am Bus lässt sich "wie grün" nicht mehr auf
+                # einzelne Verbraucher zurückrechnen, für ein einzelnes Gerät so
+                # wenig wie für eine Gruppe. Ohne dieses Flag hing die Farbe
+                # eines Geräts davon ab, ob es zufällig gruppiert ist — eine
+                # reine Darstellungsfrage hätte damit die Bedeutung der Farbe
+                # bestimmt. Innerhalb einer Gruppe (Gruppe -> Gerät) bleibt es
+                # beim normalen Verlaufs-Farbton, dort trägt bereits die Bahn
+                # Bus -> Gruppe den Mischton.
+                **({"blend": True} if gruppe is None else {}),
             }
             if anomalie_active:
                 # Baseline == 0 (Gerät lief in keiner der Vergleichsperioden)

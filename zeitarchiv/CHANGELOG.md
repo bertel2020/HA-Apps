@@ -35,6 +35,16 @@
   Restton — sonst wäre der größte Teil jeder Karte ungefärbt, genau der
   Zustand, der schon einmal nachgebessert werden musste, weil er "kaum als
   Farbe wahrnehmbar" war.
+- **Der PV/Netz-Mischton liegt jetzt auf jeder Bahn, die direkt vom
+  Sammelknoten kommt** — also auch auf einzelnen, nicht gruppierten
+  Verbrauchern, nicht mehr nur auf Gruppen und Grundlast. Bisher hing die
+  Farbe eines Geräts davon ab, ob es zufällig einer Gruppe zugeordnet war;
+  eine reine Darstellungsfrage bestimmte damit, ob man ablesen konnte, wie
+  grün dessen Verbrauch war. Der Quelltext hatte diese Absicht schon
+  beschrieben, aber nur für Gruppen umgesetzt. Innerhalb einer Gruppe bleibt
+  es beim normalen Verlaufs-Farbton, dort trägt bereits die Bahn zur Gruppe
+  den Mischton; Einspeisung und Speicherladung behalten ihre eigenen
+  Rollenfarben.
 - **Das App-Logo in der Kopfleiste ist etwas größer** (30 statt 26 Pixel),
   es wirkte neben der Wortmarke zu zurückhaltend. Die Höhe der Kopfleiste
   bleibt unverändert.
