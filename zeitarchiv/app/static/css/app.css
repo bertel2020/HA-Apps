@@ -711,10 +711,13 @@ a.menu-row{text-decoration:none;}
   background-image:
     linear-gradient(to right,var(--surface),transparent),
     linear-gradient(to left,var(--surface),transparent),
-    linear-gradient(to right,var(--ink-faint),transparent),
-    linear-gradient(to left,var(--ink-faint),transparent);
+    linear-gradient(to right,var(--border-strong),transparent),
+    linear-gradient(to left,var(--border-strong),transparent);
   background-position:0 0,100% 0,0 0,100% 0;
-  background-size:22px 100%,22px 100%,14px 100%,14px 100%;
+  /* --border-strong statt --ink-faint: der Hinweis soll die Kante andeuten,
+     nicht sich über den Inhalt legen. Dafür etwas breiter (16 statt 14 px),
+     damit er trotz der helleren Farbe noch als Verlauf lesbar bleibt. */
+  background-size:22px 100%,22px 100%,16px 100%,16px 100%;
   background-repeat:no-repeat;
   background-attachment:local,local,scroll,scroll;
 }
