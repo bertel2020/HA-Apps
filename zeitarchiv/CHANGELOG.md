@@ -35,6 +35,22 @@
   Restton — sonst wäre der größte Teil jeder Karte ungefärbt, genau der
   Zustand, der schon einmal nachgebessert werden musste, weil er "kaum als
   Farbe wahrnehmbar" war.
+- **Schriftgrößen-Auswahl auf drei Stufen zurückgeführt.** Die Randstufen
+  „Kleiner" (Faktor 0,9) und „Größer" (1,4) sind wieder entfallen: 0,9
+  unterschied sich zu wenig von „Klein", und 1,4 verschärfte den
+  Seitenüberlauf auf schmalen Bildschirmen. Wer eine der beiden ausgewählt
+  hatte, landet automatisch auf der nächstgelegenen verbliebenen Stufe statt
+  pauschal auf „Normal" — die gespeicherte Einstellung bleibt gültig, eine
+  Migration ist nicht nötig.
+- **Monospace-Schrift nur noch dort, wo sie etwas bedeutet.** Sie steht in
+  der App für „maschinenlesbar" — Entity-IDs, Zeitstempel, Rohwerte — und
+  verlor an Aussagekraft, solange sie auch auf Beschriftungen, Erklärtexten
+  und selbst eingegebenen Anzeigenamen lag. Betroffen sind Typ-Pillen (jetzt
+  Versalien statt Monospace), Tooltips, die Blätter-Zeile unter Tabellen und
+  das Namensfeld in Formularen. Wo Zahlen beim Blättern nicht springen
+  sollen, sorgen jetzt tabellarische Ziffern dafür, ohne den
+  Terminal-Eindruck. Entity-IDs in Tooltips bleiben Monospace.
+
 - **Der PV/Netz-Mischton liegt jetzt auf jeder Bahn, die direkt vom
   Sammelknoten kommt** — also auch auf einzelnen, nicht gruppierten
   Verbrauchern, nicht mehr nur auf Gruppen und Grundlast. Bisher hing die

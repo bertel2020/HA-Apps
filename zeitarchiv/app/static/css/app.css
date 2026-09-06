@@ -696,7 +696,13 @@ td.label,td.strong{color:var(--ink);font-weight:600;}
 td.mono{font-family:var(--font-mono);}
 
 .flag-badge{font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;background:var(--danger);color:var(--danger-contrast);margin-right:4px;}
-.badge{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border);}
+/* Versalien statt Monospace: der Typ ist ein Kategoriewort, keine kopierbare
+   Zeichenkette — Mono steht in dieser App für "maschinenlesbar" (Entity-IDs,
+   Zeitstempel, Rohwerte) und verlor an Aussagekraft, solange sie auch auf
+   Beschriftungen lag. Sperrung und Versalien tragen den technischen Ton, den
+   vorher die Schriftart übernommen hatte; kleinerer Grad und etwas mehr
+   Innenabstand halten die Pille dabei auf ihrer bisherigen Höhe. */
+.badge{font-family:var(--font-display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:calc(9.5px * var(--font-scale, 1));padding:3px 9px;border-radius:999px;border:1px solid var(--border);}
 .badge.counter{color:var(--accent-bar);border-color:var(--accent-bar);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
@@ -726,7 +732,13 @@ button[data-tooltip]{cursor:pointer;}
 [data-tooltip]::after{
   content:attr(data-tooltip);position:absolute;left:0;bottom:calc(100% + 6px);
   background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;
-  font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);white-space:normal;width:max-content;max-width:min(520px,calc(100vw - 48px));overflow-wrap:anywhere;z-index:30;
+  /* Display- statt Monospace-Schrift: der Inhalt ist praktisch immer ein
+     erklärender Satz, und gleiche Buchstabenbreiten sind für Codespalten
+     gemacht, nicht für Fließtext. Entity-IDs in Tooltips behalten ihre
+     Monospace über .entity-tooltip code weiter unten. Explizit gesetzt statt
+     weggelassen — sonst würde ein Tooltip an einem Mono-Host (td.mono,
+     .status-card-mono, Entity-ID-Zellen) dessen Schrift erben. */
+  font-family:var(--font-display);font-size:calc(11px * var(--font-scale, 1));white-space:normal;width:max-content;max-width:min(520px,calc(100vw - 48px));overflow-wrap:anywhere;z-index:30;
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;
   opacity:0;visibility:hidden;transition:visibility 0s;
 }
@@ -816,7 +828,11 @@ button[data-tooltip]{cursor:pointer;}
 .navbtn:disabled{opacity:.35;cursor:default;}
 
 /* Pager */
-.pager{display:flex;align-items:center;gap:10px;margin-top:10px;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+/* Display-Schrift mit tabellarischen Ziffern statt Monospace: die Zeile ist
+   überwiegend Text ("1–50 von 86", "Seite X / Y"), nur die Zahlen darin sollen
+   beim Blättern nicht springen — genau das leistet font-variant-numeric, ohne
+   die Wörter drumherum wie Terminalausgabe wirken zu lassen. */
+.pager{display:flex;align-items:center;gap:10px;margin-top:10px;font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
 .pager-page{white-space:nowrap;}
 .pager-range{color:var(--ink-faint);}
 /* Zeilen/Seite-Auswahl direkt im Pager statt oben im Toolbar (Konzept-
@@ -825,7 +841,7 @@ button[data-tooltip]{cursor:pointer;}
    select die generische Toolbar-Regel, hier soll er sich wie ein weiteres
    Pager-Detail lesen, nicht wie ein eigenständiges Steuerelement). */
 .pager select{
-  font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);
+  font-family:var(--font-display);font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);
   padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
   min-height:0;box-sizing:border-box;cursor:pointer;
 }
@@ -836,7 +852,7 @@ button[data-tooltip]{cursor:pointer;}
    Spinner-Pfeile ausgeblendet, da Klick-Pfeile fürs Wandern über viele Seiten
    ohnehin nicht taugen (dafür gibt es die navbtn-Buttons daneben). */
 .pager-page-input{
-  width:3.2em;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink);
+  width:3.2em;font-family:var(--font-display);font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink);
   padding:2px 4px;border-radius:5px;border:1px solid var(--border);background:var(--surface);
   text-align:center;box-sizing:border-box;
 }
@@ -961,8 +977,14 @@ button[data-tooltip]{cursor:pointer;}
 .field label{display:block;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:600;margin-bottom:8px;}
 .field select{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);min-width:200px;cursor:pointer;}
 .field select:hover{border-color:var(--accent-line);}
+/* Display- statt Monospace-Schrift: hier steht ein selbst getippter
+   Anzeigename, also Fließtext für Menschen — Beschriftung und Hinweis
+   darüber/darunter sind ebenfalls Display-Schrift, der Wert dazwischen brach
+   als einziger aus. Explizit gesetzt, nicht weggelassen: Formularfelder erben
+   font-family nicht, ohne Angabe fielen sie auf die Browser-Standardschrift
+   zurück statt auf die der App. */
 .field input[type="text"]{
-  font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;
+  font-family:var(--font-display);font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;
   border:1px solid var(--border);background:var(--surface);color:var(--ink);box-sizing:border-box;
 }
 .field input[type="text"]:focus{outline:none;border-color:var(--accent-line);}

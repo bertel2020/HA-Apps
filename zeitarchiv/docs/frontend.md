@@ -119,6 +119,20 @@ praktisch jede `font-size` in `app.css` über `calc(Npx * var(--font-scale,
 1))` — neue Komponenten müssen dieses Muster übernehmen, sonst ignorieren
 sie die Schriftgrößen-Einstellung.
 
+`--font-mono` steht in dieser App für **maschinenlesbar**: Entity-IDs,
+Zeitstempel, Rohwerte, Codeausschnitte — alles, was man kopiert oder Zeichen
+für Zeichen vergleicht. Beschriftungen, Erklärtexte und selbst getippte
+Anzeigenamen bekommen dagegen `--font-display`, auch wenn Zahlen darin
+vorkommen; sollen die Zahlen beim Blättern nicht springen, leistet
+`font-variant-numeric: tabular-nums` das ohne den Terminal-Eindruck einer
+Monospace-Schrift. Die Unterscheidung trägt nur, solange sie konsequent
+bleibt: liegt Mono auch auf Fließtext, sagt sie nichts mehr aus.
+
+Zwei Fallstricke: Formularfelder erben `font-family` nicht — ohne explizite
+Angabe fallen sie auf die Browser-Standardschrift zurück, nicht auf die der
+App. Und ein Tooltip an einem Mono-Host (`td.mono`, Entity-ID-Zellen) erbt
+dessen Schrift, wenn er selbst keine setzt.
+
 ## Charts (ECharts)
 
 Kein eigener Chart-Renderer — ECharts-Instanzen werden direkt aus den

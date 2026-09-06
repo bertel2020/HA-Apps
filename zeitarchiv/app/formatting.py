@@ -227,15 +227,14 @@ BACKUP_KEEP_COUNT_LABELS = {
     "10": "10",
     "20": "20",
 }
-# Die drei bisherigen Schlüssel bleiben absichtlich erhalten: dadurch werden
-# bestehende Installationen ohne Datenmigration exakt auf Kleiner/Klein/Normal
-# umbenannt. "3" und "4" ergänzen die zwei neuen größeren Stufen.
+# Die Schlüssel bleiben stabil, damit gespeicherte Auswahlen ohne Datenmigration
+# gültig bleiben. Die vormaligen Randstufen "0" (Kleiner) und "4" (Größer) sind
+# entfallen; main.py bildet sie über LEGACY_FONT_SCALE auf die nächstgelegene
+# verbliebene Stufe ab. Faktoren und Begründung siehe FONT_SCALE dort.
 FONT_SCALE_LABELS = {
-    "0": "Kleiner",
     "1": "Klein",
     "2": "Normal",
     "3": "Groß",
-    "4": "Größer",
 }
 
 

@@ -235,11 +235,15 @@ TZ = load_timezone(_OPTIONS, on_invalid=logger.error)
 # "Schriftgröße"-Einstellung, und ohne den Aufwand, jede Größenangabe im
 # geteilten Stylesheet und in den Seiten-eigenen <style>-Blöcken anzufassen.
 #
-# Die drei vorhandenen Faktoren behalten ihre Schlüssel: bestehende Auswahl
-# "Etwas kleiner" wird zu "Kleiner", "Normal" zu "Klein" und "Etwas größer"
-# zu "Normal". So ist keine Migration gespeicherter Einstellungen nötig.
-FONT_SCALE = {"0": "0.9", "1": "1", "2": "1.125", "3": "1.25", "4": "1.4"}
-DASHBOARD_ROW_HEIGHT = {"0": 206, "1": 210, "2": 218, "3": 228, "4": 240}
+# Die Schlüssel bleiben über Umbenennungen hinweg stabil, damit gespeicherte
+# Einstellungen ohne Migration gültig bleiben. Die Randstufen "Kleiner" (0,9)
+# und "Größer" (1,4) sind wieder entfallen — 0,9 unterschied sich zu wenig von
+# "Klein", 1,4 verschärfte den Seitenüberlauf auf schmalen Viewports;
+# LEGACY_FONT_SCALE bildet ihre gespeicherte Auswahl auf die nächstgelegene
+# verbliebene Stufe ab statt pauschal auf "Normal".
+FONT_SCALE = {"1": "1", "2": "1.125", "3": "1.25"}
+DASHBOARD_ROW_HEIGHT = {"1": 210, "2": 218, "3": 228}
+LEGACY_FONT_SCALE = {"0": "1", "4": "3"}
 COLOR_SCHEME_LABELS = {
     "zeitarchiv": "Zeitarchiv",
     "home_assistant": "Home Assistant",
@@ -265,13 +269,24 @@ DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
 STARTSEITE_LABELS = {"uebersicht": "Übersicht", "energiedashboard": "Energiedashboard"}
 
 
+def _current_font_scale() -> str:
+    """Gespeicherte Stufe als garantiert gültiger FONT_SCALE-Schlüssel — einzige
+    Stelle, die den Rohwert aus der Settings-Tabelle auslegt. Kontextprozessor,
+    Einstellungsformular und Diagnose lesen darüber, damit eine entfallene Stufe
+    überall dieselbe Ersatzstufe ergibt statt im Formular als leeres Label
+    durchzuschlagen."""
+    font_scale = index.get_setting("font_scale", "1")
+    font_scale = LEGACY_FONT_SCALE.get(font_scale, font_scale)
+    if font_scale not in FONT_SCALE:
+        font_scale = "2"
+    return font_scale
+
+
 def _font_scale_context(request: Request) -> dict:
     """Starlette context_processor: läuft für JEDE TemplateResponse automatisch
     mit, ohne dass jede einzelne Route den Skalierungsfaktor selbst in ihren
     Kontext aufnehmen müsste."""
-    font_scale = index.get_setting("font_scale", "1")
-    if font_scale not in FONT_SCALE:
-        font_scale = "2"
+    font_scale = _current_font_scale()
     color_scheme = index.get_setting("color_scheme", "zeitarchiv")
     color_mode = index.get_setting("color_mode", "auto")
     if color_scheme not in COLOR_SCHEME_LABELS:
@@ -282,7 +297,7 @@ def _font_scale_context(request: Request) -> dict:
     if dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
         dashboard_animation = "1"
     return {
-        "font_scale_value": FONT_SCALE.get(font_scale, FONT_SCALE["1"]),
+        "font_scale_value": FONT_SCALE[font_scale],
         "dashboard_row_height": DASHBOARD_ROW_HEIGHT[font_scale],
         "color_scheme": color_scheme,
         "color_mode": color_mode,
@@ -1313,7 +1328,7 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         startseite = "uebersicht"
     entity_defaults = _get_entity_chart_defaults()
     return {
-        "font_scale": index.get_setting("font_scale", "1"),
+        "font_scale": _current_font_scale(),
         "font_scale_options": list(FONT_SCALE_LABELS.items()),
         "font_scale_values": FONT_SCALE,
         "color_scheme": color_scheme,
@@ -2973,7 +2988,7 @@ def _diagnostics_payload() -> dict:
             "access_log_mode": index.get_setting("access_log_mode", DEFAULT_ACCESS_LOG_MODE),
             "color_scheme": index.get_setting("color_scheme", "zeitarchiv"),
             "color_mode": index.get_setting("color_mode", "auto"),
-            "font_scale": index.get_setting("font_scale", "1"),
+            "font_scale": _current_font_scale(),
         },
         "storage": {
             "entity_count": int(overview["entity_count"]),
