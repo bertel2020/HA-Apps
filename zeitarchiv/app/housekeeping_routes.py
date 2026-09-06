@@ -535,7 +535,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         request: Request,
         search: str = Query(default="", max_length=200),
         page: int = Query(default=1, ge=1),
-        page_size: int = Query(default=50, ge=10, le=200),
+        page_size: int = Query(default=20, ge=10, le=200),
     ) -> HTMLResponse:
         """On-demand-Detailansicht der einzelnen Soft-Delete-Markierungen."""
         result = deps.index.list_deleted_points(search=search, page=page, page_size=page_size)

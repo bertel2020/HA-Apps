@@ -2906,7 +2906,7 @@ def _export_table_response(
     sort: str,
     direction: str,
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = 20,
 ) -> HTMLResponse:
     total = index.count_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter)
     pagination = _paginate_meta(total, page, page_size)
@@ -2971,7 +2971,7 @@ def export_table(
     sort: str = "entity_id",
     dir: str = "asc",
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = 20,
 ) -> HTMLResponse:
     return _export_table_response(request, search, type, unit, sort, dir, page, page_size)
 
@@ -3056,7 +3056,7 @@ def _entities_table_response(
     sort: str,
     direction: str,
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = 20,
     favorites_only: bool = False,
     visible_columns: set[str] | None = None,
 ) -> HTMLResponse:
@@ -3182,7 +3182,7 @@ def entities_table(
     sort: str = "entity_id",
     dir: str = "asc",
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = 20,
     favorites: bool = False,
     columns: list[str] = Query([]),
     columns_submitted: bool = False,
@@ -5028,7 +5028,7 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
 
 
 def _rows_fragment(
-    request: Request, entity_id: str, filter_: str, range_key: str, offset: int = 0, page: int = 1, page_size: int = 50,
+    request: Request, entity_id: str, filter_: str, range_key: str, offset: int = 0, page: int = 1, page_size: int = 20,
     mode: str = "cleanup",
 ) -> HTMLResponse:
     entity = index.get_entity(entity_id)
@@ -5215,7 +5215,7 @@ def entity_rows(
     range_key: str = Query("day", alias="range"),
     offset: int = 0,
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = 20,
     mode: str = "cleanup",
 ) -> HTMLResponse:
     _require_entity(entity_id)
@@ -5227,7 +5227,7 @@ def _rows_form_common(form) -> tuple[str, str, int, int, int, str]:
     range_key = str(form.get("range", "day"))
     offset = int(form.get("offset", 0))
     page = int(form.get("page", 1))
-    page_size = int(form.get("page_size", 50))
+    page_size = int(form.get("page_size", 20))
     mode = str(form.get("mode", "cleanup"))
     return filter_, range_key, offset, page, page_size, mode
 

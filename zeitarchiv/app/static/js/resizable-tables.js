@@ -125,7 +125,11 @@
     if (states.has(table) || table.dataset.resizable === 'off' || table.offsetParent === null) return;
     const headerRow = Array.from(table.querySelectorAll('tr')).find(row => row.querySelector('th'));
     if (!headerRow) return;
-    const headers = Array.from(headerRow.children).filter(cell => cell.tagName === 'TH');
+    // .dt-cards-sort-toggle ist der Auf-/Zuklapper der mobilen Sortierleiste
+    // (table-cards.js) — eine Bedienung, keine Spalte. Mitgezählt ergäbe er
+    // eine überzählige Spaltenbreite und einen Ziehgriff ins Leere.
+    const headers = Array.from(headerRow.children)
+      .filter(cell => cell.tagName === 'TH' && !cell.classList.contains('dt-cards-sort-toggle'));
     if (headers.length < 2) return;
     const wrapper = table.closest('.tbl-wrap') || table.parentElement;
     const state = {

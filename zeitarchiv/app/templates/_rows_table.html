@@ -136,7 +136,7 @@
   <select name="page_size" title="Zeilen pro Seite"
           hx-get="{{ base }}/entities/{{ entity_id }}/rows" hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML"
           onchange="resetPage()">
-    {% for size in [10, 50, 100, 500, 1000] %}
+    {% for size in [10, 20, 50, 100, 500, 1000] %}
     <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
     {% endfor %}
   </select>

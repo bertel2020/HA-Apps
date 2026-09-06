@@ -81,8 +81,50 @@
       head.classList.contains('dt-sortable-col') ||
       Array.from(head.cells).some(cell => cell.classList.contains('dt-sortable-col'));
     head.classList.add(sortable ? 'dt-cards-sortbar' : 'dt-cards-head-hidden');
+    if (sortable) addSortToggle(head, table);
     table.classList.toggle('dt-cards-titled', titleDone);
     table.classList.add('dt-cards');
+  }
+
+  // Eingeklappt zeigt die Leiste nur die aktive Sortierung plus einen
+  // Auf-/Zuklapper. Ausgeklappt wären es je nach Tabelle vier bis sieben
+  // Chips über zwei Zeilen — mehr Höhe, als die erste Karte selbst braucht,
+  // und das auf jeder Liste über der eigentlichen Antwort.
+  function activeCell(head) {
+    return head.querySelector('.dt-sort-asc, .dt-sort-desc') ||
+      (head.querySelector('a.active') || {}).closest?.('th') || null;
+  }
+
+  function setToggleLabel(button, head, collapsed) {
+    // Ohne sichtbare aktive Sortierung wäre ein einzelnes "···" nicht zu
+    // deuten — dann benennt der Knopf, was er öffnet.
+    const alone = collapsed && !activeCell(head);
+    button.textContent = collapsed ? (alone ? 'Sortieren' : '···') : '⌃';
+    button.setAttribute('aria-expanded', String(!collapsed));
+    button.setAttribute('aria-label', collapsed ? 'Sortierung wählen' : 'Sortierauswahl schließen');
+  }
+
+  function addSortToggle(head, table) {
+    if (head.querySelector('.dt-cards-sort-toggle')) return;
+    const cell = document.createElement('th');
+    cell.className = 'dt-cards-sort-toggle';
+    const button = document.createElement('button');
+    button.type = 'button';
+    cell.appendChild(button);
+    head.appendChild(cell);
+
+    const apply = collapsed => {
+      table.classList.toggle('dt-cards-sort-collapsed', collapsed);
+      setToggleLabel(button, head, collapsed);
+    };
+    button.addEventListener('click', () => apply(!table.classList.contains('dt-cards-sort-collapsed')));
+    // Nach der Wahl wieder zu. Bei serverseitiger Sortierung lädt die Seite
+    // ohnehin neu; bei der clientseitigen (sortable-table.js) bliebe die
+    // Leiste sonst offen stehen.
+    head.addEventListener('click', event => {
+      if (!event.target.closest('.dt-cards-sort-toggle')) setTimeout(() => apply(true), 0);
+    });
+    apply(true);
   }
 
   function scan() {

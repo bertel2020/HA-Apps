@@ -116,7 +116,7 @@ class ReportService:
     def context(
         self, source: str = "all", status: str = "all", search: str = "",
         date_from: str = "", date_to: str = "", sort: str = "finished_at",
-        direction: str = "desc", page: int = 1, page_size: int = 50,
+        direction: str = "desc", page: int = 1, page_size: int = 20,
     ) -> dict:
         with self.deps.coordinator.exclusive():
             all_reports = [self.view(report) for report in import_reports.list_all(self.deps.data_dir)]
@@ -164,7 +164,7 @@ class ReportService:
         @router.get("/reports", response_class=RedirectResponse)
         def reports_page(
             request: Request, source: str = "all", status: str = "all", search: str = "",
-            date_from: str = "", date_to: str = "", page: int = 1, page_size: int = 50,
+            date_from: str = "", date_to: str = "", page: int = 1, page_size: int = 20,
         ) -> RedirectResponse:
             query = urlencode({
                 "tab": "reports", "source": source, "status": status, "search": search,
