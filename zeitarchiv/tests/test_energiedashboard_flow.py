@@ -576,3 +576,54 @@ def test_mehrere_speicher_werden_bei_energie_summiert(monkeypatch, tmp: Path) ->
         assert aufschluesselung == {"A": pytest.approx(3.0), "B": pytest.approx(4.0)}
     finally:
         a.close()
+
+
+# --- Sankey-Kartenhöhe ------------------------------------------------------
+#
+# Reine Darstellungslogik im JS, deshalb hier als Quelltext-Prüfung wie in den
+# übrigen test_energiedashboard_*.py. Der eigentliche Nachweis lief im Browser:
+# bei 16 Verbrauchern wuchs der dünnste Balken von 7,6 px auf 17,8 px.
+
+
+def _js() -> str:
+    return (Path(__file__).resolve().parents[1] / "app/static/js/energiedashboard.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_kartenhoehe_waechst_mit_der_dichtesten_ebene() -> None:
+    js = _js()
+    assert "Math.min(760, Math.max(420, dichtesteEbene * 52))" in js
+    # Untergrenze 420 = bisheriger Wert, damit kleine Anlagen unverändert bleiben.
+    assert "wrap.classList.contains('edash-sankey-wrap')" in js
+
+
+def test_kartenhoehe_nur_horizontal_mobil_bleibt_die_css_regel() -> None:
+    """Vertikal wirkt die Knotenzahl auf die BREITE (narrowNodeGap), nicht auf
+    die Höhe — dort muss der Inline-Stil geleert werden, sonst überschriebe er
+    dauerhaft die @media-Regel."""
+    js = _js()
+    start = js.index("const neueHoehe = isNarrow")
+    assert "? ''" in js[start:start + 120]
+
+
+def test_hoehenaenderung_loest_ein_resize_aus() -> None:
+    """ECharts merkt sich die Größe beim init() — ohne resize() zeichnet es in
+    den alten Ausschnitt und der Rest der Karte bleibt leer."""
+    js = _js()
+    start = js.index("if (wrap.style.height !== neueHoehe)")
+    # Die vollständige Anweisung prüfen, nicht nur den Methodennamen: ein
+    # ausgehebelter Wächter ("if (false) chartInstance.resize()") enthält den
+    # Aufruf ja weiterhin und rutschte durch eine Teilstring-Prüfung durch.
+    assert "if (chartInstance) chartInstance.resize();" in js[start:start + 400]
+
+
+def test_narrow_node_gap_ist_deklariert_bevor_die_serie_ihn_nutzt() -> None:
+    """Beim Einbau der Kartenhöhe wurde die Deklaration von narrowNodeGap
+    versehentlich mit ersetzt. node --check meldete nichts (kein Syntaxfehler),
+    der vertikale Sankey warf erst zur Laufzeit "narrowNodeGap is not defined"
+    und blieb leer."""
+    js = _js()
+    deklaration = js.index("const narrowNodeGap =")
+    nutzung = js.index("nodeGap: isNarrow ? narrowNodeGap")
+    assert deklaration < nutzung

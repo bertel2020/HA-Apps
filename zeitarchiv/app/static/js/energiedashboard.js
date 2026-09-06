@@ -995,6 +995,29 @@
         const narrowNodeGap = Math.max(
           4, Math.min(36, (narrowExtent * 0.35) / Math.max(1, dichtesteEbene - 1)),
         );
+        // Kartenhöhe an die dichteste Ebene koppeln — aber NUR horizontal.
+        // Dort stehen die Knoten einer Ebene übereinander, die feste Höhe
+        // teilte sich also auf immer mehr Bänder auf: ab etwa zehn Verbrauchern
+        // wurden die kleinen zu Haarlinien, die man weder erkennen noch
+        // anklicken konnte. Vertikal wirkt die Knotenzahl dagegen auf die
+        // BREITE (siehe narrowNodeGap oben), die Höhe bleibt dort das, was die
+        // CSS-Regel vorgibt — deshalb inline-Stil zurücksetzen statt setzen,
+        // damit die @media-Regel wieder greift.
+        // Untergrenze 420 = der bisherige Wert, damit kleine Anlagen exakt so
+        // aussehen wie vorher; Obergrenze 760, sonst schiebt eine große Anlage
+        // alle folgenden Karten aus dem Blickfeld.
+        const wrap = el.parentElement;
+        if (wrap && wrap.classList.contains('edash-sankey-wrap')) {
+          const neueHoehe = isNarrow
+            ? ''
+            : Math.round(Math.min(760, Math.max(420, dichtesteEbene * 52))) + 'px';
+          if (wrap.style.height !== neueHoehe) {
+            wrap.style.height = neueHoehe;
+            // ECharts hat seine Größe beim init() gemerkt — ohne resize()
+            // zeichnet es in den alten Ausschnitt und der Rest bleibt leer.
+            if (chartInstance) chartInstance.resize();
+          }
+        }
         const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
         const labelFor = (name) => (nodeByName[name] && nodeByName[name].label) || name;
         // Der "X % von …"-Zusatz galt bisher NUR für Link-Tooltips; ein Knoten
