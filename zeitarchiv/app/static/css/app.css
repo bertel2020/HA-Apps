@@ -359,6 +359,16 @@ a.stat:hover .label{color:var(--accent-line);}
 .stat .label{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:500;margin-bottom:6px;}
 .stat .value{font-family:var(--font-display);font-size:calc(19px * var(--font-scale, 1));font-weight:700;font-variant-numeric:tabular-nums;word-break:break-word;}
 .stat .sub-value{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;font-variant-numeric:tabular-nums;}
+/* Auf dem Telefon stehen zwei Kacheln nebeneinander, jede mit 136px für den
+   Wert. Bei 19px reicht das für elf Zeichen ("486.911.150"); ab einer
+   Milliarde Datensätzen ("4.861.911.150") bricht der Wert um — und weil
+   word-break:break-word greifen muss, damit er nicht aus der Kachel läuft,
+   bricht er MITTEN in der Zahl. 17px verschiebt die Grenze auf 13 Zeichen
+   (gemessen 132,5px von 136px), also weit über jeden realistischen Archivstand
+   hinaus; der Umbruch bleibt als letzter Ausweg bestehen. */
+@media (max-width:640px){
+  .stat .value{font-size:calc(17px * var(--font-scale, 1));}
+}
 .ts-time{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);margin-top:1px;}
 .nowrap{white-space:nowrap;}
 .sparkline{display:block;width:100%;height:22px;margin-top:6px;overflow:visible;}
@@ -377,10 +387,9 @@ input[type="date"],input[type="time"]{color-scheme:inherit;}
 /* Buttons/Filter-Chips rechtsbündig, unabhängig von der (unveränderten)
    Breite des Suchfelds davor — auto-Margin auf dem ELEMENT DIREKT NACH dem
    Suchfeld schiebt sich selbst plus alle folgenden Geschwister an den
-   rechten Rand. Der Geschwister-Selektor statt einer festen Klasse, weil
-   Charts/Tabellen "Favoriten zuerst" und die Sortiergruppe in vertauschter
-   Reihenfolge zeigen (siehe charts.html/tables.html) — so passt sich die
-   Regel automatisch an, welches Element dort gerade zuerst kommt. */
+   rechten Rand. Der Geschwister-Selektor statt einer festen Klasse: er
+   greift unabhängig davon, welches Bedienelement eine Seite dort zuerst
+   führt, und überlebt damit ein Umsortieren der Leiste. */
 #controls > input[type="search"] + *,.card-browser > input[type="search"] + *{margin-left:auto;}
 /* Such-/Sortierleiste der Kachel-Übersichten (Dashboards, Charts, Tabellen)
    — siehe static/js/card-browser.js. Erbt Feld-Optik von .search/select oben,
@@ -872,10 +881,30 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
   .card-browser:has(.list-settings) input[type="search"]{min-width:0;flex:1;}
   .list-settings-popover{width:min(280px,calc(100vw - 40px));max-height:70vh;overflow-y:auto;}
   .list-settings-popover > *{display:block;width:100%;margin:4px 0;}
-  .list-settings-popover .btn,.list-settings-popover .filter-chip span{
+  .list-settings-popover .btn,.list-settings-popover .filter-chip span,
+  .list-settings-popover .chip{
     width:100%;justify-content:space-between;text-align:left;
   }
   .list-settings-popover .filter-chip{display:block;}
+  /* .chip ist dieselbe Bedienung wie .filter-chip, nur ohne Checkbox
+     dahinter (Kachel-Übersichten statt Formular): "★ Favoriten zuerst" stand
+     sonst als einzige Zeile des Menüs mittig statt links. */
+  /* Die Sortierung der Kachel-Übersichten trägt ihre Beschriftung NEBEN dem
+     Knopf statt darin — am Schreibtisch richtig, wo "Sortierung [Neueste
+     zuerst ▾]" neben dem Suchfeld steht. Im Menü ergäbe das eine Zeile aus
+     zwei Kästchen, während jede andere Zeile eine einzelne Pille ist. Die
+     Beschriftung wandert deshalb in den Knopf, und zwar als ::before:
+     selectDDOption() setzt beim Umschalten textContent, was einen echten
+     Kindknoten mitlöschen würde. Charts und Tabellen führen gar keine
+     Beschriftung — dort ergänzt dieselbe Regel die fehlende. */
+  .list-settings-popover .card-browser-sort-label{display:none;}
+  .list-settings-popover .card-browser-sortgroup .btn::before{content:'Sortierung: ';}
+  /* Der Knopf steckt eine Ebene tiefer als die übrigen (Sortiergruppe →
+     dd-picker-wrap → Knopf). Beide Hüllen sind inline, sein width:100% bezog
+     sich damit auf eine Box, die selbst nur so breit war wie ihr Inhalt — die
+     Zeile blieb 40px schmaler als alle anderen. */
+  .list-settings-popover .card-browser-sortgroup,
+  .list-settings-popover .card-browser-sortgroup > .dd-picker-wrap{display:block;}
   .list-settings-popover .dd-picker-wrap{position:static;}
   .list-settings-popover .dd-picker-popover{
     position:static;width:auto;padding:2px 0 6px 10px;margin:0;
@@ -942,8 +971,15 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
      nicht unter die Knöpfe laufen. */
   table.dt.dt-cards tbody tr:has(> td.dt-card-pre),
   table.dt.dt-cards tbody tr.dt-card-collapsible{position:relative;}
+  /* z-index: der Namenslink trägt position:relative (für die Tooltip-Box) und
+     steht im DOM NACH diesen Knöpfen. Bei gleichem z-index gewinnt der
+     spätere — der Link lag also ÜBER Stern und Aufklapper, und von deren
+     Fläche waren real nur die obersten Pixel erreichbar (mit
+     elementFromPoint über einem 4px-Raster nachgemessen: vom Stern 8 seiner
+     22px, vom Pfeil 8 seiner 28px). Jeder Griff daneben sprang stattdessen
+     in den Entitätenchart. */
   table.dt.dt-cards tbody tr > td.dt-card-pre{
-    position:absolute;top:9px;right:12px;padding:0;
+    position:absolute;top:9px;right:12px;padding:0;z-index:1;
   }
   table.dt.dt-cards tbody tr:has(> td.dt-card-pre) > td.dt-card-title::before{
     content:'';float:right;width:32px;height:1.4em;
@@ -959,8 +995,12 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
   .pager{justify-content:flex-end!important;}
   .pager > div{flex-wrap:wrap;justify-content:flex-end;}
 
+  /* 44×44 statt 28×28 (Richtwert für Fingerziele) und bündig in der Ecke der
+     Karte: der Rand der Karte ist ohnehin toter Raum, und das Zeichen selbst
+     verschiebt sich dadurch nur um 3px — die Fläche wächst, das Bild bleibt.
+     z-index siehe die Begründung an .dt-card-pre weiter oben. */
   .dt-card-toggle{
-    position:absolute;top:7px;right:10px;width:28px;height:28px;padding:0;
+    position:absolute;top:0;right:0;width:44px;height:44px;padding:0;z-index:1;
     display:flex;align-items:center;justify-content:center;
     background:none;border:0;border-radius:8px;cursor:pointer;
     color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));line-height:1;
@@ -1184,6 +1224,34 @@ button[data-tooltip]{cursor:pointer;}
 .pager-page-input:focus{outline:none;border-color:var(--accent-line);}
 .pager-page-input::-webkit-inner-spin-button,.pager-page-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
 .pager-page-input{-moz-appearance:textfield;}
+/* Auf dem Telefon reicht der Platz der Blätter-Reihe auf ein Zeichen genau:
+   "1–20 von 86 « ‹ Seite 1 / 5 › »" braucht 335px von 343px, eine Stelle mehr
+   im Gesamtwert bricht sie um (gemessen bei 375px Viewport). 11px statt 12px
+   und 7px statt 10px Abstand bringen zusammen 30px — damit trägt die Reihe
+   "1–20 von 4.312 … Seite 116 / 216" statt bisher nur dreistelliger Werte.
+   Steht hier und nicht im Karten-Block weiter oben, weil die Grundregeln des
+   Pagers erst darüber kommen und eine gleich spezifische Regel davor sonst
+   verliert. Der Abstand ist ein Inline-Stil in den Templates, deshalb
+   !important — dieselbe Begründung wie bei .pager{justify-content}. */
+@media (max-width:640px){
+  .pager{font-size:calc(11px * var(--font-scale, 1));}
+  .pager select,.pager-page-input{font-size:calc(11px * var(--font-scale, 1));}
+  .pager > div{gap:7px!important;}
+  /* Die Blätter-Knöpfe bleiben bei 28px: sie sind die Treffflächen der Reihe,
+     und die Breite kommt aus Text und Abständen, nicht aus ihnen. */
+  /* "1–20 von 86" links, Blättern rechts: der Zählstand ist eine Angabe zur
+     Liste und liest sich an derselben Kante wie deren Namen; rechtsbündig
+     stand er ohne Bezug mitten unter der letzten Karte, besonders sobald er
+     in eine eigene Zeile umbricht. margin-right:auto statt einer eigenen
+     Ausrichtung, damit alles Übrige an der rechten Kante bleibt. Der
+     flex-grow braucht die Gruppe, in der der Zählstand steckt: sie ist sonst
+     nur so breit wie ihr Inhalt, und "links" wäre nur ihr eigener linker
+     Rand. Zwei Bauformen gibt es — mit Gruppen-<div> (Entitäten, Backup,
+     Export …) und flach (sortable-table.js); :has trifft nur die erste, die
+     zweite braucht keinen. */
+  .pager > div:has(.pager-range){flex-grow:1;}
+  .pager-range{margin-right:auto;}
+}
 
 /* Aktionsleiste unter Tabellen */
 .actionbar{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);flex-wrap:wrap;}

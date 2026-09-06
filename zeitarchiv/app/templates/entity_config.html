@@ -18,8 +18,20 @@
      darunter (wie in der Entitäten-Übersichtstabelle, wo die zweizeilige Form
      für die dort eng bemessenen Spalten passt) — sonst wären "Erster/Letzter
      Wert" allein durch die Uhrzeit-Zeile höher als die übrigen Kacheln in
-     derselben Reihe. */
-  .stat .ts-time{display:inline;font-family:inherit;font-size:inherit;font-weight:inherit;color:inherit;margin:0 0 0 8px;}
+     derselben Reihe.
+
+     Nur am Schreibtisch: auf dem Telefon stehen zwei Kacheln nebeneinander,
+     also 133px für den Wert, und "17.09.2023 09:41:41" braucht in der großen
+     Schrift knapp 200px — es brach mitten in der Uhrzeit um ("17.09.2023 0" /
+     "9:41:41"). Dort trägt die Reihe ohnehin nur "Erster Wert" und "Letzter
+     Wert" (die dritte Kachel rutscht in die nächste Zeile), beide bekommen die
+     Uhrzeit-Zeile, und die Höhen bleiben gleich — der Grund für diese Regel
+     entfällt also genau da, wo sie schadet. Einzige min-width-Abfrage der App;
+     die Umkehrung wäre eine Kopie der .ts-time-Grundregel aus app.css, die
+     dann getrennt gepflegt werden müsste. */
+  @media (min-width:641px){
+    .stat .ts-time{display:inline;font-family:inherit;font-size:inherit;font-weight:inherit;color:inherit;margin:0 0 0 8px;}
+  }
   .entity-data-management{margin-top:28px;padding-top:22px;border-top:1px solid var(--border);}
   .entity-data-management > .hint{margin:0 0 14px;}
   .entity-data-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}

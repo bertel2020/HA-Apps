@@ -359,3 +359,175 @@ def test_the_view_menu_needs_a_search_field_to_appear() -> None:
     js = (APP_JS / "list-settings-menu.js").read_text(encoding="utf-8")
     assert "':scope > input[type=\"search\"]'" in js
     assert "if (!suche) return;" in js
+
+
+def test_the_consumer_share_table_stays_on_one_line_in_a_narrow_container() -> None:
+    """Die Verbrauchertabelle steht auf 375px in einer 305px breiten Kachel und
+    im zweispaltigen Raster ab 820px neben dem Donut sogar nur in 285px. Mit
+    350px Mindestbreite lief sie beide Male seitlich über UND brach lange Namen
+    trotzdem um. Die kompakte Fassung hängt deshalb an der Container- statt an
+    der Fensterbreite; zwei Details entscheiden, ob sie greift: der Farbpunkt
+    darf keine Zeilenbreite belegen, sonst rutscht der Name als Ganzes in die
+    zweite Zeile und der Punkt bleibt allein oben stehen — und die Namensspalte
+    muss den Rest bekommen, den die nowrap-Zahlenspalten übrig lassen."""
+    html = (TEMPLATES / "energiedashboard.html").read_text(encoding="utf-8")
+    assert re.search(
+        r"\.edash-share-wrap \.tbl-wrap\{[^}]*container-type:\s*inline-size", html
+    ), "ohne container-type auf .tbl-wrap ist der @container-Block wirkungslos"
+    # Der Block endet bei der ersten Zeile, die auf Einrückung der Regelebene
+    # nur eine schließende Klammer enthält — verschachtelt ist er nicht.
+    block = re.search(r"@container \(max-width:\d+px\)\{(.*?)\n  \}", html, re.S)
+    assert block, "kein @container-Block für die Verbrauchertabelle"
+    block = block.group(1)
+    punkt = re.search(r"\.edash-share-dot\{([^}]*)\}", block)
+    assert punkt, "der Farbpunkt bleibt im Textfluss"
+    assert "position:absolute" in punkt.group(1)
+    breite = re.search(r"([^{}]*td\.label[^{}]*)\{([^}]*)\}", block)
+    assert breite, "keine Regel für die Namensspalte"
+    assert "width:100%" in breite.group(2), (
+        "ohne width:100% verteilt die automatische Tabellenaufteilung den freien "
+        "Platz anteilig, und der Name bricht um, obwohl rechts noch Luft ist"
+    )
+
+
+def test_the_pager_text_gets_smaller_on_phones_than_at_the_desk() -> None:
+    """Die Blätter-Reihe passt auf 375px auf ein Zeichen genau: "1–20 von 86
+    « ‹ Seite 1 / 5 › »" braucht 335px von 343px, eine Stelle mehr im
+    Gesamtwert bricht sie um. Mit 11px und 7px Abstand trägt sie "1–20 von
+    4.312 … Seite 116 / 216" (339px). Die Knopfgröße bleibt außen vor — die
+    Knöpfe sind die Treffflächen der Reihe.
+
+    Mitgeprüft wird die Reihenfolge in der Datei: beide Regeln heißen `.pager`
+    und sind gleich spezifisch, ein @media-Block VOR der Grundregel verliert
+    also lautlos."""
+    css = APP_CSS.read_text(encoding="utf-8")
+
+    def groesse(regel: str) -> float:
+        treffer = re.search(r"font-size:calc\(([\d.]+)px", regel)
+        assert treffer, f"keine font-size in {regel[:60]}"
+        return float(treffer.group(1))
+
+    grund = re.search(r"\n\.pager\{[^}]*font-size[^}]*\}", css)
+    assert grund, "Grundregel des Pagers fehlt"
+    klein = re.search(r"@media \(max-width:640px\)\{[^@]*?\n  \.pager\{[^}]*font-size[^}]*\}", css)
+    assert klein, "der Pager wird auf dem Telefon nicht kleiner gesetzt"
+    assert groesse(klein.group(0)) < groesse(grund.group(0))
+    assert klein.start() > grund.start(), (
+        "die Telefon-Regel steht vor der Grundregel und wird von ihr überschrieben"
+    )
+    # select und Seiteneingabe tragen ihre eigene font-size und blieben sonst groß.
+    block = _media_block(css, "max-width:640px")
+    assert re.search(r"\.pager select,\.pager-page-input\{[^}]*font-size", block)
+
+
+def test_the_row_count_sits_at_the_left_edge_of_the_pager_on_phones() -> None:
+    """Der Zählstand ist eine Angabe zur Liste und gehört an dieselbe Kante wie
+    deren Namen; rechtsbündig stand er ohne Bezug unter der letzten Karte.
+    Alles Übrige bleibt rechts, deshalb margin-right:auto statt einer eigenen
+    Ausrichtung. Der flex-grow ist der Teil, der leicht fehlt: die Gruppe um
+    den Zählstand ist sonst nur so breit wie ihr Inhalt, und „links" wäre nur
+    ihr eigener linker Rand."""
+    block = _media_block(APP_CSS.read_text(encoding="utf-8"), "max-width:640px")
+    assert re.search(r"\.pager-range\{[^}]*margin-right:auto", block)
+    assert re.search(r"\.pager > div:has\(\.pager-range\)\{[^}]*flex-grow:1", block)
+
+
+def test_the_big_numbers_in_the_stat_tiles_shrink_on_phones() -> None:
+    """Zwei Kacheln nebeneinander lassen 136px für den Wert. Bei 19px reicht das
+    für elf Zeichen ("486.911.150"); ab einer Milliarde bricht der Wert um, und
+    weil word-break:break-word greifen muss, damit er nicht aus der Kachel
+    läuft, bricht er mitten in der Zahl. 17px verschiebt die Grenze auf 13
+    Zeichen (gemessen 132,5px)."""
+    css = APP_CSS.read_text(encoding="utf-8")
+
+    def groesse(regel: str) -> float:
+        treffer = re.search(r"font-size:calc\(([\d.]+)px", regel)
+        assert treffer, f"keine font-size in {regel[:60]}"
+        return float(treffer.group(1))
+
+    grund = re.search(r"\n\.stat \.value\{[^}]*\}", css)
+    assert grund, "Grundregel für den Kachelwert fehlt"
+    klein = re.search(r"@media \(max-width:640px\)\{\s*\.stat \.value\{[^}]*\}", css)
+    assert klein, "der Kachelwert wird auf dem Telefon nicht kleiner gesetzt"
+    assert groesse(klein.group(0)) < groesse(grund.group(0))
+    # Gleiche Spezifität wie die Grundregel: davor stehend verliert sie lautlos.
+    assert klein.start() > grund.start()
+    # Der Umbruch bleibt als letzter Ausweg — ohne ihn liefe eine noch längere
+    # Zahl über den Kachelrand hinaus.
+    assert "word-break:break-word" in grund.group(0)
+
+
+def test_the_timestamp_tiles_use_the_two_line_form_on_phones() -> None:
+    """Auf der Entitäts-Konfiguration steht die Uhrzeit neben dem Datum statt
+    darunter, damit "Erster/Letzter Wert" nicht höher werden als die übrigen
+    Kacheln derselben Reihe. Auf dem Telefon lässt eine Kachel 133px für den
+    Wert, und "17.09.2023 09:41:41" braucht in der großen Schrift knapp 200px —
+    es brach mitten in der Uhrzeit um. Dort trägt die Reihe ohnehin nur die
+    beiden Zeitstempel-Kacheln, der Grund für die Regel entfällt also genau da,
+    wo sie schadet."""
+    html = (TEMPLATES / "entity_config.html").read_text(encoding="utf-8")
+    assert re.search(r"@media \(min-width:641px\)\{\s*\.stat \.ts-time\{", html), (
+        "die Inline-Uhrzeit gilt nicht mehr nur am Schreibtisch"
+    )
+    # Eine zweite, unbedingte Regel würde die Grundform auf dem Telefon wieder
+    # aushebeln — die Abfrage allein sagt darüber nichts.
+    ohne_media = re.sub(r"@media[^{]*\{.*?\n  \}", "", html, flags=re.S)
+    assert ".stat .ts-time{" not in ohne_media
+
+
+def test_the_card_buttons_lie_above_the_name_link() -> None:
+    """Der Namenslink trägt position:relative (für die Tooltip-Box) und steht im
+    DOM NACH Stern und Aufklapper. Bei gleichem z-index gewinnt der spätere —
+    der Link lag über beiden, und von ihrer Fläche waren real nur die obersten
+    Pixel erreichbar (mit elementFromPoint über einem 4px-Raster nachgemessen:
+    vom Stern 8 seiner 22px, vom Pfeil 8 seiner 28px). Jeder Griff daneben
+    sprang in den Entitätenchart. Ohne den z-index bringt auch die größere
+    Fläche nichts, deshalb hängen beide Prüfungen zusammen."""
+    block = _media_block(APP_CSS.read_text(encoding="utf-8"), "max-width:640px")
+    for selektor in (".dt-card-toggle", "table.dt.dt-cards tbody tr > td.dt-card-pre"):
+        regel = re.search(re.escape(selektor) + r"\{([^}]*)\}", block)
+        assert regel, f"{selektor} fehlt"
+        assert "z-index:1" in regel.group(1), f"{selektor} liegt wieder unter dem Link"
+    pfeil = re.search(r"\.dt-card-toggle\{([^}]*)\}", block).group(1)
+    assert "width:44px" in pfeil and "height:44px" in pfeil, (
+        "28px ist kleiner als eine Fingerkuppe und rundum von einem Link umgeben"
+    )
+
+
+def test_the_card_browser_menu_matches_the_entity_menu() -> None:
+    """Dashboards, Charts und Tabellen bringen andere Bauteile mit als die
+    Entitätenliste — einen .chip ohne Checkbox dahinter und eine Sortierung,
+    deren Beschriftung NEBEN dem Knopf steht. Ohne Zutun sah ihr Menü deshalb
+    anders aus als das der Entitätenliste, die hier der Maßstab ist: eine
+    mittige gefüllte Pille und eine Zeile aus zwei Kästchen statt gleich
+    breiter, linksbündiger Zeilen."""
+    block = _media_block(APP_CSS.read_text(encoding="utf-8"), "max-width:640px")
+    regel = re.search(r"\.list-settings-popover \.btn,[^{]*\{([^}]*)\}", block, re.S)
+    assert regel, "Regel für die Menüzeilen fehlt"
+    assert ".list-settings-popover .chip" in regel.group(0), "der Chip bleibt mittig"
+    assert "text-align:left" in regel.group(1)
+    assert re.search(
+        r"\.list-settings-popover \.card-browser-sort-label\{[^}]*display:none", block
+    ), "die Beschriftung steht weiterhin neben dem Knopf"
+    # Als Pseudo-Element, nicht als Kindknoten: selectDDOption() setzt beim
+    # Umschalten textContent und würde einen echten Knoten mitlöschen.
+    assert re.search(
+        r"\.list-settings-popover \.card-browser-sortgroup \.btn::before\{[^}]*content:'Sortierung: '",
+        block,
+    )
+    # Zwei inline-Hüllen zwischen Menü und Knopf — ohne display:block bezieht
+    # sich sein width:100% auf eine Box in Inhaltsbreite.
+    assert re.search(
+        r"\.list-settings-popover \.card-browser-sortgroup > \.dd-picker-wrap\{[^}]*display:block",
+        block,
+    )
+
+
+def test_the_three_card_browsers_order_their_controls_alike() -> None:
+    """Im Menü stehen die Bedienelemente in DOM-Reihenfolge untereinander.
+    Charts und Tabellen führten "Favoriten zuerst" vor der Sortierung,
+    Dashboards und die Entitätenliste danach — im Menü war das direkt
+    nebeneinander sichtbar."""
+    for name in ("dashboards.html", "charts.html", "tables.html"):
+        html = (TEMPLATES / name).read_text(encoding="utf-8")
+        assert html.index("card-browser-sortgroup") < html.index("card-browser-fav"), name
