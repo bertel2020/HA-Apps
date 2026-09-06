@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.83.1 - 2026-09-07
+
+### Neu
+
+- **Die Statistik zeigt den Zuwachs der letzten 24 Stunden als eigene Kachel.**
+  „Neue Datensätze" steht dort neben Bestand und Größe.
+
+### Geändert
+
+- **Der Abschnitt „Ereignisrate" ist aufgelöst.** Seine beiden Kacheln stehen
+  jetzt bei den übrigen Kennzahlen und heißen „Ø/Stunde" und „Ø/Tag". „Neue
+  Datensätze" und „Ø/Tag" tragen dieselbe Einheit und lassen sich dadurch
+  direkt vergleichen.
+- **Das Menü „Ansicht" sieht überall gleich aus.** Bei Dashboards, Charts und
+  Tabellen wichen die Einträge von denen der Entitätenliste ab; auch die
+  Reihenfolge von Sortierung und „Favoriten zuerst" ist jetzt auf allen Seiten
+  dieselbe.
+- **Die Seitenauswahl unter Listen ist auf dem Telefon kleiner.** Der
+  Zählstand („1–20 von 86") steht links, die Blätter-Knöpfe rechts.
+
+### Behoben
+
+- **Der Aufklapp-Pfeil und der Favoritenstern auf Karten waren kaum zu
+  treffen.** Der Name daneben lag über ihnen, ein Griff daneben sprang in den
+  Verlauf der Entität. Beide reagieren jetzt auf ihrer ganzen Fläche, der
+  Pfeil zusätzlich auf einer größeren.
+- **Lange Namen und große Zahlen brachen auf dem Telefon zu früh um** — in der
+  Verbrauchertabelle des Energiedashboards, in den Kennzahlen-Kacheln und bei
+  den Zeitstempeln der Entität-Konfiguration.
+
 ## 0.83.0 - 2026-09-06
 
 ### Neu
