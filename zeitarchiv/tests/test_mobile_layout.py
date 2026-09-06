@@ -123,22 +123,51 @@ def test_every_page_with_cards_uses_its_own_url_prefix() -> None:
     assert pages >= 9, f"nur {pages} Seiten laden table-cards.js"
 
 
-def test_the_sort_toggle_is_a_control_and_never_a_column() -> None:
-    """Die mobile Sortierleiste ist die Kopfzeile der Tabelle; ihr Auf-/Zuklapper
-    hängt deshalb als zusätzliches <th> darin. In der Tabellenform wäre das eine
-    überzählige, leere Spalte — die Kopfzeile hätte eine Zelle mehr als jede
-    Datenzeile. Zwei Stellen müssen ihn daher ausnehmen: das CSS blendet ihn
-    außerhalb der Kartenform aus, und die Spaltenbreiten-Anpassung darf ihn nicht
-    als Spalte zählen, sonst entstünde eine Breite zu viel und ein Ziehgriff ins
-    Leere."""
-    css = APP_CSS.read_text(encoding="utf-8")
-    assert re.search(r"table\.dt \.dt-cards-sort-toggle\{[^}]*display:none", css)
+def test_sorting_moves_out_of_the_table_into_a_menu() -> None:
+    """Sortieren ist auf dem Telefon eine Einstellung der Liste, keine
+    Tabellenkopfzeile. Als Chip-Leiste standen dort vier bis sieben
+    Bedienelemente über der ersten Karte; als Menü ist es ein Knopf in der
+    Optik der Filter-Dropdowns darüber.
 
-    resizable = (APP_JS / "resizable-tables.js").read_text(encoding="utf-8")
-    assert "!cell.classList.contains('dt-cards-sort-toggle')" in resizable
-
+    Der Test hält vor allem fest, dass die Kopfzeile in der Kartenform
+    ausnahmslos verschwindet — solange sie als Leiste sichtbar blieb, brauchte
+    ihr Auf-/Zuklapper ein zusätzliches <th>, das außerhalb der Kartenform an
+    zwei Stellen versteckt werden musste."""
     cards = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
-    assert "cell.className = 'dt-cards-sort-toggle'" in cards
-    # Eingeklappt startet die Leiste; ausgeklappt beginnen wäre auf dem Telefon
-    # die Höhe, die der Befund gerade beseitigt hat.
-    assert "apply(true);" in cards
+    assert "head.classList.add('dt-cards-head-hidden');" in cards
+    assert "dt-cards-sortbar" not in cards, "die Chip-Leiste ist ersetzt, nicht ergänzt"
+    assert "dt-cards-sort-toggle" not in cards
+
+    # Das zusätzliche <th> ist weg, also darf auch seine Sonderbehandlung weg
+    # sein — sonst bliebe eine Regel stehen, die auf nichts mehr zeigt.
+    resizable = (APP_JS / "resizable-tables.js").read_text(encoding="utf-8")
+    assert "dt-cards-sort" not in resizable
+    css = APP_CSS.read_text(encoding="utf-8")
+    assert "dt-cards-sort-toggle" not in css
+
+
+def test_the_sort_menu_reuses_the_existing_dropdown_look() -> None:
+    """Ein neues Element soll aussehen, als hätte es schon immer dazugehört:
+    das Menü trägt die Klassen der Filter-Dropdowns aus der Werkzeugleiste
+    darüber. Sein Auf und Zu steuert es trotzdem selbst, weil dd-picker.js
+    nicht auf allen Seiten mit Listentabellen geladen ist."""
+    cards = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    assert "'dd-picker-wrap dt-cards-sort'" in cards
+    assert "'dd-picker-popover dt-cards-sort-popover'" in cards
+    assert "'dd-picker-row'" in cards
+
+    css = APP_CSS.read_text(encoding="utf-8")
+    # Außerhalb der Kartenform sortiert man über die sichtbaren Spaltenköpfe.
+    assert re.search(r"(?m)^\.dt-cards-sort\{[^}]*display:none", css)
+
+
+def test_the_sort_menu_uses_the_page_own_sorting_mechanism() -> None:
+    """Zwei Sortiermechanismen leben nebeneinander: serverseitige Links, die
+    per htmx nachladen, und clientseitige Spaltenköpfe (sortable-table.js). Das
+    Menü ruft beide über ihren eigenen Weg auf, statt einen dritten zu bauen —
+    ein synthetisches link.click() erreicht htmx nicht, htmx.trigger() schon."""
+    cards = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
+    assert "window.htmx.trigger(link, 'click')" in cards
+    assert "cell.click();" in cards
+    # Clientseitig lädt nichts nach, also zieht die Beschriftung von Hand nach.
+    assert "setTimeout(mark, 0);" in cards

@@ -803,10 +803,9 @@ td.mono{font-family:var(--font-mono);}
    vererbte Zellen-Regel (tr.tbl-bold td) sonst nicht überschreiben würde. */
 tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--ink);}
 
-/* Der Auf-/Zuklapper der mobilen Sortierleiste hängt als zusätzliches <th>
-   in der Kopfzeile (table-cards.js). Breit genug für die Tabellenform wäre
-   er eine überzählige, leere Spalte — dort gibt es ihn deshalb nicht. */
-table.dt .dt-cards-sort-toggle{display:none;}
+/* Das Sortiermenü gehört zur Kartenform. In der Tabellenform sortiert man
+   weiterhin über die Spaltenköpfe, die dort ja sichtbar sind. */
+.dt-cards-sort{display:none;}
 
 /* Zeilenkarten auf schmalen Bildschirmen (ZG-02 Stufe 2). Von der
    Entitätenliste sind bei 390px rund 35 % zu sehen — der Rest ist zwar
@@ -834,31 +833,17 @@ table.dt .dt-cards-sort-toggle{display:none;}
   table.dt.dt-cards .table-column-resize-handle{display:none;}
   table.dt.dt-cards .dt-cards-head-hidden{display:none;}
 
-  /* Kopfzeile als Sortierleiste: nur dort, wo sie eine Bedienung trägt. Ohne
-     sie wäre Sortieren auf dem Telefon gar nicht mehr erreichbar, denn in der
-     Kartenform gibt es keine Spaltenköpfe zum Antippen mehr. */
-  table.dt.dt-cards .dt-cards-sortbar{
-    display:flex;flex-wrap:wrap;gap:6px;padding:0 0 10px;border:0;
-  }
-  table.dt.dt-cards .dt-cards-sortbar th{
-    display:block;padding:4px 9px;border:1px solid var(--border);border-radius:999px;
-    background:var(--surface);white-space:nowrap;
-  }
-  table.dt.dt-cards .dt-cards-sortbar th.dt-cards-label-empty{display:none;}
-  /* Eingeklappt bleibt nur die aktive Sortierung stehen, daneben der
-     Auf-/Zuklapper. Ausgeklappt wären es je nach Tabelle vier bis sieben Chips
-     über zwei Zeilen — mehr Höhe, als die erste Karte darunter braucht. Den
-     Zustand setzt table-cards.js, das auch den Knopf erzeugt. */
-  table.dt.dt-cards .dt-cards-sortbar th.dt-cards-sort-toggle{padding:0;border:0;background:none;}
-  table.dt.dt-cards .dt-cards-sortbar th.dt-cards-sort-toggle button{
-    padding:4px 11px;border:1px solid var(--border);border-radius:999px;
-    background:var(--surface);color:var(--ink-faint);cursor:pointer;line-height:inherit;
-  }
-  table.dt.dt-cards.dt-cards-sort-collapsed .dt-cards-sortbar th{display:none;}
-  table.dt.dt-cards.dt-cards-sort-collapsed .dt-cards-sortbar th.dt-sort-asc,
-  table.dt.dt-cards.dt-cards-sort-collapsed .dt-cards-sortbar th.dt-sort-desc,
-  table.dt.dt-cards.dt-cards-sort-collapsed .dt-cards-sortbar th:has(a.active),
-  table.dt.dt-cards.dt-cards-sort-collapsed .dt-cards-sortbar th.dt-cards-sort-toggle{display:block;}
+  /* Sortieren steht in der Kartenform als Menü über der Tabelle statt als
+     Chip-Leiste darin — dieselbe Optik wie die Filter-Dropdowns der
+     Werkzeugleiste darüber (.dd-picker-*), weil es dieselbe Art von Bedienung
+     ist: eine Einstellung der Liste, keine Tabellenkopfzeile. Aufgebaut wird
+     es von table-cards.js. */
+  .dt-cards-sort{display:block;margin-bottom:10px;}
+  .dt-cards-sort > .btn{background:var(--surface);}
+  .dt-cards-sort > .btn.dt-cards-sort-active{color:var(--accent-line);border-color:var(--accent-line);}
+  .dt-cards-sort-popover{left:0;right:auto;width:min(230px,calc(100vw - 48px));}
+  .dt-cards-sort-popover .dd-picker-row{justify-content:space-between;}
+  .dt-cards-sort-dir{font-variant-numeric:tabular-nums;}
 
   table.dt.dt-cards tbody tr{
     display:block;padding:10px 12px;margin-bottom:8px;
