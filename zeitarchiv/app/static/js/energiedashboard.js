@@ -826,6 +826,12 @@
       // Deshalb aus data.nodes abgeleitet statt aus der Konfiguration: die
       // Legende beschreibt genau das, was gerade gezeichnet ist.
       buildLegend(data, palette) {
+        // Ist die Legende abgeschaltet (Allgemein -> Energiefluss), liefert der
+        // Server ihr Markup gar nicht erst aus — dann auch nicht rechnen. Der
+        // Mischton-Eintrag ruft blendColors() auf, das für die Farbumrechnung
+        // kurz ein Element in den DOM hängt und getComputedStyle() erzwingt;
+        // das für eine unsichtbare Liste zu tun wäre reine Verschwendung.
+        if (!this.$refs.legendEl) { this.legendItems = []; return; }
         const nodes = data.nodes || [];
         const hat = (pruef) => nodes.some(pruef);
         const items = [];

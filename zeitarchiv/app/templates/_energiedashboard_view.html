@@ -410,10 +410,22 @@
         <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2.2"/><path d="M14.5 9a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
         <strong x-text="fmtCurrency(kpi.net_cost)"></strong><span x-text="kpi.net_cost < 0 ? 'gespart' : 'Kosten'"></span>
       </div>
-      <div class="edash-hero-item" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
+      <div class="edash-hero-item edash-hero-prognose" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
         <svg width="16" height="13" viewBox="0 0 26 20"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--chart-3)" opacity=".8"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface)" stroke="var(--chart-3)" stroke-width="1.6"/></svg>
-        <span x-show="kpi.prognose_rest_heute != null">Prognose noch <strong x-text="fmt(kpi.prognose_rest_heute, 1) + ' kWh'"></strong> heute</span>
-        <span x-show="kpi.prognose_morgen != null">&middot; morgen <strong x-text="fmt(kpi.prognose_morgen, 1) + ' kWh'"></strong></span>
+        {# "Prognose:" steht als eigenes Element VOR den beiden Werten, nicht
+           mehr im "noch ..."-Text — dadurch bleibt die Beschriftung auch dann
+           stehen, wenn nur ein Morgen-Wert zugeordnet ist (vorher verschwand
+           sie mit dem heute-Span), und die beiden Werte bilden einen eigenen
+           Block, der mobil sauber untereinander bricht. #}
+        <span>Prognose:</span>
+        <span class="edash-hero-prognose-werte">
+          <span x-show="kpi.prognose_rest_heute != null">noch <strong x-text="fmt(kpi.prognose_rest_heute, 1) + ' kWh'"></strong> heute</span>
+          {# Der Trennpunkt sitzt in einem eigenen Element, weil er nur in der
+             einzeiligen (Desktop-)Darstellung Sinn ergibt — sobald "morgen"
+             mobil in die zweite Zeile rutscht, würde er dort als führendes
+             Satzzeichen stehen. #}
+          <span class="edash-hero-morgen" x-show="kpi.prognose_morgen != null"><span class="edash-hero-sep">&middot; </span>morgen <strong x-text="fmt(kpi.prognose_morgen, 1) + ' kWh'"></strong></span>
+        </span>
       </div>
     </div>
 
@@ -527,8 +539,15 @@
        Chart-Legenden in entity_detail.html/dashboard_detail.html, Variante
        .static (nicht klickbar — hier gibt es keine Serien zum Ein-/Ausblenden).
        Einträge und Farben kommen aus buildLegend() in energiedashboard.js,
-       damit sie garantiert dieselbe Palette benutzen wie die Knoten. #}
-    <div class="chart-legend edash-sankey-legend" x-show="hasFlow && legendItems.length">
+       damit sie garantiert dieselbe Palette benutzen wie die Knoten.
+       Abschaltbar über Allgemein -> Energiefluss -> Farblegende (Default aus,
+       siehe show_sankey_legende in _empty_config()) — serverseitig entschieden
+       statt clientseitig per x-show, damit das Markup bei ausgeschalteter
+       Legende gar nicht erst ausgeliefert wird. Das x-ref dient zugleich als
+       Signal an buildLegend(): fehlt der Knoten, wird die Legende auch nicht
+       berechnet. #}
+    {% if config.show_sankey_legende %}
+    <div class="chart-legend edash-sankey-legend" x-ref="legendEl" x-show="hasFlow && legendItems.length">
       <template x-for="item in legendItems" :key="item.name">
         <span class="chart-legend-item static">
           <span class="dot" :style="{background: item.color}"></span>
@@ -536,6 +555,7 @@
         </span>
       </template>
     </div>
+    {% endif %}
   </div>
 
   <div class="edash-grid" style="margin-top:14px;">

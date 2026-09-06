@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.81.3 - 2026-09-06
+
+### Behoben
+
+- **Die PV-Prognose lief auf Smartphone-Breite aus der Karte heraus.** Die
+  Zeile bündelt zwei Aussagen ("noch X kWh heute" und "morgen Y kWh") in
+  einem Eintrag, der als Ganzes nicht umbrechen durfte. "morgen" steht jetzt
+  in einer eigenen Zeile, exakt unter dem "noch …" darüber statt unter der
+  Beschriftung — ohne dass dafür ein Einzug auf die Breite des Wortes
+  "Prognose:" geraten werden müsste, der sich mit Schriftgröße und
+  Skalierung ohnehin verschoben hätte. Der Trennpunkt zwischen beiden
+  Angaben entfällt beim Umbruch, sonst stünde er als führendes Satzzeichen
+  am Zeilenanfang. Auf breiten Bildschirmen bleibt alles einzeilig.
+- **Die Beschriftung "Prognose" verschwand, wenn nur ein Morgen-Wert
+  zugeordnet war.** Sie steckte im Text des Heute-Werts und wurde mit ihm
+  ausgeblendet — die Zeile begann dann mit "· morgen". Sie steht jetzt
+  unabhängig davor.
+
+### Geändert
+
+- **Die Farblegende unter dem Energiefluss lässt sich ein- und
+  ausschalten** (Einrichtung → Allgemein → Energiefluss), standardmäßig
+  aus. Der Energiefluss ist auch ohne sie lesbar — der Tooltip nennt Name,
+  Wert und Anteil —, deshalb soll die zusätzliche Zeile niemandem ungefragt
+  erscheinen. Ist sie abgeschaltet, liefert der Server ihr Markup gar nicht
+  erst aus und berechnet die Einträge auch nicht.
+- **Die Bereiche der Einrichtungsseite sind jetzt mit einem Verlauf statt
+  einer flachen Tönung hinterlegt.** Netz, Erzeuger, Speicher und
+  Verbraucher behalten ihre Rollenfarbe; Kosten, PV-Prognose und CO₂
+  bekommen einen neutralen Verlauf, "Allgemein" einen kräftigeren neutralen,
+  der es als Ort der Grundeinstellungen von den Datenbereichen abhebt. Der
+  Verlauf läuft bewusst nicht auf durchsichtig aus, sondern auf einen
+  Restton — sonst wäre der größte Teil jeder Karte ungefärbt, genau der
+  Zustand, der schon einmal nachgebessert werden musste, weil er "kaum als
+  Farbe wahrnehmbar" war.
+- **Das App-Logo in der Kopfleiste ist etwas größer** (30 statt 26 Pixel),
+  es wirkte neben der Wortmarke zu zurückhaltend. Die Höhe der Kopfleiste
+  bleibt unverändert.
+
 ## 0.81.2 - 2026-09-05
 
 ### Behoben

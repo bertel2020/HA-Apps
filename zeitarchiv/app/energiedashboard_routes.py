@@ -150,6 +150,14 @@ def _empty_config() -> dict:
         "show_co2": True,
         "show_tageslastprofil": True,
         "show_bilanz_datenqualitaet": True,
+        # Farblegende unter dem Energiefluss — anders als die Kachel-Schalter
+        # oben per Default AUS: der Sankey ist auch ohne sie lesbar (Tooltip
+        # nennt Name, Wert und Anteil), und eine zusätzliche Zeile unter dem
+        # Diagramm soll niemandem ungefragt untergeschoben werden. Bestehende
+        # gespeicherte Configs kennen den Schlüssel nicht und bekommen über
+        # _load_config() automatisch diesen False-Default — die Legende
+        # erscheint also erst, wenn man sie hier einschaltet.
+        "show_sankey_legende": False,
         # Schwellenwert für die Verbraucher-Auffälligkeiten-Markierung (siehe
         # ANOMALIE_SCHWELLE_LABELS) — "50" (Default an, +50 %) statt "off",
         # analog zu den übrigen Kacheln, die ebenfalls per Default sichtbar
@@ -1983,6 +1991,7 @@ class EnergieDashboardService:
             show_co2: str = Form(""),
             show_tageslastprofil: str = Form(""),
             show_bilanz_datenqualitaet: str = Form(""),
+            show_sankey_legende: str = Form(""),
             anomalie_schwelle: str = Form("50"),
         ) -> HTMLResponse:
             if not netzbezug.strip():
@@ -2120,6 +2129,7 @@ class EnergieDashboardService:
                 "show_co2": show_co2 == "on",
                 "show_tageslastprofil": show_tageslastprofil == "on",
                 "show_bilanz_datenqualitaet": show_bilanz_datenqualitaet == "on",
+                "show_sankey_legende": show_sankey_legende == "on",
                 "anomalie_schwelle": anomalie_schwelle,
             }
             _save_config(deps.index, config)

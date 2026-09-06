@@ -192,6 +192,22 @@
   .edash-hero-item + .edash-hero-item{border-left:1px solid var(--border-strong);}
   .edash-hero-item svg{flex:none;}
   .edash-hero-item strong{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
+  /* Die Prognose ist als EIN Hero-Item aufgebaut, enthält aber zwei Aussagen
+     ("noch X kWh heute" + "morgen Y kWh"). Zusammen mit dem nowrap der
+     Hero-Items passte das auf Smartphone-Breite nicht mehr in die Zeile und
+     lief rechts aus der Karte. Die beiden Werte bilden deshalb einen eigenen
+     Block hinter der Beschriftung "Prognose:", der mobil zur Spalte wird —
+     "morgen" steht dadurch exakt unter "noch ...", ohne dass ein Einzug auf
+     die Breite des Wortes "Prognose:" geraten werden müsste (die hängt von
+     Schriftgröße und Font-Scale ab). Der Trennpunkt entfällt beim Umbruch,
+     und Icon samt Beschriftung richten sich an der ERSTEN Wertezeile aus
+     statt mittig zum zweizeiligen Block. */
+  @media(max-width:560px){
+    .edash-hero-item{flex-wrap:wrap;}
+    .edash-hero-prognose{align-items:flex-start;}
+    .edash-hero-prognose-werte{display:flex;flex-direction:column;}
+    .edash-hero-sep{display:none;}
+  }
   .edash-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:16px;align-items:stretch;}
   /* Flex-Spalte statt gestapelter Blöcke: die Speicher-Kachel hat mit der
      zusätzlichen Ladezustand-Zeile (.edash-kpi-sub) eine Zeile mehr als die
@@ -633,10 +649,77 @@
      Kosten bleiben bewusst ungefärbt — keine natürliche Rollen-Farbe. 8%/32%
      statt vorher 5%/25%, weil die schwächere Tönung im Browser kaum als
      Farbe wahrnehmbar war, eher wie ein Rendering-Unterschied wirkte. */
-  .edash-section-netz{background:color-mix(in srgb, var(--chart-1) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-1) 32%, var(--border));}
-  .edash-section-erzeuger{background:color-mix(in srgb, var(--chart-3) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-3) 32%, var(--border));}
-  .edash-section-speicher{background:color-mix(in srgb, var(--chart-4) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-4) 32%, var(--border));}
-  .edash-section-verbraucher{background:color-mix(in srgb, var(--chart-7) 8%, var(--surface));border-color:color-mix(in srgb, var(--chart-7) 32%, var(--border));}
+  /* Verlauf statt flächiger Tönung: derselbe Eck-radial-gradient wie bei den
+     Dashboard-Karten (.edash-flow-card u. a. weiter unten), nur kräftiger —
+     dort liegt der Verlauf ZUSÄTZLICH auf weißem Kartengrund, hier ERSETZT er
+     die bisherige 8%-Fläche. Der Verlauf läuft deshalb NICHT auf transparent
+     aus, sondern auf einen Sockel von 6%: liefe er auf Null, wäre der größte
+     Teil der Karte praktisch ungefärbt — genau der Zustand, der laut dem
+     Kommentar oben schon einmal von 5% auf 8% angehoben werden musste, weil
+     er "kaum als Farbe wahrnehmbar" war (in hellen Schemata deutlich
+     sichtbarer als in dunklen). 18% in der Ecke auf 6% Sockel hält die
+     Farbmenge also mindestens auf dem bisherigen Stand und ergibt trotzdem
+     einen erkennbaren Verlauf. Rahmenfarbe unverändert.
+     Alle vier bekommen dieselbe Ecke (oben-links) — anders als bei den
+     Dashboard-Karten, wo zwei Karten dieselbe Rollenfarbe teilen und deshalb
+     unterschiedliche Ecken brauchen; hier hat jeder Abschnitt seine eigene
+     Farbe, die gleiche Ecke ergibt dadurch einen ruhigen Rhythmus statt
+     Wiederholung. */
+  .edash-section-netz{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-1) 18%, transparent), color-mix(in srgb, var(--chart-1) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-1) 32%, var(--border));
+  }
+  .edash-section-erzeuger{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-3) 18%, transparent), color-mix(in srgb, var(--chart-3) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-3) 32%, var(--border));
+  }
+  .edash-section-speicher{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-4) 18%, transparent), color-mix(in srgb, var(--chart-4) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-4) 32%, var(--border));
+  }
+  .edash-section-verbraucher{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-7) 18%, transparent), color-mix(in srgb, var(--chart-7) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-7) 32%, var(--border));
+  }
+  /* Kosten/PV-Prognose/CO2 haben keine natürliche Sankey-Rollenfarbe (siehe
+     Kommentar oben) — sie bekommen denselben Verlauf, aber im neutralen Ton
+     --border-strong statt einer erfundenen Farbe. Genau derselbe Ton, den
+     .edash-item-accent-neutral für die Kacheln dieser Bereiche nutzt.
+     ABER: als Flächenton getestet war --border-strong praktisch unsichtbar —
+     nachgemessen (Ecke gegen Kartenfläche, RGB-Abstand) 19 gegenüber 43-56
+     bei den farbigen Abschnitten, in hellem wie dunklem Schema gleichermaßen.
+     Kein Wunder: --border-strong ist per Definition kartennah, es ist die
+     Farbe der Kartenkante. --ink-faint liegt weiter von der Fläche entfernt
+     und landet bei derselben Dosierung (22%) bei 40/46 — also auf dem Niveau
+     der übrigen Abschnitte, ohne dass eine Sonderdosierung nötig wäre.
+     Rahmenfarbe bleibt der Standard: eine getönte Kante ohne zugehörige
+     Rollenfarbe hätte nichts zu bedeuten. */
+  .edash-section-neutral{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);
+  }
+  /* "Allgemein" ist weder eine Sankey-Rolle noch einer der neutralen
+     Datenbereiche, sondern der Ort für Grundeinstellungen — und hebt sich
+     deshalb ab: derselbe neutrale Farbkreis wie Kosten/Prognose/CO2, aber
+     kräftiger dosiert (--ink-muted statt --ink-faint, 24% statt 22%), also
+     erkennbar schwerer statt andersfarbig. 24% ist dabei der Punkt, an dem
+     der Abstand zum leichten Neutral mit 17 sicher über dem Maßstab 11 liegt,
+     die Fläche aber erst das 1,45-fache der Rollenabschnitte erreicht — bei
+     30% wären es 35 Abstand, aber fast das Doppelte an Farbmenge, und der
+     Abschnitt sähe wie ein dunkles Banner aus.
+     Der Weg dahin, damit ihn niemand rückgängig "verbessert": ein eigener
+     Buntton scheidet praktisch aus. Rollenbelegt sind --chart-1/2/3/4/7,
+     --accent-line ist im Standard-Schema mit --chart-1 identisch (Allgemein
+     sähe aus wie Netz), --chart-8 fällt seit der Neutral-Korrektur mit
+     --ink-faint zusammen (nachgemessener Abstand 0-2). Von den freien
+     Tönen kam --chart-6 nicht über den Maßstab (10 gegenüber 11, so weit
+     liegen die bestehenden Abschnitte selbst auseinander) und --chart-5
+     zwar auf 21, ist aber ein Rotorange nahe --danger und würde als
+     Warnung gelesen. Das kräftigere Neutral erreicht 31 und damit den mit
+     Abstand deutlichsten Unterschied. */
+  .edash-section-allgemein{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-muted) 24%, transparent), color-mix(in srgb, var(--ink-muted) 8%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--ink-muted) 24%, var(--border));
+  }
 
   /* Rollen-Kacheln: eine Kachel pro Einzeleintrag (Netzbezug/Einspeisung
      fix, Erzeuger/Speicher/Verbraucher dynamisch) statt einer Formularzeile

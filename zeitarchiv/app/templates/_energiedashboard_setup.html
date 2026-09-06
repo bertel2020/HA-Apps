@@ -324,7 +324,7 @@
   <p class="sub">Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.</p>
   <form hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
 
-    <section class="settings-section">
+    <section class="settings-section edash-section-allgemein">
       <h2 class="settings-section-title">Allgemein</h2>
       <p class="settings-section-description">Grundeinstellungen für das Energiedashboard.</p>
       <div class="edash-field-grid">
@@ -362,6 +362,18 @@
           <label class="filter-chip"><input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}><span>Bilanz &amp; Datenqualität</span></label>
         </div>
         <p class="hint">Energiefluss ist immer sichtbar — alle anderen Kacheln lassen sich hier einzeln ausblenden.</p>
+      </div>
+      {# Eigenes Feld statt eines weiteren Chips in "Sichtbare Kacheln"
+         darüber: die Legende ist keine Kachel, sondern ein Bestandteil der
+         Energiefluss-Karte — in derselben Liste stünde sie im Widerspruch
+         zum dortigen Hinweis ("Energiefluss ist immer sichtbar"). Gleiche
+         .filter-chip-Optik wie oben, damit es trotzdem zusammengehört. #}
+      <div class="field" style="margin-bottom:0;margin-top:14px;">
+        <label>Energiefluss</label>
+        <div class="edash-toggle-list">
+          <label class="filter-chip"><input type="checkbox" name="show_sankey_legende" {% if config.show_sankey_legende %}checked{% endif %}><span>Farblegende</span></label>
+        </div>
+        <p class="hint">Blendet unter dem Energiefluss eine Legende der verwendeten Farben ein — inklusive des Mischtons der Verbrauchsbahnen, der anzeigt, welcher Anteil des Verbrauchs aus eigener Erzeugung kam.</p>
       </div>
     </section>
 
@@ -681,7 +693,7 @@
       </template>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section edash-section-neutral">
       <h2 class="settings-section-title">Kosten</h2>
       <p class="settings-section-description">Optional — Preis-Sensoren für Netzbezug und Einspeisung. Bucket-genau verrechnet, funktioniert also auch mit variablen/dynamischen Tarifen. Ohne passende Preis-Entität kann ersatzweise ein fester Preis in Cent je kWh eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
       <div class="edash-item-grid">
@@ -779,7 +791,7 @@
          "vermiedene_kosten" in compute_flow (energiedashboard_routes.py). #}
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section edash-section-neutral">
       <h2 class="settings-section-title">PV-Prognose</h2>
       <p class="settings-section-description">Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast. Anders als bei Kosten/CO2 gibt es hier keinen festen Ersatzwert (eine Prognose lässt sich nicht sinnvoll als fixe Zahl eintragen) — nur Entitäten.</p>
       <div class="edash-item-grid">
@@ -849,7 +861,7 @@
       </dialog>
     </section>
 
-    <section class="settings-section">
+    <section class="settings-section edash-section-neutral">
       <h2 class="settings-section-title">CO₂</h2>
       <p class="settings-section-description">Optional — CO2-Intensität des bezogenen Netzstroms (g/kWh), z. B. über eine Electricity-Maps-/CO2-Signal-Entität. PV und Speicher gelten als emissionsfrei, brauchen also keinen eigenen Faktor. Ohne passende Entität kann ersatzweise ein fester Wert eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
       <div class="edash-item-grid">
