@@ -166,8 +166,8 @@ def test_energiebilanz_geht_am_bus_auf(monkeypatch, tmp: Path) -> None:
     flow, a, config = _flow(monkeypatch, tmp)
     try:
         hub = config["hub_name"]
-        hinein = sum(l["value"] for l in flow["links"] if l["target"] == hub)
-        heraus = sum(l["value"] for l in flow["links"] if l["source"] == hub)
+        hinein = sum(link["value"] for link in flow["links"] if link["target"] == hub)
+        heraus = sum(link["value"] for link in flow["links"] if link["source"] == hub)
         assert hinein == pytest.approx(heraus)
         bus = next(n for n in flow["nodes"] if n["role"] == "bus")
         assert bus["value"] == pytest.approx(hinein)
@@ -187,12 +187,12 @@ def test_gruppe_mit_einem_mitglied_wird_aufgeloest(monkeypatch, tmp: Path) -> No
         assert "Haushalt" in namen
         hub = config["hub_name"]
         assert {"source": hub, "target": "Wallbox", "value": pytest.approx(4.0)} in [
-            {"source": l["source"], "target": l["target"], "value": pytest.approx(l["value"])}
-            for l in flow["links"]
+            {"source": link["source"], "target": link["target"], "value": pytest.approx(link["value"])}
+            for link in flow["links"]
         ]
         # Die Gruppe bleibt zweistufig: Bus -> Haushalt -> Gerät.
-        assert any(l["source"] == hub and l["target"] == "Haushalt" for l in flow["links"])
-        assert any(l["source"] == "Haushalt" and l["target"] == "Trockner" for l in flow["links"])
+        assert any(link["source"] == hub and link["target"] == "Haushalt" for link in flow["links"])
+        assert any(link["source"] == "Haushalt" and link["target"] == "Trockner" for link in flow["links"])
         # Der aufgelöste Verbraucher zählt trotzdem voll mit.
         assert flow["kpi"]["verbrauch"] == pytest.approx(13.0)
     finally:
@@ -854,5 +854,117 @@ def test_groebere_abfrage_spart_bei_monat_tatsaechlich_abfragen(monkeypatch, tmp
         gezaehlt[0] = 0
         a.service.compute_flow(config, "month", -1)
         assert mit < gezaehlt[0], "gröbere Abfrage muss weniger Abfragen brauchen"
+    finally:
+        a.close()
+
+
+def _preis_anlage(tmp: Path, versatz_minuten: int, takt_minuten: int) -> tuple[_Anlage, dict]:
+    """Beispielanlage plus Preis-Entität mit einstellbarem Sendezyklus.
+
+    Der Netzbezug ist ein Zähler und bekommt bei Zeitraum "Tag" Stunden-Buckets,
+    die Preis-Entität ist ein Messwert und bekommt 5-Minuten-Buckets
+    (LIVE_BUCKET_SECONDS in storage/query.py). Ob beide Raster zusammenfinden,
+    hängt allein an der Sendephase des Preissensors — genau das prüfen die
+    Tests unten.
+    """
+    a, config = _beispielanlage(tmp)
+    a.index.get_or_create_entity("sensor.preis", "sensor", "measurement", "EUR/kWh")
+    schritte = int(24 * 60 / takt_minuten)
+    for i in range(schritte):
+        ts = _ts(0) + i * takt_minuten * 60 + versatz_minuten * 60
+        hotbuffer.append(tmp, "sensor.preis", ts, 0.30, TZ)
+        a.index.record_write("sensor.preis", ts)
+    config["kosten"] = {"preis_netzbezug": "sensor.preis"}
+    return a, config
+
+
+@pytest.mark.parametrize(
+    "versatz,takt",
+    [(0, 60), (0, 15), (7, 15), (2, 5), (13, 30)],
+    ids=["stuendlich-auf-null", "15min-ab-00", "15min-ab-07", "5min-ab-02", "30min-ab-13"],
+)
+def test_grid_costs_do_not_depend_on_the_price_sensors_reporting_phase(
+    monkeypatch, tmp: Path, versatz: int, takt: int
+) -> None:
+    """Der Netzbezug beträgt über den Tag 6 kWh, der Preis konstant 0,30 €/kWh
+    — also 1,80 € Kosten, unabhängig davon, WANN der Preissensor sendet.
+
+    Vor der Umstellung suchte die Rechnung den Preis per Schlüsselgleichheit
+    (`ts in factor_series`) und traf damit nur, wenn der Preissensor zufällig
+    innerhalb der ersten fünf Minuten einer Stunde einen Wert hatte. Ein
+    Sensor, der alle 15 Minuten ab :07 sendet, lieferte NULL Treffer und damit
+    0,00 € — bei völlig gesunder Anlage und ohne jede Fehlermeldung.
+    """
+    a, config = _preis_anlage(tmp, versatz, takt)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        ergebnis = a.service.compute_flow(config, "day", -1)
+        assert ergebnis["kpi"]["netzbezug_cost"] == pytest.approx(1.80, abs=0.01)
+    finally:
+        a.close()
+
+
+def _preis_anlage_mit_ende(tmp: Path, letzte_stunde: float, schwelle: str = "15") -> tuple[_Anlage, dict]:
+    """Preissensor, der ab ``letzte_stunde`` schweigt — der tote Sensor."""
+    a, config = _beispielanlage(tmp)
+    a.index.get_or_create_entity("sensor.preis", "sensor", "measurement", "EUR/kWh")
+    a.index.set_config("sensor.preis", gap_threshold=schwelle)
+    i = 0
+    while i * 15 <= letzte_stunde * 60:
+        ts = _ts(0) + i * 15 * 60
+        hotbuffer.append(tmp, "sensor.preis", ts, 0.30, TZ)
+        a.index.record_write("sensor.preis", ts)
+        i += 1
+    config["kosten"] = {"preis_netzbezug": "sensor.preis"}
+    return a, config
+
+
+def test_a_dead_price_sensor_is_not_carried_forward_indefinitely(monkeypatch, tmp: Path) -> None:
+    """Der letzte bekannte Preis gilt fort — aber nicht beliebig lange. Ein
+    Sensor, der um 3 Uhr verstummt, darf seinen Wert nicht über den Rest des
+    Tages legen; sonst wäre das Fortschreiben nur eine andere stille Lüge als
+    das frühere Verschlucken."""
+    a, config = _preis_anlage_mit_ende(tmp, letzte_stunde=3)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        assert flow["kpi"]["netzbezug_cost"] < 1.80
+        pruefung = next(
+            p for p in flow["quality"]["checks"] if p["label"] == "Preise und Faktoren vollständig"
+        )
+        assert pruefung["ok"] is False
+        assert "Preis Netzbezug" in pruefung["detail"]
+    finally:
+        a.close()
+
+
+def test_gap_threshold_off_means_carry_forward_without_limit(monkeypatch, tmp: Path) -> None:
+    """"off" ist in dieser App die ausdrückliche Ansage "diese Entität sendet
+    unregelmäßig, melde mir keine Lücken". Dann gilt der letzte Preis auch
+    über eine lange Pause — und die Kosten sind wieder vollständig."""
+    a, config = _preis_anlage_mit_ende(tmp, letzte_stunde=3, schwelle="off")
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        assert flow["kpi"]["netzbezug_cost"] == pytest.approx(1.80, abs=0.01)
+        pruefung = next(
+            p for p in flow["quality"]["checks"] if p["label"] == "Preise und Faktoren vollständig"
+        )
+        assert pruefung["ok"] is True
+    finally:
+        a.close()
+
+
+def test_complete_prices_report_no_gap(monkeypatch, tmp: Path) -> None:
+    """Gegenprobe: bei lückenlosem Preis meldet die Prüfung nichts — sonst
+    stünde dauerhaft eine Warnung da, die niemand abstellen kann."""
+    a, config = _preis_anlage(tmp, versatz_minuten=7, takt_minuten=15)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        pruefung = next(
+            p for p in flow["quality"]["checks"] if p["label"] == "Preise und Faktoren vollständig"
+        )
+        assert pruefung["ok"] is True
     finally:
         a.close()
