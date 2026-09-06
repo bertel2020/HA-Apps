@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.82.0 - 2026-09-06
+
+### Neu
+
+- **Werte-Kacheln zeigen Kennzahlen und einen wählbaren Zeitraum.** Neben dem
+  aktuellen Wert lassen sich Minimum, Durchschnitt, Maximum und Summe
+  einblenden, und die große Zahl muss nicht mehr der Momentanwert sein — eine
+  Kachel kann auch nur den Monatsdurchschnitt zeigen. Der Zeitraum reicht von
+  Stunde bis Jahr, wahlweise ab der Kalendergrenze ("laufend") oder als festes
+  Fenster bis jetzt ("rollierend"), und gilt zugleich für die Sparkline.
+- **Listentabellen werden auf schmalen Bildschirmen zu Zeilenkarten.** Statt
+  seitwärts zu scrollen trägt jeder Wert sein Etikett bei sich; sortiert wird
+  über ein Menü über der Liste.
+
+### Geändert
+
+- **"Kontinuierlich" heißt jetzt "Rollierend"** — in der Verlaufsansicht, in
+  den Einstellungen und auf den Werte-Kacheln. Der Schalter stellt den
+  abgefragten Zeitraum um und nicht das Aussehen der Kurve; der Hilfetext
+  darunter sagt das jetzt auch, statt eine Darstellungsoption zu beschreiben,
+  die es gar nicht gibt.
+- **Listen beginnen mit 20 statt 50 Zeilen je Seite.**
+- **Dashboards und das Energiedashboard laden weniger Daten nach.**
+  Werte-Kacheln mit gleicher Einstellung holen ihre Werte gemeinsam statt
+  einzeln, und die Auffälligkeiten-Prüfung des Energiedashboards kommt mit
+  einer gröberen Abfrage aus.
+
+### Behoben
+
+- **Kosten und CO₂ konnten null sein, obwohl Verbrauch und Preis vorlagen.** Ob
+  ein Preis überhaupt angerechnet wurde, hing davon ab, zu welcher Minute der
+  Preissensor sendet — betroffen war, wer statt eines festen Betrags eine
+  Preis-Entität nutzt, also dynamische Tarife. Jetzt gilt der zuletzt bekannte
+  Preis fort, bis ein neuer kommt; was auch dann ohne Preis bleibt, weist die
+  Datenqualitäts-Prüfung mit Menge und Anteil aus, statt es stillschweigend
+  wegzulassen.
+- **Fast alle Seiten ließen sich auf dem Telefon seitwärts schieben.** Ursache
+  war die Menüleiste, die unter 480 Pixel breiter blieb als der Seiteninhalt.
+- **Die Glocke saß auf dem Telefon mitten in der Menüleiste** statt neben dem
+  Menü-Knopf.
+- **Zwei Schriftschnitte wurden verwendet, aber nie geladen.** Eine als fett
+  ausgezeichnete Trennzeile in Vergleichstabellen war dadurch wirkungslos.
+- **Der Scroll-Hinweis an breiten Tabellen legte sich als grauer Schleier über
+  die ersten Zeichen der Zeile.** Er deutet die Kante jetzt nur noch an.
+
 ## 0.81.3 - 2026-09-06
 
 ### Behoben
