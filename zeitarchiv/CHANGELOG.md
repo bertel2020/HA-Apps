@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.83.0 - 2026-09-06
+
+### Neu
+
+- **Listen zeigen auf dem Telefon mehr auf einen Blick.** Jeder Eintrag ist
+  eingeklappt und zeigt Name und einen Leitwert; der Pfeil rechts öffnet den
+  Rest. Auf der Entitätenliste passen damit sieben statt drei Einträge auf
+  einen Bildschirm.
+- **Ein Menü „Ansicht" für alle Einstellungen einer Liste.** Filter, Spalten
+  und Sortierung stehen auf schmalen Bildschirmen zusammen in einem Menü neben
+  der Suche statt in vier Reihen darüber — auf der Entitätenliste, beim
+  CSV-Export sowie in den Übersichten für Dashboards, Charts und Tabellen.
+
+### Geändert
+
+- **Die Kacheln der Übersichten sind auf dem Telefon knapp halb so hoch.** Der
+  freigehaltene Platz für lange Namen ergibt nur nebeneinander Sinn, nicht
+  untereinander.
+- **Hilfetexte sind kürzer**, vor allem in den Einstellungen und in der
+  Entität-Konfiguration. Warnungen behalten ihre Aussage.
+- **Das Beschriftungsfeld im Tabellen-Editor steht in jeder Zeile an derselben
+  Stelle**, auch bei Summenzeile und Trennlinie.
+- **Die Seitenauswahl unter Listen steht rechts**, zusammen mit der Auswahl der
+  Zeilen pro Seite.
+
+### Behoben
+
+- **Import und Backup konnten die Oberfläche warten lassen.** Drei Abläufe
+  griffen nach der Sperre für Wartungsarbeiten, während sie die Seite bedienten
+  — lief gleichzeitig eine Entitätsoperation, stand die App, bis diese fertig
+  war.
+- **Der Scroll-Hinweis am Rand von Tabellen erschien auch dort, wo es nichts zu
+  scrollen gab.** Er zeigt sich jetzt nur noch an Tabellen, die tatsächlich
+  breiter sind als der Platz, und ist dabei schmaler und zurückhaltender.
+- **Lange Entity-IDs brachen auf Karten für zwei, drei Zeichen in eine zweite
+  Zeile um.** Sie enden jetzt mit Auslassungspunkten.
+- **In der Entitätenauswahl eines Charts fehlte der Tooltip mit vollem Namen
+  und ID.**
+
 ## 0.82.0 - 2026-09-06
 
 ### Neu
