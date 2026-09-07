@@ -1092,6 +1092,23 @@ def _settings_background_processes_context() -> dict:
         ),
     ]
 
+    # Kein row(): Der Stand ist eine Warteschlange, kein Zeitpunkt — dieselbe
+    # Form wie beim Stunden-Rollup-Backfill unten. Ein "letzter Lauf" wäre hier
+    # nichtssagend, weil in jedem Takt einer stattfindet, solange etwas offen
+    # ist; die Frage ist, wie viel noch aussteht.
+    outlier = cleanup_stats.outlier_rate_overview(index)
+    outlier_gesamt = outlier["measured"] + outlier["pending"]
+    rows.append({
+        "name": "Ausreißer-Quoten",
+        "hint": "Misst je Entität die Markierungsquote über die ganze Historie · 1 Entität/30s",
+        "last_run": (
+            f"{outlier['measured']} von {outlier_gesamt} gemessen" if outlier_gesamt
+            else "keine Entität mit Ausreißer-Erkennung"
+        ),
+        "pill_class": "pending" if outlier["pending"] else "ok",
+        "pill_label": f"{outlier['pending']} ausstehend" if outlier["pending"] else "OK",
+    })
+
     if is_energiedashboard_configured(index):
         try:
             pending = json.loads(index.get_setting(SETTING_HOURLY_BACKFILL_PENDING, "[]"))
