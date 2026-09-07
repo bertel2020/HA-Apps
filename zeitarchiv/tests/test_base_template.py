@@ -21,7 +21,12 @@ NUR_IM_RAHMEN = [
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport"',
-    "fonts.googleapis.com",
+    # Bis ZG-14 stand hier "fonts.googleapis.com" — der Schriften-<link>, den
+    # der Rahmen den Seiten abgenommen hat. Seit die Schriften lokal liegen
+    # und in app.css gebunden sind, gibt es diese Zeile nicht mehr. An ihre
+    # Stelle tritt der Marker, der jetzt rahmen-exklusiv ist: der <style>-Block,
+    # über den der Rahmen die Schriftgröße an die Seite reicht.
+    "<style>:root{--font-scale:",
     "app.css?v={{ css_v }}",
 ]
 

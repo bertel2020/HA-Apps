@@ -78,8 +78,8 @@ maßgeblich.
 | htmx | 2.0.3 | lokal gebündelt | 0BSD |
 | Apache ECharts | 5.5.1 | lokal gebündelt | Apache-2.0 |
 | ZRender | 5.6.0 | Bestandteil des ECharts-Bundles | BSD-3-Clause |
-| IBM Plex Sans | durch Google Fonts bestimmt | extern geladen | SIL OFL-1.1 |
-| IBM Plex Mono | durch Google Fonts bestimmt | extern geladen | SIL OFL-1.1 |
+| IBM Plex Sans | v23 (variabel) | lokal gebündelt | SIL OFL-1.1 |
+| IBM Plex Mono | v20 | lokal gebündelt | SIL OFL-1.1 |
 
 Lizenznachweise:
 
@@ -88,6 +88,14 @@ Lizenznachweise:
 - Apache ECharts: https://github.com/apache/echarts/blob/master/LICENSE
 - ZRender: https://github.com/ecomfe/zrender/blob/master/LICENSE
 - IBM Plex: https://github.com/IBM/plex/blob/master/LICENSE.txt
+
+Die beiden Schriften lagen bis September 2026 extern und wurden bei jedem
+Seitenaufruf von `fonts.googleapis.com` geladen; seit ZG-14 liegen sie als
+WOFF2 unter `app/static/fonts/`. Ausgeliefert sind die Zeichensätze latin und
+latin-ext in den Schnitten 400, 500, 600 und 700 — bei IBM Plex Sans als eine
+variable Datei je Zeichensatz, bei IBM Plex Mono als eine Datei je Schnitt.
+Die Versionsangaben sind die Ausgabestände, unter denen Google Fonts die
+Dateien führt (`/s/ibmplexsans/v23/`, `/s/ibmplexmono/v20/`).
 
 ## Von Home Assistant bereitgestellte Komponenten
 
@@ -154,5 +162,5 @@ abweichende Lizenz angegeben ist.
 - Die lokal gebündelten Browserbibliotheken sollten zusammen mit ihren
   Lizenztexten ausgeliefert werden.
 - Änderungen an Versionen in `requirements.txt`, den Dateien unter
-  `app/static/vendor/`, dem Docker-Basisimage oder den Google-Fonts-URLs müssen
-  in dieser Übersicht nachgezogen werden.
+  `app/static/vendor/` oder `app/static/fonts/` oder am Docker-Basisimage
+  müssen in dieser Übersicht nachgezogen werden.

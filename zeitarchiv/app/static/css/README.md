@@ -18,12 +18,16 @@ jeweiligen Template. Seit ZG-04 Schritt 3 liegt es als eigene Datei in
 ## Einbinden
 
 ```html
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="{{ app_root }}/static/css/app.css?v={{ css_v }}">
 ```
 
-Beides steht seit ZG-04 Schritt 1 nur noch **einmal**, in `base.html`. Eine
-neue Seite erbt es über `{% extends "base.html" %}` und schreibt es nicht selbst.
+Das steht seit ZG-04 Schritt 1 nur noch **einmal**, in `base.html`. Eine neue
+Seite erbt es über `{% extends "base.html" %}` und schreibt es nicht selbst.
+Daneben stand bis ZG-14 ein zweiter `<link>` auf `fonts.googleapis.com` — die
+Schriften liegen jetzt als WOFF2 unter `static/fonts/` und werden am Kopf
+dieser Datei per `@font-face` gebunden. Der Kommentar dort erklärt, warum die
+Pfade relativ sein müssen und warum ein Schriften-Update einen neuen
+Dateinamen bekommt.
 
 `{{ app_root }}` ist der Präfix aus dem `X-Ingress-Path`-Header (siehe
 `_app_root_context()` in `main.py`) und damit unabhängig davon, wie tief die

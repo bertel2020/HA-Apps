@@ -21,16 +21,21 @@ def _full_page_templates() -> list[Path]:
     ]
 
 
-def test_full_pages_load_all_used_ibm_plex_mono_weights() -> None:
-    """Die Schriftschnitte kommen aus einer einzigen Zeile in base.html —
-    und keine Seite bringt daneben noch einen eigenen Fonts-Link mit.
+def test_full_pages_load_all_used_ibm_plex_weights() -> None:
+    """Die Schriftschnitte kommen aus einer einzigen Quelle — und keine Seite
+    bringt daneben noch einen eigenen Fonts-Link mit.
 
     Die zweite Hälfte ist der eigentliche Wert: vorher stand derselbe Link
-    23-mal da und musste 23-mal stimmen. Jetzt wäre eine 24. Kopie eine
-    Regression, keine Pflicht."""
-    base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
-    assert "IBM+Plex+Mono:wght@400;500;600;700" in base
-    assert "IBM+Plex+Sans:wght@400;500;600;700" in base
+    23-mal da und musste 23-mal stimmen. Mit ZG-04 Schritt 1 wurde daraus eine
+    Zeile in base.html, mit ZG-14 sind es @font-face-Blöcke in app.css. Eine
+    24. Kopie wäre in jeder dieser Fassungen eine Regression."""
+    css = APP_CSS.read_text(encoding="utf-8")
+    for family in ("IBM Plex Sans", "IBM Plex Mono"):
+        for weight in (400, 500, 600, 700):
+            assert re.search(
+                rf"font-family:'{family}';\s*font-style:normal;\s*font-weight:{weight};",
+                css,
+            ), f"{family} {weight} ist nicht als @font-face deklariert"
 
     full_pages = _full_page_templates()
     assert len(full_pages) >= 20, f"nur {len(full_pages)} Templates erben von base.html"
@@ -109,14 +114,17 @@ def test_only_loaded_font_weights_are_used() -> None:
     700 und waren dadurch nicht zu unterscheiden. Der Fehler ist im Browser
     unsichtbar, deshalb muss ihn der Test sehen.
 
-    Quelle der geladenen Schnitte ist bewusst die <link>-Zeile selbst und keine
-    Liste im Test — wird sie geändert (etwa beim Umstieg auf selbst gehostete
-    Schriften, ZG-14), zieht die Prüfung automatisch mit."""
-    loaded: set[int] = set()
-    for path in TEMPLATES.glob("*.html"):
-        for spec in re.findall(r"IBM\+Plex\+\w+:wght@([\d;]+)", path.read_text(encoding="utf-8")):
-            loaded.update(int(weight) for weight in spec.split(";"))
-    assert loaded, "keine Google-Fonts-Einbindung gefunden — Quelle der Schnitte prüfen"
+    Quelle der geladenen Schnitte ist bewusst die Einbindung selbst und keine
+    Liste im Test. Mit ZG-14 ist das nicht mehr die <link>-Zeile auf Google,
+    sondern die @font-face-Blöcke in app.css — die Prüfung ist wie angekündigt
+    von selbst mitgezogen, ohne dass die Aussage sich geändert hat."""
+    loaded = {
+        int(weight)
+        for weight in re.findall(
+            r"font-weight:(\d+); font-display:swap;", APP_CSS.read_text(encoding="utf-8")
+        )
+    }
+    assert loaded, "keine @font-face-Einbindung gefunden — Quelle der Schnitte prüfen"
 
     sources = {path.name: path.read_text(encoding="utf-8") for path in TEMPLATES.glob("*.html")}
     sources[APP_CSS.name] = APP_CSS.read_text(encoding="utf-8")

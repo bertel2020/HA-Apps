@@ -428,8 +428,12 @@ class SecurityHeadersMiddleware:
                 headers["Content-Security-Policy"] = (
                     "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; "
                     "img-src 'self' data:; connect-src 'self'; "
-                    "font-src 'self' https://fonts.gstatic.com; "
-                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                    # Seit ZG-14 liegen IBM Plex Sans/Mono als WOFF2 unter
+                    # static/fonts/ und werden in app.css per @font-face gebunden.
+                    # Vorher musste hier fonts.gstatic.com (die Schriftdateien) und
+                    # fonts.googleapis.com (deren Stylesheet) offen stehen.
+                    "font-src 'self'; "
+                    "style-src 'self' 'unsafe-inline'; "
                     # Alpine.js' Standard-Build kompiliert x-* Ausdrücke über
                     # AsyncFunction und benötigt deshalb unsafe-eval. unsafe-inline wird
                     # für die bestehenden seitenlokalen Skripte/Handler benötigt. Externe

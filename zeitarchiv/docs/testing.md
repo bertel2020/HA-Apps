@@ -52,7 +52,8 @@ der Testumgebung nicht installiert ist).
 | `test_paths.py` | Entity-ID-Validierung, Symlink-/Traversal-Schutz |
 | `test_csv_import.py`, `test_import_reports.py` | Import-Pipeline |
 | `test_route_modules.py`, `test_metadata_and_versions.py` | Routen-Registrierung, Versions-Konsistenz (`sync_versions.py`) |
-| `test_base_template.py` | Der gemeinsame Seitenrahmen trägt seine Zusagen (`<!doctype>`, Font-Link, Stylesheet) — **und keine Seite wiederholt sie** |
+| `test_base_template.py` | Der gemeinsame Seitenrahmen trägt seine Zusagen (`<!doctype>`, Stylesheet, Schriftgrößen-Block) — **und keine Seite wiederholt sie** |
+| `test_selfhosted_fonts.py` | Die Schriften kommen aus `static/fonts/`: Dateien vorhanden und gebraucht, Pfade ingress-fest, kein externer Host, CSP entsprechend eng |
 | `test_ingress_prefix.py` | URL-Präfix unter Ingress: geprüft wird die *Auflösung* jeder Asset-Angabe (`urljoin` gegen den Header-Pfad), nicht ihre Schreibweise |
 | `test_requirements_lock.py` | `requirements.txt` vollständig gepinnt und mit Dockerfile konsistent |
 | `test_page_scripts.py` | Seitenlokales JavaScript liegt als Datei: im Template steht nichts mehr, was etwas *tut* |

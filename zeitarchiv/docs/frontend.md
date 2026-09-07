@@ -33,10 +33,12 @@ expliziten Speichern-Klick an den Server gesendet.
 ## Seitenrahmen (`base.html`) und URL-Präfix
 
 Alle 23 Vollseiten-Templates erben ihren Rahmen von `base.html` — Doctype,
-`<head>`, Font-Link, Stylesheet-Verweis, Topnav. Vorher baute sich jede Seite
+`<head>`, Stylesheet-Verweis, Topnav. Vorher baute sich jede Seite
 ihren Kopf selbst zusammen, und zwar weitgehend gleich: Doctype, `<html>`,
 `<meta charset>`, Viewport, Font-Link und `<body>` waren über alle 23
-byte-identisch. Ein Fix am Kopf musste damit 23-mal gepflegt werden — und die
+byte-identisch. (Der Font-Link ist inzwischen ganz entfallen — seit ZG-14
+liegen die Schriften lokal und werden in `app.css` gebunden, siehe
+„Statische Assets".) Ein Fix am Kopf musste damit 23-mal gepflegt werden — und die
 eine Zeile, die *nicht* identisch war, lief in vier Schreibweisen
 auseinander (siehe unten).
 
@@ -95,6 +97,19 @@ test_page_scripts.py` hält das fest. Konventionen dazu
 (Dateiname folgt dem Template, wann etwas nach `app.css` gehört) stehen in
 [`app/static/css/README.md`](../app/static/css/README.md), dem Dokument des
 Design-Systems.
+
+`static/fonts/` enthält IBM Plex Sans und IBM Plex Mono als WOFF2 (10 Dateien,
+164 KB, Zeichensätze latin und latin-ext). Bis ZG-14 kamen beide von
+`fonts.googleapis.com` — in Netzen ohne Internetzugang oder mit DNS-Filter
+kostete das bei jedem Seitenaufbau einen Timeout, bevor die Ersatzschrift
+griff. Gebunden werden sie per `@font-face` am Kopf von `app.css`, mit Pfaden
+**relativ zum Stylesheet** (`url(../fonts/…)`): Ein Browser wertet `url()`
+gegen die URL der CSS-Datei aus, die den Ingress-Präfix bereits trägt — ein
+absolutes `/static/fonts/…` wäre unter Ingress ein 404, und `{{ app_root }}`
+hilft nicht, weil CSS nicht durch Jinja läuft. Die Dateinamen sind
+unveränderlich zu behandeln: `/static/*` trägt `Cache-Control: immutable` über
+ein Jahr, und `url()` kann keinen `?v=`-Cache-Buster mitführen. Ein
+Schriften-Update bekommt deshalb einen **neuen Dateinamen**.
 
 ## Hinweistexte: drei Rollen, ein Info-Knopf
 
