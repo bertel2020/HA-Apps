@@ -5,14 +5,14 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader
 
-from _paths import ADDON, TEMPLATES
+from _paths import ADDON, TEMPLATES, page_text
 
 
 
 
 
 def test_logs_page_uses_text_content_for_untrusted_log_lines() -> None:
-    source = (TEMPLATES / "logs.html").read_text(encoding="utf-8")
+    source = page_text("logs.html")
     assert "output.textContent" in source
     assert "output.innerHTML" not in source
     assert "api/logs" in source
@@ -22,7 +22,7 @@ def test_logs_page_uses_text_content_for_untrusted_log_lines() -> None:
 
 
 def test_logs_search_uses_shared_search_field_style() -> None:
-    source = (TEMPLATES / "logs.html").read_text(encoding="utf-8")
+    source = page_text("logs.html")
     assert 'id="log-search" class="search" type="search"' in source
 
 
@@ -36,7 +36,7 @@ def test_logs_page_embeds_logging_settings_directly() -> None:
     # verlinkt, sondern direkt auf der Protokollseite eingebettet — wer sich
     # das Protokoll ansieht, will die Stufe oft im selben Moment anpassen
     # (siehe Kommentar in logs.html).
-    source = (TEMPLATES / "logs.html").read_text(encoding="utf-8")
+    source = page_text("logs.html")
     assert '_settings_logging_form.html' in source
     assert 'id="log-settings-section"' in source
     assert 'href="settings#protokollierung"' not in source

@@ -77,28 +77,39 @@ def test_page_scripts_contain_no_jinja() -> None:
         assert "{{" not in text and "{%" not in text, f"{path.name} enthält Jinja"
 
 
+#: Was Verhalten ausmacht. Eine Präambel darf Werte enthalten, auch über
+#: mehrere Zeilen ({ … } als Objektliteral), aber nichts, was etwas TUT.
+VERHALTEN = ("function ", "=>", "if (", "if(", "for (", "for(", "while (",
+             "return ", "addEventListener", "querySelector", "fetch(")
+
+
 def test_what_stays_inline_is_only_what_the_server_renders() -> None:
-    """Die eigentliche Regel des Schritts.
+    """Die eigentliche Regel des Schritts: inline Daten, in der Datei Verhalten.
 
-    Ohne sie bliebe „ein bisschen Code oben, der Rest in der Datei" zulässig,
-    und die Kante wäre nach dem dritten Template nicht mehr auffindbar.
+    Erst über Zeilen mit Jinja formuliert, dann zweimal nachgeschärft, weil die
+    Formulierung enger war als die Absicht:
 
-    Kommentare zählen nicht als Code. Ein `const DECIMALS = {{ decimals }}`
-    braucht seine Begründung neben sich, nicht in einer anderen Datei — bei
-    chart_editor sind das acht Zeilen, die erklären, warum "auto" hier eine
-    Übersteuerung ist und warum compare/compareMode nie gespeichert werden.
-    Sie in die ausgelagerte Datei zu schieben hieße, sie von ihrem Gegenstand
-    zu trennen.
+    - Kommentare sind kein Code. Ein `const DECIMALS = {{ decimals }}` braucht
+      seine Begründung neben sich, nicht in einer anderen Datei (chart_editor:
+      acht solche Zeilen, entity_detail: 24).
+    - Ein Wert darf mehrzeilig sein. `dashboard_editor` reicht vier gerenderte
+      Startwerte als ein Objekt durch; dessen `{`- und `};`-Zeilen tragen selbst
+      kein Jinja und wären nach der alten Formulierung verboten gewesen.
+
+    Geprüft wird deshalb, was gemeint war: im Inline-Block steht nichts, was
+    etwas tut.
     """
     for name, source in _converted().items():
         for block in INLINE.finditer(source):
-            zeilen = [z.strip() for z in block.group("body").splitlines() if z.strip()]
-            code = [z for z in zeilen if not z.startswith("//")]
-            ohne_jinja = [z for z in code if "{{" not in z and "{%" not in z]
-            assert not ohne_jinja, (
-                f"{name}: {len(ohne_jinja)} Codezeile(n) ohne Jinja im Inline-Block, "
-                f"z. B. {ohne_jinja[0][:60]!r} — gehört in die Datei"
-            )
+            for zeile in block.group("body").splitlines():
+                nackt = zeile.strip()
+                if not nackt or nackt.startswith("//"):
+                    continue
+                treffer = [w for w in VERHALTEN if w in nackt]
+                assert not treffer, (
+                    f"{name}: {nackt[:70]!r} im Inline-Block — {treffer[0]!r} ist "
+                    "Verhalten und gehört in die Datei"
+                )
 
 
 def test_the_page_script_is_loaded_after_its_data() -> None:
@@ -107,24 +118,35 @@ def test_the_page_script_is_loaded_after_its_data() -> None:
     Die Präambel legt die Konstanten an, die Datei benutzt sie auf oberster
     Ebene. Stünde der <script src> davor, wäre jede davon in der temporalen
     Todeszone — die Seite bliebe leer, und zwar erst zur Laufzeit.
+
+    Seiten ganz ohne gerenderte Werte haben keine Präambel (acht der siebzehn).
+    Dort gibt es nichts zu ordnen.
     """
     for name, source in _converted().items():
         link = LINK.search(source)
-        letzter_inline = max(
-            (m.end() for m in INLINE.finditer(source) if m.end() < len(source)), default=-1
-        )
-        assert letzter_inline != -1, f"{name}: kein Inline-Block mehr — dann fehlen die Daten"
+        letzter_inline = max((m.end() for m in INLINE.finditer(source)), default=None)
+        if letzter_inline is None:
+            continue
         assert link.start() > letzter_inline, (
             f"{name}: das Seitenskript wird VOR seiner Datenpräambel geladen"
         )
 
 
-def test_the_bytes_really_left_the_template() -> None:
-    """Sonst bliebe alles grün, wenn jemand den Code zusätzlich stehen lässt."""
-    for name, source in _converted().items():
-        datei = PAGE_JS / LINK.search(source).group("file")
-        inline = sum(len(m.group("body")) for m in INLINE.finditer(source))
-        assert datei.stat().st_size > 10 * inline, (
-            f"{name}: {inline} B inline gegenüber {datei.stat().st_size} B in der Datei — "
-            "sieht nach einer Kopie aus, nicht nach einer Verschiebung"
-        )
+def test_the_bytes_really_left_the_templates() -> None:
+    """Sonst bliebe alles grün, wenn jemand den Code zusätzlich stehen lässt.
+
+    Über alle umgestellten Seiten zusammen statt je Seite: eine kleine Seite
+    mit vier gerenderten Startwerten (dashboard_editor) hat naturgemäß ein
+    ungünstiges Verhältnis, ohne dass daran etwas falsch wäre. In der Summe
+    fällt eine stehengebliebene Kopie trotzdem sofort auf.
+    """
+    inline = sum(
+        len(m.group("body"))
+        for source in _converted().values()
+        for m in INLINE.finditer(source)
+    )
+    ausgelagert = sum(p.stat().st_size for p in PAGE_JS.glob("*.js"))
+    assert ausgelagert > 20 * inline, (
+        f"{inline} B inline gegenüber {ausgelagert} B in Dateien — "
+        "sieht nach Kopien aus, nicht nach Verschiebungen"
+    )

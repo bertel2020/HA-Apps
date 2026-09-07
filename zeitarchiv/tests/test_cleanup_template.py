@@ -23,7 +23,7 @@ def test_cleanup_delete_requires_reversible_confirmation() -> None:
 def test_destructive_entity_actions_have_explicit_confirmations() -> None:
     cleanup = page_text("cleanup.html")
     detail = page_text("entity_detail.html")
-    config = (TEMPLATES / "entity_config.html").read_text(encoding="utf-8")
+    config = page_text("entity_config.html")
     assert "Alle Werte löschen" in config
     assert "Entität entfernen" in config
     assert "Dies kann nicht rückgängig gemacht werden" in config
