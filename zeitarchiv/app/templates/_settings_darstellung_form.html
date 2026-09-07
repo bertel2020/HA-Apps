@@ -34,7 +34,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Darstellungsmodus</div>
-      <div class="settings-compact-hint">Folgt dem System oder dauerhaft fest</div>
+      <div class="settings-compact-hint">Hell/Dunkel vom System oder fest gewählt</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="color-mode-btn" onclick="toggleDDPicker('color-mode')">{% for k, l in color_mode_options %}{% if k == color_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -50,7 +50,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Schriftgröße</div>
-      <div class="settings-compact-hint">Andere Seiten erst beim nächsten Laden</div>
+      <div class="settings-compact-hint">Hier sofort, andere Seiten beim Neuladen</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="font-scale-btn" onclick="toggleDDPicker('font-scale')">{% for k, l in font_scale_options %}{% if k == font_scale %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -66,7 +66,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">Dashboard-Animation</div>
-      <div class="settings-compact-hint">Charts auf angehefteten Kacheln zeigen</div>
+      <div class="settings-compact-hint">Charts auf den Kacheln animiert aufbauen</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="dashboard-animation-btn" onclick="toggleDDPicker('dashboard-animation')">{% for k, l in dashboard_animation_options %}{% if k == dashboard_animation %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -83,7 +83,7 @@
 
 <div class="settings-minor-section">
   <h4 class="settings-minor-title">Chart-Optionen (Standardwerte)</h4>
-  <p class="hint" style="margin:0 0 10px;">Startwerte für das Optionen-Menü der Chart-Seite. Ändert eine Entität dort etwas, merkt sie sich das dauerhaft — bis „Auf Standard zurücksetzen“.</p>
+  <p class="hint" style="margin:0 0 10px;">Startwerte für das Optionen-Menü der Chart-Seite. Wird dort etwas geändert, gilt das dauerhaft für diese eine Entität — bis „Auf Standard zurücksetzen“.</p>
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">

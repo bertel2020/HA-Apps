@@ -26,7 +26,7 @@
         <template x-if="editing">
           <div>
             <h3 class="tbl-h">Spalten (Zeiträume)</h3>
-            <p class="tbl-hint">Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ "Monat" also -12. Reihenfolge per Ziehen oder über die Pfeile.</p>
+            <p class="tbl-hint">Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ „Monat“ also -12. Reihenfolge per Ziehen oder über die Pfeile.</p>
             <div class="tbl-columns">
               <template x-for="(col, idx) in columns" :key="col.uid">
                 <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid" :class="{'tbl-col-card-hidden': col.hidden}">
@@ -116,7 +116,7 @@
             </div>
 
             <h3 class="tbl-h">Zeilen (Größen)</h3>
-            <p class="tbl-hint"><strong>Entität</strong>: eine einzelne. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet über die Kürzel (links) mit Zeilen oberhalb, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.</p>
+            <p class="tbl-hint"><strong>Entität</strong>: genau eine. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet mit den Kürzeln links — nur mit Zeilen darüber, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.</p>
             <div class="tbl-rows" id="tbl-rows">
               <template x-for="(row, idx) in rows" :key="row.uid">
                 <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid" :class="{'tbl-row-card-hidden': row.hidden}">

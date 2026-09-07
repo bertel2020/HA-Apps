@@ -17,7 +17,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Mindestabstand zum zuletzt gespeicherten Wert; "Rohdaten" speichert jede Zustandsänderung. Gilt nur für neue Werte, vorhandene bleiben.</p>
+  <p class="hint">Mindestabstand zum zuletzt gespeicherten Wert; „Rohdaten“ speichert jede Zustandsänderung. Gilt nur für neue Werte, vorhandene bleiben.</p>
 </div>
 <div class="field">
   <label>Aufbewahrung</label>
@@ -31,7 +31,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Überschreibt den globalen Standard. Durchgesetzt wird sie unter Einstellungen → Aufbewahrung.</p>
+  <p class="hint">Überschreibt den globalen Standard. Wann tatsächlich gelöscht wird, steuert Einstellungen → Aufbewahrung.</p>
 </div>
 <div class="field">
   <label>Nachkommastellen</label>
@@ -59,7 +59,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Alle 6 Stunden bleibt ein Lebenszeichen erhalten.</p>
+  <p class="hint">Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.</p>
 </div>
 <div class="field">
   <label>Lücken-Erkennung</label>
@@ -73,7 +73,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. "Aus" blendet den Filter dort aus.</p>
+  <p class="hint">Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. „Aus“ blendet den Filter dort aus.</p>
 </div>
 <div class="field">
   <label>Ausreißer-Erkennung</label>
@@ -87,7 +87,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Ab welchem Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Ausreißer markiert. "Aus" blendet den Filter dort aus.</p>
+  <p class="hint">Ab welchem Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Ausreißer markiert. „Aus“ blendet den Filter dort aus.</p>
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">
@@ -102,7 +102,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">"Zeit" formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. "AN/AUS" zeigt den Rohwert.</p>
+  <p class="hint">„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „AN/AUS“ zeigt den Rohwert.</p>
 </div>
 {% endif %}
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

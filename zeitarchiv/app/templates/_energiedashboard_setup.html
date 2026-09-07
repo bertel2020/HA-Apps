@@ -831,7 +831,7 @@
             <div class="field">
               <label>Entität</label>
               {{ entity_field('prognose_rest_heute_entity_id_draft', 'draft.prognoseHeute', "(id) => { draft.prognoseHeute = id; }", allow_units=['kWh']) }}
-              <p class="hint">kWh, die heute noch erwartet werden (z. B. Forecast.Solar "Geschätzte Energieerzeugung – Resttag").</p>
+              <p class="hint">kWh, die heute noch erwartet werden (z. B. Forecast.Solar „Geschätzte Energieerzeugung – Resttag“).</p>
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="prognoseHeute = draft.prognoseHeute; $el.closest('dialog').close();">Übernehmen</button>
@@ -918,7 +918,7 @@
     <div class="detail-dialog-header">
       <div>
         <h2 id="gruppen-dialog-title">Verbraucher-Gruppen</h2>
-        <p class="hint">Fasst mehrere Verbraucher im Energiefluss zu einem Knoten zusammen, z. B. „Mobilität“.</p>
+        <p class="hint">Fasst mehrere Verbraucher im Energiefluss zu einer Bahn zusammen, z. B. „Mobilität“.</p>
       </div>
       <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
     </div>

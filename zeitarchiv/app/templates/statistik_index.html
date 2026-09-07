@@ -26,7 +26,7 @@
 
     <section class="index-maintenance">
       <h2>Index-Optimierung</h2>
-      <p class="hint">SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn du eine Optimierung startest.</p>
+      <p class="hint">SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn eine Optimierung gestartet wird.</p>
       <div class="stat-row">
         <div class="stat index-status-stat {{ 'is-recommended' if index_optimization.recommended else '' }}"><div class="label">Status</div><div class="value">{{ index_optimization.status_label }}</div></div>
         <div class="stat"><div class="label">Freier/reclaimbarer Speicher</div><div class="value">{{ index_optimization.reclaimable_size }}</div><div class="sub-value">{{ index_optimization.reclaimable_percent }} % der Indexdatei</div></div>
