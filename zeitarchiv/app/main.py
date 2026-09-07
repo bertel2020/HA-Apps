@@ -2141,6 +2141,7 @@ def _maintenance_scheduler_loop() -> None:
             _refresh_duplicate_snapshot_if_stale()
             _refresh_stale_entity_count()
             _refresh_host_disk_usage()
+            notices_mod.refresh_import_leftovers_if_stale(SYMCON_IMPORT_DIR, CSV_IMPORT_DIR)
             version_check.refresh_if_stale(index)
             ha_integration.refresh_integration_version_check_if_stale(index)
             process_pending_hourly_backfill(DATA_DIR, index, TZ, storage_coordinator)

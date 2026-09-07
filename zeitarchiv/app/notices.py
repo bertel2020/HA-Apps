@@ -32,6 +32,7 @@ from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETT
 from .formatting import GAP_THRESHOLD_LABELS, format_int, format_resolution, format_size
 from .index_optimization import get_index_optimization_state
 from .report_routes import SOURCE_LABELS
+from .route_support import dir_size_and_newest_mtime
 from .storage import import_reports
 from .storage.index import should_raise_gap_threshold
 from .version import APP_VERSION
@@ -71,6 +72,54 @@ INACTIVE_ENTITY_ERROR_DAYS = 7
 # zu spät, auf großen zu früh dran).
 HOST_DISK_WARN_RATIO = 0.10
 HOST_DISK_ERROR_RATIO = 0.05
+# Entpackte Import-Quelldaten bleiben nach einem Import ABSICHTLICH liegen
+# (import_routes.py import_delete(): "damit Zuordnung/Dry Run beliebig oft
+# wiederholbar sind, ohne jedes Mal neu hochladen zu müssen") — es gibt dafür
+# auch längst einen Knopf. Was fehlte, war der Hinweis: gemessen an der
+# Testinstanz lagen dort 3,0 GB in 47.494 Dateien, seit zwölf Tagen unberührt,
+# und damit 63,7 % der gesamten Belegung. Wer auf die Statistik-Seite sieht,
+# sieht in erster Linie das.
+#
+# Zwei Bedingungen, damit die Meldung nicht im Weg steht:
+# - Ein Mindestalter, damit sie nicht mitten in eine laufende Import-Sitzung
+#   platzt. 24 Stunden statt eines "läuft gerade"-Flags: zwischen Hochladen,
+#   Zuordnen und Probelauf können Stunden liegen, und die Meldung soll erst
+#   kommen, wenn die Sitzung erkennbar vorbei ist.
+# - Eine Mindestgröße, damit ein kleiner CSV-Rest nicht dauerhaft meldet.
+#   100 MB sind gegriffen, nicht gemessen: klein genug, dass jeder Bestand,
+#   der in der Aufschlüsselung überhaupt auffällt, gemeldet wird, groß genug,
+#   dass die Meldung nicht mehr Aufmerksamkeit kostet als der Platz wert ist.
+IMPORT_LEFTOVER_MIN_AGE_SECONDS = 24 * 3600
+IMPORT_LEFTOVER_MIN_BYTES = 100 * 1024 * 1024
+# Anders als die übrigen Kennzahlen dieser Datei kommt diese NICHT aus main.py
+# hereingereicht, obwohl das dort das Muster ist (purge_totals, host_disk_usage
+# …). Jene werden auch von Templates und vom Housekeeping-Bereich gebraucht und
+# gehören deshalb dorthin; diese hier braucht genau eine Meldung. Sie hier zu
+# halten spart vier Aufrufstellen samt Durchreiche-Parameter — und main.py
+# steht unter einer Zeilengrenze (tests/test_route_modules.py), die dieser
+# Zuwachs gerissen hätte.
+#
+# Dahinter steckt ein vollständiger Verzeichnis-Walk — gemessen 278 ms für
+# 47.494 Dateien (3,0 GB) auf der Testinstanz. Der gehört weder in den
+# Request-Pfad noch in jeden 30-Sekunden-Takt des Wartungsplaners, deshalb eine
+# eigene Altersschwelle wie bei _refresh_purge_preview_if_stale() in main.py.
+_IMPORT_LEFTOVERS_MAX_AGE_SECONDS = 3600
+_import_leftovers: dict | None = None
+_import_leftovers_checked_at = 0.0
+
+
+def refresh_import_leftovers_if_stale(*dirs: Path) -> None:
+    """Vom Wartungsplaner aufgerufen. Größe und jüngste Änderungszeit der
+    entpackten Import-Quelldaten, beides aus einem Walk."""
+    global _import_leftovers, _import_leftovers_checked_at
+    if (
+        _import_leftovers is not None
+        and time.time() - _import_leftovers_checked_at < _IMPORT_LEFTOVERS_MAX_AGE_SECONDS
+    ):
+        return
+    total_bytes, newest_mtime = dir_size_and_newest_mtime(dirs)
+    _import_leftovers = {"bytes": total_bytes, "newest_mtime": newest_mtime}
+    _import_leftovers_checked_at = time.time()
 # Täglich statt mehrtägig (Konzept-Entscheidung): nur so garantiert "morgen"
 # auch wirklich einen ANDEREN Tipp, wenn der heutige ausgeblendet wurde —
 # siehe hide_tip_today(). Bei einem mehrtägigen Fenster wäre der übernächste
@@ -529,6 +578,31 @@ def build_notices(
                 ),
                 "meta": "Speicherplatz",
                 "link": "/housekeeping#speicherplatz",
+            })
+
+    # Kein Fehler und keine Aufforderung, sondern eine Auskunft: die Dateien
+    # liegen absichtlich dort (siehe Kommentar bei IMPORT_LEFTOVER_MIN_BYTES),
+    # nur weiß das niemand, solange die App nichts sagt. Deshalb "info" und
+    # stummschaltbar — wer sie behalten will, schaltet sie weg.
+    if _import_leftovers and _import_leftovers["bytes"] >= IMPORT_LEFTOVER_MIN_BYTES:
+        newest_mtime = _import_leftovers["newest_mtime"]
+        age_seconds = time.time() - newest_mtime if newest_mtime else 0
+        if age_seconds >= IMPORT_LEFTOVER_MIN_AGE_SECONDS:
+            age_days = int(age_seconds // 86400)
+            notices.append({
+                "id": "housekeeping.import_leftovers",
+                "severity": "info",
+                "title": "Import-Quelldaten liegen noch",
+                "detail": (
+                    f"{format_size(_import_leftovers['bytes'])} entpackte Quelldaten aus einem "
+                    f"Import liegen unverändert seit {age_days} Tag{'en' if age_days != 1 else ''} "
+                    "im Datenverzeichnis. Zeitarchiv behält sie absichtlich, damit sich Zuordnung "
+                    "und Probelauf ohne erneuten Upload wiederholen lassen — nach einem "
+                    "abgeschlossenen Import werden sie nicht mehr gebraucht und lassen sich unter "
+                    "Import mit „Daten löschen\u201c entfernen."
+                ),
+                "meta": "Import",
+                "link": "/import",
             })
 
     removable_rows = purge_totals.get("removable_rows", 0)

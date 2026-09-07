@@ -1083,6 +1083,11 @@ Zeitarchiv unter anderem:
   noch rückwirkend vervollständigt
 - Freier Speicherplatz auf dem Host-Dateisystem wird knapp (zweistufig:
   Warnung/kritisch) — andere Frage als Zeitarchivs eigener Speicherverbrauch
+- Entpackte Import-Quelldaten liegen noch im Datenverzeichnis (ab 100 MB und
+  frühestens einen Tag nach der letzten Änderung). Sie bleiben absichtlich
+  liegen, damit sich Zuordnung und Probelauf ohne erneuten Upload wiederholen
+  lassen — nach einem abgeschlossenen Import lassen sie sich unter **Import**
+  mit „Daten löschen" entfernen. Reine Auskunft, deshalb stummschaltbar
 - Verbundene Home-Assistant-Integration ist veraltet oder eine neuere Version
   ist verfügbar (getrennt nach Bugfix/Funktionsupdate)
 
