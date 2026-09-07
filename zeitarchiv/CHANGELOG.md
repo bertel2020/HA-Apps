@@ -61,6 +61,15 @@
   nie aus. Der Preis steht im Hilfetext: Weil der Bezug das aktuelle Niveau
   ist, reagieren Größen, die um null schwanken — Leistung mit Einspeisung,
   Außentemperatur im Winter — empfindlicher als vorher.
+- **Der Schwellwert der Ausreißer-Erkennung wird als Vielfaches eingestellt
+  statt in Prozent** — 10×, 20×, 50× oder 100×. Ein Prozentsatz vom Wert
+  bedeutete auf einem frischen und auf einem alten Zähler etwas völlig
+  Verschiedenes: 5 % sind bei Zählerstand 12 gerade 0,6, bei Stand 1.200.000
+  aber 60.000 — dieselbe Einstellung war einmal streng und einmal wirkungslos.
+  Bestehende Einstellungen werden nach ihrer Empfindlichkeit übernommen, nicht
+  nach ihrer Zahl.
+- **Für Schalter wird keine Ausreißer-Erkennung mehr angeboten** — dort hätte
+  sie jeden Zustandswechsel markiert.
 - **Die Schriften kommen aus dem Add-on statt von Google.** In Netzen ohne
   Internetzugang oder mit DNS-Filter wartete vorher jeder Seitenaufbau erst
   auf einen Timeout, bevor die Ersatzschrift griff; nebenbei erfuhr Google bei
@@ -90,6 +99,10 @@
   Browser hängenbleiben.** Die Kennung, an der der Browser eine geänderte
   Datei erkennt, hing an der Änderungszeit der Datei — die nach einem frischen
   Checkout für alle Dateien gleich ist. Sie folgt jetzt dem Inhalt.
+- **Im Farbschema „modern" war eine Warnung im Meldungs-Panel nicht von einer
+  unkritischen Meldung zu unterscheiden.** Der Punkt vor der Zeile nahm eine
+  Layoutfarbe statt der Warnfarbe — ein Blaugrün, das eher nach „in Ordnung"
+  aussah. Er ist jetzt in allen Schemata bernsteinfarben.
 
 ## 0.84.0 - 2026-09-07
 
