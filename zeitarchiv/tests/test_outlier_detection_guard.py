@@ -446,7 +446,6 @@ def test_the_old_percent_settings_are_carried_over_by_rank(tmp_path) -> None:
     werden nach ihrem PLATZ übernommen (empfindlichste alte Stufe wird
     empfindlichste neue), nicht nach ihrem Zahlenwert — und niemand findet
     beim nächsten Start eine ungültige Auswahl vor."""
-    import sqlite3
 
     from app.formatting import OUTLIER_THRESHOLD_LABELS
     from app.storage.index import Index
