@@ -30,12 +30,65 @@ Faustregel im Code: **ein Formular, ein Wert, sofortiges Speichern** → htmx.
 Speichern** → Alpine.js-Komponente mit eigenem `x-data`-Zustand, erst beim
 expliziten Speichern-Klick an den Server gesendet.
 
+## Seitenrahmen (`base.html`) und URL-Präfix
+
+Alle 23 Vollseiten-Templates erben ihren Rahmen von `base.html` — Doctype,
+`<head>`, Font-Link, Stylesheet-Verweis, Topnav. Vorher baute sich jede Seite
+ihren Kopf selbst zusammen, und zwar weitgehend gleich: Doctype, `<html>`,
+`<meta charset>`, Viewport, Font-Link und `<body>` waren über alle 23
+byte-identisch. Ein Fix am Kopf musste damit 23-mal gepflegt werden — und die
+eine Zeile, die *nicht* identisch war, lief in vier Schreibweisen
+auseinander (siehe unten).
+
+Der Rahmen bietet fünf Blöcke, alle aus dem Bestand abgelesen statt auf Vorrat
+angelegt:
+
+| Block | Wofür |
+| --- | --- |
+| `title` | Der **ganze** Titel, nicht nur sein variabler Teil: 21 Seiten folgen „Zeitarchiv — X", zwei nicht |
+| `root_vars` | Zusätzliche `:root`-Variablen; nur `entities.html` und `dashboard_detail.html` setzen neben `--font-scale` noch `--dashboard-row-height` |
+| `page_css` | Der `<link>` auf das seitenlokale Stylesheet (`static/css/pages/<seite>.css`) |
+| `topnav` | Nur `_energiedashboard_report.html` überschreibt ihn (leer) |
+| `content` | Der gesamte Seitenkörper **einschließlich der `<script>`-Tags am Ende** |
+
+Einen `page_js`-Block gibt es bewusst nicht: kein Template hat ein `<script>`
+im `<head>`, die Tags stehen am Körperende und reisen im `content`-Block mit.
+Die Ladereihenfolge bleibt dadurch exakt die bisherige.
+
+**Jeder Pfad im HTML beginnt mit `{{ app_root }}`.** Die Variable kommt aus
+einem Kontext-Prozessor (`_app_root_context` in `main.py`), der sie für *jede*
+`TemplateResponse` mitliefert — unter Home Assistant aus dem
+`X-Ingress-Path`-Header, lokal aus `root_path`, sonst leer. Sie ist absolut und
+damit unabhängig davon, wie tief eine Seite in der URL hängt.
+
+Genau daran ist die App früher wiederholt gescheitert: Seiten schrieben ihr
+Präfix selbst. Allein der Stylesheet-Verweis stand in vier Fassungen im Baum —
+`static/css/app.css`, `../static/…`, `{{ base }}/static/…` und
+`{{ app_root }}/static/…` —, und eine neue Seite auf einer neuen
+Schachtelungstiefe erwischte die falsche. Die frühere `base`-Variable gibt es
+nicht mehr; sie kommt in keinem Template und in keiner Route mehr vor, und ein
+Test hält das fest. **Für eine neue Seite heißt das: `{{ app_root }}` vor jeden
+Pfad, nichts anderes.**
+
+Abgesichert ist beides durch `tests/test_base_template.py` (der Rahmen trägt
+seine Zusagen und keine Seite wiederholt sie) und `tests/test_ingress_prefix.py`
+— Letzteres prüft die *Auflösung* jeder Asset-Angabe, indem es sie wie ein
+Browser per `urljoin` gegen den Header-Pfad auflöst, nicht ihre Schreibweise.
+Der Test überlebt damit jede weitere Umstellung der Notation.
+
 ## Statische Assets
 
 `app.mount("/static", ...)` liefert `app/static/` aus. Antworten werden mit
 Cache-Headern versehen; Template-Links hängen `?v={{ css_v }}` /
 `?v={{ js_v }}` an (Build-/Zeitstempel-basiert), damit ein Deploy nicht am
 Browser-Cache alter Assets scheitert.
+
+Was nur eine Seite braucht, liegt als `static/css/pages/<seite>.css` neben
+`app.css` und wird im `page_css`-Block verlinkt — als `<style>`-Block im
+Template reisten diese Regeln bei jedem Aufruf erneut mit. Konventionen dazu
+(Dateiname folgt dem Template, wann etwas nach `app.css` gehört) stehen in
+[`app/static/css/README.md`](../app/static/css/README.md), dem Dokument des
+Design-Systems.
 
 ## Vergleichstabellen (`table-compute.js`)
 
@@ -195,6 +248,9 @@ Aufklappen hängt dort an der Klasse `.open`, nicht an der Positionierung.
 
 ## Wiederkehrende Muster, die neue Seiten übernehmen sollten
 
+- **`base.html` erben und `{{ app_root }}` vor jeden Pfad** — beides oben
+  ausführlich; es sind die zwei Punkte, an denen eine neue Seite unter Ingress
+  am ehesten stillschweigend kaputtgeht.
 - **`dd-picker`**: einheitliches Dropdown-Picker-Markup/-Verhalten
   (`static/js/dd-picker.js` für einfache Fälle, Alpine-`x-data` direkt für
   Picker, die pro Listenzeile mehrfach vorkommen — siehe Kommentare in

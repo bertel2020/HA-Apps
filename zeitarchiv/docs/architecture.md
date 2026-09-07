@@ -161,4 +161,7 @@ Server-Side-Rendering (Jinja2) für den initialen Seitenaufbau, htmx für
 partielle Neuladungen (Formulare, Polling), Alpine.js für clientseitigen
 Zustand (Tabellen-/Chart-Editoren, Dropdown-Picker), ECharts für Diagramme.
 Kein Build-Schritt, keine Bundler — alle JS-Dateien werden unverändert unter
-`static/js/` ausgeliefert. Details: [frontend.md](frontend.md).
+`static/js/` ausgeliefert. Alle Vollseiten erben ihren Rahmen von
+`templates/base.html`; jeder Pfad im HTML trägt das Präfix `{{ app_root }}`,
+das ein Kontext-Prozessor aus dem `X-Ingress-Path`-Header ableitet. Details:
+[frontend.md](frontend.md).

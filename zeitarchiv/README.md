@@ -195,8 +195,8 @@ oder als zunächst rückgängig machbare Soft-Delete-Markierung entfernen.
 Physisch entfernt werden markierte Werte erst durch einen separaten,
 endgültigen Schritt.
 
-**Statistik.** Zeigt Bestand, Speicherbedarf und Wachstum; der SQLite-Index
-kann bei Bedarf kontrolliert optimiert werden.
+**Statistik.** Zeigt Bestand, Speicherbedarf, Zuwachs und Wachstum über die
+Zeit; der SQLite-Index kann bei Bedarf kontrolliert optimiert werden.
 
 **Import und Export.** Bestehende Historie lässt sich aus Symcon-Exporten,
 frei zuordenbaren CSV-Dateien oder direkt aus der laufenden

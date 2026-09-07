@@ -79,6 +79,9 @@ app/
     ha_import.py, ha_statistics.py     Datenübernahme aus laufender HA-Instanz
     import_reports.py                   Protokollierung ausgeführter Importe
   templates/               Jinja2-Seiten (Server-Side-Rendering + htmx-Fragmente)
+    base.html                 Gemeinsamer Rahmen aller Vollseiten (siehe frontend.md)
+  static/css/app.css        Design-System (eigenes README daneben)
+    pages/<seite>.css        Seitenlokale Regeln, im page_css-Block verlinkt
   static/js/                Alpine.js-Komponenten, ECharts-Wrapper, mobile
                             Listenansicht (siehe frontend.md)
 ```

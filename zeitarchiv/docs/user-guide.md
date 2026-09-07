@@ -114,7 +114,7 @@ hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
 ## Auf dem Telefon
 
 Zeitarchiv ist dieselbe Anwendung, ob im Browser am Schreibtisch oder auf dem
-Telefon — nur zeigen Listen dort weniger auf einmal. Drei Dinge sehen deshalb
+Telefon — nur zeigen Listen dort weniger auf einmal. Zwei Dinge sehen deshalb
 auf schmalen Bildschirmen anders aus.
 
 **Listen werden zu Karten.** Statt einer Tabelle, die seitwärts geschoben
@@ -885,6 +885,15 @@ sowie Aufschlüsselungen nach Typ, Auflösung und Aufbewahrung. Ein interner
 Planer erfasst unabhängig von Seitenaufrufen höchstens stündlich einen
 realen Bestandsschnappschuss, sodass die Wachstumsansicht auch ohne
 regelmäßigen Besuch der Seite aussagekräftig bleibt.
+
+Die Kachelreihe oben nennt neben dem Bestand auch den **Zuwachs**: „Neue
+Datensätze" zählt die letzten 24 Stunden, „Ø/Stunde" und „Ø/Tag" geben
+dieselbe Messung als Durchschnitt über 24 Stunden bzw. sieben Tage. „Neue
+Datensätze" und „Ø/Tag" tragen dieselbe Einheit — liegt der eine deutlich
+unter dem anderen, war der letzte Tag ruhiger als die Woche davor (oder
+umgekehrt). Alle drei stammen aus denselben Bestandsschnappschüssen, es gibt
+also kein eigenes Ereignisprotokoll dafür; solange weniger als 24 Stunden
+Verlauf vorliegen, steht dort ein Strich.
 
 Alle Tabellen lassen sich durch Anklicken ihrer Spaltenüberschriften wie die
 Entitätenliste sortieren. Das Wachstumsdiagramm passt seine beiden Y-Achsen

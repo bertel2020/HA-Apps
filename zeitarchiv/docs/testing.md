@@ -52,6 +52,8 @@ der Testumgebung nicht installiert ist).
 | `test_paths.py` | Entity-ID-Validierung, Symlink-/Traversal-Schutz |
 | `test_csv_import.py`, `test_import_reports.py` | Import-Pipeline |
 | `test_route_modules.py`, `test_metadata_and_versions.py` | Routen-Registrierung, Versions-Konsistenz (`sync_versions.py`) |
+| `test_base_template.py` | Der gemeinsame Seitenrahmen trägt seine Zusagen (`<!doctype>`, Font-Link, Stylesheet) — **und keine Seite wiederholt sie** |
+| `test_ingress_prefix.py` | URL-Präfix unter Ingress: geprüft wird die *Auflösung* jeder Asset-Angabe (`urljoin` gegen den Header-Pfad), nicht ihre Schreibweise |
 | `test_requirements_lock.py` | `requirements.txt` vollständig gepinnt und mit Dockerfile konsistent |
 | `test_*_template.py`, `test_*_breadcrumbs.py` | Template-Rendering/-Struktur ohne laufenden Server (Jinja direkt gerendert und auf erwartete Fragmente geprüft) |
 | `test_config_flow_sortable_entities.py`, `test_options_transfer.py` | Integrations-seitige Config-Flow-Logik |
@@ -77,7 +79,7 @@ Extraktionen). Seit 0.82.0 ist auch die Housekeeping-Seite ausgelagert
 (`housekeeping_routes.py`) — der Schritt, den dieser Abschnitt vorher als
 nächsten angekündigt hat.
 
-Stand 0.83.0: **rund 5.590 Zeilen**, Test grün. Wächst `main.py` nochmal
+Stand 0.83.1: **rund 5.590 Zeilen**, Test grün. Wächst `main.py` nochmal
 spürbar über das Budget, ist die nächste Extraktion der richtige Schritt, nicht
 ein weiteres stillschweigendes Anheben der Zahl. Kandidaten sind die
 Einstellungs- und die Statistik-Routen; welche zuerst, entscheidet, wo dann
