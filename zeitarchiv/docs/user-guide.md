@@ -279,6 +279,11 @@ Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
   aber auch überzeichnen.
 - **Werte anzeigen** blendet die Zahlenwerte direkt neben den Datenpunkten
   ein.
+- **Durchschnittslinie** legt eine gestrichelte waagerechte Linie beim
+  Durchschnitt der angezeigten Werte über den Chart, mit dem Wert rechts
+  daneben. Sie ist unabhängig von der Legende: die Legende nennt die Zahl,
+  die Linie zeigt, wo sie im Bild liegt. Der Zoom ändert sie nicht — sie
+  gehört zum geladenen Zeitraum, nicht zum gerade sichtbaren Ausschnitt.
 - **Nachkommastellen** übersteuert für diese Ansicht die globale Anzeige-
   Einstellung der Entität (Automatisch oder fest 0–3).
 
@@ -352,6 +357,11 @@ gewählten Zeitraum an (z. B. "Vortag" bei Tagesansicht, "Vorjahrestag" beim
 Jahresvergleich einer Tagesansicht) und erscheint direkt im Button, sodass
 die aktive Vergleichsoption ohne Menüaufruf erkennbar bleibt.
 
+Bei den Zeiträumen **Jahr** und **Dekade** gibt es nur die Vorperiode: bei
+"Jahr" ist sie das Vorjahr, ein zweiter Eintrag hieße dort genauso; bei
+"Dekade" würde ein Vorjahresvergleich das Jahrzehnt nur um ein Jahr
+verschieben und sich damit fast vollständig mit dem gezeigten überschneiden.
+
 ### Kennzahlen und Legende
 
 Aktuell/Min/Max/Durchschnitt/Summe des angezeigten Zeitraums lassen sich
@@ -370,7 +380,8 @@ Chart bearbeiten und auf ein Dashboard anheften lässt.
 
 Alle Optionen im Optionen-Menü (Rollierend, Rohwerte, Markierte Werte,
 Diagrammtyp, Punkte anzeigen, Werte anzeigen, Dynamische Y-Achse,
-Legenden-Statistik und -Kennzahlen, Legenden-Stil) werden **pro Entität**
+Durchschnittslinie, Legenden-Statistik und -Kennzahlen, Legenden-Stil)
+werden **pro Entität**
 dauerhaft gespeichert und beim nächsten Aufruf automatisch wieder
 angewendet. Die Startwerte für neu geöffnete Entitäten lassen sich unter
 **Einstellungen → Darstellung** ändern; "Optionen auf Standard

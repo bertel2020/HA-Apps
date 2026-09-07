@@ -1,0 +1,111 @@
+"""Durchschnittslinie im Chart (Optionen-Menü, „Darstellung").
+
+Eine waagerechte `markLine` beim Durchschnitt der gezeichneten Werte — auf der
+Entitäts-Chart-Seite und im Chart-Editor. Bewusst eine EIGENE Menüzeile und
+nicht an „Statistik in Legende" gekoppelt: die Legende nennt die Zahl, die
+Linie zeigt, wo sie im Bild liegt.
+"""
+
+from _paths import APP
+
+DETAIL_TEMPLATE = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+EDITOR_TEMPLATE = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+DETAIL_JS = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8")
+EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
+
+
+def test_both_pages_offer_the_row_independently_of_the_legend() -> None:
+    """Die Kennzahlen-Chips hängen an chartStats und verschwinden mit ihm. Die
+    Durchschnittslinie darf das nicht: wer die Legende ausgeschaltet hat, käme
+    sonst gar nicht mehr an die Linie heran."""
+    for name, vorlage in (("entity_detail", DETAIL_TEMPLATE), ("chart_editor", EDITOR_TEMPLATE)):
+        zeilen = [z for z in vorlage.splitlines() if "Durchschnittslinie" in z]
+        assert len(zeilen) == 1, name
+        block = vorlage.split("Durchschnittslinie")[0].rsplit("<label", 1)[1]
+        assert "x-show" not in block, f"{name}: Zeile hängt an einer Bedingung"
+        assert 'averageLine = !averageLine' in vorlage, name
+
+
+def test_the_average_is_computed_here_not_by_echarts() -> None:
+    """`markLine: {type: 'average'}` rechnet über die Daten, die die Serie
+    gerade führt — bei dataZoom mit filterMode 'filter' also über den
+    sichtbaren Ausschnitt. Die Linie änderte damit ihre Bedeutung beim Zoomen,
+    abhängig von einer ganz anderen Option („Dynamische Y-Achse", die den
+    filterMode bestimmt)."""
+    for name, js in (("entity_detail", DETAIL_JS), ("chart_editor", EDITOR_JS)):
+        assert "function averageOf(values)" in js, name
+        assert "type: 'average'" not in js, name
+        assert "data: [{yAxis: durchschnitt}]" in js, name
+
+
+def test_each_page_averages_exactly_what_it_draws() -> None:
+    """Die Entitätsseite zeichnet ihre Punkte unverändert — dort ist der
+    Durchschnitt derselbe wie in der Legende. Der Editor zeichnet
+    resamplePoints(), und die fassen Zähler/Schalter per SUMME zusammen: ein
+    Durchschnitt über die Rohpunkte läge dort um den Faktor der Bucketbreite
+    unter den gezeichneten Balken."""
+    assert "averageOf(this.points.map(p => p.value))" in DETAIL_JS
+    assert "averageOf(mainPoints.map(p => p.value))" in EDITOR_JS
+    assert "averageOf(s.points" not in EDITOR_JS
+
+
+def test_the_line_sits_on_the_main_series_only() -> None:
+    """Sonst zeichnete der Vergleichsmodus eine zweite Linie für die
+    Vorperiode — eine Aussage, die in der Legende nirgends steht."""
+    assert "series[0].markLine" in DETAIL_JS
+    assert "main.markLine" in EDITOR_JS
+    assert "compareSeries.markLine" not in DETAIL_JS
+    assert "cmp.markLine" not in EDITOR_JS
+
+
+def test_the_saved_chart_keeps_the_option(client) -> None:
+    """Speichern, Wiederöffnen und Duplizieren müssen die Linie mitnehmen —
+    sonst wäre sie eine Einstellung, die jeder Seitenaufruf vergisst."""
+    from app.main import index
+
+    index.get_or_create_entity("sensor.avgline", "sensor", "measurement", "°C")
+    body = {"name": "Ø-Probe", "entity_ids": ["sensor.avgline"], "range_key": "day",
+            "average_line": True}
+    chart_id = client.post("/charts", json=body).json()["id"]
+    assert index.get_saved_chart(chart_id)["average_line"] is True
+    assert "const AVERAGE_LINE = true;" in client.get(f"/charts/{chart_id}").text
+
+    kopie = client.post(f"/charts/{chart_id}/duplicate").json()["id"]
+    assert index.get_saved_chart(kopie)["average_line"] is True
+
+    client.post(f"/charts/{chart_id}", json={**body, "average_line": False})
+    assert index.get_saved_chart(chart_id)["average_line"] is False
+
+
+def test_every_entity_chart_option_survives_the_request_model(client) -> None:
+    """Der eigentliche Fund bei dieser Änderung, und ein alter Fehler:
+    Pydantic verwirft unbekannte Felder stillschweigend, und
+    entity_set_chart_options() speichert genau das, was model_dump() liefert.
+    Ein im Modell vergessenes Feld wird gesendet, mit HTTP 200 angenommen und
+    NIE gespeichert — beim nächsten Laden steht wieder der globale Default da.
+
+    Genau so ist show_marked durchgefallen, seit es eingeführt wurde. Diese
+    Zusage prüft nicht ein Feld, sondern die Regel: jeder Schlüssel der
+    Defaults muss im Modell stehen.
+    """
+    from app.main import _ENTITY_CHART_OPTION_DEFAULTS, _EntityChartOptionsBody
+
+    fehlend = set(_ENTITY_CHART_OPTION_DEFAULTS) - set(_EntityChartOptionsBody.model_fields)
+    assert not fehlend, f"nicht im Request-Modell und damit nicht speicherbar: {sorted(fehlend)}"
+
+
+def test_the_option_is_actually_stored_per_entity(client) -> None:
+    """Die Gegenprobe zur Regel oben, einmal durch den echten Weg."""
+    from app.main import _resolve_entity_chart_options, index
+
+    index.get_or_create_entity("sensor.avgstore", "sensor", "measurement", "°C")
+    schnappschuss = {
+        "continuous": False, "raw": False, "chart_type": "line", "show_points": False,
+        "show_values": False, "dynamic_y_axis": False, "chart_stats": True,
+        "show_marked": True, "average_line": True,
+        "legend_metrics": ["min"], "legend_style": "chips", "decimals": "auto",
+    }
+    assert client.post("/entities/sensor.avgstore/chart-options", json=schnappschuss).status_code == 200
+    optionen = _resolve_entity_chart_options(index.get_entity("sensor.avgstore"))
+    assert optionen["average_line"] is True
+    assert optionen["show_marked"] is True

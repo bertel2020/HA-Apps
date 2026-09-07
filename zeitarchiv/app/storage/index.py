@@ -801,6 +801,16 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN show_values INTEGER NOT NULL DEFAULT 0"
             )
+        if "average_line" not in sc_columns:
+            # "Durchschnittslinie" (Optionen-Menü, "Darstellung") — eine
+            # waagerechte markLine je Serie beim Durchschnitt der GEZEICHNETEN
+            # Punkte. Bewusst ein eigenes Chart-Feld statt einer Ableitung aus
+            # legend_metrics: die Legende beantwortet "wie hoch ist der
+            # Durchschnitt", die Linie "wo liegt er im Bild" — das eine will
+            # man oft ohne das andere.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN average_line INTEGER NOT NULL DEFAULT 0"
+            )
         if "decimals" not in sc_columns:
             # Nachkommastellen-Übersteuerung (Optionen-Menü, "Darstellung") —
             # "auto" übernimmt weiterhin je Serie deren eigene entities.decimals-
@@ -1734,6 +1744,7 @@ class Index:
         chart_type: str = "auto",
         decimals: str = "auto",
         show_values: bool = False,
+        average_line: bool = False,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1742,14 +1753,15 @@ class Index:
                 "INSERT INTO saved_charts "
                 "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, decimals, show_values, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, decimals, show_values, average_line, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, chart_type, decimals, int(show_values), now, now,
+                    legend_style, chart_type, decimals, int(show_values),
+                    int(average_line), now, now,
                 ),
             )
             return cur.lastrowid
@@ -1771,6 +1783,7 @@ class Index:
         chart_type: str = "auto",
         decimals: str = "auto",
         show_values: bool = False,
+        average_line: bool = False,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -1778,13 +1791,14 @@ class Index:
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
                 "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, updated_at = ? WHERE id = ?",
+                "show_values = ?, average_line = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, chart_type, decimals, int(show_values), time.time(), chart_id,
+                    legend_style, chart_type, decimals, int(show_values),
+                    int(average_line), time.time(), chart_id,
                 ),
             )
 
@@ -1800,6 +1814,7 @@ class Index:
         d["chart_type"] = d.get("chart_type") or "auto"
         d["decimals"] = d.get("decimals") or "auto"
         d["show_values"] = bool(d.get("show_values", 0))
+        d["average_line"] = bool(d.get("average_line", 0))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["is_favorite"] = bool(d["is_favorite"])
         return d

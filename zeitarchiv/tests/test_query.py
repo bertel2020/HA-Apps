@@ -568,6 +568,60 @@ def test_year_over_year_shifts_window_by_exactly_one_year_not_one_period() -> No
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_for_a_past_year_the_two_compare_modes_are_the_same_window() -> None:
+    """Erster Grund dafür, dass die Oberfläche bei "Jahr" nur EINE
+    Vergleichszeile anbietet (COMPARE_YEAR_RANGES in entity_detail.js /
+    chart_editor.js): für jedes abgeschlossene Jahr ist die Vorperiode
+    buchstäblich das Vorjahr. Das Menü zeigte zweimal "Vorjahr" und lieferte
+    zweimal dasselbe.
+    """
+    now_local = datetime(2026, 9, 7, 14, 30, 0, tzinfo=TZ)
+    for continuous in (False, True):
+        vorperiode = query._window("year", now_local, offset=-2, continuous=continuous)
+        gezeigt = query._window("year", now_local, offset=-1, continuous=continuous)
+        vorjahr = tuple(query._shift_year(grenze, -1) for grenze in gezeigt)
+        assert vorperiode == vorjahr, f"continuous={continuous}"
+
+
+def test_for_the_running_year_the_two_modes_differ_only_in_the_cut() -> None:
+    """Zweiter Grund, und der eigentliche Fund: im LAUFENDEN Jahr sind die
+    beiden Modi nicht identisch. Sie beginnen gleich, aber der
+    Vorjahresvergleich endet am selben Tag des Vorjahres statt am Jahresende —
+    ein fairer Vergleich für das angebrochene Jahr.
+
+    Beide trugen im Menü dasselbe Wort "Vorjahr". Zwei verschiedene Fenster
+    unter einer Beschriftung sind für niemanden auseinanderzuhalten; deshalb
+    ist der Modus dort entfallen und nicht etwa die eine Zeile umbenannt
+    worden. Wenn der Unterschied zurück in die Oberfläche soll, braucht er ein
+    eigenes Wort — und dieser Test hält fest, worin er besteht.
+    """
+    now_local = datetime(2026, 9, 7, 14, 30, 0, tzinfo=TZ)
+    vor_start, vor_ende, _ = query._window("year", now_local, offset=-1)
+    start, ende, _ = query._window("year", now_local, offset=0)
+    jahr_start, jahr_ende = query._shift_year(start, -1), query._shift_year(ende, -1)
+
+    assert jahr_start == vor_start
+    assert jahr_ende < vor_ende
+    assert jahr_ende == query._shift_year(now_local, -1)
+
+
+def test_for_a_decade_the_year_shift_overlaps_the_window_it_compares_to() -> None:
+    """Der Grund bei "Dekade", und ein anderer: dort ist der
+    Vorjahresvergleich nicht bloß doppelt, sondern falsch. Er schiebt das
+    Jahrzehnt um EIN Jahr zurück — das Ergebnis überlappt genau den Zeitraum,
+    gegen den es verglichen wird. Die Vorperiode liegt dagegen sauber daneben.
+    """
+    now_local = datetime(2026, 9, 7, 14, 30, 0, tzinfo=TZ)
+    for offset in (0, -1):
+        start, ende, _ = query._window("decade", now_local, offset=offset)
+        jahr_start = query._shift_year(start, -1)
+        jahr_ende = query._shift_year(ende, -1)
+        assert jahr_start < ende and jahr_ende > start, f"offset={offset}"
+
+        vor_start, vor_ende, _ = query._window("decade", now_local, offset=offset - 1)
+        assert vor_ende <= start and vor_start < start, f"offset={offset}"
+
+
 def test_year_over_year_leap_day_falls_back_to_february_28() -> None:
     """29. Februar 2024 (Schaltjahr) minus ein Jahr landet in 2023, wo es diesen
     Tag nicht gibt — statt eines ValueError soll das auf den 28. ausweichen."""

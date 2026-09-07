@@ -3431,6 +3431,16 @@ def entity_favorite_toggle(entity_id: str) -> dict:
 
 
 class _EntityChartOptionsBody(BaseModel):
+    """Vollständiger Schnappschuss des Optionen-Menüs.
+
+    Jedes Feld des Menüs MUSS hier stehen: Pydantic verwirft unbekannte Felder
+    stillschweigend, und set_entity_chart_options() speichert genau das, was
+    model_dump() liefert. Ein vergessenes Feld wird also gesendet, angenommen
+    (HTTP 200) und nie gespeichert — beim nächsten Laden steht es wieder auf
+    dem globalen Default. Genau so ist show_marked seit seiner Einführung
+    durchgefallen.
+    """
+
     continuous: bool
     raw: bool
     chart_type: str
@@ -3438,6 +3448,8 @@ class _EntityChartOptionsBody(BaseModel):
     show_values: bool
     dynamic_y_axis: bool
     chart_stats: bool
+    show_marked: bool = False
+    average_line: bool = False
     legend_metrics: list[str]
     legend_style: str
     decimals: str
@@ -3531,6 +3543,13 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     # kommt über den Link aus der Purge-Vorschau, der ihn per ?marked=1 für
     # den Besuch mitbringt, ohne ihn zu speichern.
     "show_marked": False,
+    # Waagerechte Linie beim Durchschnitt der gezeigten Punkte. Standard aus:
+    # sie beantwortet eine Zusatzfrage ("wo liegt der Schnitt im Bild"), und ein
+    # Chart, das ungefragt eine zweite Linie zeichnet, erklärt sich schlechter
+    # als eines mit nur der Messkurve. Bewusst NICHT an legend_metrics gekoppelt:
+    # die Legende nennt die Zahl, die Linie zeigt die Lage — das eine will man
+    # oft ohne das andere.
+    "average_line": False,
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
     "decimals": "auto",
@@ -3660,6 +3679,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_type": chart["chart_type"] if chart else "auto",
         "decimals": chart["decimals"] if chart else "auto",
         "show_values": chart["show_values"] if chart else False,
+        "average_line": chart["average_line"] if chart else False,
         "entity_names": chart["entity_names"] if chart else {},
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
@@ -3717,6 +3737,7 @@ class _SaveChartBody(BaseModel):
     chart_type: str = "auto"
     decimals: str = "auto"
     show_values: bool = False
+    average_line: bool = False
 
 
 @app.post("/charts")
@@ -3744,6 +3765,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
+        average_line=body.average_line,
     )
     return {"id": chart_id}
 
@@ -3783,6 +3805,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
+        average_line=body.average_line,
     )
     return {"id": chart_id}
 
@@ -3818,6 +3841,7 @@ def charts_duplicate(chart_id: int) -> dict:
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
+        average_line=chart["average_line"],
     )
     return {"id": new_id}
 

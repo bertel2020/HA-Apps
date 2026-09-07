@@ -90,7 +90,7 @@ Einzelentität, für die Entitäts-eigene Chart-Seite.
 | `offset` | `0` | `0` = aktuelle Periode, `-1` = vorherige, nie positiv |
 | `continuous` | `false` | `true` = rollierendes Fenster (z. B. "letzte 24 h" statt "heute Kalendertag") |
 | `compare` | `false` | Zusätzlich `compare_points` für Vorperiode/Vorjahr |
-| `compare_mode` | `previous` | `previous`\|`year` |
+| `compare_mode` | `previous` | `previous`\|`year` — `year` bleibt für jeden Zeitraum gültig; die Oberfläche bietet ihn bei `year`/`decade` nicht an (dort doppelt bzw. überlappend) |
 | `raw` | `false` | Rohwerte statt Bucket-Aggregation (`query_raw_series`, begrenzt auf `MAX_RAW_QUERY_POINTS`) |
 | `chart_type` | `null` | `line`\|`bar`, überschreibt die automatische Wahl |
 

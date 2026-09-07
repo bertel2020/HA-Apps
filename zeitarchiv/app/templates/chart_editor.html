@@ -91,7 +91,7 @@
                    x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
                 <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
                 <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
-                <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-text="compareYearLabel"></button>
+                <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-show="compareYearAvailable" x-text="compareYearLabel"></button>
               </div>
             </div>
             <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
@@ -200,6 +200,18 @@
                     <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
                   </div>
                 </div>
+                {# Eigene Zeile, ausdrücklich NICHT an "Statistik in Legende"
+                   gehängt: die Legende nennt die Zahl, die Linie zeigt, wo sie
+                   im Bild liegt. Das eine will man oft ohne das andere — und
+                   eine Zeile, die nur zusammen mit einer anderen Option
+                   erscheint, wäre ohne sie unauffindbar. #}
+                <label class="menu-row">
+                  <span class="menu-row-label">Durchschnittslinie</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="averageLine" @change="averageLine = !averageLine; render()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
                 <label class="menu-row">
                   <span class="menu-row-label">Statistik in Legende</span>
                   <span class="menu-toggle">
@@ -337,6 +349,7 @@
     // die Werte-Kachel-Übersteuerung auf Dashboards.
     const DECIMALS = {{ decimals | tojson }};
     const SHOW_VALUES = {{ show_values | tojson }};
+    const AVERAGE_LINE = {{ average_line | tojson }};
     // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
     // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
     // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart

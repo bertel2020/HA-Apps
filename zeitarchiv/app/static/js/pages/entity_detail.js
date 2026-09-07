@@ -140,6 +140,41 @@
       return labels[range] || 'Vorjahreszeitraum';
     }
 
+    // Zwei Zeiträume bekommen keine zweite Vergleichszeile, aus zwei
+    // verschiedenen Gründen (beide in tests/test_query.py gemessen):
+    //
+    //   "Jahr"   — die Vorperiode IST das Vorjahr. Für jedes abgeschlossene
+    //              Jahr liefern beide Modi buchstäblich dasselbe Fenster; im
+    //              laufenden Jahr unterscheiden sie sich nur darin, dass der
+    //              Vorjahresvergleich am selben TAG des Vorjahres endet statt
+    //              am Jahresende. Das ist ein echter Unterschied — aber beide
+    //              Zeilen trugen dafür dasselbe Wort "Vorjahr", und zwei
+    //              Fenster unter einer Beschriftung kann niemand
+    //              auseinanderhalten. Soll der faire Jahresvergleich zurück,
+    //              braucht er ein eigenes Wort, keine zweite "Vorjahr"-Zeile.
+    //   "Dekade" — dort ist der Modus schlicht falsch: er schiebt das
+    //              Jahrzehnt um EIN Jahr zurück, das Ergebnis überlappt also
+    //              genau den Zeitraum, gegen den es verglichen wird.
+    const COMPARE_YEAR_RANGES = ['hour', 'day', 'week', 'month'];
+
+    function compareYearAvailable(range) {
+      return COMPARE_YEAR_RANGES.includes(range);
+    }
+
+    // Durchschnitt der GEZEICHNETEN Werte, oder null wenn es keine gibt.
+    //
+    // Bewusst selbst gerechnet statt ECharts' markLine {type:'average'}: das
+    // rechnet über die Daten, die die Serie im Moment führt — bei aktivem
+    // dataZoom mit filterMode 'filter' also über den sichtbaren Ausschnitt.
+    // Die Linie änderte damit ihre Bedeutung, sobald jemand hineinzoomt, und
+    // zwar abhängig von einer ganz anderen Option ("Dynamische Y-Achse", die
+    // den filterMode bestimmt). Ein fester yAxis-Wert kann das nicht.
+    function averageOf(values) {
+      const zahlen = values.filter(Number.isFinite);
+      if (!zahlen.length) return null;
+      return zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length;
+    }
+
     // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie
     // in chart_editor.html, hier für den Tooltip-Zeitstempel-Formatter unten.
     function detectResolutionSeconds(points) {
@@ -310,6 +345,7 @@ function selectBrush() {
         showValues: CHART_OPTIONS.show_values,
         dynamicYAxis: CHART_OPTIONS.dynamic_y_axis,
         chartStats: CHART_OPTIONS.chart_stats,
+        averageLine: CHART_OPTIONS.average_line,
         legendMetrics: [...CHART_OPTIONS.legend_metrics],
         legendStyle: CHART_OPTIONS.legend_style,
         decimals: CHART_OPTIONS.decimals,
@@ -409,6 +445,11 @@ function selectBrush() {
         },
         get compareYearLabel() {
           return previousYearPeriodLabel(this.range);
+        },
+        // Blendet die zweite Menüzeile aus, wo sie nichts Eigenes aussagt
+        // (siehe COMPARE_YEAR_RANGES).
+        get compareYearAvailable() {
+          return compareYearAvailable(this.range);
         },
         // Zeigt im Button selbst, WELCHER Vergleich aktiv ist (statt nur
         // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
@@ -514,6 +555,10 @@ function selectBrush() {
           const nextOffset = PeriodNavigation.offsetForRange(key, anchorMs);
           this.range = key;
           this.compare = false;
+          // Sonst bliebe ein "Vorjahres…"-Modus an einem Zeitraum stehen, der
+          // ihn gar nicht mehr anbietet — sichtbar würde das erst indirekt,
+          // etwa in der Vorbelegung von saveAsChartUrl.
+          if (!compareYearAvailable(key)) this.compareMode = 'previous';
           this.raw = false;
           this.offset = nextOffset;
           this.continuous = false;
@@ -542,6 +587,7 @@ function selectBrush() {
                 show_points: this.showPoints, show_values: this.showValues,
                 dynamic_y_axis: this.dynamicYAxis, chart_stats: this.chartStats,
                 show_marked: this.showMarked,
+                average_line: this.averageLine,
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
                 decimals: this.decimals,
               }),
@@ -577,6 +623,7 @@ function selectBrush() {
             this.dynamicYAxis !== CHART_DEFAULTS.dynamic_y_axis ||
             this.chartStats !== CHART_DEFAULTS.chart_stats ||
             this.showMarked !== CHART_DEFAULTS.show_marked ||
+            this.averageLine !== CHART_DEFAULTS.average_line ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
             this.decimals !== CHART_DEFAULTS.decimals ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
@@ -908,6 +955,35 @@ function selectBrush() {
                   {xAxis: (mitte + breite / 2) * 1000},
                 ];
               }),
+            };
+          }
+          // Durchschnittslinie (Optionen-Menü, "Darstellung"). Sie sitzt auf der
+          // Hauptserie, nicht zusätzlich auf der Vergleichsserie: die Legende
+          // nennt genau einen Durchschnitt, nämlich den der gezeigten Periode
+          // — zwei Linien für zwei Perioden wären eine zweite Aussage, die
+          // dort niemand ablesen kann.
+          //
+          // Der Wert kommt aus denselben Punkten wie die Legende, Zahl und
+          // Linie stimmen hier also immer überein.
+          const durchschnitt = this.averageLine ? averageOf(this.points.map(p => p.value)) : null;
+          if (durchschnitt !== null) {
+            series[0].markLine = {
+              // Wie beim Markierungs-Band: die Linie ist Beiwerk und darf das
+              // Achsen-Tooltip der Kurve nicht abfangen.
+              silent: true,
+              symbol: 'none',
+              lineStyle: {
+                color: getComputedStyle(document.body).getPropertyValue('--accent-line'),
+                type: 'dashed', width: 1,
+              },
+              // Rechts innen, weil oben links die Einheit der y-Achse steht.
+              label: {
+                position: 'insideEndTop',
+                fontSize: Math.round(10.5 * uiFontScale * 10) / 10,
+                color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+                formatter: () => `Ø ${fmtValue(durchschnitt)}`,
+              },
+              data: [{yAxis: durchschnitt}],
             };
           }
           const option = {

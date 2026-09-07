@@ -74,6 +74,36 @@
       })[range] || 'Vorjahreszeitraum';
     }
 
+    // Zwei Zeiträume bekommen keine zweite Vergleichszeile, aus zwei
+    // verschiedenen Gründen (beide in tests/test_query.py gemessen):
+    //
+    //   "Jahr"   — die Vorperiode IST das Vorjahr. Für jedes abgeschlossene
+    //              Jahr liefern beide Modi buchstäblich dasselbe Fenster; im
+    //              laufenden Jahr unterscheiden sie sich nur darin, dass der
+    //              Vorjahresvergleich am selben TAG des Vorjahres endet statt
+    //              am Jahresende. Das ist ein echter Unterschied — aber beide
+    //              Zeilen trugen dafür dasselbe Wort "Vorjahr", und zwei
+    //              Fenster unter einer Beschriftung kann niemand
+    //              auseinanderhalten. Soll der faire Jahresvergleich zurück,
+    //              braucht er ein eigenes Wort, keine zweite "Vorjahr"-Zeile.
+    //   "Dekade" — dort ist der Modus schlicht falsch: er schiebt das
+    //              Jahrzehnt um EIN Jahr zurück, das Ergebnis überlappt also
+    //              genau den Zeitraum, gegen den es verglichen wird.
+    const COMPARE_YEAR_RANGES = ['hour', 'day', 'week', 'month'];
+
+    function compareYearAvailable(range) {
+      return COMPARE_YEAR_RANGES.includes(range);
+    }
+
+    // Durchschnitt der GEZEICHNETEN Werte, oder null wenn es keine gibt.
+    // Selbst gerechnet statt ECharts' markLine {type:'average'} — Begründung
+    // in entity_detail.js (dort steht dieselbe Funktion).
+    function averageOf(values) {
+      const zahlen = values.filter(Number.isFinite);
+      if (!zahlen.length) return null;
+      return zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length;
+    }
+
     const RESOLUTION_SECONDS = {
       hour: {medium: 5 * 60, coarse: 15 * 60},
       // full: die komplette Periode als EIN Balken — z. B. "Tag" bei
@@ -305,9 +335,14 @@
         // load()). Eine direkt zugewiesene Property umgeht das vollständig.
         autoResolutionLabel: '',
         compare: COMPARE,
-        compareMode: COMPARE_MODE,
+        // Ein gespeichertes Chart kann compare_mode="year" mit einem Zeitraum
+        // tragen, der den Vorjahresvergleich nicht (mehr) anbietet — dann wäre
+        // im Menü keine Zeile aktiv und der Knopf zeigte ein Wort, das nirgends
+        // mehr auswählbar ist.
+        compareMode: compareYearAvailable(RANGE_KEY) ? COMPARE_MODE : 'previous',
         showPoints: false,
         showValues: SHOW_VALUES,
+        averageLine: AVERAGE_LINE,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -449,6 +484,9 @@
         },
         get comparePreviousLabel() { return previousPeriodLabel(this.range); },
         get compareYearLabel() { return previousYearPeriodLabel(this.range); },
+        // Blendet die zweite Menüzeile aus, wo sie nichts Eigenes aussagt
+        // (siehe COMPARE_YEAR_RANGES).
+        get compareYearAvailable() { return compareYearAvailable(this.range); },
         // Zeigt im Button selbst, WELCHER Vergleich aktiv ist (statt nur
         // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
         // die beiden Label-Getter oben automatisch an den Zeitraum an.
@@ -477,6 +515,10 @@
         },
         setRange(key) {
           this.range = key;
+          // Anders als auf der Entitätsseite bleibt der Vergleich beim
+          // Zeitraumwechsel eingeschaltet — ein stehengebliebener
+          // "Vorjahres…"-Modus liefe hier also direkt in die nächste Abfrage.
+          if (!compareYearAvailable(key)) this.compareMode = 'previous';
           // Rohwerte gibt es (wie auf der Entität-eigenen Chart-Seite) nur für
           // die kleineren Zeiträume — ohne diesen Reset bliebe raw bei einem
           // Wechsel z. B. zu "Jahr" unsichtbar aktiv (Chip ausgegraut/disabled,
@@ -794,6 +836,37 @@
               // Normalisierung stürzt sonst ab.
               if (!this.showPoints) main.symbol = 'none';
             }
+            // Durchschnittslinie (Optionen-Menü, "Darstellung") — je Serie eine,
+            // in deren eigener Farbe und auf deren eigener y-Achse
+            // (yAxisIndex oben), sonst läge die Linie einer °C-Serie auf der
+            // kWh-Skala.
+            //
+            // Gerechnet wird über mainPoints, also über das, was TATSÄCHLICH
+            // gezeichnet wird — nicht über s.points wie die Legende. Bei
+            // gewählter Auflösung fasst resamplePoints() Zähler und Schalter
+            // per SUMME zusammen (Standard-Entitäten per Mittelwert); der
+            // Durchschnitt der Rohpunkte läge dort um den Faktor der
+            // Bucketbreite unter den gezeichneten Balken, die Linie klebte
+            // sichtbar an der Nulllinie. Legende und Linie können dadurch bei
+            // Zählern mit gewählter Auflösung verschiedene Zahlen nennen — sie
+            // beantworten dann auch verschiedene Fragen.
+            const durchschnitt = this.averageLine
+              ? averageOf(mainPoints.map(p => p.value))
+              : null;
+            if (durchschnitt !== null) {
+              main.markLine = {
+                silent: true,
+                symbol: 'none',
+                lineStyle: {color, type: 'dashed', width: 1},
+                label: {
+                  position: 'insideEndTop',
+                  fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
+                  color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+                  formatter: () => `Ø ${fmtNum(durchschnitt, seriesDecimals)}${s.unit ? ' ' + s.unit : ''}`,
+                },
+                data: [{yAxis: durchschnitt}],
+              };
+            }
             echartsSeries.push(main);
             if (this.compare && s.compare_points && s.compare_points.length) {
               // Vorperiode um die exakte Fensterdifferenz verschieben, nicht per
@@ -1063,6 +1136,7 @@
             chart_type: this.timeline ? 'timeline' : 'auto',
             decimals: this.decimals,
             show_values: this.showValues,
+            average_line: this.averageLine,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

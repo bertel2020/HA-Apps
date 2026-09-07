@@ -25,6 +25,8 @@ TEMPLATE = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
 ENERGIE = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
 EDITOR = page_text("chart_editor.html")
 EDITOR_TEMPLATE = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+DETAIL_JS = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8")
+EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 APP_CSS = (APP / "static/css/app.css").read_text(encoding="utf-8")
 
 
@@ -139,3 +141,39 @@ def test_the_right_hand_menus_open_leftwards_but_only_where_they_must() -> None:
     davor = APP_CSS.split(regel)[0]
     assert davor.rstrip().endswith("@media (min-width:641px){"), \
         "die Rechts-Verankerung muss an dieselbe Breite gebunden sein wie die Rechtsbündigkeit"
+
+
+def test_the_year_comparison_is_offered_only_where_it_says_something_new() -> None:
+    """Bei „Jahr" standen zwei Zeilen mit demselben Wort „Vorjahr" untereinander,
+    bei „Dekade" eine, die das Jahrzehnt um ein Jahr verschiebt und damit den
+    Zeitraum überlappt, gegen den sie vergleicht. Beides ist gemessen in
+    tests/test_query.py."""
+    for name, js in (("entity_detail", DETAIL_JS), ("chart_editor", EDITOR_JS)):
+        assert "const COMPARE_YEAR_RANGES = ['hour', 'day', 'week', 'month'];" in js, name
+    for name, vorlage in (("entity_detail", TEMPLATE), ("chart_editor", EDITOR_TEMPLATE)):
+        zeile = [z for z in vorlage.splitlines() if "setCompareMode('year')" in z]
+        assert len(zeile) == 1, name
+        assert 'x-show="compareYearAvailable"' in zeile[0], name
+        # Die Vorperiode-Zeile bleibt IMMER sichtbar — sonst stünde bei „Jahr"
+        # nur noch „Aus" im Menü.
+        vorperiode = [z for z in vorlage.splitlines() if "setCompareMode('previous')" in z]
+        assert len(vorperiode) == 1 and "x-show" not in vorperiode[0], name
+
+
+def test_a_stale_year_mode_does_not_survive_a_range_switch() -> None:
+    """Von „Monat, Vorjahresmonat" auf „Jahr" umschalten ließ den Modus
+    stehen. Im Chart-Editor liefe er direkt in die nächste Abfrage (dort
+    bleibt der Vergleich beim Wechsel an), auf der Entitätsseite käme er in
+    der Vorbelegung von saveAsChartUrl wieder heraus."""
+    for name, js in (("entity_detail", DETAIL_JS), ("chart_editor", EDITOR_JS)):
+        # Bis zum Ende der Methode, nicht auf gut Glück n Zeichen weit: die
+        # beiden setRange() sind unterschiedlich lang kommentiert.
+        zweig = js.split("setRange(key) {")[1].split("\n        },")[0]
+        assert "if (!compareYearAvailable(key)) this.compareMode = 'previous';" in zweig, name
+
+
+def test_a_saved_chart_cannot_start_in_a_mode_its_range_does_not_offer() -> None:
+    """Der Chart-Editor bekommt compare_mode vom Server. Ein Chart, das mit
+    „Dekade" + Vorjahresvergleich gespeichert wurde, hätte sonst keine aktive
+    Zeile im Menü und einen Knopf, dessen Wort nirgends mehr anwählbar ist."""
+    assert "compareMode: compareYearAvailable(RANGE_KEY) ? COMPARE_MODE : 'previous'," in EDITOR_JS

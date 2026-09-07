@@ -461,6 +461,40 @@ Energiedashboard seit jeher (`setRange()` in `energiedashboard.js`); ein
 `tests/test_entity_chart_toolbar.py` hält beides fest, einschließlich der
 Vorlage im Energiedashboard.
 
+### Durchschnittslinie
+
+Eine `markLine` je Serie beim Durchschnitt der **gezeichneten** Werte, eigene
+Zeile im Optionen-Menü (nicht an „Statistik in Legende" gekoppelt: die Legende
+nennt die Zahl, die Linie zeigt ihre Lage — das eine will man oft ohne das
+andere, und eine Zeile, die nur zusammen mit einer anderen Option erscheint,
+wäre ohne sie unauffindbar).
+
+Zwei Entscheidungen, die man beim Nachbauen sonst anders träfe:
+
+- **Der Wert wird selbst gerechnet, nicht per `markLine: {type: 'average'}`.**
+  ECharts rechnet dort über die Daten, die die Serie gerade führt — bei
+  `dataZoom` mit `filterMode: 'filter'` also über den sichtbaren Ausschnitt.
+  Die Linie änderte damit ihre Bedeutung beim Zoomen, und zwar abhängig von
+  „Dynamische Y-Achse", die den filterMode bestimmt. Ein fester `yAxis`-Wert
+  kann das nicht.
+- **Die Quelle der Werte ist je Seite eine andere, und das ist Absicht.** Die
+  Entitätsseite zeichnet ihre Punkte unverändert — dort ist der Durchschnitt
+  derselbe wie in der Legende. Der Chart-Editor zeichnet `resamplePoints()`,
+  und die fassen Zähler und Schalter per SUMME zusammen; ein Durchschnitt über
+  die Rohpunkte läge dort um den Faktor der Bucketbreite unter den
+  gezeichneten Balken und klebte sichtbar an der Nulllinie. Legende und Linie
+  können dort deshalb verschiedene Zahlen nennen — sie beantworten dann auch
+  verschiedene Fragen.
+
+Die Linie sitzt nur auf der Hauptserie: bei aktivem Vergleich wäre eine zweite
+Linie für die Vorperiode eine Aussage, die in der Legende nirgends steht. Im
+Zeitstrahl gibt es sie gar nicht — dort ist die y-Achse keine Werteachse.
+
+Gespeichert wird sie wie die übrigen Optionen: pro Entität in
+`entities.chart_options`, pro Chart in `saved_charts.average_line`. Die
+Dashboard-Kachel zeichnet sie **nicht** — sie lässt wie bisher auch Vergleich,
+Zoom und Markierungsbänder weg.
+
 ## Mobile Listenansicht
 
 Unter 640 px arbeiten zwei Module zusammen, die eine neue Seite nicht
