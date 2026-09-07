@@ -51,6 +51,7 @@
        data-legend-style="{{ tile.legend_style }}"
        data-chart-type="{{ tile.chart_type }}"
        data-show-values="{{ 'true' if tile.show_values else 'false' }}"
+       data-average-line="{{ 'true' if tile.average_line else 'false' }}"
        data-decimals="{{ tile.decimals }}"
        data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
       <div class="dtile-title">{{ tile.name }}</div>

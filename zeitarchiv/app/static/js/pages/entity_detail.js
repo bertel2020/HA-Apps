@@ -163,8 +163,8 @@
 
     // Durchschnitt der GEZEICHNETEN Werte, oder null wenn es keine gibt.
     //
-    // Bewusst selbst gerechnet statt ECharts' markLine {type:'average'}: das
-    // rechnet über die Daten, die die Serie im Moment führt — bei aktivem
+    // Bewusst selbst gerechnet statt ECharts' eigenem Durchschnitts-Typ für
+    // markLine: der rechnet über die Daten, die die Serie im Moment führt — bei aktivem
     // dataZoom mit filterMode 'filter' also über den sichtbaren Ausschnitt.
     // Die Linie änderte damit ihre Bedeutung, sobald jemand hineinzoomt, und
     // zwar abhängig von einer ganz anderen Option ("Dynamische Y-Achse", die

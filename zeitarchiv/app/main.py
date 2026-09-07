@@ -3998,6 +3998,7 @@ def _dashboard_tiles_context(
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
                 "legend_style": c["legend_style"], "chart_type": c["chart_type"],
                 "show_values": c["show_values"], "decimals": c["decimals"],
+                "average_line": c["average_line"],
             })
         elif p["item_type"] == "table":
             t = index.get_saved_table(p["item_id"])

@@ -492,8 +492,15 @@ Zeitstrahl gibt es sie gar nicht — dort ist die y-Achse keine Werteachse.
 
 Gespeichert wird sie wie die übrigen Optionen: pro Entität in
 `entities.chart_options`, pro Chart in `saved_charts.average_line`. Die
-Dashboard-Kachel zeichnet sie **nicht** — sie lässt wie bisher auch Vergleich,
-Zoom und Markierungsbänder weg.
+Dashboard-Kachel zeichnet sie mit — sie liest den Wert über
+`data-average-line` aus dem angehefteten Chart, damit dasselbe Chart nicht
+zweimal verschieden aussieht. Dort ohne Einheit im Text, wie auch die eigenen
+Wert-Beschriftungen der Kachel.
+
+Die Kachel mittelt dabei nicht über `lineData`: der Linien-Zweig hängt bis
+`window_end` einen Halte-Punkt an, der den letzten Wert wiederholt und ihn
+damit doppelt zählen würde. Deshalb sammelt jeder der beiden Zweige seine
+Werte in `averageValues` selbst.
 
 ## Mobile Listenansicht
 

@@ -14,6 +14,12 @@ DETAIL_JS = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 
 
+def _nutzt_echarts_average(js: str) -> bool:
+    """ECharts' eingebauter Durchschnitt, in beiden üblichen Schreibweisen —
+    ohne Leerzeichen wäre die Zusage sonst nur zufällig erfüllt."""
+    return "type: 'average'" in js or "type:'average'" in js
+
+
 def test_both_pages_offer_the_row_independently_of_the_legend() -> None:
     """Die Kennzahlen-Chips hängen an chartStats und verschwinden mit ihm. Die
     Durchschnittslinie darf das nicht: wer die Legende ausgeschaltet hat, käme
@@ -34,7 +40,7 @@ def test_the_average_is_computed_here_not_by_echarts() -> None:
     filterMode bestimmt)."""
     for name, js in (("entity_detail", DETAIL_JS), ("chart_editor", EDITOR_JS)):
         assert "function averageOf(values)" in js, name
-        assert "type: 'average'" not in js, name
+        assert not _nutzt_echarts_average(js), name
         assert "data: [{yAxis: durchschnitt}]" in js, name
 
 
@@ -109,3 +115,39 @@ def test_the_option_is_actually_stored_per_entity(client) -> None:
     optionen = _resolve_entity_chart_options(index.get_entity("sensor.avgstore"))
     assert optionen["average_line"] is True
     assert optionen["show_marked"] is True
+
+
+def test_the_dashboard_tile_gets_the_option_from_its_chart(client) -> None:
+    """Ein angeheftetes Chart soll nicht anders aussehen als dasselbe Chart auf
+    seiner eigenen Seite. Die Kachel liest die Einstellung aus dem
+    data-Attribut, das _dashboard_tiles.html aus dem gespeicherten Chart
+    schreibt — fehlt sie im Kachel-Kontext, steht dort still „false" (Jinja
+    liefert für einen fehlenden Schlüssel Undefined, und das ist falsy).
+    """
+    from app.main import index
+
+    index.get_or_create_entity("sensor.avgtile", "sensor", "measurement", "°C")
+    body = {"name": "Ø-Kachel", "entity_ids": ["sensor.avgtile"], "range_key": "day",
+            "average_line": True}
+    chart_id = client.post("/charts", json=body).json()["id"]
+    html = client.post(f"/charts/{chart_id}/pin?dashboard_id=1").text
+    assert 'data-average-line="true"' in html
+
+    client.post(f"/charts/{chart_id}", json={**body, "average_line": False})
+    html = client.get("/dashboards/1").text
+    assert 'data-average-line="true"' not in html
+    assert 'data-average-line="false"' in html
+
+
+def test_the_tile_averages_the_drawn_points_without_the_hold_point() -> None:
+    """Der Linien-Zweig hängt bis window_end einen Halte-Punkt an, der den
+    letzten Wert wiederholt. Über lineData zu mitteln zählte ihn doppelt —
+    deshalb eine eigene Werteliste je Zweig."""
+    tiles = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+    assert "const averageOf = values =>" in tiles
+    assert not _nutzt_echarts_average(tiles)
+    assert "el.dataset.averageLine === 'true'" in tiles
+    assert "averageOf(averageValues)" in tiles
+    assert "averageValues = displayPoints.map(p => p.value);" in tiles
+    assert "averageValues = [aggregate];" in tiles
+    assert "averageOf(lineData" not in tiles

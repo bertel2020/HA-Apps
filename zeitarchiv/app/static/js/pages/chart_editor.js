@@ -96,8 +96,8 @@
     }
 
     // Durchschnitt der GEZEICHNETEN Werte, oder null wenn es keine gibt.
-    // Selbst gerechnet statt ECharts' markLine {type:'average'} — Begründung
-    // in entity_detail.js (dort steht dieselbe Funktion).
+    // Selbst gerechnet statt ECharts' eigenem Durchschnitts-Typ für markLine
+    // — Begründung in entity_detail.js (dort steht dieselbe Funktion).
     function averageOf(values) {
       const zahlen = values.filter(Number.isFinite);
       if (!zahlen.length) return null;

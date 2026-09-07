@@ -27,6 +27,15 @@
     getComputedStyle(document.documentElement).getPropertyValue('--font-scale')
   ) || 1;
   const scaledFont = size => Math.round(size * UI_FONT_SCALE * 10) / 10;
+
+  // Durchschnitt der gezeichneten Werte, oder null wenn es keine gibt.
+  // Wortgleich mit averageOf() in entity_detail.js/chart_editor.js — selbst
+  // gerechnet statt über ECharts' eigenen Durchschnitts-Typ für markLine,
+  // damit der Wert nicht davon abhängt, welche Punkte die Serie gerade führt.
+  const averageOf = values => {
+    const zahlen = values.filter(Number.isFinite);
+    return zahlen.length ? zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length : null;
+  };
   const RESOLUTION_SECONDS = {
     hour: {medium: 5 * 60, coarse: 15 * 60},
     day: {medium: 30 * 60, coarse: 60 * 60},
@@ -290,6 +299,10 @@
     // "Werte anzeigen" (Optionen-Menü) — bislang nicht an die Dashboard-Kachel
     // durchgereicht, siehe showValues-Verwendung im echartsSeries-Aufbau unten.
     const showValues = el.dataset.showValues === 'true';
+    // "Durchschnittslinie" (Optionen-Menü der Chart-Seite) — die Kachel
+    // zeichnet sie mit, damit ein angeheftetes Chart nicht anders aussieht als
+    // dasselbe Chart auf seiner eigenen Seite.
+    const averageLine = el.dataset.averageLine === 'true';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -467,6 +480,11 @@
       const color = PALETTE[i % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
       let lineData;
+      // Die Punkte, über die der Durchschnitt geht: das GEZEICHNETE, aber
+      // ohne den Halte-Punkt, den der Linien-Zweig unten bis window_end
+      // anhängt — der ist eine Wiederholung des letzten Werts und würde
+      // ihn doppelt zählen.
+      let averageValues = [];
       if (singleBucket) {
         // resamplePoints() kennt nur "medium"/"coarse" (RESOLUTION_SECONDS),
         // für "full" gibt sie unverändert alle Rohpunkte zurück — ohne diesen
@@ -484,6 +502,7 @@
             ? rawValues.reduce((sum, v) => sum + v, 0)
             : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
           lineData = [[0, aggregate, s.unit, effectiveDecimals(s)]];
+          averageValues = [aggregate];
         }
       } else {
         const displayPoints = resamplePoints(
@@ -493,6 +512,7 @@
           tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
         }
         lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s)]);
+        averageValues = displayPoints.map(p => p.value);
         if (s.chart_type === 'line' && lineData.length && data.window_end != null
             && lineData[lineData.length - 1][0] < data.window_end * 1000) {
           const last = lineData[lineData.length - 1];
@@ -537,6 +557,25 @@
         cfg.areaStyle = {color, opacity: 0.08};
       } else {
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
+      }
+      // Durchschnittslinie je Serie, in deren Farbe und auf deren y-Achse.
+      // Ohne Einheit im Text: die Kachel beschriftet auch ihre Werte
+      // (showValues) nur mit der Zahl, und der Platz ist hier knapper als auf
+      // der Chart-Seite.
+      const durchschnitt = averageLine ? averageOf(averageValues) : null;
+      if (durchschnitt !== null) {
+        cfg.markLine = {
+          silent: true,
+          symbol: 'none',
+          lineStyle: {color, type: 'dashed', width: 1},
+          label: {
+            position: 'insideEndTop',
+            fontSize: scaledFont(10),
+            color: inkMuted,
+            formatter: () => `Ø ${fmtCompactNumber(durchschnitt, effectiveDecimals(s))}`,
+          },
+          data: [{yAxis: durchschnitt}],
+        };
       }
       return cfg;
     });
