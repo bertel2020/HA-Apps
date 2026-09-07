@@ -3524,6 +3524,13 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "show_values": False,
     "dynamic_y_axis": False,
     "chart_stats": True,
+    # Bereiche mit zur Löschung markierten Werten als Band im Chart. Standard aus:
+    # der Normalfall ist eine Entität ohne offene Markierungen, und ein
+    # Schalter, der bei fast allen nichts bewirkt, gehört nicht in die
+    # Voreinstellung. Wer bereinigt, schaltet ihn für diese Entität ein — oder
+    # kommt über den Link aus der Purge-Vorschau, der ihn per ?marked=1 für
+    # den Besuch mitbringt, ohne ihn zu speichern.
+    "show_marked": False,
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
     "decimals": "auto",
@@ -4850,6 +4857,7 @@ def entity_detail(
     entity_id: str,
     range_key: str | None = Query(None, alias="range"),
     offset: int = 0,
+    marked: bool = False,
 ) -> HTMLResponse:
     # URLs dieser Seite laufen über app_root: unter Ingress hat sie einen
     # dynamischen Pfad-Präfix, ein fest absoluter Pfad ("/api/query") würde
@@ -4892,6 +4900,13 @@ def entity_detail(
             "entity_chart_defaults": _get_entity_chart_defaults(),
             "initial_range": initial_range,
             "initial_offset": offset if initial_range else 0,
+            # ?marked=1 schaltet die Markierungs-Anzeige NUR für diesen Besuch
+            # ein — der Link aus der Purge-Vorschau (Housekeeping ->
+            # Speicherplatz -> Endgültige Bereinigung) führt hierher, und wer von dort kommt,
+            # will sie sehen. Bewusst ohne Speichern: die Seite über einen Link
+            # zu öffnen ist keine Einstellung, und beim nächsten Aufruf ohne
+            # Parameter gilt wieder, was im Optionen-Menü steht.
+            "initial_marked": marked,
             # Steuert den statischen "zurück zum Energiedashboard"-Link (nur
             # gezeigt, wenn der Rücksprung dorthin überhaupt sinnvoll ist) —
             # bewusst zusätzlich zum referrer-basierten dynamic-back-link.js,

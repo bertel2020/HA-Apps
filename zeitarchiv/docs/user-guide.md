@@ -245,6 +245,9 @@ Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
 
 - Auswahl von Stunde, Tag, Woche, Monat, Jahr oder Dekade als Basiseinheit;
   Vor-/Zurück-Pfeile blättern jeweils um eine Einheit.
+- **Ein erneuter Klick auf die bereits gewählte Einheit springt zurück in die
+  laufende Periode** — „Tag" auf heute, „Monat" auf den aktuellen Monat.
+  Dieselbe Geste wie im Energiedashboard.
 - **Laufend** ("bis heute") zeigt den aktuellen, noch nicht abgeschlossenen
   Zeitraum, z. B. "diese Woche bis jetzt" — auch bevor für die restliche
   Periode überhaupt Daten vorliegen, reicht die Achse bis zur vollen
@@ -288,6 +291,9 @@ auseinanderhalten kann. Dann lässt sich ein Ausschnitt vergrößern:
 - **Am Rechner:** **Strg** gedrückt halten und das Mausrad drehen. Das Rad
   allein scrollt weiter die Seite, es passiert also nichts versehentlich. Mit
   gedrückter Strg-Taste ziehen verschiebt den Ausschnitt.
+- **Einen Bereich direkt aufziehen:** **Umschalt** gedrückt halten und mit der
+  Maus über den gewünschten Zeitraum ziehen. Beim Loslassen zeigt das Diagramm
+  genau diesen Ausschnitt.
 - **Am Trackpad und auf dem Telefon:** mit zwei Fingern auseinander- bzw.
   zusammenziehen. Ein Wisch mit einem Finger scrollt wie überall sonst die
   Seite.
@@ -307,6 +313,36 @@ Angeboten wird das nur, wo es etwas aufzudecken gibt — bei wenigen Punkten
 gibt es ihn dagegen immer: Schaltvorgänge von wenigen Minuten sind in einer
 Monatsansicht schmaler als ein Bildpunkt und werden erst beim Hineinzoomen
 sichtbar.
+
+### Markierte Werte sehen
+
+Wer auf der Bereinigungsseite Werte „löscht", markiert sie zunächst nur — weg
+sind sie erst nach dem endgültigen Bereinigen unter **Housekeeping →
+Speicherplatz → Endgültige Bereinigung**. Bis dahin verschwinden sie zwar aus
+dem Verlauf, sind aber noch da.
+
+**Markierte Werte** (Optionen-Menü) zeigt, wo: die betroffenen Zeitabschnitte
+werden im Diagramm hinterlegt. Aufeinanderfolgende Markierungen bilden dabei
+ein zusammenhängendes Feld, weit auseinanderliegende bleiben getrennt. So
+lässt sich vor dem endgültigen Löschen noch einmal ansehen, ob wirklich nur
+die gemeinten Stellen erwischt wurden. Die Einstellung gilt pro Entität und
+ist standardmäßig aus.
+
+Gibt es im gezeigten Zeitraum Markierungen, erscheint ein Knopf mit ihrer
+Anzahl in der Werkzeugleiste. Er führt wahlweise zur Bereinigungsseite (dort
+lassen sich einzelne Markierungen zurücknehmen) oder direkt zur Vorschau
+„Rückgängig", die zeigt, was die zuletzt markierte Löschung wiederherstellen
+würde.
+
+Beides sind Verweise, keine Aktionen — mit Absicht: die zuletzt markierte
+Löschung kann sehr viel mehr Werte umfassen, als der Knopf anzeigt (er zählt
+nur den gerade gezeigten Zeitraum), und sie kann vollständig außerhalb davon
+liegen. Die Vorschau zeigt die betroffenen Zeilen mit Anzahl, bevor irgendetwas
+passiert.
+
+In der Tabelle unter **Housekeeping → Speicherplatz → Endgültige
+Bereinigung** führt jeder Entitätsname direkt hierher, mit bereits
+eingeschalteter Anzeige.
 
 ### Vergleich
 
@@ -332,7 +368,7 @@ Chart bearbeiten und auf ein Dashboard anheften lässt.
 
 ### Gespeicherte Optionen
 
-Alle Optionen im Optionen-Menü (Rollierend, Rohwerte,
+Alle Optionen im Optionen-Menü (Rollierend, Rohwerte, Markierte Werte,
 Diagrammtyp, Punkte anzeigen, Werte anzeigen, Dynamische Y-Achse,
 Legenden-Statistik und -Kennzahlen, Legenden-Stil) werden **pro Entität**
 dauerhaft gespeichert und beim nächsten Aufruf automatisch wieder

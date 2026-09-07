@@ -154,7 +154,10 @@
           hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
     Löschen
   </button>
-  <button class="btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
+  {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
+     (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
+     über seinen Beschriftungstext suchen. #}
+  <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
           hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
     Rückgängig (letzte Löschung)

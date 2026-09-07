@@ -38,7 +38,13 @@
       <div class="toolbar">
         <div class="seg">
           <template x-for="r in ranges" :key="r.key">
-            <button :class="{active: range === r.key}" @click="setRange(r.key)" x-text="r.label"></button>
+            {# Ein erneuter Klick auf die schon aktive Stufe springt zurück auf
+               die laufende Periode — dieselbe Geste wie im Energiedashboard
+               (setRange() dort) und der Ersatz für den früheren
+               "Jetzt"-Knopf. Der title sagt es, solange es etwas zu tun gibt;
+               ohne ihn wäre die Zweitfunktion unauffindbar. #}
+            <button :class="{active: range === r.key}" @click="setRange(r.key)" x-text="r.label"
+                    :title="range === r.key && offset !== 0 ? 'Zurück zur laufenden Periode' : ''"></button>
           </template>
         </div>
         <div class="nav">
@@ -54,22 +60,47 @@
           </div>
           <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="Nächster Zeitraum">›</button>
         </div>
-        <button class="chip" :class="{active: offset !== 0}" :disabled="offset === 0" @click="goToNow()">Jetzt</button>
-        {# Ausschnitts-Chip: zeigt den hineingezoomten Bereich und setzt ihn per
-           Klick zurück. Nach dem Muster des "Jetzt"-Knopfes daneben immer im
-           Layout, nur deaktiviert wenn nichts gezoomt ist (statt per x-show zu
-           erscheinen) — siehe der Kommentar zu .toolbars in entity_detail.css:
-           jeder Control hat einen festen Platz, sonst rutschen die Nachbarn bei
-           jedem Zustandswechsel woandershin. Die feste Mindestbreite in
-           .chip-zoom hat denselben Grund: die Beschriftung wechselt beim Zoomen
-           von "Ausschnitt" zu einer Zeitspanne und würde die Zeile sonst bei
-           jeder Radbewegung neu umbrechen. #}
-        <button type="button" class="chip chip-zoom" :class="{active: !!zoomRange}"
-                :disabled="!zoomRange" @click="resetZoom()"
-                title="Gezeigten Ausschnitt zurücksetzen">
-          <span x-text="zoomLabel"></span>
-          <span class="chip-zoom-x" aria-hidden="true">&times;</span>
-        </button>
+        {# Markierungs-Chip. Nur wenn die Anzeige läuft und es im Zeitraum
+           tatsächlich Markierungen gibt — sonst stünde dort dauerhaft ein
+           Knopf über etwas, das man gerade nicht sieht. Er ist
+           beides: Anzeige (wie viele im Zeitraum markiert sind) und Einstieg in
+           die zwei Dinge, die man damit tun will. Beide Wege führen bewusst
+           nicht ins Blaue: "Bereinigung" öffnet die Seite, auf der man einzelne
+           Markierungen zurücknimmt, "Rückgängig" öffnet auf derselben Seite
+           die Vorschau der letzten Charge.
+
+           Beides sind Links, und das ist der Punkt: die letzte Charge kann
+           sechsstellig sein (in einer echten Installation gemessen 196.263
+           Werte), während der Chip darüber nur die paar Markierungen des
+           gezeigten Zeitraums nennt. Aus diesem Menü heraus eine Aktion dieser
+           Größenordnung auszulösen — mit einer Rückfrage als einziger
+           Zwischenstufe — wäre eine Falle. Die Vorschau auf der
+           Bereinigungsseite zeigt statt einer Zahl die betroffenen Zeilen
+           selbst, bevor irgendetwas passiert. #}
+        <template x-if="showMarked && markedTotal">
+          <div class="menu-wrap" @click.outside="markedMenuOpen = false">
+            <button type="button" class="chip menu-btn chip-marked" @click="markedMenuOpen = !markedMenuOpen">
+              <span class="marked-dot" aria-hidden="true"></span>
+              <span x-text="markedLabel"></span> <span class="chevron">&#9662;</span>
+            </button>
+            <div class="menu-popover menu-popover-narrow" x-show="markedMenuOpen" x-cloak
+                 x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+              <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup">Zur Bereinigung <span class="menu-row-arrow">&rarr;</span></a>
+              <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup?undo=1">Letzte Löschung rückgängig <span class="menu-row-arrow">&rarr;</span></a>
+            </div>
+          </div>
+        </template>
+        {# Vergleichen und Optionen sitzen am rechten Rand: links steht, WELCHER
+           Ausschnitt gezeigt wird (Zeitraum, Navigation, Markierungen), rechts,
+           WIE er gezeigt wird. Der Abstand dazwischen macht aus zwei Gruppen
+           zwei Gedanken. Erst ab 641 px — darunter bricht die Leiste ohnehin um,
+           und eine rechtsbündige Restzeile sähe nach Versehen aus.
+
+           Beide zusammen in EINEM Behälter, nicht margin-left:auto auf dem
+           ersten von zweien: dann verschluckt der erste den ganzen freien
+           Platz, und der zweite bricht in die nächste Zeile — die Gruppe wäre
+           auseinandergerissen statt zusammengerückt. #}
+        <div class="toolbar-right">
         <div class="menu-wrap" @click.outside="compareMenuOpen = false">
           <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
             <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
@@ -112,6 +143,18 @@
               <span class="menu-row-label">Rohwerte</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            {# Markierte Werte: gehört zu "Daten", nicht zu "Darstellung" — er
+               blendet nicht etwas Vorhandenes ein, sondern zeigt an, wo die
+               Abfrage etwas herausgefiltert hat. Für jeden Entitätstyp
+               verfügbar: ein senkrechtes Band braucht nur die Zeitachse und
+               trifft keine Aussage über den Wert. #}
+            <label class="menu-row">
+              <span class="menu-row-label">Markierte Werte</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="showMarked" @change="toggleMarked()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
@@ -200,11 +243,36 @@
             <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
           </div>
         </div>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <div id="chart" x-show="points.length" :style="chartType === 'timeline' ? 'height:150px;' : ''"></div>
+      {# Der Ausschnitts-Chip liegt IM Chart, oben rechts, und erscheint nur bei
+         aktivem Zoom. Er stand vorher in der Werkzeugleiste und war dort
+         gemessen die Ursache für deren Umbruch: bei 1000 px Fensterbreite
+         brauchte die Leiste mit ihm 1003 von 952 verfügbaren Pixeln, ohne ihn
+         843. Dabei ist er das Element mit dem seltensten Anlass — sichtbar
+         immer, gemeint nur während eines Zooms.
+
+         Hier überdeckt er keine Daten: die Zeichenfläche beginnt erst bei
+         grid.top (36 px), und dieser Streifen ist rechts leer — links steht
+         dort die Einheiten-Beschriftung der y-Achse. Der Behälter .chart-wrap
+         existiert nur, damit "oben rechts" sich auf den Chart bezieht und
+         nicht auf die Karte samt ihrer je nach Breite unterschiedlichen
+         Polsterung. #}
+      <div class="chart-wrap" x-show="points.length">
+        <div id="chart" :style="chartType === 'timeline' ? 'height:150px;' : ''"></div>
+        {# Statisch "active": der Chip existiert nur, wenn es einen Ausschnitt
+           gibt — ein deaktivierter Zustand wäre unerreichbar. Aus demselben
+           Grund keine feste Mindestbreite mehr: die wechselnde Beschriftung
+           kann hier niemanden mehr verschieben. #}
+        <button type="button" class="chip chip-zoom active" x-show="zoomRange" x-cloak
+                @click="resetZoom()" title="Gezeigten Ausschnitt zurücksetzen">
+          <span x-text="zoomLabel"></span>
+          <span class="chip-zoom-x" aria-hidden="true">&times;</span>
+        </button>
+      </div>
       <div class="empty" x-show="!points.length" x-text="loading ? 'Lädt …' : 'Keine Daten für diesen Zeitraum.'"></div>
       <div class="chart-legend" x-show="points.length && chartStats && legendStyle === 'chips'">
         <span class="chart-legend-item static">
@@ -293,6 +361,10 @@
     // bisherigen Standard ('day'/0).
     const INITIAL_RANGE = {{ initial_range | tojson }};
     const INITIAL_OFFSET = {{ initial_offset | tojson }};
+    // ?marked=1 (Link aus der Purge-Vorschau, Housekeeping -> Speicherplatz
+    // -> Endgültige Bereinigung) schaltet die Markierungs-Anzeige für diesen Besuch ein,
+    // ohne sie zu speichern — siehe entity_detail() in main.py.
+    const INITIAL_MARKED = {{ initial_marked | tojson }};
     // Globale Startwerte (unabhängig von einer etwaigen Übersteuerung dieser
     // Entität) — Grundlage für hasCustomOptions(), das "Optionen auf Standard
     // zurücksetzen" (Aktionen) nur zeigt, wenn es dafür tatsächlich etwas zu

@@ -77,8 +77,9 @@ def test_zoom_appears_only_where_there_is_more_data_than_pixels() -> None:
     assert "if (this.zoomAvailable) {" in ENTITY
 
 
-def test_the_hint_under_the_chart_answers_why_the_chip_is_grey() -> None:
-    """Ein deaktivierter Knopf ohne Begründung ist eine Sackgasse.
+def test_the_hint_under_the_chart_says_whether_zooming_is_possible() -> None:
+    """Ohne ihn gäbe es keinen Hinweis darauf, dass es den Zoom überhaupt gibt:
+    der Ausschnitts-Chip erscheint erst, wenn schon gezoomt ist.
 
     Der Hinweis nennt deshalb beide Fälle: wo sich zoomen lässt, wie es geht;
     wo nicht, warum es nicht nötig ist. `hint-status` und nicht hinter dem
@@ -88,7 +89,7 @@ def test_the_hint_under_the_chart_answers_why_the_chip_is_grey() -> None:
     assert 'class="hint hint-status zoom-hint" x-show="points.length" x-text="zoomHint"' in ENTITY
     assert "get zoomHint()" in ENTITY
     assert "alle einzeln sichtbar" in ENTITY
-    assert "mit Strg und Mausrad einen Ausschnitt vergrößern" in ENTITY
+    assert "mit Strg und Mausrad zoomen" in ENTITY
     # Unter der Karte, nicht darin: er sagt etwas über das Bedienen der
     # Ansicht, während in der Karte die Legende steht, die die Werte selbst
     # beschreibt.
@@ -149,17 +150,95 @@ def test_the_zoom_is_not_persisted_anywhere() -> None:
     assert "zoom" not in ENTITY.split("_syncUrl")[-1][:600].lower()
 
 
-def test_the_reset_chip_never_leaves_the_layout() -> None:
-    """Die Toolbar hält jeden Control an einem festen Platz und schaltet ihn nur
-    aktiv/inaktiv (siehe der Kommentar zu .toolbars in entity_detail.css) —
-    sonst rutschen die Nachbarn bei jedem Zustandswechsel woandershin. Ein per
-    x-show erscheinender Chip wäre genau der Fall, gegen den diese Regel
-    geschrieben wurde. Die feste Mindestbreite gehört dazu: die Beschriftung
-    wechselt zwischen "Ausschnitt" und einer Zeitspanne."""
-    chip = ENTITY.split('class="chip chip-zoom"')[1][:400]
-    assert ':disabled="!zoomRange"' in chip
-    assert "x-show" not in chip
-    assert "min-width:152px" in ENTITY
+def test_a_region_can_be_dragged_open_with_shift() -> None:
+    """Die Geste war noch frei: schlichtes Ziehen ist unbelegt, Schwenken liegt
+    auf Strg+Ziehen, Zoomen auf Strg+Rad. Umschalt fügt sich in dieselbe Regel
+    ein — Taste halten heißt „ich meine den Chart" — und es gibt sie auf einem
+    Touchscreen nicht, dort bleibt der Wisch also der Seite, ohne dass es dafür
+    eine Sonderregel bräuchte."""
+    assert "key: 'brush'," in ENTITY
+    assert "brushType: 'lineX', brushMode: 'single'" in ENTITY
+    # Ausschalten braucht brushType:false — ein fehlendes brushOption ließe den
+    # Modus stehen.
+    assert "{brushType: false}" in ENTITY
+    assert "e.key !== 'Shift'" in ENTITY
+
+
+def test_the_selection_goes_through_brush_not_through_the_toolbox() -> None:
+    """Am laufenden Chart gemessen: `toolbox.feature.dataZoom` mit
+    `show: false` ist wirkungslos — ohne sichtbare Werkzeugleiste legt ECharts
+    deren View nicht an, `takeGlobalCursor` mit `dataZoomSelect` läuft ins
+    Leere. Über die brush-Komponente ist der Modus dagegen nachweislich scharf.
+    """
+    # Der Name darf im ERKLÄRENDEN Kommentar stehen — nur benutzt werden darf
+    # er nicht, sonst wäre der gemessene Fehlweg wieder eingebaut.
+    assert "key: 'dataZoomSelect'" not in ENTITY
+    assert "function selectBrush()" in ENTITY
+    assert "brushType: 'lineX'" in ENTITY
+
+
+def test_the_foreign_toolbox_icons_are_switched_off_twice() -> None:
+    """Die zweite Stelle ist am laufenden Chart aufgefallen und war nicht
+    naheliegend: `toolbox: []` in der brush-Konfiguration sagt nur, welche
+    brush-Knöpfe die Werkzeugleiste zeigt. Die Werkzeugleiste selbst legt
+    ECharts trotzdem an — sie erschien mit vier fremden Icons genau dort, wo
+    der Ausschnitts-Chip sitzt."""
+    assert "toolbox: []," in ENTITY
+    assert "option.toolbox = {show: false};" in ENTITY
+    assert "toolbox: {show: false}," in ENTITY
+
+
+def test_a_click_without_dragging_does_not_zoom_to_nothing() -> None:
+    """Und die gezogene Fläche verschwindet sofort wieder — sonst bliebe das
+    Rechteck als graue Fläche über dem Chart liegen, obwohl es seine Aufgabe
+    erfüllt hat."""
+    handler = ENTITY.split("chartInstance.on('brushEnd'")[1][:900]
+    assert "type: 'brush', areas: []" in handler
+    assert "if (!spanne || !(spanne[1] > spanne[0])) return;" in handler
+    assert "type: 'dataZoom', startValue: spanne[0], endValue: spanne[1]" in handler
+
+
+def test_releasing_shift_mid_drag_does_not_cut_the_rectangle() -> None:
+    """Wer die Taste vor der Maustaste loslässt, hinterließe sonst einen halb
+    gezogenen Rahmen. Und ein Fensterwechsel bei gedrückter Taste bekommt nie
+    ein keyup — der Chart bliebe dauerhaft im Auswahlmodus."""
+    assert "const nachziehen = () => { if (!zieht) setzeAuswahl(taste); };" in ENTITY
+    assert "getZr().on('mouseup'" in ENTITY
+    assert "window.addEventListener('blur'" in ENTITY
+
+
+def test_the_hint_names_the_new_gesture() -> None:
+    """Ohne Hinweis ist eine Tastenkombination unauffindbar."""
+    assert "mit Umschalt einen Bereich aufziehen" in ENTITY
+
+
+def test_the_reset_chip_sits_in_the_chart_not_in_the_toolbar() -> None:
+    """Gemessen, nicht gefühlt: in der Werkzeugleiste brauchte sie mit dem Chip
+    1003 von 952 verfügbaren Pixeln und brach um, ohne ihn 843. Er war dabei
+    das Element mit dem seltensten Anlass — sichtbar immer, gemeint nur während
+    eines Zooms.
+
+    Im Chart überdeckt er keine Daten: ECharts beginnt erst bei grid.top
+    (36 px) zu zeichnen, und dieser Streifen ist rechts leer.
+    """
+    template = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+    leiste = template.split('<div class="toolbar">')[1].split('<div class="card">')[0]
+    assert "chip-zoom" not in leiste, "der Chip gehört nicht mehr in die Werkzeugleiste"
+    assert 'class="chip chip-zoom active"' in template
+    assert ".chart-wrap{position:relative;}" in ENTITY
+    assert "position:absolute;top:2px;right:6px" in ENTITY
+
+
+def test_the_chip_only_exists_while_something_is_zoomed() -> None:
+    """Kein deaktivierter Zustand mehr: er wäre unerreichbar, weil der Chip
+    ohne Ausschnitt gar nicht erscheint. Und ohne Nachbarn braucht die
+    wechselnde Beschriftung keine feste Mindestbreite mehr — die gab es nur,
+    damit sie die Leiste nicht bei jeder Radbewegung neu umbrechen lässt."""
+    chip = ENTITY.split('class="chip chip-zoom active"')[1][:300]
+    assert 'x-show="zoomRange"' in chip
+    assert "x-cloak" in chip, "sonst blitzt er vor Alpines Initialisierung auf"
+    assert ":disabled" not in chip
+    assert "min-width:152px" not in ENTITY
 
 
 def test_no_other_chart_in_the_app_gets_a_zoom() -> None:

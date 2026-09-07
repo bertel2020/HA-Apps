@@ -37,7 +37,19 @@
           <tbody>
           {% for row in purge_preview.rows %}
             <tr>
-              <td><strong>{{ row.friendly_name or row.entity_id }}</strong>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}</td>
+              {# Führt in den Verlauf der Entität, mit bereits eingeschalteter
+                 Markierungs-Anzeige (?marked=1, siehe entity_detail() in
+                 main.py) — nicht auf die Bereinigungsseite. Diese Tabelle
+                 beantwortet die Frage „was würde der Purge wegräumen", und
+                 die einzige Stelle, an der man das ANSIEHT statt es zu zählen,
+                 ist der Chart. Der Parameter gilt nur für diesen Besuch und
+                 überschreibt die gespeicherte Option der Entität nicht. #}
+              <td>
+                <a href="{{ app_root }}/entities/{{ row.entity_id }}?marked=1"
+                   title="Markierte Werte im Verlauf ansehen">
+                  <strong>{{ row.friendly_name or row.entity_id }}</strong>
+                </a>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}
+              </td>
               <td data-sort="{{ row.removable_rows }}">{{ row.removable_rows | format_int }} / {{ row.marked_rows | format_int }}</td>
               <td>{{ row.hot_rows | format_int }}</td>
               <td>{{ row.archive_rows | format_int }}</td>

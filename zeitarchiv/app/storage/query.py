@@ -218,6 +218,74 @@ def _read_hot_rows_filtered(
     return filter_deleted_occurrences(in_range, deleted_counts)
 
 
+def marked_ranges_in_window(
+    index: Index,
+    entity_id: str,
+    start_ts: float,
+    end_ts: float,
+    limit: int,
+) -> tuple[list[dict], int]:
+    """Zusammenhängende Blöcke zur Löschung markierter Werte in einem Fenster.
+
+    Gegenstück zur Filterung, die sonst überall greift: markierte Zeilen werden
+    aus jeder Antwort entfernt, damit ein Chart nach dem Markieren sofort ohne
+    sie aussieht. Sie sind damit aber auch aus jeder Ansicht verschwunden,
+    obwohl sie bis zum Purge noch da und noch zu retten sind — nachsehen ließ
+    sich das nur in einer Zeitstempel-Tabelle unter Housekeeping ->
+    Speicherplatz. Hier kommt die Information zurück, damit der Chart die
+    betroffenen Stellen als Band markieren kann.
+
+    Gelesen wird ausschließlich der Index; Hot Buffer und Archiv werden nicht
+    angefasst. Die WERTE der markierten Zeilen bräuchte es dafür nicht — und
+    genau das macht diese Auskunft billig genug, um sie bei jeder Abfrage
+    mitzuliefern.
+
+    Benachbarte Markierungen werden zu EINEM Block zusammengefasst — 163
+    aufeinanderfolgende Messungen sind ein Vorgang, kein
+    Hundertdreiundsechzigfaches. Die Schwelle dafür ist an der ANZEIGE
+    hergeleitet, nicht an den Daten: ein Chart ist rund 900 px breit, zwei
+    Bänder näher als ein Hundertstel des Fensters (etwa neun Pixel) sind als
+    getrennte Streifen nicht mehr zu unterscheiden.
+
+    Der Wert ist gemessen, nicht geraten. Der erste Versuch stand bei einem
+    Dreihundertstel (drei Pixel) und ist an echten Daten gescheitert: eine
+    Tagesansicht ergibt damit 4,8 Minuten, ein Sensor im 5-Minuten-Takt liegt
+    also um zwölf Sekunden darüber — aus einem zusammenhängenden Block wurden
+    147 getrennte Bänder. Ein Hundertstel lässt für einen Tag 14,4 Minuten zu
+    und fasst damit alle üblichen Melderhythmen zusammen, hält aber
+    stündliche oder weiter entfernte Markierungen auseinander, die auf dem
+    Schirm ohnehin klar getrennt liegen.
+
+    Bewusst NICHT aus den Daten abgeleitet (etwa dem Median der Abstände):
+    bei genau zwei Markierungen ist der Median ihr eigener Abstand, sie
+    verschmelzen dann immer — egal wie weit sie auseinanderliegen.
+
+    Aus 44.000 Einzelmarkierungen einer Jahresansicht werden so eine Handvoll
+    Bänder — und zwar VOLLSTÄNDIG, während ein Kappen der Zeitstempel nur die
+    frühesten gezeigt und damit den Eindruck erweckt hätte, der Rest des
+    Jahres sei unberührt.
+
+    Rückgabe ist ein Paar aus (höchstens ``limit`` Blöcken, tatsächlicher
+    Gesamtzahl markierter Werte). Die Gesamtzahl ist auch dann richtig, wenn
+    die Blockliste gekappt wurde.
+    """
+    counts = index.get_deleted_counts(entity_id, start_ts, end_ts)
+    if not counts:
+        return [], 0
+    gesamt = sum(counts.values())
+    luecke = max((end_ts - start_ts) / 100.0, 1.0)
+    bloecke: list[dict] = []
+    for ts in sorted(counts):
+        if bloecke and ts - bloecke[-1]["end"] <= luecke:
+            bloecke[-1]["end"] = ts
+            bloecke[-1]["count"] += counts[ts]
+            continue
+        if len(bloecke) >= limit:
+            break
+        bloecke.append({"start": ts, "end": ts, "count": counts[ts]})
+    return bloecke, gesamt
+
+
 def _last_value_before(path: Path, before_ts: float) -> float | None:
     """Letzter Wert einer einzelnen Archiv-Monatsdatei mit ``ts < before_ts``.
 

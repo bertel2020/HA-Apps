@@ -297,3 +297,39 @@
       });
       document.addEventListener('scroll', hideTip, true);
     })();
+
+    // Direkteinstieg aus dem Markierungs-Menü des Entitäts-Charts
+    // (…/cleanup?undo=1): die Rückgängig-Vorschau gleich aufklappen, statt den
+    // Nutzer den Knopf suchen zu lassen. Genau dafür verweist das Menü
+    // hierher — die Vorschau zeigt die betroffenen Zeilen, bevor irgendetwas
+    // passiert, während eine Rückfrage im Menü nur eine Zahl nennen könnte
+    // (und die letzte Charge kann sechsstellig sein).
+    //
+    // Warum ein Warteschritt und nicht einfach der erste htmx-Austausch: die
+    // Zeilentabelle wird beim Seitenaufbau ZWEIMAL geholt. Erst durch
+    // hx-trigger="load" auf #controls, und gleich darauf noch einmal, weil das
+    // frisch eingesetzte Fragment das Seitengrößen-Feld schreibt und damit ein
+    // "change" auslöst — sichtbar an den beiden /rows-Anfragen, von denen nur
+    // die zweite page_size trägt. Wer die Vorschau nach dem ERSTEN Austausch
+    // öffnet, sieht sie vom zweiten sofort wieder überschrieben; am laufenden
+    // Stand war genau das der Fall, und es sah aus, als hätte der Klick nie
+    // stattgefunden. Deshalb erst öffnen, wenn kurz kein Austausch mehr kam.
+    if (new URLSearchParams(location.search).get('undo') === '1') {
+      let warte = null;
+      const versuche = () => {
+        const knopf = document.getElementById('undo-preview-btn');
+        if (!knopf) return;
+        // Deaktiviert heißt: es gibt gar keine Löschung zum Rückgängigmachen.
+        // Dann ist der Direkteinstieg gegenstandslos, aber erledigt.
+        if (!knopf.disabled) knopf.click();
+        document.body.removeEventListener('htmx:afterSwap', beobachte);
+      };
+      const beobachte = (e) => {
+        if (!e.target || e.target.id !== 'rows-table') return;
+        clearTimeout(warte);
+        warte = setTimeout(versuche, 300);
+      };
+      document.body.addEventListener('htmx:afterSwap', beobachte);
+      // Falls die Tabelle schon steht, bevor diese Datei ausgeführt wird.
+      if (document.getElementById('undo-preview-btn')) warte = setTimeout(versuche, 300);
+    }

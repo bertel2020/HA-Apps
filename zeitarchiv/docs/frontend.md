@@ -298,6 +298,40 @@ wird von seinem Anfang bis zu seinem Ende gezeichnet, und bei „Monat" auf rund
 900 px entspricht ein Pixel etwa 48 Minuten — jedes kürzere Schaltereignis ist
 schmaler als ein Pixel. Die Zahl der Segmente sagt darüber nichts.
 
+### Bereich aufziehen (Umschalt + Ziehen)
+
+Ein Ausschnitt lässt sich auch direkt aufziehen: Umschalttaste halten, mit der
+Maus einen Bereich über der Zeitachse markieren, loslassen. Die Geste war
+frei — schlichtes Ziehen war unbelegt, Schwenken liegt auf Strg+Ziehen, Zoomen
+auf Strg+Rad — und fügt sich in dieselbe Regel ein: Taste halten heißt „ich
+meine den Chart". Auf einem Touchscreen gibt es keine Umschalttaste, dort
+bleibt der Wisch also der Seite, ohne dass es dafür eine Sonderregel bräuchte.
+
+Umgesetzt über die **`brush`-Komponente**, nicht über
+`toolbox.feature.dataZoom`. Der naheliegende Weg wäre eine `toolbox` mit
+`show: false` gewesen, damit die fremden ECharts-Icons draußen bleiben — der
+ist aber am laufenden Chart gemessen **wirkungslos**: ohne sichtbare Toolbox
+legt ECharts deren View nicht an, `takeGlobalCursor` mit `dataZoomSelect`
+läuft ins Leere (`getModel().getComponent('brush')` bleibt `null`). Über
+`brush` direkt ist der Modus nachweislich scharf (`brushOption.brushType`
+wird `'lineX'`), und die Auswahl gehört uns: aus `brushEnd` wird selbst ein
+`dataZoom` mit `startValue`/`endValue`, danach wird die Fläche sofort wieder
+aufgehoben — sonst bliebe das Rechteck grau über dem Chart liegen.
+
+Die Icons müssen an **zwei** Stellen abbestellt werden, und die zweite ist
+nicht naheliegend: `toolbox: []` in der brush-Konfiguration sagt nur, welche
+brush-Knöpfe die Werkzeugleiste zeigt. Die Werkzeugleiste selbst legt ECharts
+trotzdem an — sie erschien mit vier fremden Icons genau dort, wo der
+Ausschnitts-Chip sitzt. Erst ein zusätzliches `toolbox: {show: false}` in der
+Option hält sie draußen.
+
+Der Tastaturzustand braucht drei Ereignisse, nicht eines: `keydown` schaltet
+scharf, `keyup` wieder aus — aber **nicht mitten im Ziehen**, sonst
+hinterließe ein zu früh losgelassenes Umschalt einen halb gezogenen Rahmen;
+der Zustand wird gemerkt und beim `mouseup` nachgezogen. Dazu `blur` auf dem
+Fenster: wer bei gedrückter Taste das Fenster wechselt, bekommt nie ein
+`keyup`, und der Chart bliebe dauerhaft im Auswahlmodus.
+
 **Unter der Karte** steht dauerhaft eine Zeile, die beide Fälle benennt — wie
 viele Punkte gezeichnet sind und ob sich daran etwas vergrößern lässt
 (`get zoomHint()`). Sie ist `hint-status` und darf deshalb nicht hinter den
@@ -309,17 +343,114 @@ Wortlaut ohne Punktzahl: dort sind es oft eine Handvoll Segmente, und
 „3 Datenpunkte — zoomen möglich" widerspräche der Regel, die der Satz daneben
 aufstellt.
 
-Zurückgesetzt wird über den Ausschnitts-Chip in der Toolbar. Er steht wie der
-„Jetzt"-Knopf daneben immer im Layout und wird nur deaktiviert (nie per
-`x-show` entfernt), und er hat eine feste Mindestbreite, weil seine
-Beschriftung zwischen „Ausschnitt" und einer Zeitspanne wechselt — sonst
-bräche die Toolbar bei jeder Radbewegung neu um.
+Zurückgesetzt wird über den Ausschnitts-Chip, der **im Chart** sitzt: oben
+rechts, absolut im `.chart-wrap` positioniert, sichtbar nur bei aktivem Zoom.
+
+Er stand zunächst in der Werkzeugleiste und war dort gemessen die Ursache für
+deren Umbruch — bei 1000 px Fensterbreite brauchte sie mit ihm 1003 von 952
+verfügbaren Pixeln, ohne ihn 843. Dabei war er das Element mit dem seltensten
+Anlass: sichtbar immer, gemeint nur während eines Zooms. (Das ursprüngliche
+Argument für den festen Platz — „jeder Control behält seine Stelle" — hat
+sich mit dem Wegfall des „Jetzt"-Knopfes erledigt: ein meist deaktivierter
+Knopf verdient keine Zeilenbreite.)
+
+Im Chart überdeckt er keine Daten: ECharts beginnt erst bei `grid.top` (36 px)
+zu zeichnen, und dieser Streifen ist rechts leer — links steht dort die
+Einheiten-Beschriftung der y-Achse. Der Behälter `.chart-wrap` existiert nur,
+damit sich „oben rechts" auf den Chart bezieht und nicht auf die Karte samt
+ihrer je nach Breite unterschiedlichen Polsterung. Ein Schatten hebt ihn ab,
+falls die Kurve doch einmal bis dorthin reicht. Die frühere Mindestbreite ist
+entfallen — sie gab es nur, damit die wechselnde Beschriftung die Nachbarn in
+der Leiste nicht verschiebt, und Nachbarn hat er dort keine mehr.
+
+Dass es den Zoom überhaupt gibt, sagt deshalb allein die Hinweiszeile unter
+der Karte: der Chip erscheint erst, wenn schon gezoomt ist.
 
 Alle übrigen Charts der App bleiben ohne Zoom, und das ist eine Entscheidung
 und kein offener Rest: eine Dashboard-Kachel ist ein Blickfang, kein Werkzeug;
 Sankey und Donut haben keine Zeitachse; die Tag-mal-Stunde-Heatmap ist
 kategorial; der Monatsverlauf im Bericht hat zwölf Balken.
 `tests/test_chart_zoom.py` hält das fest.
+
+### Markierte Bereiche (`markArea`)
+
+„Löschen" auf der Bereinigungsseite ist ein Soft-Delete; endgültig entfernt
+wird erst der Purge. Jeder Lesepfad filtert markierte Zeilen aber sofort heraus
+(`filter_deleted_occurrences`) — sie waren damit aus jeder Ansicht
+verschwunden, obwohl sie noch existierten und noch zu retten waren.
+
+`/api/query?marked=true` liefert `marked_ranges` (Blöcke aus `start`, `end`,
+`count`) und `marked_total` — die Zahl der markierten WERTE im Fenster, auch
+wenn die Blockliste gekappt wurde (`MAX_MARKED_RANGES`). Gelesen wird
+**ausschließlich der Index** (`get_deleted_counts`); Hot Buffer und Archiv
+werden nicht angefasst. Genau das macht die Auskunft billig genug, um sie bei
+jeder Abfrage mitzuliefern — und es ist der Grund, warum die Bänder-Variante
+der Punkt-Variante vorzuziehen war: ein Band braucht die Werte nicht.
+
+Benachbarte Markierungen werden zu einem Block zusammengefasst; die Schwelle
+ist ein Hundertstel des Fensters (rund neun Pixel auf einem 900 px breiten
+Chart). **Der Wert ist gemessen, nicht geraten:** ein Dreihundertstel (drei
+Pixel) ergibt für eine Tagesansicht 4,8 Minuten, ein Sensor im 5-Minuten-Takt
+lag also um zwölf Sekunden darüber — aus einem zusammenhängenden Block wurden
+147 getrennte Bänder. Eine aus den Daten abgeleitete Schwelle (Median der
+Abstände) scheitert an genau zwei Markierungen: dort ist der Median ihr
+eigener Abstand, sie verschmelzen dann immer.
+
+Gezeichnet wird als `markArea` an der Hauptserie, nicht als zweite Serie: eine
+Serie bestimmte die Achsenskalierung mit, verfälschte die Punkt-Schwelle des
+Zooms und stünde in der Legende. `silent: true` ist Pflicht — sonst fängt das
+Band die Mauszeiger-Ereignisse ab und das Achsen-Tooltip der Kurve bleibt
+ausgerechnet an den interessanten Stellen aus. Ein Block aus einer einzigen
+Markierung bekommt eine Mindestbreite, sonst wäre er null Pixel breit.
+
+Weil ein Band nur die Zeitachse braucht und keine Aussage über den Wert
+trifft, gilt es für **jeden** Entitätstyp. (Ein Marker auf dem entfernten Wert
+hätte das nicht gekonnt: bei einem Zähler sind Bucket-Werte Zuwächse und
+Rohwerte absolute Stände.)
+
+Der Zustand wird pro Entität gespeichert (`show_marked`, Standard aus). Der
+Link aus der Purge-Vorschau (Housekeeping → Speicherplatz → Endgültige
+Bereinigung) bringt ihn über `?marked=1` für den Besuch mit, **ohne** ihn zu
+speichern: eine Seite über einen Link zu öffnen ist keine Einstellung.
+
+Der Chip in der Werkzeugleiste erscheint nur, wenn es im Zeitraum tatsächlich
+Markierungen gibt, und ist beides — Anzeige und Menü mit den zwei Wegen, die
+man von dort aus gehen will: zur Bereinigungsseite (einzelne Markierungen
+zurücknehmen) oder zur Rückgängig-Vorschau der letzten Charge
+(`…/cleanup?undo=1`).
+
+**Beides sind Links, und das ist der Punkt.** Die letzte Charge kann
+sechsstellig sein — in einer echten Installation gemessen 196.263 Werte —,
+während der Chip darüber nur die paar Markierungen des gezeigten Zeitraums
+nennt. Aus diesem Menü heraus eine Aktion dieser Größenordnung auszulösen,
+mit einer Rückfrage als einziger Zwischenstufe, wäre eine Falle: die Zahl im
+Knopf legt eine ganz andere Größenordnung nahe als das, was tatsächlich
+passiert. Die Vorschau auf der Bereinigungsseite zeigt stattdessen die
+betroffenen Zeilen selbst, bevor irgendetwas geschieht.
+
+Das Aufklappen der Vorschau übernimmt `cleanup.js` anhand von `?undo=1` — mit
+einem **Warteschritt**, und der ist gemessen nötig: die Zeilentabelle wird beim
+Seitenaufbau zweimal geholt (`hx-trigger="load"` auf `#controls`, und gleich
+darauf ein `change`, weil das eingesetzte Fragment das Seitengrößen-Feld
+schreibt; nur die zweite Anfrage trägt `page_size`). Wer nach dem ersten
+Austausch öffnet, sieht die Vorschau vom zweiten sofort wieder überschrieben —
+es sieht aus, als hätte der Klick nie stattgefunden.
+
+### Werkzeugleiste: zwei Gruppen
+
+Links steht, **welcher** Ausschnitt gezeigt wird (Zeitraum, Blättern,
+Markierungen), rechts, **wie** er gezeigt wird (Vergleichen, Optionen —
+`.toolbar-right` mit `margin-left:auto`, erst ab 641 px, darunter bricht die
+Leiste ohnehin um).
+
+Einen „Jetzt"-Knopf gibt es nicht mehr: er belegte dauerhaft Platz und war die
+meiste Zeit deaktiviert. Seine Funktion liegt als Zweitfunktion auf der schon
+aktiven Zeitraum-Stufe — ein erneuter Klick auf „Tag" springt zurück auf
+heute, auf „Monat" in den laufenden Monat. Dieselbe Geste kennt das
+Energiedashboard seit jeher (`setRange()` in `energiedashboard.js`); ein
+`title` weist darauf hin, solange es etwas zu tun gibt.
+`tests/test_entity_chart_toolbar.py` hält beides fest, einschließlich der
+Vorlage im Energiedashboard.
 
 ## Mobile Listenansicht
 

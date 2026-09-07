@@ -44,22 +44,47 @@
   }
   .period-label:hover:not(:disabled){color:var(--accent-line);}
   .period-label:disabled{cursor:default;}
-  /* Ausschnitts-Chip (Zoom). Bis auf zwei Dinge ein gewöhnlicher .chip — er
-     füllt sich im aktiven Zustand mit --accent-line wie der "Jetzt"-Knopf
-     daneben, statt sich eine eigene Sonderoptik zu geben.
-     Mono, weil er eine Zeitspanne zeigt (wie das Perioden-Label daneben), und
-     mit fester Mindestbreite, weil seine Beschriftung zwischen "Ausschnitt"
-     und "14:20 – 16:05" wechselt: ohne sie würde die Toolbar bei jeder
-     Radbewegung neu umbrechen. Der Wert ist an der längsten Form gemessen
-     (zwei Uhrzeiten plus Trennstrich und ד). */
+  /* Schiebt sich und alles danach an den rechten Rand der Werkzeugleiste
+     (dieselbe margin-left:auto-Geste wie bei #controls in app.css). Erst ab
+     641 px: darunter bricht die Leiste ohnehin um, und ein rechtsbündiger
+     Rest einer umgebrochenen Zeile liest sich als Versehen. */
+  .toolbar-right{display:flex;align-items:center;gap:8px;}
+  @media (min-width:641px){
+    .toolbar-right{margin-left:auto;}
+  }
+  /* Markierungs-Chip. Erscheint nur, wenn es im Zeitraum tatsächlich
+     Markierungen gibt — deshalb darf er auffallen, ohne zu drängen: Rand und
+     Schrift in --danger, aber ohne gefüllte Fläche, damit er neben den
+     gefüllten .chip.active-Knöpfen ("Ausschnitt") nicht wie der
+     aktive Zustand von irgendetwas aussieht. */
+  .chip-marked{border-color:var(--danger);color:var(--danger);}
+  .marked-dot{
+    width:7px;height:7px;border-radius:50%;flex:none;
+    /* Derselbe gestrichelte Kreis wie im Chart, nur zu klein für eine
+       sichtbare Strichelung — deshalb hier gefüllt statt umrandet. */
+    background:var(--danger);
+  }
+  /* Ausschnitts-Chip (Zoom) — schwebt oben rechts über der Zeichenfläche.
+     Er lag vorher in der Werkzeugleiste und war dort gemessen die Ursache für
+     deren Umbruch (1003 von 952 px). Hier kostet er keine Zeilenbreite und
+     steht dort, wo der Ausschnitt entstanden ist.
+
+     top:2px hält ihn im oberen Rand der Chart-Fläche: ECharts beginnt erst bei
+     grid.top (36 px) zu zeichnen, ein rund 30 px hoher Chip passt vollständig
+     in diesen Streifen. Der Schatten hebt ihn von der Kurve ab, falls sie doch
+     einmal bis dorthin reicht.
+
+     Keine feste Mindestbreite mehr: die gab es nur, damit die zwischen
+     "Ausschnitt" und einer Zeitspanne wechselnde Beschriftung die Nachbarn in
+     der Leiste nicht verschiebt. Nachbarn hat er hier keine. */
+  .chart-wrap{position:relative;}
   .chip-zoom{
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));min-width:152px;
+    position:absolute;top:2px;right:6px;z-index:2;
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));
+    padding:5px 11px;box-shadow:var(--shadow);
   }
   .chip-zoom-x{opacity:.75;line-height:1;}
-  /* Ohne Ausschnitt gibt es nichts zurückzusetzen — das × verschwindet, der
-     Platz bleibt (siehe min-width oben). */
-  .chip-zoom:disabled .chip-zoom-x{visibility:hidden;}
 
   /* Kalender-Widget für den Datums-Sprung — Aufbau/Verhalten identisch zur
      Bereinigungs-Seite (cleanup.html), siehe static/js/calendar-picker.js. */

@@ -19,6 +19,16 @@ MAX_EVENT_TS = 4_102_444_800.0  # 2100-01-01T00:00:00Z
 MAX_EVENT_TEXT_LENGTH = 255
 MAX_MULTI_QUERY_ENTITIES = 25
 MAX_RAW_QUERY_POINTS = 100_000
+# Wie viele zusammenhängende Markierungs-Bänder ein Chart höchstens zeichnet.
+# Gekappt werden BÄNDER, nicht Markierungen: benachbarte Zeitstempel werden
+# vorher zu einem Block zusammengefasst (siehe marked_ranges_in_window() in
+# storage/query.py), aus 44.000 Markierungen werden dadurch typischerweise eine
+# Handvoll Bänder. Der Wert greift nur bei über den ganzen Zeitraum verstreuten
+# Einzelmarkierungen — und dort ist er ein Anzeige-, kein Ressourcenlimit:
+# jenseits von ein paar hundert senkrechten Streifen ist das kein Hinweis mehr,
+# sondern eine zweite Fläche über der Kurve. Die ANGEZEIGTE Gesamtzahl bleibt
+# unberührt (marked_total kommt aus dem Index).
+MAX_MARKED_RANGES = 200
 MAX_UI_ANALYSIS_ROWS = 500_000
 MAX_EXPORT_ROWS = 5_000_000
 MAX_IMPORT_ROWS_PER_ENTITY = 10_000_000

@@ -237,7 +237,44 @@
       };
     }
 
-    // Der sichtbare Ausschnitt in echten Zeitstempeln (ms). ECharts drückt den
+    // Aufziehen eines Bereichs mit gedrückter Umschalttaste.
+//
+// Über die `brush`-Komponente, NICHT über `toolbox.feature.dataZoom`. Der
+// naheliegende Weg wäre eine toolbox mit `show: false` gewesen, damit die
+// fremden ECharts-Icons draußen bleiben — der ist aber am laufenden Chart
+// gemessen wirkungslos: ohne sichtbare toolbox legt ECharts deren View nicht
+// an, und `takeGlobalCursor` mit `dataZoomSelect` läuft dann ins Leere (die
+// brush-Komponente bleibt leer, `getModel().getComponent('brush')` null).
+// Über `brush` direkt ist der Modus dagegen nachweislich scharf
+// (`brushOption.brushType === 'lineX'`), und die Auswahl gehört uns: aus dem
+// brushEnd-Ereignis wird selbst ein dataZoom, statt sich auf die Umsetzung
+// der toolbox zu verlassen.
+//
+// brushType 'lineX' beschränkt das Rechteck auf die Zeitachse: senkrecht
+// hineinzuzoomen ergäbe hier keinen Sinn — die y-Achse folgt der Einstellung
+// "fest/dynamisch" und nicht einem gezogenen Rahmen.
+//
+// Die Knopfleiste muss an ZWEI Stellen abbestellt werden, und die zweite ist
+// am laufenden Chart aufgefallen: `toolbox: []` hier sagt nur, welche
+// brush-Knöpfe die Werkzeugleiste zeigen soll — die Werkzeugleiste selbst legt
+// ECharts trotzdem an, und sie erschien mit vier fremden Icons genau dort, wo
+// der Ausschnitts-Chip sitzt. Erst `toolbox: {show: false}` in der Option
+// (siehe unten, neben brush) hält sie draußen.
+function selectBrush() {
+  return {
+    xAxisIndex: 0,
+    toolbox: [],
+    throttleType: 'debounce',
+    throttleDelay: 80,
+    brushStyle: {
+      color: getComputedStyle(document.body).getPropertyValue('--accent-line-soft'),
+      borderColor: getComputedStyle(document.body).getPropertyValue('--accent-line'),
+      borderWidth: 1,
+    },
+  };
+}
+
+// Der sichtbare Ausschnitt in echten Zeitstempeln (ms). ECharts drückt den
     // Zoom je nach Auslöser mal als Prozentbereich (start/end), mal als
     // Wertebereich (startValue/endValue) aus — deshalb beide Wege, statt sich
     // auf einen zu verlassen. null bedeutet "voller Zeitraum", also kein Zoom.
@@ -291,6 +328,15 @@
         // gehören dorthin, ein Ausschnitt ist eine Aussage über die letzten
         // dreißig Sekunden.
         zoomRange: null,
+        // Zur Löschung markierte Bereiche: die Werte selbst sind aus points
+        // herausgefiltert, hier kommen die betroffenen Zeitabschnitte zurück.
+        // markedTotal ist die WAHRE Zahl markierter Werte im Fenster, auch
+        // wenn die Blockliste gekappt wurde (MAX_MARKED_RANGES) — der Chip
+        // nennt sie, das Chart zeichnet nur, was es lesbar zeichnen kann.
+        showMarked: INITIAL_MARKED || CHART_OPTIONS.show_marked,
+        markedRanges: [],
+        markedTotal: 0,
+        markedMenuOpen: false,
         comparePoints: [],
         compareWindowStart: null,
         compareWindowEnd: null,
@@ -391,8 +437,8 @@
         // Werkzeugleiste unerklärt: dass er nicht anklickbar ist, hat einen
         // Grund, und der steht hier.
         get zoomHint() {
-          const geste = 'mit Strg und Mausrad einen Ausschnitt vergrößern, '
-            + 'am Telefon mit zwei Fingern';
+          const geste = 'mit Strg und Mausrad zoomen, '
+            + 'mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern';
           if (this.chartType === 'timeline') {
             return `Kurze Schaltvorgänge sind schmaler als ein Bildpunkt — ${geste}.`;
           }
@@ -407,7 +453,7 @@
           return `${punkte}${sichtbar} — Hineinzoomen ist hier nicht nötig.`;
         },
         // Ohne Zoom ein fester Text statt eines leeren Knopfes: der Chip bleibt
-        // wie der "Jetzt"-Knopf daneben immer im Layout stehen und wird nur
+        // wie die Zeitraum-Knöpfe daneben immer im Layout stehen und wird nur
         // deaktiviert (siehe Kommentar zu .toolbars in entity_detail.css) —
         // dann braucht er auch ohne Ausschnitt eine Beschriftung.
         get zoomLabel() {
@@ -431,6 +477,15 @@
           const opts = {year: 'numeric'};
           return `${from.toLocaleDateString(LOCALE, opts)} – ${to.toLocaleDateString(LOCALE, opts)}`;
         },
+        get markedLabel() {
+          if (!this.markedTotal) return 'Keine Markierungen';
+          return this.markedTotal === 1 ? '1 markiert' : `${this.markedTotal} markiert`;
+        },
+        toggleMarked() {
+          this.showMarked = !this.showMarked;
+          this.load();
+          this.saveChartOptions();
+        },
         resetZoom() {
           if (!chartInstance) return;
           chartInstance.dispatchAction({type: 'dataZoom', start: 0, end: 100});
@@ -438,7 +493,16 @@
         },
 
         setRange(key) {
-          if (key === this.range) return;
+          // Zweitfunktion der schon aktiven Stufe: zurück auf die laufende
+          // Periode. Sie ersetzt den früheren "Jetzt"-Knopf, der dauerhaft
+          // Platz in der Leiste belegte und die meiste Zeit deaktiviert war —
+          // dieselbe Geste kennt das Energiedashboard schon (setRange() in
+          // energiedashboard.js). Steht die Ansicht bereits auf "jetzt",
+          // passiert wie bisher nichts.
+          if (key === this.range) {
+            if (this.offset !== 0) this.goToNow();
+            return;
+          }
           // Nicht auf offset=0 ("jetzt") zurückspringen: Aus dem tatsächlich
           // angezeigten Serverfenster einen zeitlichen Anker bilden und diesen
           // in den Offset der neuen Auflösung übersetzen. So bleibt beim
@@ -477,6 +541,7 @@
                 continuous: this.continuous, raw: this.raw, chart_type: this.chartType,
                 show_points: this.showPoints, show_values: this.showValues,
                 dynamic_y_axis: this.dynamicYAxis, chart_stats: this.chartStats,
+                show_marked: this.showMarked,
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
                 decimals: this.decimals,
               }),
@@ -511,6 +576,7 @@
             this.showValues !== CHART_DEFAULTS.show_values ||
             this.dynamicYAxis !== CHART_DEFAULTS.dynamic_y_axis ||
             this.chartStats !== CHART_DEFAULTS.chart_stats ||
+            this.showMarked !== CHART_DEFAULTS.show_marked ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
             this.decimals !== CHART_DEFAULTS.decimals ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
@@ -587,6 +653,11 @@
             compare_mode: this.compareMode, raw: String(this.raw),
             chart_type: this.chartType === 'timeline' ? 'line' : this.chartType,
           });
+          // Nur anfordern, wenn die Anzeige auch eingeschaltet ist: die
+          // Markierungen kosten serverseitig einen eigenen Lauf über Hot Buffer
+          // und Archiv, und im Normalfall (Entität ohne offene Markierungen)
+          // wäre der Ertrag eine leere Liste.
+          if (this.showMarked) params.set('marked', 'true');
           const res = await fetch(`${BASE}/api/query?${params}`);
           const data = await res.json();
           if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
@@ -599,6 +670,8 @@
           this.windowEnd = data.window_end;
           this.periodEnd = data.period_end ?? data.window_end;
           this.isCurrent = data.is_current;
+          this.markedRanges = data.marked_ranges || [];
+          this.markedTotal = data.marked_total || 0;
           this.loading = false;
           this.$nextTick(() => this.render());
         },
@@ -618,6 +691,61 @@
                 this.periodEnd != null ? this.periodEnd * 1000 - 1000 : null,
               );
             });
+
+            // Umschalt gedrückt = Bereich aufziehen. Die Taste statt eines
+            // Modus-Knopfes, weil das schlichte Ziehen ohnehin unbelegt ist
+            // (Schwenken liegt auf Strg+Ziehen, Zoomen auf Strg+Rad) und weil
+            // es auf einem Touchscreen keine Umschalttaste gibt — dort bleibt
+            // der Wisch der Seite, ohne dass es dafür eine Sonderregel
+            // bräuchte. Dieselbe Regel wie beim Rest: Taste halten heißt "ich
+            // meine den Chart".
+            let scharf = false;
+            const setzeAuswahl = (an) => {
+              if (an === scharf) return;
+              scharf = an;
+              chartInstance.dispatchAction({
+                type: 'takeGlobalCursor',
+                key: 'brush',
+                // brushType:false ist das dokumentierte Ausschalten — ein
+                // fehlendes brushOption ließe den Modus stehen.
+                brushOption: an ? {brushType: 'lineX', brushMode: 'single'} : {brushType: false},
+              });
+            };
+            chartInstance.on('brushEnd', (params) => {
+              const spanne = ((params.areas || [])[0] || {}).coordRange;
+              // Die Auswahl sofort wieder aufheben: sonst bleibt das gezogene
+              // Rechteck als graue Fläche über dem Chart liegen, obwohl es
+              // seine Aufgabe erfüllt hat.
+              chartInstance.dispatchAction({type: 'brush', areas: []});
+              // Ein Klick ohne Ziehen liefert eine Spanne von null Breite —
+              // daraus einen Zoom zu machen hieße, auf nichts zu zoomen.
+              if (!spanne || !(spanne[1] > spanne[0])) return;
+              chartInstance.dispatchAction({
+                type: 'dataZoom', startValue: spanne[0], endValue: spanne[1],
+              });
+            });
+            // Ein gerade laufendes Ziehen darf nicht mitten im Rechteck
+            // abgeschaltet werden — wer die Taste vor der Maustaste loslässt,
+            // hinterließe sonst einen halb gezogenen Rahmen. Der Zustand wird
+            // deshalb gemerkt und erst beim Loslassen der Maus nachgezogen.
+            let zieht = false;
+            let taste = false;
+            const nachziehen = () => { if (!zieht) setzeAuswahl(taste); };
+            chartInstance.getZr().on('mousedown', () => { zieht = true; });
+            chartInstance.getZr().on('mouseup', () => { zieht = false; nachziehen(); });
+            document.addEventListener('keydown', (e) => {
+              if (e.key !== 'Shift' || !this.zoomAvailable) return;
+              taste = true;
+              nachziehen();
+            });
+            document.addEventListener('keyup', (e) => {
+              if (e.key !== 'Shift') return;
+              taste = false;
+              nachziehen();
+            });
+            // Fensterwechsel bei gedrückter Taste: das keyup kommt dann nie an,
+            // und der Chart bliebe dauerhaft im Auswahlmodus.
+            window.addEventListener('blur', () => { taste = false; zieht = false; nachziehen(); });
           }
           // Der Zoom ist in absoluten Zeitstempeln eines Fensters ausgedrückt,
           // das sich beim Neuzeichnen geändert haben kann. setOption(…, true)
@@ -745,6 +873,42 @@
             }
             if (this.chartType === 'line') compareSeries.smooth = true;
             series.push(compareSeries);
+          }
+          // Zur Löschung markierte Bereiche als senkrechte Bänder. markArea
+          // und nicht eine zweite Serie: eine Serie bestimmte die
+          // Achsenskalierung mit, verfälschte die Punkt-Schwelle des Zooms und
+          // stünde in der Legende.
+          //
+          // Ein Band braucht nur die x-Achse und trifft damit keine Aussage
+          // über den Wert — deshalb gilt es für JEDEN Entitätstyp. (Ein
+          // Marker auf dem entfernten Wert hätte das nicht gekonnt: bei einem
+          // Zähler sind Bucket-Werte Zuwächse und Rohwerte absolute Stände,
+          // ein markierter Stand von 45.213 kWh in einem Chart mit
+          // Tageszuwächsen um 12 kWh zerrisse die Achse.)
+          if (this.showMarked && this.markedRanges.length) {
+            const dangerSoft = getComputedStyle(document.body).getPropertyValue('--danger-soft');
+            const danger = getComputedStyle(document.body).getPropertyValue('--danger');
+            series[0].markArea = {
+              // silent: das Band ist Beiwerk. Ohne dies fängt es die
+              // Mauszeiger-Ereignisse ab und das Achsen-Tooltip der Kurve
+              // bleibt ausgerechnet an den interessanten Stellen aus.
+              silent: true,
+              itemStyle: {color: dangerSoft, opacity: 0.85, borderColor: danger, borderWidth: 0},
+              // Ein Block aus genau einer Markierung hat start == end und wäre
+              // ohne Mindestbreite unsichtbar — ein Band von null Pixeln. Ein
+              // Dreihundertstel des Fensters entspricht der Schwelle, mit der
+              // der Server Blöcke zusammenfasst (siehe
+              // marked_ranges_in_window()), also etwa drei Pixeln.
+              data: this.markedRanges.map(b => {
+                const mindest = (this.periodEnd - this.windowStart) / 300;
+                const breite = Math.max(b.end - b.start, mindest);
+                const mitte = (b.start + b.end) / 2;
+                return [
+                  {xAxis: (mitte - breite / 2) * 1000},
+                  {xAxis: (mitte + breite / 2) * 1000},
+                ];
+              }),
+            };
           }
           const option = {
             textStyle: {
@@ -876,6 +1040,8 @@
             option.dataZoom = [zoomConfig(
               (this.dynamicYAxis && this.chartType !== 'bar') ? 'filter' : 'none'
             )];
+            option.brush = selectBrush();
+            option.toolbox = {show: false};
           }
           chartInstance.setOption(option, true);
           chartInstance.resize();
@@ -974,6 +1140,8 @@
             // filterMode 'none': die y-Achse ist hier eine einzelne Kategorie
             // ("AN"), es gibt nichts nachzuskalieren.
             dataZoom: [zoomConfig('none')],
+            brush: selectBrush(),
+            toolbox: {show: false},
           };
           chartInstance.setOption(option, true);
           chartInstance.resize();

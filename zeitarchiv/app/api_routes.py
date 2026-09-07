@@ -18,7 +18,12 @@ from pydantic import BaseModel, Field
 
 from . import ha_integration
 from .formatting import decimals_to_int, entity_display_name
-from .limits import MAX_EVENT_TEXT_LENGTH, MAX_MULTI_QUERY_ENTITIES, MAX_WRITE_EVENTS
+from .limits import (
+    MAX_EVENT_TEXT_LENGTH,
+    MAX_MARKED_RANGES,
+    MAX_MULTI_QUERY_ENTITIES,
+    MAX_WRITE_EVENTS,
+)
 from .logging_setup import log_rate_limited
 from .route_support import storage_locked
 from .storage import query as query_mod
@@ -509,21 +514,27 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         compare_mode: str = "previous",
         raw: bool = False,
         chart_type: str | None = None,
+        marked: bool = False,
     ) -> dict:
         _validate_entity_id_or_400(entity_id)
         if chart_type not in (None, "line", "bar"):
             raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
         now = datetime.now(deps.tz)
+        # Kein frühes return im raw-Zweig mehr: die Markierungen unten gelten
+        # für beide Pfade, und ein zweiter Ausgang hätte sie im
+        # Rohwert-Modus stillschweigend übersprungen — ausgerechnet dort, wo
+        # sie am genauesten sitzen.
         if raw:
-            return query_mod.query_raw_series(
+            result = query_mod.query_raw_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset, continuous=continuous,
             )
-        result = query_mod.query_series(
-            deps.data_dir, deps.index, entity_id, range, deps.tz, now,
-            offset=offset, continuous=continuous, chart_type=chart_type,
-        )
-        if compare:
+        else:
+            result = query_mod.query_series(
+                deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                offset=offset, continuous=continuous, chart_type=chart_type,
+            )
+        if compare and not raw:
             compare_result = query_mod.query_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset if compare_mode == "year" else offset - 1,
@@ -536,6 +547,18 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 compare_window_start=compare_result["window_start"],
                 compare_window_end=compare_result["window_end"],
             )
+        # Zur Löschung markierte Bereiche — nur auf Anforderung, obwohl sie
+        # billig sind (reine Index-Abfrage, kein Zugriff auf Hot Buffer oder
+        # Archiv): ein Feld, das fast immer leer ist, gehört nicht in jede
+        # Antwort. Hier und nicht in query_series()/query_raw_series(), damit
+        # beide Pfade dieselbe Ergänzung bekommen, ohne sie zweimal einzubauen.
+        if marked:
+            bereiche, gesamt = query_mod.marked_ranges_in_window(
+                deps.index, entity_id,
+                result["window_start"], result["window_end"], MAX_MARKED_RANGES,
+            )
+            result["marked_ranges"] = bereiche
+            result["marked_total"] = gesamt
         return result
 
     @router.get("/api/query-multi")
