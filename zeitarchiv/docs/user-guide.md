@@ -1238,7 +1238,8 @@ zeigen sie ihren Stand — je nachdem, wo sie ausgelöst werden — an bis zu dr
 Stellen:
 
 - **Am Knopf.** Er wird für die Dauer der Anfrage blass, bekommt einen kleinen
-  rotierenden Ring und lässt sich nicht ein zweites Mal drücken.
+  rotierenden Ring und lässt sich nicht ein zweites Mal drücken. Dauert es
+  länger als drei Sekunden, zählt im Knopf zusätzlich eine Uhr mit.
 - **Unter dem Knopf.** Wo es eine ehrliche Zahl gibt (importierte Zeilen,
   geprüfte Variablen, bereinigte Monate), erscheint ein Fortschrittsbalken mit
   „X von Y". Gibt es keine verlässliche Gesamtzahl, zeigt die Anzeige bewusst

@@ -322,6 +322,48 @@ def test_every_indicator_points_at_something_that_exists() -> None:
             )
 
 
+def test_the_clock_lives_in_the_button_now() -> None:
+    """Die mitlaufende Uhr ist das Einzige, was vom Chip übrig bleiben musste:
+    Ring und Dimmung sagen "läuft", aber nicht "noch, seit einer Minute". Sie
+    sitzt jetzt im Knopf selbst — und hängt an keiner Vorlage, sondern nur
+    daran, ob der Auslöser ein .btn ist. Damit gibt es keine Liste, die jemand
+    beim Anlegen eines neuen Knopfes vergessen könnte, und keinen Selektor,
+    den ein Tippfehler lautlos abschalten kann (beides war beim Chip über
+    seinen hx-indicator möglich)."""
+    js = (APP / "static" / "js" / "btn-elapsed.js").read_text(encoding="utf-8")
+
+    assert "UHR_AB_MS = 3000" in js, "unter drei Sekunden ist die Uhr Unruhe, keine Information"
+    assert "aria-hidden" in js, "eine im Sekundentakt vorgelesene Zahl wäre eine Dauerunterbrechung"
+    assert "isConnected" in js, "ohne Reißleine tickt ein Timer auf abgehängtem Knopf weiter"
+    assert "navbtn" in js, "28x28 mit fester Größe — die Uhr würde das Glyph hinausdrücken"
+
+    # Genau die vier Endereignisse: Eine ABGEBROCHENE lange Anfrage ist der
+    # Fall, in dem eine ewig weiterzählende Uhr am auffälligsten wäre.
+    for ereignis in ("htmx:afterRequest", "htmx:sendError", "htmx:timeout", "htmx:sendAbort"):
+        assert ereignis in js, f"{ereignis} stoppt die Uhr nicht"
+
+    css = (APP / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".btn-elapsed{" in css
+    assert "tabular-nums" in css[css.index(".btn-elapsed{"):css.index(".btn-elapsed{") + 200], (
+        "ohne Tabellenziffern wechselt der Knopf bei jeder Sekunde die Breite"
+    )
+
+
+def test_the_clock_script_is_loaded_where_the_buttons_are() -> None:
+    """Zentral in _topnav.html, aus demselben Grund wie topnav-activity.js:
+    Die Knöpfe stehen über die halbe App verteilt. Das Skript des Vorgängers
+    musste jede Seite einzeln einbinden — eine Liste, die mit jeder neuen
+    Seite falsch werden konnte."""
+    topnav = (TEMPLATES / "_topnav.html").read_text(encoding="utf-8")
+    assert "js/btn-elapsed.js" in topnav
+    for seite in TEMPLATES.glob("*.html"):
+        if seite.name == "_topnav.html":
+            continue
+        assert "js/btn-elapsed.js" not in seite.read_text(encoding="utf-8"), (
+            f"{seite.name} bindet das Skript ein zweites Mal ein"
+        )
+
+
 def test_the_busy_chip_is_gone_for_good() -> None:
     """Der "Läuft"-Chip stand von 0.85.0 an neben fünf Knöpfen und wurde wieder
     entfernt: Er verdoppelte die Aussage des Knopfes, reservierte daneben

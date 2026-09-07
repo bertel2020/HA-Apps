@@ -587,7 +587,21 @@ Unterbau (`progress.py`, wer sich anmeldet und warum) steht in
 **Stufe 1 — der Knopf sagt, dass er arbeitet.** `hx-disabled-elt="this"` plus
 die `.btn`-Regeln in `app.css`: gedimmt, `cursor:progress`, ein kleiner
 rotierender Ring hinter der Beschriftung. Beantwortet „ist mein Klick
-angekommen?" und verhindert zugleich den zweiten Klick. Drei Fallen:
+angekommen?" und verhindert zugleich den zweiten Klick.
+
+Dauert die Anfrage länger als drei Sekunden, hängt `js/btn-elapsed.js` eine
+mitlaufende Uhr in den Knopf (`.btn-elapsed`, Tabellenziffern, damit er beim
+Weiterzählen nicht die Breite wechselt). Erst ab dieser Schwelle, weil eine
+Sekundenanzeige darunter keine Information ist, sondern Unruhe — dass etwas
+läuft, sagen Ring und Dimmung bereits; die Uhr sagt „noch, seit einer
+Minute". Sie hängt an keiner Vorlage, sondern nur daran, ob der Auslöser ein
+`.btn` ist: Damit gibt es keine Liste von Knöpfen, die beim Anlegen eines
+neuen jemand vergessen könnte. Das Skript lädt `_topnav.html` zentral, wie
+`topnav-activity.js`. `aria-hidden` liegt auf der Uhr — eine im Sekundentakt
+vorgelesene Zahl wäre eine Dauerunterbrechung, und dass der Knopf beschäftigt
+ist, sagt Screenreadern sein `disabled`.
+
+Drei Fallen:
 
 - **Der Aufhänger ist nicht nur `.htmx-request`.** htmx setzt diese Klasse auf
   das auslösende Element — aber nur, solange kein `hx-indicator` gesetzt ist;
@@ -604,12 +618,13 @@ angekommen?" und verhindert zugleich den zweiten Klick. Drei Fallen:
   verschluckt seinen Wert also nicht. Das ist im minifizierten htmx
   nachgeprüft, nicht angenommen.
 
-> Zwischen 0.85.0 und dieser Fassung stand neben fünf dieser Knöpfe zusätzlich
-> ein „Läuft"-Chip mit mitlaufender Uhr (`_busy.html`, `busy-chip.js`). Er ist
-> wieder entfernt: Er sagte dasselbe wie der Knopf, hielt daneben dauerhaft
-> Platz frei — und nahm dem Knopf über seinen `hx-indicator` genau den
-> Laufzustand weg, den er ergänzen sollte. Wer eine solche Anzeige neben einem
-> Knopf erwägt, hat damit den Präzedenzfall.
+> Kurzzeitig stand diese Uhr in einem eigenen Chip **neben** fünf dieser
+> Knöpfe (`_busy.html`, `busy-chip.js`). Der Chip ist wieder entfernt: Er
+> sagte im Kern dasselbe wie der Knopf, hielt daneben dauerhaft Platz frei —
+> und nahm dem Knopf über seinen `hx-indicator` genau den Laufzustand weg, den
+> er ergänzen sollte. Geblieben ist der eine Teil, den der Knopf allein nicht
+> konnte: die Sekunden. Wer eine Anzeige neben einem Knopf erwägt, hat damit
+> den Präzedenzfall — erst prüfen, ob sie nicht in den Knopf gehört.
 
 **Stufe 2 — der Balken sagt, wie weit.** `_job_progress.html`, gefüllt aus
 `JobProgress.snapshot()`. Der Container pollt sich alle 500 ms per

@@ -1409,6 +1409,10 @@ button[data-tooltip]{cursor:pointer;}
   animation:btn-spin .7s linear infinite;
 }
 @keyframes btn-spin{to{transform:rotate(360deg);}}
+/* Die Sekunden im Knopf (js/btn-elapsed.js hängt den Span erst nach drei
+   Sekunden ein). Tabellenziffern, damit der Knopf beim Weiterzählen nicht
+   bei jeder Sekunde die Breite wechselt. */
+.btn-elapsed{margin-left:.5em;font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:.92em;opacity:.85;}
 @media (prefers-reduced-motion:reduce){
   .btn.htmx-request:not(.navbtn)::after,.btn[data-disabled-by-htmx]:not(.navbtn)::after{animation:none;}
 }

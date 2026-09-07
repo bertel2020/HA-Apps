@@ -19,6 +19,11 @@
    einbinden — eine Liste, die sich sonst mit jeder neuen Seite verschieben
    würde. defer, damit #notice-activity beim Start bereits im Dokument steht. #}
 <script src="{{ asset('js/topnav-activity.js') }}" defer></script>
+{# Ebenso zentral: Die Uhr im Knopf hängt an keiner Vorlage, sondern daran,
+   ob der Auslöser einer htmx-Anfrage ein .btn ist. Eine Liste von Seiten
+   wäre hier dieselbe Fehlerquelle wie beim vorherigen Chip, dessen Skript
+   jede Seite einzeln einbinden musste. #}
+<script src="{{ asset('js/btn-elapsed.js') }}" defer></script>
 {% set _path = request.url.path %}
 {% set _rel = _path[(app_root|length):] if app_root and _path.startswith(app_root) else _path %}
 {% set nav_home = _rel in ('/', '', '/uebersicht') %}
