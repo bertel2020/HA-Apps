@@ -34,7 +34,7 @@
         </div>
         <div class="chart-grid" data-card-grid>
           {% for row in rows %}
-          <div class="card chart-card" data-name="{{ row.name }}" data-created="{{ row.created_at }}"
+          <div class="card chart-card{% if row.type_key %} has-typ is-typ-{{ row.type_key }}{% endif %}" data-name="{{ row.name }}" data-created="{{ row.created_at }}"
                data-favorite="{{ 1 if row.is_favorite else 0 }}">
             <div class="card-top-actions">
               <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"

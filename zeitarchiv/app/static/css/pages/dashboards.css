@@ -3,6 +3,24 @@
      noch Titel + Kennzahlenzeile und braucht die alte Breite nicht mehr. */
   .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px;}
   .dash-card{display:flex;flex-direction:column;gap:6px;position:relative;padding:16px 18px;}
+  /* Neutraler Eck-Verlauf statt reiner Kartenfläche — Dosierung und
+     Begründung stehen bei --tile-wash in app.css. Der Verlauf ist bewusst
+     bedeutungsfrei: die Übersichten haben, anders als das Energiedashboard,
+     keine Rollen, an die eine Farbe gebunden wäre.
+     Hover ersetzt den Verlauf, statt ihn zu ergänzen — zwei übereinander
+     liegende Ecken derselben Stelle ergäben nur einen Farbmatsch. */
+  /* .edash-pin-card ist mit aufgeführt, damit die feste
+     Energiedashboard-Kachel nicht als einzige flach und ohne Reaktion in der
+     Reihe steht — sie ist zwar kein gespeichertes Dashboard, sieht im Raster
+     aber wie eines aus. */
+  .dash-card,.edash-pin-card{
+    background:var(--tile-wash), var(--surface);
+    transition:background .16s ease, border-color .16s ease;
+  }
+  .dash-card:hover,.edash-pin-card:hover{
+    background:var(--tile-wash-hover), var(--surface);
+    border-color:color-mix(in srgb, var(--accent-line) 30%, var(--border));
+  }
   .dash-card h3{
     overflow-wrap:anywhere;margin:0;font-size:calc(15px * var(--font-scale, 1));line-height:1.35;
     /* Platz für vier Titelzeilen freihalten: so viele braucht der längste
@@ -111,6 +129,9 @@
      Ebene; der Toggle bleibt per z-index:2 (wie .card-top-actions oben)
      trotzdem unabhängig anklickbar. */
   .edash-pin-title a{color:inherit;text-decoration:none;}
+  /* Titel beim Überfahren einfärben wie bei .dash-card h3 a — die Kachel
+     sieht im Raster aus wie ein Dashboard und soll sich auch so anfühlen. */
+  .edash-pin-card:hover .edash-pin-title a{color:var(--accent-line);}
   .edash-pin-title a::after{content:"";position:absolute;inset:0;border-radius:inherit;}
   /* Startseiten-Abzeichen — nur sichtbar, wenn die Einstellung "Startseite"
      (siehe _settings_darstellung_form.html) auf Energiedashboard steht.

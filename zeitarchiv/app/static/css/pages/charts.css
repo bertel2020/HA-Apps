@@ -3,6 +3,20 @@
      noch Titel + Kennzahlenzeile und braucht die alte Breite nicht mehr. */
   .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px;}
   .chart-card{display:flex;flex-direction:column;gap:6px;position:relative;padding:16px 18px;}
+  /* Neutraler Eck-Verlauf statt reiner Kartenfläche — Dosierung und
+     Begründung stehen bei --tile-wash in app.css. Der Verlauf ist bewusst
+     bedeutungsfrei: die Übersichten haben, anders als das Energiedashboard,
+     keine Rollen, an die eine Farbe gebunden wäre.
+     Hover ersetzt den Verlauf, statt ihn zu ergänzen — zwei übereinander
+     liegende Ecken derselben Stelle ergäben nur einen Farbmatsch. */
+  .chart-card{
+    background:var(--tile-wash), var(--surface);
+    transition:background .16s ease, border-color .16s ease;
+  }
+  .chart-card:hover{
+    background:var(--tile-wash-hover), var(--surface);
+    border-color:color-mix(in srgb, var(--accent-line) 30%, var(--border));
+  }
   .chart-card h3{
     overflow-wrap:anywhere;margin:0;font-size:calc(15px * var(--font-scale, 1));line-height:1.35;
     /* Platz für vier Titelzeilen freihalten: so viele braucht der längste
@@ -29,6 +43,40 @@
   .chart-card h3 a{color:inherit;text-decoration:none;}
   .chart-card:hover h3 a{color:var(--accent-line);}
   .chart-card h3 a::after{content:'';position:absolute;inset:0;border-radius:inherit;}
+  /* Kopfstreifen nach Chart-Typ — die Klasse kommt aus type_key
+     (_chart_type_key() in main.py), nicht aus dem Label. Aufbau exakt wie
+     .dash-card.is-default-home::before in dashboards.css: normaler
+     Flow-::before mit negativem Rand, weil die Karte ihr Padding selbst
+     trägt.
+
+     Der Streifen läuft nach rechts auf 35% aus, statt Vollton zu sein. Grund:
+     die überwiegende Mehrheit der Charts ist reine Linie oder reiner Balken —
+     ohne Auslauf stünden dort drei satte Farbbalken im Raster, was die Kachel
+     zur Beschriftung eines Typs macht, den die Meta-Zeile ohnehin nennt. Beim
+     gemischten Chart wird aus dem Auslauf ein echter Übergang von der einen
+     Typfarbe in die andere; genau dort trägt der Verlauf eine Aussage, die
+     sonst nur im Text steht.
+
+     Farben aus der Chart-Palette, nicht aus den Akzenten: --chart-1/--chart-2
+     sind dieselben Töne, in denen Linie und Balken im Chart selbst gezeichnet
+     werden (siehe --chart-line/--chart-bar). Zeitstrahl hat keine eigene
+     Zeichenfarbe und bekommt --chart-4, den nächsten freien Palettenton. */
+  .chart-card.has-typ::before{
+    content:'';display:block;height:4px;margin:-16px -18px 12px;
+    border-radius:14px 14px 0 0;
+  }
+  .chart-card.is-typ-linie::before{
+    background:linear-gradient(90deg, var(--chart-1), color-mix(in srgb, var(--chart-1) 35%, transparent));
+  }
+  .chart-card.is-typ-balken::before{
+    background:linear-gradient(90deg, var(--chart-2), color-mix(in srgb, var(--chart-2) 35%, transparent));
+  }
+  .chart-card.is-typ-zeitstrahl::before{
+    background:linear-gradient(90deg, var(--chart-4), color-mix(in srgb, var(--chart-4) 35%, transparent));
+  }
+  .chart-card.is-typ-gemischt::before{
+    background:linear-gradient(90deg, var(--chart-1), var(--chart-2));
+  }
   .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:96px;border-style:dashed;text-decoration:none;}
   .chart-grid-add-btn{
     display:flex;align-items:center;justify-content:center;

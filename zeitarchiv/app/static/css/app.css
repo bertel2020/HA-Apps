@@ -133,6 +133,30 @@
   --chart-5:#C4472B; --chart-6:#4C8C4A; --chart-7:#B0932A; --chart-8:#5C6B73;
   --font-display:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
   --shadow:0 1px 2px rgba(19,28,23,.06), 0 1px 1px rgba(19,28,23,.04);
+  /* Eck-Verlauf der Übersichtskacheln (/dashboards, /tables, /charts) statt
+     reiner Kartenfläche. Als EIN Token, obwohl die drei Seiten ihre
+     Kartenregeln sonst je einzeln führen: die Dosierung ist der einzige
+     wirklich strittige Wert daran, und dreifach gepflegt driftet sie
+     auseinander, sobald jemand eine Seite nachjustiert.
+
+     Dosierung 14% auf --ink-faint, ausgelaufen bei 62%. Warum diese
+     Größenordnung: --border-strong ist als Flächenton nachgemessen
+     unsichtbar (siehe .edash-section-neutral in pages/energiedashboard.css),
+     --ink-faint liegt weit genug von der Kartenfläche weg. Die dortigen 22%
+     gelten für einen großen Konfig-Abschnitt; auf einer 240px-Kachel, von
+     der zwanzig gleichzeitig im Raster stehen, ist das zu viel Farbmenge.
+
+     var() wird erst am Element aufgelöst — der Verlauf folgt damit von
+     selbst dem aktiven Schema und Hell/Dunkel, ohne je Schema wiederholt zu
+     werden. In dunklen Schemata hellt --ink-faint die Ecke auf statt sie
+     abzudunkeln; das ist dieselbe Umkehr wie bei den Energiedashboard-
+     Abschnitten und dort erwünscht.
+
+     Hover in --accent-line statt derselben neutralen Tinte: der Ruhezustand
+     ist jetzt selbst getönt, eine bloße Verstärkung wäre kaum als Reaktion
+     zu erkennen. */
+  --tile-wash:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 14%, transparent), transparent 62%);
+  --tile-wash-hover:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--accent-line) 10%, transparent), transparent 60%);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-color-mode]),:root[data-color-mode="auto"]{

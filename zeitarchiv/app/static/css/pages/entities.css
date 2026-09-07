@@ -1,3 +1,18 @@
+  /* Die drei Kennzahl-Kacheln der Übersicht bekommen denselben neutralen
+     Eck-Verlauf wie die Karten auf /dashboards, /tables und /charts — siehe
+     --tile-wash in app.css für Dosierung und Begründung.
+
+     Bewusst HIER statt bei .stat in app.css: dieselbe Klasse trägt auch die
+     Kachelreihen auf /statistik und in der Entitätskonfiguration. Ob die
+     mitziehen, ist eine eigene Entscheidung und keine Nebenwirkung dieser.
+
+     a.stat hat in app.css schon einen Hover (Rahmen + 1px Anheben); die
+     Übergangsliste wird hier ersetzt statt ergänzt, damit der Verlauf mit
+     derselben Dauer mitläuft wie auf den Übersichtskarten. */
+  .stat{background:var(--tile-wash), var(--surface);}
+  a.stat{transition:background .16s ease, border-color .12s, transform .12s;}
+  a.stat:hover{background:var(--tile-wash-hover), var(--surface);}
+
   /* Dashboard-Kacheln: drei Spalten als feste Desktop-Grundeinheit. Jede
      Kachel kann davon 1–3 Spalten und 1–3 Zeilen belegen. */
   [x-cloak]{display:none!important;}

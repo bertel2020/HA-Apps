@@ -3,6 +3,20 @@
      noch Titel + Kennzahlenzeile und braucht die alte Breite nicht mehr. */
   .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:20px;}
   .chart-card{display:flex;flex-direction:column;gap:6px;position:relative;padding:16px 18px;}
+  /* Neutraler Eck-Verlauf statt reiner Kartenfläche — Dosierung und
+     Begründung stehen bei --tile-wash in app.css. Der Verlauf ist bewusst
+     bedeutungsfrei: die Übersichten haben, anders als das Energiedashboard,
+     keine Rollen, an die eine Farbe gebunden wäre.
+     Hover ersetzt den Verlauf, statt ihn zu ergänzen — zwei übereinander
+     liegende Ecken derselben Stelle ergäben nur einen Farbmatsch. */
+  .chart-card{
+    background:var(--tile-wash), var(--surface);
+    transition:background .16s ease, border-color .16s ease;
+  }
+  .chart-card:hover{
+    background:var(--tile-wash-hover), var(--surface);
+    border-color:color-mix(in srgb, var(--accent-line) 30%, var(--border));
+  }
   .chart-card h3{
     overflow-wrap:anywhere;margin:0;font-size:calc(15px * var(--font-scale, 1));line-height:1.35;
     /* Platz für vier Titelzeilen freihalten: so viele braucht der längste

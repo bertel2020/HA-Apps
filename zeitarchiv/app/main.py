@@ -3097,22 +3097,38 @@ def _resolve_entity_chart_options(entity) -> dict:
     return options
 
 
-def _chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
+# Kennung -> Beschriftung. Die Kennung ist die Grundform, nicht das Label: sie
+# trägt auf /charts zusätzlich die Kachel-Klasse für den Kopfstreifen je Typ
+# (siehe .is-typ-* in pages/charts.css). Aus dem zusammengesetzten Label
+# "Linie + Balken" im Template eine Klasse abzuleiten wäre der umgekehrte,
+# brüchige Weg.
+_CHART_TYPE_LABELS = {
+    "zeitstrahl": "Zeitstrahl",
+    "linie": "Linie",
+    "balken": "Balken",
+    "gemischt": "Linie + Balken",
+}
+
+
+def _chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
     """Wie das Chart tatsächlich gezeichnet wird, für die Übersichtskachel.
 
     Gespeichert ist nur "auto" oder "timeline" — bei "auto" entscheidet der
     Aggregationstyp JEDER Entität einzeln (Zähler/Schalter → Balken, sonst
     Linie, dieselbe Regel wie _resolved_chart_type() in storage/query.py).
-    Ein Chart kann deshalb beides zugleich enthalten."""
+    Ein Chart kann deshalb beides zugleich enthalten. Ein Chart ohne
+    Entitäten hat keinen Typ — leere Kennung, Kachel ohne Streifen."""
     if chart["chart_type"] == "timeline":
-        return "Zeitstrahl"
+        return "zeitstrahl"
     vorhanden = {
-        "Balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "Linie"
+        "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
         for entity_id in chart["entity_ids"]
     }
-    # Feste Reihenfolge statt der ungeordneten Menge, damit ein gemischtes
-    # Chart nicht mal "Linie + Balken" und mal "Balken + Linie" anzeigt.
-    return " + ".join(typ for typ in ("Linie", "Balken") if typ in vorhanden)
+    return "gemischt" if len(vorhanden) > 1 else next(iter(vorhanden), "")
+
+
+def _chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
+    return _CHART_TYPE_LABELS.get(_chart_type_key(chart, aggregation_types), "")
 
 
 @app.get("/charts", response_class=HTMLResponse)
@@ -3129,6 +3145,7 @@ def charts_list(request: Request) -> HTMLResponse:
             "entity_count": len(c["entity_ids"]),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
             "type_label": _chart_type_label(c, aggregation_types),
+            "type_key": _chart_type_key(c, aggregation_types),
             # Nur für "Neueste/Älteste zuerst" im Browser (card-browser.js),
             # nicht zum Anzeigen — deshalb roh statt formatiert.
             "created_at": c["created_at"],
