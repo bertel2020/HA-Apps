@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.storage.index import Index
 
-from _paths import APP
+from _paths import APP, page_text
 
 
 
@@ -65,7 +65,7 @@ def test_formula_unit_is_saved_and_loaded() -> None:
 
 
 def test_formula_unit_feature_is_wired_through_editor_and_compute_core() -> None:
-    editor = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+    editor = page_text("table_editor.html")
     compute = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
 
     # Natives title auf das App-eigene data-tooltip-System umgestellt.

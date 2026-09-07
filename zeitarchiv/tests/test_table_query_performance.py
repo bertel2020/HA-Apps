@@ -20,14 +20,14 @@ from app.api_routes import (
 from app.storage.coordinator import StorageCoordinator
 from app.storage.index import Index
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, page_text
 
 
 TZ = ZoneInfo("Europe/Berlin")
 COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 FIXED_TOOLTIP = (APP / "static/js/fixed-tooltip.js").read_text(encoding="utf-8")
-TABLE_EDITOR = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+TABLE_EDITOR = page_text("table_editor.html")
 
 
 def test_query_read_cache_parses_current_hot_file_once(monkeypatch, tmp_path: Path) -> None:

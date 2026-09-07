@@ -540,9 +540,11 @@ templates.env.globals["css_v"] = _AssetVersion(
 # Browser-Cache unbemerkt hängen, obwohl der Server längst die neue Version
 # ausliefert. Eine gemeinsame mtime über alle JS-Dateien statt einer pro Datei:
 # einfacher als js_v-Kopien an jeder <script>-Stelle zu pflegen, und ändert sich
-# ohnehin bei jedem Deploy dieses Verzeichnisses.
+# ohnehin bei jedem Deploy dieses Verzeichnisses. Seit ZG-04 Schritt 3b gehört
+# static/js/pages/ dazu — die aus den Templates gehobenen Seitenskripte, analog
+# zu static/css/pages/ bei css_v.
 templates.env.globals["js_v"] = _AssetVersion(
-    lambda: (APP_DIR / "static" / "js").glob("*.js")
+    lambda: (APP_DIR / "static" / "js").glob("**/*.js")
 )
 # Dieselbe Begründung wie js_v, für htmx/echarts/alpine — trugen bisher
 # keinen Cache-Buster, wären damit die einzige Lücke im langen Cache-Control
