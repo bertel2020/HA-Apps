@@ -44,6 +44,22 @@
   }
   .period-label:hover:not(:disabled){color:var(--accent-line);}
   .period-label:disabled{cursor:default;}
+  /* Ausschnitts-Chip (Zoom). Bis auf zwei Dinge ein gewöhnlicher .chip — er
+     füllt sich im aktiven Zustand mit --accent-line wie der "Jetzt"-Knopf
+     daneben, statt sich eine eigene Sonderoptik zu geben.
+     Mono, weil er eine Zeitspanne zeigt (wie das Perioden-Label daneben), und
+     mit fester Mindestbreite, weil seine Beschriftung zwischen "Ausschnitt"
+     und "14:20 – 16:05" wechselt: ohne sie würde die Toolbar bei jeder
+     Radbewegung neu umbrechen. Der Wert ist an der längsten Form gemessen
+     (zwei Uhrzeiten plus Trennstrich und ד). */
+  .chip-zoom{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));min-width:152px;
+  }
+  .chip-zoom-x{opacity:.75;line-height:1;}
+  /* Ohne Ausschnitt gibt es nichts zurückzusetzen — das × verschwindet, der
+     Platz bleibt (siehe min-width oben). */
+  .chip-zoom:disabled .chip-zoom-x{visibility:hidden;}
 
   /* Kalender-Widget für den Datums-Sprung — Aufbau/Verhalten identisch zur
      Bereinigungs-Seite (cleanup.html), siehe static/js/calendar-picker.js. */
@@ -96,6 +112,11 @@
   .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
   .card{overflow:hidden;}
   #chart{width:100%;height:380px;max-width:100%;}
+  /* Fußnote UNTER der Karte (Zoom verfügbar oder nicht) — mehr Luft als die
+     8 px, die .hint mitbringt, weil er hier einen Kartenrand überbrücken muss
+     statt nur einen Absatz. Mit dem Standardabstand klebte er an der Karte,
+     als gehöre er noch hinein. */
+  .zoom-hint{margin-top:12px;}
   @media (max-width:480px){
     #chart{height:280px;}
     .card{padding:14px;}

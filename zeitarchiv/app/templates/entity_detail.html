@@ -55,6 +55,21 @@
           <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="Nächster Zeitraum">›</button>
         </div>
         <button class="chip" :class="{active: offset !== 0}" :disabled="offset === 0" @click="goToNow()">Jetzt</button>
+        {# Ausschnitts-Chip: zeigt den hineingezoomten Bereich und setzt ihn per
+           Klick zurück. Nach dem Muster des "Jetzt"-Knopfes daneben immer im
+           Layout, nur deaktiviert wenn nichts gezoomt ist (statt per x-show zu
+           erscheinen) — siehe der Kommentar zu .toolbars in entity_detail.css:
+           jeder Control hat einen festen Platz, sonst rutschen die Nachbarn bei
+           jedem Zustandswechsel woandershin. Die feste Mindestbreite in
+           .chip-zoom hat denselben Grund: die Beschriftung wechselt beim Zoomen
+           von "Ausschnitt" zu einer Zeitspanne und würde die Zeile sonst bei
+           jeder Radbewegung neu umbrechen. #}
+        <button type="button" class="chip chip-zoom" :class="{active: !!zoomRange}"
+                :disabled="!zoomRange" @click="resetZoom()"
+                title="Gezeigten Ausschnitt zurücksetzen">
+          <span x-text="zoomLabel"></span>
+          <span class="chip-zoom-x" aria-hidden="true">&times;</span>
+        </button>
         <div class="menu-wrap" @click.outside="compareMenuOpen = false">
           <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
             <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
@@ -234,6 +249,16 @@
         </table>
       </div>
     </div>
+
+    {# Unter der Karte, nicht darin: er beantwortet die Frage, die der graue
+       "Ausschnitt"-Knopf in der Werkzeugleiste sonst offen ließe — warum sich
+       hier nichts vergrößern lässt (bzw. wie es geht, wo es geht). Damit sagt
+       er etwas über das Bedienen der Ansicht und nicht über die dargestellten
+       Werte; in der Karte hätte er neben der Legende gestanden, die genau das
+       tut. hint-status statt eines aufklappbaren Hinweises, weil die Punktzahl
+       ein Datenzustand ist und kein Hilfetext; siehe "Hinweistexte: drei
+       Rollen" in docs/frontend.md. #}
+    <p class="hint hint-status zoom-hint" x-show="points.length" x-text="zoomHint"></p>
 
   </div>
 

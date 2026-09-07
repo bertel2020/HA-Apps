@@ -279,6 +279,35 @@ Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
 - **Nachkommastellen** übersteuert für diese Ansicht die globale Anzeige-
   Einstellung der Entität (Automatisch oder fest 0–3).
 
+### In einen Ausschnitt hineinzoomen
+
+Wenn ein Zeitraum viele Messwerte enthält — Rohwerte eines häufig meldenden
+Sensors etwa —, liegen die Punkte dichter, als der Bildschirm sie
+auseinanderhalten kann. Dann lässt sich ein Ausschnitt vergrößern:
+
+- **Am Rechner:** **Strg** gedrückt halten und das Mausrad drehen. Das Rad
+  allein scrollt weiter die Seite, es passiert also nichts versehentlich. Mit
+  gedrückter Strg-Taste ziehen verschiebt den Ausschnitt.
+- **Am Trackpad und auf dem Telefon:** mit zwei Fingern auseinander- bzw.
+  zusammenziehen. Ein Wisch mit einem Finger scrollt wie überall sonst die
+  Seite.
+
+Ist ein Ausschnitt aktiv, zeigt der Knopf **Ausschnitt** in der Werkzeugleiste
+dessen Zeitspanne (z. B. "14:20 – 16:05"); ein Klick darauf zeigt wieder den
+ganzen Zeitraum. Der Ausschnitt ist bewusst flüchtig: er wird nicht
+gespeichert, und ein Wechsel des Zeitraums oder eine Änderung im
+Optionen-Menü stellt die volle Ansicht wieder her.
+
+Unter dem Diagramm steht immer eine Zeile, die sagt, woran man ist: wie viele
+Datenpunkte gerade gezeichnet sind und ob sich davon ein Ausschnitt vergrößern
+lässt.
+
+Angeboten wird das nur, wo es etwas aufzudecken gibt — bei wenigen Punkten
+(etwa zwölf Monatsbalken im Jahr) bleibt der Knopf grau. Beim **Zeitstrahl**
+gibt es ihn dagegen immer: Schaltvorgänge von wenigen Minuten sind in einer
+Monatsansicht schmaler als ein Bildpunkt und werden erst beim Hineinzoomen
+sichtbar.
+
 ### Vergleich
 
 Über das Optionen-Menü lässt sich die aktuelle Ansicht mit der Vorperiode
@@ -310,7 +339,10 @@ dauerhaft gespeichert und beim nächsten Aufruf automatisch wieder
 angewendet. Die Startwerte für neu geöffnete Entitäten lassen sich unter
 **Einstellungen → Darstellung** ändern; "Optionen auf Standard
 zurücksetzen" (im Optionen-Menü der Entität) wirft nur diese eine Entität
-wieder auf diese Startwerte zurück.
+wieder auf diese Startwerte zurück. Nicht dazu gehört der gezoomte
+Ausschnitt: er beschreibt keine Eigenschaft der Entität, sondern nur den
+gerade betrachteten Bildausschnitt, und gilt deshalb nur bis zur nächsten
+Änderung.
 
 ## Entität konfigurieren
 

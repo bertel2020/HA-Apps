@@ -188,6 +188,76 @@
     // eine Chart-Instanz pro Seite gibt.
     let chartInstance = null;
 
+    // Ab wie vielen Punkten ein Zoom überhaupt etwas aufdecken kann: der Chart
+    // ist am Desktop rund 900 px breit, bei 200 Punkten hat jeder davon noch
+    // gut 4 px für sich — darunter verdeckt kein Punkt einen anderen, es gibt
+    // nichts zu vergrößern.
+    //
+    // Bewusst eine Schwelle über die tatsächlich geladenen Punkte statt einer
+    // Liste erlaubter Zeiträume: dieselbe Zeitraum-Stufe braucht je nach
+    // Melderhythmus der Entität unterschiedliche Antworten. Ein Sensor mit zwei
+    // Werten am Tag hat im Monat 60 Punkte und nichts zu zoomen, einer im
+    // 10-Sekunden-Takt am Tag 8.640 und dringend etwas davon.
+    const ZOOM_MIN_POINTS = 200;
+
+    // Gemeinsam für Chart und Zeitstrahl. Die Voreinstellungen von ECharts sind
+    // hier durchweg die falschen, deshalb steht jede Zeile bewusst so:
+    //
+    // - zoomOnMouseWheel:'ctrl' statt true — sonst kapert der Chart das
+    //   Scrollrad, und wer nur an ihm vorbeiscrollen will, zoomt versehentlich.
+    //   Strg+Rad ist außerdem das, was Browser selbst mit Zoom belegen. Ein
+    //   Trackpad-Pinch erzeugt genau diese Kombination nativ, die Geste
+    //   funktioniert dadurch ohne eine einzige Zeile Touch-Code.
+    // - moveOnMouseWheel:false — dasselbe Argument: das Rad allein gehört der
+    //   Seite, nicht dem Chart.
+    // - moveOnMouseMove:'ctrl' statt true, und das ist eine Mobil-Entscheidung:
+    //   zrender setzt eine Ein-Finger-Berührung in Mausereignisse um, ein
+    //   schlichtes true würde also auf dem Telefon jeden senkrechten Wisch über
+    //   dem Chart als Schwenk verstehen — und weil preventDefaultMouseMove per
+    //   Voreinstellung true ist, bliebe die Seite dabei stehen statt zu
+    //   scrollen. Mit 'ctrl' greift der Schwenk nur bei gedrückter Taste, die es
+    //   auf einem Touchscreen nicht gibt: dort bleibt der Wisch der Seite, und
+    //   gezoomt wird mit zwei Fingern (der Pinch läuft über einen eigenen
+    //   Handler und ist von diesen Schaltern unberührt). Nebenbei ergibt sich
+    //   dadurch am Rechner eine einzige Regel statt zweier: Strg gedrückt
+    //   halten heißt "ich meine den Chart, nicht die Seite".
+    // - filterMode entscheidet, ob der Zoom die y-Achse mitskaliert. 'filter'
+    //   wirft Punkte außerhalb des Ausschnitts weg und lässt die Achse damit
+    //   nachziehen; 'none' behält alles. Die Seite hat mit "y-Achse
+    //   fest/dynamisch" schon einen Schalter dafür — ein Zoom, der die Achse
+    //   eigenmächtig nachskaliert, würde gegen diese Option arbeiten statt sie
+    //   zu bedienen. Deshalb wird sie hier durchgereicht, nicht neu entschieden.
+    function zoomConfig(filterMode) {
+      return {
+        type: 'inside',
+        zoomOnMouseWheel: 'ctrl',
+        moveOnMouseWheel: false,
+        moveOnMouseMove: 'ctrl',
+        filterMode,
+      };
+    }
+
+    // Der sichtbare Ausschnitt in echten Zeitstempeln (ms). ECharts drückt den
+    // Zoom je nach Auslöser mal als Prozentbereich (start/end), mal als
+    // Wertebereich (startValue/endValue) aus — deshalb beide Wege, statt sich
+    // auf einen zu verlassen. null bedeutet "voller Zeitraum", also kein Zoom.
+    function visibleWindow(zoom, fromMs, toMs) {
+      if (zoom == null || fromMs == null || toMs == null) return null;
+      let start = zoom.startValue;
+      let end = zoom.endValue;
+      if (start == null || end == null) {
+        const span = toMs - fromMs;
+        start = fromMs + span * (zoom.start ?? 0) / 100;
+        end = fromMs + span * (zoom.end ?? 100) / 100;
+      }
+      // Ein Promille Toleranz: eine Radbewegung bis an den Anschlag landet
+      // nicht immer exakt auf 0/100, und ein Chip, der bei voller Ansicht noch
+      // "aktiv" aussieht, wäre schlicht falsch.
+      const tolerance = (toMs - fromMs) / 1000;
+      if (start <= fromMs + tolerance && end >= toMs - tolerance) return null;
+      return {start, end};
+    }
+
     function entityChart() {
       return {
         ranges: [
@@ -214,6 +284,13 @@
         offset: INITIAL_OFFSET,
         continuous: CHART_OPTIONS.continuous,
         points: [],
+        // Sichtbarer Ausschnitt innerhalb des geladenen Zeitraums ({start, end}
+        // in ms) oder null für "ganzer Zeitraum". Bewusst NICHT in der URL und
+        // nicht in den Chart-Optionen der Entität gespiegelt: "Rollierend",
+        // "Rohwerte" und "Diagrammtyp" sind Aussagen über die Entität und
+        // gehören dorthin, ein Ausschnitt ist eine Aussage über die letzten
+        // dreißig Sekunden.
+        zoomRange: null,
         comparePoints: [],
         compareWindowStart: null,
         compareWindowEnd: null,
@@ -296,6 +373,68 @@
         },
         get periodLabel() {
           return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.offset, this.isCurrent);
+        },
+        // Einzige Stelle, an der die Schwelle ausgewertet wird — render() liest
+        // sie hier ab, statt die Bedingung ein zweites Mal hinzuschreiben.
+        // Der Zeitstrahl ist ausgenommen: dort geht es nicht um Komfort,
+        // sondern um Sichtbarkeit (Begründung bei seiner dataZoom-Angabe in
+        // renderTimeline()), und die Zahl der Segmente sagt darüber nichts.
+        get zoomAvailable() {
+          return this.chartType === 'timeline' || this.points.length > ZOOM_MIN_POINTS;
+        },
+        // Steht dauerhaft unter dem Chart, weil er zwei Dinge auf einmal sagt,
+        // von denen das erste ein Datenzustand ist: WIE VIELE Punkte gerade
+        // gezeichnet sind und ob sich daran etwas vergrößern lässt. Damit ist
+        // er `hint-status` und kein erklärender Hinweis — er darf nicht hinter
+        // den Info-Knopf (siehe "Hinweistexte: drei Rollen" in
+        // docs/frontend.md). Ohne ihn bliebe der graue Ausschnitts-Chip in der
+        // Werkzeugleiste unerklärt: dass er nicht anklickbar ist, hat einen
+        // Grund, und der steht hier.
+        get zoomHint() {
+          const geste = 'mit Strg und Mausrad einen Ausschnitt vergrößern, '
+            + 'am Telefon mit zwei Fingern';
+          if (this.chartType === 'timeline') {
+            return `Kurze Schaltvorgänge sind schmaler als ein Bildpunkt — ${geste}.`;
+          }
+          const einzeln = this.points.length === 1;
+          const anzahl = this.points.length.toLocaleString(LOCALE);
+          const punkte = einzeln ? '1 Datenpunkt' : `${anzahl} Datenpunkte`;
+          if (this.zoomAvailable) return `${punkte} — ${geste}.`;
+          // "alle einzeln sichtbar" passt nicht zu einem einzelnen Punkt, und
+          // den gibt es wirklich: eine Stundenansicht einer selten meldenden
+          // Entität hat oft genau einen.
+          const sichtbar = einzeln ? '' : ', alle einzeln sichtbar';
+          return `${punkte}${sichtbar} — Hineinzoomen ist hier nicht nötig.`;
+        },
+        // Ohne Zoom ein fester Text statt eines leeren Knopfes: der Chip bleibt
+        // wie der "Jetzt"-Knopf daneben immer im Layout stehen und wird nur
+        // deaktiviert (siehe Kommentar zu .toolbars in entity_detail.css) —
+        // dann braucht er auch ohne Ausschnitt eine Beschriftung.
+        get zoomLabel() {
+          if (!this.zoomRange) return 'Ausschnitt';
+          const from = new Date(this.zoomRange.start);
+          const to = new Date(this.zoomRange.end);
+          const span = this.zoomRange.end - this.zoomRange.start;
+          // Dieselbe Staffelung wie fmt() im Chart: ein Ausschnitt von zwei
+          // Stunden wird über die Uhrzeit benannt, einer von zwei Monaten über
+          // das Datum. Die Grenzen liegen bewusst über 24 Stunden bzw. einem
+          // Jahr, damit ein knapp darunter liegender Ausschnitt nicht zwischen
+          // zwei Formaten hin und her springt.
+          if (span < 36 * 3600 * 1000) {
+            const opts = {hour: '2-digit', minute: '2-digit'};
+            return `${from.toLocaleTimeString(LOCALE, opts)} – ${to.toLocaleTimeString(LOCALE, opts)}`;
+          }
+          if (span < 400 * 86400 * 1000) {
+            const opts = {day: '2-digit', month: '2-digit'};
+            return `${from.toLocaleDateString(LOCALE, opts)} – ${to.toLocaleDateString(LOCALE, opts)}`;
+          }
+          const opts = {year: 'numeric'};
+          return `${from.toLocaleDateString(LOCALE, opts)} – ${to.toLocaleDateString(LOCALE, opts)}`;
+        },
+        resetZoom() {
+          if (!chartInstance) return;
+          chartInstance.dispatchAction({type: 'dataZoom', start: 0, end: 100});
+          this.zoomRange = null;
         },
 
         setRange(key) {
@@ -466,7 +605,25 @@
 
         render() {
           if (!this.points.length) return;
-          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (!chartInstance) {
+            chartInstance = echarts.init(document.getElementById('chart'));
+            // Einmalig bei der Instanzerzeugung registriert, nicht bei jedem
+            // Rendern — sonst stapeln sich mit jedem Neuzeichnen weitere
+            // Handler auf derselben Instanz.
+            chartInstance.on('dataZoom', () => {
+              const [zoom] = chartInstance.getOption().dataZoom || [];
+              this.zoomRange = visibleWindow(
+                zoom,
+                this.windowStart != null ? this.windowStart * 1000 : null,
+                this.periodEnd != null ? this.periodEnd * 1000 - 1000 : null,
+              );
+            });
+          }
+          // Der Zoom ist in absoluten Zeitstempeln eines Fensters ausgedrückt,
+          // das sich beim Neuzeichnen geändert haben kann. setOption(…, true)
+          // weiter unten wirft die dataZoom-Komponente ohnehin weg (notMerge),
+          // hier zieht nur der Chip nach.
+          this.zoomRange = null;
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           // Kurze, zum Zeitraum passende Beschriftung statt immer Datum+Uhrzeit —
           // sonst überlappen sich die Achsenbeschriftungen bei vielen Punkten.
@@ -706,6 +863,20 @@
           // die Legende fehlt, sondern serverseitig auch das komplette Tooltip nie
           // rendert (der Fehler reißt den ganzen Render-Zyklus ab).
           if (this.compare) option.legend = {bottom: 0};
+          // Bedingt zugewiesen statt "dataZoom: … : undefined" — aus demselben
+          // Grund wie legend direkt darüber: ein explizit auf undefined
+          // gesetzter Komponenten-Key reißt beim internen Normalisieren den
+          // ganzen Render-Zyklus ab.
+          //
+          // Der Vergleichsmodus bleibt ausdrücklich eingeschlossen: die zweite
+          // Serie liegt auf derselben Achse, der Zoom erfasst also beide — ein
+          // Ausschnitt, in dem Vorperiode und aktuelle Periode gemeinsam
+          // vergrößert sind, ist eher nützlicher als die Gesamtansicht.
+          if (this.zoomAvailable) {
+            option.dataZoom = [zoomConfig(
+              (this.dynamicYAxis && this.chartType !== 'bar') ? 'filter' : 'none'
+            )];
+          }
           chartInstance.setOption(option, true);
           chartInstance.resize();
         },
@@ -790,6 +961,19 @@
               encode: {x: [1, 2], y: 0},
               data: intervals,
             }],
+            // Der Zeitstrahl bekommt den Zoom IMMER, ohne die Punkt-Schwelle
+            // der Linien-/Balken-Ansicht. Grund ist kein Komfort, sondern
+            // Sichtbarkeit: ein Segment wird als Rechteck von seinem Anfang bis
+            // zu seinem Ende gezeichnet, und bei Zeitraum "Monat" auf rund
+            // 900 px entspricht ein Pixel etwa 48 Minuten. Jedes kürzere
+            // Schaltereignis ist damit schmaler als ein Pixel und praktisch
+            // unsichtbar — Hineinzoomen ist die einzige Möglichkeit, überhaupt
+            // hinzusehen. Die Zahl der Intervalle sagt darüber nichts aus: auch
+            // drei Segmente können zu kurz zum Sehen sein.
+            //
+            // filterMode 'none': die y-Achse ist hier eine einzelne Kategorie
+            // ("AN"), es gibt nichts nachzuskalieren.
+            dataZoom: [zoomConfig('none')],
           };
           chartInstance.setOption(option, true);
           chartInstance.resize();

@@ -265,6 +265,62 @@ Kein eigener Chart-Renderer — ECharts-Instanzen werden direkt aus den
 `/api/query[-multi]`-Antworten befüllt. Mehrere Entitäten mit
 unterschiedlichen Einheiten bekommen automatisch getrennte Y-Achsen.
 
+### Zoom: eine Lupe im Zeitraum, kein zweiter Zeitraum
+
+Nur die Entitäts-Detailseite (`entity_detail.js`) hat einen `dataZoom`.
+Möglich wird das dadurch, dass die x-Achse dort ohnehin hart auf das
+Abfragefenster genagelt ist (`min: windowStart`, `max: periodEnd`), damit der
+Chart immer die ganze gewählte Periode zeigt — auch dort, wo keine Daten
+liegen. Der Zoom wählt einen Ausschnitt *innerhalb* dieser Grenzen; sein
+Vollzustand ist per Definition die ohnehin sichtbare Periode. Daraus folgt der
+Rest: keine Serveranfrage (die Punkte sind geladen), kein URL-Zustand
+(`range`/`offset` behalten ihre Bedeutung), kein Eintrag in den Chart-Optionen
+der Entität. Ein Neuzeichnen verwirft den Ausschnitt von selbst, weil
+`setOption(option, true)` die ganze Komponente ersetzt.
+
+Vier Einstellungen tragen das Verhalten, und die Voreinstellung von ECharts ist
+an jeder einzelnen die falsche:
+
+| Einstellung | Wert | Warum nicht die Voreinstellung |
+| --- | --- | --- |
+| `zoomOnMouseWheel` | `'ctrl'` | `true` ließe den Chart das Scrollrad kapern — wer vorbeiscrollt, zoomt. Ein Trackpad-Pinch erzeugt ctrl+wheel nativ, die Geste kommt dadurch gratis. |
+| `moveOnMouseWheel` | `false` | Dasselbe Argument: das Rad allein gehört der Seite. |
+| `moveOnMouseMove` | `'ctrl'` | zrender macht aus einer Ein-Finger-Berührung Mausereignisse; mit `true` gälte auf dem Telefon jeder senkrechte Wisch über dem Chart als Schwenk, und `preventDefaultMouseMove` (Voreinstellung `true`) hielte die Seite dabei an. Strg gibt es dort nicht — der Wisch bleibt der Seite, gezoomt wird per Pinch (eigener Handler, von diesen Schaltern unberührt). |
+| `filterMode` | an `dynamicYAxis` gekoppelt | `'filter'` skaliert die y-Achse mit, `'none'` nicht. Die Seite hat mit „y-Achse fest/dynamisch" schon einen Schalter dafür — fest verdrahtet würde der Zoom gegen ihn arbeiten statt ihn zu bedienen. |
+
+Angeboten wird der Zoom nur, wo mehr Punkte als Pixel da sind:
+`points.length > ZOOM_MIN_POINTS` (200). Bewusst eine Schwelle über die
+tatsächlich geladenen Punkte statt einer Liste erlaubter Zeiträume — dieselbe
+Zeitraum-Stufe braucht je nach Melderhythmus der Entität unterschiedliche
+Antworten. Der **Zeitstrahl** ist davon ausgenommen und bekommt den Zoom
+immer: dort geht es nicht um Komfort, sondern um Sichtbarkeit. Ein Segment
+wird von seinem Anfang bis zu seinem Ende gezeichnet, und bei „Monat" auf rund
+900 px entspricht ein Pixel etwa 48 Minuten — jedes kürzere Schaltereignis ist
+schmaler als ein Pixel. Die Zahl der Segmente sagt darüber nichts.
+
+**Unter der Karte** steht dauerhaft eine Zeile, die beide Fälle benennt — wie
+viele Punkte gezeichnet sind und ob sich daran etwas vergrößern lässt
+(`get zoomHint()`). Sie ist `hint-status` und darf deshalb nicht hinter den
+Info-Knopf: die Punktzahl ist ein Datenzustand, keine Erklärung. Ohne sie
+bliebe der graue Ausschnitts-Chip unerklärt. Sie steht bewusst *außerhalb* der
+Karte — in ihr beschreibt die Legende die Werte selbst, der Satz beschreibt
+dagegen das Bedienen der Ansicht. Der Zeitstrahl bekommt einen eigenen
+Wortlaut ohne Punktzahl: dort sind es oft eine Handvoll Segmente, und
+„3 Datenpunkte — zoomen möglich" widerspräche der Regel, die der Satz daneben
+aufstellt.
+
+Zurückgesetzt wird über den Ausschnitts-Chip in der Toolbar. Er steht wie der
+„Jetzt"-Knopf daneben immer im Layout und wird nur deaktiviert (nie per
+`x-show` entfernt), und er hat eine feste Mindestbreite, weil seine
+Beschriftung zwischen „Ausschnitt" und einer Zeitspanne wechselt — sonst
+bräche die Toolbar bei jeder Radbewegung neu um.
+
+Alle übrigen Charts der App bleiben ohne Zoom, und das ist eine Entscheidung
+und kein offener Rest: eine Dashboard-Kachel ist ein Blickfang, kein Werkzeug;
+Sankey und Donut haben keine Zeitachse; die Tag-mal-Stunde-Heatmap ist
+kategorial; der Monatsverlauf im Bericht hat zwölf Balken.
+`tests/test_chart_zoom.py` hält das fest.
+
 ## Mobile Listenansicht
 
 Unter 640 px arbeiten zwei Module zusammen, die eine neue Seite nicht

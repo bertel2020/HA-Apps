@@ -62,6 +62,7 @@ der Testumgebung nicht installiert ist).
 | `test_unstorable_measurements.py` | NaN/Inf werden beim Empfang aussortiert statt archiviert |
 | `test_csv_import_locking.py` | Der CSV-Import sperrt nur seine eigene Entität und reicht die Zeilen ohne Kopie durch |
 | `test_zip_guard.py` | ZIP-Eintragsgrenze greift, **bevor** das Zentralverzeichnis gelesen wird |
+| `test_chart_zoom.py` | Chart-Zoom: Rad allein scrollt weiter die Seite, Ein-Finger-Wisch bleibt dem Telefon, Schwelle (genau einmal ausgewertet) und Zeitstrahl-Ausnahme, Hinweiszeile unter statt in der Karte — und dass kein anderer Chart der App einen Zoom bekommt |
 | `test_*_template.py`, `test_*_breadcrumbs.py` | Template-Rendering/-Struktur ohne laufenden Server (Jinja direkt gerendert und auf erwartete Fragmente geprüft) |
 | `test_config_flow_sortable_entities.py`, `test_options_transfer.py` | Integrations-seitige Config-Flow-Logik |
 
