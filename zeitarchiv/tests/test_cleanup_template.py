@@ -21,8 +21,8 @@ def test_cleanup_delete_requires_reversible_confirmation() -> None:
 
 
 def test_destructive_entity_actions_have_explicit_confirmations() -> None:
-    cleanup = (TEMPLATES / "cleanup.html").read_text(encoding="utf-8")
-    detail = (TEMPLATES / "entity_detail.html").read_text(encoding="utf-8")
+    cleanup = page_text("cleanup.html")
+    detail = page_text("entity_detail.html")
     config = (TEMPLATES / "entity_config.html").read_text(encoding="utf-8")
     assert "Alle Werte löschen" in config
     assert "Entität entfernen" in config
@@ -34,7 +34,7 @@ def test_destructive_entity_actions_have_explicit_confirmations() -> None:
 
 
 def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
-    cleanup = (TEMPLATES / "cleanup.html").read_text(encoding="utf-8")
+    cleanup = page_text("cleanup.html")
     rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
     chart_editor = page_text("chart_editor.html")
     main = (APP / "main.py").read_text(encoding="utf-8")
