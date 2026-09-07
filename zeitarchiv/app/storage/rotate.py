@@ -8,6 +8,7 @@ siehe rollup.py) — Bucket-Größe/Aggregationsfunktion hängen vom Typ ab.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -75,7 +76,13 @@ def rotate_if_needed(data_dir: Path, entity_id: str, current_ts: float, index: I
         rotate_month_file(stale_path, data_dir, entity_id, index, tz)
 
 
-def rotate_all_stale(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None) -> int:
+def rotate_all_stale(
+    data_dir: Path,
+    index: Index,
+    tz: ZoneInfo,
+    now: datetime | None = None,
+    on_entity: Callable[[int, int, str], None] | None = None,
+) -> int:
     """Manueller Anstoß für alle Entitäten (Einstellungen-Bereich, Konzept
     "Offene Punkte": Rotation läuft sonst nur lazy beim nächsten Schreibvorgang
     — eine Entität, die komplett aufhört zu senden, rotiert ihre letzte
@@ -83,11 +90,19 @@ def rotate_all_stale(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime |
     zurück.
 
     `now` ist injizierbar (wie in cleanup.py/query.py) statt datetime.now()
-    fest zu verdrahten — hält die Funktion ohne Zeitreise-Tricks testbar."""
+    fest zu verdrahten — hält die Funktion ohne Zeitreise-Tricks testbar.
+
+    `on_entity(nummer, gesamt, entity_id)` meldet den Fortschritt an den
+    Aufrufer, bevor eine Entität geprüft wird. Ein Callback statt eines
+    Fortschritts-Objekts, damit die Speicherschicht nichts von der Anzeige
+    weiß — dasselbe Muster wie cleanup.purge_archived_months(on_month=...)."""
     now_ts = (now or datetime.now(tz)).timestamp()
     rotated = 0
-    for entity in index.list_entities():
+    entities = index.list_entities()
+    for nummer, entity in enumerate(entities, start=1):
         entity_id = entity["entity_id"]
+        if on_entity is not None:
+            on_entity(nummer, len(entities), entity_id)
         stale = find_stale_hot_files(data_dir, entity_id, now_ts, tz)
         for stale_path in stale:
             rotate_month_file(stale_path, data_dir, entity_id, index, tz)

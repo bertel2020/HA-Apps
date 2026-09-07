@@ -512,3 +512,276 @@ def test_the_header_script_is_loaded_where_the_header_is() -> None:
         assert "js/topnav-activity.js" not in quelle, (
             f"{seite.name} lädt das Skript ein zweites Mal"
         )
+
+
+# --------------------------------------------------------------------------
+# Stufe 4, zweiter Teil: die Vorgänge, die niemand angestoßen hat
+#
+# Die erste Runde meldete die sieben Aufträge an, die ein Klick auslöst. Übrig
+# blieben fünf, die von selbst anlaufen — beim Serverstart, im Wartungsplaner
+# oder mitten im Schreibpfad. Genau die sind der schwierigere Fall: Wer nichts
+# gedrückt hat, sucht die Erklärung für einen zähen Server auch nirgends.
+# --------------------------------------------------------------------------
+
+#: Was die Glocke kennen muss, mit dem Namen, unter dem es dort steht.
+#: Absichtlich ausgeschrieben statt aus dem Code eingesammelt: Diese Liste ist
+#: die Behauptung, gegen die geprüft wird. Kommt eine lange Aktion dazu und
+#: meldet sich nicht an, muss jemand diese Zeile bewusst schreiben.
+ERWARTETE_QUELLEN = {
+    "retention": "Aufbewahrung",
+    "backup": "Backup",
+    "purge": "Bereinigung",
+    "symcon-import": "Symcon-Import",
+    "symcon-dry-run": "Symcon-Vorschau",
+    "csv-import": "CSV-Import",
+    "ha-import": "Home-Assistant-Import",
+    # --- ab hier die fünf ohne Auslöser ---
+    "storage-reconcile": "Speicherabgleich",
+    "rotation": "Rotation",
+    "hourly-backfill": "Stunden-Rollup",
+    "rollup-rebuild": "Rollup-Neuaufbau",
+    "index-optimize": "Index-Optimierung",
+}
+
+
+def test_every_long_running_action_reports_to_the_bell(client) -> None:
+    """Der Anker der ganzen Stufe. Eine lange Aktion, die sich nicht anmeldet,
+    ist für jeden anderen Tab ein grundlos hängender Server."""
+    from app.progress import _quellen
+
+    angemeldet = {q.kennung: q.label for q in _quellen if not q.kennung.startswith("pytest-")}
+    assert angemeldet == ERWARTETE_QUELLEN
+
+
+# -- JobProgress.track(): der Lauf, der im Request-Thread bleibt ------------
+
+def test_track_releases_the_job_and_lets_the_error_through() -> None:
+    """claim() allein gibt bei sauberem Verlassen NICHT frei (siehe dessen
+    Docstring) — track() muss das in JEDEM Fall tun, sonst gälte die Rotation
+    nach einem einzigen Fehler bis zum Neustart als laufend."""
+    auftrag = JobProgress("pytest-track-fehler")
+
+    with pytest.raises(ValueError, match="kaputt"):
+        with auftrag.track():
+            raise ValueError("kaputt")
+
+    stand = auftrag.snapshot()
+    assert stand["running"] is False
+    assert stand["error"] == "kaputt", "der Fehler ist weder verschluckt noch verloren"
+    assert auftrag.activity() is None
+
+
+def test_track_leaves_an_already_running_job_alone() -> None:
+    """Zwei Rollup-Neuaufbauten für verschiedene Entitäten dürfen gleichzeitig
+    laufen — die Reihenfolge regeln die Entitätssperren, nicht diese Anzeige.
+    Der zweite darf den Stand des ersten weder überschreiben noch beim
+    Verlassen dessen Anzeige abräumen."""
+    auftrag = JobProgress("pytest-track-doppelt")
+
+    with auftrag.track():
+        auftrag.set_phase("Erster Lauf", total=10)
+        auftrag.advance(done=4, detail="sensor.a")
+        with auftrag.track():
+            auftrag.set_detail("sensor.b")
+        assert auftrag.snapshot()["running"] is True, "der zweite hat den ersten beendet"
+        assert auftrag.snapshot()["done"] == 4, "der zweite hat den Zähler zurückgesetzt"
+    assert auftrag.snapshot()["running"] is False
+
+
+def test_setting_a_detail_invents_no_count() -> None:
+    """Rollup-Nachbau und Index-Kompaktierung bestehen aus genau einem Stück.
+    Ein Zähler wäre dort eine erfundene Zahl — und die Glocke zeichnet einen
+    Balken, sobald total steht."""
+    auftrag = JobProgress("pytest-detail")
+    with auftrag.track():
+        auftrag.set_phase("Läuft")
+        auftrag.set_detail("sensor.x")
+        stand = auftrag.snapshot()
+    assert stand["detail"] == "sensor.x"
+    assert stand["total"] == 0 and stand["done"] == 0
+
+
+# -- Die fünf einzeln --------------------------------------------------------
+
+def test_the_reconciliation_heartbeat_still_ticks_per_entity() -> None:
+    """last_reconcile_tick MUSS im Schleifenkörper stehen, nicht dahinter:
+    Der Tick ist die Stall-Erkennung für genau den Fall, dass der Abgleich an
+    einer Entitätssperre hängt — käme er erst nach dem vollständigen
+    Durchlauf, meldete er nie einen Hänger. Beim Einziehen der
+    Fortschrittsanzeige ist die Zeile genau einmal aus der Schleife
+    herausgerutscht; deshalb steht sie hier."""
+    import ast
+
+    quelle = (APP / "background.py").read_text(encoding="utf-8")
+    baum = ast.parse(quelle)
+    funktion = next(
+        knoten for knoten in ast.walk(baum)
+        if isinstance(knoten, ast.FunctionDef)
+        and knoten.name == "_background_storage_reconciliation"
+    )
+    schleifen = [k for k in ast.walk(funktion) if isinstance(k, ast.For)]
+    assert len(schleifen) == 1
+    im_schleifenkoerper = {
+        ziel.attr
+        for anweisung in ast.walk(schleifen[0])
+        if isinstance(anweisung, ast.Assign)
+        for ziel in anweisung.targets
+        if isinstance(ziel, ast.Attribute)
+    }
+    assert "last_reconcile_tick" in im_schleifenkoerper
+
+
+def test_the_backfill_announces_nothing_when_there_is_nothing_to_do(tmp_path) -> None:
+    """Der Wartungsplaner ruft den Backfill alle 30 Sekunden auf, meistens mit
+    leerer Warteschlange. Läge die Anmeldung vor der Prüfung, blinkte die
+    Glocke im Halbminutentakt für einen Vorgang, den es nicht gab."""
+    from zoneinfo import ZoneInfo
+
+    from app.energiedashboard_routes import process_pending_hourly_backfill
+    from app.progress import activity_snapshot
+    from app.storage.coordinator import StorageCoordinator
+    from app.storage.index import Index
+
+    index = Index(tmp_path / "index.sqlite")
+    process_pending_hourly_backfill(tmp_path, index, ZoneInfo("UTC"), StorageCoordinator())
+    assert [j for j in activity_snapshot() if j["id"] == "hourly-backfill"] == []
+
+    # Und auch dann nicht, wenn die Rolle zwischen Einreihen und Abarbeiten
+    # wieder entfernt wurde — die Entität steht dann noch in der Schlange.
+    index.set_setting("energiedashboard_hourly_backfill_pending", '["sensor.weg"]')
+    process_pending_hourly_backfill(tmp_path, index, ZoneInfo("UTC"), StorageCoordinator())
+    assert [j for j in activity_snapshot() if j["id"] == "hourly-backfill"] == []
+
+
+def test_rotation_reports_every_entity_with_an_honest_total(tmp_path) -> None:
+    """Der Balken an der Glocke braucht eine Gesamtzahl. Sie kann nur aus
+    rotate_all_stale() selbst kommen — der Aufrufer kennt die Entitätenliste
+    nicht, ohne sie ein zweites Mal unter der Wartungssperre zu holen."""
+    from zoneinfo import ZoneInfo
+
+    from app.storage import rotate
+    from app.storage.index import Index
+
+    index = Index(tmp_path / "index.sqlite")
+    for entity_id in ("sensor.a", "sensor.b", "sensor.c"):
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+
+    gemeldet: list[tuple[int, int, str]] = []
+    rotate.rotate_all_stale(
+        tmp_path, index, ZoneInfo("UTC"),
+        on_entity=lambda nummer, gesamt, eid: gemeldet.append((nummer, gesamt, eid)),
+    )
+    assert [(n, g) for n, g, _ in gemeldet] == [(1, 3), (2, 3), (3, 3)]
+    assert {eid for _, _, eid in gemeldet} == {"sensor.a", "sensor.b", "sensor.c"}
+
+
+def test_the_index_optimisation_is_visible_while_it_blocks_everything(tmp_path) -> None:
+    """Der Fall, der die Anzeige am nötigsten hat: Das VACUUM hält
+    coordinator.exclusive() und legt damit auch die Aufnahme still. Geprüft
+    wird deshalb nicht, DASS es sich anmeldet, sondern dass es das genau
+    während der Sperre tut."""
+    from contextlib import contextmanager
+
+    from app.index_optimization import optimize_index
+    from app.progress import activity_snapshot
+
+    waehrend_der_sperre: list[list[dict]] = []
+
+    class FakeIndex:
+        def get_database_maintenance_stats(self) -> dict:
+            return {"reclaimable_bytes": 4096}
+
+        def vacuum_database(self) -> dict:
+            waehrend_der_sperre.append(activity_snapshot())
+            return {"before": {"database_bytes": 8192}, "after": {"database_bytes": 4096}}
+
+    class FakeCoordinator:
+        @contextmanager
+        def exclusive(self):
+            yield
+
+    index_path = tmp_path / "index.sqlite"
+    index_path.write_bytes(b"x" * 8192)
+
+    ergebnis = optimize_index(FakeIndex(), index_path, FakeCoordinator())
+    assert ergebnis["success"] is True
+
+    laufend = {j["id"]: j for j in waehrend_der_sperre[0]}
+    assert "index-optimize" in laufend, "die Sperre steht, die Glocke schweigt"
+    assert laufend["index-optimize"]["label"] == "Index-Optimierung"
+    assert laufend["index-optimize"]["total"] == 0, "ein Balken behauptete hier einen Fortschritt"
+    assert [j for j in activity_snapshot() if j["id"] == "index-optimize"] == []
+
+
+def test_the_rollup_rebuild_is_visible_while_the_write_path_waits(monkeypatch, tmp_path) -> None:
+    """Ändert Home Assistant die Aggregationsart, baut der Schreibpfad alle
+    Rollups der Entität neu auf — gemessen gut fünf Sekunden mit gehaltener
+    Entitätssperre, ausgelöst von niemandem."""
+    from zoneinfo import ZoneInfo
+
+    from app.progress import activity_snapshot
+    from app.storage import ingestion, rollup
+
+    waehrend_des_umbaus: list[list[dict]] = []
+
+    def fake_rebuild(*args, **kwargs) -> None:
+        waehrend_des_umbaus.append(activity_snapshot())
+
+    monkeypatch.setattr(rollup, "rebuild_entity_rollups", fake_rebuild)
+    ingestion._rebuild_after_type_change(
+        tmp_path, "sensor.typwechsel", "counter", ZoneInfo("UTC"), False
+    )
+
+    laufend = {j["id"]: j for j in waehrend_des_umbaus[0]}
+    assert laufend["rollup-rebuild"]["label"] == "Rollup-Neuaufbau"
+    assert laufend["rollup-rebuild"]["detail"] == "sensor.typwechsel"
+    assert [j for j in activity_snapshot() if j["id"] == "rollup-rebuild"] == []
+
+
+def test_the_write_path_still_routes_the_type_change_through_the_announcement() -> None:
+    """Der Hook hängt an get_or_create_entity(on_type_change=...). Ginge er
+    wieder direkt auf rollup.rebuild_entity_rollups(), wäre die Anzeige
+    lautlos weg — der Test darüber liefe trotzdem weiter grün."""
+    quelle = (APP / "storage" / "ingestion.py").read_text(encoding="utf-8")
+    assert "on_type_change=lambda _old, new, hourly_rollup: _rebuild_after_type_change(" in quelle
+    assert quelle.count("rollup.rebuild_entity_rollups(") == 1, (
+        "der Neuaufbau läuft an der Anmeldung vorbei"
+    )
+
+
+def test_the_startup_reconciliation_announces_the_entity_it_is_on(monkeypatch, tmp_path) -> None:
+    """Auf einem großen Bestand der längste Vorgang überhaupt — und er läuft
+    ausgerechnet dann, wenn gerade jemand die frisch gestartete App aufruft.
+    Geprüft wird der Stand MITTEN im Durchlauf: dass er sich am Ende wieder
+    abmeldet, sagt über die Zeit dazwischen nichts."""
+    from zoneinfo import ZoneInfo
+
+    from app.background import BackgroundDependencies, BackgroundService
+    from app.progress import activity_snapshot
+    from app.storage import reconcile
+    from app.storage.coordinator import StorageCoordinator
+    from app.storage.index import Index
+
+    index = Index(tmp_path / "index.sqlite")
+    for entity_id in ("sensor.a", "sensor.b"):
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+
+    unterwegs: list[dict] = []
+
+    def fake_audit(_dir, _index, _tz, *, entity_ids, repair):
+        unterwegs.extend(j for j in activity_snapshot() if j["id"] == "storage-reconcile")
+        return {"entities_checked": 1, "mismatches": [], "errors": [], "repaired": repair}
+
+    monkeypatch.setattr(reconcile, "audit_storage_metadata", fake_audit)
+    dienst = BackgroundService(BackgroundDependencies(
+        data_dir=tmp_path, tz=ZoneInfo("UTC"), index=index, coordinator=StorageCoordinator(),
+        backups_dir=tmp_path / "backups", symcon_import_dir=tmp_path / "symcon",
+        csv_import_dir=tmp_path / "csv", backup_default_time="03:00", backup_default_weekday=6,
+        retention_default_time="04:00", retention_default_weekday=6,
+        count_stale_entities=lambda: 0,
+    ))
+    dienst._background_storage_reconciliation()
+
+    assert [j["detail"] for j in unterwegs] == ["sensor.a", "sensor.b"]
+    assert {j["total"] for j in unterwegs} == {2}, "ohne Gesamtzahl gäbe es keinen Balken"
+    assert [j for j in activity_snapshot() if j["id"] == "storage-reconcile"] == []

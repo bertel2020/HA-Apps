@@ -193,11 +193,45 @@ class JobProgress:
             if detail is not None:
                 self.detail = detail
 
+    def set_detail(self, detail: str) -> None:
+        """Benennt die bearbeitete Einheit, ohne den Zähler zu bewegen.
+
+        Für Aufträge, deren Arbeit aus genau einem unteilbaren Stück besteht
+        (Rollup-Nachbau einer Entität, Index-Kompaktierung): Ein Zähler wäre
+        dort eine erfundene Zahl, der Name des Stücks ist die eigentliche
+        Auskunft.
+        """
+        with self.lock:
+            self.detail = detail
+
     def set_total(self, total: int) -> None:
         with self.lock:
             self.total = total
 
     # -- Lebenszyklus -----------------------------------------------------
+
+    def _besetzen(self, kind: str) -> bool:
+        """Belegt den Auftrag, falls er frei ist, und setzt ihn zurück.
+
+        Liefert True, wenn die Belegung von HIER kommt — nur dann darf der
+        Aufrufer sie später auch wieder freigeben. Prüfen und Setzen müssen in
+        einem einzigen Lock-Abschnitt passieren, sonst könnten zwei Threads
+        beide "frei" sehen und der zweite den Zustand des ersten überschreiben.
+        """
+        with self.lock:
+            if self.running:
+                return False
+            self.started = True
+            self.running = True
+            self.kind = kind
+            self.phase_label = ""
+            self.done = 0
+            self.total = 0
+            self.detail = ""
+            self.error = ""
+            self.result = None
+            self.finished_at = 0.0
+        return True
 
     @contextmanager
     def claim(self, kind: str = "") -> Iterator[None]:
@@ -220,19 +254,8 @@ class JobProgress:
         ``claim()`` allein benutzt, hinterlässt einen Auftrag, der bis zum
         Neustart als laufend gilt.
         """
-        with self.lock:
-            if self.running:
-                raise JobBusy(f"{self.name} läuft bereits")
-            self.started = True
-            self.running = True
-            self.kind = kind
-            self.phase_label = ""
-            self.done = 0
-            self.total = 0
-            self.detail = ""
-            self.error = ""
-            self.result = None
-            self.finished_at = 0.0
+        if not self._besetzen(kind):
+            raise JobBusy(f"{self.name} läuft bereits")
         try:
             yield
         except BaseException:
@@ -276,6 +299,47 @@ class JobProgress:
                 name=f"zeitarchiv-{self.name}",
                 daemon=True,
             ).start()
+
+    @contextmanager
+    def track(self, kind: str = "") -> Iterator[None]:
+        """Meldet Arbeit als laufend, die im AUFRUFENDEN Thread bleibt.
+
+        Für die Aktionen, die schon vor der Kopfleisten-Anzeige synchron
+        liefen und es auch bleiben sollen (Rotation, Index-Optimierung,
+        Rollup-Neuaufbau im Schreibpfad): Sie brauchen keine eigene
+        Fortschrittsseite — wer sie auslöst, wartet ohnehin auf die Antwort.
+        Sichtbar sein müssen sie trotzdem, denn mehrere von ihnen halten die
+        globale Wartungssperre und lassen damit JEDEN anderen Tab stehen,
+        ohne dass dort etwas erklärt, warum.
+
+        Zwei Unterschiede zu :meth:`run`:
+
+        * Ausnahmen laufen unverändert weiter, statt in ``error`` zu landen.
+          Der Aufrufer ist hier ein Request-Handler mit eigener
+          Fehlerbehandlung; ein verschlucktes Problem würde dort im nächsten
+          Schritt als NameError zurückkommen.
+        * Ein bereits laufender Auftrag wirft NICHT ``JobBusy``, sondern läuft
+          ungezählt mit. Die Reihenfolge regelt die Wartungssperre, nicht
+          diese Anzeige — und ein zweiter Rollup-Neuaufbau für eine ANDERE
+          Entität ist ohnehin erlaubt. Die Anzeige gehört dann dem ersten;
+          "läuft" bleibt in beiden Fällen wahr.
+        """
+        eigene_belegung = self._besetzen(kind)
+        try:
+            yield
+        except Exception as fehler:
+            # Nicht verschluckt, nur festgehalten: Ein Auftrag, der mit
+            # started=True und leerem error endet, sähe für snapshot() aus wie
+            # einer, der sauber durchgelaufen ist.
+            if eigene_belegung:
+                with self.lock:
+                    self.error = str(fehler)[:2000] or fehler.__class__.__name__
+            raise
+        finally:
+            if eigene_belegung:
+                with self.lock:
+                    self.running = False
+                    self.finished_at = time.time()
 
     # -- Lesende Seite ----------------------------------------------------
 

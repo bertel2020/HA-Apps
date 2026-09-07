@@ -31,6 +31,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from .formatting import entity_display_name
+from .progress import JobProgress
 from .storage import cleanup as cleanup_mod
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
@@ -50,6 +51,12 @@ CONFIG_SCHEMA_VERSION = 1
 # hier auf ihren rückwirkenden Rollup-Backfill (bereits archivierte Monate),
 # bevor _wartungsplaner sie einzeln nachträgt — siehe process_pending_hourly_backfill().
 SETTING_HOURLY_BACKFILL_PENDING = "energiedashboard_hourly_backfill_pending"
+#: Meldet den Nachbau an der Kopfleiste an. Ein Backfill über eine lange
+#: Historie hält die Entitätssperre und lässt damit die Aufnahme genau dieser
+#: Entität warten — sichtbar nur hier, denn ausgelöst hat ihn niemand
+#: absichtlich: er hängt am Speichern der Energiedashboard-Konfiguration und
+#: läuft erst Minuten später im Wartungsplaner an.
+_backfill_progress = JobProgress("hourly-backfill", label="Stunden-Rollup")
 # Kurzlebiger Cache für den Speicher-Wirkungsgrad (siehe _speicher_efficiency).
 # Sechs Stunden: der Wert wird über die gesamte Historie gebildet und bewegt
 # sich innerhalb eines Tages nicht sichtbar, ein Nutzer soll eine korrigierte
@@ -307,7 +314,13 @@ def process_pending_hourly_backfill(data_dir: Path, index: Index, tz: ZoneInfo, 
         entity = index.get_entity(entity_id)
         if entity is None or not entity["hourly_rollup"]:
             return  # Rolle wurde zwischenzeitlich wieder entfernt
-        rollup_mod.rebuild_entity_rollups(data_dir, entity_id, "counter", tz, hourly_rollup=True)
+        # Erst hier, nicht schon vor dem Entnehmen aus der Warteschlange: Sonst
+        # zeigte die Kopfleiste bei jedem 30s-Takt kurz einen Vorgang an, auch
+        # wenn nichts zu tun war oder die Rolle inzwischen wieder weg ist.
+        with _backfill_progress.track():
+            _backfill_progress.set_phase("Stunden-Rollup wird nachgebaut")
+            _backfill_progress.set_detail(entity_id)
+            rollup_mod.rebuild_entity_rollups(data_dir, entity_id, "counter", tz, hourly_rollup=True)
 
 
 def refresh_heatmap_weekday_cache_if_stale(service: "EnergieDashboardService") -> None:

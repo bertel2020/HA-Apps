@@ -54,6 +54,7 @@ from .energiedashboard_routes import (
     sync_hourly_rollup_flags_for_current_config,
 )
 from .limits import MAX_UI_ANALYSIS_ROWS
+from .progress import JobProgress
 from .storage import backup, cleanup, reconcile
 from .storage import retention as retention_mod
 from .storage.coordinator import StorageCoordinator
@@ -148,6 +149,14 @@ class BackgroundService:
         # --- Zustand, vorher Modul-Globale in main.py ---------------------
         self.retention_progress = _RetentionProgress()
         self.backup_progress = _BackupProgress()
+        #: Der Startabgleich läuft über ALLE Entitäten und ist auf einem großen
+        #: Bestand der längste Vorgang überhaupt — dabei nimmt er reihum jede
+        #: Entitätssperre und bremst so die frisch angelaufene Aufnahme. Ohne
+        #: Eintrag in der Kopfleiste sähe das nach einem grundlos zähen Server
+        #: kurz nach dem Start aus.
+        self.reconcile_progress = JobProgress(
+            "storage-reconcile", unit="Entitäten", label="Speicherabgleich"
+        )
         self.storage_reconcile_last: dict | None = None
         self._storage_reconcile_thread: threading.Thread | None = None
         self._storage_reconcile_stop = threading.Event()
@@ -642,20 +651,26 @@ class BackgroundService:
         started_at = time.time()
         reports: list[dict] = []
         entities = [entity["entity_id"] for entity in self.index.list_entities()]
-        for entity_id in entities:
-            if self._storage_reconcile_stop.is_set():
-                return
-            with self.coordinator.entity(entity_id):
-                reports.append(
-                    reconcile.audit_storage_metadata(
-                        self.data_dir, self.index, self.tz, entity_ids=[entity_id], repair=True
+        # track() statt start(): Der Thread existiert hier bereits und wird
+        # über _storage_reconcile_stop/-_thread beendet — ein zweiter, von
+        # JobProgress verwalteter, hätte diesen Abbruchweg unterlaufen.
+        with self.reconcile_progress.track():
+            self.reconcile_progress.set_phase("Speicherindex wird geprüft", total=len(entities))
+            for entity_id in entities:
+                if self._storage_reconcile_stop.is_set():
+                    return
+                self.reconcile_progress.advance(detail=entity_id)
+                with self.coordinator.entity(entity_id):
+                    reports.append(
+                        reconcile.audit_storage_metadata(
+                            self.data_dir, self.index, self.tz, entity_ids=[entity_id], repair=True
+                        )
                     )
-                )
-            # Nach jeder Entität statt nur einmal am Ende — sonst würde ein Hänger
-            # an der Entitäts-Sperre (with self.coordinator.entity(...)) oder
-            # im audit_storage_metadata()-Aufruf selbst nie sichtbar, weil der
-            # Tick sowieso erst nach vollständigem Durchlauf käme.
-            self.last_reconcile_tick = time.time()
+                # Nach jeder Entität statt nur einmal am Ende — sonst würde ein Hänger
+                # an der Entitäts-Sperre (with self.coordinator.entity(...)) oder
+                # im audit_storage_metadata()-Aufruf selbst nie sichtbar, weil der
+                # Tick sowieso erst nach vollständigem Durchlauf käme.
+                self.last_reconcile_tick = time.time()
         self.storage_reconcile_last = {
             "checked_at": time.time(),
             "started_at": started_at,

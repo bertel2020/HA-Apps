@@ -9,8 +9,17 @@ import time
 from pathlib import Path
 
 from .formatting import format_int, format_size
+from .progress import JobProgress
 
 logger = logging.getLogger(__name__)
+
+#: Meldet das VACUUM an der Kopfleiste an. Es bleibt synchron im
+#: Request-Thread — wer den Knopf drückt, wartet ohnehin auf die neu
+#: gerenderte Seite. Sichtbar sein muss es trotzdem: Unter
+#: storage_coordinator.exclusive() steht für die Dauer die GESAMTE Anwendung,
+#: einschließlich der Aufnahme aus Home Assistant. Ohne diesen Eintrag sähe
+#: jeder andere Tab nur einen Server, der ohne Grund nicht mehr antwortet.
+_optimize_progress = JobProgress("index-optimize", label="Index-Optimierung")
 
 INDEX_VACUUM_MIN_FILE_BYTES = 50 * 1024 * 1024
 INDEX_VACUUM_MIN_RECLAIMABLE_BYTES = 10 * 1024 * 1024
@@ -65,15 +74,18 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
 
     started_at = time.monotonic()
     try:
-        with storage_coordinator.exclusive():
-            # Unter der Wartungssperre erneut messen, da sich der Zustand seit
-            # dem Seitenaufruf geändert haben kann.
-            latest = get_index_optimization_state(index, index_path)
-            if not latest["can_optimize"]:
-                raise ValueError(
-                    "Keine vollständig freien SQLite-Seiten mehr vorhanden."
-                )
-            vacuum_result = index.vacuum_database()
+        with _optimize_progress.track():
+            _optimize_progress.set_phase("Indexdatei wird kompaktiert")
+            _optimize_progress.set_detail(index_path.name)
+            with storage_coordinator.exclusive():
+                # Unter der Wartungssperre erneut messen, da sich der Zustand seit
+                # dem Seitenaufruf geändert haben kann.
+                latest = get_index_optimization_state(index, index_path)
+                if not latest["can_optimize"]:
+                    raise ValueError(
+                        "Keine vollständig freien SQLite-Seiten mehr vorhanden."
+                    )
+                vacuum_result = index.vacuum_database()
         before_bytes = int(vacuum_result["before"]["database_bytes"])
         after_bytes = int(vacuum_result["after"]["database_bytes"])
         freed_bytes = max(0, before_bytes - after_bytes)

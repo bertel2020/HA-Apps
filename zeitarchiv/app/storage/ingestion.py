@@ -19,6 +19,7 @@ from .coordinator import StorageCoordinator
 from .index import Index, should_accept_value, should_accept_write
 from ..limits import MAX_EVENT_TS, MIN_EVENT_TS
 from ..logging_setup import log_rate_limited
+from ..progress import JobProgress
 from .paths import entity_dir, validate_entity_id
 
 
@@ -77,6 +78,31 @@ def legacy_event_id(event: dict) -> str:
 _IDEMPOTENCY_RETENTION_SECONDS = 7 * 24 * 60 * 60
 _PRUNE_EVERY_COMPLETIONS = 10_000
 _PENDING_WARNING_SECONDS = 5 * 60
+
+#: Der einzige langsame Vorgang, den überhaupt niemand ausgelöst hat: Ändert
+#: Home Assistant die Aggregationsart einer Entität, werden hier mitten im
+#: Schreibpfad sämtliche Rollups dieser Entität neu aufgebaut — gemessen gut
+#: fünf Sekunden, und die Entitätssperre bleibt so lange gehalten. Ohne Eintrag
+#: in der Kopfleiste ist das eine unerklärliche Pause in der Aufnahme.
+#:
+#: JobProgress hier statt eines Callbacks an den Aufrufer (wie bei
+#: cleanup.purge_archived_months): Diesen Pfad löst kein Request aus, es gibt
+#: also keinen Aufrufer, dem die Anzeige gehören könnte. progress.py hängt
+#: seinerseits an nichts außer der Standardbibliothek — dieselbe Ebene wie
+#: ..limits und ..logging_setup, die dieses Modul bereits benutzt.
+_rollup_rebuild_progress = JobProgress("rollup-rebuild", label="Rollup-Neuaufbau")
+
+
+def _rebuild_after_type_change(
+    data_dir: Path, entity_id: str, aggregation_type: str, tz: ZoneInfo, hourly_rollup: bool
+) -> None:
+    """Baut die Rollups nach einem Typwechsel neu und meldet das solange an."""
+    with _rollup_rebuild_progress.track():
+        _rollup_rebuild_progress.set_phase("Rollups werden neu aufgebaut")
+        _rollup_rebuild_progress.set_detail(entity_id)
+        rollup.rebuild_entity_rollups(
+            data_dir, entity_id, aggregation_type, tz, hourly_rollup=hourly_rollup
+        )
 
 
 def _event_exists(
@@ -264,9 +290,8 @@ class IngestionService:
             event.state_class,
             event.unit,
             event.friendly_name,
-            on_type_change=lambda _old, new, hourly_rollup: rollup.rebuild_entity_rollups(
-                self._data_dir, event.entity_id, new, self._tz,
-                hourly_rollup=hourly_rollup,
+            on_type_change=lambda _old, new, hourly_rollup: _rebuild_after_type_change(
+                self._data_dir, event.entity_id, new, self._tz, hourly_rollup
             ),
         )
         claim = self._index.claim_ingest_event(event.event_id, event.entity_id, event.ts)

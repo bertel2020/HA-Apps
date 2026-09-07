@@ -74,6 +74,20 @@ logger = logging.getLogger(__name__)
 #: könnte ohnehin nur warten.
 _purge_progress = JobProgress("purge", unit="Monate", label="Bereinigung")
 
+#: Fortschritt der manuellen Rotation. Sie bleibt bewusst synchron — wer sie
+#: auslöst, wartet auf die Antwort und braucht keine eigene Anzeige. In der
+#: Kopfleiste steht sie trotzdem, weil sie unter der globalen Wartungssperre
+#: läuft: Für jeden ANDEREN Tab sieht das sonst nach einem grundlos hängenden
+#: Server aus. Siehe JobProgress.track().
+_rotation_progress = JobProgress("rotation", unit="Entitäten", label="Rotation")
+
+
+def _rotation_step(nummer: int, gesamt: int, entity_id: str) -> None:
+    """Callback für rotate_all_stale(). Die Gesamtzahl kommt erst aus der
+    Funktion selbst — sie zählt die Entitäten, nicht der Aufrufer."""
+    _rotation_progress.set_total(gesamt)
+    _rotation_progress.advance(done=nummer, detail=entity_id)
+
 
 @dataclass(frozen=True)
 class HousekeepingDependencies:
@@ -473,8 +487,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         nur lazy beim nächsten Schreibvorgang einer Entität — eine Entität, die
         komplett aufhört zu senden, würde ihre letzte Hot-Datei sonst nie von
         selbst archivieren)."""
-        with deps.coordinator.exclusive():
-            rotated = rotate.rotate_all_stale(deps.data_dir, deps.index, deps.tz)
+        with _rotation_progress.track():
+            _rotation_progress.set_phase("Hot-Dateien werden archiviert")
+            with deps.coordinator.exclusive():
+                rotated = rotate.rotate_all_stale(
+                    deps.data_dir, deps.index, deps.tz, on_entity=_rotation_step
+                )
         if rotated == 0:
             result = "Nichts zu tun — alle Entitäten sind bereits aktuell rotiert."
         else:
