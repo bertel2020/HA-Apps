@@ -28,6 +28,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import zip_guard
 from .coordinator import StorageCoordinator
 from .paths import entity_dir, storage_area_dir, validate_entity_id
 from ..limits import (
@@ -290,8 +291,15 @@ def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: 
     Für alles andere (Upload, Restore) bleibt der Default True.
     """
     try:
+        # Vor dem Öffnen: der ZipFile-Konstruktor baut sonst erst das komplette
+        # Zentralverzeichnis auf (619 Byte je Eintrag), und die Grenze darunter
+        # käme zu spät. Siehe zip_guard.
+        zip_guard.ensure_entry_count_allowed(
+            path, MAX_ZIP_MEMBERS, "Backup enthält zu viele Dateien"
+        )
         with zipfile.ZipFile(path) as zf:
             members = zf.infolist()
+            # Auffangnetz für den Fall, dass die Zahl vorab nicht lesbar war.
             if len(members) > MAX_ZIP_MEMBERS:
                 raise ValueError("Backup enthält zu viele Dateien")
             uncompressed = sum(member.file_size for member in members)

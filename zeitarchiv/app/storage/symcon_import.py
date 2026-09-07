@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from . import hotbuffer, rollup
+from . import hotbuffer, rollup, zip_guard
 from ..limits import (
     MAX_IMPORT_ROWS_PER_ENTITY,
     MAX_ZIP_COMPRESSION_RATIO,
@@ -67,8 +67,15 @@ def extract_zip(
     staging_dir = dest_dir.with_name(dest_dir.name + ".extracting")
     shutil.rmtree(staging_dir, ignore_errors=True)
     try:
+        # Vor dem Öffnen, aus demselben Grund wie in backup.validate_backup():
+        # der Konstruktor materialisiert sonst erst das ganze
+        # Zentralverzeichnis. Siehe zip_guard.
+        zip_guard.ensure_entry_count_allowed(
+            zip_path, max_members, "ZIP enthält zu viele Einträge"
+        )
         with zipfile.ZipFile(zip_path) as zf:
             members = zf.infolist()
+            # Auffangnetz für den Fall, dass die Zahl vorab nicht lesbar war.
             if len(members) > max_members:
                 raise ValueError(f"ZIP enthält zu viele Einträge (maximal {max_members})")
             total_uncompressed = sum(member.file_size for member in members)

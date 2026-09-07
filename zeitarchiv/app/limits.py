@@ -26,6 +26,17 @@ MAX_IMPORT_ROWS_PER_ENTITY = 10_000_000
 MAX_ZIP_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 MAX_CSV_UPLOAD_BYTES = 256 * 1024 * 1024
 MAX_SETTINGS_UPLOAD_BYTES = 16 * 1024 * 1024
-MAX_ZIP_MEMBERS = 500_000_000
+# Obergrenze für die Zahl der Einträge in einem hochgeladenen ZIP (Backup oder
+# Symcon-Export). Stand bis September 2026 auf 500.000.000 und konnte damit
+# gar nicht auslösen: ein Eintrag kostet auch leer 87,6 Byte, in
+# MAX_ZIP_UPLOAD_BYTES (2 GiB) passen also höchstens rund 24,5 Millionen.
+#
+# Der neue Wert ist an gemessenen Beständen hergeleitet, nicht geschätzt: ein
+# echtes Zeitarchiv-Backup (9 Entitäten, 3,6 GB) enthält 1.395 Einträge, ein
+# echter Symcon-Export 47.494. Eine halbe Million lässt damit auch einen um
+# eine Größenordnung größeren Bestand durch und begrenzt zugleich, was das
+# Zählen selbst kostet (rund 310 MB für die Eintragsliste — siehe
+# storage/zip_guard.py, das die Grenze prüft, BEVOR diese Liste entsteht).
+MAX_ZIP_MEMBERS = 500_000
 MAX_ZIP_UNCOMPRESSED_BYTES = 5 * 1024 * 1024 * 1024
 MAX_ZIP_COMPRESSION_RATIO = 200
