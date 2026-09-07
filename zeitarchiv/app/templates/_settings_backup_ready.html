@@ -35,7 +35,7 @@
       </p>
     </form>
   </div>
-  <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML">
+  <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
     Backup jetzt erstellen
   </button>
   {% include "_backup_table.html" %}

@@ -179,8 +179,8 @@
            wenn dieser Reiter gar keine Zeilen zeigt (leerer/Scan-Zustand). -->
 
       <div class="actionbar">
-        <button type="button" class="btn" hx-post="import/dry-run" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
-        <button type="button" class="btn primary" hx-post="import/start" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML">Import starten</button>
+        <button type="button" class="btn" hx-post="import/dry-run" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">Vorschau (Dry Run)</button>
+        <button type="button" class="btn primary" hx-post="import/start" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">Import starten</button>
         <span>Nur ausgefüllte Zuordnungen werden berücksichtigt.</span>
       </div>
       <div id="import-output" hx-get="import/progress" hx-trigger="load" hx-swap="innerHTML"></div>
@@ -233,6 +233,7 @@
   <script src="{{ asset('js/dd-picker.js') }}"></script>
   <script src="{{ asset('js/map-entity-picker.js') }}"></script>
   <script src="{{ asset('js/table-cards.js') }}"></script>
+  <script src="{{ asset('js/busy-chip.js') }}"></script>
   <script>
     // Aktuelle Seite der Report-Liste. Steht nur hier — das Formularfeld
     // #report-page (_reports_panel.html) trägt fest value="1" und taugt

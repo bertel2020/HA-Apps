@@ -151,6 +151,7 @@
   <button class="btn btn-danger needs-selection" disabled
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
           hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
+          hx-disabled-elt="this"
           hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
     Löschen
   </button>
@@ -159,14 +160,14 @@
      über seinen Beschriftungstext suchen. #}
   <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
-          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
     Rückgängig (letzte Löschung)
   </button>
   {% if filter == 'duplicates' %}
   <button class="btn btn-danger-outline"
           {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"{% endif %}
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/duplicates-preview"
-          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
     Duplikate automatisch entfernen
   </button>
   {% endif %}
@@ -174,7 +175,7 @@
   <button class="btn btn-danger-outline"
           {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"{% endif %}
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/repetitions-preview"
-          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML">
+          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
     Wiederholungen verdichten
   </button>
   {% endif %}

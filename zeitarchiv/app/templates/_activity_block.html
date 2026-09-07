@@ -1,0 +1,50 @@
+{# Abschnitt "Läuft gerade" im Glocken-Menü — die Vorgänge, die im Hintergrund
+   arbeiten, während man irgendwo anders in der App ist.
+
+   Warum es das gibt: Seit Symcon-Vorschau, CSV-Import, Home-Assistant-Import
+   und Bereinigung in Hintergrund-Threads laufen, überleben sie den
+   Seitenwechsel. Außerhalb ihrer eigenen Seite sagte das bis dahin niemand —
+   dabei halten mehrere von ihnen die globale Wartungssperre und bremsen
+   damit auch die Aufnahme aus Home Assistant.
+
+   Steht ÜBER dem Meldungskopf und in der Akzentfarbe statt in den
+   Schweregrad-Punkten darunter: Ein laufender Vorgang ist kein Problem, und
+   er soll auch nicht wie eines aussehen.
+
+   Wird serverseitig beim Seitenaufbau gerendert UND von topnav-activity.js
+   im Takt nachgeladen — dasselbe Muster wie _notice_panel_body.html mit
+   refreshNoticePanel(), damit es das Markup nur einmal gibt.
+
+   data-job-id trägt die Kennung aus progress.py: Daran erkennt das Skript,
+   ob ein Vorgang dazugekommen oder verschwunden ist, und blinkt genau dann. #}
+{% if activity %}
+<div class="activity-block">
+  <div class="activity-head">
+    <h4>Läuft gerade</h4>
+    <span>{{ activity | length }} {{ 'Vorgang' if activity | length == 1 else 'Vorgänge' }}</span>
+  </div>
+  <ul class="activity-list">
+    {% for job in activity %}
+    <li class="activity-item" data-job-id="{{ job.id }}">
+      <div class="activity-name">{{ job.label }}</div>
+      {% if job.phase or job.detail %}
+      <p class="activity-detail">
+        {{ job.phase }}{% if job.phase and job.detail %} &middot; {% endif %}{{ job.detail }}
+      </p>
+      {% endif %}
+      {# Balken nur mit einer ehrlichen Gesamtzahl. Aufbewahrung und einige
+         Phasen des CSV-Imports haben keine — dort trägt die Zeile darüber
+         die Information, statt dass ein Balken eine Zahl behauptet. #}
+      {% if job.total %}
+      <p class="activity-numbers">
+        {{ job.done | format_int }} von {{ job.total | format_int }}{% if job.unit %} {{ job.unit }}{% endif %}
+      </p>
+      <div class="activity-track">
+        <div class="activity-fill" style="width:{{ job.percent }}%"></div>
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

@@ -2926,7 +2926,8 @@ class Index:
         """Ob der nächste stündliche RAM-Schnappschuss fällig ist — getrennt
         vom eigentlichen Schreiben (record_memory_snapshot), weil das
         Auslesen des Werts selbst ein externer Netzwerkaufruf an den
-        Supervisor ist (main._maintenance_scheduler_loop), der nicht bei
+        Supervisor ist (background.BackgroundService._maintenance_scheduler_loop),
+        der nicht bei
         jedem 30s-Planer-Tick unnötig wiederholt werden soll."""
         with self._lock, self._conn:
             latest_row = self._conn.execute("SELECT MAX(ts) AS latest FROM memory_snapshots").fetchone()

@@ -1,0 +1,32 @@
+{# Der "Läuft"-Chip für Aktionen, die spürbar dauern, aber keinen zählbaren
+   Fortschritt haben — Bereinigung, Retention, Speicher-Index, HA-Vorschau.
+
+   Warum überhaupt: Bis 0.84.0 sah ein Button, dessen Anfrage noch unterwegs
+   war, exakt aus wie ein ruhender; die einzige Ausnahme war der Textchip an
+   "Verfügbarkeit prüfen" (.ha-checked-at in pages/import.css). Gemessen liegt
+   die Bereinigung bei rund 20 Sekunden (163 Archivmonate neu berechnet), und
+   sie hält dabei die globale Wartungssperre — auch die Aufnahme aus Home
+   Assistant steht so lange still. Genau das soll der Chip sagen.
+
+   Warum ein Chip und nicht ein Balken: Diese Aktionen liefern keine Zahl, an
+   der sich ein Balken festmachen ließe, ohne sie zu erfinden. Wo es eine echte
+   Zahl gibt (Import, Dry Run, Purge-Monate), steht stattdessen die
+   Fortschrittsanzeige aus _job_progress.html.
+
+   Verwendung — hx-indicator am Button muss auf die id des Chips zeigen:
+
+     {{ busy_chip('purge-busy', 'Bereinigung läuft') }}
+
+   Sichtbarkeit macht htmx/CSS allein (.busy-chip.htmx-request in app.css),
+   die Uhr ab drei Sekunden js/busy-chip.js. Die Seite, die den Chip
+   einsetzt, muss dieses Skript einbinden.
+
+   role="status" statt "alert": Das ist ein Zwischenstand, keine Störung —
+   Screenreader sollen ihn beiläufig vorlesen, nicht dazwischenfahren. #}
+{% macro busy_chip(chip_id, label) %}
+<span class="busy-chip" id="{{ chip_id }}" role="status">
+  <span class="busy-chip-dot" aria-hidden="true"></span>
+  <span>{{ label }}</span>
+  <span class="busy-chip-elapsed" hidden>00:00</span>
+</span>
+{% endmacro %}

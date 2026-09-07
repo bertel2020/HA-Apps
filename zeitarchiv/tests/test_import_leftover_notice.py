@@ -136,8 +136,10 @@ def test_the_scheduler_actually_refreshes_it() -> None:
     die Meldung erschiene nie."""
     from pathlib import Path
 
-    import app.main as main_mod
+    import app.background as background_mod
 
-    quelle = Path(main_mod.__file__).read_text(encoding="utf-8")
-    schleife = quelle.split("def _maintenance_scheduler_loop()")[1].split("\ndef ")[0]
+    # Der Wartungsplaner sitzt seit 0.85.0 in background.py, nicht mehr in
+    # main.py (Zeilenbudget, siehe test_route_modules.py).
+    quelle = Path(background_mod.__file__).read_text(encoding="utf-8")
+    schleife = quelle.split("def _maintenance_scheduler_loop(self)")[1].split("\n    def ")[0]
     assert "notices_mod.refresh_import_leftovers_if_stale(" in schleife

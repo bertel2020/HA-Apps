@@ -331,6 +331,108 @@
       });
     }
 
+    // CSV-Upload — dieselbe XHR-Mechanik wie der ZIP-Upload oben, aus
+    // demselben Grund: nur XMLHttpRequest liefert Fortschritts-Events beim
+    // Hochladen. Bis 0.84.0 hing hier ein hx-post direkt am Dateifeld; eine
+    // CSV-Datei darf aber bis 256 MiB groß sein (MAX_CSV_UPLOAD_BYTES), und
+    // die Dropzone stand währenddessen völlig unverändert da.
+    //
+    // Unterschied zum ZIP: Danach folgt keine serverseitige Hintergrundarbeit,
+    // die noch zu verfolgen wäre — die Antwort IST bereits der fertige
+    // Konfigurationsabschnitt. Deshalb kein Polling, sondern der Austausch von
+    // #csv-section, wie ihn vorher htmx erledigt hat.
+    //
+    // Delegation an document statt fester Listener: #csv-section wird von htmx
+    // bei jeder Änderung an Trennzeichen/Spalten komplett ersetzt, angeheftete
+    // Listener wären danach weg.
+    function csvUploadArea() {
+      return document.getElementById('csv-upload-area');
+    }
+
+    function uploadCsv(file) {
+      const area = csvUploadArea();
+      if (!area) return;
+      const progress = renderUploadProgress(
+        area,
+        'Wird hochgeladen…',
+        0,
+        `${file.name} · ${NumberFormat.fmt(file.size / 1024 / 1024, 1)} MB`,
+        true
+      );
+      const formData = new FormData();
+      formData.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'import/csv/upload');
+      xhr.upload.addEventListener('progress', (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        progress.fill.style.width = pct + '%';
+        progress.percentLabel.textContent = pct + '%';
+      });
+      xhr.onload = () => {
+        const section = document.getElementById('csv-section');
+        if (xhr.status === 200 && section) {
+          // Genau der Austausch, den vorher hx-target/hx-swap gemacht haben.
+          // htmx.process() ist dabei Pflicht: Die eingesetzte Antwort enthält
+          // selbst wieder hx-*-Attribute (Vorschau, Dry Run, Import), die
+          // sonst tote Buttons wären.
+          section.outerHTML = xhr.responseText;
+          const neu = document.getElementById('csv-section');
+          if (neu && window.htmx) window.htmx.process(neu);
+          return;
+        }
+        let message = 'Bitte eine CSV-Datei hochladen.';
+        try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
+        if (window.appAlert) window.appAlert(message);
+        renderCsvDropzoneFallback(area);
+      };
+      xhr.onerror = () => {
+        if (window.appAlert) window.appAlert('Upload fehlgeschlagen — Verbindung unterbrochen.');
+        renderCsvDropzoneFallback(area);
+      };
+      xhr.send(formData);
+    }
+
+    // Nach einem Fehlschlag muss die Dropzone zurück — die Fortschrittsanzeige
+    // hat sie ersetzt, und ein Seitenreload nur wegen einer falschen Datei wäre
+    // unverhältnismäßig. Serverseitig gerendert wird sie beim nächsten
+    // regulären Aufruf ohnehin wieder.
+    function renderCsvDropzoneFallback(area) {
+      area.replaceChildren();
+      const label = document.createElement('label');
+      label.className = 'dropzone';
+      label.id = 'csv-dropzone';
+      label.setAttribute('for', 'csv-file-input');
+      label.setAttribute('role', 'button');
+      label.tabIndex = 0;
+      const zeile = document.createElement('p');
+      zeile.textContent = 'CSV-Datei hierher ziehen oder klicken zum Auswählen';
+      const feld = document.createElement('input');
+      feld.type = 'file';
+      feld.name = 'file';
+      feld.id = 'csv-file-input';
+      feld.accept = '.csv';
+      feld.style.display = 'none';
+      label.append(zeile, feld);
+      area.appendChild(label);
+    }
+
+    document.addEventListener('change', (event) => {
+      const feld = event.target.closest && event.target.closest('#csv-file-input');
+      if (feld && feld.files && feld.files.length) uploadCsv(feld.files[0]);
+    });
+
+    ['dragover', 'dragleave', 'drop'].forEach((name) => {
+      document.addEventListener(name, (event) => {
+        const zone = event.target.closest && event.target.closest('#csv-dropzone');
+        if (!zone) return;
+        event.preventDefault();
+        if (name === 'dragover') zone.classList.add('dragging');
+        else zone.classList.remove('dragging');
+        if (name === 'drop' && event.dataTransfer.files.length) uploadCsv(event.dataTransfer.files[0]);
+      });
+    });
+
     // settings.json-Zusatz-Upload: anders als der ZIP-Upload synchron ohne
     // eigene Fortschrittsanzeige (reiner JSON-Text, Parsen dauert Millisekunden)
     // — bei Erfolg lädt die Seite neu, damit die Namensspalte + der Wegfall

@@ -102,7 +102,8 @@ IMPORT_LEFTOVER_MIN_BYTES = 100 * 1024 * 1024
 # Dahinter steckt ein vollständiger Verzeichnis-Walk — gemessen 278 ms für
 # 47.494 Dateien (3,0 GB) auf der Testinstanz. Der gehört weder in den
 # Request-Pfad noch in jeden 30-Sekunden-Takt des Wartungsplaners, deshalb eine
-# eigene Altersschwelle wie bei _refresh_purge_preview_if_stale() in main.py.
+# eigene Altersschwelle wie bei refresh_purge_preview_if_stale() in
+# background.py.
 _IMPORT_LEFTOVERS_MAX_AGE_SECONDS = 3600
 _import_leftovers: dict | None = None
 _import_leftovers_checked_at = 0.0
@@ -836,6 +837,53 @@ def _is_muted(notice: dict, mute_entry: dict | None, now: float) -> bool:
     # Bedingung hinter einer alten Stummschaltung verschwinden.
     snapshot = mute_entry.get("detail_snapshot")
     return snapshot is None or snapshot == notice["detail"]
+
+
+# --------------------------------------------------------------------------
+# Adapter für die Kopfleisten-Registratur (progress.py)
+#
+# Backup und Aufbewahrung tragen ihren Zustand in eigenen, älteren Klassen mit
+# fachlichen Zusatzfeldern (job_id der Backup-Tabelle, Dateizähler) und werden
+# dafür nicht umgeschrieben. Sie bekommen stattdessen hier je eine Lesefunktion,
+# die daraus die Anzeigefelder macht — dieselben, die JobProgress.activity()
+# liefert, damit die Kopfleiste alle Vorgänge gleich behandeln kann.
+#
+# Sie stehen in diesem Modul und nicht in main.py, weil sie Anzeigelogik der
+# Glocke sind — und weil main.py ein Zeilenbudget hat (test_route_modules.py),
+# dessen nächster planmäßiger Schnitt ausgerechnet die Hintergrundarbeit ist.
+# --------------------------------------------------------------------------
+
+def retention_activity(retention_progress) -> dict | None:
+    """Aufbewahrung — ohne Zahlen.
+
+    enforce_retention_all() arbeitet Entität für Entität ohne Zwischenstand
+    nach außen; ein Balken müsste eine Gesamtzahl behaupten, die niemand kennt.
+    Die Zeile in der Glocke trägt deshalb nur den Namen.
+
+    Meldet AUCH den geplanten Lauf — gerade der ist es, den bisher niemand
+    sieht, weil ihn niemand angestoßen hat.
+    """
+    with retention_progress.lock:
+        if not retention_progress.running:
+            return None
+    return {"phase": "Aufbewahrung wird angewendet…", "done": 0, "total": 0,
+            "unit": "", "detail": "", "percent": 0}
+
+
+def backup_activity(backup_progress) -> dict | None:
+    """Backup — zählt Dateien, wie die Anzeige auf der Backup-Seite."""
+    with backup_progress.lock:
+        if not backup_progress.running:
+            return None
+        done, total = backup_progress.done, backup_progress.total
+    return {
+        "phase": "Backup wird erstellt…",
+        "done": min(done, total) if total else done,
+        "total": total,
+        "unit": "Dateien",
+        "detail": "",
+        "percent": int(min(done, total) / total * 100) if total else 0,
+    }
 
 
 def collect_notices(

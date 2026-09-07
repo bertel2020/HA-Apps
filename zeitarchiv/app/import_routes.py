@@ -48,6 +48,7 @@ from .limits import (
     MAX_SETTINGS_UPLOAD_BYTES,
     MAX_ZIP_UPLOAD_BYTES,
 )
+from .progress import JobBusy, JobProgress, register_source
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size
 from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import
 from .storage.coordinator import StorageCoordinator
@@ -210,6 +211,20 @@ class ImportService:
         self._import_admission_lock = threading.Lock()
         self._upload_progress = _UploadProgress()
         self._import_progress = _ImportProgress()
+        # Eigener Auftrag statt einer weiteren Phase in _ImportProgress: Die
+        # Vorschau ist für sich abgeschlossen und darf laufen, ohne dass ein
+        # Import angestoßen wäre — beides in einem Zustand hieße, "läuft" für
+        # zwei Dinge zu benutzen, die einander nicht bedingen.
+        self._dry_run_progress = JobProgress("symcon-dry-run", unit="Variablen", label="Symcon-Vorschau")
+        self._csv_progress = JobProgress("csv-import", unit="Zeilen", label="CSV-Import")
+        self._ha_progress = JobProgress("ha-import", unit="Entitäten", label="Home-Assistant-Import")
+        # Der Symcon-Import hat seinen eigenen, älteren Zustand mit
+        # Monatszählern (_ImportProgress) und wird nicht umgeschrieben — er
+        # meldet sich mit einem Adapter an, wie Backup und Aufbewahrung in
+        # main.py. Die Phasenbezeichnung entspricht der, die
+        # _import_progress.html anzeigt, damit Kopfleiste und Importseite
+        # nicht zwei verschiedene Wörter für denselben Schritt benutzen.
+        register_source("symcon-import", "Symcon-Import", self._symcon_activity)
         self._ha_availability_cache = _HaAvailabilityCache()
 
 
@@ -810,11 +825,122 @@ class ImportService:
                 "total_months": total_months,
                 "done_months": done_months,
                 "percent": percent,
-                "rows_imported": format_int(self._import_progress.rows_imported),
+                # Roh, nicht vorformatiert: _import_progress.html legt selbst
+                # den Filter |format_int darauf (Hausregel, siehe main.py bei
+                # templates.env.filters). Beides zusammen lief ab 1.000 Zeilen
+                # in ein ValueError, weil format_int() auf seiner eigenen
+                # Ausgabe ein int("1.000") versucht.
+                "rows_imported": self._import_progress.rows_imported,
                 "current_variable": self._import_progress.current_variable,
                 "results": list(self._import_progress.results),
                 "errors": list(self._import_progress.errors),
             }
+
+
+
+    def _symcon_activity(self) -> dict | None:
+        """Adapter des Symcon-Imports für die Kopfleisten-Registratur."""
+        with self._import_progress.lock:
+            if not self._import_progress.running:
+                return None
+            planung = self._import_progress.phase == "planning"
+            done = self._import_progress.planned_variables if planung else self._import_progress.done_months
+            total = self._import_progress.total_variables if planung else self._import_progress.total_months
+            return {
+                "phase": "Schritt 1/2 · Berechne Vorschau…" if planung else "Schritt 2/2 · Import läuft…",
+                "done": min(done, total) if total else done,
+                "total": total,
+                "unit": "Variablen" if planung else "Monate",
+                "detail": self._import_progress.current_variable,
+                "percent": int(min(done, total) / total * 100) if total else 0,
+            }
+
+
+
+    def _dry_run_progress_context(self) -> dict:
+        return {
+            **self._dry_run_progress.snapshot(),
+            "progress_id": "symcon-dry-run-progress",
+            "poll_url": "import/dry-run/progress",
+        }
+
+
+
+    def _ha_progress_context(self) -> dict:
+        return {
+            **self._ha_progress.snapshot(),
+            "progress_id": "ha-progress",
+            "poll_url": "import/ha/progress",
+        }
+
+
+
+    def _csv_progress_context(self) -> dict:
+        return {
+            **self._csv_progress.snapshot(),
+            "progress_id": "csv-progress",
+            "poll_url": "import/csv/progress",
+        }
+
+
+
+    def _parse_csv_with_progress(
+        self, path: Path, delimiter: str, has_header: bool, ts_col: int, value_col: int,
+        ts_format: str, custom_pattern: str, phase_label: str,
+    ) -> csv_import.ParseResult:
+        """parse_rows() mit angeschlossener Fortschrittsanzeige.
+
+        Die Gesamtzahl kommt aus count_data_rows() — einem binären Zählen der
+        Zeilenumbrüche, das gemessen rund 50 ms kostet, gegenüber 6,0 Sekunden
+        fürs eigentliche Einlesen derselben Datei. Der Balken ist damit die
+        50 ms wert; ohne die Vorabzahl bliebe er leer, weil ein CSV-Reader
+        nicht sagen kann, wie weit er ist (f.tell() ist während der Iteration
+        eines Textstroms gesperrt).
+
+        Gezählt werden GELESENE Zeilen, nicht übernommene: eine Datei mit
+        vielen unlesbaren Zeilen liefe sonst gegen eine Zahl, die sie nie
+        erreicht."""
+        self._csv_progress.set_phase(phase_label, csv_import.count_data_rows(path, has_header))
+        return csv_import.parse_rows(
+            path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz,
+            on_progress=self._csv_progress.advance,
+        )
+
+
+
+    def _run_dry_run(self, mapped: list[tuple[symcon_import.SymconVariable, str, float]]) -> dict:
+        """Die Planung selbst, im Hintergrund-Thread (siehe import_dry_run()).
+
+        Sperrreihenfolge wie überall im Modul: erst die Quellsperre, dann die
+        Entitätssperren — nie umgekehrt, sonst entstünde ein Zyklus mit dem
+        Import, der dieselben beiden Sperren in dieser Reihenfolge nimmt.
+
+        Der Zähler steht bewusst VOR plan_import(): "40 von 233 geprüft"
+        zusammen mit der gerade bearbeiteten Symcon-ID beschreibt genau den
+        Moment, in dem die Anzeige abgerufen wird. Nach dem Aufruf gezählt
+        stünde dort die ID der bereits fertigen Variable."""
+        self._dry_run_progress.set_phase("Vorschau wird berechnet…", len(mapped))
+        with self._import_source_lock:
+            with self.deps.coordinator.entities([target for _, target, _ in mapped]):
+                plans = []
+                errors = []
+                for nummer, (variable, target_entity_id, factor) in enumerate(mapped):
+                    self._dry_run_progress.advance(nummer, variable.variable_id)
+                    try:
+                        plans.append(
+                            symcon_import.plan_import(
+                                self.deps.data_dir,
+                                self.deps.index,
+                                variable,
+                                target_entity_id,
+                                self.deps.tz,
+                                factor=factor,
+                            )
+                        )
+                    except ValueError:
+                        errors.append(f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden")
+                self._dry_run_progress.advance(len(mapped), "")
+                return {"plans": plans, "errors": errors}
 
 
 
@@ -1149,6 +1275,7 @@ class ImportService:
     def _fetch_ha_history(self,
         entity_ids: list[str], start: datetime, end: datetime,
         history_source: str = "raw", period: str = ha_statistics.DEFAULT_PERIOD,
+        on_entity: Callable[[int, str], None] | None = None,
     ) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
         """Netzwerkteil komplett außerhalb jeder Datei-/Indexsperre (Konzept
         "Offene Punkte" zu HA-Import: Sperren dürfen nicht unter einem
@@ -1163,7 +1290,12 @@ class ImportService:
         label = "Langzeitstatistik" if history_source == "stats" else "HA-Historie"
         fetched: dict[str, ha_import.HistoryFetchResult] = {}
         errors: list[str] = []
-        for entity_id in entity_ids:
+        for nummer, entity_id in enumerate(entity_ids):
+            # Vor dem Abruf melden, nicht danach: Der Roundtrip IST die
+            # Wartezeit, und die Anzeige soll sagen, worauf gerade gewartet
+            # wird — nicht, was zuletzt fertig wurde.
+            if on_entity is not None:
+                on_entity(nummer, entity_id)
             try:
                 if history_source == "stats":
                     history = ha_statistics.fetch_statistics_rows(entity_id, start, end, period)
@@ -1193,6 +1325,8 @@ class ImportService:
                     "%s für %s: %d von %d Punkten übersprungen (nicht numerisch/kein bekannter Zustand)",
                     label, entity_id, history.skipped, history.skipped + len(history.rows),
                 )
+        if on_entity is not None:
+            on_entity(len(entity_ids), "")
         return fetched, errors
 
 
@@ -1340,15 +1474,23 @@ class ImportService:
         stats_start: datetime,
         end: datetime,
         include_long_term_stats: bool = True,
+        on_entity: Callable[[int, str], None] | None = None,
     ) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
-        """Rohhistorie zuerst, anschließend optional Stundenstatistik."""
+        """Rohhistorie zuerst, anschließend optional Stundenstatistik.
+
+        ``on_entity`` meldet den Fortschritt beider Durchläufe in EINER
+        Zählung über 2n statt zweimal über n: Der Vollimport holt je Entität
+        erst die Rohhistorie und danach die Statistik, ein Balken, der bei der
+        Hälfte auf null zurückspringt, sähe nach einem Fehler aus."""
         fetched: dict[str, ha_import.HistoryFetchResult] = {}
         errors: list[str] = []
         raw_by_entity: dict[str, ha_import.HistoryFetchResult | None] = {}
 
         # Wirklich zuerst alle Rohbereiche bestimmen: Erst deren frühester
         # verfügbarer Wert entscheidet, wo die Statistik später endet.
-        for entity_id in entity_ids:
+        for nummer, entity_id in enumerate(entity_ids):
+            if on_entity is not None:
+                on_entity(nummer, entity_id)
             try:
                 raw_by_entity[entity_id] = ha_import.fetch_history_rows(
                     entity_id, entity_id.split(".", 1)[0], raw_start, end
@@ -1366,7 +1508,9 @@ class ImportService:
                 errors.append(f"Langzeitstatistik-Metadaten: {exc}")
                 logger.warning("HA-Vollimport: Statistik-Metadaten nicht abrufbar · %s", exc)
 
-        for entity_id in entity_ids:
+        for nummer, entity_id in enumerate(entity_ids):
+            if on_entity is not None:
+                on_entity(len(entity_ids) + nummer, entity_id)
             raw = raw_by_entity[entity_id]
             stats: ha_import.HistoryFetchResult | None = None
             meta = statistic_meta.get(entity_id)
@@ -1403,6 +1547,8 @@ class ImportService:
                 )
             except ValueError as exc:
                 errors.append(f"{entity_id} · Vollimport: {exc}")
+        if on_entity is not None:
+            on_entity(2 * len(entity_ids), "")
         return fetched, errors
 
 
@@ -1838,33 +1984,59 @@ class ImportService:
         @router.post("/import/dry-run", response_class=HTMLResponse)
         async def import_dry_run(request: Request) -> HTMLResponse:
             """Vorschau ohne Schreibvorgang (Konzept Abschnitt 03) — beliebig oft
-            wiederholbar, z. B. nach einer geänderten Zuordnung."""
+            wiederholbar, z. B. nach einer geänderten Zuordnung.
+
+            Läuft seit 0.85.0 im Hintergrund mit Fortschrittsanzeige, wie der
+            Import daneben. Grund ist eine Messung: plan_import() liest je
+            Variable sämtliche Symcon-Rohdaten ein, eine einzelne große
+            Variable kostet dabei 6,3 Sekunden — über einen echten Bestand
+            (233 Variablen, 124,6 Mio. Rohzeilen) summiert sich das auf rund
+            1,7 Minuten. Die Anzeige zählt gegen dieselbe Zahl wie die
+            Planungsphase des Imports, damit beide Schritte gleich aussehen."""
             form = await request.form()
-            def plan_locked():
+
+            def einreihen() -> None:
+                # _mapped_variables() gehört in den Request-Thread, nicht in den
+                # Auftrag: es wirft bei einem unbrauchbaren Faktor HTTPException,
+                # und die wäre im Hintergrund-Thread nur ein Logeintrag statt
+                # einer 400-Antwort am Formular.
                 with self._import_source_lock:
                     mapped = self._mapped_variables(form)
-                    with self.deps.coordinator.entities([target for _, target, _ in mapped]):
-                        plans = []
-                        errors = []
-                        for variable, target_entity_id, factor in mapped:
-                            try:
-                                plans.append(
-                                    symcon_import.plan_import(
-                                        self.deps.data_dir,
-                                        self.deps.index,
-                                        variable,
-                                        target_entity_id,
-                                        self.deps.tz,
-                                        factor=factor,
-                                    )
-                                )
-                            except ValueError:
-                                errors.append(f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden")
-                        return plans, errors
+                self._dry_run_progress.start(
+                    lambda: self._run_dry_run(mapped), logger
+                )
 
-            plans, errors = await run_in_threadpool(plan_locked)
+            try:
+                await run_in_threadpool(einreihen)
+            except JobBusy:
+                # Zweiter Klick, während die erste Vorschau noch rechnet: die
+                # laufende Anzeige zurückgeben statt einen zweiten Durchlauf
+                # über dieselben Quelldateien zu starten.
+                logger.info("Dry Run bereits aktiv · event=symcon_dry_run_already_running")
             return self.deps.templates.TemplateResponse(
-                request, "_import_dry_run.html", {"plans": plans, "errors": errors}
+                request, "_job_progress.html", self._dry_run_progress_context()
+            )
+
+
+        @router.get("/import/dry-run/progress", response_class=HTMLResponse)
+        def import_dry_run_progress(request: Request) -> HTMLResponse:
+            """Poll-Ziel der Vorschau — liefert die Anzeige oder das Ergebnis
+            ohne hx-trigger, wodurch das Polling von selbst endet."""
+            stand = self._dry_run_progress.snapshot()
+            if not stand["started"]:
+                return HTMLResponse("")
+            if stand["running"]:
+                return self.deps.templates.TemplateResponse(
+                    request, "_job_progress.html", self._dry_run_progress_context()
+                )
+            ergebnis = stand["result"] or {"plans": [], "errors": []}
+            if stand["error"]:
+                ergebnis = {
+                    "plans": [],
+                    "errors": [*ergebnis.get("errors", []), f"Vorschau abgebrochen: {stand['error']}"],
+                }
+            return self.deps.templates.TemplateResponse(
+                request, "_import_dry_run.html", ergebnis
             )
 
 
@@ -1892,7 +2064,7 @@ class ImportService:
                             self._run_import_background(self._mapped_variables(form))
 
             await run_in_threadpool(admit_import)
-            return self.deps.templates.TemplateResponse(request, "self._import_progress.html", self._import_progress_context())
+            return self.deps.templates.TemplateResponse(request, "_import_progress.html", self._import_progress_context())
 
 
 
@@ -1908,7 +2080,7 @@ class ImportService:
             if not started:
                 return HTMLResponse("")
             if ctx["running"]:
-                return self.deps.templates.TemplateResponse(request, "self._import_progress.html", ctx)
+                return self.deps.templates.TemplateResponse(request, "_import_progress.html", ctx)
             return self.deps.templates.TemplateResponse(request, "_import_result.html", ctx)
 
 
@@ -2000,7 +2172,13 @@ class ImportService:
         async def import_csv_dry_run(request: Request) -> HTMLResponse:
             """Vorschau ohne Schreibvorgang — reicht dieselbe ImportPlan-Vorlage wie
             der Symcon-Import (_import_dry_run.html), da plan_import_rows() dieselbe
-            generische ImportPlan-Struktur zurückgibt."""
+            generische ImportPlan-Struktur zurückgibt.
+
+            Läuft seit 0.85.0 im Hintergrund mit Fortschrittsanzeige: Das
+            Einlesen kostet gemessen 6,0 Sekunden für 104 MB, und die Grenze
+            liegt bei 256 MiB je Datei (MAX_CSV_UPLOAD_BYTES) — die Vorschau
+            ist damit kein Sonderfall des Schnellen, sondern derselbe Fall wie
+            der Import darunter."""
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             plans: list[symcon_import.ImportPlan] = []
@@ -2008,54 +2186,135 @@ class ImportService:
             if not entity_id:
                 errors.append("Bitte eine Ziel-Entität auswählen.")
             else:
-                def plan_csv_locked():
+                def plan_csv_locked() -> dict:
                     path = self._csv_uploaded_path()
                     if path is None:
-                        return None
+                        return {"plans": [], "errors": ["Keine CSV-Datei hochgeladen."]}
                     # Das Lesen und Sortieren der Datei berührt keinen
                     # Speicherbestand und braucht deshalb keine Sperre — siehe
                     # dieselbe Trennung in import_csv_start().
-                    parsed = csv_import.parse_rows(
-                        path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz
+                    parsed = self._parse_csv_with_progress(
+                        path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
+                        phase_label="Datei wird gelesen…",
                     )
+                    self._csv_progress.set_phase("Vorschau wird berechnet…")
                     with self.deps.coordinator.entity(entity_id):
-                        return symcon_import.plan_import_rows(
+                        plan = symcon_import.plan_import_rows(
                             self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
                             source_label=path.name, skipped_rows=parsed.skipped
                         )
+                    return {"plans": [plan], "errors": []}
 
                 try:
-                    plan = await run_in_threadpool(plan_csv_locked)
-                    if plan is None:
-                        errors.append("Keine CSV-Datei hochgeladen.")
-                    else:
-                        plans.append(plan)
-                except ValueError as exc:
-                    errors.append(str(exc))
+                    self._csv_progress.start(plan_csv_locked, logger, kind="dry-run")
+                except JobBusy:
+                    logger.info("CSV-Auftrag bereits aktiv · event=csv_job_already_running")
+                return self.deps.templates.TemplateResponse(
+                    request, "_job_progress.html", self._csv_progress_context()
+                )
             return self.deps.templates.TemplateResponse(request, "_import_dry_run.html", {"plans": plans, "errors": errors})
+
+
+        @router.get("/import/csv/progress", response_class=HTMLResponse)
+        def import_csv_progress(request: Request) -> HTMLResponse:
+            """Poll-Ziel für Vorschau UND Import derselben CSV-Datei. Beide
+            teilen sich einen Auftrag, weil sie dieselbe Datei lesen und
+            deshalb ohnehin nie gleichzeitig laufen dürfen; welche Vorlage das
+            Ergebnis anzeigt, entscheidet die beim Start hinterlegte Spielart
+            (JobProgress.kind) — auch dann noch, wenn der Lauf mit einem
+            Fehler geendet hat und gar kein Ergebnis dasteht."""
+            stand = self._csv_progress.snapshot()
+            if not stand["started"]:
+                return HTMLResponse("")
+            if stand["running"]:
+                return self.deps.templates.TemplateResponse(
+                    request, "_job_progress.html", self._csv_progress_context()
+                )
+            ergebnis = dict(stand["result"] or {})
+            if stand["error"]:
+                ergebnis.setdefault("errors", [])
+                ergebnis["errors"] = [*ergebnis["errors"], f"Abgebrochen: {stand['error']}"]
+            if stand["kind"] == "start":
+                ergebnis.setdefault("results", [])
+                return self.deps.templates.TemplateResponse(request, "_import_result.html", ergebnis)
+            ergebnis.setdefault("plans", [])
+            return self.deps.templates.TemplateResponse(request, "_import_dry_run.html", ergebnis)
 
 
 
         @router.post("/import/csv/start", response_class=HTMLResponse)
         async def import_csv_start(request: Request) -> HTMLResponse:
-            """Schreibt synchron (anders als der Symcon-Import kein Hintergrund-Thread
-            nötig): eine einzelne Datei/Entität ist vom Umfang her vergleichbar mit
-            EINER Symcon-Variable, für die der Symcon-Import ebenfalls ohne spürbare
-            Verzögerung durchläuft. Nie destruktiv — dieselbe Monats-Klassifizierung
-            (import_rows()) wie beim Symcon-Import, derselbe Dry-Run vorher möglich."""
+            """Schreibt seit 0.85.0 im Hintergrund, mit derselben zweiphasigen
+            Fortschrittsanzeige wie der Symcon-Import. Nie destruktiv — dieselbe
+            Monats-Klassifizierung (import_rows()) wie dort, derselbe Dry-Run
+            vorher möglich.
+
+            Vorher lief das synchron, begründet damit, eine einzelne
+            Datei/Entität sei vom Umfang her vergleichbar mit EINER
+            Symcon-Variable, "für die der Symcon-Import ebenfalls ohne
+            spürbare Verzögerung durchläuft". Beide Hälften der Begründung
+            sind gemessen falsch: Eine einzelne große Symcon-Variable kostet
+            allein in der Planung 6,3 Sekunden und bekommt dort sehr wohl
+            einen Balken; und eine CSV-Datei darf hier 256 MiB groß sein
+            (MAX_CSV_UPLOAD_BYTES) bzw. 10 Mio. Zeilen enthalten
+            (MAX_IMPORT_ROWS_PER_ENTITY) — für 104 MB wurden allein fürs
+            Einlesen 6,0 Sekunden gemessen, das Schreiben kommt obendrauf."""
             started_at = datetime.now(timezone.utc)
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
-            results: list[symcon_import.ImportResult] = []
-            errors: list[str] = []
-            reconciliation_report = None
             source_path = self._csv_uploaded_path()
             if not entity_id:
-                errors.append("Bitte eine Ziel-Entität auswählen.")
-            else:
-                logger.info("CSV-Import gestartet · Ziel=%s", entity_id)
+                # Kein Auftrag, keine Anzeige: Das ist ein Formularfehler, der
+                # sofort beantwortet gehört, nicht ein Lauf, der scheitert.
+                return self.deps.templates.TemplateResponse(
+                    request, "_import_result.html",
+                    {"results": [], "errors": ["Bitte eine Ziel-Entität auswählen."]},
+                )
+            logger.info("CSV-Import gestartet · Ziel=%s", entity_id)
 
-                def execute_csv_import():
+            def write_csv_report(
+                results: list[symcon_import.ImportResult],
+                errors: list[str],
+                reconciliation_report: dict | None,
+            ) -> None:
+                """Schreibt den Importbericht unter der Wartungssperre.
+
+                Steht bewusst neben execute_csv_import() statt darin: Der
+                Syntaxbaum-Test in test_csv_import_locking.py sieht auch
+                verschachtelte Funktionen, und execute_csv_import() soll
+                nachweisbar keinen exclusive()-Block enthalten (ZG-25).
+
+                exclusive() wartet unbegrenzt; das ist hier unkritisch, weil
+                der ganze Ablauf im Hintergrund-Thread läuft und keine
+                HTTP-Antwort mehr offen hält."""
+                with self.deps.coordinator.exclusive():
+                    import_reports.create(
+                        self.deps.data_dir,
+                        source_type="csv",
+                        started_at=started_at,
+                        source={
+                            "filename": source_path.name if source_path else None,
+                            "size_bytes": source_path.stat().st_size if source_path and source_path.is_file() else 0,
+                        },
+                        configuration={
+                            "delimiter": delimiter,
+                            "has_header": has_header,
+                            "timestamp_column": ts_col,
+                            "value_column": value_col,
+                            "timestamp_format": ts_format,
+                            "custom_pattern": custom_pattern if ts_format == "custom" else "",
+                            "entity_id": entity_id,
+                        },
+                        results=[dataclasses.asdict(result) for result in results],
+                        errors=errors,
+                        reconciliation=reconciliation_report,
+                    )
+
+            def execute_csv_import() -> dict:
+                results: list[symcon_import.ImportResult] = []
+                errors: list[str] = []
+                reconciliation_report = None
+                try:
                     path = self._csv_uploaded_path()
                     if path is None:
                         raise ValueError("Keine CSV-Datei hochgeladen.")
@@ -2065,16 +2324,17 @@ class ImportService:
                     # er mit unter der Sperre (ZG-25). Derselbe Schnitt wie beim
                     # Home-Assistant-Import darunter, der seinen Netzwerk-Fetch
                     # ebenfalls davor legt.
-                    parsed = csv_import.parse_rows(
-                        path,
-                        delimiter,
-                        has_header,
-                        ts_col,
-                        value_col,
-                        ts_format,
-                        custom_pattern,
-                        self.deps.tz,
+                    parsed = self._parse_csv_with_progress(
+                        path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
+                        phase_label="Schritt 1/2 · Datei wird gelesen…",
                     )
+                    # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
+                    # geschrieben werden, entscheidet erst die Klassifizierung
+                    # in import_rows() (bestehende Archivmonate werden
+                    # übersprungen). Die Zahl der Monate IN den gelesenen Daten
+                    # wäre eine Obergrenze — ein Balken, der nie 100 % erreicht,
+                    # ist schlechter als gar keiner.
+                    self._csv_progress.set_phase("Schritt 2/2 · Werte werden geschrieben…", unit="Monate")
                     # Entitätssperre statt exclusive(): dieser Import schreibt
                     # genau eine Entität — Archiv, Rollups, Hot Buffer und
                     # Indexzeilen gehören alle ihr. Die globale Sperre hielt für
@@ -2093,12 +2353,9 @@ class ImportService:
                             self.deps.tz,
                             source_label=path.name,
                             skipped_rows=parsed.skipped,
+                            on_month_done=lambda label, _anzahl: self._csv_progress.advance(detail=label),
                         )
-                        reconciliation = self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)
-                        return result, reconciliation
-
-                try:
-                    result, reconciliation_report = await run_in_threadpool(execute_csv_import)
+                        reconciliation_report = self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)
                     results.append(result)
                     logger.info(
                         "CSV-Import abgeschlossen · Ziel=%s · Zeilen importiert=%d · Zeilen zusammengeführt=%d",
@@ -2114,43 +2371,30 @@ class ImportService:
                         )
                 except ValueError as exc:
                     errors.append(str(exc))
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 — landet als Text im Ergebnis
                     logger.exception("CSV-Import unerwartet fehlgeschlagen")
                     errors.append(f"Import abgebrochen: {exc}")
-            try:
-                # exclusive() wartet unbegrenzt, bis keine andere
-                # Speicheroperation mehr läuft. Im Event-Loop stünde
-                # während dieses Wartens der ganze Server still statt nur
-                # eines Threadpool-Workers — siehe backup_import() in
-                # main.py, wo dieselbe Stelle denselben Fehler hatte.
-                def write_csv_report() -> None:
-                    with self.deps.coordinator.exclusive():
-                        import_reports.create(
-                            self.deps.data_dir,
-                            source_type="csv",
-                            started_at=started_at,
-                            source={
-                                "filename": source_path.name if source_path else None,
-                                "size_bytes": source_path.stat().st_size if source_path and source_path.is_file() else 0,
-                            },
-                            configuration={
-                                "delimiter": delimiter,
-                                "has_header": has_header,
-                                "timestamp_column": ts_col,
-                                "value_column": value_col,
-                                "timestamp_format": ts_format,
-                                "custom_pattern": custom_pattern if ts_format == "custom" else "",
-                                "entity_id": entity_id,
-                            },
-                            results=[dataclasses.asdict(result) for result in results],
-                            errors=errors,
-                            reconciliation=reconciliation_report,
-                        )
+                # Der Bericht wird auch nach einem Fehlschlag geschrieben — er ist
+                # die einzige dauerhafte Spur des Versuchs. Er steht bewusst in
+                # einer Geschwisterfunktion statt hier eingerückt:
+                # execute_csv_import() soll nachweisbar KEINEN exclusive()-Block
+                # enthalten, damit der Import selbst nie wieder die ganze App
+                # anhält (ZG-25; test_csv_import_locking.py prüft das am
+                # Syntaxbaum und sieht dabei auch verschachtelte Funktionen).
+                try:
+                    self._csv_progress.set_phase("Importbericht wird geschrieben…")
+                    write_csv_report(results, errors, reconciliation_report)
+                except Exception:  # noqa: BLE001 — ein fehlender Bericht darf den Import nicht kippen
+                    logger.exception("CSV-Importreport konnte nicht gespeichert werden")
+                return {"results": results, "errors": errors}
 
-                await run_in_threadpool(write_csv_report)
-            except Exception:
-                logger.exception("CSV-Importreport konnte nicht gespeichert werden")
-            return self.deps.templates.TemplateResponse(request, "_import_result.html", {"results": results, "errors": errors})
+            try:
+                self._csv_progress.start(execute_csv_import, logger, kind="start")
+            except JobBusy:
+                logger.info("CSV-Auftrag bereits aktiv · event=csv_job_already_running")
+            return self.deps.templates.TemplateResponse(
+                request, "_job_progress.html", self._csv_progress_context()
+            )
 
 
         # ---------------------------------------------------------------------------
@@ -2464,10 +2708,16 @@ class ImportService:
 
         @router.post("/import/ha/start", response_class=HTMLResponse)
         async def import_ha_start(request: Request) -> HTMLResponse:
-            """Schreibt synchron, wie der CSV-Import — der Netzwerk-Fetch (potenziell
-            der langsamste Teil) läuft vorher außerhalb jeder Sperre; exclusive() hält
-            danach nur noch den eigentlichen Schreib- und Indexabgleich-Teil. Eigene
-            Vorlage (_ha_import_result.html) wie beim Dry Run, aus demselben Grund."""
+            """Läuft seit 0.85.0 im Hintergrund mit Fortschrittsanzeige je
+            Entität. Der Netzwerk-Fetch (der langsamste Teil) liegt weiterhin
+            vor jeder Sperre; exclusive() hält danach nur noch den Schreib- und
+            Indexabgleich-Teil. Eigene Vorlage (_ha_import_result.html) wie beim
+            Dry Run, aus demselben Grund.
+
+            Warum Hintergrund: _fetch_ha_history() macht einen sequenziellen
+            HTTP- bzw. WebSocket-Roundtrip JE Entität. Bei einer zweistelligen
+            Auswahl über einen langen Zeitraum sind das Minuten, in denen die
+            Antwort offen stand und der Button aussah wie ein ruhender."""
             started_at = datetime.now(timezone.utc)
             form = await request.form()
             (
@@ -2476,15 +2726,105 @@ class ImportService:
             ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
-            items: list[dict] = []
-            results: list[symcon_import.ImportResult] = []
-            errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
-            reconciliation_report = None
-            start, end = (None, None)
+            vorab_fehler = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
             if not entity_ids:
+                # Nichts zu holen: sofort antworten statt einen Auftrag zu
+                # starten, der nur eine Fehlermeldung zu tragen hätte.
                 if not unknown_ids:
-                    errors.append("Bitte mindestens eine Entität auswählen.")
-            else:
+                    vorab_fehler.append("Bitte mindestens eine Entität auswählen.")
+                return self.deps.templates.TemplateResponse(
+                    request, "_ha_import_result.html",
+                    {"history_source": history_source, "period": period, "items": [], "errors": vorab_fehler},
+                )
+
+            def execute_ha_import(
+                fetched: dict[str, ha_import.HistoryFetchResult], errors: list[str],
+            ) -> tuple[list[dict], dict | None]:
+                """Der Schreibteil unter der Wartungssperre.
+
+                Steht neben run_ha_import() statt darin, damit der Sperrumfang
+                dieses Blocks für sich lesbar bleibt — dieselbe Aufteilung wie
+                beim CSV-Import daneben."""
+                with self.deps.coordinator.exclusive():
+                    run_items = []
+                    for nummer, (entity_id, history) in enumerate(fetched.items()):
+                        self._ha_progress.advance(nummer, entity_id)
+                        entity = self.deps.index.get_entity(entity_id)
+                        try:
+                            result = symcon_import.import_rows(
+                                self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
+                                source_label=entity_id, skipped_rows=history.skipped,
+                                include_existing_months=include_existing_months,
+                            )
+                        except ValueError as exc:
+                            errors.append(f"{entity_id}: {exc}")
+                            continue
+                        run_items.append({
+                            "entity_id": entity_id,
+                            "friendly_name": entity_display_name(
+                                entity_id,
+                                entity["friendly_name"] if entity else None,
+                                entity["custom_name"] if entity else None,
+                            ),
+                            "available_label": self._ha_available_label(history, history_source),
+                            "result": result,
+                            "full_summary": (
+                                self._ha_full_summary(history) if history_source == "full" else None
+                            ),
+                        })
+                    self._ha_progress.advance(len(fetched), "")
+                    reconciliation = self.deps.run_storage_reconciliation(
+                        entity_ids=sorted(fetched.keys()), repair=True
+                    ) if fetched else None
+                    return run_items, reconciliation
+
+            def write_ha_report(
+                items: list[dict], errors: list[str], reconciliation_report: dict | None,
+            ) -> None:
+                """Importbericht unter der Wartungssperre — auch nach einem
+                Fehlschlag, er ist die einzige dauerhafte Spur des Versuchs.
+
+                exclusive() wartet unbegrenzt; unkritisch, weil der ganze
+                Ablauf im Hintergrund-Thread läuft und keine HTTP-Antwort mehr
+                offen hält (vorher war genau das der Grund für den
+                run_in_threadpool-Umweg an dieser Stelle)."""
+                with self.deps.coordinator.exclusive():
+                    report_results = []
+                    for item in items:
+                        result_payload = dataclasses.asdict(item["result"])
+                        result_payload["available_label"] = item["available_label"]
+                        if item.get("full_summary") is not None:
+                            result_payload["full_summary"] = item["full_summary"]
+                        report_results.append(result_payload)
+                    import_reports.create(
+                        self.deps.data_dir,
+                        source_type="ha",
+                        started_at=started_at,
+                        source={"filename": "Home Assistant", "size_bytes": 0},
+                        configuration={
+                            "entity_ids": raw_entity_ids,
+                            "range_preset": range_preset,
+                            "date_from": date_from,
+                            "date_to": date_to,
+                            "history_source": history_source,
+                            "period": period if history_source in ("stats", "full") else None,
+                            "stats_range_preset": (
+                                stats_range_preset if history_source == "full" else None
+                            ),
+                            "include_long_term_stats": (
+                                include_long_term_stats if history_source == "full" else None
+                            ),
+                            "include_existing_months": include_existing_months,
+                        },
+                        results=report_results,
+                        errors=errors,
+                        reconciliation=reconciliation_report,
+                    )
+
+            def run_ha_import() -> dict:
+                items: list[dict] = []
+                errors: list[str] = list(vorab_fehler)
+                reconciliation_report = None
                 logger.info(
                     "Home-Assistant-Import gestartet · Quelle=%s · Entitäten=%d · Zeitraum=%s",
                     history_source, len(entity_ids), range_preset,
@@ -2492,52 +2832,34 @@ class ImportService:
                 start, stats_start, end = self._ha_request_ranges(
                     range_preset, date_from, date_to, history_source, stats_range_preset
                 )
+
+                def melde_entitaet(nummer: int, entity_id: str) -> None:
+                    self._ha_progress.advance(nummer, entity_id)
+
+                # Der Vollimport holt je Entität zwei Dinge nacheinander
+                # (Rohhistorie, danach Statistik) und zählt deshalb gegen 2n —
+                # siehe _fetch_ha_full_history().
+                schritte = 2 * len(entity_ids) if history_source == "full" else len(entity_ids)
+                self._ha_progress.set_phase(
+                    "Schritt 1/2 · Daten werden aus Home Assistant geholt…", schritte, unit="Abrufe",
+                )
                 if history_source == "full":
-                    fetched, fetch_errors = await run_in_threadpool(
-                        self._fetch_ha_full_history,
+                    fetched, fetch_errors = self._fetch_ha_full_history(
                         entity_ids, start, stats_start, end, include_long_term_stats,
+                        on_entity=melde_entitaet,
                     )
                 else:
-                    fetched, fetch_errors = await run_in_threadpool(
-                        self._fetch_ha_history, entity_ids, start, end, history_source, period
+                    fetched, fetch_errors = self._fetch_ha_history(
+                        entity_ids, start, end, history_source, period, on_entity=melde_entitaet,
                     )
                 errors.extend(fetch_errors)
 
-                def execute_ha_import() -> tuple[list[dict], dict]:
-                    with self.deps.coordinator.exclusive():
-                        run_items = []
-                        for entity_id, history in fetched.items():
-                            entity = self.deps.index.get_entity(entity_id)
-                            try:
-                                result = symcon_import.import_rows(
-                                    self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
-                                    source_label=entity_id, skipped_rows=history.skipped,
-                                    include_existing_months=include_existing_months,
-                                )
-                            except ValueError as exc:
-                                errors.append(f"{entity_id}: {exc}")
-                                continue
-                            run_items.append({
-                                "entity_id": entity_id,
-                                "friendly_name": entity_display_name(
-                                    entity_id,
-                                    entity["friendly_name"] if entity else None,
-                                    entity["custom_name"] if entity else None,
-                                ),
-                                "available_label": self._ha_available_label(history, history_source),
-                                "result": result,
-                                "full_summary": (
-                                    self._ha_full_summary(history) if history_source == "full" else None
-                                ),
-                            })
-                        reconciliation = self.deps.run_storage_reconciliation(
-                            entity_ids=sorted(fetched.keys()), repair=True
-                        ) if fetched else None
-                        return run_items, reconciliation
-
                 if fetched:
+                    self._ha_progress.set_phase(
+                        "Schritt 2/2 · Werte werden geschrieben…", len(fetched), unit="Entitäten",
+                    )
                     try:
-                        items, reconciliation_report = await run_in_threadpool(execute_ha_import)
+                        items, reconciliation_report = execute_ha_import(fetched, errors)
                         results = [item["result"] for item in items]
                         rows_imported = sum(r.rows_imported for r in results)
                         rows_merged = sum(r.rows_merged for r in results)
@@ -2565,55 +2887,45 @@ class ImportService:
                                 "Home-Assistant-Import ohne Fehler abgeschlossen, aber 0 Zeilen geschrieben · Entitäten=%d",
                                 len(results),
                             )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 — landet als Text im Ergebnis
                         logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
                         errors.append(f"Import abgebrochen: {exc}")
-            try:
-                # exclusive() wartet unbegrenzt, bis keine andere
-                # Speicheroperation mehr läuft. Im Event-Loop stünde
-                # während dieses Wartens der ganze Server still statt nur
-                # eines Threadpool-Workers — siehe backup_import() in
-                # main.py, wo dieselbe Stelle denselben Fehler hatte.
-                def write_ha_report() -> None:
-                    with self.deps.coordinator.exclusive():
-                        report_results = []
-                        for item in items:
-                            result_payload = dataclasses.asdict(item["result"])
-                            result_payload["available_label"] = item["available_label"]
-                            if item.get("full_summary") is not None:
-                                result_payload["full_summary"] = item["full_summary"]
-                            report_results.append(result_payload)
-                        import_reports.create(
-                            self.deps.data_dir,
-                            source_type="ha",
-                            started_at=started_at,
-                            source={"filename": "Home Assistant", "size_bytes": 0},
-                            configuration={
-                                "entity_ids": raw_entity_ids,
-                                "range_preset": range_preset,
-                                "date_from": date_from,
-                                "date_to": date_to,
-                                "history_source": history_source,
-                                "period": period if history_source in ("stats", "full") else None,
-                                "stats_range_preset": (
-                                    stats_range_preset if history_source == "full" else None
-                                ),
-                                "include_long_term_stats": (
-                                    include_long_term_stats if history_source == "full" else None
-                                ),
-                                "include_existing_months": include_existing_months,
-                            },
-                            results=report_results,
-                            errors=errors,
-                            reconciliation=reconciliation_report,
-                        )
 
-                await run_in_threadpool(write_ha_report)
-            except Exception:
-                logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")
+                try:
+                    self._ha_progress.set_phase("Importbericht wird geschrieben…")
+                    write_ha_report(items, errors, reconciliation_report)
+                except Exception:  # noqa: BLE001 — ein fehlender Bericht darf den Import nicht kippen
+                    logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")
+                return {
+                    "history_source": history_source, "period": period,
+                    "items": items, "errors": errors,
+                }
+
+            try:
+                self._ha_progress.start(run_ha_import, logger)
+            except JobBusy:
+                logger.info("HA-Import bereits aktiv · event=ha_import_already_running")
             return self.deps.templates.TemplateResponse(
-                request, "_ha_import_result.html",
-                {"history_source": history_source, "period": period, "items": items, "errors": errors},
+                request, "_job_progress.html", self._ha_progress_context()
+            )
+
+
+        @router.get("/import/ha/progress", response_class=HTMLResponse)
+        def import_ha_progress(request: Request) -> HTMLResponse:
+            """Poll-Ziel des HA-Imports — Anzeige oder Endergebnis, letzteres
+            ohne hx-trigger, wodurch das Polling von selbst endet."""
+            stand = self._ha_progress.snapshot()
+            if not stand["started"]:
+                return HTMLResponse("")
+            if stand["running"]:
+                return self.deps.templates.TemplateResponse(
+                    request, "_job_progress.html", self._ha_progress_context()
+                )
+            ergebnis = dict(stand["result"] or {"history_source": "raw", "period": "", "items": [], "errors": []})
+            if stand["error"]:
+                ergebnis["errors"] = [*ergebnis.get("errors", []), f"Abgebrochen: {stand['error']}"]
+            return self.deps.templates.TemplateResponse(
+                request, "_ha_import_result.html", ergebnis
             )
 
 

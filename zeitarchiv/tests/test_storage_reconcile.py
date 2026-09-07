@@ -92,15 +92,23 @@ def test_storage_index_settings_fragment_has_preview_and_confirmed_repair() -> N
 
 
 def test_reconciliation_runs_after_restore_startup_and_both_import_paths() -> None:
+    """Die Reihenfolge beim Start ist die eigentliche Zusicherung: erst das
+    vorgemerkte Backup einspielen, dann den Index dagegen abgleichen.
+
+    Der Abgleich selbst wohnt seit 0.85.0 in background.py (siehe dessen
+    Modul-Docstring und das Zeilenbudget in test_route_modules.py); main.py
+    hängt ihn nur noch ein. Der Test folgt dem Umzug, statt die alte Stelle
+    zu suchen — geprüft wird weiterhin dasselbe."""
     main = (APP / "main.py").read_text(encoding="utf-8")
+    background = (APP / "background.py").read_text(encoding="utf-8")
     import_routes = (APP / "import_routes.py").read_text(encoding="utf-8")
     restore = main.index("backup.apply_pending_restore(DATA_DIR, BACKUPS_DIR)")
-    startup_repair = main.index("_run_storage_reconciliation(repair=True)")
+    startup_repair = main.index("_background.run_storage_reconciliation(repair=True)")
     assert restore < startup_repair
     assert 'index.get_setting("storage_clean_shutdown", "0") == "1"' in main
     assert "_requires_synchronous_reconciliation" in main
-    assert "target=_background_storage_reconciliation" in main
-    assert "with storage_coordinator.entity(entity_id):" in main
+    assert "target=self._background_storage_reconciliation" in background
+    assert "with self.coordinator.entity(entity_id):" in background
     # Symcon-/CSV-Import (Reconciliation nach Import) leben seit der Extraktion
     # in import_routes.py (siehe test_route_modules.py), nicht mehr in main.py.
     assert "entity_ids=sorted({target for _, target, _ in mapped}), repair=True" in import_routes

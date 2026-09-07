@@ -7,10 +7,13 @@
       Max. {{ import_limits.csv_upload_mib }} MiB. Wird gespeichert, bis du sie wieder löschst
       &mdash; Spalten/Format wählst du im nächsten Schritt.
     </p>
-    <input type="file" name="file" id="csv-file-input" accept=".csv" style="display:none;"
-           hx-post="import/csv/upload" hx-trigger="change" hx-encoding="multipart/form-data"
-           hx-target="#csv-section" hx-swap="outerHTML"
-           hx-on::response-error="appAlert('Bitte eine CSV-Datei hochladen.')">
+    {# Kein hx-post mehr am Feld: Der Upload läuft seit 0.85.0 über
+       XMLHttpRequest (js/pages/import.js, uploadCsv), weil nur XHR
+       Fortschritts-Events beim Hochladen liefert. Der ZIP-Upload daneben macht
+       das seit jeher so; hier fehlte es, obwohl eine CSV-Datei bis zu
+       {{ import_limits.csv_upload_mib }} MiB groß sein darf — über eine
+       langsame Leitung minutenlang ohne jede Rückmeldung. #}
+    <input type="file" name="file" id="csv-file-input" accept=".csv" style="display:none;">
   </label>
 </div>
 {% else %}
@@ -111,10 +114,14 @@
   </div>
 
   <div class="actionbar">
-    <button type="button" class="btn" hx-post="import/csv/dry-run" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML">Vorschau (Dry Run)</button>
-    <button type="button" class="btn primary" hx-post="import/csv/start" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML">Import starten</button>
+    <button type="button" class="btn" hx-post="import/csv/dry-run" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML" hx-disabled-elt="this">Vorschau (Dry Run)</button>
+    <button type="button" class="btn primary" hx-post="import/csv/start" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML" hx-disabled-elt="this">Import starten</button>
   </div>
-  <div id="csv-import-output"></div>
+  {# hx-trigger="load" wie beim Symcon-Import: Wird die Seite neu geladen,
+     während ein CSV-Auftrag noch läuft, zieht die Fortschrittsanzeige von
+     selbst wieder ein. Ohne das stünde hier nach einem versehentlichen
+     Reload eine leere Fläche, obwohl im Hintergrund geschrieben wird. #}
+  <div id="csv-import-output" hx-get="import/csv/progress" hx-trigger="load" hx-swap="innerHTML"></div>
   {% else %}
   <div class="empty">Datei enthält keine Zeilen.</div>
   {% endif %}

@@ -10,13 +10,14 @@ sind gewachsen, bevor die Housekeeping-Seite sie zusammenfasste, und ein
 Umbenennen würde Lesezeichen und die Formular-Ziele in mehreren Templates
 brechen. Maßgeblich ist, welche Seite sie bedienen, nicht ihr Pfad.
 
-Was BEWUSST in main.py bleibt: alles, was sich der Bereich mit dem
-Hintergrund-Scheduler oder der Einstellungsseite teilt — die Vorschau-Caches
-(_load_purge_preview, _refresh_*_if_stale), die Job-Klammer
-(_begin/_finish_retention_job), _set_next_retention_run und
-_run_storage_reconciliation. Sie werden als Callables in
-HousekeepingDependencies hereingereicht, statt sie mitzunehmen und von hier
-aus wieder nach main.py zu exportieren.
+Was BEWUSST NICHT hier liegt: alles, was sich der Bereich mit dem
+Wartungsplaner teilt — die beiden Vorschau-Zwischenspeicher
+(load_purge_preview, refresh_*_if_stale), die Job-Klammer
+(begin_/finish_retention_job), set_next_retention_run und
+run_storage_reconciliation. Sie gehören seit 0.85.0 dem BackgroundService
+(background.py) und werden von main.py als Callables in
+HousekeepingDependencies hereingereicht — die Routen hier rufen sie auf, ohne
+zu wissen, wer sie im Hintergrund pflegt.
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ from .formatting import (
     format_timestamp,
     format_value,
 )
+from .progress import JobBusy, JobProgress
 from .storage import cleanup, rotate
 from .storage.coordinator import StorageCoordinator
 from .storage.index import (
@@ -63,6 +65,14 @@ from .storage.index import (
 
 
 logger = logging.getLogger(__name__)
+
+#: Fortschritt der manuellen Bereinigung. Modulweit statt im Router-Bau, damit
+#: der Zustand nicht an der Router-Instanz hängt: /settings/purge/progress muss
+#: denselben Auftrag sehen wie /settings/purge, auch wenn die Anzeige nach einem
+#: Seitenwechsel neu aufgebaut wird. Es gibt genau einen Bereinigungslauf
+#: gleichzeitig — der Auftrag hält die globale Wartungssperre, ein zweiter
+#: könnte ohnehin nur warten.
+_purge_progress = JobProgress("purge", unit="Monate", label="Bereinigung")
 
 
 @dataclass(frozen=True)
@@ -498,15 +508,32 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
 
 
-    @router.post("/settings/purge", response_class=HTMLResponse)
-    def settings_purge(request: Request) -> HTMLResponse:
-        """Manueller Anstoß, der zur Löschung markierte Datensätze überall
-        physisch entfernt — sowohl im laufenden Monat (Hot Buffer, purge_hot_buffer())
-        als auch in bereits archivierten Monaten (Parquet-Rewrite + Rollup-
-        Neuberechnung, purge_archived_months()). Konzept "Offene Punkte"."""
+    def _purge_progress_context() -> dict:
+        return {
+            **_purge_progress.snapshot(),
+            "progress_id": "purge-progress",
+            "poll_url": "settings/purge/progress",
+        }
+
+    def _purge_worker() -> str:
+        """Der eigentliche Lauf, im Hintergrund-Thread. Rückgabewert ist der
+        Ergebnistext, den die Vorlage nach dem letzten Polling anzeigt."""
+        # Die Gesamtzahl kommt aus derselben Vorschau, die die Seite ohnehin
+        # zeigt (deps.load_purge_preview()) — der Balken zählt also gegen
+        # genau die Zahl, die der Nutzer vor dem Klick gelesen hat. Fehlt sie,
+        # bleibt der Balken leer und die Zeile darüber trägt den Stand; das
+        # ist ehrlicher als eine geschätzte Gesamtzahl.
+        vorschau = deps.load_purge_preview() or {}
+        _purge_progress.set_phase(
+            "Bereinigung läuft…",
+            int(vorschau.get("totals", {}).get("archive_months", 0) or 0),
+        )
         with deps.coordinator.exclusive():
             hot_purged = cleanup.purge_hot_buffer(deps.data_dir, deps.index, deps.tz)
-            archive_result = cleanup.purge_archived_months(deps.data_dir, deps.index, deps.tz)
+            archive_result = cleanup.purge_archived_months(
+                deps.data_dir, deps.index, deps.tz,
+                on_month=lambda anzahl, kennung: _purge_progress.advance(anzahl, kennung),
+            )
         total_rows = hot_purged + archive_result["rows_purged"]
         months = archive_result["months_purged"]
         if total_rows == 0:
@@ -525,8 +552,50 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             months,
         )
         deps.refresh_purge_preview_if_stale(force=True)
+        return result
+
+    @router.post("/settings/purge", response_class=HTMLResponse)
+    def settings_purge(request: Request) -> HTMLResponse:
+        """Manueller Anstoß, der zur Löschung markierte Datensätze überall
+        physisch entfernt — sowohl im laufenden Monat (Hot Buffer, purge_hot_buffer())
+        als auch in bereits archivierten Monaten (Parquet-Rewrite + Rollup-
+        Neuberechnung, purge_archived_months()). Konzept "Offene Punkte".
+
+        Läuft seit 0.85.0 im Hintergrund und antwortet sofort mit der
+        Fortschrittsanzeige, statt die Antwort bis zum Ende offen zu halten.
+        Gemessen an einem echten Bestand dauert der Lauf rund 20 Sekunden
+        (163 Archivmonate neu berechnet) — und hält dabei die globale
+        Wartungssperre, hält also auch die Aufnahme aus Home Assistant an.
+        Genau deshalb muss er sichtbar sein statt stumm.
+
+        Ein zweiter Klick startet keinen zweiten Lauf (JobProgress.claim), er
+        bekommt die Anzeige des bereits laufenden zurück."""
+        try:
+            _purge_progress.start(_purge_worker, logger)
+        except JobBusy:
+            logger.info("Bereinigung bereits aktiv · event=manual_cleanup_already_running")
         return deps.templates.TemplateResponse(
-            request, "_settings_purge_form.html", _settings_purge_context(result=result)
+            request, "_job_progress.html", _purge_progress_context()
+        )
+
+    @router.get("/settings/purge/progress", response_class=HTMLResponse)
+    def settings_purge_progress(request: Request) -> HTMLResponse:
+        """Poll-Ziel der Fortschrittsanzeige: liefert entweder wieder die
+        Anzeige (und damit das nächste Polling) oder das fertige Formular
+        ohne hx-trigger, was das Polling von selbst beendet."""
+        stand = _purge_progress.snapshot()
+        if not stand["started"]:
+            return HTMLResponse("")
+        if stand["running"]:
+            return deps.templates.TemplateResponse(
+                request, "_job_progress.html", _purge_progress_context()
+            )
+        if stand["error"]:
+            ergebnis = f"Bereinigung fehlgeschlagen: {stand['error']}"
+        else:
+            ergebnis = stand["result"]
+        return deps.templates.TemplateResponse(
+            request, "_settings_purge_form.html", _settings_purge_context(result=ergebnis)
         )
 
 

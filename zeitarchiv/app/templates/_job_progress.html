@@ -1,0 +1,43 @@
+{# Fortschrittsanzeige für Aufträge mit zählbarem Fortschritt.
+
+   Gegenstück zu _busy.html: Dort ein Chip ohne Zahl, hier ein Balken mit
+   Zahl. Welche Aktion was bekommt, entscheidet allein, ob es eine ehrliche
+   Gesamtzahl gibt — eine geschätzte Prozentzahl wäre schlimmer als keine.
+
+   Der Aufrufer übergibt aus JobProgress.snapshot() plus zwei eigene Werte:
+
+     progress_id  id des Containers, den das Polling per outerHTML ersetzt
+     poll_url     Endpunkt, der entweder wieder diese Anzeige liefert oder,
+                  sobald der Auftrag durch ist, das Endergebnis OHNE
+                  hx-trigger — dadurch endet das Polling von selbst, ohne
+                  dass die Anzeige mitzählen müsste, wann sie aufhören soll.
+
+   Warum 500 ms: derselbe Takt wie beim Symcon-Import und beim Backup, die
+   das seit Langem so machen. Ein schnellerer Takt brächte nichts — die
+   Balkenbreite ist per CSS ohnehin über 300 ms interpoliert.
+
+   aria-live="polite" am Textabsatz statt am Container: Der Container wird
+   durch das Polling zweimal je Sekunde komplett ersetzt; eine Live-Region
+   auf ihm würde bei jedem Austausch neu angelegt und deshalb je nach
+   Screenreader gar nicht oder unablässig vorgelesen. #}
+<div id="{{ progress_id }}" class="job-progress"
+     hx-get="{{ poll_url }}" hx-trigger="every 500ms" hx-target="this" hx-swap="outerHTML">
+  {% if phase_label %}<h3 class="eyebrow job-progress-title">{{ phase_label }}</h3>{% endif %}
+  <p class="job-progress-line" aria-live="polite">
+    {% if detail %}<span class="job-progress-id">{{ detail }}</span> &middot; {% endif %}
+    {% if total %}
+      <strong>{{ done | format_int }}</strong> von <strong>{{ total | format_int }}</strong>{% if unit %} {{ unit }}{% endif %}
+    {% elif done %}
+      {# Zählbar, aber ohne bekannte Gesamtzahl — z. B. die Schreibphase des
+         CSV-Imports, deren Monatszahl erst im Schreiben feststeht. Dann eine
+         wachsende Zahl statt eines Balkens, der eine Gesamtzahl behauptet,
+         die niemand kennt; der Balken darunter bleibt leer. #}
+      <strong>{{ done | format_int }}</strong>{% if unit %} {{ unit }}{% endif %} bisher
+    {% else %}
+      läuft&hellip;
+    {% endif %}
+  </p>
+  <div class="job-progress-track">
+    <div class="job-progress-fill" style="width:{{ percent }}%"></div>
+  </div>
+</div>

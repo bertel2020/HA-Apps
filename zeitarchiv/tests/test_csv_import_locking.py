@@ -87,6 +87,14 @@ def test_the_csv_import_locks_only_its_own_entity() -> None:
             )
 
 
+#: Beide CSV-Pfade parsen nicht mehr selbst, sondern über diesen Helfer — er
+#: hängt die Fortschrittsanzeige an parse_rows() (Stufe 3 der Rückmeldung für
+#: lange Aktionen). Der Test folgt der Indirektion, statt sie zu ignorieren:
+#: die Zusicherung ist "das Einlesen passiert außerhalb jeder Sperre", nicht
+#: "parse_rows steht wörtlich in dieser Funktion".
+PARSE_HELFER = "self._parse_csv_with_progress"
+
+
 def test_reading_the_file_happens_before_any_lock_is_taken() -> None:
     """Datei lesen und sortieren berührt keinen Speicherbestand.
 
@@ -95,11 +103,29 @@ def test_reading_the_file_happens_before_any_lock_is_taken() -> None:
     """
     for name in ("execute_csv_import", "plan_csv_locked"):
         function = _function(_tree(), name)
-        assert "csv_import.parse_rows" in _calls(function), f"{name}() parst nicht mehr"
+        assert PARSE_HELFER in _calls(function), f"{name}() parst nicht mehr"
         for block in _coordinator_with_blocks(function):
-            assert "csv_import.parse_rows" not in _calls(block), (
+            aufrufe = _calls(block)
+            assert PARSE_HELFER not in aufrufe, (
                 f"{name}() liest die Datei wieder unter der Sperre"
             )
+            assert "csv_import.parse_rows" not in aufrufe, (
+                f"{name}() liest die Datei wieder unter der Sperre"
+            )
+
+
+def test_the_parse_helper_itself_takes_no_lock() -> None:
+    """Die Zusicherung oben wäre wertlos, wenn der Helfer selbst sperrte.
+
+    Er sitzt zwischen Route und parse_rows(): Nähme er eine Sperre, stünde
+    das Einlesen wieder darunter, ohne dass es an der Aufrufstelle sichtbar
+    wäre — genau die Art Regression, die eine Indirektion einschleppt.
+    """
+    helfer = _function(_tree(), "_parse_csv_with_progress")
+    assert "csv_import.parse_rows" in _calls(helfer), "der Helfer parst gar nicht"
+    assert not _coordinator_with_blocks(helfer), (
+        "_parse_csv_with_progress() nimmt eine Speichersperre"
+    )
 
 
 # --------------------------------------------------------------------------

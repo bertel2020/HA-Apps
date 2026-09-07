@@ -71,8 +71,14 @@
           {% if totals.marked_rows == 0 %}disabled{% endif %}>
     Markierte Datensätze anzeigen
   </button>
+  {# hx-disabled-elt deckt nur die Sekunde zwischen Klick und Antwort ab —
+     die Antwort kommt seit 0.85.0 sofort, weil der Lauf selbst im
+     Hintergrund stattfindet und die Fortschrittsanzeige (_job_progress.html)
+     an dieser Stelle einzieht. Ein zweiter Lauf ist dennoch ausgeschlossen,
+     serverseitig über JobProgress.claim(). #}
   <button type="button" class="btn btn-danger"
           hx-post="settings/purge" hx-target="#purge-form" hx-swap="innerHTML"
+          hx-disabled-elt="this"
           hx-confirm="Zur Löschung markierte Datensätze jetzt endgültig physisch entfernen? Das lässt sich nicht rückgängig machen."
           {% if totals.marked_rows == 0 %}disabled{% endif %}>
     Jetzt bereinigen

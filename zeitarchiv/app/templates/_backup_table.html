@@ -23,12 +23,12 @@
           <span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;">
             <button type="button" class="btn"
                     hx-post="backup/verify/{{ b.filename }}"
-                    hx-target="#backup-status" hx-swap="outerHTML">
+                    hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
               Prüfen
             </button>
             <button type="button" class="btn btn-danger"
                     hx-post="backup/restore/{{ b.filename }}"
-                    hx-target="#backup-status" hx-swap="outerHTML"
+                    hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this"
                     hx-confirm="Backup {{ b.created_at }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.">
               Wiederherstellen
             </button>

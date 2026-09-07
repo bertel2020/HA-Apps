@@ -24,42 +24,38 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     assert "ReportService" in main
     # Schwellenhistorie: 4.800, dann 5.700 (Housekeeping-Bereich, 0.75.0),
     # dann 5.800 (CoordinatorBusy-Handler + Backup-Worker-Heartbeat), dann
-    # 5.850. Seit dem 7. September 2026 wieder 5.700 — die Zahl wurde erstmals
-    # GESENKT, und das ist der Punkt (ZG-27).
+    # 5.850. Am 7. September 2026 erstmals GESENKT auf 5.700 (ZG-27), am
+    # 8. September auf 5.150.
     #
-    # Was schiefgelaufen war: Bei 5.850 stand hier der Satz, der nächste
-    # Schritt sei eine eigene housekeeping_routes.py und NICHT ein weiteres
-    # Anheben. Genau das ist dann passiert — c279ae2 hat das Modul angelegt
-    # (632 Zeilen), main.py fiel von 5.848 auf 5.578. Nur wusste dieser
+    # Was beim vorletzten Mal schiefgelaufen war: Bei 5.850 stand hier der
+    # Satz, der nächste Schritt sei eine eigene housekeeping_routes.py und
+    # NICHT ein weiteres Anheben. Genau das ist dann passiert — c279ae2 hat
+    # das Modul angelegt, main.py fiel von 5.848 auf 5.578. Nur wusste dieser
     # Kommentar es nicht: Er nannte den Ausweg weiter als verfügbar, obwohl er
     # genommen war. Wer die Grenze als Nächstes gerissen hätte, hätte eine
     # bereits ausgeführte Anweisung gelesen und mangels Alternative doch die
     # Zahl erhöht — also genau das, wovor der Satz schützen sollte.
     #
-    # Zweiter Schaden derselben Sache: Die Schwelle war als "Ist-Stand plus
-    # kleiner Puffer" (~40 Zeilen) gedacht. Nach dem Schnitt wurde daraus
-    # stillschweigend "Ist-Stand plus 272". Eine Grenze mit so viel Luft
-    # stellt ihre Frage nicht mehr im richtigen Moment.
+    # DIESER EINTRAG IST DIE GEGENPROBE ZU JENEM FEHLER. Der am 7. September
+    # benannte nächste Schnitt — die Hintergrundarbeit — ist am 8. September
+    # ausgeführt: app/background.py hält seither Wartungsplaner, Backup-,
+    # Retention- und Abgleich-Läufe samt ihrem Zustand (623 Zeilen), main.py
+    # fiel von 5.707 auf 5.084. Der Ausweg ist also GENOMMEN und steht nicht
+    # mehr zur Verfügung.
     #
-    # Deshalb 5.700 gegen die heutigen 5.635: 65 Zeilen. Bei gemessenen rund
-    # fünf Zeilen Zuwachs je Commit sind das ein gutes Dutzend Commits — kurz
-    # genug, dass die Frage wieder gestellt wird, lang genug, dass nicht jede
-    # Kleinigkeit sie auslöst.
+    # Die Schwelle folgt weiter der Regel "Ist-Stand plus kleiner Puffer":
+    # 5.150 gegen die heutigen 5.084, also 66 Zeilen. Bei gemessenen rund fünf
+    # Zeilen Zuwachs je Commit sind das ein gutes Dutzend Commits.
     #
-    # Der nächste Schnitt ist KEIN weiteres Routenmodul mehr. Am 7. September
-    # gezählt: von 5.635 Zeilen sind nur 1.697 (30 %) Routenfunktionen, verteilt
-    # auf 111 Routen; die größte verbliebene Gruppe ist /entities mit 476 Zeilen,
-    # also 8 % der Datei. Die Masse sind 2.185 Zeilen Hilfsfunktionen.
-    #
-    # Der nächste Schnitt ist deshalb die HINTERGRUNDARBEIT: Sie ist klar
-    # abgegrenzt, hängt nicht am Request und ist heute nur deshalb hier, weil
-    # sie beim Start eingehängt wird — _run_backup_background (123),
-    # _finish_retention_job (58), _background_storage_reconciliation (43) und
-    # die zugehörigen Heartbeat-/Tick-Zustände. Erst danach käme die zweite,
-    # größere Gruppe: die Template-Kontexte (_rows_fragment 176,
-    # _dashboard_tiles_context 157, _entities_table_response 123 …), die enger
-    # mit den Routen verzahnt sind.
-    assert len(main.splitlines()) < 5_700
+    # Der nächste Schnitt ist deshalb ein anderer, und er ist schwieriger als
+    # die beiden bisherigen: die TEMPLATE-KONTEXTE. Am 8. September gezählt
+    # sind von 5.084 Zeilen rund 1.730 Routenfunktionen (34 %) auf 112 Routen;
+    # der Rest sind überwiegend Kontext-Erbauer (_rows_fragment,
+    # _dashboard_tiles_context, _entities_table_response …). Sie sind enger
+    # mit den Routen verzahnt als die Hintergrundarbeit es war — ein Schnitt
+    # dort braucht erst eine Antwort darauf, was ein Kontext-Erbauer vom
+    # Request wissen darf.
+    assert len(main.splitlines()) < 5_150
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:
@@ -82,3 +78,47 @@ def test_report_router_is_independent_and_route_locking_is_shared() -> None:
     assert "from .main import" not in reports
     assert "def storage_locked" in support
     assert "with coordinator.entities(entity_ids, timeout=timeout):" in support
+
+
+def test_background_module_owns_the_scheduler_and_its_state() -> None:
+    """Der Vertrag des jüngsten Schnitts (0.85.0).
+
+    Die Hintergrundarbeit hing nur deshalb in main.py, weil sie dort beim
+    Start eingehängt wurde — nicht, weil sie mit den Routen zu tun hätte. Was
+    hier geprüft wird, ist genau die Grenze, die den Umzug erst möglich machte:
+    keine Abhängigkeit zurück auf main.py, und der Zustand liegt am Dienst
+    statt als Modul-Globale.
+    """
+    background = _source("background.py")
+    tree = ast.parse(background)
+    classes = {node.name for node in tree.body if isinstance(node, ast.ClassDef)}
+    assert {"BackgroundDependencies", "BackgroundService"} <= classes
+    assert "from .main import" not in background
+
+    # Kein Modul-Zustand mehr: Alles, was der Wartungsplaner umschreibt, gehört
+    # der Instanz. Ein "global" hier hieße, dass zwei Dienste in einem Prozess
+    # einander überschrieben — und genau das war der Grund, warum main.py für
+    # jeden dieser Werte einen Getter durch die Bereichsmodule reichen musste.
+    assert "global " not in background
+
+    dienst = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "BackgroundService")
+    methoden = {n.name for n in dienst.body if isinstance(n, ast.FunctionDef)}
+    # Was main.py und die Bereichsmodule aufrufen, muss öffentlich bleiben.
+    assert {
+        "start", "stop", "run_backup", "run_storage_reconciliation",
+        "begin_retention_job", "finish_retention_job",
+        "load_purge_preview", "load_retention_overview",
+        "refresh_purge_preview_if_stale", "refresh_retention_overview_if_stale",
+        "invalidate_purge_preview", "invalidate_retention_overview",
+        "set_next_backup_run", "set_next_retention_run", "reconcile_in_progress",
+    } <= methoden
+
+    # main.py hängt den Dienst nur noch ein und hält keine eigene Kopie des
+    # Zustands mehr — sonst liefen beide auseinander.
+    main = _source("main.py")
+    assert "_background = BackgroundService(BackgroundDependencies(" in main
+    for weg in (
+        "_maintenance_scheduler_loop", "_run_backup_background",
+        "_storage_reconcile_thread", "_last_scheduler_tick",
+    ):
+        assert f"\n{weg}" not in main, f"{weg} steht wieder in main.py"

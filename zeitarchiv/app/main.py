@@ -19,7 +19,6 @@ import os
 import platform
 import secrets
 import shutil
-import threading
 import time
 from collections import deque
 from contextlib import asynccontextmanager
@@ -89,15 +88,14 @@ from .logging_setup import (
     log_http_request,
 )
 from .security import ensure_api_token, generate_api_token
-from .backup_scheduler import next_scheduled_run, parse_schedule_time
+from .background import BackgroundDependencies, BackgroundService
+from .backup_scheduler import parse_schedule_time
 from .storage import (
     backup,
     cleanup,
     entity_removal,
     hotbuffer,
     import_reports,
-    retention as retention_mod,
-    reconcile,
 )
 from .storage import query as query_mod
 from .storage.index import (
@@ -142,15 +140,13 @@ from .energiedashboard_routes import (
     energiedashboard_role_count,
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
-    process_pending_hourly_backfill,
-    refresh_heatmap_weekday_cache_if_stale,
-    sync_hourly_rollup_flags_for_current_config,
 )
 from . import cleanup_stats
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
+from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
 trace_logger = logging.getLogger("zeitarchiv.trace")
@@ -355,12 +351,18 @@ def _notices_context(request: Request) -> dict:
     günstige Werte ab (PRAGMA-Stats, LIMIT-1-Queries), siehe notices.py."""
     return {
         "notices": collect_notices(
-            index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-            _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
-            _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
-            _last_backup_worker_tick, _backup_progress.running,
+            index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+            _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+            _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+            _background.last_backup_worker_tick, _background.backup_progress.running,
         ),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
+        # Rein im Arbeitsspeicher (siehe activity_snapshot()) — kein Datei-
+        # oder Datenbankzugriff, deshalb tragbar in einem Kontextprozessor,
+        # der bei JEDER TemplateResponse mitläuft. Serverseitig gerendert,
+        # damit die Kopfleiste schon beim Seitenaufbau stimmt statt erst nach
+        # dem ersten Poll; aktuell hält sie danach topnav-activity.js.
+        "activity": activity_snapshot(),
     }
 
 
@@ -622,58 +624,33 @@ if not index.get_setting("retention_last_success"):
         index.set_setting("retention_last_success", _legacy_retention_last_run)
 storage_coordinator = StorageCoordinator()
 
-
-def _run_storage_reconciliation(
-    *, entity_ids: list[str] | None = None, repair: bool
-) -> dict:
-    """Gemeinsamer, bereits durch den Aufrufer koordinierter Indexabgleich."""
-    global _storage_reconcile_last
-    report = reconcile.audit_storage_metadata(
-        DATA_DIR, index, TZ, entity_ids=entity_ids, repair=repair
-    )
-    _storage_reconcile_last = report
-    if report["mismatches"]:
-        logger.warning(
-            "Speicherindex %s · event=storage_reconcile_completed mismatches=%d errors=%d",
-            "repariert" if report["repaired"] else "geprüft",
-            len(report["mismatches"]),
-            len(report["errors"]),
-        )
-    elif report["errors"]:
-        logger.error(
-            "Speicherindex-Prüfung beendet · event=storage_reconcile_failed errors=%d",
-            len(report["errors"]),
-        )
-    else:
-        logger.info(
-            "Speicherindex konsistent · event=storage_reconcile_completed entities=%d",
-            report["entities_checked"],
-        )
-    return report
+# Die gesamte Hintergrundarbeit — Wartungsplaner, Backup, Aufbewahrung,
+# Speicherabgleich und die beiden teuren Vorschau-Zwischenspeicher — lebt seit
+# 0.85.0 in background.py. Hier steht nur noch das Einhängen. Der Dienst wird
+# bewusst SO FRÜH gebaut: Der Speicherabgleich läuft weiter unten noch vor dem
+# ersten Request, also lange bevor es ein Energiedashboard oder Router gibt.
+# count_stale_entities als Lambda, weil _count_stale_entities() weiter unten in
+# dieser Datei steht — aufgelöst wird es erst beim Aufruf.
+_background = BackgroundService(BackgroundDependencies(
+    data_dir=DATA_DIR,
+    tz=TZ,
+    index=index,
+    coordinator=storage_coordinator,
+    backups_dir=BACKUPS_DIR,
+    symcon_import_dir=SYMCON_IMPORT_DIR,
+    csv_import_dir=CSV_IMPORT_DIR,
+    backup_default_time=BACKUP_DEFAULT_TIME,
+    backup_default_weekday=BACKUP_DEFAULT_WEEKDAY,
+    retention_default_time=RETENTION_DEFAULT_TIME,
+    retention_default_weekday=RETENTION_DEFAULT_WEEKDAY,
+    count_stale_entities=lambda: _count_stale_entities(),
+))
 
 
-_storage_reconcile_last: dict | None = None
-_storage_reconcile_thread: threading.Thread | None = None
-_storage_reconcile_stop = threading.Event()
-_storage_reconcile_completed = False
-# Analog zu _last_scheduler_tick weiter unten, aber pro geprüfter Entität
-# statt pro Schleifendurchlauf aktualisiert — der Hintergrundabgleich hat
-# keinen festen Takt wie der Wartungsplaner (Laufzeit hängt von der
-# Datenmenge je Entität ab), ein Deadlock am selben Index-Lock (siehe
-# 0.76.0-Fund in Index.get_or_create_entity()) würde ihn aber genauso
-# unsichtbar hängen lassen. Initial auf den Startzeitpunkt gesetzt, siehe
-# Begründung bei _last_scheduler_tick.
-_last_reconcile_tick = time.time()
 
 
-def _reconcile_in_progress() -> bool:
-    """True nur, während der Hintergrund-Thread tatsächlich noch laufen
-    sollte. Im synchronen Modus (_requires_synchronous_reconciliation) wird
-    er nie gestartet — dann bliebe _storage_reconcile_completed sonst
-    dauerhaft False und eine Stall-Meldung würde fälschlich für immer aktiv
-    bleiben, obwohl der Abgleich längst (synchron, vor dem ersten Request)
-    passiert ist."""
-    return _storage_reconcile_thread is not None and not _storage_reconcile_completed
+
+
 # Beim ersten Start (und defensiv auch nach einem manuell geleerten DB-Wert)
 # muss vor dem Öffnen eines HTTP-Listeners ein nicht-leerer Token existieren.
 # ZEITARCHIV_API_TOKEN ist ausschließlich der explizite Override für den
@@ -683,9 +660,10 @@ ensure_api_token(index, development_token=os.environ.get("ZEITARCHIV_API_TOKEN")
 ingestion_service = IngestionService(DATA_DIR, index, TZ, storage_coordinator)
 _recovered_ingest_events = ingestion_service.recover_pending()
 _requires_synchronous_reconciliation = bool(_restore_startup_result) or not _previous_shutdown_clean
+_background.requires_synchronous_reconciliation = _requires_synchronous_reconciliation
 if _requires_synchronous_reconciliation:
     with storage_coordinator.exclusive():
-        _run_storage_reconciliation(repair=True)
+        _background.run_storage_reconciliation(repair=True)
 else:
     logger.info(
         "Speicherindex-Abgleich wird nach dem Start im Hintergrund ausgeführt · "
@@ -723,10 +701,10 @@ app.include_router(
             api_token=_current_api_token,
             app_version=APP_VERSION,
             collect_notices=lambda: collect_notices(
-                index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-                _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
-                _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
-                _last_backup_worker_tick, _backup_progress.running,
+                index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+                _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+                _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+                _background.last_backup_worker_tick, _background.backup_progress.running,
             ),
         ),
         _api_state,
@@ -750,6 +728,10 @@ _energiedashboard_service = EnergieDashboardService(EnergieDashboardDependencies
     templates=templates,
     app_root_context=_app_root_context,
 ))
+# Nachgereicht statt in BackgroundDependencies: Der Wartungsplaner braucht den
+# Energiedashboard-Dienst (Stunden-Rollup-Backfill, Heatmap-Cache), der
+# Hintergrunddienst selbst muss aber schon vor ihm existieren — siehe oben.
+_background.energiedashboard_service = _energiedashboard_service
 app.include_router(_energiedashboard_service.router())
 
 
@@ -825,200 +807,29 @@ def _sparkline_paths(values: list[float], width: float = 84, height: float = 28,
     return {"line": line, "area": area}
 
 
-class _RetentionProgress:
-    def __init__(self) -> None:
-        self.lock = threading.Lock()
-        self.running = False
-        self.job_id: int | None = None
-
-
-_retention_progress = _RetentionProgress()
 
 
 
-def _begin_retention_job(trigger: str, scheduled_for: float | None = None) -> int | None:
-    with _retention_progress.lock:
-        if _retention_progress.running:
-            if trigger == "scheduled":
-                skipped_id = index.create_retention_job(trigger, scheduled_for)
-                index.update_retention_job(
-                    skipped_id,
-                    status="skipped",
-                    finished_at=time.time(),
-                    error="Übersprungen, weil bereits ein Retention-Lauf aktiv ist",
-                )
-            return None
-        job_id = index.create_retention_job(trigger, scheduled_for)
-        _retention_progress.running = True
-        _retention_progress.job_id = job_id
-        return job_id
 
 
-def _finish_retention_job(job_id: int, *, now: datetime | None = None) -> dict:
-    started_at = time.time()
-    index.update_retention_job(job_id, status="running", started_at=started_at)
-    logger.info("Retention gestartet · event=retention_started job_id=%d", job_id)
-    try:
-        with storage_coordinator.exclusive():
-            totals = retention_mod.enforce_retention_all(DATA_DIR, index, TZ, now=now)
-        finished_at = time.time()
-        index.update_retention_job(
-            job_id,
-            status="success",
-            finished_at=finished_at,
-            rows_deleted=totals["rows_deleted"],
-            bytes_freed=totals["bytes_freed"],
-            months_deleted=totals["months_deleted"],
-            entities_affected=totals["entities_affected"],
-        )
-        index.set_setting("retention_enforcement_last_run", str(finished_at))
-        index.set_setting("retention_last_success", str(finished_at))
-        try:
-            _refresh_retention_overview_if_stale(force=True)
-        except Exception:
-            # Die Löschung war erfolgreich; ein Fehler der rein informativen
-            # Folgevorschau darf den Job nicht nachträglich als Fehler markieren.
-            logger.exception(
-                "Retention-Übersicht konnte nicht aktualisiert werden · "
-                "event=retention_followup_failed job_id=%d",
-                job_id,
-            )
-        logger.info(
-            "Retention erfolgreich · event=retention_completed job_id=%d rows_deleted=%d "
-            "months_deleted=%d bytes_freed=%d duration_s=%.1f",
-            job_id,
-            totals["rows_deleted"],
-            totals["months_deleted"],
-            totals["bytes_freed"],
-            max(0.0, finished_at - started_at),
-        )
-        return {"status": "success", "totals": totals}
-    except Exception as exc:
-        logger.exception(
-            "Retention fehlgeschlagen · event=retention_failed job_id=%d phase=enforce",
-            job_id,
-        )
-        finished_at = time.time()
-        error = str(exc)[:2000] or exc.__class__.__name__
-        index.update_retention_job(
-            job_id,
-            status="failed",
-            finished_at=finished_at,
-            error=error,
-        )
-        index.set_setting("retention_last_failure", str(finished_at))
-        return {"status": "failed", "error": error}
-    finally:
-        with _retention_progress.lock:
-            _retention_progress.running = False
-            _retention_progress.job_id = None
 
 
-def _run_retention_background(*, scheduled_for: float | None = None) -> bool:
-    job_id = _begin_retention_job("scheduled", scheduled_for)
-    if job_id is None:
-        return False
-    threading.Thread(
-        target=_finish_retention_job,
-        args=(job_id,),
-        name="zeitarchiv-retention",
-        daemon=True,
-    ).start()
-    return True
 
 
-def _set_next_retention_run(now: datetime) -> float | None:
-    schedule = index.get_setting("retention_enforcement", "off")
-    if schedule not in ("daily", "weekly"):
-        schedule = "off"
-    weekday = int(index.get_setting("retention_enforcement_weekday", str(RETENTION_DEFAULT_WEEKDAY)))
-    next_run = next_scheduled_run(
-        now,
-        schedule,
-        index.get_setting("retention_enforcement_time", RETENTION_DEFAULT_TIME),
-        weekday,
-    )
-    index.set_setting("retention_enforcement_next_run", "" if next_run is None else str(next_run.timestamp()))
-    return None if next_run is None else next_run.timestamp()
 
 
-def _run_retention_enforcement_if_due(now: datetime) -> None:
-    """Führt genau einen fälligen Lauf (täglich/wöchentlich) aus, unabhängig von Requests."""
-    if index.get_setting("retention_enforcement", "off") not in ("daily", "weekly"):
-        return
-    raw_next = index.get_setting("retention_enforcement_next_run", "")
-    try:
-        next_ts = float(raw_next) if raw_next else _set_next_retention_run(now)
-    except (TypeError, ValueError):
-        next_ts = _set_next_retention_run(now)
-    if next_ts is None or now.timestamp() < next_ts:
-        return
-    _run_retention_background(scheduled_for=next_ts)
-    _set_next_retention_run(now)
 
 
-_RETENTION_OVERVIEW_SETTING = "retention_overview_snapshot"
-_RETENTION_OVERVIEW_MAX_AGE_SECONDS = 3600
 
 
-def _empty_retention_overview() -> dict:
-    return {
-        "generated_at": None,
-        "totals": {
-            "rows_deleted": 0,
-            "bytes_freed": 0,
-            "months_deleted": 0,
-            "entities_affected": 0,
-        },
-        "groups": [],
-    }
 
 
-def _load_retention_overview() -> dict:
-    raw = index.get_setting(_RETENTION_OVERVIEW_SETTING, "")
-    if not raw:
-        return _empty_retention_overview()
-    try:
-        value = json.loads(raw)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return _empty_retention_overview()
-    if not isinstance(value, dict) or not isinstance(value.get("groups"), list):
-        return _empty_retention_overview()
-    return value
 
 
-def _refresh_retention_overview_if_stale(*, force: bool = False) -> dict:
-    """Aktualisiert die teure Dateivorschau höchstens einmal pro Stunde."""
-    current = _load_retention_overview()
-    generated_at = current.get("generated_at")
-    now_ts = time.time()
-    if (
-        not force
-        and isinstance(generated_at, (int, float))
-        and now_ts - generated_at < _RETENTION_OVERVIEW_MAX_AGE_SECONDS
-    ):
-        return current
-    limited_ids = [
-        entity["entity_id"]
-        for entity in index.list_entities()
-        if entity["retention"] != "unlimited"
-    ]
-    with storage_coordinator.entities(limited_ids):
-        overview = retention_mod.preview_retention_overview(DATA_DIR, index, TZ)
-    index.set_setting(
-        _RETENTION_OVERVIEW_SETTING,
-        json.dumps(overview, ensure_ascii=False, separators=(",", ":")),
-    )
-    logger.debug(
-        "Retention-Übersicht aktualisiert · fällige Zeilen=%d · Entitäten=%d",
-        overview["totals"]["rows_deleted"],
-        overview["totals"]["entities_affected"],
-    )
-    return overview
 
 
-def _invalidate_retention_overview() -> None:
-    index.set_setting(_RETENTION_OVERVIEW_SETTING, "")
+
+
 
 
 @app.get("/")
@@ -1106,122 +917,26 @@ def _count_stale_entities() -> int:
         return len(hotbuffer.find_entities_with_stale_hot_files(DATA_DIR, set(entity_ids), now_ts, TZ))
 
 
-# Vom Wartungsplaner (alle 30s) gepflegter Zwischenstand für die Meldungen
-# (housekeeping.rotation_pending). _count_stale_entities() selbst nimmt über
-# storage_coordinator.entities() die Sperren ALLER Entitäten — ohne Timeout,
-# wartend auf laufende Exklusiv-Wartung (Backup/VACUUM) und diese ihrerseits
-# blockierend. Als Teil von _notices_context() lief das bisher bei JEDER
-# Template-Antwort, auch bei jedem htmx-Such-Fragment pro Tastendruck — in
-# Produktion mit laufender Ingestion (die dieselben Sperren je Entität hält)
-# der Grund für sekundenlange Hänger beim Filtern der Entitätenliste. Nur
-# _settings_rotation_context() (Housekeeping → Rotation, bewusster
-# Seitenaufruf) zählt weiterhin live.
-_stale_entity_count_cached = 0
-
-
-def _refresh_stale_entity_count() -> None:
-    global _stale_entity_count_cached
-    _stale_entity_count_cached = _count_stale_entities()
-
-
-# Für housekeeping.host_disk_space_low (notices.py) — Host-Speicherplatz statt
-# Zeitarchivs eigener interner Aufschlüsselung. Wie _stale_entity_count_cached
-# im Wartungsplaner statt pro Request aktualisiert; shutil.disk_usage() selbst
-# ist zwar günstig genug für den Request-Pfad (siehe index_optimization.py),
-# aber _notices_context() läuft bei JEDER Template-Antwort (siehe deren
-# Docstring) — ein Syscall weniger pro Seitenaufruf ist der einfachere Weg,
-# konsistent mit dem Rest dieser Cache-Gruppe zu bleiben.
-_host_disk_usage_cached: dict | None = None
-
-
-def _refresh_host_disk_usage() -> None:
-    global _host_disk_usage_cached
-    usage = shutil.disk_usage(DATA_DIR)
-    _host_disk_usage_cached = {"free": usage.free, "total": usage.total}
 
 
 
 
 
 
-_PURGE_PREVIEW_SETTING = "purge_preview_snapshot"
-_PURGE_PREVIEW_MAX_AGE_SECONDS = 3600
 
 
-def _empty_purge_preview() -> dict:
-    return {
-        "generated_at": None,
-        "totals": {
-            "marked_rows": 0,
-            "removable_rows": 0,
-            "hot_rows": 0,
-            "archive_rows": 0,
-            "archive_months": 0,
-            "entities_affected": 0,
-            "not_removable_rows": 0,
-        },
-        "rows": [],
-    }
 
 
-def _invalidate_purge_preview() -> None:
-    """Erzwingt eine Aktualisierung der Bereinigungsvorschau beim nächsten
-    Wartungsplaner-Durchlauf (binnen ~30s), NICHT synchron im aufrufenden
-    Request — der Vollscan ist teuer (siehe _refresh_purge_preview_if_stale)
-    und würde sonst jeden einzelnen Markier-Klick auf der Bereinigungsseite
-    spürbar verlangsamen. Nach dem Markieren neuer Datensätze zur Löschung
-    aufgerufen (delete_rows, Duplikate-/Wiederholungen-Löschung), damit
-    Housekeeping → Speicherplatz nicht bis zu einer Stunde lang veraltete
-    Zahlen zeigt, nur weil noch niemand "Jetzt bereinigen" geklickt hat."""
-    current = _load_purge_preview()
-    current["generated_at"] = 0
-    index.set_setting(_PURGE_PREVIEW_SETTING, json.dumps(current, ensure_ascii=False, separators=(",", ":")))
 
 
-def _load_purge_preview() -> dict:
-    raw = index.get_setting(_PURGE_PREVIEW_SETTING, "")
-    if not raw:
-        return _empty_purge_preview()
-    try:
-        value = json.loads(raw)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return _empty_purge_preview()
-    if not isinstance(value, dict) or not isinstance(value.get("rows"), list):
-        return _empty_purge_preview()
-    return value
 
 
-def _refresh_purge_preview_if_stale(*, force: bool = False) -> dict:
-    """Aktualisiert die teure Bereinigungsvorschau (liest für jede Entität mit
-    markierten Löschungen die betroffenen Archiv-Parquet-Dateien) höchstens
-    einmal pro Stunde — dieselbe Zwischenspeicher-Konvention wie
-    _refresh_retention_overview_if_stale(). Ohne diesen Cache lief
-    preview_purge() bei JEDEM Aufruf von /settings neu; bei einer Entität mit
-    sehr vielen markierten Zeilen und vielen Archiv-Monaten machte allein das
-    die Einstellungen-Seite spürbar langsam (mehrere Sekunden)."""
-    current = _load_purge_preview()
-    generated_at = current.get("generated_at")
-    now_ts = time.time()
-    if (
-        not force
-        and isinstance(generated_at, (int, float))
-        and now_ts - generated_at < _PURGE_PREVIEW_MAX_AGE_SECONDS
-    ):
-        return current
-    entity_ids = [row["entity_id"] for row in index.get_deleted_points_by_entity()]
-    with storage_coordinator.entities(entity_ids):
-        preview = cleanup.preview_purge(DATA_DIR, index, TZ)
-    preview["generated_at"] = now_ts
-    index.set_setting(
-        _PURGE_PREVIEW_SETTING,
-        json.dumps(preview, ensure_ascii=False, separators=(",", ":")),
-    )
-    logger.debug(
-        "Bereinigungsvorschau aktualisiert · entfernbare Zeilen=%d · Entitäten=%d",
-        preview["totals"]["removable_rows"],
-        preview["totals"]["entities_affected"],
-    )
-    return preview
+
+
+
+
+
+
 
 
 
@@ -1325,7 +1040,8 @@ def _integration_update_context(integration_info: dict | None) -> dict:
 def _settings_background_processes_context() -> dict:
     """Letzter Lauf + Status je Wartungsplaner-Hintergrundaufgabe (Einstellungen
     → Diagnose, Abschnitt "Hintergrundprozesse") — bisher nur in den
-    Server-Logs sichtbar (siehe _maintenance_scheduler_loop()). Rein lesend,
+    Server-Logs sichtbar (siehe _maintenance_scheduler_loop() in
+    background.py). Rein lesend,
     löst selbst nichts aus; der Wartungsplaner läuft unabhängig alle 30s
     weiter, unabhängig davon, ob diese Seite gerade geöffnet ist."""
     now = time.time()
@@ -1342,7 +1058,7 @@ def _settings_background_processes_context() -> dict:
 
     duplicate_snapshot = index.get_duplicate_snapshot()
     version_state = version_check.get_cached_state(index)
-    reconcile = _storage_reconcile_last or {}
+    reconcile = _background.storage_reconcile_last or {}
     reconcile_ts = reconcile.get("checked_at") or reconcile.get("started_at")
 
     rows = [
@@ -1356,11 +1072,11 @@ def _settings_background_processes_context() -> dict:
         ),
         row(
             "Aufbewahrung-Übersicht", "Vorschau der von der Frist betroffenen Zeilen · bei Bedarf",
-            _load_retention_overview().get("generated_at"),
+            _background.load_retention_overview().get("generated_at"),
         ),
         row(
             "Löschvorschau", "Vorschau für weich gelöschte, noch nicht entfernte Werte · bei Bedarf",
-            _load_purge_preview().get("generated_at"),
+            _background.load_purge_preview().get("generated_at"),
         ),
         row(
             "Duplikat-Erkennung", "Zählt doppelte Zeitstempel je Entität vor · stündlich",
@@ -1527,9 +1243,9 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     notice = next(
         (
             n for n in notices_mod.build_notices(
-                index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-                _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
-                _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
+                index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+                _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+                _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
             )
             if n["id"] == notice_id
         ),
@@ -1547,10 +1263,10 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     until = time.time() + seconds if seconds is not None else None
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
     remaining = collect_notices(
-        index, DATA_DIR / "index.sqlite", TZ, _load_purge_preview()["totals"],
-        _storage_reconcile_last, _stale_entity_count_cached, _last_scheduler_tick,
-        _last_reconcile_tick, _reconcile_in_progress(), _host_disk_usage_cached,
-        _last_backup_worker_tick, _backup_progress.running,
+        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+        _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+        _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+        _background.last_backup_worker_tick, _background.backup_progress.running,
     )
     return {"success": True, "remaining_count": len(remaining)}
 
@@ -1571,6 +1287,14 @@ def notices_panel(request: Request) -> HTMLResponse:
     für ganze TemplateResponses — hier explizit erneut aufgerufen, weil diese
     Route ganz bewusst nur das kleine Partial zurückgibt."""
     return templates.TemplateResponse(request, "_notice_panel_body.html", _notices_context(request))
+
+
+@app.get("/notices/activity", response_class=HTMLResponse)
+def notices_activity(request: Request) -> HTMLResponse:
+    """Frischer Inhalt für #notice-activity (Glocken-Menü), Gegenstück zu
+    notices_panel() — warum nur die LAUFENDEN Vorgänge und nichts über
+    fertige, steht bei activity_snapshot() in progress.py."""
+    return templates.TemplateResponse(request, "_activity_block.html", _notices_context(request))
 
 
 @app.get("/settings/muted-notices", response_class=HTMLResponse)
@@ -1883,342 +1607,41 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
 
 
 
-class _BackupProgress:
-    """Geteilter Fortschritts-Status für das Erstellen eines Backup-ZIPs im
-    Hintergrund-Thread (eigene Seite "Backup") — dasselbe Muster wie beim
-    Symcon-Import (_UploadProgress/_ImportProgress, Konzept Abschnitt 04):
-    /backup/progress wird per htmx-Self-Polling (hx-trigger="every 500ms")
-    abgefragt, damit ein großes Archiv den Server nicht für die volle Dauer
-    eines einzelnen Requests blockiert."""
-
-    def __init__(self) -> None:
-        self.lock = threading.Lock()
-        self.running = False
-        self.done = 0
-        self.total = 0
-        self.job_id: int | None = None
-        self.error: str | None = None
 
 
-_backup_progress = _BackupProgress()
-# Lebenszeichen des Backup-Hintergrund-Threads — analog zu _last_reconcile_tick
-# oben, aber für create_source_snapshot()/create_backup(): dieser Thread läuft
-# IMMER losgelöst vom Wartungsplaner (auch bei geplanten Backups), ein Hang an
-# einem Entitäts-Lock bliebe also vom Scheduler-Heartbeat unentdeckt. Nur
-# relevant, während _backup_progress.running True ist (siehe notices.py).
-_last_backup_worker_tick = time.time()
 
 
-def _run_backup_background(*, trigger: str = "manual", scheduled_for: float | None = None) -> bool:
-    with _backup_progress.lock:
-        if _backup_progress.running:
-            if trigger == "scheduled":
-                skipped_id = index.create_backup_job(trigger, scheduled_for)
-                index.update_backup_job(
-                    skipped_id,
-                    status="skipped",
-                    finished_at=time.time(),
-                    error="Übersprungen, weil bereits ein Backup läuft",
-                )
-            return False
-        job_id = index.create_backup_job(trigger, scheduled_for)
-        _backup_progress.running = True
-        _backup_progress.done = 0
-        _backup_progress.total = backup.estimate_file_count(DATA_DIR)
-        _backup_progress.job_id = job_id
-        _backup_progress.error = None
-    logger.info(
-        "Backup gestartet · event=backup_started job_id=%d trigger=%s",
-        job_id,
-        trigger,
-    )
-
-    def on_progress(done: int, total: int) -> None:
-        global _last_backup_worker_tick
-        with _backup_progress.lock:
-            _backup_progress.done = done
-            _backup_progress.total = total
-        _last_backup_worker_tick = time.time()
-
-    def on_entity_snapshot_done(done: int, total: int) -> None:
-        global _last_backup_worker_tick
-        _last_backup_worker_tick = time.time()
-
-    def worker() -> None:
-        global _last_backup_worker_tick
-        started_at = time.time()
-        _last_backup_worker_tick = started_at
-        index.update_backup_job(job_id, status="running", started_at=started_at)
-        snapshot_dir = BACKUPS_DIR / f".backup-source-{job_id}-{secrets.token_hex(6)}"
-        try:
-            BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-            backup.cleanup_stale_source_snapshots(BACKUPS_DIR)
-            entity_ids = [row["entity_id"] for row in index.list_entities()]
-            backup.create_source_snapshot(
-                DATA_DIR,
-                snapshot_dir,
-                entity_ids,
-                storage_coordinator,
-                on_entity_done=on_entity_snapshot_done,
-            )
-            with _backup_progress.lock:
-                _backup_progress.total = backup.estimate_file_count(snapshot_dir)
-
-            dest_path = BACKUPS_DIR / f"zeitarchiv-backup-{datetime.now(TZ).strftime('%Y-%m-%d-%H%M%S')}.zip"
-            backup.create_backup(
-                snapshot_dir,
-                dest_path,
-                on_progress=on_progress,
-                consistent_sqlite=True,
-                metadata={
-                    "timezone": str(TZ),
-                    "trigger": trigger,
-                    "snapshot_mode": "entity-consistent",
-                },
-            )
-            keep_count_raw = index.get_setting("backup_keep_count", "unlimited")
-            keep_days_raw = index.get_setting("backup_keep_days", "unlimited")
-            keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
-            keep_days = retention_mod.RETENTION_DAYS.get(keep_days_raw)
-            cleanup_error = None
-            try:
-                backup.prune_backups(BACKUPS_DIR, keep_count, keep_days, time.time())
-            except OSError as exc:
-                cleanup_error = f"Backup gültig; alte Sicherungen konnten nicht bereinigt werden: {exc}"[:2000]
-                logger.exception(
-                    "Alte Backups konnten nicht bereinigt werden · "
-                    "event=backup_prune_failed job_id=%d",
-                    job_id,
-                )
-            finished_at = time.time()
-            index.update_backup_job(
-                job_id,
-                status="success",
-                finished_at=finished_at,
-                filename=dest_path.name,
-                size_bytes=dest_path.stat().st_size,
-                error=cleanup_error,
-            )
-            index.set_setting("backup_last_success", str(finished_at))
-            logger.info(
-                "Backup erfolgreich · event=backup_completed job_id=%d file=%s "
-                "size_bytes=%d duration_s=%.1f",
-                job_id,
-                dest_path.name,
-                dest_path.stat().st_size,
-                max(0.0, finished_at - started_at),
-            )
-        except Exception as exc:
-            logger.exception(
-                "Backup fehlgeschlagen · event=backup_failed job_id=%d",
-                job_id,
-            )
-            finished_at = time.time()
-            error = str(exc)[:2000] or exc.__class__.__name__
-            index.update_backup_job(
-                job_id,
-                status="failed",
-                finished_at=finished_at,
-                error=error,
-            )
-            index.set_setting("backup_last_failure", str(finished_at))
-            with _backup_progress.lock:
-                _backup_progress.error = error
-        finally:
-            shutil.rmtree(snapshot_dir, ignore_errors=True)
-            with _backup_progress.lock:
-                _backup_progress.running = False
-                _backup_progress.job_id = None
-
-    threading.Thread(target=worker, daemon=True).start()
-    return True
+# Anmeldung der beiden älteren Zustände bei der Kopfleisten-Registratur. Die
+# Adapter selbst stehen in notices.py, wo auch der Rest der Glocken-Anzeige
+# lebt — main.py hat ein Zeilenbudget (test_route_modules.py), und
+# Anzeigelogik ist genau das, was hier nicht mehr dazukommen soll.
+register_source("retention", "Aufbewahrung", lambda: notices_mod.retention_activity(_background.retention_progress))
+register_source("backup", "Backup", lambda: notices_mod.backup_activity(_background.backup_progress))
 
 
-def _set_next_backup_run(now: datetime) -> float | None:
-    schedule = index.get_setting("backup_schedule", "off")
-    time_value = index.get_setting("backup_schedule_time", BACKUP_DEFAULT_TIME)
-    weekday = int(index.get_setting("backup_schedule_weekday", str(BACKUP_DEFAULT_WEEKDAY)))
-    next_run = next_scheduled_run(now, schedule, time_value, weekday)
-    index.set_setting("backup_schedule_next_run", "" if next_run is None else str(next_run.timestamp()))
-    return None if next_run is None else next_run.timestamp()
 
 
-def _run_backup_schedule_if_due(now: datetime) -> None:
-    """Startet höchstens einen verpassten Termin und plant sofort den nächsten."""
-    schedule = index.get_setting("backup_schedule", "off")
-    if schedule not in {"daily", "weekly"}:
-        return
-    raw_next = index.get_setting("backup_schedule_next_run", "")
-    try:
-        next_ts = float(raw_next) if raw_next else _set_next_backup_run(now)
-    except (TypeError, ValueError):
-        next_ts = _set_next_backup_run(now)
-    if next_ts is None or now.timestamp() < next_ts:
-        return
-    _run_backup_background(trigger="scheduled", scheduled_for=next_ts)
-    _set_next_backup_run(now)
 
 
-_maintenance_scheduler_stop = threading.Event()
-_maintenance_scheduler_thread: threading.Thread | None = None
-# Zeitpunkt des letzten (versuchten) Wartungsplaner-Durchlaufs — unabhängig
-# davon, ob er erfolgreich war (siehe try/except in _maintenance_scheduler_
-# loop()). Erkennt einen Thread, der ganz aufgehört hat zu ticken (z. B. eine
-# Endlosschleife oder ein blockierender Aufruf ohne eigenes Timeout), nicht
-# nur einzelne fehlgeschlagene Durchläufe — die werden schon geloggt.
-# Initial auf den Startzeitpunkt gesetzt, damit vor dem ersten Tick keine
-# falsche "seit 1970 kein Tick"-Meldung entsteht.
-_last_scheduler_tick = time.time()
 
 
-def _background_storage_reconciliation() -> None:
-    """Prüft einen normalen, sauber beendeten Bestand entitätsweise.
-
-    Dadurch ist der HTTP-Listener sofort verfügbar und ein großer Bestand hält
-    nie sämtliche Entitäten gleichzeitig an. Nach Restore/Crash wird dieser
-    Pfad bewusst nicht verwendet; dort lief der Abgleich bereits synchron.
-    """
-    global _storage_reconcile_last, _storage_reconcile_completed, _last_reconcile_tick
-    started_at = time.time()
-    reports: list[dict] = []
-    entities = [entity["entity_id"] for entity in index.list_entities()]
-    for entity_id in entities:
-        if _storage_reconcile_stop.is_set():
-            return
-        with storage_coordinator.entity(entity_id):
-            reports.append(
-                reconcile.audit_storage_metadata(
-                    DATA_DIR, index, TZ, entity_ids=[entity_id], repair=True
-                )
-            )
-        # Nach jeder Entität statt nur einmal am Ende — sonst würde ein Hänger
-        # an der Entitäts-Sperre (with storage_coordinator.entity(...)) oder
-        # im audit_storage_metadata()-Aufruf selbst nie sichtbar, weil der
-        # Tick sowieso erst nach vollständigem Durchlauf käme.
-        _last_reconcile_tick = time.time()
-    _storage_reconcile_last = {
-        "checked_at": time.time(),
-        "started_at": started_at,
-        "entities_checked": sum(report["entities_checked"] for report in reports),
-        "mismatches": [item for report in reports for item in report["mismatches"]],
-        "errors": [item for report in reports for item in report["errors"]],
-        "repaired": any(report["repaired"] for report in reports),
-        "background": True,
-    }
-    _storage_reconcile_completed = True
-    logger.info(
-        "Speicherindex-Hintergrundabgleich beendet · event=storage_reconcile_completed "
-        "entities=%d mismatches=%d errors=%d duration_s=%.1f",
-        _storage_reconcile_last["entities_checked"],
-        len(_storage_reconcile_last["mismatches"]),
-        len(_storage_reconcile_last["errors"]),
-        max(0.0, time.time() - started_at),
-    )
 
 
-def _refresh_duplicate_snapshot_if_stale() -> None:
-    """Berechnet die Duplikat-Zählung für /housekeeping höchstens einmal pro
-    Stunde im Hintergrund (ZP-002 in PERFORMANCE.md) — dieselbe teure
-    Rohdaten-Prüfung wie zuvor, aber nicht mehr bei jedem Seitenaufruf."""
-    if not index.is_duplicate_snapshot_stale():
-        return
-    rows = cleanup.count_duplicate_rows_by_entity(
-        DATA_DIR, index, TZ, max_rows_per_entity=MAX_UI_ANALYSIS_ROWS
-    )
-    index.set_duplicate_snapshot(
-        [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
-    )
 
 
-def _maintenance_scheduler_loop() -> None:
-    """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
-    global _last_scheduler_tick
-    while not _maintenance_scheduler_stop.is_set():
-        try:
-            if index.record_stats_snapshot_if_stale():
-                logger.debug(
-                    "Stündlicher Statistik-Schnappschuss gespeichert · "
-                    "event=hourly_stats_snapshot_completed"
-                )
-            supervisor_stats.maybe_record_memory_snapshot(index)
-            _refresh_retention_overview_if_stale()
-            _refresh_purge_preview_if_stale()
-            _refresh_duplicate_snapshot_if_stale()
-            _refresh_stale_entity_count()
-            _refresh_host_disk_usage()
-            notices_mod.refresh_import_leftovers_if_stale(SYMCON_IMPORT_DIR, CSV_IMPORT_DIR)
-            version_check.refresh_if_stale(index)
-            ha_integration.refresh_integration_version_check_if_stale(index)
-            process_pending_hourly_backfill(DATA_DIR, index, TZ, storage_coordinator)
-            refresh_heatmap_weekday_cache_if_stale(_energiedashboard_service)
-            _run_backup_schedule_if_due(datetime.now(TZ))
-            _run_retention_enforcement_if_due(datetime.now(TZ))
-        except Exception:
-            logger.exception(
-                "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "
-                "event=maintenance_scheduler_failed"
-            )
-        _last_scheduler_tick = time.time()
-        _maintenance_scheduler_stop.wait(30)
 
 
-def _start_maintenance_scheduler() -> None:
-    global _maintenance_scheduler_thread, _storage_reconcile_thread
-    # Einmalig beim Start: entities.hourly_rollup für eine bereits VOR diesem
-    # Feature gespeicherte Energiedashboard-Konfiguration nachziehen, sonst
-    # bräuchte jede bestehende Installation ein manuelles erneutes Speichern
-    # des Setup-Formulars, damit der rückwirkende Backfill überhaupt anläuft.
-    sync_hourly_rollup_flags_for_current_config(_energiedashboard_service)
-    # Einmal vorab, damit die erste Seite nach dem Start nicht 30s lang
-    # fälschlich "0 ausstehende Rotationen" meldet — zu diesem Zeitpunkt hält
-    # noch niemand Entitäts-Sperren, der Aufruf ist hier ungefährlich.
-    try:
-        _refresh_stale_entity_count()
-    except Exception:
-        logger.exception("Rotation-Zähler beim Start nicht ermittelbar · event=stale_entity_count_failed")
-    try:
-        _refresh_host_disk_usage()
-    except Exception:
-        logger.exception("Host-Speicherplatz beim Start nicht ermittelbar · event=host_disk_usage_failed")
-    if not _requires_synchronous_reconciliation and (
-        _storage_reconcile_thread is None or not _storage_reconcile_thread.is_alive()
-    ):
-        _storage_reconcile_stop.clear()
-        _storage_reconcile_thread = threading.Thread(
-            target=_background_storage_reconciliation,
-            name="zeitarchiv-storage-reconcile",
-            daemon=True,
-        )
-        _storage_reconcile_thread.start()
-    if _maintenance_scheduler_thread is not None and _maintenance_scheduler_thread.is_alive():
-        return
-    _maintenance_scheduler_stop.clear()
-    _maintenance_scheduler_thread = threading.Thread(
-        target=_maintenance_scheduler_loop,
-        name="zeitarchiv-maintenance-scheduler",
-        daemon=True,
-    )
-    _maintenance_scheduler_thread.start()
 
 
-def _stop_maintenance_scheduler() -> None:
-    _maintenance_scheduler_stop.set()
-    if _maintenance_scheduler_thread is not None:
-        _maintenance_scheduler_thread.join(timeout=5)
-    _storage_reconcile_stop.set()
-    if _storage_reconcile_thread is not None:
-        _storage_reconcile_thread.join(timeout=5)
-    # Ein abgebrochener Hintergrundabgleich gilt vorsichtshalber nicht als
-    # sauberer Shutdown; dann wird beim nächsten Start synchron geprüft.
-    if _requires_synchronous_reconciliation or _storage_reconcile_completed:
-        index.set_setting("storage_clean_shutdown", "1")
+
+
 
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
-    _start_maintenance_scheduler()
+    _background.start()
     yield
-    _stop_maintenance_scheduler()
+    _background.stop()
 
 
 # Nachträglich statt über FastAPI(lifespan=...) gesetzt: _start_/_stop_
@@ -2282,10 +1705,10 @@ def _backup_context(
     *, message: str | None = None,
     sort: str = "created_at", direction: str = "desc", page: int = 1, page_size: int = 10,
 ) -> dict:
-    with _backup_progress.lock:
-        running = _backup_progress.running
-        done = _backup_progress.done
-        total = _backup_progress.total
+    with _background.backup_progress.lock:
+        running = _background.backup_progress.running
+        done = _background.backup_progress.done
+        total = _background.backup_progress.total
     percent = int(done / total * 100) if total else 0
     jobs = []
     status_labels = {
@@ -2313,7 +1736,7 @@ def _backup_context(
     except ValueError:
         next_ts = None
     if next_ts is None and index.get_setting("backup_schedule", "off") != "off":
-        next_ts = _set_next_backup_run(datetime.now(TZ))
+        next_ts = _background.set_next_backup_run(datetime.now(TZ))
 
     def display_ts(raw: str | None) -> str:
         try:
@@ -2384,7 +1807,7 @@ def backup_start(request: Request) -> HTMLResponse:
     wenn er selbst fertig ist (create_backup schreibt atomar über eine
     .part-Datei) — ein fehlgeschlagener/abgebrochener Lauf lässt das alte
     Backup deshalb unangetastet nutzbar."""
-    _run_backup_background()
+    _background.run_backup()
     return _backup_status_response(request)
 
 
@@ -2433,7 +1856,7 @@ async def backup_schedule_save(request: Request) -> HTMLResponse:
         index.set_setting("backup_keep_days", str(keep_days))
     index.set_setting("backup_schedule_time", schedule_time)
     index.set_setting("backup_schedule_weekday", str(weekday))
-    _set_next_backup_run(datetime.now(TZ))
+    _background.set_next_backup_run(datetime.now(TZ))
     return templates.TemplateResponse(
         request, "_settings_backup_schedule_form.html", _backup_context()
     )
@@ -2665,7 +2088,7 @@ def _diagnostics_payload() -> dict:
     """Bereinigte App-Diagnose ohne Token, Messwerte oder Entitäts-IDs."""
     overview = index.get_overview()
     storage = _storage_breakdown()
-    audit = _storage_reconcile_last or {}
+    audit = _background.storage_reconcile_last or {}
     return {
         "format": "zeitarchiv-diagnostics",
         "format_version": 1,
@@ -3434,7 +2857,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 custom_name=custom_name if custom_name is not None else None,
             )
             if retention is not None:
-                _invalidate_retention_overview()
+                _background.invalidate_retention_overview()
             # Nur bei ÄNDERUNG von resolution/value_filter auslösen, sonst würde ein späteres,
             # bewusstes Verkleinern der Lücken-Erkennung bei nächster Gelegenheit zurückgedreht.
             gap_threshold_auto_adjusted = False
@@ -3536,7 +2959,7 @@ def entity_delete_all_values(entity_id: str) -> dict:
     """Löscht alle Werte, behält aber Konfiguration und Entitätseintrag."""
     _require_entity(entity_id)
     entity_removal.delete_all_values(DATA_DIR, index, entity_id)
-    _invalidate_retention_overview()
+    _background.invalidate_retention_overview()
     return {"ok": True}
 
 
@@ -3546,7 +2969,7 @@ def entity_delete(entity_id: str) -> dict:
     """Entfernt eine Entität einschließlich aller Werte und Indexmetadaten."""
     _require_entity(entity_id)
     entity_removal.delete_entity(DATA_DIR, index, entity_id)
-    _invalidate_retention_overview()
+    _background.invalidate_retention_overview()
     return {"ok": True}
 
 
@@ -5333,7 +4756,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
 
     result = await run_in_threadpool(delete_locked)
     if timestamps:
-        _invalidate_purge_preview()
+        _background.invalidate_purge_preview()
     return result
 
 
@@ -5599,7 +5022,7 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
 
     result = await run_in_threadpool(delete_locked)
     if marked_any:
-        _invalidate_purge_preview()
+        _background.invalidate_purge_preview()
     return result
 
 
@@ -5616,7 +5039,7 @@ _import_service = ImportService(ImportDependencies(
     templates=templates,
     app_root_context=_app_root_context,
     reports_context=_reports_context,
-    run_storage_reconciliation=_run_storage_reconciliation,
+    run_storage_reconciliation=_background.run_storage_reconciliation,
     symcon_import_dir=SYMCON_IMPORT_DIR,
     csv_import_dir=CSV_IMPORT_DIR,
     symcon_names_path=SYMCON_NAMES_PATH,
@@ -5641,22 +5064,22 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     chart_range_options=_CHART_RANGE_OPTIONS,
     gap_threshold_minute_tiers=_GAP_THRESHOLD_MINUTE_TIERS,
     backup_weekday_options=BACKUP_WEEKDAY_OPTIONS,
-    retention_progress=_retention_progress,
+    retention_progress=_background.retention_progress,
     storage_locked=_storage_locked,
     settings_archivierung_context=_settings_archivierung_context,
-    refresh_purge_preview_if_stale=_refresh_purge_preview_if_stale,
-    refresh_retention_overview_if_stale=_refresh_retention_overview_if_stale,
-    begin_retention_job=_begin_retention_job,
-    finish_retention_job=_finish_retention_job,
-    run_storage_reconciliation=_run_storage_reconciliation,
+    refresh_purge_preview_if_stale=_background.refresh_purge_preview_if_stale,
+    refresh_retention_overview_if_stale=_background.refresh_retention_overview_if_stale,
+    begin_retention_job=_background.begin_retention_job,
+    finish_retention_job=_background.finish_retention_job,
+    run_storage_reconciliation=_background.run_storage_reconciliation,
     gap_threshold_auto_adjust_message=_gap_threshold_auto_adjust_message,
-    set_next_retention_run=_set_next_retention_run,
+    set_next_retention_run=_background.set_next_retention_run,
     chart_type_label=_chart_type_label,
     count_stale_entities=_count_stale_entities,
-    load_purge_preview=_load_purge_preview,
-    load_retention_overview=_load_retention_overview,
+    load_purge_preview=_background.load_purge_preview,
+    load_retention_overview=_background.load_retention_overview,
     # Lambdas statt der Werte: beide werden per global neu gebunden,
     # ein Feldwert wäre für immer das None vom Programmstart.
-    host_disk_usage_cached=lambda: _host_disk_usage_cached,
-    storage_reconcile_last=lambda: _storage_reconcile_last,
+    host_disk_usage_cached=lambda: _background.host_disk_usage_cached,
+    storage_reconcile_last=lambda: _background.storage_reconcile_last,
 )))

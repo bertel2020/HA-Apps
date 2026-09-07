@@ -14,6 +14,11 @@
    uneinheitlichen base/relative-Pfad-Mix, den die einzelnen Seiten bisher
    für ihre Script-Tags nutzten. #}
 <script src="{{ asset('vendor/alpine.min.js') }}" defer></script>
+{# Aus demselben Grund hier und nicht je Seite: Das Abzeichen für laufende
+   Vorgänge gehört zur Kopfleiste, also zu genau den Seiten, die diese Datei
+   einbinden — eine Liste, die sich sonst mit jeder neuen Seite verschieben
+   würde. defer, damit #notice-activity beim Start bereits im Dokument steht. #}
+<script src="{{ asset('js/topnav-activity.js') }}" defer></script>
 {% set _path = request.url.path %}
 {% set _rel = _path[(app_root|length):] if app_root and _path.startswith(app_root) else _path %}
 {% set nav_home = _rel in ('/', '', '/uebersicht') %}
@@ -135,12 +140,27 @@
        jeweilige Ursache behoben ist (Index optimiert, nächstes Backup
        erfolgreich, …). #}
     <div class="topnav-notice" @click.outside="noticesOpen = false">
+      {# Zwei Abzeichen, zwei Bedeutungen: rechts die Zahl der offenen
+         MELDUNGEN (Probleme), links seit 0.85.0 die laufenden VORGÄNGE
+         (Hintergrundarbeit). Sie dürfen nicht zusammengezählt werden — ein
+         laufender Import ist kein Problem und gehört nicht ins Rot der Fehler.
+         Das linke Abzeichen trägt eine Ziffer erst ab zwei gleichzeitigen
+         Vorgängen; siehe .notice-badge.is-activity in app.css, warum.
+         aria-label trägt beides im Klartext: Ein Abzeichen ist für einen
+         Screenreader nichts, egal wie deutlich es aussieht. #}
       <button type="button" class="notice-btn{{ ' is-open' if noticesOpen }}" @click="noticesOpen = !noticesOpen"
-              :aria-expanded="noticesOpen.toString()" aria-haspopup="true" aria-label="Meldungen">
+              :aria-expanded="noticesOpen.toString()" aria-haspopup="true"
+              aria-label="Meldungen{% if activity %} — {{ activity | length }} {{ 'Vorgang läuft' if activity | length == 1 else 'Vorgänge laufen' }}{% endif %}">
+        {% if activity %}<span class="notice-badge is-activity">{{ activity | length if activity | length > 1 else '' }}</span>{% endif %}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         {% if notices %}<span class="notice-badge">{{ notices | length if notices | length <= 9 else '9+' }}</span>{% endif %}
       </button>
       <div class="notice-panel" x-show="noticesOpen" x-cloak>
+        {# data-app-root wie überall sonst (siehe dynamic-back-link.js): Das
+             Skript ist eine statische Datei und kann app_root nicht selbst kennen. #}
+        <div id="notice-activity" data-app-root="{{ app_root }}">
+          {% include "_activity_block.html" %}
+        </div>
         <div id="notice-panel-body">
           {% include "_notice_panel_body.html" %}
         </div>

@@ -9,6 +9,12 @@ from _paths import APP
 
 MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
 HOUSEKEEPING_SOURCE = (APP / "housekeeping_routes.py").read_text(encoding="utf-8")
+#: Der Wartungsplaner und die von ihm gepflegten Zwischenspeicher liegen seit
+#: 0.85.0 in background.py — main.py hängt sie nur noch ein (Zeilenbudget,
+#: siehe test_route_modules.py). Die Zusicherungen unten sind unverändert, nur
+#: die Fundstelle ist eine andere; aus Funktionen wurden dabei Methoden, aus
+#: `_refresh_x()` also `self.refresh_x()`.
+BACKGROUND_SOURCE = (APP / "background.py").read_text(encoding="utf-8")
 
 
 def _function(name: str, source: str = MAIN_SOURCE) -> ast.FunctionDef | ast.AsyncFunctionDef:
@@ -21,6 +27,19 @@ def _function(name: str, source: str = MAIN_SOURCE) -> ast.FunctionDef | ast.Asy
     raise AssertionError(f"Funktion {name} fehlt")
 
 
+def _self_calls(function: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Namen der über self.… aufgerufenen Methoden — das Gegenstück zu
+    _name_calls() weiter unten, seit der Wartungsplaner eine Methode ist."""
+    return {
+        node.func.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "self"
+    }
+
+
 def _calls_snapshot(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     return any(
         isinstance(node, ast.Call)
@@ -31,17 +50,12 @@ def _calls_snapshot(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
 
 
 def test_maintenance_scheduler_records_growth_snapshots() -> None:
-    assert _calls_snapshot(_function("_maintenance_scheduler_loop"))
+    assert _calls_snapshot(_function("_maintenance_scheduler_loop", BACKGROUND_SOURCE))
 
 
 def test_maintenance_scheduler_refreshes_retention_overview() -> None:
-    function = _function("_maintenance_scheduler_loop")
-    assert any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "_refresh_retention_overview_if_stale"
-        for node in ast.walk(function)
-    )
+    function = _function("_maintenance_scheduler_loop", BACKGROUND_SOURCE)
+    assert "refresh_retention_overview_if_stale" in _self_calls(function)
 
 
 def test_home_page_no_longer_controls_growth_snapshot_timing() -> None:
@@ -49,7 +63,7 @@ def test_home_page_no_longer_controls_growth_snapshot_timing() -> None:
 
 
 def test_scheduler_records_before_its_first_wait() -> None:
-    function = _function("_maintenance_scheduler_loop")
+    function = _function("_maintenance_scheduler_loop", BACKGROUND_SOURCE)
     snapshot_line = min(
         node.lineno
         for node in ast.walk(function)
@@ -66,13 +80,8 @@ def test_scheduler_records_before_its_first_wait() -> None:
 def test_maintenance_scheduler_refreshes_duplicate_snapshot() -> None:
     """ZP-002 (PERFORMANCE.md): die Duplikat-Zählung für /statistik läuft im
     Wartungsplaner statt bei jedem Seitenaufruf synchron neu zu rechnen."""
-    function = _function("_maintenance_scheduler_loop")
-    assert any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "_refresh_duplicate_snapshot_if_stale"
-        for node in ast.walk(function)
-    )
+    function = _function("_maintenance_scheduler_loop", BACKGROUND_SOURCE)
+    assert "_refresh_duplicate_snapshot_if_stale" in _self_calls(function)
 
 
 def test_statistik_view_reads_duplicate_snapshot_not_live_scan() -> None:
@@ -116,8 +125,13 @@ def test_request_path_reads_cached_stale_count_instead_of_locking_all_entities()
     damit bei jedem htmx-Such-Fragment läuft."""
     for name in ("_notices_context", "mute_notice_route"):
         assert "_count_stale_entities" not in _name_calls(_function(name)), name
-    assert "_refresh_stale_entity_count" in _name_calls(_function("_maintenance_scheduler_loop"))
-    assert "_refresh_stale_entity_count" in _name_calls(_function("_start_maintenance_scheduler"))
+    # In background.py heißt der Wartungsplaner-Start schlicht start().
+    assert "_refresh_stale_entity_count" in _self_calls(
+        _function("_maintenance_scheduler_loop", BACKGROUND_SOURCE)
+    )
+    assert "_refresh_stale_entity_count" in _self_calls(
+        _function("start", BACKGROUND_SOURCE)
+    )
 
 
 def _run_all() -> None:
