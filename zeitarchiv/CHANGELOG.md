@@ -4,10 +4,11 @@
 
 ### Geändert
 
-- **Die Kacheln auf Übersicht, Dashboards, Tabellen und Charts sind nicht mehr
-  flach weiß.** Sie tragen einen leisen Farbverlauf aus der oberen linken Ecke
-  und reagieren beim Überfahren mit der Maus. Die feste Kachel des
-  Energiedashboards verhält sich dabei wie die übrigen.
+- **Die Kacheln sind nicht mehr flach weiß.** Übersicht, Dashboards, Tabellen,
+  Charts, Statistik, Entitätskonfiguration und die Kennzahlreihen in den
+  Einstellungen tragen einen leisen Farbverlauf aus der oberen linken Ecke;
+  anklickbare Kacheln reagieren zusätzlich beim Überfahren mit der Maus. Die
+  feste Kachel des Energiedashboards verhält sich dabei wie die übrigen.
 - **Chart-Kacheln zeigen ihren Typ als farbigen Kopfstreifen** — Linie, Balken
   oder Zeitstrahl auf einen Blick, ohne die Zeile darunter zu lesen. Enthält ein
   Chart beides, geht der Streifen von der einen Farbe in die andere über.
