@@ -1,5 +1,96 @@
 # Changelog
 
+## 0.85.0 - 2026-09-07
+
+### Neu
+
+- **Aktionen, die länger dauern, sagen jetzt, dass sie laufen.** Gemessen
+  brauchen mehrere davon deutlich mehr als die fünf bis zehn Sekunden, ab
+  denen ein Klick ohne Rückmeldung wie ein Hänger wirkt — ein Symcon-Probelauf
+  über 233 Variablen rund 1,7 Minuten, eine Bereinigung über 163 Archivmonate
+  rund 20 Sekunden. Drei Anzeigen greifen ineinander: Der **Knopf** wird blass,
+  bekommt einen rotierenden Ring, lässt sich nicht ein zweites Mal drücken und
+  zählt ab drei Sekunden die verstrichene Zeit mit. Wo es eine ehrliche
+  Gesamtzahl gibt, steht darunter ein **Fortschrittsbalken** mit „X von Y" —
+  wo nicht, bewusst keiner statt einer geschätzten Prozentzahl. Und die
+  **Glocke** in der Kopfzeile führt alle laufenden Vorgänge auf, auf jeder
+  Seite: Sie laufen im Hintergrund weiter, auch wenn Sie die Seite wechseln.
+- **Auch die Vorgänge, die von selbst anlaufen, stehen an der Glocke** — die
+  Speicherindex-Prüfung nach dem Start, der nachträgliche Aufbau von
+  Auswertungsstufen, die Neuberechnung nach einem Typwechsel aus Home
+  Assistant. Das ist der wichtigere Teil: Wer nichts gedrückt hat, sucht für
+  einen zäh reagierenden Server auch keine Erklärung. Mehrere dieser Vorgänge
+  pausieren für ihre Dauer alle Schreibzugriffe einschließlich der Aufnahme
+  aus Home Assistant — die Glocke ist die Antwort darauf, warum die App
+  gerade wartet.
+- **Housekeeping hat einen neuen Bereich „Ausreißer".** Er listet die
+  Entitäten, bei denen die eingestellte Schwelle auffällig viel markiert, mit
+  ihrer jeweiligen Quote — und eine Meldung weist darauf hin. Eine zu enge
+  Schwelle markiert normales Verhalten als verdächtig; bisher fiel das nur
+  auf, wenn man die Bereinigungsseite der betroffenen Entität von Hand
+  öffnete.
+- **Die Markierungsquote steht jetzt direkt unter dem Schwellwert** in der
+  Entität-Konfiguration, auf Klick über die komplette Historie berechnet. Sie
+  gehört immer zu genau der eingestellten Schwelle: Nach einer Änderung
+  erscheint sie erst wieder, wenn neu gemessen wurde, statt die alte Zahl
+  weiterzuzeigen.
+- **Charts lassen sich vergrößern.** Mausrad im Diagramm zoomt den Zeitraum,
+  Umschalt-Ziehen zieht einen Bereich auf. Nötig, weil ein Zeitraum mehr
+  Messwerte enthalten kann, als der Bildschirm auseinanderhält — beim
+  Zeitstrahl entsprach ein Pixel im Monatszeitraum rund 48 Minuten.
+- **Zur Löschung markierte Bereiche sind im Chart sichtbar** und lassen sich
+  über die Werkzeugleiste ein- und ausblenden.
+- **Eine Durchschnittslinie lässt sich einblenden**, im Entitäts-Chart, im
+  Chart-Editor und in angehefteten Dashboard-Kacheln.
+- **Eine Meldung weist auf liegengebliebene Import-Quelldaten hin** — ab
+  100 MB und frühestens einen Tag nach der letzten Änderung. Sie bleiben
+  absichtlich liegen, damit sich Zuordnung und Probelauf ohne erneuten Upload
+  wiederholen lassen; nur wusste das bisher niemand, der den Speicherplatz
+  suchte.
+
+### Geändert
+
+- **Die Ausreißer-Erkennung misst gegen die jüngste Vergangenheit statt gegen
+  den Mittelwert des ganzen Zeitraums.** Bei Zählern zählt jetzt der Zuwachs
+  und wird mit dem vorherigen verglichen, bei allen anderen Sensoren der Wert
+  gegen den Durchschnitt der letzten fünf. Die alte Regel war bei Zählern
+  nachweislich wirkungslos: An echten Daten lag der größte reale Sprung bei
+  0,0003 % des alten Bezugs, die kleinste wählbare Schwelle bei 5 % — es gab
+  keinen einstellbaren Wert, der je ausgelöst hätte. Eine 40-fache
+  Verbrauchsspitze wird jetzt erkannt, ein gleichmäßig laufender Zähler löst
+  nie aus. Der Preis steht im Hilfetext: Weil der Bezug das aktuelle Niveau
+  ist, reagieren Größen, die um null schwanken — Leistung mit Einspeisung,
+  Außentemperatur im Winter — empfindlicher als vorher.
+- **Die Schriften kommen aus dem Add-on statt von Google.** In Netzen ohne
+  Internetzugang oder mit DNS-Filter wartete vorher jeder Seitenaufbau erst
+  auf einen Timeout, bevor die Ersatzschrift griff; nebenbei erfuhr Google bei
+  jedem Aufruf die IP-Adresse. Für ein selbst gehostetes Archiv war das
+  systemfremd.
+- **Die Kennzahlen-Auswahl im Optionen-Menü nutzt dieselben Chips wie der
+  Rest der App** statt einer Kästchenliste — die einzige Stelle, die noch aus
+  der Reihe fiel.
+- **Das Vergleichsmenü zeigt keine Vorjahres-Zeile mehr, wo sie nichts
+  vergleichen kann.**
+- **Meldungen im Einstellungs-Bereich und in der Entität-Konfiguration sind
+  präziser formuliert.** Das Handbuch-Kapitel „Entität konfigurieren" ist neu
+  geschrieben — aus einer Tabelle sind acht Abschnitte geworden, je Feld
+  einer, und zwei falsche Aussagen sind dabei korrigiert.
+- **Einstellungen → Diagnose führt den Ausreißer-Hintergrundlauf mit auf.**
+
+### Behoben
+
+- **Der Fortschrittsbalken des Symcon-Imports blieb leer und stürzte ab
+  1.000 Zeilen ab.** Er verwies auf eine Vorlage, die es nicht gab, und
+  formatierte seine Zeilenzahl ein zweites Mal. Beides fiel nicht auf, weil
+  die Anzeige lautlos ausfiel statt einen Fehler zu zeigen.
+- **Ein Teil der Tipps im Meldungs-Panel war als Link dargestellt, führte
+  aber auf eine Fehlerseite.** Diese Tipps erklären etwas an Ort und Stelle
+  und haben absichtlich kein Ziel — sie sind jetzt kein Link mehr.
+- **Nach einem Update konnten Gestaltung und Code aus der vorigen Version im
+  Browser hängenbleiben.** Die Kennung, an der der Browser eine geänderte
+  Datei erkennt, hing an der Änderungszeit der Datei — die nach einem frischen
+  Checkout für alle Dateien gleich ist. Sie folgt jetzt dem Inhalt.
+
 ## 0.84.0 - 2026-09-07
 
 ### Neu

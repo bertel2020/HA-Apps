@@ -91,7 +91,7 @@ mit `.router()`, der die Routen als verschachtelte Closures registriert
 
 **Die Schwelle ist zweimal gesenkt worden, nicht angehoben:** von 5.850 am
 7. September 2026 auf 5.700, am 8. September auf **5.150**. Stand 0.85.0:
-**rund 5.085 Zeilen**, Test grün, gut 60 Zeilen Puffer.
+**rund 5.100 Zeilen**, Test grün, knapp 50 Zeilen Puffer.
 
 Der Grund für diese Buchführung steht im Kommentar am Test selbst und ist es
 wert, hier wiederholt zu werden: Bei 5.850 stand dort der Satz, der nächste
@@ -103,7 +103,7 @@ Alternative doch die Zahl erhöht. **Wer eine Extraktion durchführt, schreibt
 sie deshalb im Test-Kommentar als erledigt fest.**
 
 Der nächste Schnitt ist entsprechend benannt und schwieriger als die beiden
-bisherigen: die **Template-Kontexte**. Von den rund 5.085 Zeilen sind etwa 1.730
+bisherigen: die **Template-Kontexte**. Von den rund 5.100 Zeilen sind etwa 1.730
 Routenfunktionen (34 %) auf 112 Routen; der Rest sind überwiegend
 Kontext-Erbauer (`_rows_fragment`, `_dashboard_tiles_context`,
 `_entities_table_response` …). Sie sind enger mit den Routen verzahnt als die
