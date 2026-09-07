@@ -8,7 +8,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.formatting import format_int, format_value
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, page_text
 
 
 
@@ -36,7 +36,7 @@ def test_destructive_entity_actions_have_explicit_confirmations() -> None:
 def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
     cleanup = (TEMPLATES / "cleanup.html").read_text(encoding="utf-8")
     rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
-    chart_editor = (TEMPLATES / "chart_editor.html").read_text(encoding="utf-8")
+    chart_editor = page_text("chart_editor.html")
     main = (APP / "main.py").read_text(encoding="utf-8")
     assert "static/js/period-navigation.js" in cleanup
     assert "PeriodNavigation.anchorForWindow" in cleanup

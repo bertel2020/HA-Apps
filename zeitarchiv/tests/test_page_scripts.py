@@ -82,14 +82,22 @@ def test_what_stays_inline_is_only_what_the_server_renders() -> None:
 
     Ohne sie bliebe „ein bisschen Code oben, der Rest in der Datei" zulässig,
     und die Kante wäre nach dem dritten Template nicht mehr auffindbar.
+
+    Kommentare zählen nicht als Code. Ein `const DECIMALS = {{ decimals }}`
+    braucht seine Begründung neben sich, nicht in einer anderen Datei — bei
+    chart_editor sind das acht Zeilen, die erklären, warum "auto" hier eine
+    Übersteuerung ist und warum compare/compareMode nie gespeichert werden.
+    Sie in die ausgelagerte Datei zu schieben hieße, sie von ihrem Gegenstand
+    zu trennen.
     """
     for name, source in _converted().items():
         for block in INLINE.finditer(source):
-            zeilen = [z for z in block.group("body").splitlines() if z.strip()]
-            ohne_jinja = [z for z in zeilen if "{{" not in z and "{%" not in z]
+            zeilen = [z.strip() for z in block.group("body").splitlines() if z.strip()]
+            code = [z for z in zeilen if not z.startswith("//")]
+            ohne_jinja = [z for z in code if "{{" not in z and "{%" not in z]
             assert not ohne_jinja, (
-                f"{name}: {len(ohne_jinja)} Zeile(n) ohne Jinja im Inline-Block, "
-                f"z. B. {ohne_jinja[0].strip()[:60]!r} — gehört in die Datei"
+                f"{name}: {len(ohne_jinja)} Codezeile(n) ohne Jinja im Inline-Block, "
+                f"z. B. {ohne_jinja[0][:60]!r} — gehört in die Datei"
             )
 
 

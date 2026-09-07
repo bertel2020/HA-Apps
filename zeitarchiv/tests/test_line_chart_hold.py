@@ -1,11 +1,11 @@
 """Regressionstests für geglättete Linien ohne künstliche Randlücken."""
 
 
-from _paths import APP, DOCS
+from _paths import APP, DOCS, page_text
 
 
 ENTITY = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
-EDITOR = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+EDITOR = page_text("chart_editor.html")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 
 
