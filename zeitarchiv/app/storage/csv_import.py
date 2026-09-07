@@ -13,6 +13,7 @@ verwerfen (dieselbe Haltung wie beim Symcon-Import)."""
 from __future__ import annotations
 
 import csv
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -109,11 +110,21 @@ def preview(path: Path, delimiter: str, has_header: bool, sample_size: int = 8) 
 
 
 def _parse_value(raw: str) -> float | None:
+    """None heißt „nicht als Messwert lesbar" und zählt als übersprungene
+    Zeile — sichtbar im Dry Run, statt still etwas Falsches zu importieren.
+
+    Dazu gehört auch alles Nicht-Endliche: float() nimmt die Zeichenketten
+    "nan", "inf" und "Infinity" klaglos an, und "1e400" läuft ohne Ausnahme
+    nach inf über. Im Archiv wäre so ein Wert kein Messwert, sondern ein
+    dauerhafter HTTP 500 auf jede Abfrage seines Zeitraums (ZG-24) — dieselbe
+    Prüfung macht ha_import._parse_state() beim Home-Assistant-Import längst.
+    """
     raw = raw.strip()
     if not raw:
         return None
     try:
-        return float(raw)
+        value = float(raw)
+        return value if math.isfinite(value) else None
     except ValueError:
         pass
     # Deutsches Dezimalformat ("21,5") — nur versuchen, wenn genau ein Komma
@@ -121,7 +132,8 @@ def _parse_value(raw: str) -> float | None:
     # nicht von einem Dezimalkomma zu unterscheiden.
     if raw.count(",") == 1 and "." not in raw:
         try:
-            return float(raw.replace(",", "."))
+            value = float(raw.replace(",", "."))
+            return value if math.isfinite(value) else None
         except ValueError:
             pass
     return _BOOL_VALUES.get(raw.lower())
@@ -133,14 +145,16 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
         return None
     if ts_format == "unix_s":
         try:
-            return float(raw)
+            value = float(raw)
         except ValueError:
             return None
+        return value if math.isfinite(value) else None
     if ts_format == "unix_ms":
         try:
-            return float(raw) / 1000.0
+            value = float(raw) / 1000.0
         except ValueError:
             return None
+        return value if math.isfinite(value) else None
     if ts_format == "iso":
         try:
             dt = datetime.fromisoformat(raw)

@@ -74,7 +74,6 @@ def test_export_table_entity_tooltip_includes_both_names() -> None:
     strict=False,
 )
 def test_other_entity_tooltips_also_include_both_names() -> None:
-    templates = ENTITIES_TEMPLATE_PATH.parent
     statistik = page_text("statistik.html")
     charts = page_text("charts.html")
     main = MAIN_PATH.read_text(encoding="utf-8")

@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from . import ha_integration
 from .formatting import decimals_to_int, entity_display_name
-from .limits import MAX_MULTI_QUERY_ENTITIES, MAX_WRITE_EVENTS
+from .limits import MAX_EVENT_TEXT_LENGTH, MAX_MULTI_QUERY_ENTITIES, MAX_WRITE_EVENTS
 from .logging_setup import log_rate_limited
 from .route_support import storage_locked
 from .storage import query as query_mod
@@ -42,18 +42,38 @@ EntityId = Annotated[
     Field(min_length=3, max_length=ENTITY_ID_MAX_LENGTH, pattern=ENTITY_ID_PATTERN),
 ]
 
+# Die Trennlinie in diesem Modell (ZG-24): was die NACHRICHT beschreibt, wird
+# hier abgelehnt; was die MESSUNG beschreibt, nicht.
+#
+# Der Grund ist das Verhalten des einzigen echten Clients. Der Queue-Writer der
+# Integration wiederholt einen Batch "bis zum Erfolg oder bis zum expliziten
+# Stopp" und unterscheidet dabei nicht zwischen 4xx und 5xx. Eine Ablehnung
+# hier trifft deshalb nie nur ein Event, sondern hält den kompletten Batch
+# dauerhaft fest — und mit ihm die Messwerte aller anderen Entitäten darin.
+#
+# Für einen kaputten Zeitstempel oder ein NaN wäre das der falsche Tausch: ein
+# HA-Sensor, dessen Zustand als "nan" rendert, ist ein Datenzustand, kein
+# Protokollfehler, und er kommt wieder. Solche Events sortiert deshalb
+# IngestionService._ingest_entity_locked() einzeln als "skipped" aus — der
+# Batch läuft weiter, die Quote landet in der bestehenden
+# INGEST_DISCARDED_WARNING_RATIO-Warnung.
+#
+# Ein 100.000 Zeichen langer friendly_name ist dagegen kein Datenzustand,
+# sondern ein fehlerhafter Client. Dafür ist 422 die richtige Antwort.
+EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
+
 
 class EventIn(BaseModel):
     event_id: str | None = Field(
         default=None, min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_-]+$"
     )
     entity_id: EntityId
-    domain: str
+    domain: EventText
     ts: float
     value: float
-    state_class: str | None = None
-    unit: str | None = None
-    friendly_name: str | None = None
+    state_class: EventText | None = None
+    unit: EventText | None = None
+    friendly_name: EventText | None = None
 
 
 class WriteRequest(BaseModel):

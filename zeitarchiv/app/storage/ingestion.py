@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass
@@ -16,11 +17,43 @@ import pyarrow.parquet as pq
 from . import hotbuffer, rollup, rotate
 from .coordinator import StorageCoordinator
 from .index import Index, should_accept_value, should_accept_write
+from ..limits import MAX_EVENT_TS, MIN_EVENT_TS
 from ..logging_setup import log_rate_limited
 from .paths import entity_dir, validate_entity_id
 
 
 logger = logging.getLogger(__name__)
+
+
+def _is_storable_measurement(event: IngestEvent) -> bool:
+    """Ist das überhaupt eine Messung, die sich speichern lässt?
+
+    NaN und Infinity sind für Python gültige Floats, für eine Zeitreihe aber
+    nicht. Ein einziges NaN im Archiv zieht jeden Aggregat-Eimer mit, in den es
+    fällt — aus einem gültigen 10,0 neben einem NaN wird NaN, nicht 10,0 — und
+    Starlette rendert JSON mit ``allow_nan=False``. Aus einem einzelnen
+    Messwert würde damit ein dauerhafter HTTP 500 auf jede Chart-, Tabellen-
+    und Dashboardabfrage, die seinen Zeitraum berührt, bis der Punkt von Hand
+    gelöscht ist (ZG-24).
+
+    Der Weg dorthin ist offen, nicht theoretisch: ``float("nan")`` ist ein
+    gültiger Aufruf, kein Fehler. Ein HA-Sensor, dessen Zustand als "nan" oder
+    "inf" rendert, passiert den Filter der Integration unbeschadet, und
+    ``json.dumps`` schreibt ``NaN`` klaglos in den Batch.
+
+    Beim Zeitstempel kommt ein Fenster dazu (siehe ``limits.py``). Ohne das
+    endet ``ts = Infinity`` als OverflowError und das Jahr 10000 als
+    ValueError — beides mitten im Schreibpfad statt hier. Das Jahr 1 wirft
+    nicht einmal: es legt klaglos ``archive/<entity>/0001-01.parquet`` samt
+    Rollups an.
+
+    Dieselbe Prüfung machen ``ha_import._parse_state()``, ``ha_statistics``
+    und seit ZG-24 auch die beiden Importparser (``csv_import``,
+    ``symcon_import``). Auf dem Live-Weg fehlte sie als einzigem.
+    """
+    if not math.isfinite(event.value) or not math.isfinite(event.ts):
+        return False
+    return MIN_EVENT_TS <= event.ts <= MAX_EVENT_TS
 
 
 @dataclass(frozen=True)
@@ -202,12 +235,29 @@ class IngestionService:
         return recovered
 
     def ingest(self, event: IngestEvent) -> str:
-        """Liefert ``written``, ``filtered``, ``duplicate`` oder ``recovered``."""
+        """Liefert ``written``, ``filtered``, ``skipped``, ``duplicate`` oder
+        ``recovered``."""
         with self._coordinator.entity(event.entity_id):
             return self._ingest_entity_locked(event)
 
     def _ingest_entity_locked(self, event: IngestEvent) -> str:
         validate_entity_id(event.entity_id)
+        if not _is_storable_measurement(event):
+            # Vor get_or_create_entity und vor dem Claim: ein unbrauchbares
+            # Event soll weder eine Entität anlegen noch einen Eintrag im
+            # Ledger hinterlassen. Damit ist es auch folgenlos wiederholbar —
+            # ein Retry desselben Batches sortiert es erneut aus.
+            log_rate_limited(
+                logger,
+                logging.WARNING,
+                f"unstorable_measurement:{event.entity_id}",
+                "Messwert verworfen · event=ingest_unstorable entity_id=%s ts=%r value=%r",
+                event.entity_id,
+                event.ts,
+                event.value,
+                interval_seconds=300,
+            )
+            return "skipped"
         self._index.get_or_create_entity(
             event.entity_id,
             event.domain,

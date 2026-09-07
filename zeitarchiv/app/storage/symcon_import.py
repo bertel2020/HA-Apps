@@ -251,8 +251,13 @@ _BOOL_VALUES = {"true": 1.0, "false": 0.0, "wahr": 1.0, "falsch": 0.0}
 
 
 def _parse_value(raw: str) -> float | None:
+    """Nicht-Endliches wird wie eine unlesbare Zeile behandelt (None) —
+    "nan"/"inf" sind für float() gültige Eingaben, im Archiv aber ein
+    dauerhafter HTTP 500 auf jede Abfrage ihres Zeitraums (ZG-24). Gleiche
+    Regel wie in csv_import._parse_value() und ha_import._parse_state()."""
     try:
-        return float(raw)
+        value = float(raw)
+        return value if math.isfinite(value) else None
     except ValueError:
         pass
     return _BOOL_VALUES.get(raw.strip().lower())
@@ -351,6 +356,8 @@ def _parse_csv_file(
                 continue
             try:
                 ts = float(line[0])
+                if not math.isfinite(ts):
+                    raise ValueError("nicht endlicher Zeitstempel")
             except ValueError:
                 if skipped_counter is not None:
                     skipped_counter[0] += 1
