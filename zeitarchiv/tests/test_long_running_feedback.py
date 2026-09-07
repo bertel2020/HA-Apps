@@ -258,7 +258,7 @@ LANGE_AKTIONEN = {
 
 @pytest.mark.parametrize(("ziel", "vorlage"), sorted(LANGE_AKTIONEN.items()))
 def test_every_slow_button_locks_itself_for_the_duration(ziel: str, vorlage: str) -> None:
-    """hx-disabled-elt="this" ist die halbe Miete von Stufe 1.
+    """hx-disabled-elt="this" ist die halbe Miete der Knopf-Anzeige.
 
     Die andere Hälfte ist CSS (`.btn.htmx-request` in app.css) und wird unten
     geprüft. Ohne das Attribut bleibt der Button klickbar, und jeder weitere
@@ -383,7 +383,7 @@ def test_the_busy_chip_is_gone_for_good() -> None:
 
 
 # --------------------------------------------------------------------------
-# Stufe 4: das Abzeichen an der Glocke
+# Die Glocke: das Abzeichen für laufende Vorgänge
 #
 # Seit die Aufträge im Hintergrund laufen, überleben sie den Seitenwechsel.
 # Die Kopfleiste ist das einzige Bauteil auf jeder Seite — also der einzige
@@ -568,7 +568,7 @@ def test_the_header_script_is_loaded_where_the_header_is() -> None:
 
 
 # --------------------------------------------------------------------------
-# Stufe 4, zweiter Teil: die Vorgänge, die niemand angestoßen hat
+# Die Glocke, zweiter Teil: die Vorgänge, die niemand angestoßen hat
 #
 # Die erste Runde meldete die sieben Aufträge an, die ein Klick auslöst. Übrig
 # blieben fünf, die von selbst anlaufen — beim Serverstart, im Wartungsplaner
@@ -598,7 +598,7 @@ ERWARTETE_QUELLEN = {
 
 
 def test_every_long_running_action_reports_to_the_bell(client) -> None:
-    """Der Anker der ganzen Stufe. Eine lange Aktion, die sich nicht anmeldet,
+    """Der Anker der ganzen Glocken-Anzeige. Eine lange Aktion, die sich nicht anmeldet,
     ist für jeden anderen Tab ein grundlos hängender Server."""
     from app.progress import _quellen
 

@@ -226,8 +226,8 @@ anlegen (nicht in main.py — das hat ein Zeilenbudget, siehe
 [testing.md](testing.md)), die Arbeit in `start()` oder `track()` fassen. Die
 Anzeige entsteht daraus von selbst. `test_long_running_feedback.py` führt die
 erwarteten Anmeldungen ausdrücklich auf: Wer eine lange Aktion baut und sie
-nicht anmeldet, muss diese Liste bewusst ändern. Wie die drei Stufen im
-Browser aussehen: [frontend.md](frontend.md).
+nicht anmeldet, muss diese Liste bewusst ändern. Wie Knopf, Balken und Glocke
+im Browser aussehen: [frontend.md](frontend.md).
 
 ## Frontend-Rendering
 

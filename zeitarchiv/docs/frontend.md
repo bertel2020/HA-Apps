@@ -580,11 +580,16 @@ Aufklappen hängt dort an der Klasse `.open`, nicht an der Positionierung.
 
 ## Rückmeldung für lange Aktionen
 
-Drei Stufen, jede eine Antwort auf eine andere Frage. Der serverseitige
-Unterbau (`progress.py`, wer sich anmeldet und warum) steht in
-[architecture.md](architecture.md); hier steht, was im Browser passiert.
+Drei Anzeigen, jede eine Antwort auf eine andere Frage: **der Knopf**, **der
+Balken**, **die Glocke**. Benannt nach dem, was man sieht, und ausdrücklich
+nicht durchnummeriert — zwischen Knopf und Balken stand zeitweise eine
+vierte Anzeige, und eine Nummer, die sich bei jedem Zu- oder Abgang
+verschiebt, taugt nicht als Name für etwas, über das man später noch reden
+will. Der serverseitige Unterbau (`progress.py`, wer sich anmeldet und warum)
+steht in [architecture.md](architecture.md); hier steht, was im Browser
+passiert.
 
-**Stufe 1 — der Knopf sagt, dass er arbeitet.** `hx-disabled-elt="this"` plus
+**Der Knopf — sagt, dass er arbeitet.** `hx-disabled-elt="this"` plus
 die `.btn`-Regeln in `app.css`: gedimmt, `cursor:progress`, ein kleiner
 rotierender Ring hinter der Beschriftung. Beantwortet „ist mein Klick
 angekommen?" und verhindert zugleich den zweiten Klick.
@@ -626,7 +631,7 @@ Drei Fallen:
 > konnte: die Sekunden. Wer eine Anzeige neben einem Knopf erwägt, hat damit
 > den Präzedenzfall — erst prüfen, ob sie nicht in den Knopf gehört.
 
-**Stufe 2 — der Balken sagt, wie weit.** `_job_progress.html`, gefüllt aus
+**Der Balken — sagt, wie weit.** `_job_progress.html`, gefüllt aus
 `JobProgress.snapshot()`. Der Container pollt sich alle 500 ms per
 `hx-swap="outerHTML"` selbst; der Endpunkt liefert entweder wieder die
 Anzeige oder — sobald der Auftrag durch ist — das Ergebnis **ohne**
@@ -637,7 +642,7 @@ beidem → „läuft…". `aria-live="polite"` sitzt am Textabsatz, nicht am
 Container: Letzterer wird zweimal je Sekunde ersetzt, eine Live-Region darauf
 würde je nach Screenreader gar nicht oder unablässig vorgelesen.
 
-**Stufe 3 — die Glocke sagt es überall.** Seit die Aufträge im Hintergrund
+**Die Glocke — sagt es überall.** Seit die Aufträge im Hintergrund
 laufen, überleben sie den Seitenwechsel; die Kopfleiste ist das einzige
 Bauteil, das auf jeder Seite steht. `js/topnav-activity.js` hängt an
 `_topnav.html` selbst (wie Alpine), nicht an einer Liste von Seiten, und holt

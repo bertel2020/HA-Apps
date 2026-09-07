@@ -88,8 +88,8 @@ def test_the_csv_import_locks_only_its_own_entity() -> None:
 
 
 #: Beide CSV-Pfade parsen nicht mehr selbst, sondern über diesen Helfer — er
-#: hängt die Fortschrittsanzeige an parse_rows() (Stufe 3 der Rückmeldung für
-#: lange Aktionen). Der Test folgt der Indirektion, statt sie zu ignorieren:
+#: hängt den Fortschrittsbalken an parse_rows() (siehe die Rückmeldung für
+#: lange Aktionen in docs/frontend.md). Der Test folgt der Indirektion, statt sie zu ignorieren:
 #: die Zusicherung ist "das Einlesen passiert außerhalb jeder Sperre", nicht
 #: "parse_rows steht wörtlich in dieser Funktion".
 PARSE_HELFER = "self._parse_csv_with_progress"
