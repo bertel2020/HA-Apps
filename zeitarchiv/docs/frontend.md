@@ -441,7 +441,16 @@ es sieht aus, als hätte der Klick nie stattgefunden.
 Links steht, **welcher** Ausschnitt gezeigt wird (Zeitraum, Blättern,
 Markierungen), rechts, **wie** er gezeigt wird (Vergleichen, Optionen —
 `.toolbar-right` mit `margin-left:auto`, erst ab 641 px, darunter bricht die
-Leiste ohnehin um).
+Leiste ohnehin um). Entitäts-Chart und Chart-Editor tragen dieselbe Gruppe,
+deshalb steht die Regel in `app.css`, nicht in einer der beiden Seiten-Dateien.
+
+Die Gruppe muss die Knöpfe **umschließen**. Ein `margin-left:auto` auf dem
+ersten von zweien schob nur diesen nach rechts und trennte den zweiten in die
+nächste Zeile ab. Ihre Menüs klappen nach links auf
+(`.toolbar-right .menu-popover{left:auto;right:0;}`), sonst ragt das 290 px
+breite Optionen-Menü am rechten Rand aus dem Fenster — an dieselbe Breite
+gebunden wie die Rechtsbündigkeit, weil es unterhalb davon genau andersherum
+falsch wäre.
 
 Einen „Jetzt"-Knopf gibt es nicht mehr: er belegte dauerhaft Platz und war die
 meiste Zeit deaktiviert. Seine Funktion liegt als Zweitfunktion auf der schon

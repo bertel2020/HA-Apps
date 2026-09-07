@@ -219,6 +219,20 @@ keine Inkonsistenz.
 `:disabled`-Zustand für "erst Filter wählen"-Fälle), `.navbtn` (quadratischer
 Icon-Button für ‹/›-Navigation, meist als `class="btn navbtn"` kombiniert).
 
+### Chip-Mehrfachauswahl (`.filter-chip`)
+
+Ein `<label class="filter-chip">` mit verstecktem `<input type="checkbox">` und
+einem `<span>`, das die Pille zeichnet. Der app-weite Standard, wo mehrere
+Optionen gleichzeitig an sein können — Energiedashboard-Einrichtung,
+Kennzahlen-Auswahl im Optionen-Menü. **Keine Liste aus Kästchen mit Text
+daneben bauen**, das ist dasselbe Muster in schlechter.
+
+Innerhalb eines Menü-Popovers (290 px breit) die kleinere Variante nutzen, wie
+sie `.legend-metrics-row .filter-chip span` setzt: `padding:4px 9px`,
+`font-size:calc(11.5px * var(--font-scale, 1))` — dieselben Werte wie
+`.menu-row .seg button`, damit die Zeilen im selben Menü nicht unterschiedlich
+hoch aufragen.
+
 ### Hinweistexte (`.hint` + Rolle)
 
 Drei Sorten Text teilen sich Schriftgröße, Zeilenhöhe und `--ink-faint`, sind

@@ -631,6 +631,37 @@ button.dd-picker-clear{
    (dort durch "Legenden-Stil" + Chips/Tabelle nötig) wären hier unnötig
    breit. */
 .menu-popover-narrow{width:190px;}
+
+/* Rechtsbündige Knopfgruppe am Ende einer .toolbar (Entitäts-Chart und
+   Chart-Editor: "Vergleichen" + "Optionen"). Schiebt sich und alles danach an
+   den rechten Rand (dieselbe margin-left:auto-Geste wie bei #controls). Erst
+   ab 641 px: darunter bricht die Leiste ohnehin um, und ein rechtsbündiger
+   Rest einer umgebrochenen Zeile liest sich als Versehen.
+
+   Die Gruppe muss die Knöpfe umschließen, statt margin-left:auto auf den
+   ersten von ihnen zu setzen — das schob nur diesen einen nach rechts und
+   trennte "Optionen" in die nächste Zeile ab. */
+.toolbar-right{display:flex;align-items:center;gap:8px;}
+@media (min-width:641px){
+  .toolbar-right{margin-left:auto;}
+}
+/* Die Menüs dieser Gruppe klappen nach LINKS auf. .menu-popover ist sonst mit
+   left:0 am Anker verankert und 290 px breit — am rechten Rand ragte das
+   Optionen-Menü dadurch aus dem Fenster (gemessen: rechte Kante bei 1163 px in
+   einem 1000 px breiten Fenster, die Seite bekam einen waagerechten
+   Rollbalken). Erst mit der Rechtsbündigkeit oben wurde das sichtbar; vorher
+   stand rechts neben den Knöpfen genug Platz.
+
+   Bewusst an DIESELBE Breite gekoppelt wie die Rechtsbündigkeit: unterhalb
+   davon stehen die Knöpfe wieder links, und ein rechts verankertes Popover
+   ragte dann über den LINKEN Rand hinaus (bei 375 px gemessen: linke Kante bei
+   −45 px, die ersten Zeichen jeder Zeile abgeschnitten). Dass es dort
+   stattdessen rechts anstößt, ist ein älterer, eigener Punkt: .menu-popover
+   ist auf jeder Seite 290 px breit und kennt keine Mobil-Variante — das gilt
+   unabhängig von dieser Regel und ist nicht hier zu reparieren. */
+@media (min-width:641px){
+  .toolbar-right .menu-popover{left:auto;right:0;}
+}
 .menu-section-label{
   font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;
   text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);padding:6px 10px 3px;
@@ -768,9 +799,14 @@ a.menu-row{text-decoration:none;}
 /* Welche Kennzahlen "Statistik in Legende" anzeigt (Min/Max/Ø/Summe) —
    eingerückte Checkbox-Reihe direkt unter dem Toggle, nur sichtbar solange
    dieser aktiv ist (x-show="chartStats" im Template). */
-.legend-metrics-row{padding:2px 10px 6px 10px;display:flex;flex-wrap:wrap;justify-content:center;gap:10px;cursor:default;}
-.legend-metric-check{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;}
-.legend-metric-check input{margin:0;cursor:pointer;}
+/* Kennzahlen-Auswahl im Optionen-Menü (Entitäts-Chart und Chart-Editor).
+   Die Einträge sind .filter-chip — der app-weite Standard für
+   Chip-Mehrfachauswahl —, hier nur kleiner: das Menü-Popover ist 290 px breit,
+   in voller Chip-Größe passten zwei je Zeile. Verkleinerungswerte identisch zu
+   .menu-row .seg button in entity_detail.css/chart_editor.css, damit die
+   Zeilen im selben Menü nicht unterschiedlich hoch aufragen. */
+.legend-metrics-row{padding:2px 10px 8px 10px;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;cursor:default;}
+.legend-metrics-row .filter-chip span{padding:4px 9px;font-size:calc(11.5px * var(--font-scale, 1));}
 
 /* Eigene Legende statt ECharts' eingebauter (dort stummgeschaltet) — jeder
    Chip ist gleichzeitig Serien-Umschalter UND (bei aktivem "Statistik in

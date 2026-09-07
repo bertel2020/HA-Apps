@@ -222,7 +222,11 @@
             </label>
             <div class="menu-row legend-metrics-row" x-show="chartStats">
               <template x-for="metric in legendMetricOptions" :key="metric.value">
-                <label class="legend-metric-check">
+                {# .filter-chip statt einer Kästchen-Liste: der app-weite Standard
+                   für Chip-Mehrfachauswahl (siehe _energiedashboard_setup.html).
+                   Das Kästchen bleibt als <input> erhalten und trägt weiterhin
+                   den Zustand — sichtbar ist nur das <span>. #}
+                <label class="filter-chip">
                   <input type="checkbox" :value="metric.value" x-model="legendMetrics" @change="render(); saveChartOptions()">
                   <span x-text="metric.label"></span>
                 </label>

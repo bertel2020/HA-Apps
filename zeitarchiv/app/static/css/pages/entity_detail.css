@@ -44,14 +44,6 @@
   }
   .period-label:hover:not(:disabled){color:var(--accent-line);}
   .period-label:disabled{cursor:default;}
-  /* Schiebt sich und alles danach an den rechten Rand der Werkzeugleiste
-     (dieselbe margin-left:auto-Geste wie bei #controls in app.css). Erst ab
-     641 px: darunter bricht die Leiste ohnehin um, und ein rechtsbündiger
-     Rest einer umgebrochenen Zeile liest sich als Versehen. */
-  .toolbar-right{display:flex;align-items:center;gap:8px;}
-  @media (min-width:641px){
-    .toolbar-right{margin-left:auto;}
-  }
   /* Markierungs-Chip. Erscheint nur, wenn es im Zeitraum tatsächlich
      Markierungen gibt — deshalb darf er auffallen, ohne zu drängen: Rand und
      Schrift in --danger, aber ohne gefüllte Fläche, damit er neben den

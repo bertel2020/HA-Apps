@@ -80,143 +80,149 @@
             <button :class="{active: range === '{{ key }}'}" @click="setRange('{{ key }}')">{{ label }}</button>
             {% endfor %}
           </div>
-          <div class="menu-wrap" @click.outside="compareMenuOpen = false">
-            <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full'" @click="compareMenuOpen = !compareMenuOpen">
-              <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
-            </button>
-            <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
-                 x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-              <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
-              <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
-              <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-text="compareYearLabel"></button>
+          <!-- Beide Menüs rechtsbündig ans Ende der Leiste, wie im
+               Entitäts-Chart (.toolbar-right in app.css). -->
+          <div class="toolbar-right">
+            <div class="menu-wrap" @click.outside="compareMenuOpen = false">
+              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full'" @click="compareMenuOpen = !compareMenuOpen">
+                <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
+              </button>
+              <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
+                   x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+                <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
+                <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
+                <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-text="compareYearLabel"></button>
+              </div>
             </div>
-          </div>
-          <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
-            <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
-              Optionen <span class="chevron">▾</span>
-            </button>
-            <div class="menu-popover" x-show="optionsMenuOpen" x-cloak
-                 x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-              <div class="menu-section-label">Daten</div>
-              <div class="menu-row">
-                <span class="menu-row-label">Auflösung
-                  <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
-                </span>
-                <!-- query_raw_series() (server) kennt gar kein resolution_preset
-                     — im Rohwerte-/Zeitstrahl-Modus (raw immer true, siehe
-                     toggleTimeline()/load()) hat diese Auswahl keinerlei
-                     Wirkung, deshalb deaktiviert statt eine wirkungslose
-                     Einstellung bedienbar zu lassen. -->
-                <!-- :selected zusätzlich zu x-model nötig: die <option>s
-                     entstehen erst per x-for, NACHDEM Alpine den
-                     x-model-Anfangswert bereits auf das (zu dem Zeitpunkt
-                     noch optionslose) <select> angewendet hat — der Browser
-                     wählt dann automatisch die erste Option ("Automatisch")
-                     statt des tatsächlichen Modell-Werts, ohne dass Alpine
-                     das danach korrigiert. Sichtbar z. B. beim Öffnen von
-                     "Anpassen" für ein mit Auflösung "Tag" gespeichertes
-                     Chart — der Chart selbst rendert korrekt (resolutionPreset
-                     stimmt), nur die Anzeige im Dropdown nicht. -->
-                <select x-model="resolutionPreset" :disabled="raw" @change="onResolutionChange()">
-                  <template x-for="option in resolutionOptions" :key="option.value">
-                    <option :value="option.value" :selected="option.value === resolutionPreset" x-text="option.label"></option>
-                  </template>
-                </select>
-              </div>
-              <label class="menu-row">
-                <span class="menu-row-label">Kontinuierlich</span>
-                <span class="menu-toggle">
-                  <!-- Bei Auflösung "Tag" (singleBucket, s. render()) ohne
-                       Wirkung auf die Balken selbst, macht das Umschalten
-                       aber trotzdem sichtbar (Perioden-Label, ob "heute"
-                       oder ein rollierendes 24h-Fenster gemeint ist) —
-                       deaktiviert, damit für den Summen-Vergleich immer der
-                       eindeutige Kalendertag gilt statt eines je nach
-                       Tageszeit wechselnden rollierenden Fensters. -->
-                  <input type="checkbox" :checked="continuous" :disabled="resolutionPreset === 'full'" @change="toggleContinuous()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <!-- Nur bei mindestens einer Linien-Serie sinnvoll: Balken zeigen
-                   Bucket-Summen (Zähler/Schalter), Rohwerte wären dort keine
-                   Verfeinerung, sondern ein anderer Diagrammtyp. Im
-                   Zeitstrahl-Modus erzwingt toggleTimeline() ohnehin raw = true
-                   — beides war bisher nur ein toter bzw. deaktivierter
-                   Schalter. Das :disabled bleibt für die Zeitraum-Grenze:
-                   Rohwerte gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
-              <label class="menu-row" x-show="!timeline && hasLineSeries">
-                <span class="menu-row-label">Rohwerte</span>
-                <span class="menu-toggle">
-                  <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <div class="menu-divider"></div>
-              <div class="menu-section-label">Darstellung</div>
-              <label class="menu-row" x-show="allSwitch">
-                <span class="menu-row-label">Zeitstrahl</span>
-                <span class="menu-toggle">
-                  <input type="checkbox" :checked="timeline" @change="toggleTimeline()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <label class="menu-row" x-show="hasLineSeries">
-                <span class="menu-row-label">Punkte</span>
-                <span class="menu-toggle">
-                  <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <label class="menu-row" x-show="hasBarSeries">
-                <span class="menu-row-label">Werte anzeigen</span>
-                <span class="menu-toggle">
-                  <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <label class="menu-row">
-                <span class="menu-row-label">Dynamische Y-Achse</span>
-                <span class="menu-toggle">
-                  <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
-                       und irreführend: die wenigen Balken sollen als
-                       Summen-Vergleich lesbar bleiben, eine nicht bei 0
-                       startende Y-Achse würde die Höhenverhältnisse
-                       verzerren — deshalb hier deaktiviert statt nur optisch
-                       ignoriert. -->
-                  <input type="checkbox" :checked="dynamicYAxis" :disabled="resolutionPreset === 'full'" @change="dynamicYAxis = !dynamicYAxis; render()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <div class="menu-row menu-row-stack">
-                <span class="menu-row-label">Nachkommastellen</span>
-                <div class="seg">
-                  <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">Auto</button>
-                  <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
-                  <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
-                  <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
-                  <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
+            <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
+              <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
+                Optionen <span class="chevron">▾</span>
+              </button>
+              <div class="menu-popover" x-show="optionsMenuOpen" x-cloak
+                   x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+                <div class="menu-section-label">Daten</div>
+                <div class="menu-row">
+                  <span class="menu-row-label">Auflösung
+                    <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
+                  </span>
+                  <!-- query_raw_series() (server) kennt gar kein resolution_preset
+                       — im Rohwerte-/Zeitstrahl-Modus (raw immer true, siehe
+                       toggleTimeline()/load()) hat diese Auswahl keinerlei
+                       Wirkung, deshalb deaktiviert statt eine wirkungslose
+                       Einstellung bedienbar zu lassen. -->
+                  <!-- :selected zusätzlich zu x-model nötig: die <option>s
+                       entstehen erst per x-for, NACHDEM Alpine den
+                       x-model-Anfangswert bereits auf das (zu dem Zeitpunkt
+                       noch optionslose) <select> angewendet hat — der Browser
+                       wählt dann automatisch die erste Option ("Automatisch")
+                       statt des tatsächlichen Modell-Werts, ohne dass Alpine
+                       das danach korrigiert. Sichtbar z. B. beim Öffnen von
+                       "Anpassen" für ein mit Auflösung "Tag" gespeichertes
+                       Chart — der Chart selbst rendert korrekt (resolutionPreset
+                       stimmt), nur die Anzeige im Dropdown nicht. -->
+                  <select x-model="resolutionPreset" :disabled="raw" @change="onResolutionChange()">
+                    <template x-for="option in resolutionOptions" :key="option.value">
+                      <option :value="option.value" :selected="option.value === resolutionPreset" x-text="option.label"></option>
+                    </template>
+                  </select>
                 </div>
-              </div>
-              <label class="menu-row">
-                <span class="menu-row-label">Statistik in Legende</span>
-                <span class="menu-toggle">
-                  <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
-                  <span class="track"><span class="thumb"></span></span>
-                </span>
-              </label>
-              <div class="menu-row legend-metrics-row" x-show="chartStats">
-                <template x-for="metric in legendMetricOptions" :key="metric.value">
-                  <label class="legend-metric-check">
-                    <input type="checkbox" :value="metric.value" x-model="legendMetrics" @change="render()">
-                    <span x-text="metric.label"></span>
-                  </label>
-                </template>
-              </div>
-              <div class="menu-row" x-show="chartStats">
-                <span class="menu-row-label">Legenden-Stil</span>
-                <div class="seg">
-                  <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">Chips</button>
-                  <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'">Tabelle</button>
+                <label class="menu-row">
+                  <span class="menu-row-label">Kontinuierlich</span>
+                  <span class="menu-toggle">
+                    <!-- Bei Auflösung "Tag" (singleBucket, s. render()) ohne
+                         Wirkung auf die Balken selbst, macht das Umschalten
+                         aber trotzdem sichtbar (Perioden-Label, ob "heute"
+                         oder ein rollierendes 24h-Fenster gemeint ist) —
+                         deaktiviert, damit für den Summen-Vergleich immer der
+                         eindeutige Kalendertag gilt statt eines je nach
+                         Tageszeit wechselnden rollierenden Fensters. -->
+                    <input type="checkbox" :checked="continuous" :disabled="resolutionPreset === 'full'" @change="toggleContinuous()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <!-- Nur bei mindestens einer Linien-Serie sinnvoll: Balken zeigen
+                     Bucket-Summen (Zähler/Schalter), Rohwerte wären dort keine
+                     Verfeinerung, sondern ein anderer Diagrammtyp. Im
+                     Zeitstrahl-Modus erzwingt toggleTimeline() ohnehin raw = true
+                     — beides war bisher nur ein toter bzw. deaktivierter
+                     Schalter. Das :disabled bleibt für die Zeitraum-Grenze:
+                     Rohwerte gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
+                <label class="menu-row" x-show="!timeline && hasLineSeries">
+                  <span class="menu-row-label">Rohwerte</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <div class="menu-divider"></div>
+                <div class="menu-section-label">Darstellung</div>
+                <label class="menu-row" x-show="allSwitch">
+                  <span class="menu-row-label">Zeitstrahl</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="timeline" @change="toggleTimeline()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <label class="menu-row" x-show="hasLineSeries">
+                  <span class="menu-row-label">Punkte</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <label class="menu-row" x-show="hasBarSeries">
+                  <span class="menu-row-label">Werte anzeigen</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <label class="menu-row">
+                  <span class="menu-row-label">Dynamische Y-Achse</span>
+                  <span class="menu-toggle">
+                    <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
+                         und irreführend: die wenigen Balken sollen als
+                         Summen-Vergleich lesbar bleiben, eine nicht bei 0
+                         startende Y-Achse würde die Höhenverhältnisse
+                         verzerren — deshalb hier deaktiviert statt nur optisch
+                         ignoriert. -->
+                    <input type="checkbox" :checked="dynamicYAxis" :disabled="resolutionPreset === 'full'" @change="dynamicYAxis = !dynamicYAxis; render()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <div class="menu-row menu-row-stack">
+                  <span class="menu-row-label">Nachkommastellen</span>
+                  <div class="seg">
+                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">Auto</button>
+                    <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
+                    <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
+                    <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
+                    <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
+                  </div>
+                </div>
+                <label class="menu-row">
+                  <span class="menu-row-label">Statistik in Legende</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <div class="menu-row legend-metrics-row" x-show="chartStats">
+                  <template x-for="metric in legendMetricOptions" :key="metric.value">
+                    {# Siehe entity_detail.html: .filter-chip ist der app-weite
+                       Standard für Chip-Mehrfachauswahl. #}
+                    <label class="filter-chip">
+                      <input type="checkbox" :value="metric.value" x-model="legendMetrics" @change="render()">
+                      <span x-text="metric.label"></span>
+                    </label>
+                  </template>
+                </div>
+                <div class="menu-row" x-show="chartStats">
+                  <span class="menu-row-label">Legenden-Stil</span>
+                  <div class="seg">
+                    <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">Chips</button>
+                    <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'">Tabelle</button>
+                  </div>
                 </div>
               </div>
             </div>
