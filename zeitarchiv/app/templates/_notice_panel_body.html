@@ -11,15 +11,21 @@
 <ul class="notice-list"{% if not notices %} hidden{% endif %}>
   {% for notice in notices %}
   <li class="notice-row" data-notice-id="{{ notice.id }}">
-    <a class="notice-row-link" href="{{ app_root }}{{ notice.link }}">
+    {# Neun der dreißig Tipps erklären etwas an Ort und Stelle — das
+       Stummschalt-Icon in derselben Zeile, den Klick auf einen Zeitraum-Titel,
+       das Sortieren per Spaltenkopf. Sie setzen in tips.py deshalb bewusst
+       `link: None`. Ohne diese Fallunterscheidung wurde daraus `href="/None"`,
+       samt Chevron, der ein Ziel verspricht — ein Klick landete auf 404.
+       Echte Meldungen aus notices.py haben durchweg ein Ziel. #}
+    {% if notice.link %}<a class="notice-row-link" href="{{ app_root }}{{ notice.link }}">{% else %}<div class="notice-row-link notice-row-static">{% endif %}
       <span class="notice-dot {{ notice.severity }}"></span>
       <span class="notice-body">
         <span class="notice-row-title">{{ notice.title }}</span>
         <span class="notice-row-detail">{{ notice.detail }}</span>
         <span class="notice-row-meta">{{ notice.meta }}</span>
       </span>
-      <svg class="notice-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9,6 15,12 9,18"/></svg>
-    </a>
+      {% if notice.link %}<svg class="notice-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9,6 15,12 9,18"/></svg>{% endif %}
+    {% if notice.link %}</a>{% else %}</div>{% endif %}
     {% if notice.id.startswith('tips.') %}
     {# Tipps nutzen ihr eigenes Ausblenden (siehe notices.hide_tip_today) statt
        des allgemeinen Stummschalt-Systems mit Dauer-Presets — dafür bräuchte
