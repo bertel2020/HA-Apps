@@ -4,7 +4,7 @@
 from _paths import APP, DOCS, page_text
 
 
-ENTITY = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+ENTITY = page_text("entity_detail.html")
 EDITOR = page_text("chart_editor.html")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 

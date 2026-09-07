@@ -7,13 +7,13 @@ einen Fehler oder ungültigen Zeitraum."""
 from __future__ import annotations
 
 
-from _paths import APP
+from _paths import APP, page_text
 
 
 MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
 ENTITY_DETAIL_SOURCE = (
-    (APP / "templates/entity_detail.html")
-).read_text(encoding="utf-8")
+    page_text("entity_detail.html")
+)
 
 
 def test_entity_detail_route_accepts_range_and_offset_query_params() -> None:
