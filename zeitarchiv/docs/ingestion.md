@@ -86,3 +86,11 @@ liefert plötzlich eine andere `state_class`), triggert das denselben
 Rollup-Neuberechnung (`rollup.rebuild_entity_rollups()`), da die Bucket-
 Größen zwischen den Typen nicht kompatibel sind (siehe
 [data-model.md](data-model.md)).
+
+Das ist der einzige langsame Vorgang der App, den überhaupt niemand
+ausgelöst hat — gemessen gut fünf Sekunden mitten im Schreibpfad, die
+Entitätssperre die ganze Zeit gehalten. Seit 0.85.0 meldet er sich deshalb an
+der Glocke an (`_rebuild_after_type_change()` in `storage/ingestion.py`,
+Registratur in `progress.py`, Hintergrund in
+[architecture.md](architecture.md)); ohne das wäre er eine unerklärliche
+Pause in der Aufnahme.

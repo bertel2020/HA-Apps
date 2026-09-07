@@ -578,6 +578,82 @@ Stelle** auf statt als Popover darüber — ein Popover im Popover ist auf 375 p
 nicht unterzubringen. Dafür war kein Eingriff in `dd-picker.js` nötig: das
 Aufklappen hängt dort an der Klasse `.open`, nicht an der Positionierung.
 
+## Rückmeldung für lange Aktionen
+
+Vier Stufen, jede eine Antwort auf eine andere Frage. Der serverseitige
+Unterbau (`progress.py`, wer sich anmeldet und warum) steht in
+[architecture.md](architecture.md); hier steht, was im Browser passiert.
+
+**Stufe 1 — der Knopf sagt, dass er gedrückt ist.** `hx-disabled-elt="this"`
+plus die Regel `.btn.htmx-request` in `app.css`: htmx setzt für die Dauer der
+Anfrage die Klasse `htmx-request` und das `disabled`-Attribut. Beantwortet
+„ist mein Klick angekommen?" und verhindert den zweiten Klick. Zwei Fallen:
+
+- Die Regel `.btn:disabled{opacity:.4}` muss **vor**
+  `.btn.htmx-request:disabled{opacity:.7}` stehen — sonst sieht ein laufender
+  Knopf aus wie ein gesperrter.
+- Das Deaktivieren passiert in htmx *nach* dem Einsammeln der
+  Formularwerte (`htmx:beforeRequest` läuft davor), ein `disabled`-Feld
+  verschluckt seinen Wert also nicht. Das ist im minifizierten htmx
+  nachgeprüft, nicht angenommen.
+
+**Stufe 2 — der Chip sagt, dass es noch läuft.** `_busy.html` stellt das
+Makro `busy_chip(chip_id, label)`; der Knopf zeigt mit
+`hx-indicator="#<chip_id>"` darauf. Sichtbarkeit macht CSS allein
+(`.busy-chip.htmx-request`), `js/busy-chip.js` blendet ab drei Sekunden
+(`UHR_AB_MS`) eine mitlaufende Uhr ein — vorher wäre sie Unruhe, danach ist
+sie die Auskunft „es geht noch weiter". Die Uhren liegen in einer `Map` über
+dem `hx-indicator`-Selektor statt am Element, damit ein htmx-Austausch keinen
+Timer verwaisen lässt. Für Aktionen **ohne** zählbaren Fortschritt: Ein Balken
+bräuchte eine Zahl, und eine geschätzte wäre schlimmer als keine.
+
+**Stufe 3 — der Balken sagt, wie weit.** `_job_progress.html`, gefüllt aus
+`JobProgress.snapshot()`. Der Container pollt sich alle 500 ms per
+`hx-swap="outerHTML"` selbst; der Endpunkt liefert entweder wieder die
+Anzeige oder — sobald der Auftrag durch ist — das Ergebnis **ohne**
+`hx-trigger`, wodurch das Polling von selbst endet, ohne mitzuzählen. Drei
+Darstellungen, je nach Ehrlichkeit der Zahlen: Gesamtzahl bekannt → „X von Y
+Einheiten"; nur ein Zähler → „X Einheiten bisher" mit leerem Balken; keins von
+beidem → „läuft…". `aria-live="polite"` sitzt am Textabsatz, nicht am
+Container: Letzterer wird zweimal je Sekunde ersetzt, eine Live-Region darauf
+würde je nach Screenreader gar nicht oder unablässig vorgelesen.
+
+**Stufe 4 — die Glocke sagt es überall.** Seit die Aufträge im Hintergrund
+laufen, überleben sie den Seitenwechsel; die Kopfleiste ist das einzige
+Bauteil, das auf jeder Seite steht. `js/topnav-activity.js` hängt an
+`_topnav.html` selbst (wie Alpine), nicht an einer Liste von Seiten, und holt
+`/notices/activity` alle 2 Sekunden, solange etwas läuft, sonst alle 8
+(`TAKT_AKTIV_MS`/`TAKT_RUHE_MS`). Der Abschnitt „Läuft gerade"
+(`_activity_block.html`) steht über dem Meldungskopf und in der Akzentfarbe,
+nicht in den Schweregrad-Punkten darunter: Ein laufender Vorgang ist kein
+Problem und soll auch nicht wie eines aussehen.
+
+Das zweite Abzeichen links an der Glocke ist bewusst getrennt vom roten
+rechts — das rote zählt Probleme. Es ist immer eine Pille; die Ziffer
+erscheint erst ab zwei gleichzeitigen Vorgängen, weil sich die meisten dieser
+Aufträge über `exclusive()` ohnehin serialisieren und eine dauerhafte „1"
+eine Ziffer ohne Information wäre. `.notice-badge.is-activity` setzt
+deshalb nur Seite und Farbe (`right:auto; left:2px;`), keine eigene Geometrie
+— ein Test hält das fest, damit die beiden Abzeichen nicht auseinanderlaufen.
+
+Geblinkt wird nur bei **Änderung**: Das Skript vergleicht die `data-job-id`
+der Einträge und blitzt dreimal (`animation:activity-blink .34s steps(1,end) 3`),
+wenn eine dazukommt oder verschwindet — beim ersten Abruf nach dem
+Seitenaufbau absichtlich nicht. Dauerblinken verbietet sich doppelt: WCAG
+lässt höchstens drei Blitze je Sekunde zu (Anfallsrisiko), und alles, was
+länger als fünf Sekunden blinkt, bräuchte eine eigene Stopp-Möglichkeit — ein
+Symcon-Import läuft Minuten. `prefers-reduced-motion` schaltet die Animation
+ganz ab — das Abzeichen selbst bleibt ruhig stehen, solange etwas läuft, und
+die Liste im Panel sagt ohnehin, was.
+
+> **Falle beim Ein-/Ausblenden.** Eine Autor-Regel `display:flex` schlägt das
+> `hidden`-Attribut immer, unabhängig von der Reihenfolge (die UA-Regel
+> `[hidden]{display:none}` hat die niedrigste Herkunft). Wer ein Element mit
+> `hidden` umschaltet und ihm zugleich ein `display` gibt, braucht einen
+> ausdrücklichen `[hidden]{display:none}`-Riegel daneben. `app.css`
+> dokumentiert das an Ort und Stelle bei `.notice-snooze-options[hidden]` —
+> die Falle ist in dieser App schon zweimal zugeschnappt.
+
 ## Wiederkehrende Muster, die neue Seiten übernehmen sollten
 
 - **`base.html` erben und `{{ app_root }}` vor jeden Pfad** — beides oben
@@ -636,6 +712,11 @@ Aufklappen hängt dort an der Klasse `.open`, nicht an der Positionierung.
   gehaltene, per Referenz (nicht kopiert) an jede Instanz durchgereichte
   Alpine-Liste — eine hier neu angelegte Gruppe taucht dadurch sofort in jedem
   anderen Gruppen-Feld auf, ganz ohne Server-Rundtrip.
+- **`busy_chip()` (`_busy.html`) und `_job_progress.html`**: die beiden
+  Bausteine für Aktionen, die spürbar dauern — Chip ohne Zahl, Balken mit
+  Zahl. Neue lange Aktionen sollen diese benutzen statt eine eigene Anzeige
+  zu bauen; welche wann, und was serverseitig dazugehört, steht oben unter
+  „Rückmeldung für lange Aktionen".
 - **`.usage-bar-track`/`.usage-bar-fill`**: schlanker Auslastungsbalken
   (Vorbild: `_settings_backup_progress.html`s Fortschrittsbalken, hier aber
   für einen Dauerzustand statt eines laufenden Vorgangs). Füllfarbe über eine

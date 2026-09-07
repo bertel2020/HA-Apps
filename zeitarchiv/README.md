@@ -184,6 +184,15 @@ abschalten. Dieselben Meldungen stehen der Home-Assistant-Integration über
 `GET /api/notices` zur Verfügung — Grundlage für Home-Assistant-Repairs und
 automatisierbare `binary_sensor`-Entities am Zeitarchiv-Gerät.
 
+**Laufende Vorgänge.** Aktionen, die spürbar dauern — Importe, Bereinigung,
+Backup, Aufbewahrung, Rotation, Index-Optimierung —, zeigen ihren Stand am
+Knopf, daneben als Chip mit Uhr oder Fortschrittsbalken, und übergreifend an
+der Glocke: Sie laufen im Hintergrund weiter, auch wenn die Seite gewechselt
+wird. Dort stehen auch die Vorgänge, die von selbst anlaufen (Speicherindex-
+Prüfung nach dem Start, nachträglicher Aufbau von Auswertungsstufen). Da
+mehrere davon für ihre Dauer alle Schreibzugriffe pausieren, ist die Glocke
+die Antwort auf die Frage, warum die App gerade wartet.
+
 **Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
 unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren
 einzelne Entitäten, Summengruppen und Formeln über frei gewählte

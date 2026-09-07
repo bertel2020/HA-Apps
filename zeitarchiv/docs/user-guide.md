@@ -74,8 +74,9 @@ oder direkt das Energiedashboard), legt **Einstellungen → Darstellung →
 Startseite** fest. Der „Übersicht"-Eintrag in der Kopfzeile führt davon
 unabhängig immer zur Übersicht selbst.
 
-Die Glocke in der Kopfzeile (auf jeder Seite sichtbar) zeigt aktuelle
-Systemmeldungen — z. B. eine empfohlene Index-Optimierung, einen
+Die Glocke in der Kopfzeile (auf jeder Seite sichtbar) zeigt an, was gerade
+im Hintergrund arbeitet (siehe [Was gerade läuft](#was-gerade-läuft)), und
+aktuelle Systemmeldungen — z. B. eine empfohlene Index-Optimierung, einen
 fehlgeschlagenen Backup- oder Aufbewahrungslauf, oder ein verfügbares
 Update. Nicht-kritische Meldungen (Info/Warnung) lassen sich einzeln für
 1 Stunde, 1 Tag, 7 Tage, 30 Tage oder dauerhaft stummschalten; Fehler nie.
@@ -1227,6 +1228,42 @@ wie die Einstellungen:
 Jeder Bereich verlinkt aus der passenden Systemmeldung (siehe unten), falls
 gerade etwas ansteht — Housekeeping selbst muss dafür nicht regelmäßig
 aufgesucht werden.
+
+### Was gerade läuft
+
+Manche Aktionen dauern spürbar: ein Symcon-Probelauf über ein paar hundert
+Variablen braucht Minuten, eine Bereinigung über viele Jahre Historie
+Sekunden bis Minuten. Damit dabei nie unklar ist, ob noch etwas passiert,
+zeigen sie ihren Stand — je nachdem, wo sie ausgelöst werden — an bis zu drei
+Stellen:
+
+- **Am Knopf.** Er wird für die Dauer der Anfrage ausgegraut und lässt sich
+  nicht ein zweites Mal drücken.
+- **Neben dem Knopf.** Ein „läuft"-Chip, ab drei Sekunden mit mitlaufender
+  Uhr. Wo es eine ehrliche Zahl gibt (importierte Zeilen, geprüfte
+  Variablen, bereinigte Monate), steht dort stattdessen ein Fortschrittsbalken
+  mit „X von Y". Gibt es keine verlässliche Gesamtzahl, zeigt die Anzeige
+  bewusst nur die bisher erreichte Zahl statt eine Prozentangabe zu schätzen.
+- **An der Glocke.** Ein zweites, farbiges Abzeichen **links** an der Glocke
+  (das rote rechts bleibt den Problemen vorbehalten), und im Panel darüber
+  der Abschnitt **Läuft gerade** mit Vorgang, aktuellem Schritt und, wo
+  vorhanden, Balken. Es blitzt kurz auf, wenn ein Vorgang beginnt oder fertig
+  wird — nicht dauerhaft. Laufen mehrere gleichzeitig, steht ihre Anzahl im
+  Abzeichen.
+
+Die Glocke ist dabei die verlässlichste Stelle: Nur sie kennt alle zwölf
+Vorgänge, und die laufen im Hintergrund weiter, auch wenn die Seite
+gewechselt oder der Tab geschlossen wird. Und einige
+von ihnen — Backup, Bereinigung, Aufbewahrung, Rotation, Index-Optimierung —
+pausieren für ihre Dauer alle anderen Schreibzugriffe, einschließlich der
+Aufnahme aus Home Assistant. Reagiert Zeitarchiv scheinbar grundlos träge,
+steht die Erklärung dort.
+
+Drei dieser Vorgänge starten von selbst, ohne dass jemand etwas gedrückt hat:
+die Speicherindex-Prüfung kurz nach dem Start der App, der nachträgliche
+Aufbau der Stunden-Auswertung nach einer Änderung im Energiedashboard, und
+die Neuberechnung der Aggregate, wenn Home Assistant für eine Entität
+plötzlich einen anderen Messwerttyp liefert. Auch sie stehen in der Liste.
 
 ### Systemmeldungen
 

@@ -122,8 +122,8 @@ Garantien umgehen. Das ist kein unterstütztes Deployment.
 
 ## Ereignisgesteuerter Hintergrundplaner
 
-`main.py:_maintenance_scheduler_loop()` läuft als Daemon-Thread, geprüft alle
-30 Sekunden, unabhängig von Seitenaufrufen:
+`background.py:BackgroundService._maintenance_scheduler_loop()` läuft als
+Daemon-Thread, geprüft alle 30 Sekunden, unabhängig von Seitenaufrufen:
 
 - stündlicher Statistik-Schnappschuss (`stats_snapshots`)
 - stündlicher RAM-Schnappschuss (Supervisor-API, falls verfügbar)
@@ -141,19 +141,93 @@ Ein Fehler in einem Planer-Durchlauf wird geloggt, bricht die Schleife aber
 nicht ab (`except Exception: logger.exception(...)`).
 
 Ein zweiter, unabhängiger Daemon-Thread
-(`main.py:_background_storage_reconciliation()`) gleicht beim Start
+(`background.py:BackgroundService._background_storage_reconciliation()`)
+gleicht beim Start
 einmalig (danach beendet er sich) den Speicherindex entitätsweise mit
 Archiv/Hot Buffer ab (siehe `storage/reconcile.py`) — läuft nur bei sauber
 beendetem letzten Shutdown im Hintergrund, sonst (Restore/Crash) synchron
 vor dem ersten Request.
 
+Beide Threads gehören seit 0.85.0 dem `BackgroundService` in
+`background.py` statt main.py — mit ihnen ist auch ihr gesamter Zustand
+(Backup-/Retention-Fortschritt, gecachte Vorschauen, Heartbeats) dorthin
+umgezogen. main.py hält nur noch die Instanz; die Bereichsmodule bekommen sie
+über ihr `*Dependencies`-Dataclass. Das Modul kennt main.py nicht (ein Test
+prüft, dass es weder `from .main import` noch überhaupt ein `global`
+enthält), damit zwei Dienste in einem Prozess einander nicht überschreiben.
+
 Beide Threads schreiben bei jedem Durchlauf bzw. jeder geprüften Entität
-einen Zeitstempel (`_last_scheduler_tick` / `_last_reconcile_tick`). Bleibt
+einen Zeitstempel (`last_scheduler_tick` / `last_reconcile_tick`). Bleibt
 einer davon länger als 5 Minuten ohne Fortschritt stehen (Deadlock am
 Index- oder Storage-Lock), erscheint eine Meldung im Meldungs-Center
 (`system.scheduler_stalled` / `system.storage_reconcile_stalled`,
 `notices.py`) — die App bleibt für alle anderen Requests weiter
 erreichbar, nur der jeweilige Thread hängt.
+
+## Rückmeldung für lange Aktionen
+
+Gemessen (0.84.0, Bestand mit 163 Monaten Historie) brauchen mehrere Aktionen
+deutlich länger als die fünf bis zehn Sekunden, ab denen ein Klick ohne
+Rückmeldung wie ein Hänger wirkt: Symcon-Probelauf über 233 Variablen rund
+1,7 Minuten, Bereinigung rund 20 Sekunden (davon 15,6 s Rollup-Neuberechnung),
+CSV-Parsen von 104 MB 6,0 Sekunden, Rollup-Neuaufbau nach Typwechsel gut
+5 Sekunden. Die ausführlichste Fortschrittsanzeige der App saß dabei
+ausgerechnet auf der schnellsten dieser Aktionen (Backup, 2,4 s).
+
+`progress.py` ist die gemeinsame Grundlage, damit dieses Muster —
+Hintergrund-Thread, geteilter Zustand hinter einem Lock, htmx-Polling — nicht
+zum sechsten Mal von Hand entsteht:
+
+- **`JobProgress`** hält den Zustand genau eines Auftrags (läuft er, welche
+  Phase, wie weit, was kam heraus). Gelesen wird nur über `snapshot()`, damit
+  kein Aufrufer zwei Felder aus zwei Momenten verrechnet.
+- **Lebenszyklus:** `claim()` belegt (im Request-Thread, damit ein zweiter
+  Klick sofort eine Antwort bekommt) und wirft sonst `JobBusy`; `run()` führt
+  aus und hinterlässt in jedem Fall einen Endzustand; `start()` ist beides
+  zusammen in einem Daemon-Thread. `claim()` allein gibt bei sauberem
+  Verlassen **nicht** frei — das tut allein `run()` in seinem `finally`.
+- **`track()`** für Arbeit, die im Request-Thread bleibt (Rotation,
+  Index-Optimierung, Rollup-Neuaufbau): gibt immer frei, lässt die Ausnahme
+  aber durch (der Aufrufer ist ein Request-Handler mit eigener
+  Fehlerbehandlung) und wirft bei einem bereits laufenden Auftrag kein
+  `JobBusy` — die Reihenfolge regeln die Sperren des `StorageCoordinator`,
+  nicht diese Anzeige.
+- **Registratur:** `register_source(kennung, label, lesen)` und
+  `activity_snapshot()`. Ein `JobProgress` meldet sich selbst an, sobald es
+  ein `label` bekommt; die zwei älteren Zustände (Symcon-Import, Backup)
+  melden sich mit einem kleinen Adapter an, statt umgeschrieben zu werden.
+  `activity_snapshot()` liefert nur die LAUFENDEN Vorgänge und wirft nie:
+  Der Kontextprozessor ruft es bei jeder Antwort auf, eine defekte Quelle
+  darf nicht jede Seite mitreißen.
+
+Angemeldet sind alle zwölf langen Aktionen:
+
+| Auftrag | Läuft | Ausgelöst durch |
+| --- | --- | --- |
+| Symcon-Vorschau, Symcon-Import | Hintergrund-Thread | Klick |
+| CSV-Import, Home-Assistant-Import | Hintergrund-Thread | Klick |
+| Bereinigung | Hintergrund-Thread | Klick |
+| Backup, Aufbewahrung | Hintergrund-Thread | Klick oder Zeitplan |
+| Rotation, Index-Optimierung | Request-Thread (`track()`) | Klick |
+| Speicherabgleich | Daemon-Thread beim Start | nichts |
+| Stunden-Rollup-Backfill | Wartungsplaner | Konfigurationsänderung, Minuten vorher |
+| Rollup-Neuaufbau | Schreibpfad (`/api/write`) | Home Assistant |
+
+Die unteren drei Zeilen sind der eigentliche Grund für die Registratur: Wer nichts
+gedrückt hat, sucht für einen zähen Server auch keine Erklärung. Mehrere der
+Aufträge — Bereinigung, Backup, Aufbewahrung, Rotation, Index-Optimierung und
+Teile der Importe — halten dabei `StorageCoordinator.exclusive()` und legen
+die gesamte Anwendung einschließlich der Aufnahme still. Sichtbar wird das
+nur in der Kopfleiste: Der eigene Ladezustand des Browsers erreicht immer nur
+den Tab, in dem geklickt wurde.
+
+**Für neue lange Aktionen:** ein `JobProgress` mit `label` im eigenen Modul
+anlegen (nicht in main.py — das hat ein Zeilenbudget, siehe
+[testing.md](testing.md)), die Arbeit in `start()` oder `track()` fassen. Die
+Anzeige entsteht daraus von selbst. `test_long_running_feedback.py` führt die
+erwarteten Anmeldungen ausdrücklich auf: Wer eine lange Aktion baut und sie
+nicht anmeldet, muss diese Liste bewusst ändern. Wie die vier Stufen im
+Browser aussehen: [frontend.md](frontend.md).
 
 ## Frontend-Rendering
 

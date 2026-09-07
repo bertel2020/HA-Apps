@@ -45,8 +45,8 @@ mehrere rückwirkend.
 
 ## Wartungsplaner
 
-`main.py:_maintenance_scheduler_loop()`, ein einzelner Daemon-Thread, alle 30
-Sekunden geprüft. Bündelt: Statistik-/RAM-Schnappschüsse, Cache-Auffrischung
+`background.py:BackgroundService._maintenance_scheduler_loop()`, ein einzelner
+Daemon-Thread, alle 30 Sekunden geprüft. Bündelt: Statistik-/RAM-Schnappschüsse, Cache-Auffrischung
 (Retention-Übersicht, Duplikat-Übersicht, Bereinigungsvorschau — siehe
 [data-model.md](data-model.md)), geplante Backups, geplante Retention. Ein
 Fehler in einem Durchlauf wird geloggt und bricht die Schleife nicht ab.
@@ -54,6 +54,22 @@ Fehler in einem Durchlauf wird geloggt und bricht die Schleife nicht ab.
 Backup, Import, Rotation und Retention greifen wegen
 `StorageCoordinator.exclusive()` nie gleichzeitig auf den Datenbestand zu —
 sie warten ggf. aufeinander, nie parallel.
+
+## Was gerade läuft
+
+Alle zwölf Vorgänge, die spürbar dauern, melden sich seit 0.85.0 an der
+Glocke in der Kopfzeile an (Abschnitt „Läuft gerade", auf jeder Seite
+sichtbar). Für den Betrieb ist vor allem der Teil interessant, den niemand
+ausgelöst hat: der Speicherabgleich beim Start, der Stunden-Rollup-Backfill
+im Wartungsplaner und der Rollup-Neuaufbau, den ein Typwechsel aus Home
+Assistant mitten im Schreibpfad auslöst. Steht die App scheinbar grundlos,
+ist die Glocke die erste Stelle zum Nachsehen — mehrere dieser Vorgänge
+halten die globale Wartungssperre und pausieren damit auch die Aufnahme.
+
+Bleibt dort etwas ungewöhnlich lange stehen, sind die nächsten Stellen die
+Stall-Meldungen (`system.scheduler_stalled`,
+`system.storage_reconcile_stalled`, ab 5 Minuten ohne Fortschritt) und das
+Log. Technischer Unterbau: [architecture.md](architecture.md).
 
 ## SQLite-Index-Wartung
 
@@ -63,7 +79,9 @@ wiederverwendbare Seiten. „Optimierung empfohlen“ erscheint konservativ ab
 50 MB Indexgröße, 10 MB reclaimbarem Speicher und 25 % freien Seiten.
 
 Die ausschließlich manuell gestartete Optimierung führt `VACUUM` unter
-`StorageCoordinator.exclusive()` und dem Index-Lock aus. Vorher müssen die
+`StorageCoordinator.exclusive()` und dem Index-Lock aus — für ihre Dauer
+steht die gesamte Anwendung einschließlich der Aufnahme, weshalb sie sich
+wie die übrigen langen Vorgänge an der Glocke anmeldet (siehe oben). Vorher müssen die
 doppelte aktuelle Indexgröße plus 16 MB Sicherheitsreserve frei sein; danach
 läuft `PRAGMA quick_check`. Es gibt bewusst weder einen periodischen Lauf
 noch eine automatische Ausführung beim Löschen von Messwerten.

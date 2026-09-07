@@ -66,6 +66,7 @@ der Testumgebung nicht installiert ist).
 | `test_entity_chart_toolbar.py` | Ein zweiter Klick auf die aktive Zeitraum-Stufe springt zurück auf jetzt (Ersatz für den „Jetzt"-Knopf, Vorlage im Energiedashboard), Vergleichen/Optionen rechtsbündig |
 | `test_chart_zoom.py` | Chart-Zoom: Rad allein scrollt weiter die Seite, Ein-Finger-Wisch bleibt dem Telefon, Schwelle (genau einmal ausgewertet) und Zeitstrahl-Ausnahme, Bereich aufziehen per Umschalt (brush statt der wirkungslosen Toolbox, Icons an zwei Stellen abbestellt, Tastaturzustand über keydown/keyup/blur), Hinweiszeile unter statt in der Karte — und dass kein anderer Chart der App einen Zoom bekommt |
 | `test_*_template.py`, `test_*_breadcrumbs.py` | Template-Rendering/-Struktur ohne laufenden Server (Jinja direkt gerendert und auf erwartete Fragmente geprüft) |
+| `test_long_running_feedback.py` | Rückmeldung für lange Aktionen: dass **jede** davon sich an der Glocke anmeldet (Liste ausdrücklich im Test), dass `JobProgress` in jedem Fall einen Endzustand hinterlässt, dass kein Balken eine Gesamtzahl behauptet, die niemand kennt — und dass die Anzeige **während** der Wartungssperre steht, nicht erst danach |
 | `test_config_flow_sortable_entities.py`, `test_options_transfer.py` | Integrations-seitige Config-Flow-Logik |
 
 ## Was hier bewusst fehlt
@@ -77,20 +78,34 @@ gerenderten HTML-Output, nicht clientseitiges Verhalten.
 ## `main.py`-Zeilenbudget
 
 `test_route_modules.py::test_main_keeps_external_api_and_report_routes_out_of_the_monolith`
-erzwingt `len(main.py.splitlines()) < 5_850` als Architektur-Wächter gegen
-unkontrolliertes Wachstum des Monolithen (angehoben von ursprünglich 4.800
-über 5.700 und 5.800 auf zuletzt 5.850, siehe Git-Historie des Tests). `/api/*`
-(`api_routes.py`), Import-Reports (`report_routes.py`) und seit 0.51.0 auch
-der komplette Symcon-/CSV-/Home-Assistant-Import (`import_routes.py`) sind
-dafür ausgelagert — jeweils ein `*Dependencies`-Frozen-Dataclass plus ein
-`*Service` mit `.router()`, der die Routen als verschachtelte Closures
-registriert (siehe `ReportService`/`ImportService` als Vorlage für weitere
-Extraktionen). Seit 0.82.0 ist auch die Housekeeping-Seite ausgelagert
-(`housekeeping_routes.py`) — der Schritt, den dieser Abschnitt vorher als
-nächsten angekündigt hat.
+erzwingt eine Obergrenze für `len(main.py.splitlines())` als Architektur-Wächter
+gegen unkontrolliertes Wachstum des Monolithen. Ausgelagert sind `/api/*`
+(`api_routes.py`), Import-Reports (`report_routes.py`), seit 0.51.0 der
+komplette Symcon-/CSV-/Home-Assistant-Import (`import_routes.py`), seit 0.82.0
+die Housekeeping-Seite (`housekeeping_routes.py`) und seit 0.85.0 die
+Hintergrundarbeit (`background.py`: Wartungsplaner, Backup-, Retention- und
+Abgleich-Läufe samt ihrem Zustand — 623 Zeilen weniger in main.py). Muster jeweils: ein
+`*Dependencies`-Frozen-Dataclass plus ein `*Service` — bei den Routenmodulen
+mit `.router()`, der die Routen als verschachtelte Closures registriert
+(`ReportService`/`ImportService` als Vorlage für weitere Extraktionen).
 
-Stand 0.84.0: **rund 5.615 Zeilen**, Test grün. Wächst `main.py` nochmal
-spürbar über das Budget, ist die nächste Extraktion der richtige Schritt, nicht
-ein weiteres stillschweigendes Anheben der Zahl. Kandidaten sind die
-Einstellungs- und die Statistik-Routen; welche zuerst, entscheidet, wo dann
-tatsächlich die Zeilen liegen.
+**Die Schwelle ist zweimal gesenkt worden, nicht angehoben:** von 5.850 am
+7. September 2026 auf 5.700, am 8. September auf **5.150**. Stand 0.85.0:
+**rund 5.085 Zeilen**, Test grün, gut 60 Zeilen Puffer.
+
+Der Grund für diese Buchführung steht im Kommentar am Test selbst und ist es
+wert, hier wiederholt zu werden: Bei 5.850 stand dort der Satz, der nächste
+Schritt sei eine eigene `housekeeping_routes.py` und **nicht** ein weiteres
+Anheben. Genau das ist dann auch passiert — aber der Kommentar wusste es
+nicht und nannte den Ausweg weiter als verfügbar. Wer die Grenze als Nächstes
+gerissen hätte, hätte eine bereits ausgeführte Anweisung gelesen und mangels
+Alternative doch die Zahl erhöht. **Wer eine Extraktion durchführt, schreibt
+sie deshalb im Test-Kommentar als erledigt fest.**
+
+Der nächste Schnitt ist entsprechend benannt und schwieriger als die beiden
+bisherigen: die **Template-Kontexte**. Von den rund 5.085 Zeilen sind etwa 1.730
+Routenfunktionen (34 %) auf 112 Routen; der Rest sind überwiegend
+Kontext-Erbauer (`_rows_fragment`, `_dashboard_tiles_context`,
+`_entities_table_response` …). Sie sind enger mit den Routen verzahnt als die
+Hintergrundarbeit es war — ein Schnitt dort braucht erst eine Antwort darauf,
+was ein Kontext-Erbauer vom Request wissen darf.

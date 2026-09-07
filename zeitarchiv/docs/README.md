@@ -47,20 +47,22 @@ app/
   energiedashboard_routes.py  Ingress-Routen des Energiedashboards
   housekeeping_routes.py       Ingress-Routen der Housekeeping-Seite
   route_support.py              Gemeinsame Hilfsfunktionen für Ingress-Routen
-  backup_scheduler.py            Geplante Backups (Intervall, Aufräumung)
-  index_optimization.py           Schwellwerte und Lauf der Index-Optimierung
-  ha_integration.py                Abfragen an die laufende HA-Instanz
-  healthcheck.py                    Selbsttest beim Start
-  notices.py                         Meldungen im Glocken-Panel
-  tips.py                             Praxis-Tipps im Meldungs-Center
-  version_check.py                     Update-Prüfung gegen GitHub
-  security.py                           Token-Erzeugung/-Prüfung
-  formatting.py                          Zahlen-/Datums-/Label-Formatierung (Jinja-Filter)
-  limits.py                               Zentrale Ressourcen-/Größenlimits
-  log_source.py, logging_setup.py          Log-Konfiguration und -Zugriff (Diagnose-Seite)
-  supervisor_stats.py                       Supervisor-/Prozess-Kennzahlen
-  timezone_config.py                         IANA-Zeitzonen-Handling
-  version.py                                  Laufzeit-Versionsauskunft
+  background.py                  Wartungsplaner, Backup-/Retention-/Abgleich-Läufe samt Zustand
+  backup_scheduler.py             Geplante Backups (Intervall, Aufräumung)
+  index_optimization.py            Schwellwerte und Lauf der Index-Optimierung
+  ha_integration.py                 Abfragen an die laufende HA-Instanz
+  healthcheck.py                     Selbsttest beim Start
+  notices.py                          Meldungen im Glocken-Panel
+  tips.py                              Praxis-Tipps im Meldungs-Center
+  version_check.py                      Update-Prüfung gegen GitHub
+  security.py                            Token-Erzeugung/-Prüfung
+  formatting.py                           Zahlen-/Datums-/Label-Formatierung (Jinja-Filter)
+  progress.py                              Fortschritt und Registratur laufender Aufträge
+  limits.py                                 Zentrale Ressourcen-/Größenlimits
+  log_source.py, logging_setup.py            Log-Konfiguration und -Zugriff (Diagnose-Seite)
+  supervisor_stats.py                         Supervisor-/Prozess-Kennzahlen
+  timezone_config.py                           IANA-Zeitzonen-Handling
+  version.py                                    Laufzeit-Versionsauskunft
   storage/
     paths.py               Pfadvalidierung (Entity-ID, Symlink-Schutz)
     coordinator.py          Entitäts-/Exklusiv-Sperren
