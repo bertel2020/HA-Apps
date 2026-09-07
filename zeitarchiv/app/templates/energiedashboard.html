@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Energiedashboard{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/energiedashboard.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/energiedashboard.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -11,13 +11,13 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/group-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/energiedashboard.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('vendor/echarts.min.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/entity-picker.js') }}"></script>
+  <script src="{{ asset('js/group-picker.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/hint-toggle.js') }}"></script>
+  <script src="{{ asset('js/energiedashboard.js') }}"></script>
 {% endblock %}

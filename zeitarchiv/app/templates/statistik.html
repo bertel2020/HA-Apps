@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Statistik{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/statistik.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/statistik.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -149,14 +149,14 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/echarts.min.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/resizable-tables.js') }}"></script>
+  <script src="{{ asset('js/sortable-table.js') }}"></script>
+  <script src="{{ asset('js/table-cards.js') }}"></script>
   <script>
     const GROWTH_POINTS = {{ growth_points | tojson }};
     const STORAGE_BREAKDOWN = {{ storage_breakdown | tojson }};
   </script>
-  <script src="{{ app_root }}/static/js/pages/statistik.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/statistik.js') }}"></script>
 {% endblock %}

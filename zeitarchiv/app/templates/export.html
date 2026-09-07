@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — CSV-Export{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/export.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/export.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -43,12 +43,12 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('js/resizable-tables.js') }}"></script>
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/table-cards.js') }}"></script>
   <!-- Werkzeugleiste als ein Menü, unter 640px — derselbe Standard wie auf
        der Entitätenliste und den Kachel-Übersichten. -->
-  <script src="{{ app_root }}/static/js/list-settings-menu.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/pages/export.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/list-settings-menu.js') }}"></script>
+  <script src="{{ asset('js/pages/export.js') }}"></script>
 {% endblock %}

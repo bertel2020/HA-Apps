@@ -2,7 +2,7 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — Einstellungen{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/settings.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/settings.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -168,14 +168,14 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/pages/settings.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('js/resizable-tables.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/hint-toggle.js') }}"></script>
+  <script src="{{ asset('js/entity-picker.js') }}"></script>
+  <script src="{{ asset('js/sortable-table.js') }}"></script>
+  <script src="{{ asset('js/pages/settings.js') }}"></script>
+  <script src="{{ asset('js/settings-nav-scrollspy.js') }}"></script>
+  <script src="{{ asset('js/table-cards.js') }}"></script>
 {% endblock %}

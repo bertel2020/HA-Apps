@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Bearbeitungsbereich — {{ entity_id }}{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/cleanup.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/cleanup.css') }}">
 {% endblock %}
 {% block content %}
   <!-- x-data hält neben "range" das zuletzt geladene Zeitfenster und einen
@@ -109,18 +109,18 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/period-navigation.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/resizable-tables.js') }}"></script>
+  <script src="{{ asset('js/period-navigation.js') }}"></script>
+  <script src="{{ asset('js/calendar-picker.js') }}"></script>
+  <script src="{{ asset('js/favorite-toggle.js') }}"></script>
+  <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
+  <script src="{{ asset('js/table-cards.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const ENTITY_ID = {{ entity_id | tojson }};
   </script>
-  <script src="{{ app_root }}/static/js/pages/cleanup.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/cleanup.js') }}"></script>
 {% endblock %}

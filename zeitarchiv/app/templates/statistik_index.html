@@ -2,7 +2,7 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — Indexdetails{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/statistik_index.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/statistik_index.css') }}">
 {# Nur die drei Regeln, deren Werte von index_sizes_available abhaengen und
    deshalb gerendert werden muessen. Alles Uebrige liegt in
    static/css/pages/statistik_index.css. #}
@@ -65,10 +65,10 @@
     </section>
   </div>
 </div>
-<script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/pages/statistik_index.js?v={{ js_v }}"></script>
+<script src="{{ asset('js/sortable-table.js') }}"></script>
+<script src="{{ asset('js/confirm-dialog.js') }}"></script>
+<script src="{{ asset('js/dynamic-back-link.js') }}"></script>
+<script src="{{ asset('js/table-cards.js') }}"></script>
+<script src="{{ asset('js/hint-toggle.js') }}"></script>
+<script src="{{ asset('js/pages/statistik_index.js') }}"></script>
 {% endblock %}

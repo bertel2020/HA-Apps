@@ -173,7 +173,7 @@ def test_fixed_tooltip_script_loaded_wherever_data_tooltip_fixed_is_used() -> No
     diesen Bug: Tooltip verschwand komplett auf /tables/<id>)."""
     for name in ("entities.html", "dashboard_detail.html", "table_editor.html"):
         html = (TEMPLATES / name).read_text(encoding="utf-8")
-        assert "static/js/fixed-tooltip.js" in html, name
+        assert "js/fixed-tooltip.js" in html, name
 
 
 def test_dashboard_only_computes_visible_table_slice() -> None:

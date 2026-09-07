@@ -2,7 +2,7 @@
 {% block title %}Zeitarchiv{% endblock %}
 {% block root_vars %}--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/entities.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/entities.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -43,12 +43,12 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-compute.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dashboard-tiles.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('vendor/echarts.min.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/entity-picker.js') }}"></script>
+  <script src="{{ asset('js/table-compute.js') }}"></script>
+  <script src="{{ asset('js/fixed-tooltip.js') }}"></script>
+  <script src="{{ asset('js/dashboard-tiles.js') }}"></script>
 {% endblock %}

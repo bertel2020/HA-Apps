@@ -18,7 +18,7 @@ jeweiligen Template. Seit ZG-04 Schritt 3 liegt es als eigene Datei in
 ## Einbinden
 
 ```html
-<link rel="stylesheet" href="{{ app_root }}/static/css/app.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/app.css') }}">
 ```
 
 Das steht seit ZG-04 Schritt 1 nur noch **einmal**, in `base.html`. Eine neue
@@ -29,19 +29,30 @@ dieser Datei per `@font-face` gebunden. Der Kommentar dort erklärt, warum die
 Pfade relativ sein müssen und warum ein Schriften-Update einen neuen
 Dateinamen bekommt.
 
-`{{ app_root }}` ist der Präfix aus dem `X-Ingress-Path`-Header (siehe
-`_app_root_context()` in `main.py`) und damit unabhängig davon, wie tief die
-Seite in der URL liegt. Vorher trugen die Seiten dafür eine `base`-Variable mit
-je nach Tiefe `""`, `".."` oder `"../.."` — dieser Mechanismus ist mit ZG-03
-ersatzlos entfallen. `tests/test_ingress_prefix.py` prüft die Auflösung, nicht
-die Schreibweise.
+`asset()` ist ein Jinja-Global (`main.py`) und liefert die vollständige URL:
+Ingress-Präfix davor, Cache-Buster dahinter. **Eine Zeile nennt nur noch den
+Pfad unterhalb von `static/`** — mehr braucht sie nicht zu wissen, und mehr
+kann sie damit auch nicht falsch machen.
 
-`{{ css_v }}` ist ein Jinja-Global (`templates.env.globals["css_v"]` in
-`main.py`, die jüngste mtime über **alle** Dateien unter `static/css/`) — es
-macht das lange `Cache-Control: public, max-age=31536000, immutable` sicher, das
-`_CachedStaticFiles` auf `/static/*` setzt. Ohne Cache-Buster bliebe eine
-geänderte Datei ein Jahr lang unsichtbar. Bei jedem neuen `<link>` auf ein
-eigenes Stylesheet deshalb immer `?v={{ css_v }}` mitführen.
+Bis ZG-05 waren das zwei getrennte Dinge, die jede neue Zeile mitbringen
+musste, und beide fielen erst beim Nutzer auf, wenn sie fehlten:
+
+- **Der Präfix.** `{{ app_root }}` kommt aus dem `X-Ingress-Path`-Header (siehe
+  `_app_root_context()`). Davor trugen die Seiten eine `base`-Variable mit je
+  nach Tiefe `""`, `".."` oder `"../.."` — ein Mechanismus, der mit ZG-03
+  ersatzlos entfallen ist. `tests/test_ingress_prefix.py` prüft die Auflösung,
+  nicht die Schreibweise.
+- **Der Cache-Buster.** `/static/*` bekommt von `_CachedStaticFiles` ein
+  `Cache-Control: public, max-age=31536000, immutable`. Ohne einen Parameter,
+  der sich mit der Datei ändert, bliebe eine geänderte Datei ein Jahr lang
+  unsichtbar.
+
+Der Wert ist seit ZG-05 der **Inhalts-Hash der einzelnen Datei** (blake2b, 8
+Hexzeichen), nicht mehr die jüngste mtime über einen ganzen Ordner. Er ändert
+sich damit genau dann, wenn sich der Inhalt ändert — und nur für die betroffene
+Datei. Vorher war er nach jedem Image-Build neu (Git speichert keine mtimes)
+und galt für alle Dateien des Ordners gemeinsam. Siehe
+`tests/test_asset_versions.py`.
 
 ## Seitenlokales CSS
 
@@ -50,7 +61,7 @@ wird im `page_css`-Block des Templates verlinkt:
 
 ```html
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/statistik.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/statistik.css') }}">
 {% endblock %}
 ```
 

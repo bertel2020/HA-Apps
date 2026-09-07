@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Import-Report{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/report_detail.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/report_detail.css') }}">
 {% endblock %}
 {% block content %}
 <div class="page">
@@ -23,5 +23,5 @@
     </div></section>{% endif %}
     {% if report.errors %}<section><h2>Fehler</h2>{% for error in report.errors %}<div class="detail-block error">{{ error }}</div>{% endfor %}</section>{% endif %}
   </div>
-</div><script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script><script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script><script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script><script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+</div><script src="{{ asset('js/resizable-tables.js') }}"></script><script src="{{ asset('js/sortable-table.js') }}"></script><script src="{{ asset('js/dynamic-back-link.js') }}"></script><script src="{{ asset('js/table-cards.js') }}"></script>
 {% endblock %}

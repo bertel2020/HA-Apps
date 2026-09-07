@@ -81,10 +81,25 @@ Der Test überlebt damit jede weitere Umstellung der Notation.
 
 ## Statische Assets
 
-`app.mount("/static", ...)` liefert `app/static/` aus. Antworten werden mit
-Cache-Headern versehen; Template-Links hängen `?v={{ css_v }}` /
-`?v={{ js_v }}` an (Build-/Zeitstempel-basiert), damit ein Deploy nicht am
-Browser-Cache alter Assets scheitert.
+`app.mount("/static", ...)` liefert `app/static/` aus, mit
+`Cache-Control: public, max-age=31536000, immutable`. Sicher ist dieser lange
+Cache nur, weil jede Referenz einen Parameter trägt, der sich mit der Datei
+ändert.
+
+Adressiert wird über **`{{ asset('js/pages/statistik.js') }}`** — ein
+Jinja-Global aus `main.py`, das den Ingress-Präfix davorsetzt und den
+Cache-Buster anhängt. Eine Zeile nennt nur noch den Pfad unterhalb von
+`static/`; den Rest kann sie damit nicht vergessen.
+
+Der Buster ist seit ZG-05 der **Inhalts-Hash der einzelnen Datei** (blake2b, 8
+Hexzeichen). Vorher waren es drei Zahlen — `css_v`, `js_v`, `vendor_v` —, je die
+jüngste mtime über einen ganzen Ordner. Das ging zweimal schief: Git speichert
+keine mtimes, ein CI-Checkout setzt alle Dateien auf die Checkout-Zeit und
+`COPY` übernimmt sie, also war nach **jedem** Release alles neu — auf dem
+Energiedashboard 1.317 KiB je Nutzer, davon 1,0 MB ECharts, das sich seit
+Monaten nicht geändert hatte. Und eine Änderung an einer der 30 JS-Dateien
+entwertete den Cache aller dreißig. Beides ist in
+`tests/test_asset_versions.py` festgehalten.
 
 Was nur eine Seite braucht, liegt als `static/css/pages/<seite>.css` neben
 `app.css` und wird im `page_css`-Block verlinkt; dasselbe gilt für das

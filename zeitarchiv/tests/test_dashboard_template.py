@@ -6,6 +6,7 @@ from __future__ import annotations
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from _paths import TEMPLATES, page_text
+from app.main import asset as asset_helper
 
 
 TEMPLATES_DIR = TEMPLATES
@@ -27,10 +28,13 @@ def _render_empty_dashboard() -> str:
         loader=FileSystemLoader(TEMPLATES_DIR),
         autoescape=select_autoescape(["html"]),
     )
+    # Seit ZG-05 adressieren die Templates ihre Assets über asset() statt über
+    # {{ app_root }}/static/…?v={{ css_v }}. Hier die echte Funktion aus
+    # main.py statt eines Platzhalters: Ein Stub liefe stillschweigend weiter,
+    # wenn sich ihre Signatur ändert.
+    environment.globals["asset"] = asset_helper
     return environment.get_template("entities.html").render(
         request=_FakeRequest(),
-        css_v=1,
-        js_v=1,
         font_scale_value="1",
         dashboard_name="Dashboard",
         dashboard_row_height=210,
@@ -71,6 +75,11 @@ def test_dashboard_tile_has_three_by_three_size_picker_and_grid_spans() -> None:
         loader=FileSystemLoader(TEMPLATES_DIR),
         autoescape=select_autoescape(["html"]),
     )
+    # Seit ZG-05 adressieren die Templates ihre Assets über asset() statt über
+    # {{ app_root }}/static/…?v={{ css_v }}. Hier die echte Funktion aus
+    # main.py statt eines Platzhalters: Ein Stub liefe stillschweigend weiter,
+    # wenn sich ihre Signatur ändert.
+    environment.globals["asset"] = asset_helper
     html = environment.get_template("_dashboard_tiles.html").render(
         tiles=[{
             "kind": "chart",

@@ -22,7 +22,7 @@ import re
 from _paths import PAGE_JS, TEMPLATES
 
 LINK = re.compile(
-    r'<script src="\{\{ app_root \}\}/static/js/pages/(?P<file>[a-z_]+\.js)\?v=\{\{ js_v \}\}"></script>'
+    r'<script src="\{\{ asset\(\'js/pages/(?P<file>[a-z_]+\.js)\'\) \}\}"></script>'
 )
 INLINE = re.compile(r"<script>\n(?P<body>.*?)\n *</script>", re.S)
 

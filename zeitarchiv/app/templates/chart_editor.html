@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — {{ chart_name or "Neuer Chart" }}{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/chart_editor.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/chart_editor.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -304,12 +304,12 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/echarts.min.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
   <!-- Tooltips in der scrollenden Entitätenauswahl, siehe data-tooltip-fixed dort. -->
-  <script src="{{ app_root }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/fixed-tooltip.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const CHART_ID = {{ chart_id | tojson }};
@@ -338,5 +338,5 @@
     const COMPARE = {{ compare | tojson }};
     const COMPARE_MODE = {{ compare_mode | tojson }};
   </script>
-  <script src="{{ app_root }}/static/js/pages/chart_editor.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/chart_editor.js') }}"></script>
 {% endblock %}

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import time
+
+import pytest
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from starlette.requests import Request
-
-
 
 from app.api_routes import (  # noqa: E402
     ApiDependencies,
@@ -21,9 +21,33 @@ from app.api_routes import (  # noqa: E402
     expire_write_capture,
     schedule_write_capture_expiry,
 )
-from app.logging_setup import configure_logging, local_log_lines  # noqa: E402
+from app.logging_setup import (  # noqa: E402
+    DEFAULT_LOG_LEVEL,
+    configure_logging,
+    current_access_mode,
+    local_log_lines,
+)
 from app.storage.coordinator import StorageCoordinator  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _logging_zurueckstellen():
+    """configure_logging() ist global — diese Datei schaltet das Access-Log ab,
+    um die eigenen Logzeilen ungestört lesen zu können, und ließ es bis
+    September 2026 abgeschaltet zurück.
+
+    Aufgefallen ist das erst bei ZG-05, und der Weg dorthin sagt, warum eine
+    solche Zusicherung nötig ist: `test_http_middleware.py` (viel später im
+    Lauf) erwartet, dass ein 404 im Access-Log landet, und bekam es trotzdem —
+    weil irgendein Test dazwischen zufällig `from app.main import …` als
+    erstes ausführte und der Modulimport `configure_logging()` erneut aufruft.
+    Die Testsuite hing damit an der Reihenfolge, in der Module zum ersten Mal
+    importiert werden. Ein Import, der in einer Testdatei dazukommt, kippt sie.
+
+    Deshalb hier: wer globalen Zustand ändert, stellt ihn zurück."""
+    vorher = current_access_mode()
+    yield
+    configure_logging(DEFAULT_LOG_LEVEL, vorher)
 
 
 class _FakeIngestion:

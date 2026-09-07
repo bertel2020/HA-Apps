@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Energiebericht — {{ period_title }}{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/energiedashboard_report.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/energiedashboard_report.css') }}">
 {% endblock %}
 {# Eigenständige, druckoptimierte Seite (siehe ROADMAP.md 1.7) — bewusst
    OHNE _topnav.html/App-Rahmen: sie soll wie ein Dokument wirken, das man

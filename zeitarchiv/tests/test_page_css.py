@@ -29,8 +29,8 @@ from _paths import PAGE_CSS, TEMPLATES
 JINJA_INLINE = {"statistik_index.html"}
 
 LINK = re.compile(
-    r'<link rel="stylesheet" href="\{\{ app_root \}\}/static/css/pages/'
-    r'(?P<file>[a-z_]+\.css)\?v=\{\{ css_v \}\}">'
+    r'<link rel="stylesheet" href="\{\{ asset\(\'css/pages/'
+    r'(?P<file>[a-z_]+\.css)\'\) \}\}">'
 )
 
 
@@ -73,7 +73,7 @@ def test_every_page_links_a_file_that_exists_and_is_named_after_it() -> None:
         if match is None:
             # Eine Seite ohne eigene Regeln ist erlaubt — sie darf dann aber
             # auch keinen leeren page_css-Block mitschleppen.
-            assert "static/css/pages/" not in source, f"{name}: kaputter Verweis"
+            assert "css/pages/" not in source, f"{name}: kaputter Verweis"
             continue
         expected = name.removesuffix(".html").lstrip("_") + ".css"
         assert match.group("file") == expected, (

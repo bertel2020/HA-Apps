@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — {{ entity_id }}{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/entity_detail.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/entity_detail.css') }}">
 {% endblock %}
 {% block content %}
   {% from "_icons.html" import custom_name_icon %}
@@ -237,12 +237,12 @@
 
   </div>
 
-  <script src="{{ app_root }}/static/vendor/echarts.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/favorite-toggle.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/calendar-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/period-navigation.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/echarts.min.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/favorite-toggle.js') }}"></script>
+  <script src="{{ asset('js/calendar-picker.js') }}"></script>
+  <script src="{{ asset('js/period-navigation.js') }}"></script>
+  <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
   <script>
     const ENTITY_ID = {{ entity_id | tojson }};
     const DISPLAY_NAME = {{ display_name | tojson }};
@@ -280,5 +280,5 @@
     // erscheinen, z. B. für einen Anwesenheitssensor.
     const DURATION_DISPLAY = {{ (aggregation_type == 'switch' and display_mode == 'time') | tojson }};
   </script>
-  <script src="{{ app_root }}/static/js/pages/entity_detail.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/entity_detail.js') }}"></script>
 {% endblock %}

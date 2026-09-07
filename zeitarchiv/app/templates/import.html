@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Import{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/import.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/import.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -226,13 +226,13 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-  <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/map-entity-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('js/resizable-tables.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/map-entity-picker.js') }}"></script>
+  <script src="{{ asset('js/table-cards.js') }}"></script>
   <script>
     // Aktuelle Seite der Report-Liste. Steht nur hier — das Formularfeld
     // #report-page (_reports_panel.html) trägt fest value="1" und taugt
@@ -247,5 +247,5 @@
     // Wert still falsy — durch tojson geschickt wäre er ein Renderfehler.
     const SCANNING = {{ scanning | default(false) | tojson }};
   </script>
-  <script src="{{ app_root }}/static/js/pages/import.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/import.js') }}"></script>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — {{ dashboard.name if dashboard else "Neues Dashboard" }}{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/dashboard_editor.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/dashboard_editor.css') }}">
 {% endblock %}
 {% block content %}
   
@@ -66,8 +66,8 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const DASHBOARD_ID = {{ dashboard.id | tojson if dashboard else 'null' }};
@@ -81,5 +81,5 @@
       fillGaps: {{ 'true' if dashboard and dashboard.fill_gaps else 'false' }},
     };
   </script>
-  <script src="{{ app_root }}/static/js/pages/dashboard_editor.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/dashboard_editor.js') }}"></script>
 {% endblock %}

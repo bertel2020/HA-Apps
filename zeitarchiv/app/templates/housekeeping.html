@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Zeitarchiv — Housekeeping{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/housekeeping.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/housekeeping.css') }}">
 {% endblock %}
 {% block content %}
 <div class="page">
@@ -218,14 +218,14 @@
     </div>
   </div>
 </div>
-<script src="{{ app_root }}/static/vendor/htmx.min.js?v={{ vendor_v }}"></script>
-<script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
+<script src="{{ asset('vendor/htmx.min.js') }}"></script>
+<script src="{{ asset('js/confirm-dialog.js') }}"></script>
+<script src="{{ asset('js/sortable-table.js') }}"></script>
+<script src="{{ asset('js/dd-picker.js') }}"></script>
 <script>
   const BASE = {{ app_root | tojson }};
 </script>
-<script src="{{ app_root }}/static/js/pages/housekeeping.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/settings-nav-scrollspy.js?v={{ js_v }}"></script>
-<script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+<script src="{{ asset('js/pages/housekeeping.js') }}"></script>
+<script src="{{ asset('js/settings-nav-scrollspy.js') }}"></script>
+<script src="{{ asset('js/table-cards.js') }}"></script>
 {% endblock %}

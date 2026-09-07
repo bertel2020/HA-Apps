@@ -6,6 +6,7 @@ from __future__ import annotations
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from _paths import ADDON, TEMPLATES, page_text
+from app.main import asset as asset_helper
 
 
 TEMPLATES_DIR = TEMPLATES
@@ -27,6 +28,11 @@ def _render_storage_table() -> str:
         loader=FileSystemLoader(TEMPLATES_DIR),
         autoescape=select_autoescape(["html"]),
     )
+    # Seit ZG-05 adressieren die Templates ihre Assets über asset() statt über
+    # {{ app_root }}/static/…?v={{ css_v }}. Hier die echte Funktion aus
+    # main.py statt eines Platzhalters: Ein Stub liefe stillschweigend weiter,
+    # wenn sich ihre Signatur ändert.
+    environment.globals["asset"] = asset_helper
     rows = [
         {"key": "archive", "label": "Archiv", "size": "1 MB", "percent": 10, "bytes": 1, "href": None},
         {"key": "rollup", "label": "Rollups", "size": "1 MB", "percent": 10, "bytes": 1, "href": None},
@@ -38,7 +44,6 @@ def _render_storage_table() -> str:
     ]
     return environment.get_template("statistik.html").render(
         request=_FakeRequest(),
-        css_v=1,
         font_scale_value="1",
         app_root="",
         entity_count=0,

@@ -2,7 +2,7 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — {{ table_name or "Neue Tabelle" }}{% endblock %}
 {% block page_css %}
-<link rel="stylesheet" href="{{ app_root }}/static/css/pages/table_editor.css?v={{ css_v }}">
+<link rel="stylesheet" href="{{ asset('css/pages/table_editor.css') }}">
 {% endblock %}
 {% block content %}
   {% from "_icons.html" import custom_name_icon %}
@@ -432,13 +432,13 @@
     </div>
   </div>
 
-  <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/number-format.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/table-compute.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
-  <script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/entity-picker.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/table-compute.js') }}"></script>
+  <script src="{{ asset('js/fixed-tooltip.js') }}"></script>
+  <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
+  <script src="{{ asset('js/hint-toggle.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const TABLE_ID = {{ table_id | tojson }};
@@ -448,5 +448,5 @@
     const INITIAL_STYLE = {{ style | tojson }};
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
   </script>
-  <script src="{{ app_root }}/static/js/pages/table_editor.js?v={{ js_v }}"></script>
+  <script src="{{ asset('js/pages/table_editor.js') }}"></script>
 {% endblock %}

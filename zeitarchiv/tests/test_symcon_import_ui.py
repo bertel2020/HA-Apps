@@ -21,7 +21,7 @@ def test_delete_action_precedes_filters_and_table() -> None:
 
 
 def test_both_delete_actions_match_and_require_confirmation() -> None:
-    assert 'static/js/confirm-dialog.js?v={{ js_v }}' in IMPORT
+    assert "asset('js/confirm-dialog.js')" in IMPORT
     assert "onsubmit=\"confirmSymconDelete(event, this)\"" in IMPORT
     assert "async function confirmSymconDelete(event, form)" in IMPORT
     assert "optionalen settings.json wirklich löschen" in IMPORT

@@ -106,20 +106,23 @@ def test_table_cards_skips_tables_whose_grid_carries_the_meaning() -> None:
     assert "MIN_COLUMNS" in source
 
 
-def test_every_page_with_cards_uses_its_own_url_prefix() -> None:
-    """Die App schreibt denselben Präfix auf drei Arten (ZG-03): relativ,
-    `{{ base }}` und `{{ app_root }}`. Wer beim Einfügen eines Skripts die
-    falsche Variante erwischt, merkt es nur auf der Seite, deren Pfadtiefe
-    abweicht — dort fiele der Kartenmodus still aus, ohne Fehlermeldung."""
-    pattern = re.compile(r'<script src="([^"]*?)static/js/([^"]+)\.js\?v=\{\{ js_v \}\}"></script>')
+def test_every_page_with_cards_loads_the_card_script() -> None:
+    """Ursprünglich prüfte dieser Test etwas anderes: Die App schrieb denselben
+    Präfix auf drei Arten (ZG-03), und wer beim Einfügen eines Skripts die
+    falsche erwischte, merkte es nur auf der Seite mit abweichender Pfadtiefe —
+    dort fiel der Kartenmodus still aus, ohne Fehlermeldung.
+
+    Diese Frage ist mit ZG-05 nicht beantwortet, sondern ENTFALLEN: Ein
+    Skript-Tag nennt seit asset() nur noch den Pfad, den Präfix liefert die
+    Funktion. Uneinheitlich schreiben lässt er sich damit nicht mehr.
+
+    Was bleibt, ist die andere Hälfte und der eigentliche Regressionsschutz:
+    dass die Seiten mit Kartenmodus ihr Skript überhaupt laden."""
+    pattern = re.compile(r"\{\{ asset\('js/([^']+)\.js'\) \}\}")
     pages = 0
     for path in TEMPLATES.glob("*.html"):
-        found = pattern.findall(path.read_text(encoding="utf-8"))
-        if "table-cards" not in {name for _, name in found}:
-            continue
-        pages += 1
-        prefixes = {prefix for prefix, _ in found}
-        assert len(prefixes) == 1, f"{path.name}: uneinheitliche Präfixe {sorted(prefixes)}"
+        if "table-cards" in set(pattern.findall(path.read_text(encoding="utf-8"))):
+            pages += 1
     assert pages >= 9, f"nur {pages} Seiten laden table-cards.js"
 
 

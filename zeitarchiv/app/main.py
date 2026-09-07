@@ -12,6 +12,7 @@ dahinter. Details zum Gesamtaufbau: docs/architecture.md.
 from __future__ import annotations
 
 import calendar
+import hashlib
 import json
 import logging
 import os
@@ -20,7 +21,6 @@ import secrets
 import shutil
 import threading
 import time
-from collections.abc import Callable, Iterable
 from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -40,6 +40,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import pass_context
 from pydantic import BaseModel, Field
 from starlette.datastructures import MutableHeaders
 from starlette.middleware.gzip import GZipMiddleware
@@ -451,8 +452,13 @@ class SecurityHeadersMiddleware:
 
 class _CachedStaticFiles(StaticFiles):
     """StaticFiles liefert nur Last-Modified/ETag, kein Cache-Control — sicher
-    lang cachebar, weil jede static/-Referenz einen mtime-Query-Parameter
-    trägt (css_v/js_v/vendor_v unten), der sich mit der Datei mitändert."""
+    lang cachebar, weil jede static/-Referenz einen Query-Parameter mit dem
+    Inhalts-Hash der Datei trägt (asset() unten), der sich mit ihr mitändert.
+
+    Eine Ausnahme trägt ihre Sicherheit anders: Die Schriften unter
+    static/fonts/ werden aus app.css per url() referenziert und können dort
+    keinen Parameter mitführen. Für sie gilt stattdessen die Regel, dass ein
+    Update einen neuen Dateinamen bekommt (ZG-14)."""
 
     async def get_response(self, path: str, scope):
         response = await super().get_response(path, scope)
@@ -473,50 +479,81 @@ def favicon() -> FileResponse:
     # immer unter dem Wurzelpfad an — ohne diese Route landet das als 404 im
     # Access-Log, obwohl das Addon-Icon längst existiert (addon/icon.png).
     return FileResponse(APP_DIR.parent / "icon.png", media_type="image/png")
-class _AssetVersion:
-    """Cache-Buster, der beim Rendern nachsieht statt einmal beim Import.
+class _AssetVersions:
+    """Cache-Buster je Datei, aus ihrem Inhalt gebildet (ZG-05).
 
-    Vorher standen css_v/js_v/vendor_v als Konstanten hier. Nach einem
-    Serverstart änderte sich ?v= dadurch nicht mehr, auch wenn die Datei sich
-    änderte — der Browser lieferte weiter seine zwischengespeicherte Fassung
-    aus, und eine CSS- oder JS-Änderung wirkte scheinbar nicht. Im Betrieb
-    fiel das nie auf, weil ein Update ohnehin neu startet; in der Entwicklung
-    kostet es jedes Mal die Zeit, bis man auf den Cache statt auf den eigenen
-    Code kommt.
+    Bis 0.84.0 waren css_v/js_v/vendor_v drei Zahlen: die jüngste mtime über
+    alle Dateien eines Ordners. Das hatte zwei Fehler, und beide kosteten den
+    Nutzer Bandbreite.
 
-    Jinja ruft __str__ beim Rendern auf, deshalb bleiben die 139 Stellen
-    "?v={{ css_v }}" in den Templates unverändert.
+    Erstens speichert Git keine mtimes. Ein frischer CI-Checkout setzt alle
+    Dateien auf die Checkout-Zeit, und COPY im Dockerfile übernimmt sie —
+    vendor_v änderte sich damit bei JEDEM Release, auch wenn ECharts seit
+    Monaten unverändert war. Jedes Add-on-Update ließ jeden Nutzer 1,0 MB
+    ECharts neu laden, für nichts.
 
-    Ein Sekunden-Fenster, weil {{ js_v }} in einer einzigen Seite bis zu
-    zehnmal vorkommt (ein <script>-Tag je Datei): ohne das würde jede dieser
-    Stellen den Ordner erneut durchsehen. Gemessen kostet ein Durchgang über
-    css + js + vendor (24 Dateien) 0,13 ms — vernachlässigbar gegen einen
-    Seitenaufbau, aber zehnmal je Seite ist es unnötig. Eine Sekunde ist beim
-    Entwickeln nicht spürbar und macht den wiederholten Zugriff kostenlos.
+    Zweitens war es EINE Zahl über ALLE Dateien eines Ordners. Eine Änderung
+    an einer der 30 JS-Dateien entwertete den Zwischenspeicher aller dreißig.
+
+    Ein Inhalts-Hash behebt beides: Er ändert sich genau dann, wenn sich der
+    Inhalt ändert, und nur für die betroffene Datei. Bei gleichem Inhalt
+    liefert er nach jedem Rebuild denselben Wert.
+
+    Gehasht wird nur, wenn (mtime, Größe) sich seit dem letzten Mal geändert
+    haben — im Betrieb also einmal je Datei, danach kostet ein Aufruf einen
+    stat() und einen Dict-Zugriff. Damit braucht es kein Zeitfenster mehr wie
+    beim Vorgänger, und eine Änderung beim Entwickeln wirkt sofort statt erst
+    nach einer Sekunde.
+
+    Der Hash ist blake2b auf 8 Hexzeichen gekürzt. Das ist keine
+    Sicherheitsfunktion, sondern eine Kennung: 32 Bit reichen, um zwei
+    Fassungen derselben Datei zu unterscheiden, und ein kurzer Wert hält die
+    URL lesbar.
     """
 
-    _FENSTER_SEKUNDEN = 1.0
+    def __init__(self, wurzel: Path) -> None:
+        self._wurzel = wurzel
+        self._cache: dict[str, tuple[tuple[int, int], str]] = {}
 
-    def __init__(self, dateien: Callable[[], Iterable[Path]]) -> None:
-        self._dateien = dateien
-        self._wert = 0
-        self._geprueft = 0.0
-
-    def _aktuell(self) -> int:
-        jetzt = time.monotonic()
-        if self._wert and jetzt - self._geprueft < self._FENSTER_SEKUNDEN:
-            return self._wert
+    def __call__(self, pfad: str) -> str:
+        datei = self._wurzel / pfad
+        bekannt = self._cache.get(pfad)
         try:
-            self._wert = int(max(datei.stat().st_mtime for datei in self._dateien()))
-        except (OSError, ValueError):
-            # Ordner fehlt oder ist leer: den zuletzt bekannten Wert behalten,
-            # statt den Seitenaufbau an einem Cache-Buster scheitern zu lassen.
-            pass
-        self._geprueft = jetzt
-        return self._wert
+            zustand = datei.stat()
+            kennung = (zustand.st_mtime_ns, zustand.st_size)
+            if bekannt is not None and bekannt[0] == kennung:
+                return bekannt[1]
+            version = hashlib.blake2b(datei.read_bytes(), digest_size=4).hexdigest()
+        except OSError:
+            # Datei fehlt oder ist nicht lesbar: den zuletzt bekannten Wert
+            # behalten, statt den Seitenaufbau an einem Cache-Buster scheitern
+            # zu lassen. Dass ein Pfad überhaupt existiert, prüft
+            # tests/test_asset_versions.py über alle Templates hinweg — zur
+            # Laufzeit ist das der falsche Ort dafür.
+            return bekannt[1] if bekannt else "0"
+        self._cache[pfad] = (kennung, version)
+        return version
 
-    def __str__(self) -> str:
-        return str(self._aktuell())
+
+asset_versions = _AssetVersions(APP_DIR / "static")
+
+
+@pass_context
+def asset(kontext, pfad: str) -> str:
+    """Vollständige URL eines Assets unter static/, mit Cache-Buster.
+
+    Ersetzt die Schreibweise "{{ app_root }}/static/<pfad>?v={{ css_v }}", die
+    an 172 Stellen stand. Zwei Fehler waren dort jederzeit möglich und fielen
+    beide erst beim Nutzer auf: den Präfix vergessen (ZG-03) oder den
+    Cache-Buster vergessen (ZG-05, dann greift das immutable-Cache-Control von
+    _CachedStaticFiles auf eine Datei, die sich noch ändert). Beides kann eine
+    neue Zeile jetzt nicht mehr, weil sie nur noch den Pfad nennt.
+
+    app_root kommt aus _app_root_context() und steht in jeder
+    TemplateResponse. Der Rückfall auf "" ist für Tests, die ein Template
+    direkt rendern.
+    """
+    return f"{kontext.get('app_root', '')}/static/{pfad}?v={asset_versions(pfad)}"
 
 
 # Cache-Busting fürs geteilte Stylesheet (siehe app/static/css/README.md),
@@ -531,31 +568,11 @@ class _AssetVersion:
 # *_label-Kopien übersetzen) hier mehr Code für denselben Zweck wäre.
 templates.env.filters["format_int"] = format_int
 templates.env.filters["format_value"] = format_value
-# Alle CSS-Dateien, nicht nur app.css: seit ZG-04 Schritt 3 liegen die
-# seitenlokalen Regeln als static/css/pages/<seite>.css daneben (vorher als
-# <style>-Block im jeweiligen Template). Eine gemeinsame mtime über alle,
-# aus demselben Grund wie bei js_v darunter — einfacher als ein eigener
-# Cache-Buster je Seite, und ändert sich beim Deploy ohnehin.
-templates.env.globals["css_v"] = _AssetVersion(
-    lambda: (APP_DIR / "static" / "css").glob("**/*.css")
-)
-# Dieselbe Cache-Busting-Begründung wie oben, nur fürs JS (calendar-picker.js,
-# confirm-dialog.js, …) — ohne das blieb z. B. ein Fix in calendar-picker.js im
-# Browser-Cache unbemerkt hängen, obwohl der Server längst die neue Version
-# ausliefert. Eine gemeinsame mtime über alle JS-Dateien statt einer pro Datei:
-# einfacher als js_v-Kopien an jeder <script>-Stelle zu pflegen, und ändert sich
-# ohnehin bei jedem Deploy dieses Verzeichnisses. Seit ZG-04 Schritt 3b gehört
-# static/js/pages/ dazu — die aus den Templates gehobenen Seitenskripte, analog
-# zu static/css/pages/ bei css_v.
-templates.env.globals["js_v"] = _AssetVersion(
-    lambda: (APP_DIR / "static" / "js").glob("**/*.js")
-)
-# Dieselbe Begründung wie js_v, für htmx/echarts/alpine — trugen bisher
-# keinen Cache-Buster, wären damit die einzige Lücke im langen Cache-Control
-# von _CachedStaticFiles gewesen.
-templates.env.globals["vendor_v"] = _AssetVersion(
-    lambda: (APP_DIR / "static" / "vendor").glob("*.js")
-)
+# Eine Funktion statt der drei Zahlen css_v/js_v/vendor_v (ZG-05). Ein
+# Template schreibt {{ asset('js/pages/statistik.js') }} und bekommt Präfix und
+# Cache-Buster mitgeliefert; welcher der drei Ordner gemeint ist, muss es nicht
+# mehr wissen. Die Begründung für den Inhalts-Hash steht bei _AssetVersions.
+templates.env.globals["asset"] = asset
 # Namenslänge für Dashboards/Charts/Tabellen: als maxlength in die
 # Eingabefelder, damit die Grenze schon beim Tippen gilt statt erst beim
 # Speichern. Die verbindliche Prüfung bleibt serverseitig

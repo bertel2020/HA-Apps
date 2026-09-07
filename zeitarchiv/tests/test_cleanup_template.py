@@ -28,7 +28,7 @@ def test_destructive_entity_actions_have_explicit_confirmations() -> None:
     assert "Entität entfernen" in config
     assert "Dies kann nicht rückgängig gemacht werden" in config
     assert "automatisch neu angelegt" in config
-    assert "static/js/confirm-dialog.js" in config
+    assert "js/confirm-dialog.js" in config
     assert "Alle Werte löschen" not in cleanup
     assert "Entität entfernen" not in detail
 
@@ -38,7 +38,7 @@ def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
     rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
     chart_editor = page_text("chart_editor.html")
     main = (APP / "main.py").read_text(encoding="utf-8")
-    assert "static/js/period-navigation.js" in cleanup
+    assert "js/period-navigation.js" in cleanup
     assert "PeriodNavigation.anchorForWindow" in cleanup
     assert "PeriodNavigation.offsetForRange" in cleanup
     assert "pageData.rangeAnchorMs = picked.getTime()" in cleanup

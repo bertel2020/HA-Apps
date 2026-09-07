@@ -27,7 +27,7 @@ NUR_IM_RAHMEN = [
     # Stelle tritt der Marker, der jetzt rahmen-exklusiv ist: der <style>-Block,
     # über den der Rahmen die Schriftgröße an die Seite reicht.
     "<style>:root{--font-scale:",
-    "app.css?v={{ css_v }}",
+    "asset('css/app.css')",
 ]
 
 
@@ -66,8 +66,12 @@ def test_the_frame_addresses_assets_independently_of_the_url_depth() -> None:
     Dass das auch WIRKT, prüft test_ingress_prefix.py — hier steht nur, dass
     der Rahmen es so schreibt."""
     quelle = (TEMPLATES / BASE).read_text(encoding="utf-8")
-    assert '"{{ app_root }}/static/css/app.css?v={{ css_v }}"' in quelle
+    assert 'href="{{ asset(\'css/app.css\') }}"' in quelle
     assert "{{ base }}" not in quelle
+    # Seit ZG-05 nennt die Zeile nur noch den Pfad — Präfix UND Cache-Buster
+    # liefert asset() (main.py). Vorher waren es zwei Dinge, die eine neue
+    # Zeile mitbringen musste und einzeln vergessen konnte.
+    assert "{{ app_root }}/static/" not in quelle
 
 
 def test_the_frame_only_offers_blocks_that_the_pages_actually_use() -> None:
