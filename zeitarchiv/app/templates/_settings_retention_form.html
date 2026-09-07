@@ -1,4 +1,3 @@
-{% from "_busy.html" import busy_chip %}
 <p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">Löscht Werte nach Ablauf ihrer Aufbewahrungsfrist &mdash; <strong>endgültig</strong>. „Unbegrenzt“-Entitäten sind ausgenommen.</p>
 
 <div class="settings-subsection">
@@ -132,16 +131,14 @@
    könnte — deshalb der Läuft-Chip mit mitlaufender Uhr statt einer
    Fortschrittsanzeige. #}
 <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin-top:16px;">
-  {{ busy_chip('retention-preview-busy', 'Vorschau wird berechnet') }}
-  {{ busy_chip('retention-run-busy', 'Retention läuft') }}
   <button type="button" class="btn"
           hx-post="settings/retention-enforcement/preview" hx-target="#retention-form" hx-swap="innerHTML"
-          hx-disabled-elt="this" hx-indicator="#retention-preview-busy">
+          hx-disabled-elt="this">
     Vorschau
   </button>
   <button type="button" class="btn btn-danger" {% if retention_running %}disabled{% endif %}
           hx-post="settings/retention-enforcement/run" hx-target="#retention-form" hx-swap="innerHTML"
-          hx-disabled-elt="this" hx-indicator="#retention-run-busy"
+          hx-disabled-elt="this"
           hx-confirm="Werte jenseits der konfigurierten Aufbewahrungsfrist jetzt endgültig löschen? Das lässt sich nicht rückgängig machen.">
     {% if retention_running %}Retention läuft&hellip;{% else %}Jetzt anwenden{% endif %}
   </button>

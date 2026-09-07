@@ -1,4 +1,3 @@
-{% from "_busy.html" import busy_chip %}
 {% from "_hints.html" import hint_button, hint_body %}
 <h3 class="settings-subsection-title">Indexkonsistenz {{ hint_button('Indexkonsistenz') }}</h3>
 {% call hint_body() %}
@@ -56,22 +55,19 @@
 
 {# Prüfen und Reparieren laufen über ALLE Entitäten und deren Archivdateien
    und halten dabei die globale Wartungssperre — die Dauer wächst also mit dem
-   Bestand, ohne dass es dafür eine Zahl gäbe. Läuft-Chip statt Balken. #}
+   Bestand, ohne dass es dafür eine Zahl gäbe. Deshalb kein Balken; den
+   Laufzustand zeigt der Knopf selbst (hx-disabled-elt + .btn-Regeln in
+   app.css). #}
 <div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;align-items:center;">
-  {{ busy_chip('storage-index-check-busy', 'Index wird geprüft') }}
   <button type="button" class="btn"
           hx-post="settings/storage-index/check" hx-target="#storage-index-form" hx-swap="innerHTML"
-          hx-disabled-elt="this" hx-indicator="#storage-index-check-busy">
+          hx-disabled-elt="this">
     Index prüfen
   </button>
-  {# Chip und Knopf stehen bewusst in derselben Bedingung: Ein Chip ohne
-     zugehörigen Knopf wäre zwar unsichtbar (display:none bis zur Anfrage),
-     aber eine id im Dokument, auf die nichts mehr zeigt. #}
   {% if storage_audit and storage_audit.rows and not storage_audit.repaired %}
-  {{ busy_chip('storage-index-repair-busy', 'Index wird repariert') }}
   <button type="button" class="btn btn-danger-outline"
           hx-post="settings/storage-index/repair" hx-target="#storage-index-form" hx-swap="innerHTML"
-          hx-disabled-elt="this" hx-indicator="#storage-index-repair-busy"
+          hx-disabled-elt="this"
           hx-confirm="Die angezeigten Indexabweichungen jetzt anhand der gespeicherten Rohdaten korrigieren? Rohwerte und Rollups werden nicht verändert."
           data-confirm-label="Index reparieren">
     Index reparieren

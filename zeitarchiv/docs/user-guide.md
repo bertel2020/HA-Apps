@@ -1237,13 +1237,14 @@ Sekunden bis Minuten. Damit dabei nie unklar ist, ob noch etwas passiert,
 zeigen sie ihren Stand — je nachdem, wo sie ausgelöst werden — an bis zu drei
 Stellen:
 
-- **Am Knopf.** Er wird für die Dauer der Anfrage ausgegraut und lässt sich
-  nicht ein zweites Mal drücken.
-- **Neben dem Knopf.** Ein „läuft"-Chip, ab drei Sekunden mit mitlaufender
-  Uhr. Wo es eine ehrliche Zahl gibt (importierte Zeilen, geprüfte
-  Variablen, bereinigte Monate), steht dort stattdessen ein Fortschrittsbalken
-  mit „X von Y". Gibt es keine verlässliche Gesamtzahl, zeigt die Anzeige
-  bewusst nur die bisher erreichte Zahl statt eine Prozentangabe zu schätzen.
+- **Am Knopf.** Er wird für die Dauer der Anfrage blass, bekommt einen kleinen
+  rotierenden Ring und lässt sich nicht ein zweites Mal drücken.
+- **Unter dem Knopf.** Wo es eine ehrliche Zahl gibt (importierte Zeilen,
+  geprüfte Variablen, bereinigte Monate), erscheint ein Fortschrittsbalken mit
+  „X von Y". Gibt es keine verlässliche Gesamtzahl, zeigt die Anzeige bewusst
+  nur die bisher erreichte Zahl, statt eine Prozentangabe zu schätzen — und wo
+  es überhaupt nichts zu zählen gibt (Indexprüfung, Rotation), bleibt es beim
+  Knopf.
 - **An der Glocke.** Ein zweites, farbiges Abzeichen **links** an der Glocke
   (das rote rechts bleibt den Problemen vorbehalten), und im Panel darüber
   der Abschnitt **Läuft gerade** mit Vorgang, aktuellem Schritt und, wo

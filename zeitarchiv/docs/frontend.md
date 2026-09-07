@@ -580,34 +580,38 @@ Aufklappen hängt dort an der Klasse `.open`, nicht an der Positionierung.
 
 ## Rückmeldung für lange Aktionen
 
-Vier Stufen, jede eine Antwort auf eine andere Frage. Der serverseitige
+Drei Stufen, jede eine Antwort auf eine andere Frage. Der serverseitige
 Unterbau (`progress.py`, wer sich anmeldet und warum) steht in
 [architecture.md](architecture.md); hier steht, was im Browser passiert.
 
-**Stufe 1 — der Knopf sagt, dass er gedrückt ist.** `hx-disabled-elt="this"`
-plus die Regel `.btn.htmx-request` in `app.css`: htmx setzt für die Dauer der
-Anfrage die Klasse `htmx-request` und das `disabled`-Attribut. Beantwortet
-„ist mein Klick angekommen?" und verhindert den zweiten Klick. Zwei Fallen:
+**Stufe 1 — der Knopf sagt, dass er arbeitet.** `hx-disabled-elt="this"` plus
+die `.btn`-Regeln in `app.css`: gedimmt, `cursor:progress`, ein kleiner
+rotierender Ring hinter der Beschriftung. Beantwortet „ist mein Klick
+angekommen?" und verhindert zugleich den zweiten Klick. Drei Fallen:
 
-- Die Regel `.btn:disabled{opacity:.4}` muss **vor**
-  `.btn.htmx-request:disabled{opacity:.7}` stehen — sonst sieht ein laufender
-  Knopf aus wie ein gesperrter.
+- **Der Aufhänger ist nicht nur `.htmx-request`.** htmx setzt diese Klasse auf
+  das auslösende Element — aber nur, solange kein `hx-indicator` gesetzt ist;
+  sonst wandert sie an das dort benannte Element, und der Knopf bleibt ohne
+  jeden Zustand. Gemessen sah „Index prüfen" während seiner Anfrage deshalb
+  aus wie ein dauerhaft gesperrter Knopf. Deshalb zeichnen die Regeln
+  zusätzlich `[data-disabled-by-htmx]` — das Attribut, das `hx-disabled-elt`
+  unabhängig davon setzt und das „gesperrt, **weil** etwas läuft" bedeutet.
+- Die Regel `.btn:disabled{opacity:.4}` muss **vor** den laufenden Varianten
+  mit `opacity:.7` stehen — sonst ist ein laufender Knopf blasser als ein
+  gesperrter.
 - Das Deaktivieren passiert in htmx *nach* dem Einsammeln der
   Formularwerte (`htmx:beforeRequest` läuft davor), ein `disabled`-Feld
   verschluckt seinen Wert also nicht. Das ist im minifizierten htmx
   nachgeprüft, nicht angenommen.
 
-**Stufe 2 — der Chip sagt, dass es noch läuft.** `_busy.html` stellt das
-Makro `busy_chip(chip_id, label)`; der Knopf zeigt mit
-`hx-indicator="#<chip_id>"` darauf. Sichtbarkeit macht CSS allein
-(`.busy-chip.htmx-request`), `js/busy-chip.js` blendet ab drei Sekunden
-(`UHR_AB_MS`) eine mitlaufende Uhr ein — vorher wäre sie Unruhe, danach ist
-sie die Auskunft „es geht noch weiter". Die Uhren liegen in einer `Map` über
-dem `hx-indicator`-Selektor statt am Element, damit ein htmx-Austausch keinen
-Timer verwaisen lässt. Für Aktionen **ohne** zählbaren Fortschritt: Ein Balken
-bräuchte eine Zahl, und eine geschätzte wäre schlimmer als keine.
+> Zwischen 0.85.0 und dieser Fassung stand neben fünf dieser Knöpfe zusätzlich
+> ein „Läuft"-Chip mit mitlaufender Uhr (`_busy.html`, `busy-chip.js`). Er ist
+> wieder entfernt: Er sagte dasselbe wie der Knopf, hielt daneben dauerhaft
+> Platz frei — und nahm dem Knopf über seinen `hx-indicator` genau den
+> Laufzustand weg, den er ergänzen sollte. Wer eine solche Anzeige neben einem
+> Knopf erwägt, hat damit den Präzedenzfall.
 
-**Stufe 3 — der Balken sagt, wie weit.** `_job_progress.html`, gefüllt aus
+**Stufe 2 — der Balken sagt, wie weit.** `_job_progress.html`, gefüllt aus
 `JobProgress.snapshot()`. Der Container pollt sich alle 500 ms per
 `hx-swap="outerHTML"` selbst; der Endpunkt liefert entweder wieder die
 Anzeige oder — sobald der Auftrag durch ist — das Ergebnis **ohne**
@@ -618,7 +622,7 @@ beidem → „läuft…". `aria-live="polite"` sitzt am Textabsatz, nicht am
 Container: Letzterer wird zweimal je Sekunde ersetzt, eine Live-Region darauf
 würde je nach Screenreader gar nicht oder unablässig vorgelesen.
 
-**Stufe 4 — die Glocke sagt es überall.** Seit die Aufträge im Hintergrund
+**Stufe 3 — die Glocke sagt es überall.** Seit die Aufträge im Hintergrund
 laufen, überleben sie den Seitenwechsel; die Kopfleiste ist das einzige
 Bauteil, das auf jeder Seite steht. `js/topnav-activity.js` hängt an
 `_topnav.html` selbst (wie Alpine), nicht an einer Liste von Seiten, und holt
@@ -712,11 +716,11 @@ die Liste im Panel sagt ohnehin, was.
   gehaltene, per Referenz (nicht kopiert) an jede Instanz durchgereichte
   Alpine-Liste — eine hier neu angelegte Gruppe taucht dadurch sofort in jedem
   anderen Gruppen-Feld auf, ganz ohne Server-Rundtrip.
-- **`busy_chip()` (`_busy.html`) und `_job_progress.html`**: die beiden
-  Bausteine für Aktionen, die spürbar dauern — Chip ohne Zahl, Balken mit
-  Zahl. Neue lange Aktionen sollen diese benutzen statt eine eigene Anzeige
-  zu bauen; welche wann, und was serverseitig dazugehört, steht oben unter
-  „Rückmeldung für lange Aktionen".
+- **`hx-disabled-elt="this"` und `_job_progress.html`**: die beiden Bausteine
+  für Aktionen, die spürbar dauern — der Knopf allein, wo es keine ehrliche
+  Gesamtzahl gibt, der Balken, wo es eine gibt. Neue lange Aktionen sollen
+  diese benutzen statt eine eigene Anzeige daneben zu stellen; was
+  serverseitig dazugehört, steht oben unter „Rückmeldung für lange Aktionen".
 - **`.usage-bar-track`/`.usage-bar-fill`**: schlanker Auslastungsbalken
   (Vorbild: `_settings_backup_progress.html`s Fortschrittsbalken, hier aber
   für einen Dauerzustand statt eines laufenden Vorgangs). Füllfarbe über eine

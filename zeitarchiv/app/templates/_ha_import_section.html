@@ -1,4 +1,3 @@
-{% from "_busy.html" import busy_chip %}
 <div id="ha-section">
 {% if not ha_available %}
 <div class="callout" style="border-left-color:var(--danger);">
@@ -212,10 +211,9 @@
        Entität), schreibt aber nichts und hat deshalb keine Zahl, gegen die ein
        Balken laufen könnte — hier reicht der Läuft-Chip. #}
     <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
-            hx-disabled-elt="this" hx-indicator="#ha-dry-run-busy">Vorschau (Dry Run)</button>
+            hx-disabled-elt="this">Vorschau (Dry Run)</button>
     <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
             hx-disabled-elt="this">{{ "Vollimport starten" if ha_history_source == "full" else "Import starten" }}</button>
-    {{ busy_chip('ha-dry-run-busy', 'Daten werden geholt') }}
   </div>
   <div id="ha-import-output" hx-get="import/ha/progress" hx-trigger="load" hx-swap="innerHTML"></div>
 </form>

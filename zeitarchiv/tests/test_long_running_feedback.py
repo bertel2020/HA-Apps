@@ -273,8 +273,13 @@ def test_every_slow_button_locks_itself_for_the_duration(ziel: str, vorlage: str
 
 
 def test_the_css_actually_draws_a_running_button() -> None:
-    """Das Attribut allein ändert nichts Sichtbares: htmx setzt zusätzlich die
-    Klasse .htmx-request, und bis 0.84.0 zeichnete die keine einzige Regel.
+    """Das Attribut allein ändert nichts Sichtbares. Es braucht ZWEI Aufhänger,
+    und das ist keine Gürtel-und-Hosenträger-Vorsicht, sondern das Ergebnis
+    einer Messung: Sobald ein Knopf hx-indicator trägt, hängt htmx die Klasse
+    .htmx-request an das dort benannte Element statt an den Knopf. "Index
+    prüfen" zeigte deshalb während seiner Anfrage gar keinen Laufzustand — nur
+    das Aussehen eines dauerhaft gesperrten Knopfes. [data-disabled-by-htmx]
+    setzt hx-disabled-elt unabhängig davon.
 
     Die Reihenfolge ist Teil der Zusicherung — `.btn:disabled{opacity:.4}`
     steht davor, und hx-disabled-elt setzt genau dieses disabled. Käme die
@@ -282,51 +287,57 @@ def test_the_css_actually_draws_a_running_button() -> None:
     gesperrter.
     """
     css = (APP / "static" / "css" / "app.css").read_text(encoding="utf-8")
-    assert ".btn.htmx-request{" in css
-    assert ".btn.htmx-request:disabled{" in css
-    assert css.index(".btn:disabled{") < css.index(".btn.htmx-request:disabled{")
+    for aufhaenger in (".btn.htmx-request", ".btn[data-disabled-by-htmx]"):
+        assert f"{aufhaenger}," in css or f"{aufhaenger}{{" in css
+        assert f"{aufhaenger}:disabled" in css
+        # .navbtn ist 28x28 mit fester Größe — ein angehängter Ring würde das
+        # Glyph aus der Mitte drücken.
+        assert f"{aufhaenger}:not(.navbtn)::after" in css
+    assert css.index(".btn:disabled{") < css.index(".btn.htmx-request:disabled,")
     assert "@keyframes btn-spin" in css
-    # .navbtn ist 28x28 mit fester Größe — ein angehängter Ring würde das
-    # Glyph aus der Mitte drücken.
-    assert ".btn.htmx-request:not(.navbtn)::after" in css
 
 
-def test_every_busy_chip_indicator_points_at_a_chip_that_exists() -> None:
+def test_a_button_with_an_indicator_still_shows_that_it_runs() -> None:
+    """Die Gegenprobe zum Fall oben, an einem echten Knopf: "Verfügbarkeit
+    prüfen" behält seinen hx-indicator (der Status daneben trägt einen eigenen
+    Text und bleibt auch nach der Anfrage stehen). Genau dieser Knopf bekäme
+    also nie .htmx-request — und muss trotzdem gezeichnet werden.
+    """
+    quelle = (TEMPLATES / "_ha_import_section.html").read_text(encoding="utf-8")
+    block = quelle[quelle.index('hx-post="import/ha/availability"'):]
+    block = block[: block.index(">")]
+    assert 'hx-indicator="#ha-availability-status"' in block
+    assert "hx-disabled-elt" in block, "ohne das Attribut bliebe dieser Knopf stumm"
+
+
+def test_every_indicator_points_at_something_that_exists() -> None:
     """hx-indicator nimmt einen CSS-Selektor. Zeigt er ins Leere, passiert
     schlicht nichts — kein Fehler, keine Meldung, nur wieder ein Button ohne
     Rückmeldung."""
     for pfad in TEMPLATES.glob("*.html"):
         quelle = pfad.read_text(encoding="utf-8")
         for selektor in re.findall(r'hx-indicator="#([\w-]+)"', quelle):
-            vorhanden = (
-                f'id="{selektor}"' in quelle
-                or f"busy_chip('{selektor}'" in quelle
+            assert f'id="{selektor}"' in quelle, (
+                f"{pfad.name}: hx-indicator #{selektor} hat kein Ziel"
             )
-            assert vorhanden, f"{pfad.name}: hx-indicator #{selektor} hat kein Ziel"
 
 
-def test_pages_that_use_the_chip_load_its_script() -> None:
-    """Der Chip erscheint per CSS auch ohne JavaScript — nur die mitlaufende
-    Uhr fehlt dann. Ein fehlendes Skript fiele deshalb nicht auf, außer man
-    prüft es."""
-    seiten = {
-        pfad.name: pfad.read_text(encoding="utf-8")
-        for pfad in TEMPLATES.glob("*.html")
-        if not pfad.name.startswith("_")
-    }
-    teilvorlagen = {
-        pfad.name: pfad.read_text(encoding="utf-8")
-        for pfad in TEMPLATES.glob("_*.html")
-    }
-    for seite, quelle in seiten.items():
-        eingebunden = {
-            name for name in teilvorlagen if f'include "{name}"' in quelle
-        }
-        nutzt_chip = "busy_chip(" in quelle or any(
-            "busy_chip(" in teilvorlagen[name] for name in eingebunden
-        )
-        if nutzt_chip:
-            assert "js/busy-chip.js" in quelle, f"{seite} nutzt den Chip ohne sein Skript"
+def test_the_busy_chip_is_gone_for_good() -> None:
+    """Der "Läuft"-Chip stand von 0.85.0 an neben fünf Knöpfen und wurde wieder
+    entfernt: Er verdoppelte die Aussage des Knopfes, reservierte daneben
+    dauerhaft Platz — und nahm dem Knopf durch seinen hx-indicator sogar
+    dessen eigenen Laufzustand weg (siehe oben). Ein Rest davon wäre entweder
+    totes Markup oder eine zweite, halbe Variante desselben Musters.
+    """
+    reste = []
+    for ordner, muster in ((TEMPLATES, "*.html"), (APP / "static", "**/*.css"),
+                           (APP / "static", "**/*.js")):
+        for pfad in ordner.glob(muster):
+            inhalt = pfad.read_text(encoding="utf-8")
+            for wort in ("busy_chip", "busy-chip", "_busy.html"):
+                if wort in inhalt:
+                    reste.append(f"{pfad.name}: {wort}")
+    assert reste == []
 
 
 # --------------------------------------------------------------------------
