@@ -55,6 +55,11 @@ der Testumgebung nicht installiert ist).
 | `test_base_template.py` | Der gemeinsame Seitenrahmen trägt seine Zusagen (`<!doctype>`, Font-Link, Stylesheet) — **und keine Seite wiederholt sie** |
 | `test_ingress_prefix.py` | URL-Präfix unter Ingress: geprüft wird die *Auflösung* jeder Asset-Angabe (`urljoin` gegen den Header-Pfad), nicht ihre Schreibweise |
 | `test_requirements_lock.py` | `requirements.txt` vollständig gepinnt und mit Dockerfile konsistent |
+| `test_page_scripts.py` | Seitenlokales JavaScript liegt als Datei: im Template steht nichts mehr, was etwas *tut* |
+| `test_hint_roles.py`, `test_hint_toggle.py` | Rollen der Hinweistexte (Warnung/Status klappen nie weg), Info-Knopf samt 44-px-Trefferfläche |
+| `test_unstorable_measurements.py` | NaN/Inf werden beim Empfang aussortiert statt archiviert |
+| `test_csv_import_locking.py` | Der CSV-Import sperrt nur seine eigene Entität und reicht die Zeilen ohne Kopie durch |
+| `test_zip_guard.py` | ZIP-Eintragsgrenze greift, **bevor** das Zentralverzeichnis gelesen wird |
 | `test_*_template.py`, `test_*_breadcrumbs.py` | Template-Rendering/-Struktur ohne laufenden Server (Jinja direkt gerendert und auf erwartete Fragmente geprüft) |
 | `test_config_flow_sortable_entities.py`, `test_options_transfer.py` | Integrations-seitige Config-Flow-Logik |
 
@@ -79,7 +84,7 @@ Extraktionen). Seit 0.82.0 ist auch die Housekeeping-Seite ausgelagert
 (`housekeeping_routes.py`) — der Schritt, den dieser Abschnitt vorher als
 nächsten angekündigt hat.
 
-Stand 0.83.1: **rund 5.590 Zeilen**, Test grün. Wächst `main.py` nochmal
+Stand 0.84.0: **rund 5.615 Zeilen**, Test grün. Wächst `main.py` nochmal
 spürbar über das Budget, ist die nächste Extraktion der richtige Schritt, nicht
 ein weiteres stillschweigendes Anheben der Zahl. Kandidaten sind die
 Einstellungs- und die Statistik-Routen; welche zuerst, entscheidet, wo dann

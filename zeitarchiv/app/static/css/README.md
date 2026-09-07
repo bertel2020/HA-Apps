@@ -59,6 +59,11 @@ Energiedashboard), als Datei genau einmal.
 Eine Regel, die zwei Seiten brauchen, gehört nicht in zwei `pages/`-Dateien,
 sondern nach `app.css`.
 
+Das seitenlokale **JavaScript** folgt derselben Regel und liegt spiegelbildlich
+als `static/js/pages/<seite>.js`, verlinkt am Körperende zwischen den geteilten
+Skripten (`tests/test_page_scripts.py`). Inline bleibt im Template nur, was
+Jinja braucht — Startwerte und Serverdaten, nichts, was etwas *tut*.
+
 Fragmente, die per htmx in eine bereits geladene Seite eingehängt werden
 (`_entities_table.html`, `_rows_table.html`, `_duplicates_preview.html`,
 `_entity_config_form.html`, `_import_*.html`) binden **nichts eigenes ein** —
@@ -199,6 +204,28 @@ keine Inkonsistenz.
 `:disabled`-Zustand für "erst Filter wählen"-Fälle), `.navbtn` (quadratischer
 Icon-Button für ‹/›-Navigation, meist als `class="btn navbtn"` kombiniert).
 
+### Hinweistexte (`.hint` + Rolle)
+
+Drei Sorten Text teilen sich Schriftgröße, Zeilenhöhe und `--ink-faint`, sind
+aber nicht dasselbe. Die **Rolle** steht zusätzlich zur Kontextklasse (`hint`,
+`tbl-hint`, `settings-compact-hint`): der Kontext bestimmt Größe und Abstände,
+die Rolle, ob der Text hinter dem Info-Knopf wegklappen darf.
+
+| Klasse | Bedeutung |
+| --- | --- |
+| `hint` allein | Erklärung — darf hinter den Info-Knopf (`_hints.html`, `hint-toggle.js`) |
+| `+ hint-warn` | Warnung — bleibt immer sichtbar |
+| `+ hint-warn hint-warn-strong` | Warnung vor nicht umkehrbarem Verlust: Kante in `--warning`, ein Ton mehr Kontrast. Nicht `--danger` — das ist die Farbe für Fehler und stumpft sonst ab |
+| `+ hint-status` | Daten-, Leer- und Ladezustand — ist Inhalt, keine Erklärung |
+
+Die Rollen sind **Auszeichnung, keine Gestaltung**: außer `hint-warn-strong`
+gestaltet keine von ihnen etwas, damit eine künftige Auszeichnung nicht
+nebenbei das Aussehen ändert (`tests/test_hint_roles.py`). Die Beschriftung
+über einer Kartenzahl war nie ein Hinweis und heißt `status-card-label`.
+
+`.hint-toggle` ist der 16-px-Knopf im Label; seine Trefferfläche wächst über
+ein Pseudoelement auf 44 × 44 px, ohne im Layout Platz zu belegen.
+
 ### Einstellungen (`.settings-layout`)
 
 Zweispaltiges Layout für `/settings`: `.settings-nav` (Kategorie-Liste, `<a href="#anchor">`
@@ -229,3 +256,4 @@ Groß-Datei, die dieses Redesign eigentlich vermeiden sollte.
 4. Kacheln nutzen `.stat-row`/`.stat` (als `<a>`, falls klickbar).
 5. Buttons/Chips nutzen `.btn`/`.chip`/`.filter-chip` statt neu erfundener Klassen.
 6. Nur wirklich seitenspezifische Regeln nach `pages/<seite>.css` — bei allem anderen erst prüfen, ob `app.css` es schon anbietet.
+7. Seitenlokales JavaScript nach `static/js/pages/<seite>.js` — im Template bleibt nur, was Jinja einsetzt.

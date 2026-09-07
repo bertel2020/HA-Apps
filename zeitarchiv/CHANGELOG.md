@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.84.0 - 2026-09-07
+
+### Neu
+
+- **Erklärende Hilfetexte stehen hinter einem Info-Knopf.** Ein kleines „i"
+  neben der Beschriftung klappt den Text bei Bedarf auf. Warnungen und
+  Statuszeilen bleiben unverändert sichtbar. Die Entität-Konfiguration ist
+  dadurch auf dem Telefon rund ein Fünftel kürzer.
+
+### Geändert
+
+- **Neu angeheftete Zähler zeigen als Hauptwert den Zuwachs im gewählten
+  Zeitraum** statt des Zählerstands. Bereits angeheftete Kacheln bleiben, wie
+  sie sind, und „Aktuell" lässt sich weiterhin wählen.
+- **Seiten laden Gestaltung und Code jetzt einmal statt bei jedem Aufruf
+  erneut.** Rund 477 KB, die vorher in jeder Seite mitreisten, liegen jetzt als
+  eigene Dateien im Browser-Zwischenspeicher; das Energiedashboard überträgt
+  dadurch nur noch halb so viele Daten.
+- **Im Einstellungs-Menü einer Kachel stehen Zeitraum und Hauptwert nicht mehr
+  doppelt.** Der Wert stand über einer Knopfreihe, in der er ohnehin
+  hervorgehoben ist.
+- **Mehrere Hinweise in Einstellungen, Entität-Konfiguration und Housekeeping
+  sind präziser formuliert.**
+
+### Behoben
+
+- **Ein Sensor, der einen ungültigen Wert liefert** — etwa ein Template-Sensor
+  mit Division durch null — **konnte die Diagramme der betroffenen Entität
+  dauerhaft unbrauchbar machen.** Solche Werte werden jetzt beim Empfang
+  aussortiert.
+- **Ein großer CSV-Import hielt bis zu seinem Ende die gesamte Archivierung
+  an**, auch für Entitäten, die gar nicht beteiligt waren. Er sperrt jetzt nur
+  noch die Entität, in die er schreibt, und braucht dabei spürbar weniger
+  Arbeitsspeicher.
+- **Nach einem Import konnte der angezeigte Beginn einer Entität zu spät
+  liegen**, wenn dabei ein Monat ergänzt wurde, der älter ist als die neu
+  angelegten. Betraf den HA- und den Symcon-Import.
+
+### Intern
+
+- **Der URL-Präfix läuft nur noch über einen einzigen Mechanismus.** Links und
+  Skripte hängen nicht mehr davon ab, wie tief eine Seite in der URL liegt —
+  nach außen sichtbar nur unter Home-Assistant-Ingress.
+- **Die Prüfung hochgeladener ZIP-Archive erkennt zu große Archive jetzt,
+  bevor sie gelesen werden**, und die Obergrenze ist erstmals erreichbar
+  gesetzt.
+- **Die Dokumentation ist auf den Stand nach 0.83.1 gebracht.**
+
 ## 0.83.1 - 2026-09-07
 
 ### Neu

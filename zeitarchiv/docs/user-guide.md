@@ -11,6 +11,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Erste Schritte](#erste-schritte)
 - [Die Übersichtsseite](#die-übersichtsseite)
 - [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)
+- [Erklärungen zu einem Feld](#erklärungen-zu-einem-feld)
 - [Auf dem Telefon](#auf-dem-telefon)
 - [Dashboards](#dashboards)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
@@ -111,6 +112,19 @@ und Kleinschreibung sowie Leerzeichen am Rand keine Rolle: neben einem Chart
 wird beim Speichern mit einem Hinweis abgelehnt. Duplikate zählen selbst
 hoch — „Wind (Kopie)“, danach „Wind (Kopie 2)“ und so weiter.
 
+## Erklärungen zu einem Feld
+
+Wo ein Feld oder ein Abschnitt eine Erklärung hat, steht ein kleines „i" neben
+seiner Beschriftung. Ein Klick darauf klappt den Text auf, ein weiterer wieder
+zu — so steht die Erklärung beim Einrichten zur Verfügung, ohne danach
+dauerhaft Platz zu belegen. Das gilt auf allen Bildschirmbreiten gleich.
+
+Nicht alles klappt weg: **Warnungen** („entfernt markierte Datensätze
+endgültig") und **Statuszeilen** („Liste wird beim Öffnen geladen …", „12
+doppelte Zeitstempel in den letzten 30 Tagen") stehen ungefragt da. Wo eine
+Warnung einen nicht umkehrbaren Verlust ankündigt, trägt sie zusätzlich eine
+farbige Kante am linken Rand.
+
 ## Auf dem Telefon
 
 Zeitarchiv ist dieselbe Anwendung, ob im Browser am Schreibtisch oder auf dem
@@ -132,7 +146,7 @@ Filter gesetzt, steht die Zahl im Knopf: „Ansicht (2)". Das gilt für die
 Entitätenliste, den CSV-Export und die Übersichten für Dashboards, Charts und
 Tabellen.
 
-**Am Schreibtisch ändert sich nichts.** Alle drei Punkte gelten unterhalb von
+**Am Schreibtisch ändert sich nichts.** Beide Punkte gelten unterhalb von
 640 Pixeln Fensterbreite. Wer ein Browserfenster schmal zieht, sieht dieselbe
 Ansicht wie auf dem Telefon; beim Aufziehen kommt die gewohnte Tabelle mit
 ihrer Werkzeugleiste zurück.
@@ -169,7 +183,11 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   liegende Chart oder die Tabelle.
 - **Werte-Kachel:** pinnt den aktuellen Wert einer einzelnen Entität direkt
   aufs Dashboard, ohne dafür ein Chart anzulegen. Nach dem Anheften öffnet
-  sich sofort die Konfiguration. Die Sparkline ist standardmäßig aktiv und
+  sich sofort die Konfiguration. Bei einer Entität vom Typ **Zähler** ist der
+  große Wert nicht der Zählerstand, sondern der **Zuwachs** im gewählten
+  Zeitraum (Kürzel „+") — der Stand seit Inbetriebnahme lässt sich über
+  „Aktuell" weiterhin einstellen. Das gilt für neu angeheftete Kacheln;
+  bestehende bleiben, wie sie eingestellt sind. Die Sparkline ist standardmäßig aktiv und
   zeigt die im Zeitarchiv gespeicherten Rohpunkte der letzten 24 Stunden;
   alternativ lässt sie sich auf einen Punkt je 5, 15 oder 30 Minuten oder je
   Stunde verdichten. Entität, Anzeige der letzten Aktualisierung,

@@ -52,8 +52,9 @@ angelegt:
 | `content` | Der gesamte Seitenkörper **einschließlich der `<script>`-Tags am Ende** |
 
 Einen `page_js`-Block gibt es bewusst nicht: kein Template hat ein `<script>`
-im `<head>`, die Tags stehen am Körperende und reisen im `content`-Block mit.
-Die Ladereihenfolge bleibt dadurch exakt die bisherige.
+im `<head>`. Die Tags stehen am Körperende und reisen im `content`-Block mit —
+auch der Verweis auf das seitenlokale Skript (`static/js/pages/<seite>.js`,
+siehe unten). Die Ladereihenfolge bleibt dadurch exakt die bisherige.
 
 **Jeder Pfad im HTML beginnt mit `{{ app_root }}`.** Die Variable kommt aus
 einem Kontext-Prozessor (`_app_root_context` in `main.py`), der sie für *jede*
@@ -84,11 +85,53 @@ Cache-Headern versehen; Template-Links hängen `?v={{ css_v }}` /
 Browser-Cache alter Assets scheitert.
 
 Was nur eine Seite braucht, liegt als `static/css/pages/<seite>.css` neben
-`app.css` und wird im `page_css`-Block verlinkt — als `<style>`-Block im
-Template reisten diese Regeln bei jedem Aufruf erneut mit. Konventionen dazu
+`app.css` und wird im `page_css`-Block verlinkt; dasselbe gilt für das
+seitenlokale JavaScript als `static/js/pages/<seite>.js`, verlinkt am Körperende
+zwischen den geteilten Skripten. Als `<style>`- bzw. `<script>`-Block im
+Template reisten diese rund 477 KB bei jedem Seitenaufruf erneut mit, statt
+einmal im Browser-Cache zu liegen. Inline bleibt im Template nur, was Jinja
+braucht — Startwerte und Serverdaten, nichts, was etwas *tut*; `tests/
+test_page_scripts.py` hält das fest. Konventionen dazu
 (Dateiname folgt dem Template, wann etwas nach `app.css` gehört) stehen in
 [`app/static/css/README.md`](../app/static/css/README.md), dem Dokument des
 Design-Systems.
+
+## Hinweistexte: drei Rollen, ein Info-Knopf
+
+Erklärende Hilfetexte belegten auf dem Telefon einen erheblichen Teil der Seite,
+obwohl sie einmal gelesen und danach nicht mehr gebraucht werden. Sie stehen
+deshalb hinter einem Info-Knopf und klappen bei Bedarf auf — inline, nicht als
+Popover: keine Überlagerung, keine Positionsrechnung, und mit `dd-picker` gibt
+es bereits eine Popover-Mechanik.
+
+Voraussetzung war eine Unterscheidung, die es vorher nicht gab: alle Hinweise
+trugen dieselbe Klasse `.hint`, obwohl drei verschiedene Dinge darin steckten.
+Die Rolle steht **zusätzlich** zur Kontextklasse (`hint`, `tbl-hint`,
+`settings-compact-hint`), weil beide Achsen unabhängig sind — der Kontext
+bestimmt Größe und Abstände, die Rolle, ob der Text wegklappen darf:
+
+| Rolle | Bedeutung |
+| --- | --- |
+| *(ohne)* | Erklärung — darf hinter den Info-Knopf |
+| `hint-warn` | Warnung — bleibt sichtbar; `hint-warn-strong` gibt den drei Sätzen mit nicht umkehrbarem Verlust eine Kante in `--warning` |
+| `hint-status` | Daten-, Leer- und Ladezustand — ist Inhalt, keine Erklärung |
+
+Gebaut wird das mit den Makros aus `_hints.html`
+(`{% from "_hints.html" import hint_button, hint_body %}`), geklappt von
+`static/js/hint-toggle.js`, das die Seite einbinden muss. Der Knopf findet
+seinen Hinweis über die **Stellung** im Dokument, nicht über `aria-controls`:
+ein Teil der Felder steht in Alpine-Vorlagen, die je Zeile neu ausgerollt
+werden, feste ids wären dort mehrfach im Dokument. Geklappt wird über
+Delegation an `document`, weil htmx die Formulare komplett austauscht.
+
+Die Trefferfläche ist 44 × 44 px bei 16 px Symbol, über ein Pseudoelement und
+6 px nach oben versetzt — mittig zentriert verliert der Knopf genau die unteren
+6 px an das Bedienelement darunter. Abgesichert durch
+`tests/test_hint_roles.py` (die Rollen sind Auszeichnung, keine Gestaltung) und
+`tests/test_hint_toggle.py`.
+
+**Faustregel, welcher Text aufklappen darf:** er erklärt das *Bedienen* genau
+eines Elements. Wer das *Ablesen* der Anzeige erklärt, bleibt stehen.
 
 ## Vergleichstabellen (`table-compute.js`)
 
