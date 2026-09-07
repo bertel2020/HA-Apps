@@ -70,6 +70,12 @@ def list_raw_rows(
     )
 
 
+# Wie viele zurückliegende Werte den Bezug für die Ausreißer-Erkennung bilden
+# (Typ "standard"). Fünf: genug, dass ein einzelner Ausreißer den Bezug nicht
+# selbst verschiebt, kurz genug, dass ein driftendes Signal mitgenommen wird.
+OUTLIER_WINDOW = 5
+
+
 class ResultLimitExceeded(ValueError):
     """Eine Abfrage würde mehr Zeilen als erlaubt materialisieren."""
 
@@ -85,25 +91,39 @@ def analyze_raw_rows_page(
     tz: ZoneInfo,
     decimals: str = "auto",
     counter_decrease_enabled: bool = False,
+    outlier_mode: str = "standard",
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
-    Der erste Durchlauf bestimmt Anzahl und Ausreißer-Basiswert. Der zweite
-    berechnet Markierungen und behält nur so viele der neuesten Treffer, wie
-    für die angeforderte Seite nötig sind. Damit funktioniert insbesondere
-    der Zeitraum "Gesamt" auch oberhalb des UI-Materialisierungslimits.
+    Der erste Durchlauf bestimmt die Anzahl. Der zweite berechnet Markierungen
+    und behält nur so viele der neuesten Treffer, wie für die angeforderte
+    Seite nötig sind. Damit funktioniert insbesondere der Zeitraum "Gesamt"
+    auch oberhalb des UI-Materialisierungslimits.
+
+    ``outlier_mode`` wählt die Ausreißer-Regel. Beide beziehen sich auf die
+    JÜNGSTE VERGANGENHEIT, nicht auf den Mittelwert des ganzen Zeitraums:
+
+    ``"standard"``
+        Abweichung des Werts vom Schnitt der letzten ``OUTLIER_WINDOW`` Werte.
+    ``"counter"``
+        Abweichung des Zuwachses vom vorherigen Zuwachs. Ein Zählerstand
+        selbst sagt nichts; interessant ist, ob der Verbrauch aus der Reihe
+        fällt.
+
+    Vorher war der Bezug für beide der Mittelwert der Beträge über den ganzen
+    Zeitraum. Das machte die Erkennung bei Zählern faktisch wirkungslos (der
+    größte reale Sprung einer echten Entität lag bei 0,0003 % dieses Bezugs,
+    die kleinste wählbare Schwelle bei 5 %) und bei Standard-Sensoren abhängig
+    vom Nullpunkt der Skala.
     """
     total_rows = 0
-    absolute_sum = 0.0
-    for _ts, value in rows_factory():
+    for _ts, _value in rows_factory():
         total_rows += 1
-        absolute_sum += abs(value)
 
     page_size = max(1, min(int(page_size), 1000))
     upper_page = max(1, -(-total_rows // page_size))
     requested_page = max(1, min(int(page), upper_page))
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
-    baseline = absolute_sum / total_rows if total_rows else 0.0
     gap_seconds = (
         gap_threshold_minutes * 60 if gap_threshold_minutes is not None else None
     )
@@ -127,6 +147,11 @@ def analyze_raw_rows_page(
     last_kept_value: float | None = None
     counter_previous_ts: float | None = None
     counter_previous_value: float | None = None
+    # Ausreißer-Erkennung, zwei Regeln je nach Entitätstyp — beide beziehen
+    # sich auf die jüngste Vergangenheit statt auf den Mittelwert des ganzen
+    # Zeitraums (siehe Docstring).
+    letzte_werte: deque[float] = deque(maxlen=OUTLIER_WINDOW)
+    vorheriger_zuwachs: float | None = None
 
     selected_filter = filter_ if filter_ in {
         "all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases"
@@ -198,17 +223,36 @@ def analyze_raw_rows_page(
                     f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)} "
                     f"(Schwellwert: {_format_duration(gap_seconds)})"
                 )
-        if (
-            previous_value is not None
-            and outlier_threshold_percent is not None
-            and baseline > 0
-        ):
-            jump_percent = abs(value - previous_value) / baseline * 100
-            if jump_percent > outlier_threshold_percent:
-                group_outlier = (
-                    f"{jump_percent:.0f} % Sprung gegenüber Vorwert "
-                    f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)}"
-                )
+        if outlier_threshold_percent is not None and previous_value is not None:
+            if outlier_mode == "counter":
+                # Ein Zählerstand steigt immer; interessant ist nicht er selbst,
+                # sondern sein ZUWACHS — und ob dieser aus der Reihe fällt. Ein
+                # Verbrauch, der plötzlich vierzigmal so hoch ist, fällt in den
+                # absoluten Ständen gar nicht auf (gemessen: 1,1 % Abweichung
+                # bei einem Stand um 45.000).
+                zuwachs = value - previous_value
+                if vorheriger_zuwachs not in (None, 0):
+                    abweichung = abs(zuwachs - vorheriger_zuwachs) / abs(vorheriger_zuwachs) * 100
+                    if abweichung > outlier_threshold_percent:
+                        group_outlier = (
+                            f"Zuwachs {_format_val(zuwachs, decimals)} weicht {abweichung:.0f} % "
+                            f"vom vorherigen Zuwachs {_format_val(vorheriger_zuwachs, decimals)} ab"
+                        )
+                vorheriger_zuwachs = zuwachs
+            elif letzte_werte:
+                # Bezug ist der Schnitt der letzten OUTLIER_WINDOW Werte, nicht
+                # der des ganzen Zeitraums: ein langsam driftendes Signal soll
+                # nicht dadurch auffällig werden, dass es sich vom Mittel eines
+                # Jahres entfernt hat.
+                basis = sum(letzte_werte) / len(letzte_werte)
+                if basis != 0:
+                    abweichung = abs(value - basis) / abs(basis) * 100
+                    if abweichung > outlier_threshold_percent:
+                        group_outlier = (
+                            f"{abweichung:.0f} % Abweichung vom Schnitt der letzten "
+                            f"{len(letzte_werte)} Werte ({_format_val(basis, decimals)})"
+                        )
+        letzte_werte.append(value)
 
         if should_accept_value(
             "decimals", decimals, last_kept_value, last_kept_ts, value, ts
@@ -779,7 +823,13 @@ def _update_first_ts_after_archive_purge(data_dir: Path, index: Index, entity_id
     index.set_first_ts(entity_id, new_first_ts)
 
 
-def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None) -> dict:
+def purge_archived_months(
+    data_dir: Path,
+    index: Index,
+    tz: ZoneInfo,
+    now: datetime | None = None,
+    on_month: Callable[[int, str], None] | None = None,
+) -> dict:
     """Entfernt weich gelöschte Vorkommen physisch aus bereits archivierten
     Monaten — schreibt die betroffene Parquet-Datei ohne die gelöschten
     Zeilen neu (Rest des Monats unverändert) und berechnet die zugehörigen
@@ -789,6 +839,15 @@ def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
     Punkte") — bewusst weiterhin nur bei explizitem Klick in den
     Einstellungen, nie automatisch/lazy: anders als beim Hot Buffer wird hier
     eine echte Archivdatei angefasst.
+
+    ``on_month`` wird nach jedem tatsächlich neu geschriebenen Monat mit
+    (Anzahl bisher, "entity_id 2024-03") gerufen — die Fortschrittsanzeige der
+    Einstellungen hängt daran. Gemessen an einem echten Bestand entfallen von
+    rund 20 Sekunden Gesamtdauer 15,6 auf die Rollup-Neuberechnung über 163
+    Monate, der Zähler läuft also fein genug, um überhaupt etwas zu zeigen.
+    Bewusst nur hier und nicht in purge_hot_buffer(): der Hot Buffer ist eine
+    CSV je Entität für den laufenden Monat und in Bruchteilen einer Sekunde
+    durch.
 
     Gibt eine Zusammenfassung zurück (rows_purged, months_purged)."""
     now = now or datetime.now(tz)
@@ -852,6 +911,8 @@ def purge_archived_months(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
 
             rows_purged += removed
             months_purged += 1
+            if on_month is not None:
+                on_month(months_purged, f"{entity_id} {path.stem}")
 
         if entity_had_emptied_month:
             _update_first_ts_after_archive_purge(data_dir, index, entity_id, tz, now)

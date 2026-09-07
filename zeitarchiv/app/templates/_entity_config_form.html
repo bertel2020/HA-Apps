@@ -78,6 +78,20 @@
 </div>
 <div class="field">
   <label>Ausreißer-Erkennung {{ hint_button('Ausreißer-Erkennung') }}</label>
+  {# Für Schalter deaktiviert statt stillschweigend dauerhaft ausgelöst: die
+     Kennzahl misst den Sprung am Mittelwert der Beträge, und bei 0/1-Werten
+     überschreitet jeder Wechsel damit jede Schwelle (siehe
+     outlier_detection_applies() in storage/index.py). Ein ausgegrautes Feld
+     ohne Begründung wäre nur die halbe Auskunft, deshalb steht der Grund
+     anstelle des Hilfetexts. #}
+  {% if outlier_blocked_reason %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" disabled>Aus ▾</button>
+  </span>
+  {# hint-status statt hint: bleibt sichtbar, der Info-Knopf klappt es
+     nicht weg (siehe HINWEIS-Selektor in hint-toggle.js). #}
+  <p class="hint hint-status">{{ outlier_blocked_reason }}</p>
+  {% else %}
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="outlier-threshold-btn" onclick="toggleDDPicker('outlier-threshold')">{% for k, l in outlier_threshold_options %}{% if k == outlier_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="outlier_threshold" id="outlier-threshold-input" value="{{ outlier_threshold }}"
@@ -88,7 +102,31 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}Ab welchem Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Ausreißer markiert. „Aus“ blendet den Filter dort aus.{% endcall %}
+  {# Was die eingestellte Schwelle tatsächlich bewirkt — die Zahl hinschreiben,
+     während sie gewählt wird, statt hinterher davor zu warnen. Quelle ist der
+     ohnehin vorhandene Cache der Bereinigungsseite (cleanup_stats.
+     outlier_rate()); er wird nur angezeigt, wenn er zu GENAU dieser Schwelle
+     gehört. Sonst steht hier der Knopf: ein Vollscan je Entität ist teuer und
+     gehört nicht in jeden Seitenaufbau. #}
+  {% if outlier_rate %}
+  <div class="outlier-rate">
+    <span class="outlier-rate-value{% if outlier_rate.percent >= 10 %} warning{% endif %}">{{ outlier_rate.percent_label }} %</span>
+    <span class="usage-bar-track">
+      <span class="usage-bar-fill {{ 'warning' if outlier_rate.percent >= 10 else 'positive' }}"
+            style="width: {{ [outlier_rate.percent, 100] | min }}%"></span>
+    </span>
+    <span class="outlier-rate-sub">{{ outlier_rate.marked_label }} von {{ outlier_rate.total_label }} Werten</span>
+  </div>
+  <p class="hint hint-status">Über die komplette Historie, am {{ outlier_rate.computed_label }} berechnet.</p>
+  {% else %}
+  <p class="hint hint-status">
+    Quote noch nicht berechnet.
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/outlier-rate"
+            hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">Jetzt prüfen</button>
+  </p>
+  {% endif %}
+  {% endif %}
+  {% call hint_body() %}Ab welcher prozentualen Abweichung die Bereinigungs-Seite einen Wert als Ausreißer markiert. Bei Zählern zählt der Zuwachs: markiert wird, wenn er um mehr als den Schwellwert vom vorherigen Zuwachs abweicht — ein ungewöhnlich hoher Verbrauch fällt so auf, ein gleichmäßiger nie. Bei allen anderen Sensoren zählt der Abstand zum Schnitt der letzten fünf Werte. Weil der Bezug das aktuelle Niveau ist, sind Größen, die um null schwanken (Leistung mit Einspeisung, Temperatur im Winter), empfindlicher als solche mit hohem Grundwert. „Aus“ blendet den Filter dort aus.{% endcall %}
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">

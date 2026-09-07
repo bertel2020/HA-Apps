@@ -53,6 +53,7 @@ from .formatting import (
     DISPLAY_MODE_LABELS,
     FONT_SCALE_LABELS,
     GAP_THRESHOLD_LABELS,
+    OUTLIER_BLOCKED_REASONS,
     OUTLIER_THRESHOLD_LABELS,
     RESOLUTION_LABELS,
     RETENTION_LABELS,
@@ -106,6 +107,8 @@ from .storage.index import (
     DEFAULT_RESOLUTION,
     DEFAULT_RETENTION,
     DEFAULT_VALUE_FILTER,
+    effective_outlier_threshold,
+    outlier_detection_applies,
     should_raise_gap_threshold,
     MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
@@ -143,6 +146,7 @@ from .energiedashboard_routes import (
     refresh_heatmap_weekday_cache_if_stale,
     sync_hourly_rollup_flags_for_current_config,
 )
+from . import cleanup_stats
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
@@ -829,6 +833,7 @@ class _RetentionProgress:
 
 
 _retention_progress = _RetentionProgress()
+
 
 
 def _begin_retention_job(trigger: str, scheduled_for: float | None = None) -> int | None:
@@ -3155,8 +3160,14 @@ def _entities_table_response(
         if "gap_threshold" in visible_columns:
             entry["gap_threshold_label"] = GAP_THRESHOLD_LABELS.get(row["gap_threshold"], row["gap_threshold"])
         if "outlier_threshold" in visible_columns:
-            entry["outlier_threshold_label"] = OUTLIER_THRESHOLD_LABELS.get(
-                row["outlier_threshold"], row["outlier_threshold"]
+            # "—" statt der gespeicherten Zahl, wo die Erkennung strukturell
+            # nicht greift: eine Zahl, die nichts bewirkt, in einer Spalte
+            # neben Zahlen, die etwas bewirken, ist irreführender als ein
+            # sichtbares "gilt hier nicht".
+            entry["outlier_threshold_label"] = (
+                OUTLIER_THRESHOLD_LABELS.get(row["outlier_threshold"], row["outlier_threshold"])
+                if outlier_detection_applies(row["aggregation_type"])
+                else "—"
             )
         rows.append(entry)
 
@@ -3311,6 +3322,8 @@ def _entity_config_context(entity) -> dict:
         "value_filter": entity["value_filter"],
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
+        "outlier_blocked_reason": OUTLIER_BLOCKED_REASONS.get(entity["aggregation_type"]),
+        "outlier_rate": _outlier_rate_labels(cleanup_stats.outlier_rate(index, entity)),
         "display_mode": entity["display_mode"],
         "resolution_options": list(RESOLUTION_LABELS.items()),
         "retention_options": list(RETENTION_LABELS.items()),
@@ -3321,6 +3334,38 @@ def _entity_config_context(entity) -> dict:
         "display_mode_options": list(DISPLAY_MODE_LABELS.items()),
         "preview_rows": preview_rows,
     }
+
+
+def _outlier_rate_labels(rate: dict | None) -> dict | None:
+    """Fertige Beschriftungen für die Vorlage — Prozent mit Komma, Zahlen mit
+    Tausenderpunkt, Zeitpunkt im App-Format. Jinja kann das nicht
+    sprachrichtig, und `round()` dort ergäbe "3.46" statt "3,46"."""
+    if rate is None:
+        return None
+    return dict(
+        rate,
+        percent_label=format_value(rate["percent"], 2),
+        marked_label=format_int(rate["marked"]),
+        total_label=format_int(rate["total"]),
+        # Datum UND Uhrzeit: der Cache lebt 15 Minuten, "am 07.09.2026"
+        # allein sagt nicht, ob das vor fünf Minuten oder heute früh war.
+        computed_label=(
+            f'{format_timestamp(rate["computed_at"], TZ)} {format_time(rate["computed_at"], TZ)}'
+        ),
+    )
+
+
+@app.post("/entities/{entity_id}/outlier-rate", response_class=HTMLResponse)
+def entity_outlier_rate(request: Request, entity_id: str) -> HTMLResponse:
+    """Rechnet die Markierungsquote der Ausreißer-Erkennung EINMAL nach, auf
+    Klick. Bewusst kein Hintergrundlauf über alle Entitäten: ein Vollscan je
+    Entität ist teuer (siehe alltime_counts()), und gebraucht wird die Zahl
+    genau dann, wenn jemand die Schwelle gerade einstellt."""
+    entity = _require_entity(entity_id)
+    cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, datetime.now(TZ), force=True)
+    return templates.TemplateResponse(
+        request, "_entity_config_form.html", _entity_config_context(_require_entity(entity_id))
+    )
 
 
 @app.get("/entities/{entity_id}/config", response_class=HTMLResponse)
@@ -3338,7 +3383,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     Ändert nur den Index-Wert; wirkt sich für die Auflösung ab dem nächsten
     Schreibvorgang aus (Drosselung in /api/write), die Aufbewahrung ist aktuell
     rein informativ (kein Purge-Job, siehe Konzept Abschnitt 09)."""
-    _require_entity(entity_id)
+    entity = _require_entity(entity_id)
     form = await request.form()
     resolution = form.get("resolution")
     retention = form.get("retention")
@@ -3367,6 +3412,12 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail="Ungültiger Lücken-Schwellwert")
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Ausreißer-Schwellwert")
+    # Für Zähler/Schalter ist das Feld deaktiviert (siehe
+    # outlier_detection_applies()). Ein trotzdem mitgeschickter Wert wird
+    # verworfen statt abgelehnt: die Einstellung wirkt für diese Typen ohnehin
+    # nicht, ein HTTP 400 würde ein Problem behaupten, wo keines ist.
+    if not outlier_detection_applies(entity["aggregation_type"]):
+        outlier_threshold = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Anzeigemodus")
     def update_locked() -> HTMLResponse:
@@ -4965,7 +5016,9 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
-            "outlier_detection_enabled": entity["outlier_threshold"] != "off",
+            "outlier_detection_enabled": effective_outlier_threshold(
+                entity["aggregation_type"], entity["outlier_threshold"]
+            ) != "off",
             "counter_decrease_enabled": entity["state_class"] == "total_increasing",
             "is_favorite": bool(entity["is_favorite"]),
         },
@@ -5022,12 +5075,6 @@ def _paginate_meta(total: int, page: int, page_size: int) -> dict:
     return pagination
 
 
-# Zeiträume der Bereinigungsseite — dieselben Perioden wie im Chart
-# (entity_detail.html/query._window(), Konsistenz zwischen beiden Werkzeugen),
-# nur ohne "decade" (bei Rohwert-Zeilen wenig sinnvoll) und dafür mit "all" als
-# Bereinigungs-spezifischer Ergänzung ohne Chart-Entsprechung.
-CLEANUP_RANGE_KEYS = ("hour", "day", "week", "month", "year", "all")
-
 # "Jahr" kann wie "Gesamt" MAX_UI_ANALYSIS_ROWS überschreiten (stiller 413, htmx swappt 4xx nicht ein) — beide laufen über den Streaming-Pfad.
 _STREAMING_RANGE_KEYS = ("year", "all")
 
@@ -5037,70 +5084,6 @@ _MONTH_NAMES_DE = (
 )
 
 
-def _rows_window(range_key: str, offset: int, now: datetime, first_ts: float | None) -> tuple[datetime, datetime]:
-    """[Anfang, Ende) für die Bereinigungsseite. Kalendarische Zeiträume kommen
-    1:1 aus query._window() — dieselbe Perioden-Logik wie im Chart (offset 0 =
-    aktuelle, kalendarisch verankerte Periode bis "jetzt", -1 = eine Periode
-    zurück, …). "all" hat dort keine Entsprechung: deckt stattdessen den
-    kompletten Datenbestand der Entität ab (seit dem ersten Rohwert) und kennt
-    keine Navigation (offset wird vom Aufrufer immer auf 0 gehalten)."""
-    if range_key not in CLEANUP_RANGE_KEYS:
-        range_key = "day"
-    if range_key == "all":
-        start = datetime.fromtimestamp(first_ts, TZ) if first_ts else now
-        return start, now
-    start, end, _period_end = query_mod._window(range_key, now, min(offset, 0), continuous=False)
-    return start, end
-
-
-_CLEANUP_ALLTIME_STATS_MAX_AGE_SECONDS = 15 * 60
-
-
-def _cleanup_alltime_counts(entity, now: datetime) -> dict:
-    """Ausreißer/Lücken/Duplikate/Wiederholungen/Zählerrückgänge über die
-    KOMPLETTE Historie der Entität, nicht nur den gerade gewählten Zeitraum
-    (Bereinigungsseite, Kachel-Zeile "Gesamter Zeitraum") — gecacht für
-    15 Minuten (index.is_cleanup_alltime_stats_stale), weil ein Vollscan bei
-    Entitäten mit Millionen Rohwerten sonst bei jedem Seitenaufruf bzw. jedem
-    Filterklick teuer wäre. Nutzt denselben speicherbegrenzten Streaming-Pfad
-    wie der Zeitraum "Gesamt" im Chip (analyze_raw_rows_page, zwei Durchläufe
-    ohne Materialisierung aller Zeilen), page_size=1 weil hier nur die
-    counts gebraucht werden, keine Zeilenliste."""
-    entity_id = entity["entity_id"]
-    if not index.is_cleanup_alltime_stats_stale(entity_id, _CLEANUP_ALLTIME_STATS_MAX_AGE_SECONDS):
-        cached = index.get_cleanup_alltime_stats(entity_id)
-        if cached is not None:
-            return cached["counts"]
-
-    window_start, window_end = _rows_window("all", 0, now, entity["first_ts"])
-    gap_threshold = entity["gap_threshold"]
-    outlier_threshold = entity["outlier_threshold"]
-    # Siehe _rows_fragment(): analyze_raw_rows_page() ruft rows_factory()
-    # zweimal auf, ohne Cache liest das bei "Gesamt" die laufende Monats-CSV
-    # doppelt (PERFORMANCE.md, ZP-012).
-    read_cache = query_mod.QueryReadCache()
-
-    def rows_factory():
-        return cleanup.iter_raw_rows(
-            DATA_DIR, index, entity_id,
-            window_start.timestamp(), window_end.timestamp(), TZ, now=now,
-            hot_rows_loader=read_cache.read_hot_rows,
-        )
-
-    analysis = cleanup.analyze_raw_rows_page(
-        rows_factory,
-        filter_="all",
-        page=1,
-        page_size=1,
-        gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
-        outlier_threshold_percent=None if outlier_threshold == "off" else float(outlier_threshold),
-        tz=TZ,
-        decimals=entity["decimals"],
-        counter_decrease_enabled=entity["state_class"] == "total_increasing",
-    )
-    counts = analysis["counts"]
-    index.set_cleanup_alltime_stats(entity_id, counts)
-    return counts
 
 
 def _rows_period_label(range_key: str, offset: int, window_start: datetime, window_end: datetime, now: datetime) -> str:
@@ -5136,13 +5119,15 @@ def _rows_fragment(
     entity = index.get_entity(entity_id)
     decimals_int = decimals_to_int(entity["decimals"])
     now = datetime.now(TZ)
-    if range_key not in CLEANUP_RANGE_KEYS:
+    if range_key not in cleanup_stats.CLEANUP_RANGE_KEYS:
         range_key = "day"
     offset = 0 if range_key == "all" else min(offset, 0)
-    window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
+    window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
     gap_threshold = entity["gap_threshold"]
-    outlier_threshold = entity["outlier_threshold"]
+    outlier_threshold = effective_outlier_threshold(
+        entity["aggregation_type"], entity["outlier_threshold"]
+    )
     if range_key in _STREAMING_RANGE_KEYS:
         # Können Millionen Rohwerte umfassen: materialisiert nur die angeforderte Seite (zwei Streaming-Durchläufe).
         effective_page_size = 1000 if page_size <= 0 else min(page_size, 1000)
@@ -5178,6 +5163,7 @@ def _rows_fragment(
             tz=TZ,
             decimals=entity["decimals"],
             counter_decrease_enabled=entity["state_class"] == "total_increasing",
+        outlier_mode="counter" if entity["aggregation_type"] == "counter" else "standard",
         )
         counts = analysis["counts"]
         pagination = analysis["pagination"]
@@ -5273,9 +5259,9 @@ def _rows_fragment(
         # der Cache bleibt aber trotzdem aufgefrischt (nächster Aufruf mit
         # engerem Zeitraum-Chip muss dann nicht sofort neu scannen).
         alltime_counts = counts
-        index.set_cleanup_alltime_stats(entity_id, counts)
+        index.set_cleanup_alltime_stats(entity_id, counts, outlier_threshold)
     else:
-        alltime_counts = _cleanup_alltime_counts(entity, now)
+        alltime_counts = cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, now)
 
     return templates.TemplateResponse(
         request,
@@ -5475,7 +5461,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
     now = datetime.now(TZ)
     offset = 0 if range_key == "all" else min(offset, 0)
-    window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
+    window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
     def load_to_delete() -> list[tuple[float, float]]:
         with storage_coordinator.entity(entity_id):
@@ -5536,7 +5522,7 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
     now = datetime.now(TZ)
     offset = 0 if range_key == "all" else min(offset, 0)
-    window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
+    window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
     def load_preview() -> tuple[int, list[tuple[float, float]]]:
         with storage_coordinator.entity(entity_id):
@@ -5585,7 +5571,7 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
     now = datetime.now(TZ)
     offset = 0 if range_key == "all" else min(offset, 0)
-    window_start, window_end = _rows_window(range_key, offset, now, entity["first_ts"])
+    window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
     marked_any = False
 

@@ -502,6 +502,28 @@ Die Kachel mittelt dabei nicht über `lineData`: der Linien-Zweig hängt bis
 damit doppelt zählen würde. Deshalb sammelt jeder der beiden Zweige seine
 Werte in `averageValues` selbst.
 
+### Markierungsquote der Ausreißer-Erkennung
+
+Unter dem Schwellwert-Feld (Entität konfigurieren) steht, welchen Anteil der
+Werte die eingestellte Schwelle markiert — die Zahl hinschreiben, während sie
+gewählt wird, statt hinterher davor zu warnen.
+
+Zwei Eigenheiten, die man beim Nachbauen anders träfe:
+
+- **Die Quote erscheint nur, wenn sie zu GENAU dieser Schwelle gehört.** Der
+  Cache der Bereinigungsseite (`cleanup_alltime_stats`) hält je Entität eine
+  Zahl; wer die Schwelle ändert, hätte sonst die Quote der alten daneben
+  stehen. Deshalb speichert der Eintrag jetzt mit, mit welcher Schwelle
+  gezählt wurde; passt sie nicht (oder fehlt sie, bei Einträgen von vor dieser
+  Änderung), steht dort „Jetzt prüfen" statt einer Zahl.
+- **Der Vollscan läuft auf Klick, nie beim Seitenaufbau.** Gemessen 7,1
+  Sekunden für eine Entität mit 3,8 Mio. Rohwerten — das gehört in keinen
+  Request-Pfad. Kein Hintergrundlauf über alle Entitäten: gebraucht wird die
+  Zahl genau dann, wenn jemand die Schwelle einstellt.
+
+Balken und Farben kommen von `.usage-bar-track`/`.usage-bar-fill`, demselben
+Baustein wie der Host-Speicherplatz in `housekeeping.html`.
+
 ## Mobile Listenansicht
 
 Unter 640 px arbeiten zwei Module zusammen, die eine neue Seite nicht

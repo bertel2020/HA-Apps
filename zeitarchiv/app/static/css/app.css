@@ -1626,6 +1626,18 @@ select:disabled,textarea[readonly],textarea:disabled{background:var(--surface-al
 .usage-bar-fill.warning{background:linear-gradient(90deg, var(--warning), color-mix(in srgb, var(--warning) 75%, white));}
 .usage-bar-fill.danger{background:linear-gradient(90deg, var(--danger), color-mix(in srgb, var(--danger) 75%, white));}
 
+/* Markierungsquote unter der Ausreißer-Schwelle (Entität konfigurieren) —
+   nutzt denselben Balken wie oben, nur schmaler eingefasst: die Zahl trägt
+   die Aussage, der Balken macht sie auf einen Blick vergleichbar. */
+.outlier-rate{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:9px;}
+.outlier-rate .usage-bar-track{flex:1 1 150px;min-width:110px;}
+.outlier-rate-value{
+  font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-weight:600;
+  font-size:calc(13px * var(--font-scale, 1));color:var(--ink);
+}
+.outlier-rate-value.warning{color:var(--warning);}
+.outlier-rate-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+
 /* Verbindungsstatus nutzt dieselben Statuskacheln wie Backup und Retention.
    Das innere Raster enthält ausschließlich die drei Kennzahlen: So bleiben
    ihre Spalten und Zeilen auch nach einem responsiven Umbruch exakt gleich,

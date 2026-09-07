@@ -394,24 +394,196 @@ gerade betrachteten Bildausschnitt, und gilt deshalb nur bis zur nächsten
 ## Entität konfigurieren
 
 Über das Zahnrad-Symbol einer Entität (in der Liste oder in der
-Verlaufsansicht) erreichbar:
+Verlaufsansicht). Jede Einstellung gilt **nur für diese eine Entität** und
+überschreibt den globalen Standard aus **Einstellungen → Archivierung**. Neue
+globale Standards wirken nie rückwirkend auf bereits angelegte Entitäten.
 
-| Feld | Bedeutung |
-| --- | --- |
-| App-eigener Anzeigename | Optional, bis 40 Zeichen — überschreibt nur die Darstellung in Zeitarchiv, nie Home Assistants eigenen `friendly_name` oder die Entitäts-ID selbst. Ein Tag-Symbol markiert überall, wo er aktiv ist; leer lassen setzt den Standardnamen zurück |
-| Auflösung | Mindestabstand zwischen zwei gespeicherten Werten (z. B. "alle 5 Minuten"); engmaschigere Quellwerte werden entsprechend verdichtet |
-| Aufbewahrung | Wie lange Werte behalten werden, bevor eine aktivierte automatische Löschung greift (**Unbegrenzt** möglich) |
-| Nachkommastellen | „Automatisch“ zeigt bis zu drei Stellen und entfernt Nullen am Ende (z. B. 4 statt 4,000); eine feste Anzahl (0–3) rundet auf genau diese Stellen und ergänzt bei Bedarf Nullen (z. B. 4,00 bei 2 Stellen) |
-| Wertänderungsfilter | Überspringt gerundet gleiche Folgewerte (spart Speicherplatz bei trägen Sensoren), behält aber mindestens alle 6 Stunden ein Lebenszeichen, damit lange Stillstände von fehlenden Daten unterscheidbar bleiben. Bei neu erkannten Entitäten standardmäßig aktiv (einstellbar unter **Einstellungen → Archivierung → Standards**) |
-| Lücken-Erkennung | Schwellwert von 1 Minute bis 1 Tag (einschließlich 6 und 12 Stunden), ab dem eine Pause zwischen zwei Werten in der Bereinigung als Lücke markiert wird — „Aus“ deaktiviert die Markierung. Wird beim Ändern von Auflösung oder Wertänderungsfilter automatisch angehoben, falls sie enger eingestellt ist, als die neue Kombination zulässt — eine gröbere Auflösung erzwingt selbst schon einen Mindestabstand zwischen Werten, der aktivierte Wertänderungsfilter zusätzlich mindestens 6 Stunden. Sonst würde die gewählte Kombination normale Pausen ständig als Lücke melden. Lässt sich danach jederzeit wieder manuell verkleinern |
-| Ausreißer-Erkennung | Schwellwert in Prozent, um den ein Wert gegenüber dem Vorwert mindestens abweichen muss, um als Ausreißer markiert zu werden — "Aus" deaktiviert die Markierung |
-| Anzeigemodus | Nur bei Schaltern: Rohwert (AN/AUS als Zustand) oder Zeit (kumulierte Einschaltdauer je Zeitraum) |
+### Womit fange ich an?
 
-Änderungen an Auflösung, Aufbewahrung oder Nachkommastellen wirken nur auf
-künftig eintreffende bzw. künftig berechnete Werte, nie rückwirkend auf
-bereits archivierte Daten.
+Die acht Felder greifen an sehr unterschiedlichen Stellen an. Diese Einteilung
+ist beim Einstellen wichtiger als die Reihenfolge im Formular:
 
-Am Seitenende dieser Konfigurationsseite stehen zwei endgültige Aktionen:
+| Wirkt auf … | Felder | Rückgängig? |
+| --- | --- | --- |
+| **Was überhaupt gespeichert wird** | Auflösung, Wertänderungsfilter | Nein — was nicht gespeichert wurde, ist weg |
+| **Wie lange es bleibt** | Aufbewahrung | Bis zur nächsten Löschung ja |
+| **Was gezeigt wird** | Anzeigename, Nachkommastellen, Anzeigemodus | Jederzeit |
+| **Was die Bereinigung markiert** | Lücken-Erkennung, Ausreißer-Erkennung | Jederzeit |
+
+Die beiden ersten Felder verwerfen Messwerte beim Eintreffen. Alles darunter
+lässt sich beliebig oft ändern, ohne etwas zu verlieren.
+
+Eine Ausnahme von dieser sauberen Trennung: **Nachkommastellen** ist nicht rein
+optisch — der Wertänderungsfilter benutzt dieselbe Rundung, um zu entscheiden,
+ob zwei Werte „gleich" sind (siehe unten).
+
+### App-Anzeigename
+
+Optional, bis 40 Zeichen. Überschreibt die Darstellung **nur in Zeitarchiv**
+(Listen, Auswahlfelder, Diagramme, Tabellen) — Home Assistants eigener
+`friendly_name` und die Entitäts-ID bleiben unangetastet. Ein Tag-Symbol
+markiert überall, wo ein eigener Name aktiv ist. Leer lassen stellt den
+HA-Namen wieder her.
+
+### Auflösung
+
+**Mindestabstand zwischen zwei gespeicherten Werten.** Wählbar: Rohdaten,
+30 Sekunden, 1, 5, 15 Minuten, 1 Stunde.
+
+Zwei Dinge, die man leicht falsch erwartet:
+
+- **Zu dichte Werte werden verworfen, nicht zusammengefasst.** Bei „5 Min."
+  wird ein Wert, der 30 Sekunden nach dem letzten gespeicherten eintrifft,
+  weggeworfen — es entsteht kein Mittelwert daraus. Wer verdichtete Werte
+  will, lässt die Auflösung fein und nutzt in Charts und Tabellen die dortige
+  Aggregation.
+- **Der Abstand läuft ab dem zuletzt gespeicherten Wert**, nicht ab festen
+  Uhrzeit-Rastern. Nach einer Pause wird der erste wieder eintreffende Wert
+  also sofort gespeichert, nicht erst zur nächsten vollen Fünf-Minuten-Marke.
+
+„Rohdaten" speichert jede eintreffende Zustandsänderung und ist die
+Voreinstellung für neu erkannte Entitäten. Die Einstellung gilt nur für neu
+eintreffende Werte; bereits archivierte bleiben unverändert.
+
+### Aufbewahrung
+
+Wie lange Werte behalten werden: Unbegrenzt, 30 Tage, 90 Tage, 365 Tage,
+2 Jahre, 5 Jahre. Voreinstellung für neue Entitäten ist **Unbegrenzt**.
+
+**Das Feld allein löscht nichts.** Es legt nur fest, was als „zu alt" gilt.
+Ob und wann tatsächlich gelöscht wird, steuert **Einstellungen →
+Aufbewahrung**: Ist die automatische Durchsetzung dort aus, sammeln sich die
+Daten weiter an, egal was hier steht. Ein Blick auf **Housekeeping →
+Aufbewahrung** zeigt, wie viel bei der nächsten Durchsetzung wegfiele.
+
+### Nachkommastellen
+
+„Automatisch" zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt
+4,000). Eine feste Auswahl (0–3) rundet auf genau diese Stellen und füllt auf
+(4,00 bei zwei Stellen).
+
+**Die Einstellung wirkt über die Anzeige hinaus:** Der Wertänderungsfilter
+entscheidet anhand derselben Rundung, ob ein neuer Wert dem vorherigen gleicht.
+Wer die Nachkommastellen von 3 auf 1 stellt und den Filter aktiv hat, wirft
+damit auch mehr Werte weg — aus 21,04 °C und 21,03 °C wird zweimal 21,0 °C,
+also ein gefilterter Wert. „Automatisch" verhält sich dabei wie 3.
+
+### Wertänderungsfilter
+
+Überspringt Werte, die nach der Nachkommastellen-Regel dem zuletzt
+gespeicherten gleichen — spart bei trägen Sensoren erheblich Platz.
+
+**Spätestens alle 6 Stunden wird trotzdem ein Wert gespeichert**, auch wenn
+sich nichts geändert hat. Dieses Lebenszeichen ist der Unterschied zwischen
+„der Sensor meldet unverändert 21,0 °C" und „der Sensor meldet gar nichts
+mehr" — ohne es wäre beides in den Daten nicht zu unterscheiden, und die
+Inaktivitäts-Meldung würde falsch anschlagen.
+
+Bei neu erkannten Entitäten standardmäßig aktiv.
+
+### Lücken-Erkennung
+
+Ab welcher Pause zwischen zwei Werten die Bereinigungs-Seite eine **Lücke**
+markiert: 1, 5, 15, 30 Minuten, 1, 6, 12 Stunden, 1 Tag — oder Aus. Die
+Markierung ist reine Analyse; an den Daten ändert sie nichts.
+
+**Der Wert wird automatisch angehoben, wenn er nicht zutreffen kann.** Eine
+Auflösung von 1 Stunde erzwingt selbst schon einen Mindestabstand von einer
+Stunde zwischen Werten; eine Lücken-Erkennung von 5 Minuten würde dann bei
+*jedem* normalen Zyklus anschlagen. Dasselbe gilt für den aktivierten
+Wertänderungsfilter mit seinen 6 Stunden Lebenszeichen. Zeitarchiv hebt die
+Schwelle beim Ändern von Auflösung oder Filter deshalb auf die nächste Stufe,
+die noch sinnvoll ist, und sagt es dazu. Danach lässt sie sich jederzeit wieder
+manuell verkleinern. Bestehende Entitäten mit einer solchen Kombination listet
+**Housekeeping → Konfiguration**.
+
+### Ausreißer-Erkennung
+
+Ab welcher prozentualen Abweichung die Bereinigungs-Seite einen Wert als
+**Ausreißer** markiert: 5, 10, 25, 50, 100 % — oder Aus. Wie die
+Lücken-Erkennung reine Analyse, ohne Eingriff in die Daten.
+
+**Wogegen gemessen wird, hängt vom Typ der Entität ab.** Das ist der
+entscheidende Punkt, denn derselbe Prozentsatz bedeutet dadurch je nach Sensor
+etwas anderes:
+
+**Zähler** (Verbrauchszähler, Erzeugung, alles mit stetig steigendem Stand) —
+verglichen wird der **Zuwachs mit dem vorherigen Zuwachs**. Markiert wird, wenn
+er um mehr als den Schwellwert abweicht.
+
+> Ein Stromzähler steht bei 45.000 kWh und wächst stündlich um rund 12 kWh.
+> Springt der Verbrauch in einer Stunde auf 500 kWh, weicht dieser Zuwachs um
+> das Vierzigfache ab und wird markiert. Der Zählerstand selbst hat sich dabei
+> nur um gut ein Prozent verändert — deshalb ist der Zuwachs die richtige
+> Bezugsgröße und nicht der Stand.
+
+Ein gleichmäßig laufender Zähler löst nie aus, egal wie eng die Schwelle steht.
+Erkannt werden dafür zuverlässig auch grobe Fehler des Zählers selbst: eine
+Fehlmessung um den Faktor 10 und ein Rücksprung auf 0 nach einem
+Zählerwechsel. (Für den Rücksprung gibt es zusätzlich die eigene Markierung
+**Zählerrückgang**.)
+
+**Alle anderen Sensoren** (Temperatur, Leistung, Luftfeuchte …) — verglichen
+wird der Wert mit dem **Durchschnitt der letzten fünf Werte**. Markiert wird,
+wenn er um mehr als den Schwellwert davon abweicht.
+
+> Eine Raumtemperatur liegt bei 21 °C. Bei Schwelle 25 % wird alles markiert,
+> was mehr als rund 5 °C daneben liegt — ein einzelner Messwert von 60 °C also
+> sicher, das normale Auf und Ab nicht.
+
+Fünf Werte als Bezug bedeutet: Ein langsam driftendes Signal fällt **nicht**
+auf, weil der Bezug mitwandert. Auffällig ist nur, wer aus seiner unmittelbaren
+Nachbarschaft ausbricht.
+
+**Zwei Eigenschaften, die man kennen sollte:**
+
+- **Der Bezug ist das aktuelle Niveau, deshalb ist der Prozentsatz relativ.**
+  Bei einer Größe, die um **null** schwankt — Leistung mit Einspeisung, eine
+  Außentemperatur im Winter — wird der Durchschnitt der letzten fünf Werte
+  klein, und schon normale Schwankungen überschreiten jede Schwelle. Dort ist
+  eine höhere Schwelle nötig oder „Aus" die ehrlichere Wahl.
+- **Dieselbe Größe auf einer anderen Skala verhält sich anders.** Ein Sprung
+  von 20 auf 60 sind in Grad Celsius 200 % des Niveaus, in Kelvin (293 auf
+  333) nur 13,6 %. Eine Schwelle, die für einen Sensor passt, passt deshalb
+  nicht automatisch für einen anderen.
+
+**Für Schalter ist die Einstellung nicht verfügbar.** Bei Werten, die nur 0
+oder 1 sein können, liegt jeder Wert weit neben dem Durchschnitt seiner
+Nachbarn — jeder Zustandswechsel wäre ein „Ausreißer", und mit aktivem
+Wertänderungsfilter ist fast jeder gespeicherte Wert ein Wechsel. Das Feld ist
+deshalb ausgegraut und nennt den Grund.
+
+**Was die Schwelle tatsächlich bewirkt, steht unter dem Feld:** der Anteil der
+Werte, den sie über die komplette Historie markiert, mit Balken und absoluter
+Zahl. Ist die Quote noch nicht berechnet oder gehört sie zu einer anderen
+Schwelle, erscheint stattdessen **Jetzt prüfen** — die Berechnung liest den
+gesamten Bestand der Entität und läuft deshalb nur auf Klick.
+
+### Anzeigemodus
+
+Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`):
+
+- **AN/AUS (Rohwert)** zeigt den Zustand als 0/1.
+- **Zeit (Dauer)** zeigt stattdessen die kumulierte Einschaltdauer je Zeitraum,
+  lesbar formatiert (z. B. `1h 29m`) — sinnvoll bei Anwesenheits-, Tür- und
+  Bewegungssensoren.
+
+Als Schalter gelten die Domains `binary_sensor`, `switch` und `input_boolean`.
+
+### Was rückwirkend wirkt — und was nicht
+
+Auflösung, Aufbewahrung und Nachkommastellen wirken **nur auf künftig
+eintreffende bzw. künftig berechnete Werte**, nie rückwirkend auf bereits
+archivierte Daten. Eine gröbere Auflösung verdünnt also keinen Altbestand, und
+eine feinere holt nichts zurück, was nie gespeichert wurde.
+
+Lücken- und Ausreißer-Erkennung wirken dagegen **immer sofort auf den ganzen
+Bestand**: Sie werden bei jedem Aufruf der Bereinigungs-Seite neu gerechnet und
+verändern die Daten nicht.
+
+### Datenverwaltung
+
+Am Seitenende stehen zwei endgültige Aktionen:
 
 - **Alle Werte löschen** entfernt sämtliche Daten dieser Entität (laufender
   Monat, Archiv, Rollups), behält aber die individuelle Konfiguration
@@ -1310,7 +1482,8 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
 **"Ein Sensor sendet unplausible Ausreißer."**
 → Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf einen
-passenden Prozentsatz einstellen → zurück zur Verlaufsansicht →
+passenden Prozentsatz einstellen (bei Zählern und Schaltern gibt es die
+Einstellung nicht, siehe oben) → zurück zur Verlaufsansicht →
 **Bereinigen** → erkannte Ausreißer prüfen und löschen (Soft-Delete,
 rückgängig machbar) → **Housekeeping → Speicherplatz**, wenn der Platz
 tatsächlich freigegeben werden soll.

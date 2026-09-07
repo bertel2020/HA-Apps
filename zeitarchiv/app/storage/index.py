@@ -172,6 +172,55 @@ def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
     return floor_seconds // 60
 
 
+# Aggregationstypen, für die die Ausreißer-Erkennung strukturell nichts
+# Sinnvolles liefern kann. Anders als bei effective_gap_floor_minutes() oben
+# liegt es nicht an einer Kombination von Einstellungen, sondern an der
+# Kennzahl selbst: analyze_raw_rows_page() (storage/cleanup.py) misst den
+# Sprung zum Vorwert am MITTELWERT DER BETRÄGE im Zeitraum, nicht am Vorwert.
+#
+# Bei 0/1-Werten ist dieser Mittelwert der Anteil der Einsen p, ein Wechsel
+# springt um 1, also um 100/p Prozent: bei p=0,5 sind das 200 %, bei p=0,1
+# schon 1.000 %. Das liegt über jeder angebotenen Schwelle, auch über der
+# höchsten (100 %) — JEDER Zustandswechsel wäre ein Ausreißer, und mit aktivem
+# Wertänderungsfilter ist fast jeder gespeicherte Wert einer. Die Einstellung
+# gilt deshalb für Schalter als "aus", unabhängig vom gespeicherten Wert:
+# dieselbe Haltung wie bei 3.1 — was garantiert nichts Sinnvolles ergibt, wird
+# gar nicht erst angeboten.
+#
+# ZÄHLER standen hier zunächst ebenfalls, das war ein Fehlschluss. Gemessen
+# war nur, dass normale Zuwächse nichts auslösen (0,00 % über 30 Tage) — und
+# genau das ist erwünscht, nicht blind. Die Fehler, die Zähler tatsächlich
+# haben, löst die Erkennung sehr wohl aus, nachgerechnet an 200 Ständen um
+# 45.000 mit Stundenzuwachs 12:
+#
+#   Faktor-10-Fehlmessung  → markiert bei JEDER Schwelle (5 … 100 %)
+#   Rücksprung auf 0       → markiert bei JEDER Schwelle
+#   Ausreißer um +5 % des Stands → markiert bis Schwelle 2 %
+#
+# Was bleibt, ist eine grobe Empfindlichkeit: der Prozentsatz bezieht sich auf
+# den mittleren ZÄHLERSTAND, nicht auf den Zuwachs. 5 % von 45.000 sind 2.250 —
+# kleinere Fehlwerte bleiben unmarkiert. Das gehört in den Hilfetext, ist aber
+# kein Grund, die Einstellung zu entziehen.
+_OUTLIER_BLIND_AGGREGATION_TYPES = {"switch"}
+
+
+def outlier_detection_applies(aggregation_type: str) -> bool:
+    """False, wenn die Ausreißer-Erkennung für diesen Typ strukturell blind
+    oder strukturell dauerhaft ausgelöst ist (siehe Kommentar oben). Die
+    Begründungstexte stehen in formatting.py — der Index kennt bewusst keine
+    Anzeige-Labels."""
+    return aggregation_type not in _OUTLIER_BLIND_AGGREGATION_TYPES
+
+
+def effective_outlier_threshold(aggregation_type: str, outlier_threshold: str) -> str:
+    """Die Schwelle, wie sie TATSÄCHLICH gilt — "off" für die blinden Typen,
+    unabhängig vom gespeicherten Wert.
+
+    Eine einzige Stelle dafür, damit Bereinigungsseite, Gesamt-Statistik,
+    Entitätenliste und Formular nicht auseinanderlaufen können."""
+    return outlier_threshold if outlier_detection_applies(aggregation_type) else "off"
+
+
 def should_raise_gap_threshold(
     current_gap_threshold: str, resolution: str, value_filter: str, valid_minute_tiers: list[int]
 ) -> tuple[bool, str]:
@@ -2847,8 +2896,19 @@ class Index:
             return True
         return computed_at is None or time.time() - computed_at >= min_interval_seconds
 
-    def set_cleanup_alltime_stats(self, entity_id: str, counts: dict) -> None:
-        payload = json.dumps({"computed_at": time.time(), "counts": counts})
+    def set_cleanup_alltime_stats(
+        self, entity_id: str, counts: dict, outlier_threshold: str | None = None
+    ) -> None:
+        """`outlier_threshold` ist die Schwelle, MIT DER gezählt wurde. Ohne sie
+        ließe sich die gespeicherte Ausreißer-Zahl später nicht mehr einer
+        Einstellung zuordnen: wer die Schwelle ändert, bekäme eine Quote
+        angezeigt, die zur alten gehört. Alte Einträge ohne das Feld gelten
+        deshalb als 'unbekannt' (siehe outlier_rate() in cleanup_stats.py)."""
+        payload = json.dumps({
+            "computed_at": time.time(),
+            "counts": counts,
+            "outlier_threshold": outlier_threshold,
+        })
         self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, payload)
 
     def get_cleanup_alltime_stats(self, entity_id: str) -> dict | None:

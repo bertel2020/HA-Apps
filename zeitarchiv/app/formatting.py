@@ -215,6 +215,16 @@ OUTLIER_THRESHOLD_LABELS = {
     "100": "100 %",
     "off": "Aus",
 }
+# Warum die Ausreißer-Erkennung für diesen Typ nicht angeboten wird — die
+# Bedingung selbst steht als outlier_detection_applies() in storage/index.py.
+# Der Text nennt den Grund aus Nutzersicht, nicht die Formel: entscheidend ist,
+# dass das Feld nicht ohne Erklärung ausgegraut dasteht.
+OUTLIER_BLOCKED_REASONS = {
+    "switch": (
+        "Für Schalter nicht verfügbar: Ein Wechsel zwischen AN und AUS überschreitet "
+        "jede Schwelle, jeder Wechsel wäre ein Ausreißer."
+    ),
+}
 BACKUP_SCHEDULE_LABELS = {
     "off": "Aus",
     "daily": "Täglich",
