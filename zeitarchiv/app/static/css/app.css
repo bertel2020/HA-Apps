@@ -115,6 +115,19 @@
   --accent-contrast:#FFFFFF; --danger:#A23B36; --danger-soft:#F4DEDB; --danger-contrast:#FFFFFF;
   --positive:#2E7D46;
   --warning:#8A6D1E; --warning-soft:#F5EDD3;
+  /* Eigenes Token für den Schweregrad-Punkt im Meldungs-Panel, statt wie
+     zuvor --accent-bar mitzubenutzen. Der Akzent ist eine Marken-/Layoutfarbe
+     und in manchen Schemata schlicht keine Warnfarbe: im Schema "modern" ist
+     --accent-bar ein Blaugrün (#0E7C86), wodurch "warn" wie "in Ordnung"
+     aussah und sich kaum von --accent-line unterschied — grau/grün/rot ergibt
+     keine erkennbare Steigerung.
+
+     Der Standard ist --warning, das jedes Schema ohnehin definiert und das
+     genau diese Bedeutung trägt (auch die Balken der Markierungsquote nutzen
+     es). Nur EINMAL deklariert: var() wird erst am Element aufgelöst, der
+     Wert folgt also automatisch dem aktiven Schema. Ein Schema, das den
+     Meldungspunkt eigens abstimmen will, überschreibt --notice-warn direkt. */
+  --notice-warn:var(--warning);
   --chart-line:#0C6B5D; --chart-bar:#B15E1B;
   --chart-1:#0C6B5D; --chart-2:#B15E1B; --chart-3:#3B6FA0; --chart-4:#8B5FBF;
   --chart-5:#C4472B; --chart-6:#4C8C4A; --chart-7:#B0932A; --chart-8:#5C6B73;
@@ -358,7 +371,7 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 .notice-row-link{display:flex; gap:10px; align-items:flex-start; flex:1; min-width:0; padding:9px 8px; text-decoration:none; color:inherit;}
 .notice-dot{flex-shrink:0; width:8px; height:8px; border-radius:999px; margin-top:6px;}
 .notice-dot.info{background:var(--ink-faint);}
-.notice-dot.warn{background:var(--accent-bar);}
+.notice-dot.warn{background:var(--notice-warn);}
 .notice-dot.error{background:var(--danger);}
 .notice-body{min-width:0; flex:1; display:flex; flex-direction:column; gap:2px;}
 .notice-row-title{font-size:calc(13px * var(--font-scale, 1)); font-weight:600; color:var(--ink);}
@@ -1717,8 +1730,10 @@ select:disabled,textarea[readonly],textarea:disabled{background:var(--surface-al
    wie die bestehende Backup-Fortschrittsanzeige (_settings_backup_progress.
    html), Füllfarbe je nach übergebener severity (positive/warning/danger),
    mit dezentem Glanz-Verlauf statt einer bunten Skala über die volle Breite. */
-.usage-bar-track{height:8px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--border);overflow:hidden;}
-.usage-bar-fill{height:100%;transition:width .3s ease;}
+.usage-bar-track{display:block;height:8px;border-radius:999px;background:var(--surface-alt);border:1px solid var(--border);overflow:hidden;}
+/* display:block, weil der Balken auch als <span> vorkommt (Markierungsquote
+   im Entitäts-Formular) — inline ignoriert height und width. */
+.usage-bar-fill{display:block;height:100%;transition:width .3s ease;}
 .usage-bar-fill.positive{background:linear-gradient(90deg, var(--positive), color-mix(in srgb, var(--positive) 75%, white));}
 .usage-bar-fill.warning{background:linear-gradient(90deg, var(--warning), color-mix(in srgb, var(--warning) 75%, white));}
 .usage-bar-fill.danger{background:linear-gradient(90deg, var(--danger), color-mix(in srgb, var(--danger) 75%, white));}

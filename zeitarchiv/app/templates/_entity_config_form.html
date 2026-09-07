@@ -78,12 +78,11 @@
 </div>
 <div class="field">
   <label>Ausreißer-Erkennung {{ hint_button('Ausreißer-Erkennung') }}</label>
-  {# Für Schalter deaktiviert statt stillschweigend dauerhaft ausgelöst: die
-     Kennzahl misst den Sprung am Mittelwert der Beträge, und bei 0/1-Werten
-     überschreitet jeder Wechsel damit jede Schwelle (siehe
-     outlier_detection_applies() in storage/index.py). Ein ausgegrautes Feld
-     ohne Begründung wäre nur die halbe Auskunft, deshalb steht der Grund
-     anstelle des Hilfetexts. #}
+  {# Für Schalter deaktiviert, weil die Regel dort strukturell nie anschlägt:
+     sie misst Vielfache der üblichen Streuung, und die ist bei 0/1-Werten
+     immer null (siehe outlier_detection_applies() in storage/index.py). Ein
+     ausgegrautes Feld ohne Begründung wäre nur die halbe Auskunft, deshalb
+     steht der Grund anstelle des Hilfetexts. #}
   {% if outlier_blocked_reason %}
   <span class="dd-picker-wrap">
     <button type="button" class="btn" disabled>Aus ▾</button>
@@ -117,7 +116,14 @@
     </span>
     <span class="outlier-rate-sub">{{ outlier_rate.marked_label }} von {{ outlier_rate.total_label }} Werten</span>
   </div>
-  <p class="hint hint-status">Über die komplette Historie, am {{ outlier_rate.computed_label }} berechnet.</p>
+  {# Auch bei vorhandener Quote nachrechenbar: sie altert mit jedem neuen
+     Messwert, und ohne Knopf gäbe es keinen Weg dorthin außer die Schwelle
+     kurz zu verstellen und zurückzustellen. #}
+  <p class="hint hint-status">
+    Über die komplette Historie, am {{ outlier_rate.computed_label }} berechnet.
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/outlier-rate"
+            hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">Neu berechnen</button>
+  </p>
   {% else %}
   <p class="hint hint-status">
     Quote noch nicht berechnet.
@@ -126,7 +132,7 @@
   </p>
   {% endif %}
   {% endif %}
-  {% call hint_body() %}Ab welcher prozentualen Abweichung die Bereinigungs-Seite einen Wert als Ausreißer markiert. Bei Zählern zählt der Zuwachs: markiert wird, wenn er um mehr als den Schwellwert vom vorherigen Zuwachs abweicht — ein ungewöhnlich hoher Verbrauch fällt so auf, ein gleichmäßiger nie. Bei allen anderen Sensoren zählt der Abstand zum Schnitt der letzten fünf Werte. Weil der Bezug das aktuelle Niveau ist, sind Größen, die um null schwanken (Leistung mit Einspeisung, Temperatur im Winter), empfindlicher als solche mit hohem Grundwert. „Aus“ blendet den Filter dort aus.{% endcall %}
+  {% call hint_body() %}Ab welchem Vielfachen des für diese Entität Üblichen die Bereinigungs-Seite einen Wert als Ausreißer markiert — gesucht sind unplausible Werte (Übertragungsfehler, verrutschte Ziffern), nicht bloß hohe. Bei Zählern ist der Bezug der übliche Zuwachs: markiert wird ein Zuwachs, der ein Vielfaches davon beträgt; ein gleichmäßig laufender Zähler löst nie aus. Bei allen anderen Sensoren ist der Bezug die übliche Schwankung der letzten fünfzehn Werte. Ein Vielfaches statt eines Prozentsatzes, damit dieselbe Einstellung auf einem frischen und einem alten Zähler und auf jeder Skala dasselbe bedeutet. Kleinere Zahl = empfindlicher. „Aus“ blendet den Filter dort aus.{% endcall %}
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">

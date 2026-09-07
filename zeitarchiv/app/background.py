@@ -43,6 +43,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import cleanup_stats
 from . import ha_integration
 from . import notices as notices_mod
 from . import supervisor_stats
@@ -703,6 +704,26 @@ class BackgroundService:
             [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
         )
 
+    def _refresh_one_outlier_rate(self) -> None:
+        """Erneuert die Gesamt-Zählung EINER Entität je Takt — Grundlage für
+        Housekeeping → Ausreißer und die zugehörige Meldung.
+
+        Die Liste dort zeigt genau die Zahlen, die auch am Schwellenfeld der
+        Entität stehen. Ohne diesen Lauf stünden dort nur die Entitäten, deren
+        Bereinigungsseite jemand von Hand geöffnet hat — also fast keine, und
+        eine leere Liste sähe aus wie "alles in Ordnung".
+
+        Bewusst nur eine Entität: ein kompletter Durchgang kostete an der
+        Testinstallation 37 s, verteilt auf 30-Sekunden-Takte fällt das nicht
+        auf. Welche als Nächste drankommt, entscheidet cleanup_stats (nie
+        gemessene zuerst)."""
+        entity = cleanup_stats.next_entity_for_outlier_rate(self.index, time.time())
+        if entity is None:
+            return
+        cleanup_stats.alltime_counts(
+            self.data_dir, self.index, self.tz, entity, datetime.now(self.tz), force=True
+        )
+
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
         while not self._maintenance_scheduler_stop.is_set():
@@ -716,6 +737,7 @@ class BackgroundService:
                 self.refresh_retention_overview_if_stale()
                 self.refresh_purge_preview_if_stale()
                 self._refresh_duplicate_snapshot_if_stale()
+                self._refresh_one_outlier_rate()
                 self._refresh_stale_entity_count()
                 self._refresh_host_disk_usage()
                 notices_mod.refresh_import_leftovers_if_stale(self.symcon_import_dir, self.csv_import_dir)

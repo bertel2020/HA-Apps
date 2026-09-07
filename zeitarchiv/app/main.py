@@ -2760,16 +2760,13 @@ def _entity_config_context(entity) -> dict:
 
 
 def _outlier_rate_labels(rate: dict | None) -> dict | None:
-    """Fertige Beschriftungen für die Vorlage — Prozent mit Komma, Zahlen mit
-    Tausenderpunkt, Zeitpunkt im App-Format. Jinja kann das nicht
-    sprachrichtig, und `round()` dort ergäbe "3.46" statt "3,46"."""
+    """Die gemeinsamen Beschriftungen (cleanup_stats.rate_labels) plus den
+    Zeitpunkt — den braucht nur das Konfigurationsfeld, wo der Knopf zum
+    Nachrechnen daneben steht."""
     if rate is None:
         return None
     return dict(
-        rate,
-        percent_label=format_value(rate["percent"], 2),
-        marked_label=format_int(rate["marked"]),
-        total_label=format_int(rate["total"]),
+        cleanup_stats.rate_labels(rate),
         # Datum UND Uhrzeit: der Cache lebt 15 Minuten, "am 07.09.2026"
         # allein sagt nicht, ob das vor fünf Minuten oder heute früh war.
         computed_label=(
@@ -4580,13 +4577,13 @@ def _rows_fragment(
             gap_threshold_minutes=(
                 None if gap_threshold == "off" else float(gap_threshold)
             ),
-            outlier_threshold_percent=(
+            outlier_factor=(
                 None if outlier_threshold == "off" else float(outlier_threshold)
             ),
             tz=TZ,
             decimals=entity["decimals"],
             counter_decrease_enabled=entity["state_class"] == "total_increasing",
-        outlier_mode="counter" if entity["aggregation_type"] == "counter" else "standard",
+            outlier_mode=cleanup_stats.outlier_mode(entity),
         )
         counts = analysis["counts"]
         pagination = analysis["pagination"]
@@ -4613,7 +4610,7 @@ def _rows_fragment(
         )
         outliers = cleanup.detect_outliers(
             rows, None if outlier_threshold == "off" else float(outlier_threshold),
-            entity["decimals"], TZ,
+            entity["decimals"], TZ, mode=cleanup_stats.outlier_mode(entity),
         )
         gaps = cleanup.detect_gaps(
             rows, None if gap_threshold == "off" else float(gap_threshold),
@@ -4682,7 +4679,9 @@ def _rows_fragment(
         # der Cache bleibt aber trotzdem aufgefrischt (nächster Aufruf mit
         # engerem Zeitraum-Chip muss dann nicht sofort neu scannen).
         alltime_counts = counts
-        index.set_cleanup_alltime_stats(entity_id, counts, outlier_threshold)
+        index.set_cleanup_alltime_stats(
+            entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION
+        )
     else:
         alltime_counts = cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, now)
 

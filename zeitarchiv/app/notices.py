@@ -25,11 +25,18 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import cleanup_stats
 from . import ha_integration
 from . import tips as tips_mod
 from . import version_check
 from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETTING_HOURLY_BACKFILL_PENDING
-from .formatting import GAP_THRESHOLD_LABELS, format_int, format_resolution, format_size
+from .formatting import (
+    GAP_THRESHOLD_LABELS,
+    format_int,
+    format_resolution,
+    format_size,
+    format_value,
+)
 from .index_optimization import get_index_optimization_state
 from .report_routes import SOURCE_LABELS
 from .route_support import dir_size_and_newest_mtime
@@ -497,6 +504,36 @@ def build_notices(
             ),
             "meta": "Housekeeping",
             "link": "/housekeeping#konfiguration",
+        })
+
+    # Grundlage ist ausschließlich der ohnehin vorhandene Cache (der
+    # Wartungsplaner füllt ihn, eine Entität je Takt) — die Meldung rechnet
+    # nichts nach und kostet damit einen SELECT. Genau EINE Meldung für die
+    # ganze Installation, egal ob eine oder hundert Entitäten betroffen sind:
+    # das Meldungs-Center trägt Titel, zwei Sätze und einen Link, hundert
+    # Entitäten passen dort nicht hinein — und hundert einzelne Meldungen wären
+    # schlimmer, weil das Stummschalten je Meldung gedacht ist. Sie zählt und
+    # verweist, sie zählt nicht auf.
+    auffaellige = cleanup_stats.outlier_rate_overview(index)["rows"]
+    if auffaellige:
+        schlimmster = auffaellige[0]
+        anzahl = len(auffaellige)
+        marke = format_value(cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0)
+        beispiel = (
+            f"{schlimmster['friendly_name']} mit {schlimmster['percent_label']} %"
+        )
+        notices.append({
+            "id": "entities.outlier_rate_high",
+            "severity": "info",
+            "title": "Ausreißer-Erkennung markiert auffällig viel",
+            "detail": (
+                f"Bei {anzahl} Entität{'en' if anzahl != 1 else ''} markiert die eingestellte "
+                f"Schwelle mehr als {marke} % aller Werte"
+                + (f" — am deutlichsten {beispiel}." if anzahl != 1 else f": {beispiel}.")
+                + " Eine zu enge Schwelle markiert normales Verhalten als verdächtig."
+            ),
+            "meta": "Housekeeping",
+            "link": "/housekeeping#ausreisser",
         })
 
     # entities.hourly_rollup wird bereits automatisch synchron gehalten (beim

@@ -31,7 +31,7 @@ DEFAULT_RETENTION = "unlimited"
 DEFAULT_DECIMALS = "auto"
 DEFAULT_VALUE_FILTER = "decimals"
 DEFAULT_GAP_THRESHOLD = "15"
-DEFAULT_OUTLIER_THRESHOLD = "25"
+DEFAULT_OUTLIER_THRESHOLD = "50"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 
 # Zeitraum und Kennzahlen einer Werte-Kachel (dashboard_pins, siehe die
@@ -175,32 +175,21 @@ def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
 # Aggregationstypen, für die die Ausreißer-Erkennung strukturell nichts
 # Sinnvolles liefern kann. Anders als bei effective_gap_floor_minutes() oben
 # liegt es nicht an einer Kombination von Einstellungen, sondern an der
-# Kennzahl selbst: analyze_raw_rows_page() (storage/cleanup.py) misst den
-# Sprung zum Vorwert am MITTELWERT DER BETRÄGE im Zeitraum, nicht am Vorwert.
+# Kennzahl selbst: die Regel misst, um welches VIELFACHE der üblichen Streuung
+# ein Wert danebenliegt (cleanup.OutlierDetector).
 #
-# Bei 0/1-Werten ist dieser Mittelwert der Anteil der Einsen p, ein Wechsel
-# springt um 1, also um 100/p Prozent: bei p=0,5 sind das 200 %, bei p=0,1
-# schon 1.000 %. Das liegt über jeder angebotenen Schwelle, auch über der
-# höchsten (100 %) — JEDER Zustandswechsel wäre ein Ausreißer, und mit aktivem
-# Wertänderungsfilter ist fast jeder gespeicherte Wert einer. Die Einstellung
-# gilt deshalb für Schalter als "aus", unabhängig vom gespeicherten Wert:
-# dieselbe Haltung wie bei 3.1 — was garantiert nichts Sinnvolles ergibt, wird
-# gar nicht erst angeboten.
+# Bei 0/1-Werten gibt es diese übliche Streuung nicht. Der Median des Fensters
+# ist immer die Mehrheitsklasse, ihre Mitglieder haben Abweichung 0, und da
+# die Mehrheit definitionsgemäß über der Hälfte liegt, ist der Median der
+# Abweichungen (MAD) zwangsläufig 0 — bei JEDEM Schaltmuster. Ein Vielfaches
+# von 0 gibt es nicht, die Regel überspringt also grundsätzlich jeden Wert.
+# Die Einstellung wäre für Schalter folgenlos und wird deshalb gar nicht erst
+# angeboten: dieselbe Haltung wie bei 3.1.
 #
-# ZÄHLER standen hier zunächst ebenfalls, das war ein Fehlschluss. Gemessen
-# war nur, dass normale Zuwächse nichts auslösen (0,00 % über 30 Tage) — und
-# genau das ist erwünscht, nicht blind. Die Fehler, die Zähler tatsächlich
-# haben, löst die Erkennung sehr wohl aus, nachgerechnet an 200 Ständen um
-# 45.000 mit Stundenzuwachs 12:
-#
-#   Faktor-10-Fehlmessung  → markiert bei JEDER Schwelle (5 … 100 %)
-#   Rücksprung auf 0       → markiert bei JEDER Schwelle
-#   Ausreißer um +5 % des Stands → markiert bis Schwelle 2 %
-#
-# Was bleibt, ist eine grobe Empfindlichkeit: der Prozentsatz bezieht sich auf
-# den mittleren ZÄHLERSTAND, nicht auf den Zuwachs. 5 % von 45.000 sind 2.250 —
-# kleinere Fehlwerte bleiben unmarkiert. Das gehört in den Hilfetext, ist aber
-# kein Grund, die Einstellung zu entziehen.
+# ZÄHLER standen hier zunächst ebenfalls, das war ein Fehlschluss. Sie haben
+# mit dem Zuwachs eine tragfähige Bezugsgröße und werden deshalb erkannt —
+# gemessen an einem echten Stromzähler trennen sechs Größenordnungen den
+# größten normalen Zuwachs (10,1× Median) vom Ziffernfehler (56.941.875×).
 _OUTLIER_BLIND_AGGREGATION_TYPES = {"switch"}
 
 
@@ -273,7 +262,7 @@ CREATE TABLE IF NOT EXISTS entities (
     decimals TEXT NOT NULL DEFAULT 'auto',
     value_filter TEXT NOT NULL DEFAULT 'off',
     gap_threshold TEXT NOT NULL DEFAULT '15',
-    outlier_threshold TEXT NOT NULL DEFAULT '25',
+    outlier_threshold TEXT NOT NULL DEFAULT '50',
     unit TEXT,
     state_class TEXT,
     friendly_name TEXT,
@@ -687,7 +676,7 @@ class Index:
         if "gap_threshold" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN gap_threshold TEXT NOT NULL DEFAULT '15'")
         if "outlier_threshold" not in columns:
-            self._conn.execute("ALTER TABLE entities ADD COLUMN outlier_threshold TEXT NOT NULL DEFAULT '25'")
+            self._conn.execute("ALTER TABLE entities ADD COLUMN outlier_threshold TEXT NOT NULL DEFAULT '50'")
         if "is_favorite" not in columns:
             # Favoriten (Konzept-Erweiterung) — Entitäten lassen sich markieren,
             # um sie in der Übersicht/Liste immer oben zu finden.
@@ -1101,6 +1090,27 @@ class Index:
                     "INSERT INTO dashboard_pins (item_type, item_id, position) VALUES ('chart', ?, ?)",
                     [(row["id"], row["dashboard_position"]) for row in old_pins],
                 )
+
+        # Ausreißer-Schwelle: von Prozent auf Vielfache. Die alte Leiter
+        # (5/10/25/50/100 %) bezog sich auf einen Wert, die neue auf das für
+        # diese Entität Übliche (siehe cleanup.OutlierDetector) — die Zahlen
+        # bedeuten also etwas anderes und werden nach ihrem PLATZ auf der
+        # Leiter übernommen, nicht nach ihrem Zahlenwert: die empfindlichste
+        # alte Stufe wird die empfindlichste neue. "50" und "100" bleiben
+        # zufällig auf ihrer Zahl stehen, "off" bleibt aus.
+        #
+        # Idempotent: nach dem Lauf existieren "5"/"25" nicht mehr, und die
+        # verbliebenen Werte sind auch neu wählbar, treffen also nichts.
+        for alt, neu in (("5", "10"), ("25", "20")):
+            self._conn.execute(
+                "UPDATE entities SET outlier_threshold = ? WHERE outlier_threshold = ?",
+                (neu, alt),
+            )
+            self._conn.execute(
+                "UPDATE settings SET value = ? "
+                "WHERE key = 'default_outlier_threshold' AND value = ?",
+                (neu, alt),
+            )
 
     def get_or_create_entity(
         self,
@@ -2897,19 +2907,47 @@ class Index:
         return computed_at is None or time.time() - computed_at >= min_interval_seconds
 
     def set_cleanup_alltime_stats(
-        self, entity_id: str, counts: dict, outlier_threshold: str | None = None
+        self,
+        entity_id: str,
+        counts: dict,
+        outlier_threshold: str | None = None,
+        outlier_rule: int | None = None,
     ) -> None:
-        """`outlier_threshold` ist die Schwelle, MIT DER gezählt wurde. Ohne sie
-        ließe sich die gespeicherte Ausreißer-Zahl später nicht mehr einer
-        Einstellung zuordnen: wer die Schwelle ändert, bekäme eine Quote
-        angezeigt, die zur alten gehört. Alte Einträge ohne das Feld gelten
+        """`outlier_threshold` ist die Schwelle, MIT DER gezählt wurde, und
+        `outlier_rule` die Regel (cleanup.OUTLIER_RULE_VERSION). Ohne beides
+        ließe sich die gespeicherte Ausreißer-Zahl später keiner Einstellung
+        zuordnen: wer die Schwelle ändert, bekäme eine Quote der alten zu sehen
+        — und wer die App aktualisiert, eine der alten Regel, obwohl die
+        Schwelle unverändert dasteht. Alte Einträge ohne die Felder gelten
         deshalb als 'unbekannt' (siehe outlier_rate() in cleanup_stats.py)."""
         payload = json.dumps({
             "computed_at": time.time(),
             "counts": counts,
             "outlier_threshold": outlier_threshold,
+            "outlier_rule": outlier_rule,
         })
         self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, payload)
+
+    def list_cleanup_alltime_stats(self) -> dict[str, dict]:
+        """Alle gecachten Gesamt-Zählungen auf einmal, {entity_id: Eintrag}.
+
+        Für Housekeeping → Ausreißer und die zugehörige Meldung: beide brauchen
+        den Stand ALLER Entitäten. Einzeln nachgeschlagen wären das je Aufruf
+        so viele SELECTs wie Entitäten; hier ist es eines. Defekte Einträge
+        werden übersprungen statt zu werfen — ein kaputter JSON-Wert darf die
+        Housekeeping-Seite nicht unbenutzbar machen."""
+        vorsatz = self._CLEANUP_ALLTIME_STATS_PREFIX
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT key, value FROM settings WHERE key LIKE ? || '%'", (vorsatz,)
+            ).fetchall()
+        eintraege: dict[str, dict] = {}
+        for row in rows:
+            try:
+                eintraege[row["key"][len(vorsatz):]] = json.loads(row["value"])
+            except (json.JSONDecodeError, TypeError):
+                continue
+        return eintraege
 
     def get_cleanup_alltime_stats(self, entity_id: str) -> dict | None:
         """{"computed_at": ..., "counts": {...}} oder None vor der ersten

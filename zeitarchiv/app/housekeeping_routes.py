@@ -1,4 +1,4 @@
-"""Housekeeping-Bereich: Aufbewahrung, Rotation, Speicherplatz, Duplikate.
+"""Housekeeping-Bereich: Aufbewahrung, Rotation, Speicherplatz, Duplikate, Ausreißer.
 
 Aus main.py ausgelagert (analog api_routes.py/report_routes.py/
 import_routes.py). Der Anlass steht in test_route_modules.py: main.py hat ein
@@ -34,6 +34,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import cleanup_stats
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
 from .formatting import (
@@ -393,8 +394,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
         sucht: ungenutzte Charts/Tabellen (kein Dashboard-Pin), Entitäten mit
         erkannten Duplikaten (bestehender globaler Schnappschuss, siehe
-        _duplicate_rows_for_display), Entitäten ohne neue Werte und mit
-        unwirksamer Lücken-Erkennung. Wiederholungen sind bewusst noch nicht
+        _duplicate_rows_for_display), Entitäten ohne neue Werte, Entitäten mit
+        auffällig hoher Ausreißer-Quote und mit unwirksamer Lücken-Erkennung. Wiederholungen sind bewusst noch nicht
         enthalten (siehe Diskussion zu Schwellwert/Kalibrierung)."""
         aggregation_types = {
             row["entity_id"]: row["aggregation_type"] for row in deps.index.list_entities()
@@ -425,6 +426,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "duplicates_by_entity": duplicates_by_entity,
                 "duplicates_total": duplicates_total,
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),
+                "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
+                "outlier_notable_percent": format_value(
+                    cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0
+                ),
                 **_stale_entities_context(),
                 **_host_disk_usage_context(),
                 **_settings_storage_index_context(),

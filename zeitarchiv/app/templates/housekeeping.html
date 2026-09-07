@@ -76,6 +76,59 @@
         {% endif %}
       </section>
 
+      <section id="ausreisser" class="settings-section">
+        <h2 class="settings-section-title">Ausreißer</h2>
+        <p class="settings-section-description">Entitäten, deren Ausreißer-Erkennung mehr als {{ outlier_notable_percent }}&nbsp;% ihrer Werte markiert &mdash; dann ist die Schwelle für dieses Signal zu eng eingestellt, und die Bereinigungs-Seite zeigt normales Verhalten als verdächtig. Dieselben Zahlen stehen unter dem Schwellenfeld der jeweiligen Entität.</p>
+        <div class="tbl-wrap">
+          {% if outlier_rates.rows %}
+          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+            <colgroup>
+              <col class="stats-col-entity"><col class="stats-col-value"><col class="stats-col-value"><col class="stats-col-value">
+            </colgroup>
+            <thead><tr><th>Entität</th><th>Schwelle</th><th>Markiert</th><th>Quote</th></tr></thead>
+            <tbody>
+            {% for row in outlier_rates.rows %}
+            <tr>
+              <td class="entity" data-sort="{{ row.friendly_name }}">
+                <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
+                </a>
+              </td>
+              <td>{{ row.threshold_label }}</td>
+              <td data-sort="{{ row.marked }}">{{ row.marked_label }} von {{ row.total_label }}</td>
+              <td data-sort="{{ row.percent }}">{{ row.percent_label }} %</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          {# Ein leerer Abschnitt, der den höchsten gemessenen Wert nennt, ist
+             deutlich mehr wert als „nichts gefunden": er belegt, dass gemessen
+             wurde, und sagt, wie weit es bis zur Marke ist. #}
+          <div class="empty">
+            {% if outlier_rates.highest %}
+            Keine auffälligen Quoten. Höchster gemessener Wert: {{ outlier_rates.highest.percent_label }} % bei {{ outlier_rates.highest.friendly_name }}.
+            {% elif outlier_rates.pending %}
+            Noch nichts gemessen &mdash; die Quoten werden nach und nach im Hintergrund berechnet.
+            {% else %}
+            Keine Entität hat die Ausreißer-Erkennung eingeschaltet.
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+        <p class="hint hint-status" style="margin-top:14px;">
+          {% if outlier_rates.pending -%}
+          {{ outlier_rates.measured }} von {{ outlier_rates.measured + outlier_rates.pending }} Entitäten mit Ausreißer-Erkennung sind gemessen, jeweils über ihre komplette Historie. Die übrigen misst der Hintergrundlauf nach und nach &mdash; einzelne sofort mit „Jetzt prüfen“ auf ihrer Konfigurationsseite.
+          {%- else -%}
+          Alle {{ outlier_rates.measured }} Entitäten mit Ausreißer-Erkennung sind gemessen, jeweils über ihre komplette Historie.
+          {%- endif %}
+        </p>
+        {% if outlier_rates.rows %}
+        <p class="hint" style="margin-top:8px;">Eine zu enge Schwelle korrigiert man je Entität: Konfigurationsseite öffnen, eine Stufe höher wählen, Quote neu berechnen.</p>
+        {% endif %}
+      </section>
+
       <section id="konfiguration" class="settings-section">
         <h2 class="settings-section-title">Konfiguration</h2>
         <p class="settings-section-description">Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder der aktive Wertänderungsfilter erzwingt selbst schon einen größeren Mindestabstand zwischen Werten.</p>

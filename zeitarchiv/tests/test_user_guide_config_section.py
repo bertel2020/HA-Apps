@@ -19,7 +19,7 @@ from app.formatting import (
     OUTLIER_THRESHOLD_LABELS,
     RETENTION_LABELS,
 )
-from app.storage.cleanup import OUTLIER_WINDOW
+from app.storage.cleanup import COUNTER_OUTLIER_WINDOW, OUTLIER_WINDOW
 from app.storage.index import (
     MAX_CUSTOM_NAME_LENGTH,
     SWITCH_DOMAINS,
@@ -55,10 +55,13 @@ def test_every_field_of_the_form_has_its_own_section() -> None:
 
 def test_the_outlier_ladder_is_listed_completely() -> None:
     """Als ganze Aufzählung geprüft, nicht Stufe für Stufe: „10" käme sonst
-    auch in „100 %" oder „13,6 %" vor, und eine gestrichene Stufe fiele nicht
-    auf."""
+    auch in „100" oder „10.123" vor, und eine gestrichene Stufe fiele nicht
+    auf. Die Einheit gehört mit dazu — als die Leiter von Prozent auf
+    Vielfache umgestellt wurde, blieb das Handbuch sonst unbemerkt richtig
+    aussehend und falsch."""
     stufen = [k for k in OUTLIER_THRESHOLD_LABELS if k != "off"]
-    assert f"{', '.join(stufen)} %" in FLACH, stufen
+    assert f"Einstellbar ist ein **Vielfaches**: {', '.join(stufen)}" in FLACH, stufen
+    assert "Voreingestellt ist 50×" in FLACH
 
 
 def test_the_retention_ladder_is_listed_completely() -> None:
@@ -83,7 +86,8 @@ def test_the_named_constants_match_the_code() -> None:
     Ausreißer-Erkennung stehen als Zahl im Text."""
     assert f"bis {MAX_CUSTOM_NAME_LENGTH} Zeichen" in ABSCHNITT
     assert f"alle {VALUE_FILTER_HEARTBEAT_SECONDS // 3600} Stunden" in ABSCHNITT
-    assert OUTLIER_WINDOW == 5 and "letzten fünf Werte" in ABSCHNITT
+    assert OUTLIER_WINDOW == 15 and "letzten fünfzehn Werte" in ABSCHNITT
+    assert COUNTER_OUTLIER_WINDOW == 50 and "letzten 50 Zuwächse" in ABSCHNITT
 
 
 def test_the_switch_domains_are_named() -> None:
@@ -105,9 +109,25 @@ def test_the_outlier_rules_are_described_per_type() -> None:
     """Der zweite Fehler: eine einzige Beschreibung für alle Typen, obwohl
     Zähler und übrige Sensoren gegen verschiedene Bezugsgrößen messen."""
     ausreisser = FLACH[FLACH.index("### Ausreißer-Erkennung"):]
-    # Der ganze Satz, nicht nur das Stichwort: „vorherigen Zuwachs" allein
-    # steht auch in der Einleitung und überlebte eine Umformulierung der Regel.
-    assert "Markiert wird, wenn er um mehr als den Schwellwert abweicht." in ausreisser
-    assert "**Zuwachs mit dem vorherigen Zuwachs**" in ausreisser
-    assert "**Durchschnitt der letzten fünf Werte**" in ausreisser
+    assert "**übliche Zuwachs**" in ausreisser
+    assert "**übliche Schwankung der letzten fünfzehn Werte**" in ausreisser
     assert "Für Schalter ist die Einstellung nicht verfügbar" in ausreisser
+
+
+def test_the_chapter_does_not_describe_the_threshold_as_a_percentage() -> None:
+    """Der dritte Anlauf auf diese Kennzahl. Zweimal wurde die Regel geändert
+    und das Handbuch beschrieb weiter die alte — beim ersten Mal fiel es nur
+    durch eine Rückfrage auf. „Prozentsatz" darf im Abschnitt vorkommen, aber
+    nur dort, wo erklärt wird, warum es KEINER mehr ist."""
+    ausreisser = FLACH[FLACH.index("### Ausreißer-Erkennung"):]
+    assert "prozentualen Abweichung" not in ausreisser
+    assert "Warum ein Vielfaches und kein Prozentsatz?" in ausreisser
+
+
+def test_the_migration_of_old_settings_is_documented() -> None:
+    """Wer aktualisiert, findet plötzlich andere Zahlen im Feld. Ohne einen
+    Satz dazu sieht das nach einem Fehler aus."""
+    ausreisser = FLACH[FLACH.index("### Ausreißer-Erkennung"):]
+    assert "Nach dem Update von einer älteren Version" in ausreisser
+    for stufe in ("5 % und 10 % → 10×", "25 % → 20×", "50 % → 50×", "100 % → 100×"):
+        assert stufe in ausreisser, stufe

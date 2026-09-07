@@ -111,3 +111,32 @@ def test_modern_scheme_uses_cool_slate_cobalt_and_balanced_chart_tokens() -> Non
     assert "--warning:#E6A15A" in css
     assert "--chart-8:#9AA8BC" in css
     assert "Cobalt/Teal" in settings
+
+
+def test_the_notice_severity_dot_uses_its_own_warning_token() -> None:
+    """Der Schweregrad-Punkt im Meldungs-Panel hing an --accent-bar, einer
+    Marken-/Layoutfarbe. Im Schema "modern" ist das ein Blaugrün (#0E7C86):
+    „warn" sah damit aus wie „in Ordnung" und war von --accent-line kaum zu
+    unterscheiden — grau/grün/rot ergibt keine erkennbare Steigerung.
+
+    Jetzt ein eigenes --notice-warn, standardmäßig auf --warning, das jedes
+    Schema definiert und das genau diese Bedeutung trägt.
+    """
+    css = CSS.read_text(encoding="utf-8")
+
+    assert ".notice-dot.warn{background:var(--notice-warn);}" in css
+    assert ".notice-dot.warn{background:var(--accent-bar);}" not in css
+    assert "--notice-warn:var(--warning);" in css
+
+    # Jedes Schema muss --warning führen, sonst liefe --notice-warn dort ins
+    # Leere — je Farbschema ein heller und ein dunkler Block plus die
+    # prefers-color-scheme-Variante.
+    assert css.count("--warning:") == 9
+
+    # Die drei Stufen dürfen sich nicht dieselbe Quelle teilen.
+    quellen = {
+        zeile.split("var(")[1].split(")")[0]
+        for zeile in css.splitlines()
+        if zeile.startswith(".notice-dot.")
+    }
+    assert quellen == {"--ink-faint", "--notice-warn", "--danger"}, quellen

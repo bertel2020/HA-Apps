@@ -207,12 +207,15 @@ DISPLAY_MODE_LABELS = {
     "onoff": "AN/AUS (Rohwert)",
     "time": "Zeit (Dauer)",
 }
+# Vielfache des für die Entität Üblichen, nicht Prozent eines Werts — die
+# Begründung steht in storage/cleanup.py (OutlierDetector). Die Schlüssel sind
+# zugleich die gespeicherten Werte; die alte Prozent-Leiter (5/10/25) wird
+# beim Start einmalig darauf abgebildet (index._migrate()).
 OUTLIER_THRESHOLD_LABELS = {
-    "5": "5 %",
-    "10": "10 %",
-    "25": "25 %",
-    "50": "50 %",
-    "100": "100 %",
+    "10": "10×",
+    "20": "20×",
+    "50": "50×",
+    "100": "100×",
     "off": "Aus",
 }
 # Warum die Ausreißer-Erkennung für diesen Typ nicht angeboten wird — die
@@ -221,8 +224,9 @@ OUTLIER_THRESHOLD_LABELS = {
 # dass das Feld nicht ohne Erklärung ausgegraut dasteht.
 OUTLIER_BLOCKED_REASONS = {
     "switch": (
-        "Für Schalter nicht verfügbar: Ein Wechsel zwischen AN und AUS überschreitet "
-        "jede Schwelle, jeder Wechsel wäre ein Ausreißer."
+        "Für Schalter nicht verfügbar: Bei Werten, die nur AN oder AUS sein können, "
+        "gibt es keine übliche Schwankung, an der sich ein Vielfaches messen ließe — "
+        "die Erkennung würde nie etwas markieren."
     ),
 }
 BACKUP_SCHEDULE_LABELS = {

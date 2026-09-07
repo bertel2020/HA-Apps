@@ -67,34 +67,46 @@ def test_detect_gaps_returns_nothing_when_threshold_is_off() -> None:
     assert cleanup.detect_gaps(rows, threshold_minutes=None, decimals="auto", tz=TZ) == {}
 
 
-def test_detect_outliers_flags_jump_into_and_back_out_of_a_spike() -> None:
-    """Sprung-basiert (gegenüber dem Vorwert) statt Abweichung vom Fenster-Median
-    (siehe cleanup.detect_outliers) — ein einzelner Ausreißer erzeugt deshalb
-    ZWEI markierte Zeitstempel: den plötzlichen Sprung hinein UND den ebenso
-    plötzlichen Rücksprung zum normalen Niveau danach."""
-    rows = [
-        (_ts(2024, 7, 1, 8), 21.0),
-        (_ts(2024, 7, 1, 9), 21.4),
-        (_ts(2024, 7, 1, 10), 20.8),
-        (_ts(2024, 7, 1, 11), 184.7),  # plötzlicher Sprung
-        (_ts(2024, 7, 1, 12), 21.2),  # ebenso plötzlicher Rücksprung
-        (_ts(2024, 7, 1, 13), 21.6),
-    ]
-    outliers = cleanup.detect_outliers(rows, threshold_percent=50, decimals="auto", tz=TZ)
-    assert set(outliers) == {_ts(2024, 7, 1, 11), _ts(2024, 7, 1, 12)}
-    assert "Sprung gegenüber Vorwert" in outliers[_ts(2024, 7, 1, 11)]
+def test_detect_outliers_flags_the_spike_and_the_way_back() -> None:
+    """Bezug ist die übliche Schwankung der letzten Werte (Median + MAD, siehe
+    cleanup.OutlierDetector), nicht der Vorwert. Ein einzelner Ausreißer
+    erzeugt trotzdem ZWEI Markierungen — der Spitzenwert selbst liegt weit vom
+    Median, und solange er im Fenster steckt, verschiebt er den Median nicht
+    (das ist der Punkt am Median), der Rücksprung liegt danach aber ebenfalls
+    außerhalb, weil der Ausreißer die Streuung nicht aufbläht."""
+    rows = [(_ts(2024, 7, 1, 8 + i), v) for i, v in enumerate(
+        [21.0, 21.4, 20.8, 21.1, 21.3, 21.2, 184.7, 21.2, 21.6]
+    )]
+    outliers = cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ)
+    assert _ts(2024, 7, 1, 14) in outliers
+    assert "weiter vom Median der letzten" in outliers[_ts(2024, 7, 1, 14)]
 
 
 def test_detect_outliers_returns_nothing_when_threshold_is_off() -> None:
-    rows = [
-        (_ts(2024, 7, 1, 8), 21.0),
-        (_ts(2024, 7, 1, 9), 21.4),
-        (_ts(2024, 7, 1, 10), 20.8),
-        (_ts(2024, 7, 1, 11), 184.7),
-        (_ts(2024, 7, 1, 12), 21.2),
-        (_ts(2024, 7, 1, 13), 21.6),
+    rows = [(_ts(2024, 7, 1, 8 + i), v) for i, v in enumerate(
+        [21.0, 21.4, 20.8, 21.1, 21.3, 21.2, 184.7, 21.2, 21.6]
+    )]
+    assert cleanup.detect_outliers(rows, None, decimals="auto", tz=TZ) == {}
+
+
+def test_both_row_paths_use_the_same_outlier_rule() -> None:
+    """Die kurzen Zeiträume der Bereinigungsseite gehen über detect_outliers(),
+    "Jahr"/"Gesamt" über analyze_raw_rows_page(). Dort standen einmal zwei
+    verschieden rechnende Regeln, wodurch dieselbe Entität je nach gewähltem
+    Zeitraum unterschiedlich viele Ausreißer zeigte."""
+    werte = [20.0, 20.2, 19.9, 20.1, 20.3, 20.0, 19.8, 250.0, 20.1, 20.0, 20.2]
+    rows = [(float(i * 60), v) for i, v in enumerate(werte)]
+
+    direkt = cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ)
+    streaming = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="outliers", page=1, page_size=50,
+        gap_threshold_minutes=None, outlier_factor=10, tz=TZ,
+    )
+    assert streaming["counts"]["outliers"] == len(direkt)
+    assert {row["ts"] for row in streaming["rows"]} == set(direkt)
+    assert [row["flags"][0]["reason"] for row in streaming["rows"]] == [
+        direkt[row["ts"]] for row in streaming["rows"]
     ]
-    assert cleanup.detect_outliers(rows, threshold_percent=None, decimals="auto", tz=TZ) == {}
 
 
 def test_soft_delete_excludes_row_and_undo_restores_it() -> None:
@@ -288,7 +300,7 @@ def test_streaming_analysis_pages_complete_history_without_materializing_it() ->
         page=2,
         page_size=10,
         gap_threshold_minutes=None,
-        outlier_threshold_percent=None,
+        outlier_factor=None,
         tz=TZ,
     )
 
@@ -315,7 +327,7 @@ def test_streaming_analysis_preserves_duplicate_filter_semantics() -> None:
         page=1,
         page_size=50,
         gap_threshold_minutes=None,
-        outlier_threshold_percent=None,
+        outlier_factor=None,
         tz=TZ,
     )
 

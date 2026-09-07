@@ -500,65 +500,81 @@ manuell verkleinern. Bestehende Entitäten mit einer solchen Kombination listet
 
 ### Ausreißer-Erkennung
 
-Ab welcher prozentualen Abweichung die Bereinigungs-Seite einen Wert als
-**Ausreißer** markiert: 5, 10, 25, 50, 100 % — oder Aus. Wie die
-Lücken-Erkennung reine Analyse, ohne Eingriff in die Daten.
+Markiert **unplausible Einzelwerte** auf der Bereinigungs-Seite: verrutschte
+Ziffern, Übertragungsfehler, Sensoraussetzer. Nicht gemeint sind hohe Werte —
+ein heißer Tag oder eine Waschmaschine, die gerade läuft, sind keine Ausreißer.
+Wie die Lücken-Erkennung reine Analyse, ohne Eingriff in die Daten.
 
-**Wogegen gemessen wird, hängt vom Typ der Entität ab.** Das ist der
-entscheidende Punkt, denn derselbe Prozentsatz bedeutet dadurch je nach Sensor
-etwas anderes:
+Einstellbar ist ein **Vielfaches**: 10, 20, 50, 100 — oder Aus. Voreingestellt
+ist 50×. Kleinere Zahl heißt empfindlicher.
 
-**Zähler** (Verbrauchszähler, Erzeugung, alles mit stetig steigendem Stand) —
-verglichen wird der **Zuwachs mit dem vorherigen Zuwachs**. Markiert wird, wenn
-er um mehr als den Schwellwert abweicht.
+**Vielfaches wovon? Von dem, was für diese Entität üblich ist.** Das ist der
+Kern der Sache, und es hängt vom Typ ab:
 
-> Ein Stromzähler steht bei 45.000 kWh und wächst stündlich um rund 12 kWh.
-> Springt der Verbrauch in einer Stunde auf 500 kWh, weicht dieser Zuwachs um
-> das Vierzigfache ab und wird markiert. Der Zählerstand selbst hat sich dabei
-> nur um gut ein Prozent verändert — deshalb ist der Zuwachs die richtige
-> Bezugsgröße und nicht der Stand.
+**Zähler** (Verbrauch, Erzeugung, alles mit stetig steigendem Stand) — Bezug
+ist der **übliche Zuwachs**: der Median der letzten 50 Zuwächse. Markiert wird
+ein Zuwachs, der ein Vielfaches davon beträgt. Der Zählerstand selbst spielt
+keine Rolle.
 
-Ein gleichmäßig laufender Zähler löst nie aus, egal wie eng die Schwelle steht.
-Erkannt werden dafür zuverlässig auch grobe Fehler des Zählers selbst: eine
-Fehlmessung um den Faktor 10 und ein Rücksprung auf 0 nach einem
-Zählerwechsel. (Für den Rücksprung gibt es zusätzlich die eigene Markierung
-**Zählerrückgang**.)
+> Ein Stromzähler wächst üblicherweise um 0,0016 kWh je Messwert. Der größte
+> *echte* Zuwachs über einen Monat lag beim 10-fachen davon. Rutscht dagegen
+> eine Ziffer — 10.123 wird zu 101.230 —, ist dieser eine Zuwachs das
+> 56.941.875-fache. Zwischen normalem Betrieb und echtem Fehler liegen sechs
+> Größenordnungen; jede Schwelle dazwischen trifft nur den Fehler.
 
-**Alle anderen Sensoren** (Temperatur, Leistung, Luftfeuchte …) — verglichen
-wird der Wert mit dem **Durchschnitt der letzten fünf Werte**. Markiert wird,
-wenn er um mehr als den Schwellwert davon abweicht.
+Ein gleichmäßig laufender Zähler löst nie aus. Rückgänge werden hier **nicht**
+markiert — dafür gibt es die eigene Markierung **Zählerrückgang**.
 
-> Eine Raumtemperatur liegt bei 21 °C. Bei Schwelle 25 % wird alles markiert,
-> was mehr als rund 5 °C daneben liegt — ein einzelner Messwert von 60 °C also
-> sicher, das normale Auf und Ab nicht.
+**Alle anderen Sensoren** (Temperatur, Leistung, Luftfeuchte …) — Bezug ist die
+**übliche Schwankung der letzten fünfzehn Werte**: wie weit ein Wert typischer­
+weise von der Mitte dieses Fensters entfernt liegt. Markiert wird, wer ein
+Vielfaches weiter entfernt liegt als das.
 
-Fünf Werte als Bezug bedeutet: Ein langsam driftendes Signal fällt **nicht**
-auf, weil der Bezug mitwandert. Auffällig ist nur, wer aus seiner unmittelbaren
-Nachbarschaft ausbricht.
+> Eine Raumtemperatur pendelt um 21 °C, üblicherweise ±0,3 °C. Bei 20× wird
+> markiert, was mehr als 6 °C daneben liegt — ein einzelner Messwert von 60 °C
+> also, das normale Auf und Ab nicht.
 
-**Zwei Eigenschaften, die man kennen sollte:**
+Fünfzehn Werte als Fenster bedeutet: ein langsam driftendes Signal fällt
+**nicht** auf, weil der Bezug mitwandert. Auffällig ist nur, wer aus seiner
+unmittelbaren Nachbarschaft ausbricht.
 
-- **Der Bezug ist das aktuelle Niveau, deshalb ist der Prozentsatz relativ.**
-  Bei einer Größe, die um **null** schwankt — Leistung mit Einspeisung, eine
-  Außentemperatur im Winter — wird der Durchschnitt der letzten fünf Werte
-  klein, und schon normale Schwankungen überschreiten jede Schwelle. Dort ist
-  eine höhere Schwelle nötig oder „Aus" die ehrlichere Wahl.
-- **Dieselbe Größe auf einer anderen Skala verhält sich anders.** Ein Sprung
-  von 20 auf 60 sind in Grad Celsius 200 % des Niveaus, in Kelvin (293 auf
-  333) nur 13,6 %. Eine Schwelle, die für einen Sensor passt, passt deshalb
-  nicht automatisch für einen anderen.
+**Warum ein Vielfaches und kein Prozentsatz?** Weil ein Prozentsatz auf zwei
+Sensoren derselben Art Verschiedenes bedeutet. 5 % sind bei einem frisch
+angeschlossenen Zähler (Stand 12) ganze 0,6 und bei einem alten (Stand
+1.200.000) volle 60.000 — dieselbe Einstellung wäre beim einen streng und beim
+anderen wirkungslos, obwohl beide denselben Verbrauch messen. Dasselbe gilt für
+die Skala: ein Sprung von 20 auf 60 sind in Grad Celsius 200 %, in Kelvin (293
+auf 333) nur 13,6 %. Ein Vielfaches des Üblichen kennt diese Abhängigkeit
+nicht: dieselbe Einstellung bedeutet auf jedem Sensor dasselbe.
+
+**Zwei Grenzen, die man kennen sollte:**
+
+- **Die ersten Werte eines Zeitraums werden nicht geprüft.** Erst wenn genug
+  Vorgeschichte da ist (fünf Werte bzw. fünf Zuwächse), gibt es einen Bezug.
+- **Ein völlig konstantes Signal wird übersprungen.** Sind alle Werte im
+  Fenster gleich, gibt es keine „übliche Schwankung", an der sich ein
+  Vielfaches messen ließe — dann wird nichts markiert, statt zu raten. In der
+  Praxis selten, weil der Wertänderungsfilter konstante Reihen ohnehin
+  ausdünnt.
 
 **Für Schalter ist die Einstellung nicht verfügbar.** Bei Werten, die nur 0
-oder 1 sein können, liegt jeder Wert weit neben dem Durchschnitt seiner
-Nachbarn — jeder Zustandswechsel wäre ein „Ausreißer", und mit aktivem
-Wertänderungsfilter ist fast jeder gespeicherte Wert ein Wechsel. Das Feld ist
-deshalb ausgegraut und nennt den Grund.
+oder 1 sein können, ist die übliche Schwankung rechnerisch immer null — die
+Erkennung würde nie etwas markieren. Ein Regler, der nachweislich nichts tut,
+wäre eine Falschauskunft; das Feld ist deshalb ausgegraut und nennt den Grund.
 
 **Was die Schwelle tatsächlich bewirkt, steht unter dem Feld:** der Anteil der
 Werte, den sie über die komplette Historie markiert, mit Balken und absoluter
 Zahl. Ist die Quote noch nicht berechnet oder gehört sie zu einer anderen
-Schwelle, erscheint stattdessen **Jetzt prüfen** — die Berechnung liest den
-gesamten Bestand der Entität und läuft deshalb nur auf Klick.
+Schwelle, erscheint stattdessen **Jetzt prüfen**; steht sie schon da, lässt sie
+sich mit **Neu berechnen** auffrischen. Die Berechnung liest den gesamten
+Bestand der Entität und läuft deshalb nur auf Klick.
+
+> **Nach dem Update von einer älteren Version:** Die Schwelle war früher ein
+> Prozentsatz (5, 10, 25, 50, 100 %). Gespeicherte Einstellungen werden einmalig
+> auf die neue Leiter übernommen, und zwar nach ihrem Platz darauf — die
+> empfindlichste alte Stufe wird die empfindlichste neue (5 % und 10 % → 10×,
+> 25 % → 20×, 50 % → 50×, 100 % → 100×). „Aus" bleibt aus. Weil die Zahlen jetzt
+> etwas anderes bedeuten, lohnt ein Blick auf die Quote unter dem Feld.
 
 ### Anzeigemodus
 
@@ -579,8 +595,12 @@ archivierte Daten. Eine gröbere Auflösung verdünnt also keinen Altbestand, un
 eine feinere holt nichts zurück, was nie gespeichert wurde.
 
 Lücken- und Ausreißer-Erkennung wirken dagegen **immer sofort auf den ganzen
-Bestand**: Sie werden bei jedem Aufruf der Bereinigungs-Seite neu gerechnet und
-verändern die Daten nicht.
+Bestand**: Sie werden bei jedem Aufruf der Bereinigungs-Seite aus den Rohwerten
+des angezeigten Zeitraums neu gerechnet, nichts davon wird gespeichert, und die
+Daten selbst bleiben unberührt. Eine geänderte Schwelle gilt deshalb sofort und
+rückwirkend — es gibt keinen Bestand alter Markierungen, der nachgezogen werden
+müsste. (Einzige Ausnahme ist die Quote unter dem Schwellenfeld: die gehört zu
+einem Vollscan über die ganze Historie und wird nur auf Klick aufgefrischt.)
 
 ### Datenverwaltung
 
@@ -609,8 +629,13 @@ Reiter:
 ### 1. Bereinigen
 
 Erkannte Ausreißer, Lücken, Duplikate und gerundet gleiche Wiederholungen
-werden als Liste angezeigt, je mit einer kurzen Begründung (z. B. "3 Std.
-50 Min. seit vorherigem Wert 21,2 °C um 08:10"). Einzelne Einträge oder alle
+werden als Liste angezeigt, je mit einer kurzen Begründung — sichtbar, wenn
+der Mauszeiger auf der roten Markierung steht. Sie nennt die Regel, an der
+die Markierung hängt, und den unmittelbar vorhergehenden Wert mit Zeitpunkt:
+
+> `3 Std. 50 Min. seit vorherigem Wert 21,2 °C um 08:10`
+> `21,56 liegt 23× weiter vom Median der letzten 15 Werte (24,27) entfernt`
+> `als üblich (±0,12) — Vorwert 22,06 um 11.08.2026 00:01:41` Einzelne Einträge oder alle
 zusammen auswählen und löschen — das ist zunächst ein **Soft-Delete**: Die
 Werte verschwinden sofort aus jeder Anzeige (Charts, Tabellen, Rohwerte),
 sind aber über "Rückgängig (letzte Löschung)" wiederherstellbar, solange
@@ -1219,6 +1244,7 @@ wie die Einstellungen:
 | --- | --- |
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
+| **Ausreißer** | Entitäten, bei denen die eingestellte Ausreißer-Schwelle mehr als 1 % ihrer Werte markiert — mit Schwelle, absoluter Zahl und Quote. Dann ist die Schwelle für dieses Signal zu eng: markiert wird nicht mehr das Unplausible, sondern normales Verhalten. Es sind dieselben Zahlen, die unter dem Schwellenfeld der jeweiligen Entität stehen (siehe [Entität konfigurieren](#entität-konfigurieren)); die Liste rechnet nichts eigenes. Keine Sammel-Korrektur — die passende Schwelle hängt am Signal. |
 | **Konfiguration** | Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann, weil die gewählte Auflösung oder der aktive Wertänderungsfilter selbst schon einen größeren Mindestabstand zwischen Werten erzwingt (siehe [Entität konfigurieren](#entität-konfigurieren)) — mit Auflösung, aktueller und empfohlener Lücken-Erkennung je Entität. Rein informativ, keine Sammel-Korrektur: der passende Zielwert unterscheidet sich je Entität. |
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
@@ -1228,6 +1254,16 @@ wie die Einstellungen:
 Jeder Bereich verlinkt aus der passenden Systemmeldung (siehe unten), falls
 gerade etwas ansteht — Housekeeping selbst muss dafür nicht regelmäßig
 aufgesucht werden.
+
+**Woher die Ausreißer-Quoten kommen:** Sie zu ermitteln heißt, die komplette
+Historie einer Entität zu lesen — für alle Entitäten auf einmal wäre das bei
+jedem Seitenaufruf zu teuer. Zeitarchiv rechnet deshalb im Hintergrund eine
+Entität nach der anderen durch und frischt jede etwa alle sechs Stunden auf.
+Unter der Liste steht, wie weit das ist („4 von 5 Entitäten … gemessen"); wer
+nicht warten will, findet auf der Konfigurationsseite der Entität den Knopf
+**Jetzt prüfen**. Eine leere Liste bei noch offenen Messungen heißt also „bis
+hierhin nichts gefunden", nicht „alles geprüft" — deshalb nennt der Abschnitt
+auch dann den höchsten bisher gemessenen Wert.
 
 ### Was gerade läuft
 
@@ -1290,6 +1326,11 @@ Zeitarchiv unter anderem:
   Wertänderungsfilter strukturell nie zutreffen (siehe
   [Housekeeping → Konfiguration](#housekeeping) und
   [Entität konfigurieren](#entität-konfigurieren))
+- Ausreißer-Erkennung markiert bei mindestens einer Entität mehr als 1 % aller
+  Werte. Eine einzige Meldung für die ganze Installation, auch bei hundert
+  betroffenen Entitäten: sie nennt die Anzahl und den deutlichsten Fall und
+  führt zur Liste (siehe [Housekeeping → Ausreißer](#housekeeping)). Reine
+  Auskunft, deshalb stummschaltbar
 - Tageslastprofil im Energiedashboard wird nach einer Konfigurationsänderung
   noch rückwirkend vervollständigt
 - Freier Speicherplatz auf dem Host-Dateisystem wird knapp (zweistufig:
@@ -1520,9 +1561,10 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 ## Typische Aufgaben
 
 **"Ein Sensor sendet unplausible Ausreißer."**
-→ Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf einen
-passenden Prozentsatz einstellen (bei Zählern und Schaltern gibt es die
-Einstellung nicht, siehe oben) → zurück zur Verlaufsansicht →
+→ Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf ein passendes
+Vielfaches einstellen und an der Quote darunter ablesen, was das bewirkt
+(bei Schaltern gibt es die Einstellung nicht, siehe oben) → zurück zur
+Verlaufsansicht →
 **Bereinigen** → erkannte Ausreißer prüfen und löschen (Soft-Delete,
 rückgängig machbar) → **Housekeeping → Speicherplatz**, wenn der Platz
 tatsächlich freigegeben werden soll.

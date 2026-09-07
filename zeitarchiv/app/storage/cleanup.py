@@ -70,10 +70,153 @@ def list_raw_rows(
     )
 
 
-# Wie viele zurückliegende Werte den Bezug für die Ausreißer-Erkennung bilden
-# (Typ "standard"). Fünf: genug, dass ein einzelner Ausreißer den Bezug nicht
-# selbst verschiebt, kurz genug, dass ein driftendes Signal mitgenommen wird.
-OUTLIER_WINDOW = 5
+# Kennung der Ausreißer-REGEL, nicht der Schwelle. Sie steht in jedem
+# gespeicherten Zählergebnis (index.set_cleanup_alltime_stats) und muss
+# hochgezählt werden, sobald OutlierDetector anders rechnet.
+#
+# Der Anlass war ein echter Fehlanzeige: Die Umstellung von Prozent auf
+# Vielfache hat die Schwellen "10", "50" und "100" auf ihrem Schlüssel gelassen
+# (aus "50 %" wurde "50×"). Ein vor der Umstellung berechnetes Ergebnis passte
+# damit weiterhin zur eingestellten Schwelle, und Housekeeping zeigte es als
+# aktuelle Quote — gemessen: 2.406 von 52.194 markierten Werten an einer
+# Entität, an der die neue Regel 0 findet. Die Schwelle allein kann eine
+# Zählung also nicht ausweisen; erst Schwelle UND Regel zusammen tun das.
+OUTLIER_RULE_VERSION = 2
+
+# Ausreißer-Erkennung: Fenstergrößen der beiden Regeln (Begründung und
+# Messwerte siehe OutlierDetector).
+OUTLIER_WINDOW = 15
+OUTLIER_MIN_VALUES = 5
+COUNTER_OUTLIER_WINDOW = 50
+COUNTER_OUTLIER_MIN_STEPS = 5
+
+
+def _format_factor(factor: float) -> str:
+    """Vielfaches für den Markierungsgrund. Unter 10 mit einer Nachkommastelle,
+    darüber gerundet mit Tausenderpunkten — ein Ziffernfehler ergibt schnell
+    siebenstellige Vielfache, und "56941875,0×" liest niemand."""
+    if factor < 10:
+        return f"{factor:.1f}".replace(".", ",") + "×"
+    return f"{factor:,.0f}".replace(",", ".") + "×"
+
+
+class OutlierDetector:
+    """Die EINZIGE Ausreißer-Regel der App — beide Seitenpfade der
+    Bereinigungs-/Korrektur-Ansicht und die Gesamt-Statistik speisen ihre
+    Werte hier hinein (siehe analyze_raw_rows_page und detect_outliers).
+
+    Gesucht sind unplausible Werte: Übertragungsfehler, Sensoraussetzer,
+    verrutschte Ziffern. Die Schwelle ist deshalb ein VIELFACHES des für diese
+    Entität Üblichen, kein Prozentsatz eines Werts. Ein Prozentsatz war die
+    Vorgängerfassung und ist an derselben Stelle gescheitert: 5 % sind bei
+    einem frischen Zähler (Stand 12) 0,6 und bei einem alten (Stand 1.200.000)
+    60.000 — dieselbe Einstellung bedeutet auf zwei Zählern etwas völlig
+    anderes, obwohl beide dasselbe messen.
+
+    ``"counter"`` — Zähler (Verbrauch, Erzeugung, alles stetig steigende)
+        Bezug ist der ZUWACHS, nicht der Stand: Δ > Faktor × Median der
+        letzten ``COUNTER_OUTLIER_WINDOW`` positiven Zuwächse.
+
+        Gemessen an einem echten Stromzähler (3.890 Zuwächse, 30 Tage): der
+        größte ECHTE Zuwachs liegt beim 10,1-fachen des Medians, ein
+        Ziffernfehler 10.123 → 101.230 beim 56.941.875-fachen. Zwischen beidem
+        liegen sechs Größenordnungen, in denen jede Schwelle sitzen kann; 50×
+        und 100× markierten auf gesunden Daten nichts und den eingebauten
+        Fehler zuverlässig. Und der Punkt, um den es geht: derselbe Fehler bei
+        den Ständen 12, 10.123 und 1.200.000 ergibt jeweils dasselbe Ergebnis.
+
+        Negative Zuwächse gehen weder in den Bezug ein noch werden sie
+        markiert — dafür gibt es die eigene Markierung "Zählerrückgang".
+
+    ``"standard"`` — alle übrigen Sensoren
+        Werte sind hier additiv und dürfen negativ sein, ein Vielfaches des
+        Werts trägt also nicht. Bezug ist der robuste Abstand:
+        |Wert − Median| > Faktor × MAD (Median der absoluten Abweichungen)
+        über die letzten ``OUTLIER_WINDOW`` Werte.
+
+        Das ist skalen- UND nullpunktunabhängig: dieselbe Kurve in °C, in
+        Kelvin und um null herum ergibt exakt dieselben Markierungen — was
+        die Prozentfassung nicht konnte (ein Sprung 20 → 60 sind in °C 200 %,
+        in Kelvin 13,6 %).
+
+    Was die Regel NICHT kann: ist der MAD null (15 identische Werte in Folge),
+    gibt es kein "üblich", an dem sich ein Vielfaches messen ließe — dann wird
+    übersprungen statt geraten. Dasselbe gilt für einen stillstehenden Zähler.
+    """
+
+    def __init__(
+        self, *, factor: float | None, mode: str, decimals: str, tz: ZoneInfo
+    ) -> None:
+        self.factor = factor
+        self.mode = "counter" if mode == "counter" else "standard"
+        self.decimals = decimals
+        self.tz = tz
+        self._values: deque[float] = deque(maxlen=OUTLIER_WINDOW)
+        self._steps: deque[float] = deque(maxlen=COUNTER_OUTLIER_WINDOW)
+        self._previous: float | None = None
+        self._previous_ts: float | None = None
+
+    def check(self, ts: float, value: float) -> str | None:
+        """Begründung, wenn `value` ein Ausreißer ist — sonst None. Muss für
+        JEDEN Wert in zeitlicher Reihenfolge aufgerufen werden, auch wenn die
+        Erkennung aus ist: die Aufrufe bilden den Bezug."""
+        if self.mode == "counter":
+            grund = self._check_counter(value)
+        else:
+            grund = self._check_standard(value)
+        self._previous = value
+        self._previous_ts = ts
+        return grund
+
+    def _vorwert(self) -> str:
+        """Der unmittelbar vorhergehende Wert mit Zeitpunkt, als Nachsatz jeder
+        Begründung. Die Kennzahl bezieht sich auf ein Fenster, nicht auf den
+        Vorwert — aber die erste Frage vor der Zeile lautet trotzdem "und was
+        stand vorher da?", und ohne ihn muss man dafür die Markierung
+        wegklicken und in der Liste nachsehen. Derselbe Aufbau wie bei Lücken
+        und Wiederholungen ("… Vorwert X um TT.MM.JJJJ hh:mm:ss")."""
+        if self._previous is None or self._previous_ts is None:
+            return ""
+        return (
+            f" — Vorwert {_format_val(self._previous, self.decimals)} "
+            f"um {_format_ts(self._previous_ts, self.tz)}"
+        )
+
+    def _check_counter(self, value: float) -> str | None:
+        if self._previous is None:
+            return None
+        zuwachs = value - self._previous
+        if zuwachs <= 0:
+            return None
+        grund = None
+        if self.factor is not None and len(self._steps) >= COUNTER_OUTLIER_MIN_STEPS:
+            ueblich = statistics.median(self._steps)
+            if ueblich > 0 and zuwachs > self.factor * ueblich:
+                grund = (
+                    f"Zuwachs {_format_val(zuwachs, self.decimals)} ist das "
+                    f"{_format_factor(zuwachs / ueblich)} des üblichen Zuwachses "
+                    f"({_format_val(ueblich, self.decimals)}, Median der letzten "
+                    f"{len(self._steps)}){self._vorwert()}"
+                )
+        self._steps.append(zuwachs)
+        return grund
+
+    def _check_standard(self, value: float) -> str | None:
+        grund = None
+        if self.factor is not None and len(self._values) >= OUTLIER_MIN_VALUES:
+            mitte = statistics.median(self._values)
+            streuung = statistics.median([abs(v - mitte) for v in self._values])
+            abstand = abs(value - mitte)
+            if streuung > 0 and abstand > self.factor * streuung:
+                grund = (
+                    f"{_format_val(value, self.decimals)} liegt "
+                    f"{_format_factor(abstand / streuung)} weiter vom Median der letzten "
+                    f"{len(self._values)} Werte ({_format_val(mitte, self.decimals)}) "
+                    f"entfernt als üblich (±{_format_val(streuung, self.decimals)})"
+                    f"{self._vorwert()}"
+                )
+        self._values.append(value)
+        return grund
 
 
 class ResultLimitExceeded(ValueError):
@@ -87,7 +230,7 @@ def analyze_raw_rows_page(
     page: int,
     page_size: int,
     gap_threshold_minutes: float | None,
-    outlier_threshold_percent: float | None,
+    outlier_factor: float | None,
     tz: ZoneInfo,
     decimals: str = "auto",
     counter_decrease_enabled: bool = False,
@@ -100,21 +243,9 @@ def analyze_raw_rows_page(
     Seite nötig sind. Damit funktioniert insbesondere der Zeitraum "Gesamt"
     auch oberhalb des UI-Materialisierungslimits.
 
-    ``outlier_mode`` wählt die Ausreißer-Regel. Beide beziehen sich auf die
-    JÜNGSTE VERGANGENHEIT, nicht auf den Mittelwert des ganzen Zeitraums:
-
-    ``"standard"``
-        Abweichung des Werts vom Schnitt der letzten ``OUTLIER_WINDOW`` Werte.
-    ``"counter"``
-        Abweichung des Zuwachses vom vorherigen Zuwachs. Ein Zählerstand
-        selbst sagt nichts; interessant ist, ob der Verbrauch aus der Reihe
-        fällt.
-
-    Vorher war der Bezug für beide der Mittelwert der Beträge über den ganzen
-    Zeitraum. Das machte die Erkennung bei Zählern faktisch wirkungslos (der
-    größte reale Sprung einer echten Entität lag bei 0,0003 % dieses Bezugs,
-    die kleinste wählbare Schwelle bei 5 %) und bei Standard-Sensoren abhängig
-    vom Nullpunkt der Skala.
+    ``outlier_factor`` ist ein VIELFACHES des für diese Entität Üblichen (nicht
+    mehr ein Prozentsatz), ``outlier_mode`` wählt die Bezugsgröße dafür —
+    beides steckt vollständig in OutlierDetector, siehe dort.
     """
     total_rows = 0
     for _ts, _value in rows_factory():
@@ -147,11 +278,11 @@ def analyze_raw_rows_page(
     last_kept_value: float | None = None
     counter_previous_ts: float | None = None
     counter_previous_value: float | None = None
-    # Ausreißer-Erkennung, zwei Regeln je nach Entitätstyp — beide beziehen
-    # sich auf die jüngste Vergangenheit statt auf den Mittelwert des ganzen
-    # Zeitraums (siehe Docstring).
-    letzte_werte: deque[float] = deque(maxlen=OUTLIER_WINDOW)
-    vorheriger_zuwachs: float | None = None
+    # Ausreißer-Erkennung, zwei Regeln je nach Entitätstyp — dieselbe Klasse,
+    # die auch der nicht-streamende Pfad über detect_outliers() benutzt.
+    outlier_detector = OutlierDetector(
+        factor=outlier_factor, mode=outlier_mode, decimals=decimals, tz=tz
+    )
 
     selected_filter = filter_ if filter_ in {
         "all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases"
@@ -223,36 +354,12 @@ def analyze_raw_rows_page(
                     f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)} "
                     f"(Schwellwert: {_format_duration(gap_seconds)})"
                 )
-        if outlier_threshold_percent is not None and previous_value is not None:
-            if outlier_mode == "counter":
-                # Ein Zählerstand steigt immer; interessant ist nicht er selbst,
-                # sondern sein ZUWACHS — und ob dieser aus der Reihe fällt. Ein
-                # Verbrauch, der plötzlich vierzigmal so hoch ist, fällt in den
-                # absoluten Ständen gar nicht auf (gemessen: 1,1 % Abweichung
-                # bei einem Stand um 45.000).
-                zuwachs = value - previous_value
-                if vorheriger_zuwachs not in (None, 0):
-                    abweichung = abs(zuwachs - vorheriger_zuwachs) / abs(vorheriger_zuwachs) * 100
-                    if abweichung > outlier_threshold_percent:
-                        group_outlier = (
-                            f"Zuwachs {_format_val(zuwachs, decimals)} weicht {abweichung:.0f} % "
-                            f"vom vorherigen Zuwachs {_format_val(vorheriger_zuwachs, decimals)} ab"
-                        )
-                vorheriger_zuwachs = zuwachs
-            elif letzte_werte:
-                # Bezug ist der Schnitt der letzten OUTLIER_WINDOW Werte, nicht
-                # der des ganzen Zeitraums: ein langsam driftendes Signal soll
-                # nicht dadurch auffällig werden, dass es sich vom Mittel eines
-                # Jahres entfernt hat.
-                basis = sum(letzte_werte) / len(letzte_werte)
-                if basis != 0:
-                    abweichung = abs(value - basis) / abs(basis) * 100
-                    if abweichung > outlier_threshold_percent:
-                        group_outlier = (
-                            f"{abweichung:.0f} % Abweichung vom Schnitt der letzten "
-                            f"{len(letzte_werte)} Werte ({_format_val(basis, decimals)})"
-                        )
-        letzte_werte.append(value)
+        # Immer aufrufen, auch bei ausgeschalteter Erkennung: der Detektor baut
+        # dabei seinen Bezug auf. Ein bereits markierter Zeitstempel bleibt
+        # markiert — bei mehreren Werten auf derselben Sekunde genügt einer.
+        outlier_reason = outlier_detector.check(ts, value)
+        if outlier_reason is not None and group_outlier is None:
+            group_outlier = outlier_reason
 
         if should_accept_value(
             "decimals", decimals, last_kept_value, last_kept_ts, value, ts
@@ -611,41 +718,30 @@ def detect_gaps(
 
 def detect_outliers(
     rows: list[tuple[float, float]],
-    threshold_percent: float | None,
+    factor: float | None,
     decimals: str,
     tz: ZoneInfo,
+    mode: str = "standard",
 ) -> dict[float, str]:
-    """Markiert Werte, die um mehr als den je Entität konfigurierten Prozentsatz
-    gegenüber dem UNMITTELBAR VORHERGEHENDEN Wert springen (Konfigurationsseite
-    der Entität) — bewusst ein Sprung gegenüber dem Vorwert statt einer
-    Abweichung vom Median des gesamten Fensters: bei natürlich stark
-    schwankenden Entitäten (z. B. aktuelle Leistungsaufnahme, die über den Tag
-    zwischen nahe 0 W und mehreren kW pendelt) würde eine Abweichung vom
-    Fenster-Median einen Großteil der völlig normalen Werte als "Ausreißer"
-    markieren — ein plötzlicher Sprung gegenüber dem Vorwert ist die deutlich
-    zuverlässigere Definition für eine tatsächlich verdächtige Messung
-    (Sensor-Aussetzer, Übertragungsfehler). Bezugsgröße für die Prozentangabe
-    ist der mittlere Betrag aller Werte im Fenster (nicht der Vorwert selbst) —
-    sonst würde ein Sprung von z. B. 0 W auf 50 W bei einem Vorwert nahe 0 eine
-    riesige, aber im Kontext bedeutungslose Prozentzahl ergeben.
-    threshold_percent=None ("Aus" in der Konfiguration) liefert immer {}
-    (keine Ausreißer-Erkennung)."""
-    if threshold_percent is None or len(rows) < 2:
+    """Ausreißer einer bereits materialisierten Zeilenliste (kurze Zeiträume der
+    Bereinigungs-/Korrektur-Ansicht, die nicht über den Streaming-Pfad laufen).
+
+    Bewusst nur eine Hülle um OutlierDetector: hier stand früher eine ZWEITE,
+    anders rechnende Regel, wodurch dieselbe Entität je nach gewähltem Zeitraum
+    unterschiedlich viele Ausreißer zeigte (kurze Zeiträume: Sprung zum Vorwert,
+    gemessen am Mittelwert der Beträge — "Jahr"/"Gesamt": die Regel von
+    analyze_raw_rows_page). Es gibt jetzt genau eine Regel; die beiden Pfade
+    unterscheiden sich nur noch darin, ob alle Zeilen im Speicher stehen.
+
+    factor=None ("Aus" in der Konfiguration) liefert immer {}."""
+    if factor is None or len(rows) < 2:
         return {}
-    values = [v for _, v in rows]
-    baseline = statistics.mean(abs(v) for v in values)
-    if baseline == 0:
-        return {}
+    detector = OutlierDetector(factor=factor, mode=mode, decimals=decimals, tz=tz)
     flagged: dict[float, str] = {}
-    for i in range(1, len(rows)):
-        ts, value = rows[i]
-        prev_ts, prev_value = rows[i - 1]
-        jump_percent = abs(value - prev_value) / baseline * 100
-        if jump_percent > threshold_percent:
-            flagged[ts] = (
-                f"{jump_percent:.0f} % Sprung gegenüber Vorwert "
-                f"{_format_val(prev_value, decimals)} um {_format_ts(prev_ts, tz)}"
-            )
+    for ts, value in rows:
+        reason = detector.check(ts, value)
+        if reason is not None and ts not in flagged:
+            flagged[ts] = reason
     return flagged
 
 

@@ -142,12 +142,12 @@ HEATMAP_DAYS = 7
 
 DEFAULT_HUB_NAME = "Haus"
 
-# Auffälligkeiten (Schwellenwert-Färbung): dieselbe Optik wie
-# OUTLIER_THRESHOLD_LABELS (formatting.py) für den bereits vorhandenen
-# Ausreißer-Schwellenwert je Entität, hier aber eigenständig (kleinere
-# Auswahl — 5 %/10 % wären für einen Perioden-Gesamtwert-Vergleich zu
-# empfindlich, das ist ein anderer Vergleichsmaßstab als ein einzelner
-# Rohwert-Sprung) und global fürs ganze Energiedashboard statt pro Entität.
+# Auffälligkeiten (Schwellenwert-Färbung): bewusst eine EIGENE Leiter und
+# ausdrücklich NICHT die Ausreißer-Schwelle je Entität (OUTLIER_THRESHOLD_
+# LABELS in formatting.py). Verglichen wird hier ein Perioden-Gesamtwert mit
+# dem Schnitt der Vorperioden — ein Prozentsatz ist dafür die richtige Größe,
+# weil beide Seiten dieselbe Größenordnung haben. Die Ausreißer-Erkennung sucht
+# dagegen unplausible EINZELwerte und misst deshalb in Vielfachen des Üblichen.
 ANOMALIE_SCHWELLE_LABELS = {"off": "Aus", "25": "25 %", "50": "50 %", "100": "100 %"}
 # Anzahl vorheriger Perioden, deren Schnitt als "üblicher" Vergleichswert
 # dient — mehrere statt nur der einen Vorperiode, damit ein Gerät, das
