@@ -3821,6 +3821,21 @@ _TILE_RANGE_LABELS = {
 _TILE_METRIC_LABELS = {"last": "", "min": "Min", "avg": "Ø", "max": "Max", "sum": "Σ"}
 
 
+def _tile_metric_labels(aggregation_type: str | None) -> dict[str, str]:
+    """Die Kürzel für einen Entitätstyp — genau eines hängt davon ab.
+
+    Bei einem Zähler ist die Summe über den Zeitraum der Zuwachs des
+    Zählerstands: „Σ 6,496 kWh" ist rechnerisch richtig und beschreibt einen
+    Tagesertrag trotzdem falsch. Beim Schalter bleibt es Σ — dort summiert die
+    Kennzahl Einschaltdauer, das ist kein Zuwachs, und „+2h 15m" wäre keine
+    bessere Beschreibung. Bei Messwerten ist die Summe gar nicht erst wählbar
+    (siehe _tile_available_metrics()).
+    """
+    if aggregation_type == "counter":
+        return {**_TILE_METRIC_LABELS, "sum": "+"}
+    return _TILE_METRIC_LABELS
+
+
 def _tile_available_metrics(aggregation_type: str | None) -> list[str]:
     """Welche Kennzahlen für diesen Entitätstyp überhaupt eine Aussage sind.
 
@@ -3856,6 +3871,7 @@ def _tile_metric_context(pin, aggregation_type: str | None = None) -> dict:
     range_key = pin["range_key"] if pin["range_key"] in _TILE_RANGE_LABELS else "day"
     primary = pin["primary_metric"] if pin["primary_metric"] in _TILE_METRIC_LABELS else "last"
     verfuegbar = _tile_available_metrics(aggregation_type)
+    labels = _tile_metric_labels(aggregation_type)
     # Auch gegen den Entitätstyp gefiltert, nicht nur gegen den Hauptwert: ein
     # Wechsel der Entität (dashboard/entity/{id}) lässt die gespeicherten
     # Kennzahlen stehen, und ein Σ, das für einen Messwert gespeichert wurde,
@@ -3869,7 +3885,10 @@ def _tile_metric_context(pin, aggregation_type: str | None = None) -> dict:
         "continuous": bool(pin["continuous"]),
         "range_label": _TILE_RANGE_LABELS[range_key][1 if pin["continuous"] else 0],
         "primary_metric": primary,
-        "primary_label": _TILE_METRIC_LABELS[primary],
+        "primary_label": labels[primary],
+        # Auch die Kennzahlen-Zeile und das Menü beschriften sich hieraus,
+        # damit dasselbe Σ/+ nicht an vier Stellen einzeln entschieden wird.
+        "metric_labels": labels,
         "stats_metrics": metrics,
         # Der Zeitraum steht genau einmal auf der Kachel: in der
         # Kennzahlen-Zeile, wenn es sie gibt, sonst im Wert-Bereich an der

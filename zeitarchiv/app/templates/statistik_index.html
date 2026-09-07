@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — Indexdetails{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ app_root }}/static/css/pages/statistik_index.css?v={{ css_v }}">
@@ -25,8 +26,8 @@
     </div>
 
     <section class="index-maintenance">
-      <h2>Index-Optimierung</h2>
-      <p class="hint">SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn eine Optimierung gestartet wird.</p>
+      <h2>Index-Optimierung {{ hint_button('Index-Optimierung') }}</h2>
+      {% call hint_body() %}SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn eine Optimierung gestartet wird.{% endcall %}
       <div class="stat-row">
         <div class="stat index-status-stat {{ 'is-recommended' if index_optimization.recommended else '' }}"><div class="label">Status</div><div class="value">{{ index_optimization.status_label }}</div></div>
         <div class="stat"><div class="label">Freier/reclaimbarer Speicher</div><div class="value">{{ index_optimization.reclaimable_size }}</div><div class="sub-value">{{ index_optimization.reclaimable_percent }} % der Indexdatei</div></div>
@@ -68,5 +69,6 @@
 <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
 <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
 <script src="{{ app_root }}/static/js/table-cards.js?v={{ js_v }}"></script>
+<script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
 <script src="{{ app_root }}/static/js/pages/statistik_index.js?v={{ js_v }}"></script>
 {% endblock %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — {{ table_name or "Neue Tabelle" }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ app_root }}/static/css/pages/table_editor.css?v={{ css_v }}">
@@ -25,8 +26,8 @@
 
         <template x-if="editing">
           <div>
-            <h3 class="tbl-h">Spalten (Zeiträume)</h3>
-            <p class="tbl-hint">Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ „Monat“ also -12. Reihenfolge per Ziehen oder über die Pfeile.</p>
+            <h3 class="tbl-h">Spalten (Zeiträume) {{ hint_button('Spalten') }}</h3>
+            {% call hint_body('tbl-hint') %}Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ „Monat“ also -12. Reihenfolge per Ziehen oder über die Pfeile.{% endcall %}
             <div class="tbl-columns">
               <template x-for="(col, idx) in columns" :key="col.uid">
                 <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid" :class="{'tbl-col-card-hidden': col.hidden}">
@@ -115,8 +116,8 @@
               <button type="button" class="tbl-col-add" @click="addColumn()" data-tooltip="Spalte hinzufügen">+</button>
             </div>
 
-            <h3 class="tbl-h">Zeilen (Größen)</h3>
-            <p class="tbl-hint"><strong>Entität</strong>: genau eine. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet mit den Kürzeln links — nur mit Zeilen darüber, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.</p>
+            <h3 class="tbl-h">Zeilen (Größen) {{ hint_button('Zeilen') }}</h3>
+            {% call hint_body('tbl-hint') %}<strong>Entität</strong>: genau eine. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet mit den Kürzeln links — nur mit Zeilen darüber, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.{% endcall %}
             <div class="tbl-rows" id="tbl-rows">
               <template x-for="(row, idx) in rows" :key="row.uid">
                 <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid" :class="{'tbl-row-card-hidden': row.hidden}">
@@ -266,8 +267,8 @@
               <button type="button" class="btn" @click="addRow('separator')">+ Trennlinie</button>
             </div>
 
-            <h3 class="tbl-h">Darstellung</h3>
-            <p class="tbl-hint">Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).</p>
+            <h3 class="tbl-h">Darstellung {{ hint_button('Darstellung') }}</h3>
+            {% call hint_body('tbl-hint') %}Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).{% endcall %}
             <div class="tbl-style-groups">
               <div>
                 <p class="tbl-style-group-label">Hervorhebung</p>
@@ -418,7 +419,7 @@
           </div>
         </div>
         </div>
-        <p class="tbl-hint" x-show="loading" style="margin-top:8px;">Lädt …</p>
+        <p class="tbl-hint hint-status" x-show="loading" style="margin-top:8px;">Lädt …</p>
 
         <div class="save-row" x-show="editing">
           <input type="text" placeholder="Name der Tabelle …" maxlength="{{ max_name_length }}" x-model="name">
@@ -437,6 +438,7 @@
   <script src="{{ app_root }}/static/js/table-compute.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/fixed-tooltip.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/dynamic-back-link.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const TABLE_ID = {{ table_id | tojson }};

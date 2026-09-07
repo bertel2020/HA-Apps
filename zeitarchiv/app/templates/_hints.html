@@ -1,0 +1,49 @@
+{# Der Info-Knopf und der Hinweis, den er aufklappt.
+
+   Warum überhaupt: die erklärenden Hinweise belegen auf dem Telefon einen
+   erheblichen Teil der Seite, obwohl sie einmal gelesen und danach nie wieder
+   gebraucht werden — auf der Entität-Konfiguration sind es 557 von 2.806 px,
+   also ein Fünftel. Weg dürfen aber nur die erklärenden: `hint-warn` und
+   `hint-status` (siehe app.css) bleiben immer sichtbar.
+
+   Warum aufklappen statt Popover: kein Überlagern, keine Positionsrechnung,
+   kein Außenklick-Handling — und auf dem Telefon nichts, was den halben
+   Bildschirm verdeckt. Die App hat mit dd-picker bereits eine Popover-Mechanik;
+   eine zweite daneben wäre eine Fehlerquelle mehr.
+
+   Der Knopf steht IM Label (das ist display:block und trägt ihn ohne eigenes
+   Layout), der Text als eigener Absatz hinter dem Bedienelement.
+
+   Warum keine id-Verknüpfung (aria-controls): ein Teil der Felder steht in
+   Alpine-Vorlagen (`<template x-for>`), die je Zeile erneut ausgerollt werden —
+   feste ids wären dort mehrfach im Dokument. Der Knopf findet seinen Hinweis
+   stattdessen über die Stellung im Dokument, in genau zwei Formen:
+
+     im Label eines Formularfeldes — der Hinweis ist dann der aufklappbare
+     Absatz im selben `.field`:
+
+       <div class="field">
+         <label>Auflösung {{ hint_button('Auflösung') }}</label>
+         <input …>
+         {% call hint_body() %}Mindestabstand zum …{% endcall %}
+       </div>
+
+     oder in einer Überschrift — der Hinweis ist dann der Absatz direkt
+     dahinter (`klasse` setzt die Kontextklasse, z. B. `tbl-hint`):
+
+       <h3 class="tbl-h">Spalten {{ hint_button('Spalten') }}</h3>
+       {% call hint_body('tbl-hint') %}Jede Spalte ist …{% endcall %}
+
+   Eingebunden wird das Makro mit
+
+     {% from "_hints.html" import hint_button, hint_body %}
+
+   Geklappt wird von static/js/hint-toggle.js, das die Seite einbinden muss. #}
+
+{% macro hint_button(feld) -%}
+<button type="button" class="hint-toggle" aria-expanded="false" aria-label="Hinweis zu {{ feld }}">i</button>
+{%- endmacro %}
+
+{% macro hint_body(klasse='hint') -%}
+<p class="{{ klasse }}" hidden>{{ caller() }}</p>
+{%- endmacro %}

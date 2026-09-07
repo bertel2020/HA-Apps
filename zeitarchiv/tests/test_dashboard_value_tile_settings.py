@@ -322,11 +322,85 @@ def test_the_tile_menu_offers_every_setting_the_endpoint_accepts() -> None:
     for range_key in DASHBOARD_TILE_RANGES:
         assert "data-range=\"{{ value }}\"" in menu
         assert f"('{range_key}', " in menu, range_key
+    # Die Kennzahl-Reihen zählen nur noch die Schlüssel auf; das Kürzel kommt
+    # aus tile.metric_labels, weil beim Zähler die Summe "+" heißt statt "Σ".
     for metric in DASHBOARD_TILE_STATS_METRICS:
-        assert f"('{metric}', " in menu, metric
+        assert f"'{metric}'" in menu, metric
     for metric in DASHBOARD_TILE_PRIMARY_METRICS:
-        assert (f"('{metric}', " in menu) or (f'data-primary="{metric}"' in menu), metric
+        assert (f"'{metric}'" in menu) or (f'data-primary="{metric}"' in menu), metric
     # Beide Pole des Zeitfensters tragen einen Namen — ein An/Aus-Schalter
     # ließe offen, was "aus" bedeutet.
     assert "Laufend" in menu and "Rollierend" in menu
     assert "Kontinuierlich" not in menu
+
+
+def test_a_pinned_counter_starts_on_its_growth_not_its_meter_reading(tmp_path: Path) -> None:
+    """Bei einem Zähler ist der letzte Rohwert der Zählerstand seit
+    Inbetriebnahme — auf einer Kachel, deren übrige Zahlen (Min/Ø/Max/Summe)
+    schon Bucket-Deltas sind, die einzige Zahl, die man praktisch nie sucht.
+
+    Der Spalten-Default 'last' war der Standard für Messwerte, den Zähler
+    mitgeerbt haben; er stand nicht einmal in _tile_available_metrics().
+    """
+    index = Index(tmp_path / "index.sqlite")
+    try:
+        index.get_or_create_entity("sensor.pv", "sensor", "total_increasing", "kWh")
+        index.get_or_create_entity("sensor.temp", "sensor", "measurement", "°C")
+        dashboard_id = index.get_default_dashboard_id()
+        index.pin_entity_to_dashboard(dashboard_id, "sensor.pv")
+        index.pin_entity_to_dashboard(dashboard_id, "sensor.temp")
+
+        pins = {p["item_entity_id"]: p for p in index.list_dashboard_pins(dashboard_id)}
+        assert pins["sensor.pv"]["primary_metric"] == "sum"
+        assert pins["sensor.temp"]["primary_metric"] == "last"
+    finally:
+        index.close()
+
+
+def test_an_existing_tile_keeps_the_main_value_it_had(tmp_path: Path) -> None:
+    """Der neue Standard gilt beim Anheften, nicht rückwirkend — sonst änderte
+    sich bei jedem stillschweigend das Dashboard."""
+    index = Index(tmp_path / "index.sqlite")
+    try:
+        index.get_or_create_entity("sensor.pv", "sensor", "total_increasing", "kWh")
+        dashboard_id = index.get_default_dashboard_id()
+        index.pin_entity_to_dashboard(dashboard_id, "sensor.pv")
+        assert index.set_dashboard_entity_pin_metrics(
+            dashboard_id, "sensor.pv", primary_metric="last"
+        )
+        pin = index.list_dashboard_pins(dashboard_id)[0]
+        assert pin["primary_metric"] == "last"
+    finally:
+        index.close()
+
+
+def test_a_counters_sum_is_called_a_growth_not_a_sigma() -> None:
+    """„Σ 6,496 kWh" ist rechnerisch richtig und beschreibt einen Tagesertrag
+    trotzdem falsch. Beim Schalter bleibt Σ: dort summiert die Kennzahl
+    Einschaltdauer, das ist kein Zuwachs eines Standes."""
+    from app.main import _tile_metric_labels
+
+    assert _tile_metric_labels("counter")["sum"] == "+"
+    assert _tile_metric_labels("switch")["sum"] == "Σ"
+    assert _tile_metric_labels(None)["sum"] == "Σ"
+    # Die übrigen Kürzel hängen nicht am Typ.
+    for typ in ("counter", "switch", None):
+        labels = _tile_metric_labels(typ)
+        assert (labels["min"], labels["avg"], labels["max"], labels["last"]) == (
+            "Min", "Ø", "Max", "",
+        )
+
+
+def test_the_metric_shorthand_has_a_single_source() -> None:
+    """Kachel, Kennzahlen-Zeile und Menü beschriften sich aus derselben
+    Zuordnung. Stünde das Σ weiterhin als Literal in den Templates, hinge das
+    Kürzel eines Zählers davon ab, welche der vier Stellen man ansieht."""
+    for name in ("_dashboard_tiles.html", "_dashboard_tile_menu.html"):
+        markup = (APP / "templates" / name).read_text(encoding="utf-8")
+        assert "Σ" not in markup, name
+        assert "tile.metric_labels" in markup, name
+
+    skript = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+    assert "ctx.metric_labels" in skript
+    # Der Tooltip nennt dieselbe Sache beim selben Namen.
+    assert "sum: 'Zuwachs'" in skript

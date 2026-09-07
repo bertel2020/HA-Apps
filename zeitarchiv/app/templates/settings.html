@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — Einstellungen{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ app_root }}/static/css/pages/settings.css?v={{ css_v }}">
@@ -69,8 +70,8 @@
           <p class="settings-section-description">Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.</p>
           {% include "_settings_debug_tools.html" %}
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Diagnosebericht</h3>
-            <p class="hint">Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.</p>
+            <h3 class="settings-subsection-title">Diagnosebericht {{ hint_button('Diagnosebericht') }}</h3>
+            {% call hint_body() %}Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.{% endcall %}
             <div class="actionbar" style="justify-content:flex-end;">
               <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
             </div>
@@ -93,8 +94,8 @@
             </div>
           </div>
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Hintergrundprozesse</h3>
-            <p class="hint">Was der Wartungsplaner alle 30 Sekunden prüft, mit letztem Lauf und Status.</p>
+            <h3 class="settings-subsection-title">Hintergrundprozesse {{ hint_button('Hintergrundprozesse') }}</h3>
+            {% call hint_body() %}Was der Wartungsplaner alle 30 Sekunden prüft, mit letztem Lauf und Status.{% endcall %}
             <div>
               {% for proc in background_processes %}
               <div class="bgproc-row">
@@ -171,6 +172,7 @@
   <script src="{{ app_root }}/static/js/resizable-tables.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/confirm-dialog.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/dd-picker.js?v={{ js_v }}"></script>
+  <script src="{{ app_root }}/static/js/hint-toggle.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/entity-picker.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/sortable-table.js?v={{ js_v }}"></script>
   <script src="{{ app_root }}/static/js/pages/settings.js?v={{ js_v }}"></script>

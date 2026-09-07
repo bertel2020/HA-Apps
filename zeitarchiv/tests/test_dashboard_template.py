@@ -196,20 +196,30 @@ if __name__ == "__main__":
     _run_all()
 
 
-def test_metric_section_follows_the_popup_heading_convention() -> None:
-    """Die Kachel-Einstellungen beschriften jede Gruppe nach demselben Muster:
-    Titel links, aktueller Wert rechts in Monospace (.dtile-size-picker-head
-    strong, siehe Kachelgröße und Nachkommastellen). Ohne das müsste man den
-    aktuellen Stand aus den eingefärbten Knöpfen erschließen."""
+def test_only_the_size_heading_repeats_its_value() -> None:
+    """Zeitraum und Hauptwert trugen ihren aktuellen Wert rechts in der
+    Überschrift („Tag · Laufend", „Aktuell") — direkt über einer Knopfreihe,
+    in der genau dieser Wert eingefärbt darunter steht. Doppelt gesagt, und
+    beim Umschalten musste die Stelle in JavaScript nachgezogen werden.
+
+    Die Begründung dafür war, es sei „dieselbe Konvention wie bei Kachelgröße
+    und Nachkommastellen" — das stimmte nur zur Hälfte: Nachkommastellen und
+    Sparkline-Auflösung tragen bloß ihren Titel. Die Kachelgröße behält ihren
+    Wert, denn dort gibt es keinen beschrifteten Knopf, aus dem „1×1" abzulesen
+    wäre, sondern ein Ziehgitter.
+    """
     menu = (TEMPLATES_DIR / "_dashboard_tile_menu.html").read_text(encoding="utf-8")
-    assert '<strong data-head="range">' in menu
-    assert '<strong data-head="primary">' in menu
-    # Der Zeitraum nennt beide Achsen — erst zusammen ergeben sie die Aussage.
-    assert "{{ 'Rollierend' if tile.continuous else 'Laufend' }}" in menu
+    for titel in ("Zeitraum", "Hauptwert", "Nachkommastellen", "Sparkline-Auflösung"):
+        assert f'<div class="dtile-decimals-picker-head">{titel}</div>' in menu or (
+            f'dtile-choice-head-gap">{titel}</div>' in menu
+        ), titel
+    assert "data-head" not in menu
+
+    # Die Kachelgröße ist die Ausnahme — und die einzige.
+    assert '<div class="dtile-size-picker-head">Kachelgröße <strong>' in menu
 
     script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
-    assert "[data-head=\"range\"]" in script
-    assert "[data-head=\"primary\"]" in script
+    assert "data-head" not in script, "toter Nachzieh-Code"
 
 
 def test_metric_section_labels_are_all_the_same_size() -> None:

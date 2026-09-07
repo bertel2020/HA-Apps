@@ -114,7 +114,7 @@
         {% for metric in tile.stats_metrics %}
         {% if not loop.first %}<span class="sep">&middot;</span>{% endif %}
         <span class="dtile-entity-stat" data-metric="{{ metric }}">
-          <span class="k">{{ {'min': 'Min', 'avg': 'Ø', 'max': 'Max', 'sum': 'Σ'}[metric] }}</span><span class="v">&ndash;</span>
+          <span class="k">{{ tile.metric_labels[metric] }}</span><span class="v">&ndash;</span>
         </span>
         {% endfor %}
         <span class="dtile-entity-period">{{ tile.range_label }}</span>

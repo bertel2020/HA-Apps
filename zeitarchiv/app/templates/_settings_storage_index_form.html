@@ -1,19 +1,20 @@
-<h3 class="settings-subsection-title">Indexkonsistenz</h3>
-<p class="hint" style="margin:0 0 14px;">
+{% from "_hints.html" import hint_button, hint_body %}
+<h3 class="settings-subsection-title">Indexkonsistenz {{ hint_button('Indexkonsistenz') }}</h3>
+{% call hint_body() %}
   Vergleicht Index mit den gespeicherten Rohdaten. Prüfung liest nur, Reparatur korrigiert nur abgeleitete Werte.
-</p>
+{% endcall %}
 {% if storage_audit %}
 <div class="status-grid">
   <div class="status-card">
-    <span class="hint">Letzte Prüfung</span>
+    <span class="status-card-label">Letzte Prüfung</span>
     <strong class="status-card-mono">{{ storage_audit.checked_at_label }}</strong>
   </div>
   <div class="status-card">
-    <span class="hint">Geprüfte Entitäten</span>
+    <span class="status-card-label">Geprüfte Entitäten</span>
     <strong>{{ storage_audit.entities_checked }}</strong>
   </div>
   <div class="status-card{% if storage_audit.rows or storage_audit.errors %} status-card-danger{% endif %}">
-    <span class="hint">Abweichungen</span>
+    <span class="status-card-label">Abweichungen</span>
     <strong>{{ storage_audit.rows | length }}</strong>
     {% if storage_audit.repaired %}<span class="status-card-detail">repariert</span>{% endif %}
   </div>
@@ -39,14 +40,14 @@
 {% if storage_audit.repaired %}
 <p class="save-status">✓ {{ storage_audit.rows | length }} Abweichung{% if storage_audit.rows | length != 1 %}en{% endif %} repariert.</p>
 {% else %}
-<p class="hint" style="color:var(--danger);">Die Vorschau hat noch nichts verändert.</p>
+<p class="hint hint-status" style="color:var(--danger);">Die Vorschau hat noch nichts verändert.</p>
 {% endif %}
 {% elif not storage_audit.errors %}
 <p class="save-status">✓ Index und gespeicherte Rohdaten sind konsistent.</p>
 {% endif %}
 
 {% if storage_audit.errors %}
-<p class="hint" style="color:var(--danger);">
+<p class="hint hint-status" style="color:var(--danger);">
   {{ storage_audit.errors | length }} Entität{% if storage_audit.errors | length != 1 %}en konnten{% else %} konnte{% endif %} nicht vollständig geprüft werden.
 </p>
 {% endif %}

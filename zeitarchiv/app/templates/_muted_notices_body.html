@@ -8,8 +8,8 @@
   <div class="settings-compact-row" data-notice-id="{{ entry.id }}">
     <div class="settings-compact-row-text">
       <span class="settings-compact-label">{{ entry.title }}</span>
-      <div class="settings-compact-hint">{{ entry.detail }}</div>
-      <div class="settings-compact-hint">
+      <div class="settings-compact-hint hint-status">{{ entry.detail }}</div>
+      <div class="settings-compact-hint hint-status">
         Stummgeschaltet seit {{ entry.muted_at_text }}
         {% if entry.until_text %} &middot; läuft ab {{ entry.until_text }} aus{% endif %}
         {% if entry.meta %} &middot; {{ entry.meta }}{% endif %}

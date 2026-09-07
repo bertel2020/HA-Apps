@@ -93,7 +93,7 @@
       <div class="edash-quality-icon" x-text="bilanzCheck.ok ? '✓' : '!'"></div>
       <div>
         <strong x-text="'Bilanz ' + (bilanzCheck.ok ? 'plausibel' : 'unsicher')"></strong>
-        <p class="hint" style="margin:0;" x-text="bilanzCheck.detail"></p>
+        <p class="hint hint-status" style="margin:0;" x-text="bilanzCheck.detail"></p>
       </div>
     </div>
     <div class="edash-balance-bar" x-show="grundlastShare != null">
@@ -110,7 +110,7 @@
       <div class="edash-quality-icon" x-text="otherChecksOk ? '✓' : '!'"></div>
       <div>
         <strong x-text="'Datenqualität ' + (otherChecksOk ? 'einwandfrei' : ': Prüfung fehlgeschlagen')"></strong>
-        <p class="hint" style="margin:0;" x-show="otherChecksOk" x-text="'Alle ' + otherChecks.length + ' Prüfungen unauffällig.'"></p>
+        <p class="hint hint-status" style="margin:0;" x-show="otherChecksOk" x-text="'Alle ' + otherChecks.length + ' Prüfungen unauffällig.'"></p>
       </div>
     </div>
     <ul class="edash-quality-list">
@@ -135,7 +135,7 @@
       <div class="edash-quality-icon" x-text="anomalien.length ? '!' : '✓'"></div>
       <div>
         <strong x-text="anomalien.length ? (anomalien.length + ' Auffälligkeit' + (anomalien.length === 1 ? '' : 'en')) : 'Keine Auffälligkeiten'"></strong>
-        <p class="hint" style="margin:0;" x-show="!anomalien.length">Kein Verbraucher/keine Gruppe deutlich über dem üblichen Schnitt.</p>
+        <p class="hint hint-status" style="margin:0;" x-show="!anomalien.length">Kein Verbraucher/keine Gruppe deutlich über dem üblichen Schnitt.</p>
       </div>
     </div>
     <ul class="edash-quality-list" x-show="anomalien.length">
@@ -260,8 +260,8 @@
        (openTrend() -> /energiedashboard/trends, siehe energiedashboard.js) —
        bis dahin ein Ladehinweis statt des "keine Historie"-Textes, der sonst
        kurz aufblitzen und etwas Falsches behaupten würde. #}
-    <p class="hint" x-show="trendsLoading">Trend wird geladen …</p>
-    <p class="hint" x-show="trendsError">Trend konnte nicht geladen werden.</p>
+    <p class="hint hint-status" x-show="trendsLoading">Trend wird geladen …</p>
+    <p class="hint hint-status" x-show="trendsError">Trend konnte nicht geladen werden.</p>
     <div x-show="trendsLoaded && {{ trend_expr }}.length" style="margin-bottom:16px;">
       <div class="edash-kpi-label" style="margin-bottom:4px;">Gesamt</div>
       <div x-html="trendOverallSvg({{ trend_expr }})"></div>
@@ -275,7 +275,7 @@
         </div>
       </template>
     </div>
-    <p class="hint" x-show="trendsLoaded && !{{ trend_expr }}.length">{{ empty_hint }}</p>
+    <p class="hint hint-status" x-show="trendsLoaded && !{{ trend_expr }}.length">{{ empty_hint }}</p>
   </dialog>
   {% endmacro %}
 

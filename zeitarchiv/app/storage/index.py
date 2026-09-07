@@ -2179,11 +2179,22 @@ class Index:
             max_pos = self._conn.execute(
                 "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
             ).fetchone()[0]
+            # Zähler starten mit der Summe als Hauptwert, alles andere mit
+            # dem aktuellen Wert (Spalten-Default 'last'). Der Zählerstand
+            # eines PV-Ertrags ("30.550 kWh seit Inbetriebnahme") ist die
+            # einzige Zahl auf so einer Kachel, die man praktisch nie sucht —
+            # gefragt ist der Zuwachs im Zeitraum, und genau den liefert die
+            # Summe der Bucket-Deltas. Umstellbar bleibt es im Kachelmenü;
+            # bestehende Kacheln fasst das hier nicht an.
+            zaehler = self._conn.execute(
+                "SELECT 1 FROM entities WHERE entity_id = ? AND aggregation_type = 'counter'",
+                (entity_id,),
+            ).fetchone() is not None
             self._conn.execute(
                 "INSERT INTO dashboard_pins "
-                "(dashboard_id, item_type, item_id, item_entity_id, position, show_sparkline) "
-                "VALUES (?, 'entity', 0, ?, ?, 1)",
-                (dashboard_id, entity_id, (max_pos or 0) + 1),
+                "(dashboard_id, item_type, item_id, item_entity_id, position, show_sparkline, primary_metric) "
+                "VALUES (?, 'entity', 0, ?, ?, 1, ?)",
+                (dashboard_id, entity_id, (max_pos or 0) + 1, "sum" if zaehler else "last"),
             )
             return True
 

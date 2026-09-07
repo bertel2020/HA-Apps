@@ -1,12 +1,13 @@
+{% from "_hints.html" import hint_button, hint_body %}
 <div class="field">
-  <label>App-Anzeigename</label>
+  <label>App-Anzeigename {{ hint_button('App-Anzeigename') }}</label>
   <input type="text" name="custom_name" value="{{ custom_name }}" maxlength="{{ custom_name_max_length }}"
          placeholder="{{ friendly_name or entity_id }}"
          hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
-  <p class="hint">Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {{ custom_name_max_length }} Zeichen.</p>
+  {% call hint_body() %}Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {{ custom_name_max_length }} Zeichen.{% endcall %}
 </div>
 <div class="field">
-  <label>Auflösung</label>
+  <label>Auflösung {{ hint_button('Auflösung') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="resolution-btn" onclick="toggleDDPicker('resolution')">{% for k, l in resolution_options %}{% if k == resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="resolution" id="resolution-input" value="{{ resolution }}"
@@ -17,10 +18,10 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Mindestabstand zum zuletzt gespeicherten Wert; „Rohdaten“ speichert jede Zustandsänderung. Gilt nur für neue Werte, vorhandene bleiben.</p>
+  {% call hint_body() %}Mindestabstand zum zuletzt gespeicherten Wert; „Rohdaten“ speichert jede Zustandsänderung. Gilt nur für neue Werte, vorhandene bleiben.{% endcall %}
 </div>
 <div class="field">
-  <label>Aufbewahrung</label>
+  <label>Aufbewahrung {{ hint_button('Aufbewahrung') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="retention-btn" onclick="toggleDDPicker('retention')">{% for k, l in retention_options %}{% if k == retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="retention" id="retention-input" value="{{ retention }}"
@@ -31,10 +32,10 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Überschreibt den globalen Standard. Wann tatsächlich gelöscht wird, steuert Einstellungen → Aufbewahrung.</p>
+  {% call hint_body() %}Überschreibt den globalen Standard. Wann tatsächlich gelöscht wird, steuert Einstellungen → Aufbewahrung.{% endcall %}
 </div>
 <div class="field">
-  <label>Nachkommastellen</label>
+  <label>Nachkommastellen {{ hint_button('Nachkommastellen') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="decimals-btn" onclick="toggleDDPicker('decimals')">{% for k, l in decimals_options %}{% if k == decimals %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="decimals" id="decimals-input" value="{{ decimals }}"
@@ -45,10 +46,10 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">„Automatisch“ zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt 4,000). Eine feste Auswahl rundet und füllt auf (4,00 bei 2 Stellen).</p>
+  {% call hint_body() %}„Automatisch“ zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt 4,000). Eine feste Auswahl rundet und füllt auf (4,00 bei 2 Stellen).{% endcall %}
 </div>
 <div class="field">
-  <label>Wertänderungsfilter</label>
+  <label>Wertänderungsfilter {{ hint_button('Wertänderungsfilter') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="value-filter-btn" onclick="toggleDDPicker('value-filter')">{% for k, l in value_filter_options %}{% if k == value_filter %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="value_filter" id="value-filter-input" value="{{ value_filter }}"
@@ -59,10 +60,10 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.</p>
+  {% call hint_body() %}Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.{% endcall %}
 </div>
 <div class="field">
-  <label>Lücken-Erkennung</label>
+  <label>Lücken-Erkennung {{ hint_button('Lücken-Erkennung') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="gap-threshold-btn" onclick="toggleDDPicker('gap-threshold')">{% for k, l in gap_threshold_options %}{% if k == gap_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="gap_threshold" id="gap-threshold-input" value="{{ gap_threshold }}"
@@ -73,10 +74,10 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. „Aus“ blendet den Filter dort aus.</p>
+  {% call hint_body() %}Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. „Aus“ blendet den Filter dort aus.{% endcall %}
 </div>
 <div class="field">
-  <label>Ausreißer-Erkennung</label>
+  <label>Ausreißer-Erkennung {{ hint_button('Ausreißer-Erkennung') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="outlier-threshold-btn" onclick="toggleDDPicker('outlier-threshold')">{% for k, l in outlier_threshold_options %}{% if k == outlier_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="outlier_threshold" id="outlier-threshold-input" value="{{ outlier_threshold }}"
@@ -87,11 +88,11 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">Ab welchem Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Ausreißer markiert. „Aus“ blendet den Filter dort aus.</p>
+  {% call hint_body() %}Ab welchem Sprung gegenüber dem Vorwert die Bereinigungs-Seite einen Ausreißer markiert. „Aus“ blendet den Filter dort aus.{% endcall %}
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">
-  <label>Anzeigemodus</label>
+  <label>Anzeigemodus {{ hint_button('Anzeigemodus') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="display-mode-btn" onclick="toggleDDPicker('display-mode')">{% for k, l in display_mode_options %}{% if k == display_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="display_mode" id="display-mode-input" value="{{ display_mode }}"
@@ -102,7 +103,7 @@
       {% endfor %}
     </div>
   </span>
-  <p class="hint">„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „AN/AUS“ zeigt den Rohwert.</p>
+  {% call hint_body() %}„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „AN/AUS“ zeigt den Rohwert.{% endcall %}
 </div>
 {% endif %}
 {% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
@@ -124,6 +125,6 @@
     </table>
   </div>
   {% else %}
-  <p class="hint" style="margin:0;">Noch keine Werte für diese Entität vorhanden.</p>
+  <p class="hint hint-status" style="margin:0;">Noch keine Werte für diese Entität vorhanden.</p>
   {% endif %}
 </div>

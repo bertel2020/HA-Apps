@@ -1,3 +1,4 @@
+{% from "_hints.html" import hint_button, hint_body %}
 {# inline_fallback: bei Feldern mit Fest-Wert-Fallback (call-Block, siehe
    unten) sitzt der Fallback standardmäßig als eigene volle Zeile UNTER dem
    Auswahl-Button — bei kurzen Fallback-Feldern (Zahl+Einheit, z. B. Kosten/
@@ -82,7 +83,7 @@
     <div class="dd-picker-row edash-group-create-row" x-show="search.trim() && !exactMatch()" @click="createAndSelect()">
       <span>+ „<span x-text="search.trim()"></span>" anlegen</span>
     </div>
-    <p class="hint" x-show="!groups.length && !search.trim()" style="padding:5px 4px;margin:0;">Noch keine Gruppen — Namen eingeben, um eine anzulegen.</p>
+    <p class="hint hint-status" x-show="!groups.length && !search.trim()" style="padding:5px 4px;margin:0;">Noch keine Gruppen — Namen eingeben, um eine anzulegen.</p>
   </div>
   <input type="hidden" name="{{ name }}" :value="value">
 </span>
@@ -329,12 +330,12 @@
       <p class="settings-section-description">Grundeinstellungen für das Energiedashboard.</p>
       <div class="edash-field-grid">
         <div class="field">
-          <label>Name des zentralen Knotens</label>
+          <label>Name des zentralen Knotens {{ hint_button('Name des zentralen Knotens') }}</label>
           <input type="text" name="hub_name" value="{{ config.hub_name or '' }}" placeholder="Haus" maxlength="40">
-          <p class="hint">Beschriftung des Sammelknotens in der Sankey-Mitte.</p>
+          {% call hint_body() %}Beschriftung des Sammelknotens in der Sankey-Mitte.{% endcall %}
         </div>
         <div class="field">
-          <label>Auffälligkeiten</label>
+          <label>Auffälligkeiten {{ hint_button('Auffälligkeiten') }}</label>
           <span class="dd-picker-wrap">
             <button type="button" class="btn" id="anomalie-schwelle-btn" onclick="toggleDDPicker('anomalie-schwelle')">{% for k, l in anomalie_schwelle_options %}{% if k == config.anomalie_schwelle %}{{ l }}{% endif %}{% endfor %} ▾</button>
             <input type="hidden" name="anomalie_schwelle" id="anomalie-schwelle-input" value="{{ config.anomalie_schwelle }}">
@@ -344,7 +345,7 @@
               {% endfor %}
             </div>
           </span>
-          <p class="hint">Schwellenwert für die Auffälligkeiten-Markierung. „Aus" deaktiviert die Prüfung.</p>
+          {% call hint_body() %}Schwellenwert für die Auffälligkeiten-Markierung. „Aus" deaktiviert die Prüfung.{% endcall %}
         </div>
       </div>
       {# Chip-Mehrfachauswahl (.filter-chip, app-weiter Standard z. B. in
@@ -352,7 +353,7 @@
          gleiche Funktion, aber deutlich kompakter (eine umbrechende Zeile
          statt sechs) und einheitlich mit dem Rest der App. #}
       <div class="field" style="margin-bottom:0;">
-        <label>Sichtbare Kacheln</label>
+        <label>Sichtbare Kacheln {{ hint_button('Sichtbare Kacheln') }}</label>
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}><span>Autarkie &amp; Speicher</span></label>
           <label class="filter-chip"><input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}><span>Verbraucheranteile</span></label>
@@ -361,7 +362,7 @@
           <label class="filter-chip"><input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}><span>Tageslastprofil</span></label>
           <label class="filter-chip"><input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}><span>Bilanz &amp; Datenqualität</span></label>
         </div>
-        <p class="hint">Energiefluss ist immer sichtbar — alle anderen Kacheln lassen sich hier einzeln ausblenden.</p>
+        {% call hint_body() %}Energiefluss ist immer sichtbar — alle anderen Kacheln lassen sich hier einzeln ausblenden.{% endcall %}
       </div>
       {# Eigenes Feld statt eines weiteren Chips in "Sichtbare Kacheln"
          darüber: die Legende ist keine Kachel, sondern ein Bestandteil der
@@ -369,11 +370,11 @@
          zum dortigen Hinweis ("Energiefluss ist immer sichtbar"). Gleiche
          .filter-chip-Optik wie oben, damit es trotzdem zusammengehört. #}
       <div class="field" style="margin-bottom:0;margin-top:14px;">
-        <label>Energiefluss</label>
+        <label>Energiefluss {{ hint_button('Energiefluss') }}</label>
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="show_sankey_legende" {% if config.show_sankey_legende %}checked{% endif %}><span>Farblegende</span></label>
         </div>
-        <p class="hint">Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.</p>
+        {% call hint_body() %}Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.{% endcall %}
       </div>
     </section>
 
@@ -420,9 +421,9 @@
             <div class="edash-dialog-fields">
               <div class="field"><label>Name</label><input type="text" x-model="draft.netzbezugName" placeholder="Netzbezug" maxlength="40"></div>
               <div class="field">
-                <label>Entität *</label>
+                <label>Entität * {{ hint_button('Netzbezug-Entität') }}</label>
                 {{ entity_field('netzbezug_draft', 'draft.netzbezug', "(id) => { draft.netzbezug = id; }", allow_units=['kWh'], require_counter=true) }}
-                <p class="hint">Zähler „aus dem Netz bezogene Energie" (kWh, steigend).</p>
+                {% call hint_body() %}Zähler „aus dem Netz bezogene Energie" (kWh, steigend).{% endcall %}
               </div>
             </div>
             <div class="edash-dialog-footer">
@@ -441,9 +442,9 @@
             <div class="edash-dialog-fields">
               <div class="field"><label>Name</label><input type="text" x-model="draft.einspeisungName" placeholder="Einspeisung" maxlength="40"></div>
               <div class="field">
-                <label>Entität</label>
+                <label>Entität {{ hint_button('Einspeisung-Entität') }}</label>
                 {{ entity_field('einspeisung_draft', 'draft.einspeisung', "(id) => { draft.einspeisung = id; }", allow_units=['kWh'], require_counter=true) }}
-                <p class="hint">Zähler „ins Netz eingespeiste Energie" (kWh, steigend).</p>
+                {% call hint_body() %}Zähler „ins Netz eingespeiste Energie" (kWh, steigend).{% endcall %}
               </div>
             </div>
             <div class="edash-dialog-footer">
@@ -499,9 +500,9 @@
                   <div class="edash-dialog-fields">
                     <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="Name" maxlength="40"></div>
                     <div class="field">
-                      <label>Entität</label>
+                      <label>Entität {{ hint_button('Erzeuger-Entität') }}</label>
                       {{ entity_field('erzeuger_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      <p class="hint">Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).</p>
+                      {% call hint_body() %}Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).{% endcall %}
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
@@ -565,14 +566,14 @@
                   <div class="edash-dialog-fields">
                     <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="z. B. Hausspeicher" maxlength="40"></div>
                     <div class="field">
-                      <label>Entladung</label>
+                      <label>Entladung {{ hint_button('Entladung') }}</label>
                       {{ entity_field('speicher_entladen_entity_id_draft', 'draftRow.entladen_entity_id', "(id) => { draftRow.entladen_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      <p class="hint">Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).</p>
+                      {% call hint_body() %}Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).{% endcall %}
                     </div>
                     <div class="field">
-                      <label>Ladung</label>
+                      <label>Ladung {{ hint_button('Ladung') }}</label>
                       {{ entity_field('speicher_laden_entity_id_draft', 'draftRow.laden_entity_id', "(id) => { draftRow.laden_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      <p class="hint">Zähler „in den Speicher geladene Energie" (kWh, steigend).</p>
+                      {% call hint_body() %}Zähler „in den Speicher geladene Energie" (kWh, steigend).{% endcall %}
                     </div>
                     <div class="field">
                       <label>Ladezustand</label>
@@ -580,7 +581,7 @@
                       <p class="hint">Aktueller Füllstand in Prozent (SOC).</p>
                     </div>
                     <div class="field">
-                      <label>Kapazität</label>
+                      <label>Kapazität {{ hint_button('Kapazität') }}</label>
                       {% call entity_field('speicher_capacity_entity_id_draft', 'draftRow.capacity_entity_id', "(id) => { draftRow.capacity_entity_id = id; }", allow_units=['kWh', 'Wh'], inline_fallback=true) %}
                         <span class="edash-unit-input edash-speicher-capacity-input" x-show="!entityId">
                           <input type="text" inputmode="decimal" x-model="draftRow.capacity_kwh"
@@ -588,7 +589,7 @@
                           <span class="edash-unit-suffix">kWh</span>
                         </span>
                       {% endcall %}
-                      <p class="hint">Nutzbare Gesamtkapazität, nur nötig für die kWh-Anzeige. Entität hat Vorrang, Wh wird automatisch umgerechnet.</p>
+                      {% call hint_body() %}Nutzbare Gesamtkapazität, nur nötig für die kWh-Anzeige. Entität hat Vorrang, Wh wird automatisch umgerechnet.{% endcall %}
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
@@ -657,14 +658,14 @@
                   <div class="edash-dialog-fields">
                     <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="Name" maxlength="40"></div>
                     <div class="field">
-                      <label>Entität</label>
+                      <label>Entität {{ hint_button('Verbraucher-Entität') }}</label>
                       {{ entity_field('verbraucher_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      <p class="hint">Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).</p>
+                      {% call hint_body() %}Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).{% endcall %}
                     </div>
                     <div class="field">
-                      <label>Gruppe</label>
+                      <label>Gruppe {{ hint_button('Gruppe') }}</label>
                       {{ group_field('verbraucher_gruppe_draft', 'draftRow.gruppe', "(name) => { draftRow.gruppe = name; }") }}
-                      <p class="hint">Optional — fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen.</p>
+                      {% call hint_body() %}Optional — fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen.{% endcall %}
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
@@ -747,11 +748,11 @@
         <template x-if="activePopup === 'kosten-bezug'">
           <div>
             <div class="field">
-              <label>Preis</label>
+              <label>Preis {{ hint_button('Preis') }}</label>
               {% call entity_field('preis_netzbezug_draft', 'draft.kostenBezugEntity', "(id) => { draft.kostenBezugEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              <p class="hint">Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.</p>
+              {% call hint_body() %}Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.{% endcall %}
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; kostenBezugFixed = readFixedInput('preis_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
@@ -770,11 +771,11 @@
         <template x-if="activePopup === 'kosten-einspeisung'">
           <div>
             <div class="field">
-              <label>Vergütung</label>
+              <label>Vergütung {{ hint_button('Vergütung') }}</label>
               {% call entity_field('preis_einspeisung_draft', 'draft.kostenEinspeisungEntity', "(id) => { draft.kostenEinspeisungEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              <p class="hint">Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.</p>
+              {% call hint_body() %}Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.{% endcall %}
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; kostenEinspeisungFixed = readFixedInput('preis_einspeisung_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
@@ -793,7 +794,7 @@
 
     <section class="settings-section edash-section-neutral">
       <h2 class="settings-section-title">PV-Prognose</h2>
-      <p class="settings-section-description">Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast. Anders als bei Kosten/CO2 gibt es hier keinen festen Ersatzwert (eine Prognose lässt sich nicht sinnvoll als fixe Zahl eintragen) — nur Entitäten.</p>
+      <p class="settings-section-description">Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast.</p>
       <div class="edash-item-grid">
         <button type="button" class="edash-item-tile" @click="draft.prognoseHeute = prognoseHeute; activePopup = 'prog-heute'; openEdashDialog('edash-dlg-prog-heute')">
           <div class="edash-item-accent edash-item-accent-neutral"></div>
@@ -829,9 +830,9 @@
         <template x-if="activePopup === 'prog-heute'">
           <div>
             <div class="field">
-              <label>Entität</label>
+              <label>Entität {{ hint_button('Prognose-Entität für heute') }}</label>
               {{ entity_field('prognose_rest_heute_entity_id_draft', 'draft.prognoseHeute', "(id) => { draft.prognoseHeute = id; }", allow_units=['kWh']) }}
-              <p class="hint">kWh, die heute noch erwartet werden (z. B. Forecast.Solar „Geschätzte Energieerzeugung – Resttag“).</p>
+              {% call hint_body() %}kWh, die heute noch erwartet werden (z. B. Forecast.Solar „Geschätzte Energieerzeugung – Resttag“).{% endcall %}
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="prognoseHeute = draft.prognoseHeute; $el.closest('dialog').close();">Übernehmen</button>
@@ -848,9 +849,9 @@
         <template x-if="activePopup === 'prog-morgen'">
           <div>
             <div class="field">
-              <label>Entität</label>
+              <label>Entität {{ hint_button('Prognose-Entität für morgen') }}</label>
               {{ entity_field('prognose_morgen_entity_id_draft', 'draft.prognoseMorgen', "(id) => { draft.prognoseMorgen = id; }", allow_units=['kWh']) }}
-              <p class="hint">kWh, die für morgen insgesamt erwartet werden.</p>
+              {% call hint_body() %}kWh, die für morgen insgesamt erwartet werden.{% endcall %}
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="prognoseMorgen = draft.prognoseMorgen; $el.closest('dialog').close();">Übernehmen</button>
@@ -888,11 +889,11 @@
         <template x-if="activePopup === 'co2'">
           <div>
             <div class="field">
-              <label>Entität</label>
+              <label>Entität {{ hint_button('CO2-Faktor-Entität') }}</label>
               {% call entity_field('co2_faktor_netzbezug_entity_draft', 'draft.co2Entity', "(id) => { draft.co2Entity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('co2_faktor_netzbezug_fixed_draft', co2_fixed, '', 'x-show="!entityId" oninput="document.getElementById(\'co2_faktor_netzbezug_fixed_real\').value = event.target.value"', 'g/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              <p class="hint">g CO2/kWh &mdash; ergibt mit dem Netzbezug den Ausstoß, mit dem PV-Eigenverbrauch das vermiedene CO2.</p>
+              {% call hint_body() %}g CO2/kWh &mdash; ergibt mit dem Netzbezug den Ausstoß, mit dem PV-Eigenverbrauch das vermiedene CO2.{% endcall %}
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; co2Fixed = readFixedInput('co2_faktor_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
@@ -931,7 +932,7 @@
         </div>
       </template>
     </div>
-    <p class="hint" x-show="!gruppen.length">Noch keine Gruppen angelegt.</p>
+    <p class="hint hint-status" x-show="!gruppen.length">Noch keine Gruppen angelegt.</p>
     <div class="edash-gruppen-add">
       <input type="text" x-model="newGroupName" placeholder="Neue Gruppe …" maxlength="40" @keydown.enter.prevent="addGroup()">
       <button type="button" class="edash-setup-add" @click="addGroup()">+ Hinzufügen</button>

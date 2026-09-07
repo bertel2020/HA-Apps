@@ -90,7 +90,7 @@
            und ein Endpunkt (/dashboard/entity-metrics): die vier Werte hängen
            voneinander ab, der Hauptwert fällt aus der Zeile heraus. #}
         <div class="dtile-settings-section">
-          <div class="dtile-decimals-picker-head">Zeitraum<strong data-head="range">{{ tile.range_label }} · {{ 'Rollierend' if tile.continuous else 'Laufend' }}</strong></div>
+          <div class="dtile-decimals-picker-head">Zeitraum</div>
           <div class="dtile-choice-row dtile-range-row" role="group" aria-label="Zeitraum wählen">
             {% for value, label in [('hour', 'Std.'), ('day', 'Tag'), ('week', 'Woche'), ('month', 'Monat'), ('year', 'Jahr')] %}
             <button type="button" class="dtile-choice-cell dtile-range-cell{% if tile.range_key == value %} is-selected{% endif %}"
@@ -110,11 +110,11 @@
           </div>
           <p class="dtile-settings-hint">Gilt für Kennzahlen und Sparkline.</p>
 
-          <div class="dtile-decimals-picker-head dtile-choice-head-gap">Hauptwert<strong data-head="primary">{{ tile.primary_label or 'Aktuell' }}</strong></div>
+          <div class="dtile-decimals-picker-head dtile-choice-head-gap">Hauptwert</div>
           <div class="dtile-choice-row dtile-primary-row" role="group" aria-label="Hauptwert wählen">
             <button type="button" class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == 'last' %} is-selected{% endif %}"
                     draggable="false" data-primary="last">Aktuell</button>
-            {% for value, label in [('min', 'Min'), ('avg', 'Ø'), ('max', 'Max'), ('sum', 'Σ')] %}
+            {% for value in ['min', 'avg', 'max', 'sum'] %}{% set label = tile.metric_labels[value] %}
             <button type="button" draggable="false" data-primary="{{ value }}"
                     class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == value %} is-selected{% endif %}{% if value not in tile.available_metrics %} is-off{% endif %}"
                     {% if value not in tile.available_metrics %}disabled title="Für diese Entität keine sinnvolle Kennzahl"{% endif %}>{{ label }}</button>
@@ -130,7 +130,7 @@
           </label>
           <div class="dtile-choice-row dtile-stats-row" role="group" aria-label="Kennzahlen wählen"
                {% if not tile.stats_metrics %}hidden{% endif %}>
-            {% for value, label in [('min', 'Min'), ('avg', 'Ø'), ('max', 'Max'), ('sum', 'Σ')] %}
+            {% for value in ['min', 'avg', 'max', 'sum'] %}{% set label = tile.metric_labels[value] %}
             {% set gesperrt = value not in tile.available_metrics or value == tile.primary_metric %}
             <button type="button" draggable="false" data-metric="{{ value }}"
                     class="dtile-choice-cell dtile-stats-cell{% if value in tile.stats_metrics %} is-selected{% endif %}{% if gesperrt %} is-off{% endif %}"

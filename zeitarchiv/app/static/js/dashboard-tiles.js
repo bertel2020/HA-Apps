@@ -1038,6 +1038,10 @@
     month: ['im laufenden Monat', 'in den letzten 30 Tagen'],
     year: ['im laufenden Jahr', 'in den letzten 12 Monaten'],
   };
+  // Rückfall, falls eine Antwort die Kürzel nicht mitbringt. Maßgeblich ist
+  // ctx.metric_labels vom Server: dort hängt genau eines am Entitätstyp — bei
+  // einem Zähler heißt die Summe "+", weil sie der Zuwachs des Zählerstands
+  // ist (siehe _tile_metric_labels() in main.py).
   const TILE_METRIC_LABELS = {last: '', min: 'Min', avg: 'Ø', max: 'Max', sum: 'Σ'};
 
   function tileRangeLabel(el) {
@@ -1058,7 +1062,7 @@
     if (bucket) {
       const jeBucket = {
         min: `schwächster ${bucket}`, avg: `Ø je ${bucket}`,
-        max: `stärkster ${bucket}`, sum: 'Summe',
+        max: `stärkster ${bucket}`, sum: 'Zuwachs',
       }[metric];
       return `${jeBucket} · ${fenster}`;
     }
@@ -1589,7 +1593,8 @@
               stat.className = 'dtile-entity-stat';
               stat.dataset.metric = metric;
               stat.innerHTML = `<span class="k"></span><span class="v">–</span>`;
-              stat.querySelector('.k').textContent = TILE_METRIC_LABELS[metric] || metric;
+              const kuerzel = ctx.metric_labels || TILE_METRIC_LABELS;
+              stat.querySelector('.k').textContent = kuerzel[metric] || metric;
               zeile.appendChild(stat);
             });
             const periode = document.createElement('span');
@@ -1615,18 +1620,6 @@
           } else if (alter) {
             alter.hidden = body.dataset.showAge !== 'true';
           }
-
-          // Aktueller Wert rechts in der Überschrift — dieselbe Konvention
-          // wie bei Kachelgröße und Nachkommastellen: was gerade gilt, steht
-          // ablesbar da, statt aus den eingefärbten Knöpfen erschlossen zu
-          // werden. Der Zeitraum nennt beide Achsen ("Tag · Laufend"), weil
-          // sie zusammen erst die Aussage ergeben.
-          const kopfZeitraum = control.querySelector('[data-head="range"]');
-          const kopfHauptwert = control.querySelector('[data-head="primary"]');
-          if (kopfZeitraum) {
-            kopfZeitraum.textContent = `${ctx.range_label} · ${ctx.continuous ? 'Rollierend' : 'Laufend'}`;
-          }
-          if (kopfHauptwert) kopfHauptwert.textContent = ctx.primary_label || 'Aktuell';
 
           // Popup-Zustand nachziehen: der Hauptwert sperrt seinen Eintrag in
           // der Kennzahlen-Zeile, deshalb reicht kein reines Umfärben.

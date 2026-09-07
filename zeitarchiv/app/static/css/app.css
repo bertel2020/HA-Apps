@@ -597,11 +597,6 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
 /* Abstand zur vorigen Gruppe innerhalb desselben Abschnitts — die Abschnitte
    selbst trennt schon .dtile-settings-section + .dtile-settings-section. */
 .dtile-choice-head-gap{margin-top:15px;}
-/* .dtile-decimals-picker-head strong setzt Mono (dashboard_detail.html/
-   entities.html) — richtig für einen Wert wie "1×1", falsch für "Tag ·
-   Laufend" und "Aktuell". Attribut-Selektor, damit die Regel unabhängig von
-   der Ladereihenfolge der Seiten-Stylesheets gewinnt. */
-.dtile-decimals-picker-head strong[data-head]{font-family:var(--font-display);}
 /* Die Zeile mit dem Schalter trägt links dieselbe Beschriftung wie die
    Überschriften darüber. .menu-row-label erbt sonst die größere Schrift der
    Zeile und ließe den Abschnitt nach zwei kleinen Überschriften plötzlich
@@ -1380,7 +1375,61 @@ button[data-tooltip]{cursor:pointer;}
   border:1px solid var(--border);background:var(--surface);color:var(--ink);box-sizing:border-box;
 }
 .field input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
-.hint{margin:8px 0 0;font-size:calc(12.5px * var(--font-scale, 1));line-height:1.55;color:var(--ink-faint);}
+/* Drei Sorten Text trugen lange dieselbe Klasse. Die Rollenklassen kommen
+   ZUSÄTZLICH zu .hint/.tbl-hint/.settings-compact-hint und sehen bewusst
+   gleich aus — sie sind da, damit ansprechbar ist, was ausgeblendet werden
+   darf und was nicht:
+     (ohne Rolle)  erklärt ein Bedienelement — darf hinter den Info-Knopf
+     .hint-warn    nennt eine nicht umkehrbare Folge — muss ungefragt dastehen
+     .hint-status  trägt Daten, Leer- oder Ladezustand — ist Inhalt, keine Hilfe
+   Kartenbeschriftungen sind gar keine Hinweise; sie heißen .status-card-label. */
+.hint,.hint-warn,.hint-status{margin:8px 0 0;font-size:calc(12.5px * var(--font-scale, 1));line-height:1.55;color:var(--ink-faint);}
+
+/* Der Info-Knopf, der einen erklärenden Hinweis aufklappt (siehe
+   _hints.html). Er steht im Label und darf dessen Zeile nicht höher machen —
+   daher 16 px und vertical-align statt eigener Zeilenhöhe. */
+.hint-toggle{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;margin-left:5px;padding:0;vertical-align:-2px;
+  border:1px solid var(--border-strong);border-radius:50%;background:transparent;
+  color:var(--ink-faint);font-family:inherit;font-size:calc(11px * var(--font-scale, 1));
+  font-weight:600;line-height:1;cursor:pointer;
+}
+/* 16 px sind mit dem Daumen nicht zu treffen — daran ist in dieser App schon
+   der Aufklapppfeil der Kacheln gescheitert. Die Trefferfläche wächst über ein
+   Pseudoelement auf 44 x 44 px, ohne im Layout Platz zu belegen (wie bei
+   .dt-card-toggle). Sie reicht damit über die Labelzeile hinaus; deshalb steht
+   das Bedienelement darunter auf position:relative und gewinnt die
+   Überlappung — bei gleicher Stapelebene gewinnt das spätere Element.
+
+   Die 6 px Versatz nach oben sind gemessen, nicht geschätzt: mittig zentriert
+   verliert der Knopf genau die unteren 6 px an dieses Bedienelement (44 x 38
+   statt 44 x 44). Nach oben ist die Zeile frei — das Feld darüber behält seine
+   Fläche unverändert (3.116 px² mit wie ohne Versatz). */
+.hint-toggle::before{content:"";position:absolute;left:50%;top:calc(50% - 6px);width:44px;height:44px;transform:translate(-50%,-50%);}
+.hint-toggle:hover,.hint-toggle[aria-expanded="true"]{color:var(--accent-line);border-color:var(--accent-line);background:var(--accent-line-soft);}
+.hint-toggle:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
+
+/* Drei der fünf Warnungen kündigen einen nicht umkehrbaren Verlust an —
+   Backups, die nur lokal liegen; endgültiges Bereinigen; ablaufende
+   Aufbewahrung. Sie standen in --ink-faint, also in der Farbe, die diese App
+   für Nebensächliches benutzt, und damit im selben Grau wie „Petrol/Kupfer,
+   HA-Blau oder Cobalt/Teal".
+
+   Kante und ein Ton mehr Kontrast, mehr nicht: die Warnung soll auffallen,
+   aber nicht wie ein Fehler aussehen — dafür ist --danger da. Die beiden
+   übrigen `hint-warn` (die Diagnose-Werkzeuge) bleiben bewusst unmarkiert;
+   sie warnen vor dem, was sie aufzeichnen, nicht vor Datenverlust.
+
+   Der zweite Selektor ist kein Versehen: `.settings-panel p.hint` weiter oben
+   setzt die Farbe mit (0,2,1) und stünde sonst darüber — gemessen, der Text
+   blieb zunächst faint, obwohl die Kante schon da war. */
+.hint-warn-strong,p.hint.hint-warn-strong{color:var(--ink-muted);border-left:3px solid var(--warning);padding:2px 0 2px 11px;}
+.field:has(> label > .hint-toggle) > input,
+.field:has(> label > .hint-toggle) > select,
+.field:has(> label > .hint-toggle) > textarea,
+.field:has(> label > .hint-toggle) > .dd-picker-wrap,
+.field:has(> label > .hint-toggle) > .entity-picker-wrap{position:relative;}
 .save-status{margin:10px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);font-weight:600;}
 .config-card,.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;}
 
@@ -1408,7 +1457,7 @@ select:disabled,textarea[readonly],textarea:disabled{background:var(--surface-al
    dass Backup und Retention bei Typografie/Farbe auseinanderlaufen. */
 .status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px;}
 .status-card{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);min-width:0;}
-.status-card .hint{display:block;margin:0 0 3px;}
+.status-card-label{display:block;margin:0 0 3px;font-size:calc(12.5px * var(--font-scale, 1));line-height:1.55;color:var(--ink-faint);}
 .status-card strong{display:block;font-size:calc(15px * var(--font-scale, 1));line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;}
 .status-card .status-card-mono{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);}
 .status-card .status-card-detail{display:block;margin-top:4px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}

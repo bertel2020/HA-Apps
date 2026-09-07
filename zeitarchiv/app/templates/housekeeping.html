@@ -72,7 +72,7 @@
           {% endif %}
         </div>
         {% if duplicates_by_entity %}
-        <p class="hint" style="margin-top:14px;">{{ duplicates_total }} doppelte Zeitstempel in den letzten 30 Tagen &mdash; die Bereinigungs-Seite entfernt sie über „Duplikate automatisch entfernen“.</p>
+        <p class="hint hint-status" style="margin-top:14px;">{{ duplicates_total }} doppelte Zeitstempel in den letzten 30 Tagen &mdash; die Bereinigungs-Seite entfernt sie über „Duplikate automatisch entfernen“.</p>
         {% endif %}
       </section>
 
@@ -120,7 +120,7 @@
           <p class="hint" style="margin:0 0 14px;">Nicht Zeitarchivs eigener Verbrauch (Zahlen unten), sondern der freie Platz auf der Platte selbst.</p>
           <div class="status-grid">
             <div class="status-card{% if host_disk_usage.severity == 'danger' %} status-card-danger{% elif host_disk_usage.severity == 'warning' %} status-card-accent-strong{% endif %}">
-              <span class="hint">Frei</span>
+              <span class="status-card-label">Frei</span>
               <strong>{{ host_disk_usage.free_label }}</strong>
               <span class="status-card-detail">von {{ host_disk_usage.total_label }} ({{ host_disk_usage.free_percent }} %)</span>
               <div class="usage-bar-track" style="margin-top:8px;">
@@ -154,7 +154,7 @@
                  hx-get="settings/purge/marked" hx-trigger="input changed delay:300ms, search"
                  hx-target="#marked-points-list" hx-swap="innerHTML">
           <div id="marked-points-list" style="margin-top:14px;">
-            <p class="hint">Liste wird beim Öffnen geladen …</p>
+            <p class="hint hint-status">Liste wird beim Öffnen geladen …</p>
           </div>
         </dialog>
       </section>

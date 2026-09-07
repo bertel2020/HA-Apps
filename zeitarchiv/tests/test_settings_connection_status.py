@@ -25,7 +25,8 @@ def test_connection_status_uses_shared_status_cards() -> None:
 @pytest.mark.xfail(
     reason=(
         "connection-status-note/-note-item existieren nirgends in Template "
-        "oder CSS — nur einzelne <span class=\"hint\"> je Statuskarte, keine "
+        "oder CSS — nur einzelne <span class=\"status-card-label\"> je "
+        "Statuskarte, keine "
         "gruppierte Hinweiszeile. Unklar, ob nie gebaut oder bei der "
         "Statuskarten-Umstellung entfernt; siehe GAPS_AUDIT.md."
     ),

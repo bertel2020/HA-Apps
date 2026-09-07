@@ -1,8 +1,8 @@
-<p class="hint" style="margin:0 0 14px;">Entfernt markierte Datensätze endgültig und gibt Speicherplatz frei. Rollups werden automatisch neu berechnet.</p>
+<p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">Entfernt markierte Datensätze endgültig und gibt Speicherplatz frei. Rollups werden automatisch neu berechnet.</p>
 {% set totals = purge_preview.totals %}
 <div class="settings-minor-section">
     <h4 class="settings-minor-title">Vorschau der Bereinigung</h4>
-    <p class="hint" style="margin:0 0 14px;">Diese Vorschau verändert keine Daten.</p>
+    <p class="hint hint-status" style="margin:0 0 14px;">Diese Vorschau verändert keine Daten.</p>
     <div class="stat-row" style="margin-bottom:14px;">
       <div class="stat">
         <div class="label">Physisch entfernbar</div>
@@ -26,7 +26,7 @@
       </div>
     </div>
     {% if totals.not_removable_rows %}
-      <p class="hint" style="margin:0 0 14px;color:var(--danger);">
+      <p class="hint hint-status" style="margin:0 0 14px;color:var(--danger);">
         {{ totals.not_removable_rows | format_int }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} ohne passende Rohdatenzeile &mdash; {% if totals.not_removable_rows == 1 %}wird{% else %}werden{% endif %} nicht entfernt.
       </p>
     {% endif %}

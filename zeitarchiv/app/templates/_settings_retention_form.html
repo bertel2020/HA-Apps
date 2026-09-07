@@ -1,4 +1,4 @@
-<p class="hint" style="margin:0 0 14px;">Löscht Werte nach Ablauf ihrer Aufbewahrungsfrist &mdash; <strong>endgültig</strong>. „Unbegrenzt“-Entitäten sind ausgenommen.</p>
+<p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">Löscht Werte nach Ablauf ihrer Aufbewahrungsfrist &mdash; <strong>endgültig</strong>. „Unbegrenzt“-Entitäten sind ausgenommen.</p>
 
 <div class="settings-subsection">
 <h3 class="settings-subsection-title">Aufbewahrung und endgültiges Löschen</h3>
@@ -30,19 +30,19 @@
 <h3 class="settings-subsection-title">Automatische Durchsetzung</h3>
 <div class="status-grid">
   <div class="status-card">
-    <span class="hint">Begrenzte Entitäten</span>
+    <span class="status-card-label">Begrenzte Entitäten</span>
     <strong>{{ limited_retention_count }}</strong>
   </div>
   <div class="status-card">
-    <span class="hint">Nächster Lauf</span>
+    <span class="status-card-label">Nächster Lauf</span>
     <strong>{{ retention_next_run }}</strong>
   </div>
   <div class="status-card">
-    <span class="hint">Letzter Erfolg</span>
+    <span class="status-card-label">Letzter Erfolg</span>
     <strong>{{ retention_last_success }}</strong>
   </div>
   <div class="status-card">
-    <span class="hint">Letzter Fehler</span>
+    <span class="status-card-label">Letzter Fehler</span>
     <strong>{{ retention_last_failure }}</strong>
   </div>
 </div>
@@ -161,7 +161,7 @@
     </tbody>
   </table>
 </div>
-<p class="hint" style="margin-top:10px;">Vorschau aktualisiert: <strong>{{ retention_preview_generated_at }}</strong></p>
+<p class="hint hint-status" style="margin-top:10px;">Vorschau aktualisiert: <strong>{{ retention_preview_generated_at }}</strong></p>
 </div>
 
 {% if retention_jobs %}

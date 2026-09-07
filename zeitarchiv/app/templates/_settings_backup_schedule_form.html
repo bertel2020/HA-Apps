@@ -2,15 +2,15 @@
       style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border);">
   <div class="status-grid">
     <div class="status-card">
-      <span class="hint">Nächster Lauf</span>
+      <span class="status-card-label">Nächster Lauf</span>
       <strong>{{ backup_next_run }}</strong>
     </div>
     <div class="status-card">
-      <span class="hint">Letzter Erfolg</span>
+      <span class="status-card-label">Letzter Erfolg</span>
       <strong>{{ backup_last_success }}</strong>
     </div>
     <div class="status-card">
-      <span class="hint">Letzter Fehler</span>
+      <span class="status-card-label">Letzter Fehler</span>
       <strong>{{ backup_last_failure }}</strong>
     </div>
   </div>
@@ -99,5 +99,5 @@
     </span>
   </label>
   </div>
-  <p class="hint" style="margin:12px 0 0;">Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen.</p>
+  <p class="hint hint-warn hint-warn-strong" style="margin:12px 0 0;">Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen.</p>
 </form>
