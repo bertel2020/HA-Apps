@@ -2009,13 +2009,16 @@ class ImportService:
                 errors.append("Bitte eine Ziel-Entität auswählen.")
             else:
                 def plan_csv_locked():
+                    path = self._csv_uploaded_path()
+                    if path is None:
+                        return None
+                    # Das Lesen und Sortieren der Datei berührt keinen
+                    # Speicherbestand und braucht deshalb keine Sperre — siehe
+                    # dieselbe Trennung in import_csv_start().
+                    parsed = csv_import.parse_rows(
+                        path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz
+                    )
                     with self.deps.coordinator.entity(entity_id):
-                        path = self._csv_uploaded_path()
-                        if path is None:
-                            return None
-                        parsed = csv_import.parse_rows(
-                            path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz
-                        )
                         return symcon_import.plan_import_rows(
                             self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
                             source_label=path.name, skipped_rows=parsed.skipped
@@ -2053,20 +2056,35 @@ class ImportService:
                 logger.info("CSV-Import gestartet · Ziel=%s", entity_id)
 
                 def execute_csv_import():
-                    with self.deps.coordinator.exclusive():
-                        path = self._csv_uploaded_path()
-                        if path is None:
-                            raise ValueError("Keine CSV-Datei hochgeladen.")
-                        parsed = csv_import.parse_rows(
-                            path,
-                            delimiter,
-                            has_header,
-                            ts_col,
-                            value_col,
-                            ts_format,
-                            custom_pattern,
-                            self.deps.tz,
-                        )
+                    path = self._csv_uploaded_path()
+                    if path is None:
+                        raise ValueError("Keine CSV-Datei hochgeladen.")
+                    # Datei lesen, parsen und sortieren passiert VOR der Sperre.
+                    # Es berührt keinen Speicherbestand, ist aber der Teil, der
+                    # bei großen Dateien den Arbeitsspeicher füllt — vorher lief
+                    # er mit unter der Sperre (ZG-25). Derselbe Schnitt wie beim
+                    # Home-Assistant-Import darunter, der seinen Netzwerk-Fetch
+                    # ebenfalls davor legt.
+                    parsed = csv_import.parse_rows(
+                        path,
+                        delimiter,
+                        has_header,
+                        ts_col,
+                        value_col,
+                        ts_format,
+                        custom_pattern,
+                        self.deps.tz,
+                    )
+                    # Entitätssperre statt exclusive(): dieser Import schreibt
+                    # genau eine Entität — Archiv, Rollups, Hot Buffer und
+                    # Indexzeilen gehören alle ihr. Die globale Sperre hielt für
+                    # die gesamte Dauer auch jede andere Entität an, also auch
+                    # die laufende Aufnahme aus Home Assistant. Die Vorschau
+                    # nebenan (import_csv_dry_run) macht es längst so, und der
+                    # Live-Schreibpfad ebenfalls (siehe ZA-003 in
+                    # CODE_REVIEW.md: "Jeder Schreibvorgang verwendet
+                    # ausschließlich die Sperre seiner Entität").
+                    with self.deps.coordinator.entity(entity_id):
                         result = symcon_import.import_rows(
                             self.deps.data_dir,
                             self.deps.index,

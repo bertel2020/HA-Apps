@@ -597,10 +597,21 @@ def _new_rows_for_archive(
 def _group_by_month(
     rows: list[tuple[float, float]], tz: ZoneInfo
 ) -> dict[tuple[int, int], list[tuple[float, float]]]:
+    """Gruppiert nach Kalendermonat und reicht dabei die ÜBERGEBENEN Tupel
+    weiter, statt sie neu zu bauen.
+
+    Der Unterschied ist unsichtbar und teuer: ein `(ts, value)`-Tupel kostet in
+    CPython 104 Byte (56 fürs Tupel, zweimal 24 für die Floats). Wer es hier
+    neu zusammensetzt, hat den kompletten Datensatz ein zweites Mal im
+    Speicher, solange der Aufrufer seine Liste noch hält — beim CSV-Import mit
+    dem eigenen Zeilenlimit von 10 Millionen also 1,3 GiB zusätzlich, unter
+    der globalen Speichersperre (ZG-25). Tupel sind unveränderlich, das Teilen
+    ist deshalb folgenlos.
+    """
     by_month: dict[tuple[int, int], list[tuple[float, float]]] = {}
-    for ts, value in rows:
-        local = datetime.fromtimestamp(ts, tz)
-        by_month.setdefault((local.year, local.month), []).append((ts, value))
+    for row in rows:
+        local = datetime.fromtimestamp(row[0], tz)
+        by_month.setdefault((local.year, local.month), []).append(row)
     return by_month
 
 
@@ -755,8 +766,22 @@ def import_rows(
     )
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     archive_dir.mkdir(parents=True, exist_ok=True)
-    written_rows: list[tuple[float, float]] = []
+    # Statt jede geschriebene Zeile zu sammeln, nur das, was danach gebraucht
+    # wird: der kleinste Zeitstempel und die Anzahl (siehe
+    # _backfill_index_stats). Eine Liste wäre hier eine dritte vollständige
+    # Kopie des Datensatzes — und wäre außerdem falsch, siehe unten.
+    written_first_ts: float | None = None
+    written_count = 0
     archived_month_updated = False
+
+    def note_written(month_rows: list[tuple[float, float]]) -> None:
+        nonlocal written_first_ts, written_count
+        if not month_rows:
+            return
+        written_count += len(month_rows)
+        smallest = min(row[0] for row in month_rows)
+        if written_first_ts is None or smallest < written_first_ts:
+            written_first_ts = smallest
 
     for year, month, label, month_rows in to_import:
         month_rows.sort()
@@ -772,7 +797,7 @@ def import_rows(
 
         result.imported_months.append(label)
         result.rows_imported += len(month_rows)
-        written_rows.extend(month_rows)
+        note_written(month_rows)
         if on_month_done is not None:
             on_month_done(label, len(month_rows))
 
@@ -794,7 +819,7 @@ def import_rows(
 
         result.merged_months.append(label)
         result.rows_merged += len(new_rows)
-        written_rows.extend(new_rows)
+        note_written(new_rows)
         if on_month_done is not None:
             on_month_done(label, len(new_rows))
 
@@ -827,7 +852,7 @@ def import_rows(
 
         result.updated_months.append(label)
         result.rows_updated += len(new_rows)
-        written_rows.extend(new_rows)
+        note_written(new_rows)
         if on_month_done is not None:
             on_month_done(label, len(new_rows))
 
@@ -837,21 +862,30 @@ def import_rows(
         # vollständigen Roharchiven neu aufbauen, nicht nur den einen Monat.
         rollup.rebuild_entity_rollups(data_dir, entity_id, aggregation_type, tz, hourly_rollup=hourly_rollup)
 
-    if written_rows:
-        _backfill_index_stats(index, entity_id, written_rows)
+    if written_count:
+        _backfill_index_stats(index, entity_id, written_first_ts, written_count)
 
     return result
 
 
-def _backfill_index_stats(index: Index, entity_id: str, rows: list[tuple[float, float]]) -> None:
+def _backfill_index_stats(
+    index: Index, entity_id: str, first_ts: float | None, row_count: int
+) -> None:
     """Zieht first_ts/row_count nach, falls der Import ältere Daten als den
     bisherigen ersten Wert eingebracht hat — last_ts bleibt unangetastet
-    (kommt aus dem aktuellen Live-Betrieb, nie aus dem Import)."""
+    (kommt aus dem aktuellen Live-Betrieb, nie aus dem Import).
+
+    first_ts ist das Minimum über ALLE geschriebenen Monate. Vorher stand hier
+    das erste Element einer mitgeführten Liste, und das war nicht dasselbe: die
+    Liste wurde in der Reihenfolge to_import → to_merge → to_update gefüllt,
+    ein per include_existing_months ergänzter Monat kann aber älter sein als
+    jeder neu angelegte. Ein Import, der einen bestehenden Archivmonat um
+    frühere Zeitstempel ergänzt, ließ first_ts dadurch zu spät stehen.
+    """
     entity = index.get_entity(entity_id)
-    if entity is None or not rows:
+    if entity is None or not row_count or first_ts is None:
         return
-    new_first = rows[0][0]
-    if entity["first_ts"] is None or new_first < entity["first_ts"]:
-        index.set_first_ts_and_add_rows(entity_id, new_first, len(rows))
+    if entity["first_ts"] is None or first_ts < entity["first_ts"]:
+        index.set_first_ts_and_add_rows(entity_id, first_ts, row_count)
     else:
-        index.add_row_count(entity_id, len(rows))
+        index.add_row_count(entity_id, row_count)
