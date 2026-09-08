@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.88.0 - 2026-09-08
+
+### Neu
+
+- **Der Energiebericht zeigt „Erzeugung & Verbrauch im Detail".** Zwei
+  Balkendiagramme schlüsseln auf, wohin der Ertrag geht (Eigenverbrauch oder
+  Einspeisung) und woher der Verbrauch kommt (Netzbezug oder eigene
+  Versorgung) — je im Vergleich zur vorherigen Periode.
+- **Und eine Tabelle „Stärkster & schwächster Tag"** je Kennzahl, mit Datum,
+  Wert und dem Abstand zum Durchschnitt.
+
+### Geändert
+
+- **Jede Entität hat jetzt drei gleichrangige Reiter: Verlauf, Werte
+  bearbeiten, Konfiguration.** Vorher steckten die letzten beiden als
+  Menüeinträge im Optionen-Menü der Verlaufsansicht, und von dort führte nur
+  ein Rücklink zurück. Alle drei Seiten tragen denselben Kopf, ein Wechsel
+  tauscht nur den Inhalt darunter.
+- **Auf „Werte bearbeiten" wählt ein Menü „Markierung" aus, was gezeigt
+  wird** — mit der Trefferzahl je Kategorie im gewählten Zeitraum. Kategorien
+  ohne Treffer sind nicht mehr wählbar; vorher sahen alle gleich aus und man
+  landete auf einer leeren Tabelle. Die Zeile mit „Löschen" und „Rückgängig"
+  steht jetzt über der Tabelle statt darunter, und die Werteliste bleibt auf
+  dem Telefon eine Tabelle, statt in einzelne Karten zu zerfallen.
+- **Erklärtexte auf der Housekeeping-Seite stehen hinter dem Info-Knopf.**
+  Warnungen und Zahlen bleiben unverändert sichtbar. Auf der Import-Seite
+  lassen sich die drei „So funktioniert …"-Anleitungen zuklappen; auf dem
+  Telefon sind sie es von vornherein.
+- **Die Seiten haben mehr Tiefe bekommen**: der Hintergrund dunkelt nach unten
+  ab, und Karten, Tabellen und Kennzahl-Kacheln liegen sichtbar darauf statt
+  flach darin.
+- **Im Energiebericht** stehen die Kennzahlen in derselben Reihenfolge wie im
+  Energiedashboard, jede mit ihrem Symbol; steigender Verbrauch wird jetzt wie
+  steigender Netzbezug rot dargestellt. Die Delta-Zahlen nennen ihren
+  Bezugswert, und die Legende führt keine Fläche mehr auf, die im Diagramm gar
+  nicht zu sehen ist.
+- **Im Energiedashboard** steht Netzbezug direkt hinter Erzeugung.
+- Auf dem Telefon steht die Seitennavigation unter Tabellen links, und im
+  Housekeeping teilen sich Zeitraum-Auswahl und Sortierung eine Zeile.
+
+### Behoben
+
+- **Das Optionen-Menü der Verlaufsansicht war auf dem Telefon unbedienbar.**
+  Es ragte aus dem Bild, und da die Seite nicht seitwärts scrollt, waren die
+  Schalter am rechten Rand nicht erreichbar. Dasselbe galt für den Hilfe-Text
+  am „i" der Home-Assistant-Importoptionen.
+- **Der Bericht-Knopf im Energiefluss** stand auf dem Telefon allein in einer
+  eigenen Zeile; er passt jetzt neben die Zeitraum-Navigation.
+- Kleinere Ausrichtungsfehler auf schmalen Bildschirmen: die Badges im
+  Energiedashboard-Kopf und die Zeitraum-Navigation der Entitätsansicht.
+
 ## 0.87.0 - 2026-09-08
 
 ### Neu
