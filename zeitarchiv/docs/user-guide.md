@@ -242,6 +242,15 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
 oder die Entity-ID und filterbar (z. B. nach Domain). Ein Klick auf eine
 Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
 
+Jede Entität hat drei gleichrangige Ansichten, erreichbar über die Reiterzeile
+unter dem Namen: **Verlauf** (das Diagramm), **Werte bearbeiten** (siehe
+[Bereinigung](#bereinigung)) und **Konfiguration** (siehe
+[Entität konfigurieren](#entität-konfigurieren)). Alle drei tragen denselben
+Kopf — Anzeigename, Favoriten-Stern, darunter Entity-ID, Typ und der Weg
+zurück zur Liste —, sodass ein Wechsel nur den Inhalt darunter austauscht. Das
+Optionen-Menü der Verlaufsansicht enthält deshalb nur noch Aktionen und
+Darstellungs-Schalter, keine Navigation mehr.
+
 ### Zeitraum-Navigation
 
 - Auswahl von Stunde, Tag, Woche, Monat, Jahr oder Dekade als Basiseinheit;
@@ -394,8 +403,9 @@ gerade betrachteten Bildausschnitt, und gilt deshalb nur bis zur nächsten
 
 ## Entität konfigurieren
 
-Über das Zahnrad-Symbol einer Entität (in der Liste oder in der
-Verlaufsansicht). Jede Einstellung gilt **nur für diese eine Entität** und
+Über das Zahnrad-Symbol in der Entitätenliste oder über den Reiter
+**Konfiguration** einer geöffneten Entität. Jede Einstellung gilt **nur für
+diese eine Entität** und
 überschreibt den globalen Standard aus **Einstellungen → Archivierung**. Neue
 globale Standards wirken nie rückwirkend auf bereits angelegte Entitäten.
 
@@ -623,8 +633,8 @@ Zeitpunkt schlicht keine Daten mehr für sie.
 
 ## Bereinigung
 
-Von der Verlaufsansicht über den Button "Bereinigen" erreichbar, drei
-Reiter:
+Über den Reiter **Werte bearbeiten** einer geöffneten Entität erreichbar,
+darin drei Bereiche:
 
 ### 1. Bereinigen
 
@@ -855,9 +865,11 @@ folgen jeweils einer eigenen, festen Regel:
 
 Wichtig: Diese Markierungen schließen sich **nicht gegenseitig aus**. Ein
 und derselbe Wert kann z. B. gleichzeitig als Ausreißer **und** als Teil
-eines Duplikats markiert sein — die Filter-Reiter im Bereinigen-Tab wählen
-jeweils nur aus, welche Werte eine bestimmte Markierung tragen, sie teilen
-die Liste nicht in getrennte, überschneidungsfreie Gruppen auf.
+eines Duplikats markiert sein — die Auswahl **Markierung** über der Liste
+wählt jeweils nur aus, welche Werte eine bestimmte Markierung tragen, sie
+teilt die Liste nicht in getrennte, überschneidungsfreie Gruppen auf. Jeder
+Eintrag der Auswahl nennt seine Trefferzahl im gewählten Zeitraum; Kategorien
+ohne Treffer sind nicht wählbar.
 
 ## Charts
 

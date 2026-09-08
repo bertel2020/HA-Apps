@@ -107,6 +107,8 @@ Alle Farben sind CSS-Variablen auf `:root`, mit einem `@media (prefers-color-sch
 | `--font-display` | `'IBM Plex Sans'` | — | Fließtext, Überschriften, UI-Beschriftungen |
 | `--font-mono` | `'IBM Plex Mono'` | — | **Nur echte Daten** — siehe Typografie unten |
 | `--shadow` | dezenter Elevation-Schatten für Karten/Kacheln |
+| `--tile-wash` / `--tile-wash-hover` | Eck-Verlauf für anklickbare Kacheln (Ruhe/Überfahren) |
+| `--bg-shade` | Abdunklung des Seitengrunds nach unten (rohes `rgba` je Schema, siehe unten) |
 
 Farben nie hart verdrahten — immer über `var(--…)`, sonst bricht Dark Mode
 lautlos für genau diese eine Stelle.
@@ -137,6 +139,33 @@ Eine einzige Breite für alle Seiten — vorher zwischen 720px (Konfiguration) u
 1080px (Import) uneinheitlich. `min-width:0` verhindert, dass breite Inhalte
 (Tabellen, Diagramme) das Flex-/Grid-Elternelement aufblähen; `.tbl-wrap` und
 `.card` scrollen bei Bedarf selbst horizontal statt die ganze Seite zu strecken.
+
+Der Seitengrund ist kein gleichmäßiger Ton, sondern dunkelt nach unten ab —
+`body::before` als fixiertes Pseudoelement mit
+`linear-gradient(180deg, transparent, var(--bg-shade))`. Grund: `--bg` gegen
+`--surface` ergibt im Schema „modern" nur 1,071 Kontrast; die Karten waren an
+ihrer Fläche praktisch nicht vom Grund zu unterscheiden, man las sie am Rahmen.
+Mit dem Verlauf sind es unten 1,190.
+
+**`--bg-shade` ist bewusst ein rohes `rgba` je Schema und kein Farbtoken.**
+`--ink-faint`, `--ink` und `--accent-line` kehren sich in dunklen Schemata um;
+ein Verlauf aus ihnen ließe den Grund dort *zur* Kartenfarbe hin wandern und
+fräße genau die Kante, um die es geht (gemessen 1,098 → 1,028 bei 5 %
+Akzenttönung). `--shadow` ist aus demselben Grund seit jeher so gebaut.
+Fixiert statt mitscrollend, weil ein Verlauf über die ganze Dokumenthöhe
+unsichtbar wird; als Pseudoelement statt `background-attachment:fixed`, das auf
+iOS ruckelt. Der Energiebericht nimmt ihn zurück (`body::before{display:none}`),
+und `@media print` ebenfalls.
+
+Was auf diesem Grund liegt, trägt `var(--shadow)`: `.settings-section`, `.stat`,
+die Übersichtskarten auf `/dashboards`, `/charts`, `/tables`, die Panels des
+Energiedashboards, freistehende `.tbl-wrap` und `.status-card`. **Nicht** aber
+eine `.tbl-wrap` oder `.status-card` *innerhalb* einer Fläche, die schon einen
+trägt — ein Schatten im Schatten liest sich als Fehler, nicht als zweite Ebene;
+dafür gibt es eine ausdrückliche Rücknahme in `app.css`. Ebenfalls flach
+bleiben Bedienelemente (eine Segmentleiste ist keine Fläche) und alles, was
+unter 640 px zur Kartenform wechselt: dort gibt `.tbl-wrap` Rahmen und Fläche
+ab, ein Schatten ohne Fläche schwebte frei.
 
 Jede Seite folgt demselben Kopfbereich:
 
@@ -237,8 +266,12 @@ hoch aufragen.
 
 Drei Sorten Text teilen sich Schriftgröße, Zeilenhöhe und `--ink-faint`, sind
 aber nicht dasselbe. Die **Rolle** steht zusätzlich zur Kontextklasse (`hint`,
-`tbl-hint`, `settings-compact-hint`): der Kontext bestimmt Größe und Abstände,
-die Rolle, ob der Text hinter dem Info-Knopf wegklappen darf.
+`tbl-hint`, `settings-compact-hint`, `settings-section-description`): der
+Kontext bestimmt Größe und Abstände, die Rolle, ob der Text hinter dem
+Info-Knopf wegklappen darf. `settings-section-description` — der Satz zwischen
+Abschnittsüberschrift und Inhalt — ist dieselbe Sorte Text, nur eine Ebene
+höher; er behält seine eigene Klasse, weil er anders aussieht (`--ink-muted`,
+13 px statt `--ink-faint`, 12,5 px).
 
 | Klasse | Bedeutung |
 | --- | --- |

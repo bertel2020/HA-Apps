@@ -137,14 +137,21 @@ es bereits eine Popover-Mechanik.
 Voraussetzung war eine Unterscheidung, die es vorher nicht gab: alle Hinweise
 trugen dieselbe Klasse `.hint`, obwohl drei verschiedene Dinge darin steckten.
 Die Rolle steht **zusätzlich** zur Kontextklasse (`hint`, `tbl-hint`,
-`settings-compact-hint`), weil beide Achsen unabhängig sind — der Kontext
-bestimmt Größe und Abstände, die Rolle, ob der Text wegklappen darf:
+`settings-compact-hint`, `settings-section-description`), weil beide Achsen
+unabhängig sind — der Kontext bestimmt Größe und Abstände, die Rolle, ob der
+Text wegklappen darf:
 
 | Rolle | Bedeutung |
 | --- | --- |
 | *(ohne)* | Erklärung — darf hinter den Info-Knopf |
 | `hint-warn` | Warnung — bleibt sichtbar; `hint-warn-strong` gibt den drei Sätzen mit nicht umkehrbarem Verlust eine Kante in `--warning` |
 | `hint-status` | Daten-, Leer- und Ladezustand — ist Inhalt, keine Erklärung |
+
+`settings-section-description` — der Satz zwischen Abschnittsüberschrift und
+Inhalt — kam zuletzt dazu: dieselbe Sorte Text, nur eine Ebene höher. Er
+behält seine eigene Klasse, weil er anders aussieht (`--ink-muted`, 13 px statt
+`--ink-faint`, 12,5 px), und steht deshalb sowohl im Selektor von
+`hint-toggle.js` als auch in den Kontextklassen von `test_hint_roles.py`.
 
 Gebaut wird das mit den Makros aus `_hints.html`
 (`{% from "_hints.html" import hint_button, hint_body %}`), geklappt von
@@ -452,6 +459,21 @@ breite Optionen-Menü am rechten Rand aus dem Fenster — an dieselbe Breite
 gebunden wie die Rechtsbündigkeit, weil es unterhalb davon genau andersherum
 falsch wäre.
 
+Unterhalb von 641 px reicht das nicht: dort hängt das Menü wieder links am
+Knopf, und der steht am rechten Ende seiner Zeile — gemessen lief es auf einem
+375-px-Telefon von 257 bis 547 px, ragte also 172 px aus dem Fenster, und da
+`<html>` `overflow-x:hidden` trägt, waren die rechtsbündigen Schalter jeder
+Menüzeile **unerreichbar**. In CSS ist das nicht zu lösen: Rechtsöffnung
+verschiebt das Problem nur an den anderen Rand (im Chart-Editor läge die linke
+Kante bei −97 px), und ein fest breites Popover an einem beweglichen Anker
+lässt sich ohne Kenntnis der Ankerposition nicht klemmen.
+`static/js/menu-popover-clamp.js` misst deshalb beim Öffnen und schiebt
+waagerecht zurück — gegen `documentElement.clientWidth`, denn das ist die Box,
+an der `overflow-x:hidden` abschneidet. Verschoben wird über `left`, nicht
+`transform`: `transform` gehört der Öffnen-Animation. Dasselbe Vorgehen wie
+`reposition()` im Kalender-Popover. Dazu `max-height:70vh` mit Innenscroll
+unter 640 px — das Menü ist 621 px hoch und reichte sonst unter die Falz.
+
 Einen „Jetzt"-Knopf gibt es nicht mehr: er belegte dauerhaft Platz und war die
 meiste Zeit deaktiviert. Seine Funktion liegt als Zweitfunktion auf der schon
 aktiven Zeitraum-Stufe — ein erneuter Klick auf „Tag" springt zurück auf
@@ -549,6 +571,22 @@ die erste Spalte. Eingeklappt wird ab zwei versteckten Werten.
 Ebenfalls von hier: der Scroll-Hinweis an den Rändern von `.tbl-wrap` hängt an
 der Klasse `.is-scrollable`, die das Modul aus `scrollWidth` gegen
 `clientWidth` setzt — ob ein Container überläuft, weiß nur das Layout.
+
+Wohin das Sortiermenü gehört, entscheidet `sortHost()` in drei Stufen: ein
+`[data-sort-host]` im selben `<section>` gewinnt, sonst das Ansicht-Menü (nur
+bei genau einer Listentabelle auf der Seite), sonst die `.tbl-wrap` über der
+Tabelle. Der erste Fall ist für Seiten, die über ihrer Liste schon eine
+Bedienzeile haben — auf Housekeeping steht in „Inaktive Entitäten" eine
+Zeitraum-Auswahl, und Sortieren gehört in dieselbe Zeile statt in eine zweite
+darunter. **Das Ziel muss außerhalb des per htmx getauschten Bereichs liegen:**
+dort überlebt es den Austausch, während das Menü selbst neu gebaut wird (siehe
+`verwaisteSortmenues()`). Läge es darin, löschte jeder Wechsel des
+Schwellwerts genau das Formular, das ihn auslöst.
+
+Der Pager steht unter 640 px linksbündig — an derselben Kante wie
+Überschriften, Zählstand und die Zeilenkarten selbst. `justify-content` steht
+in acht Templates als Inline-Stil (`space-between`, für den Schreibtisch
+richtig), deshalb setzt `app.css` es mit `!important` statt in acht Vorlagen.
 
 **`list-settings-menu.js` — die Werkzeugleiste wird ein Menü.** Filter,
 Spaltenauswahl und Sortierung stehen auf schmalen Bildschirmen zusammen in
@@ -707,6 +745,16 @@ die Liste im Panel sagt ohnehin, was.
   kombinierbarer Schalter, kein Sortiermodus. Kacheln mit
   `data-sort-first="true"` bleiben unabhängig davon ganz vorn; die
   Dashboard-Übersicht nutzt dies für das Standard-Dashboard.
+- **`_entity_tabs.html`**: die Reiterzeile der drei Entitätsseiten (Verlauf,
+  Werte bearbeiten, Konfiguration). Sie borgt bewusst das Idiom der Topnav —
+  Grundlinie, aktiver Unterstrich, `aria-current="page"` —, und alle drei
+  Seiten tragen darüber denselben Kopf (`.h1-row` mit Favoriten-Stern,
+  darunter Entity-ID, Typ, Weg zur Liste), sodass ein Reiterwechsel nur den
+  Inhalt austauscht. Vorher steckten zwei der drei als Navigationseinträge im
+  Optionen-Menü der Verlaufsseite; das Menü enthält jetzt nur noch Aktionen.
+  Treffen wie auf „Werte bearbeiten“ zwei Reiterzeilen aufeinander, ist die
+  innere zu weichen Pillen abgestuft (`--accent-line-soft`, kleinere Schrift,
+  keine Grundlinie), damit die Rangfolge auch ohne Farbwissen lesbar bleibt.
 - **`_dashboard_usage.html`**: gemeinsame Verwendungsanzeige in geöffneten
   Chart- und Tabellenansichten. Sie nutzt die bestehenden Chip-, Menü- und
   Popover-Bausteine; bei mehreren Zuordnungen steht das Standard-Dashboard
