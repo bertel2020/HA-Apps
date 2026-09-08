@@ -61,6 +61,17 @@
     padding:8px 12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);
     background:var(--surface-alt);border:1px solid var(--border);border-bottom:none;
     border-radius:12px 12px 0 0;
+    /* Denselben Schatten wie die .tbl-wrap darunter (app.css): beide bilden
+       ein Objekt, und ohne diese Zeile blieb dessen OBERE Kante als einzige
+       flach, während Seiten und Unterkante lagen.
+
+       Die beiden Schatten überlappen sich an der Naht — der der Tabelle fällt
+       über die Unterkante der Leiste, weil sie im DOM danach kommt und später
+       gemalt wird. Bei 0,07 Deckkraft über zwei Ebenen sind das zwei bis vier
+       Helligkeitsstufen auf einem 10px-Streifen: nicht zu sehen, und der
+       Preis dafür, kein zusätzliches Hüllelement nur für einen Schatten in
+       die Vorlage zu setzen. */
+    box-shadow:var(--shadow);
   }
   /* Die Tabelle darunter gibt ihre oberen Ecken ab — beide zusammen ergeben
      einen Rahmen. Geschwister-Selektor statt einer eigenen Klasse an der
