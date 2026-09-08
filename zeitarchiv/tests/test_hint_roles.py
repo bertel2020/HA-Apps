@@ -19,7 +19,16 @@ from _paths import APP_CSS, TEMPLATES
 
 
 ROLLEN = ("hint-warn", "hint-status")
-KONTEXTE = ("hint", "tbl-hint", "settings-compact-hint", "bgproc-hint")
+# settings-section-description kam mit dem Housekeeping dazu: der Satz zwischen
+# Abschnittsüberschrift und Tabelle ist dieselbe Sorte Text, nur eine Ebene
+# höher — er darf hinter den Knopf, seine Rollen-Varianten dürfen es nicht.
+KONTEXTE = (
+    "hint",
+    "tbl-hint",
+    "settings-compact-hint",
+    "bgproc-hint",
+    "settings-section-description",
+)
 
 
 def _templates() -> dict[str, str]:

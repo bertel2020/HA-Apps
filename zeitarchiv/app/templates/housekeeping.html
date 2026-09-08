@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — Housekeeping{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/housekeeping.css') }}">
@@ -15,7 +16,19 @@
 
       <section id="entitaeten" class="settings-section">
         <div class="hk-section-head">
-          <h2 class="settings-section-title">Inaktive Entitäten</h2>
+          <h2 class="settings-section-title">Inaktive Entitäten {{ hint_button('Inaktive Entitäten') }}</h2>
+          {# Steht IM .hk-section-head und direkt hinter der Überschrift, weil
+             hint-toggle.js den Hinweis dort sucht (siehe _hints.html, zweite
+             Form). Aufgeklappt rutscht er über order/flex-basis unter die
+             Zeile, damit die Zeitraum-Auswahl rechts stehen bleibt. #}
+          {% call hint_body('settings-section-description') %}Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.{% endcall %}
+          {# data-sort-host: table-cards.js hängt sein Sortiermenü (nur auf dem
+             Telefon, siehe dort) hier hinein statt über die Tabelle — dann
+             stehen „seit …“ und „Sortieren“ in EINER Zeile statt in zweien.
+             Bewusst außerhalb von #stale-entities-body: dessen Inhalt wird bei
+             jeder Änderung ausgetauscht, das Formular darf dabei nicht
+             mitgelöscht werden. #}
+          <div class="hk-section-tools" data-sort-host>
           <form id="stale-entities-form" hx-get="housekeeping/stale-entities" hx-trigger="change"
                 hx-target="#stale-entities-body" hx-swap="innerHTML" hx-include="#stale-entities-form">
             <span class="dd-picker-wrap">
@@ -32,16 +45,16 @@
               </div>
             </span>
           </form>
+          </div>
         </div>
-        <p class="settings-section-description">Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.</p>
         <div id="stale-entities-body">
           {% include "_stale_entities_body.html" %}
         </div>
       </section>
 
       <section id="duplikate" class="settings-section">
-        <h2 class="settings-section-title">Duplikate</h2>
-        <p class="settings-section-description">Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage.</p>
+        <h2 class="settings-section-title">Duplikate {{ hint_button('Duplikate') }}</h2>
+        {% call hint_body('settings-section-description') %}Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage.{% endcall %}
         <div class="tbl-wrap">
           {% if duplicates_by_entity %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
@@ -77,8 +90,11 @@
       </section>
 
       <section id="ausreisser" class="settings-section">
-        <h2 class="settings-section-title">Ausreißer</h2>
-        <p class="settings-section-description">Entitäten, deren Ausreißer-Erkennung mehr als {{ outlier_notable_percent }}&nbsp;% ihrer Werte markiert &mdash; dann ist die Schwelle für dieses Signal zu eng eingestellt, und die Bereinigungs-Seite zeigt normales Verhalten als verdächtig. Dieselben Zahlen stehen unter dem Schwellenfeld der jeweiligen Entität.</p>
+        <h2 class="settings-section-title">Ausreißer {{ hint_button('Ausreißer') }}</h2>
+        {# Der Rat, der früher unter der Tabelle stand, steckt jetzt mit im
+           selben Hinweis: er gehört zur Frage „was mache ich damit?" und hätte
+           als zweiter Info-Knopf im selben Abschnitt nur verwirrt. #}
+        {% call hint_body('settings-section-description') %}Entitäten, deren Ausreißer-Erkennung mehr als {{ outlier_notable_percent }}&nbsp;% ihrer Werte markiert &mdash; dann ist die Schwelle für dieses Signal zu eng eingestellt, und die Bereinigungs-Seite zeigt normales Verhalten als verdächtig. Dieselben Zahlen stehen unter dem Schwellenfeld der jeweiligen Entität.{% if outlier_rates.rows %} Eine zu enge Schwelle korrigiert man je Entität: Konfigurationsseite öffnen, eine Stufe höher wählen, Quote neu berechnen.{% endif %}{% endcall %}
         <div class="tbl-wrap">
           {% if outlier_rates.rows %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
@@ -128,14 +144,11 @@
           Alle {{ outlier_rates.measured }} Entitäten mit Ausreißer-Erkennung sind gemessen, jeweils über ihre komplette Historie.
           {%- endif %}
         </p>
-        {% if outlier_rates.rows %}
-        <p class="hint" style="margin-top:8px;">Eine zu enge Schwelle korrigiert man je Entität: Konfigurationsseite öffnen, eine Stufe höher wählen, Quote neu berechnen.</p>
-        {% endif %}
       </section>
 
       <section id="konfiguration" class="settings-section">
-        <h2 class="settings-section-title">Konfiguration</h2>
-        <p class="settings-section-description">Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder der aktive Wertänderungsfilter erzwingt selbst schon einen größeren Mindestabstand zwischen Werten.</p>
+        <h2 class="settings-section-title">Konfiguration {{ hint_button('Konfiguration') }}</h2>
+        {% call hint_body('settings-section-description') %}Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder der aktive Wertänderungsfilter erzwingt selbst schon einen größeren Mindestabstand zwischen Werten.{% if gap_threshold_conflicts %} Nicht in einem Zug korrigierbar: je nach Entität hilft eine gröbere Lücken-Erkennung oder eine feinere Auflösung &mdash; auf der jeweiligen Konfigurationsseite.{% endif %}{% endcall %}
         <div class="tbl-wrap">
           {% if gap_threshold_conflicts %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
@@ -167,18 +180,15 @@
           <div class="empty">Keine widersprüchlichen Kombinationen gefunden.</div>
           {% endif %}
         </div>
-        {% if gap_threshold_conflicts %}
-        <p class="hint" style="margin-top:14px;">Nicht in einem Zug korrigierbar: je nach Entität hilft eine gröbere Lücken-Erkennung oder eine feinere Auflösung &mdash; auf der jeweiligen Konfigurationsseite.</p>
-        {% endif %}
       </section>
 
       <section id="speicherplatz" class="settings-section">
-        <h2 class="settings-section-title">Speicherplatz</h2>
-        <p class="settings-section-description">Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.</p>
+        <h2 class="settings-section-title">Speicherplatz {{ hint_button('Speicherplatz') }}</h2>
+        {% call hint_body('settings-section-description') %}Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.{% endcall %}
         {% if host_disk_usage %}
         <div class="settings-subsection">
-          <h3 class="settings-subsection-title">Host-Dateisystem</h3>
-          <p class="hint" style="margin:0 0 14px;">Nicht Zeitarchivs eigener Verbrauch (Zahlen unten), sondern der freie Platz auf der Platte selbst.</p>
+          <h3 class="settings-subsection-title">Host-Dateisystem {{ hint_button('Host-Dateisystem') }}</h3>
+          {% call hint_body() %}Nicht Zeitarchivs eigener Verbrauch (Zahlen unten), sondern der freie Platz auf der Platte selbst.{% endcall %}
           <div class="status-grid">
             <div class="status-card{% if host_disk_usage.severity == 'danger' %} status-card-danger{% elif host_disk_usage.severity == 'warning' %} status-card-accent-strong{% endif %}">
               <span class="status-card-label">Frei</span>
@@ -205,8 +215,8 @@
         <dialog id="marked-points-dialog" class="detail-dialog" aria-labelledby="marked-points-title">
           <div class="detail-dialog-header">
             <div>
-              <h2 id="marked-points-title">Markierte Datensätze</h2>
-              <p class="hint">Read-only-Übersicht der noch rückgängig machbaren Löschmarkierungen.</p>
+              <h2 id="marked-points-title">Markierte Datensätze {{ hint_button('Markierte Datensätze') }}</h2>
+              {% call hint_body() %}Read-only-Übersicht der noch rückgängig machbaren Löschmarkierungen.{% endcall %}
             </div>
             <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
           </div>
@@ -228,15 +238,25 @@
       </section>
 
       <section id="rotation" class="settings-section">
-        <h2 class="settings-section-title">Rotation</h2>
+        <h2 class="settings-section-title">Rotation {{ hint_button('Rotation') }}</h2>
+        {# Stand bis hierher als erste Zeile in _settings_rotation_form.html.
+           Hier gehört er hin: hint-toggle.js sucht den Hinweis direkt hinter
+           der Überschrift, und als statischer Text muss er nicht bei jedem
+           htmx-Tausch des Formulars mitgeschickt werden. #}
+        {% call hint_body() %}Rotiert Entitäten, die keine neuen Werte mehr senden und sonst nie automatisch archiviert würden.{% endcall %}
         <div id="rotation-form">
           {% include "_settings_rotation_form.html" %}
         </div>
       </section>
 
       <section id="ungenutzt" class="settings-section">
-        <h2 class="settings-section-title">Ungenutzte Elemente</h2>
-        <p class="settings-section-description"><span id="hk-unused-count">{{ unused_charts | length + unused_tables | length }}</span> von <span id="hk-total-count">{{ chart_count + table_count }}</span> &middot; in keinem Dashboard eingebunden. Ermittelt aus den bestehenden Dashboard-Kacheln &mdash; sobald ein Chart oder eine Tabelle irgendwo angepinnt wird, verschwindet der Eintrag hier von selbst.</p>
+        <h2 class="settings-section-title">Ungenutzte Elemente {{ hint_button('Ungenutzte Elemente') }}</h2>
+        {% call hint_body('settings-section-description') %}Ermittelt aus den bestehenden Dashboard-Kacheln &mdash; sobald ein Chart oder eine Tabelle irgendwo angepinnt wird, verschwindet der Eintrag hier von selbst.{% endcall %}
+        {# Die Zählung bleibt stehen: sie ist Inhalt, keine Erklärung, und wird
+           per JS nachgeführt (hk-unused-count). .hint-status nimmt sie aus dem
+           Aufklapp-Selektor aus, sonst schaltete der Knopf sie statt des
+           Hinweises darüber. #}
+        <p class="settings-section-description hint-status"><span id="hk-unused-count">{{ unused_charts | length + unused_tables | length }}</span> von <span id="hk-total-count">{{ chart_count + table_count }}</span> &middot; in keinem Dashboard eingebunden.</p>
         <div class="tbl-wrap">
           {% if unused_charts or unused_tables %}
           <table class="dt" data-sortable data-paginate data-page-size="10">
@@ -292,4 +312,5 @@
 <script src="{{ asset('js/pages/housekeeping.js') }}"></script>
 <script src="{{ asset('js/settings-nav-scrollspy.js') }}"></script>
 <script src="{{ asset('js/table-cards.js') }}"></script>
+<script src="{{ asset('js/hint-toggle.js') }}"></script>
 {% endblock %}

@@ -349,14 +349,3 @@
        oben — sie gilt in beiden Breiten. */
   }
 
-  /* Der Pager dieser Seite steht auf dem Telefon linksbündig — anders als der
-     app-weite Standard, der ihn dort rechts ausrichtet
-     (.pager{justify-content:flex-end!important} in app.css). Dessen Begründung
-     ist die Kartenform: in einer Karten-Liste stehen die Werte an der rechten
-     Kante, und der Pager schließt daran an. Diese Seite hat seit
-     data-cards="off" keine Karten mehr, sondern eine linksbündige Tabelle —
-     die Seitengröße stand damit als einziges Element rechts unter einer Liste,
-     die links beginnt. !important, weil die app-weite Regel eines trägt. */
-  @media (max-width:640px){
-    #rows-table .pager{justify-content:flex-start!important;}
-  }

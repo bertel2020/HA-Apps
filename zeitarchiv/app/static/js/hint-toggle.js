@@ -8,9 +8,15 @@
 
 /* `hint-warn` und `hint-status` sind ausdrücklich ausgenommen: eine Warnung
    und eine Statuszeile dürfen nicht wegklappen, auch nicht versehentlich. */
+/* .settings-section-description kam mit dem Housekeeping dazu: der Satz
+   zwischen Abschnittsüberschrift und Tabelle ist dieselbe Sorte Text wie ein
+   .hint, nur eine Ebene höher — er erklärt, was der Abschnitt zeigt. Er behält
+   seine eigene Klasse, weil er anders aussieht (--ink-muted, 13px statt
+   --ink-faint, 12,5px). */
 const HINWEIS =
   '.hint:not(.hint-warn):not(.hint-status),' +
   '.tbl-hint:not(.hint-warn):not(.hint-status),' +
+  '.settings-section-description:not(.hint-warn):not(.hint-status),' +
   '.settings-compact-hint:not(.hint-warn):not(.hint-status)';
 
 /* Zwei Formen, mehr gibt es nicht:

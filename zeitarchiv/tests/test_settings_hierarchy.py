@@ -46,9 +46,9 @@ def test_storage_and_retention_use_distinct_sublevels() -> None:
         encoding="utf-8"
     )
 
-    assert '<h2 class="settings-section-title">Speicherplatz</h2>' in housekeeping
-    # Die Überschrift trägt seit dem Info-Knopf noch ein Makro vor dem </h3>;
-    # geprüft ist hier die Ebene, nicht der Rest der Zeile.
+    # Beide Überschriften tragen seit dem Info-Knopf noch ein Makro vor dem
+    # schließenden Tag; geprüft ist hier die Ebene, nicht der Rest der Zeile.
+    assert '<h2 class="settings-section-title">Speicherplatz' in housekeeping
     assert '<h3 class="settings-subsection-title">Indexkonsistenz' in storage
     assert '<h3 class="settings-subsection-title">Endgültige Bereinigung</h3>' in housekeeping
     assert '<h4 class="settings-minor-title">Vorschau der Bereinigung</h4>' in purge

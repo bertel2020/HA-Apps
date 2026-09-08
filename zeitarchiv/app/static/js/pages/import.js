@@ -561,3 +561,58 @@
     applyImportPaging();
 
     if (SCANNING) document.addEventListener('DOMContentLoaded', () => pollUploadProgress());
+
+    // Die drei „So funktioniert …“-Anleitungen sind auf dem Telefon
+    // eingeklappt (Standard: zu, Titel ist der Schalter). Gemessen bei 375px
+    // nimmt die Symcon-Anleitung 660 px zwischen Reiterzeile und Formular —
+    // 81 % einer Telefonhöhe für einen Text, der eine EINMALIGE Migration
+    // erklärt.
+    //
+    // Dieselbe Mechanik wie bei der Protokollierungs-Karte der Log-Seite
+    // (static/js/pages/logs.js): die Klasse wird nur unterhalb des
+    // Breakpoints gesetzt, am Schreibtisch bleibt der Block ohne
+    // Zustandslogik immer offen. Beim Wechsel schmal→breit (Tablet drehen)
+    // fällt sie weg, damit sie beim Zurückdrehen wieder im Standard „zu“
+    // beginnt.
+    (function () {
+      const bloecke = Array.from(document.querySelectorAll('.callout[data-collapsible]'));
+      if (!bloecke.length) return;
+      const schmal = window.matchMedia('(max-width:700px)');
+
+      function setze(block, zu) {
+        block.classList.toggle('is-collapsed', zu);
+        block.querySelector('.callout-title')?.setAttribute('aria-expanded', String(!zu));
+      }
+
+      function anwenden() {
+        bloecke.forEach(block => {
+          const titel = block.querySelector('.callout-title');
+          if (!titel) return;
+          if (schmal.matches) {
+            titel.setAttribute('role', 'button');
+            titel.setAttribute('tabindex', '0');
+            setze(block, true);
+          } else {
+            titel.removeAttribute('role');
+            titel.removeAttribute('tabindex');
+            titel.removeAttribute('aria-expanded');
+            block.classList.remove('is-collapsed');
+          }
+        });
+      }
+
+      document.addEventListener('click', (e) => {
+        const titel = e.target.closest('.callout[data-collapsible] .callout-title');
+        if (!titel || !schmal.matches) return;
+        const block = titel.parentElement;
+        setze(block, !block.classList.contains('is-collapsed'));
+      });
+      document.addEventListener('keydown', (e) => {
+        if (!schmal.matches) return;
+        const titel = e.target.closest('.callout[data-collapsible] .callout-title');
+        if (!titel) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); titel.click(); }
+      });
+      schmal.addEventListener('change', anwenden);
+      anwenden();
+    })();

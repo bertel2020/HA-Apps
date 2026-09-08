@@ -30,8 +30,8 @@
     </datalist>
 
     <div id="tab-symcon" class="import-tab"{% if active_import_tab != 'symcon' %} style="display:none;"{% endif %}>
-    <div class="callout">
-      <strong>So funktioniert die einmalige Migration aus Symcon:</strong>
+    <div class="callout" data-collapsible>
+      <strong class="callout-title">So funktioniert die einmalige Migration aus Symcon:</strong>
       <ol class="import-steps">
         <li>Den Symcon-<code>db</code>-Ordner als ZIP-Datei hochladen. Zeitarchiv entpackt und scannt den Inhalt automatisch.</li>
         <li>Optional die aus Symcon exportierte <code>settings.json</code> ergänzen. Sie liefert Klarnamen, übergeordnete Räume/Kategorien und Einheiten; der <code>db</code>-Ordner selbst enthält nur numerische Variablen-IDs.</li>
@@ -192,8 +192,8 @@
     </div>
 
     <div id="tab-csv" class="import-tab"{% if active_import_tab != 'csv' %} style="display:none;"{% endif %}>
-    <div class="callout">
-      <strong>So funktioniert der Import einer CSV-Datei:</strong>
+    <div class="callout" data-collapsible>
+      <strong class="callout-title">So funktioniert der Import einer CSV-Datei:</strong>
       <ol class="import-steps">
         <li>Eine CSV-Datei hochladen und Trennzeichen sowie vorhandene Kopfzeile festlegen.</li>
         <li>Zeitstempel- und Wertspalte auswählen und das Zeitformat angeben: Unix-Sekunden, Unix-Millisekunden, ISO 8601 oder ein eigenes Muster.</li>
@@ -205,8 +205,8 @@
     </div>
 
     <div id="tab-ha" class="import-tab"{% if active_import_tab != 'ha' %} style="display:none;"{% endif %}>
-    <div class="callout">
-      <strong>So funktioniert der Import aus Home Assistant:</strong>
+    <div class="callout" data-collapsible>
+      <strong class="callout-title">So funktioniert der Import aus Home Assistant:</strong>
       <ol class="import-steps">
         <li>Importmodus wählen: Der empfohlene Vollimport verbindet ältere Langzeitstatistik automatisch mit der jüngeren Rohhistorie. Beide Quellen können auch einzeln importiert werden.</li>
         <li>Gewünschte Zeiträume festlegen und bei Bedarf die Verfügbarkeit prüfen. Zur Auswahl stehen Entitäten, die bereits mindestens einen Live-Wert an Zeitarchiv übertragen haben.</li>

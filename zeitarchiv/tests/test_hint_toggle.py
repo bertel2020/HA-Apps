@@ -54,6 +54,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
     seiten = {
         "entity_config.html": ["_entity_config_form.html"],
         "energiedashboard.html": ["_energiedashboard_setup.html"],
+        "housekeeping.html": ["_settings_storage_index_form.html"],
         "settings.html": ["_settings_storage_index_form.html"],
         "statistik_index.html": [],
         "table_editor.html": [],

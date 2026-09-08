@@ -220,6 +220,15 @@
   // Nur bei genau EINER Listentabelle auf der Seite: bei mehreren wäre im
   // Ansicht-Menü nicht mehr erkennbar, welche Tabelle gemeint ist.
   function sortHost(table) {
+    // Eine Seite kann für eine einzelne Liste einen eigenen Platz vorgeben:
+    // auf Housekeeping steht in „Inaktive Entitäten“ schon eine Auswahl
+    // („seit 3 Tage“) über der Tabelle, und Sortieren gehört in dieselbe
+    // Zeile statt in eine zweite darunter. Das Ziel liegt bewusst AUSSERHALB
+    // des per htmx getauschten Bereichs — dort überlebt es den Austausch,
+    // während das Menü selbst neu gebaut wird (siehe verwaisteSortmenues).
+    const abschnitt = table.closest('section');
+    const eigener = abschnitt && abschnitt.querySelector('[data-sort-host]');
+    if (eigener) return eigener;
     const menu = document.getElementById('list-settings-popover');
     if (menu && document.querySelectorAll('table.dt').length === 1) return menu;
     return table.closest('.tbl-wrap') || table.parentElement;

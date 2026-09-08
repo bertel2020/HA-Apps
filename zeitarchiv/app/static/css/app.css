@@ -1322,13 +1322,15 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
   /* Mit Aufklapper rückt der Stern eine Knopfbreite nach links. */
   table.dt.dt-cards tbody tr.dt-card-collapsible > td.dt-card-pre{right:44px;}
   table.dt.dt-cards tbody tr.dt-card-collapsible:has(> td.dt-card-pre) > td.dt-card-title::before{width:68px;}
-  /* Der Pager steht auf dem Telefon rechts, in beiden Zeilen: die Liste
-     darüber trägt ihre Werte ebenfalls an der rechten Kante, und "Seite 1 / 5"
-     und "20 / Seite" gehören sichtbar zusammen. justify-content steht als
-     Inline-Stil in acht Templates (space-between, für den Schreibtisch
-     richtig), deshalb hier !important statt acht Änderungen. */
-  .pager{justify-content:flex-end!important;}
-  .pager > div{flex-wrap:wrap;justify-content:flex-end;}
+  /* Der Pager steht auf dem Telefon LINKS, in beiden Zeilen — an derselben
+     Kante, an der auch Überschriften, Zählstand und die Zeilenkarten selbst
+     beginnen. Bis zuletzt stand er rechts, begründet mit den rechtsbündigen
+     Werten in den Karten; im Gebrauch überwiegt aber die gemeinsame linke
+     Kante mit allem anderen der Seite. justify-content steht als Inline-Stil
+     in acht Templates (space-between, für den Schreibtisch richtig), deshalb
+     hier !important statt acht Änderungen. */
+  .pager{justify-content:flex-start!important;}
+  .pager > div{flex-wrap:wrap;justify-content:flex-start;}
 
   /* 44×44 statt 28×28 (Richtwert für Fingerziele) und bündig in der Ecke der
      Karte: der Rand der Karte ist ohnehin toter Raum, und das Zeichen selbst

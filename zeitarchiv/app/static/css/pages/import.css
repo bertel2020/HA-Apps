@@ -3,6 +3,34 @@
     border-radius:10px;padding:14px 18px;margin-bottom:20px;background:var(--surface);font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);
   }
   .callout strong{color:var(--ink);}
+
+  /* Die drei „So funktioniert …“-Anleitungen sind auf dem Telefon einklappbar,
+     Standard: zu. Gemessen bei 375px nimmt die Symcon-Anleitung 660 px — 81 %
+     einer Telefonhöhe — zwischen Reiterzeile und Formular, und sie erklärt
+     eine EINMALIGE Migration, die man danach nie wieder nachliest.
+
+     Kein Info-Knopf wie sonst (_hints.html): eine nummerierte Schrittliste
+     passt nicht in einen einzeiligen Hinweis. Stattdessen dasselbe Muster wie
+     die Protokollierungs-Karte auf der Log-Seite — Titel ist der Schalter,
+     Chevron zeigt den Zustand, Desktop bleibt unverändert offen. Derselbe
+     Breakpoint (700px) wie dort, damit sich beide gleich verhalten. */
+  @media (max-width:700px){
+    .callout[data-collapsible] .callout-title{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      cursor:pointer;user-select:none;
+    }
+    .callout[data-collapsible] .callout-title::after{
+      content:"";width:8px;height:8px;flex:none;margin-right:4px;
+      border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+      transform:rotate(45deg) translateY(-2px);transition:transform .15s;
+    }
+    .callout[data-collapsible].is-collapsed .callout-title::after{transform:rotate(-45deg) translateY(2px);}
+    /* Alles außer dem Titel geht weg — Schritte wie Zusatzabsätze. Über
+       :not() statt einer Aufzählung, damit ein späterer vierter Absatz nicht
+       vergessen wird. */
+    .callout[data-collapsible].is-collapsed > :not(.callout-title){display:none;}
+    .callout[data-collapsible].is-collapsed{padding-top:12px;padding-bottom:12px;margin-bottom:16px;}
+  }
   .callout .import-steps{margin:8px 0 10px;padding-left:20px;}
   .callout .import-steps li + li{margin-top:5px;}
   .callout .symcon-import-note{margin:0;}
@@ -59,7 +87,27 @@
   .ha-archive-help-popover{position:absolute;left:calc(100% + 8px);top:50%;z-index:40;width:min(320px,calc(100vw - 64px));padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface);box-shadow:var(--shadow);color:var(--ink);font-family:var(--font-display);font-size:calc(12px * var(--font-scale, 1));font-weight:400;line-height:1.45;opacity:0;visibility:hidden;transform:translateY(-50%) translateX(-3px);transition:opacity .12s ease,transform .12s ease,visibility 0s;pointer-events:none;}
   .ha-archive-help:hover .ha-archive-help-popover{opacity:1;visibility:visible;transform:translateY(-50%) translateX(0);transition-delay:.6s;}
   .ha-archive-help:focus .ha-archive-help-popover{opacity:1;visibility:visible;transform:translateY(-50%) translateX(0);}
-  @media (max-width:600px){.ha-archive-help-popover{left:auto;right:0;top:calc(100% + 8px);transform:translateY(-3px)}.ha-archive-help:hover .ha-archive-help-popover,.ha-archive-help:focus .ha-archive-help-popover{transform:translateY(0);}}
+  /* Auf dem Telefon hängt der Kasten nicht mehr am „i", sondern am
+     Optionen-Block darüber. Mit right:0 am Badge lief er aus dem Bild: das
+     Badge sitzt am rechten Ende seiner Zeile (bei 375px x=185…203), der Kasten
+     ist 311px breit (min(320px, 100vw − 64px)) — macht eine linke Kante bei
+     −109px, und da <html> overflow-x:hidden trägt, war rund ein Drittel des
+     Textes weder sichtbar noch erreichbar.
+
+     left:0;right:0 am Block statt einer festen Breite am Badge löst das ohne
+     Rechnerei: der Kasten ist dann per Konstruktion genau so breit wie der
+     Block und kann nicht überstehen, egal wo das Badge in seiner Zeile steht.
+     Dafür muss das Badge hier position:static werden — sonst bliebe es der
+     nächste positionierte Vorfahr und damit der Bezug. */
+  @media (max-width:600px){
+    .ha-import-config-block{position:relative;}
+    .ha-archive-help{position:static;}
+    .ha-archive-help-popover{
+      left:0;right:0;width:auto;max-width:none;top:calc(100% + 8px);transform:translateY(-3px);
+    }
+    .ha-archive-help:hover .ha-archive-help-popover,
+    .ha-archive-help:focus .ha-archive-help-popover{transform:translateY(0);}
+  }
 
   /* Wie .badge (app.css), aber für die HA-Verfügbarkeitsprüfung: kein
      Zeitarchiv-Aggregationstyp, sondern ob HA für die Entität aktuell

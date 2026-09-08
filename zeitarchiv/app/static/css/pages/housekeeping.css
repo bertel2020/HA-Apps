@@ -78,6 +78,46 @@
      (margin-bottom:8px), damit hier zuverlässig margin:0 gewinnt, unabhängig
      von der Reihenfolge im Stylesheet. */
   .hk-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  /* Der aufgeklappte Abschnitts-Hinweis steht im Kopf (hint-toggle.js sucht ihn
+     direkt hinter der Überschrift, siehe _hints.html), soll dort aber keine
+     Spalte belegen: mit voller Breite und order:1 rutscht er unter die Zeile,
+     die Zeitraum-Auswahl bleibt rechts neben dem Titel stehen. */
+  .hk-section-head .settings-section-description{flex-basis:100%;order:1;margin:8px 0 0;}
+  /* Die Zeitraum-Auswahl steht rechts vom Titel — auch dann, wenn sie auf
+     schmalen Telefonen in die zweite Zeile rutscht. Ohne margin-left:auto
+     setzt space-between ein einzelnes Element der Umbruchzeile an den ANFANG,
+     die Auswahl stünde also plötzlich links unter dem Titel.
+     Gemessen bei 375px: Titel 188 + Auswahl 105 + Abstand passen nicht in die
+     293px des Abschnitts (309), ab 390px schon — der kleinere Abstand hier
+     verschiebt die Grenze so weit nach unten wie ohne Wortverlust möglich. */
+  /* Werkzeuge des Abschnitts: die Zeitraum-Auswahl und — auf dem Telefon —
+     das Sortiermenü, das table-cards.js über data-sort-host hier hinein
+     hängt. Am Schreibtisch steht die Gruppe rechts neben dem Titel; ohne
+     margin-left:auto setzt space-between ein einzelnes Element einer
+     Umbruchzeile an den ANFANG. */
+  .hk-section-tools{display:flex;align-items:center;gap:10px;margin-left:auto;}
+  /* Das Sortiermenü gibt es nur in der Kartenform. app.css blendet es über
+     .dt-cards-sort{display:none} aus — diese Regel ist aber schwächer als
+     .hk-section-head .dd-picker-wrap{display:inline-flex} weiter unten, und
+     das Menü trägt beide Klassen. Ohne die Zeile hier stünde am
+     Schreibtisch plötzlich ein „Sortieren“-Knopf neben der Zeitraum-Auswahl. */
+  /* .hk-section-head davor, damit die Regel gewinnt: die konkurrierende
+     .hk-section-head .dd-picker-wrap steht weiter unten in dieser Datei und
+     ist gleich spezifisch — bei Gleichstand entscheidet die Reihenfolge. */
+  .hk-section-head .hk-section-tools .dt-cards-sort{display:none;}
+  @media (max-width:640px){
+    /* Auf dem Telefon eine eigene Zeile unter dem Titel, über die volle
+       Breite: die Zeitraum-Auswahl links, das Sortiermenü rechts. Beides
+       stand vorher untereinander an der rechten Kante — gemessen zwei Zeilen
+       (y=308 und y=339) für zwei Knöpfe, die zusammengehören. */
+    .hk-section-tools{flex-basis:100%;order:2;margin-left:0;justify-content:space-between;}
+    /* table-cards.js setzt sein Menü an den ANFANG des Ziels (bei der
+       .tbl-wrap muss es vor der Tabelle stehen). Hier soll die
+       Zeitraum-Auswahl links stehen und Sortieren rechts — order dreht
+       das um, ohne dem Skript eine zweite Einfügeregel aufzuzwingen. */
+    .hk-section-head .hk-section-tools .dt-cards-sort{display:flex;order:1;margin-bottom:0;}
+    .hk-section-head{gap:8px;}
+  }
   .settings-panel .hk-section-head .settings-section-title{margin:0;}
   .hk-section-head .dd-picker-wrap{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
   /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
