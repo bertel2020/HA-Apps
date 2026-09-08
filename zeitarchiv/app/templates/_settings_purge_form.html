@@ -44,11 +44,24 @@
                  die einzige Stelle, an der man das ANSIEHT statt es zu zählen,
                  ist der Chart. Der Parameter gilt nur für diesen Besuch und
                  überschreibt die gespeicherte Option der Entität nicht. #}
-              <td>
+              {# Aufbau wie in den übrigen Entitätstabellen dieser Seite
+                 (td.entity mit .name/.id, siehe housekeeping.css) — vorher
+                 stand hier <strong> plus .ts-time, wodurch der Name als
+                 unterstrichener Link in Browser-Blau bzw. Besucht-Violett
+                 erschien statt in --ink wie überall sonst.
+                 BEWUSST ohne .entity-tooltip-host: der Tooltip wiederholt nur
+                 Name und ID, die hier ohnehin beide unverkürzt stehen, und er
+                 würde den title unten verdrängen — der trägt echte Information,
+                 weil dieser Link als einziger der Seite woanders hinführt. #}
+              <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
                 <a href="{{ app_root }}/entities/{{ row.entity_id }}?marked=1"
                    title="Markierte Werte im Verlauf ansehen">
-                  <strong>{{ row.friendly_name or row.entity_id }}</strong>
-                </a>{% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}
+                  {% if row.friendly_name %}
+                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  {% else %}
+                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+                  {% endif %}
+                </a>
               </td>
               <td data-sort="{{ row.removable_rows }}">{{ row.removable_rows | format_int }} / {{ row.marked_rows | format_int }}</td>
               <td>{{ row.hot_rows | format_int }}</td>

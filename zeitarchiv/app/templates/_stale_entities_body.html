@@ -4,7 +4,14 @@
 {% if stale_entities %}
 <div class="tbl-wrap">
   <table class="dt" data-sortable data-paginate data-page-size="10">
-    <thead><tr><th>Entität</th><th>Letzter Wert</th><th class="num">Vor</th><th class="num">Datenpunkte</th><th data-no-sort></th></tr></thead>
+    {# Entität ohne eigene Breite: bei table-layout:fixed (siehe
+       housekeeping.css) teilen sich Spalten ohne Angabe den Rest, die
+       Entitätsspalte bekommt damit alles Übrige und die Ellipsis greift an
+       der echten Spaltenkante statt an einer festen Obergrenze. #}
+    <colgroup>
+      <col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte">
+    </colgroup>
+    <thead><tr><th>Entität</th><th>Letzter Wert</th><th class="num">Vor</th><th class="num">Datenpunkte</th></tr></thead>
     <tbody>
     {% for row in stale_entities %}
     <tr>
@@ -21,7 +28,6 @@
       <td>{{ row.last_value_label }}</td>
       <td class="num" data-sort="{{ row.days_ago_raw }}">{{ row.days_ago_label }}</td>
       <td class="num" data-sort="{{ row.row_count_raw }}">{{ row.row_count }}</td>
-      <td><a class="btn" href="entities/{{ row.entity_id }}">Zur Entität</a></td>
     </tr>
     {% endfor %}
     </tbody>

@@ -11,12 +11,66 @@
      Spezifitätsmuster wie der Sticky-Header-Bug in table_editor.html. */
   table.dt th.hk-col-typ,table.dt td.hk-col-typ{text-align:center;}
   .hk-row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap;}
+  /* Der Name öffnet das Element, seit der "Öffnen"-Knopf daneben weg ist —
+     dieselbe Behandlung wie die Entitätsnamen darüber (td.entity a): keine
+     Browser-Linkfarbe, keine Unterstreichung, der Hinweis auf die Klickbarkeit
+     kommt erst beim Überfahren.
+
+     --ink hier ausdrücklich, nicht per color:inherit: app.css will das zwar
+     schon (`td.label,td.strong{color:var(--ink)}`), wird in Datentabellen aber
+     überstimmt — `table.dt td` (0-1-2) schlägt `td.label` (0-1-1), also gewinnt
+     dort --ink-muted. Das font-weight:600 derselben Regel kommt durch, weil
+     table.dt td keines setzt; deshalb fiel es nie auf. Die Entitätsnamen sind
+     davon nicht betroffen, `td.entity .name` (0-2-1) gewinnt. Ohne die
+     ausdrückliche Farbe stünden die Namen hier also blasser als die
+     Entitätsnamen im selben Abschnitt. Die Regel in app.css bleibt
+     unangetastet — sie zu reparieren beträfe jede Datentabelle der App. */
+  td.label a{color:var(--ink);text-decoration:none;}
+  td.label a:hover{color:var(--accent-line);}
   /* Duplikat-Tabelle hat nur 2 Spalten (Entität + Anzahl) — dieselbe
      78%/22%-Aufteilung wie zuvor auf der Statistik-Seite, damit die
      Wert-Spalte nicht unnötig breit wirkt. */
   table.stats-dt{table-layout:fixed;min-width:420px;}
   .stats-col-entity{width:78%;}
   .stats-col-value{width:22%;}
+  /* Ausreißer und Konfiguration haben VIER Spalten und können die beiden
+     Klassen oben nicht mitbenutzen: 78% + 3 × 22% sind 144%. Bei
+     table-layout:fixed rechnet der Browser das proportional herunter, die
+     Entität-Spalte landete faktisch bei 54% und die drei Wert-Spalten bei je
+     15% — Breiten, die niemand gewählt hat, sondern ein Rechenrest sind.
+
+     Deshalb px statt Prozent, und nur auf den Wert-Spalten: bei
+     table-layout:fixed teilen sich Spalten ohne eigene Breite den Rest, die
+     Entität-Spalte bekommt damit alles, was übrig bleibt, und wächst auf
+     breiten Bildschirmen mit. Die px-Werte sind am längsten möglichen Inhalt
+     bemessen, nicht am gerade vorhandenen — bei "Schwelle", "Lücken-Erkennung"
+     und "Empfohlen" ist das die Spaltenüberschrift selbst, deren Werte
+     ("100×", "30 Minuten", "12 Stunden") kürzer bleiben.
+
+     Die eigenen min-width je Tabelle ersetzen die 420px oben (die für zwei
+     Spalten gelten): Summe der Wert-Spalten plus rund 220px Sockel für Name
+     und ID. Darunter scrollt .tbl-wrap waagerecht, statt die Entität-Spalte
+     bis zur Unlesbarkeit zu quetschen. */
+     Die Breiten sind im Browser GEMESSEN, nicht geschätzt: je Spalte der
+     breiteste Inhalt aus Überschrift und allen Zellen, mit nowrap gerendert,
+     plus 28px Innenabstand (table.dt td: padding 8px 14px). Ein erster
+     Versuch mit überschlagenen Zeichenbreiten lag bei "Auflösung" 43px zu
+     niedrig, der längste Wert brach dort still um. Wer die Werte ändert,
+     misst besser nach, statt zu rechnen. */
+  #ausreisser table.stats-dt{min-width:610px;}
+  #konfiguration table.stats-dt{min-width:760px;}
+  /* gemessen 88 (Überschrift; "100×" wäre 65) */
+  .hk-col-schwelle{width:92px;}
+  /* gemessen 184 ("39.935 von 312.934"); 200 als Reserve für größere Archive */
+  .hk-col-markiert{width:200px;}
+  /* gemessen 93 ("100,00 %" wäre 98) */
+  .hk-col-quote{width:100px;}
+  /* gemessen 271 ("Rohdaten + Wertänderungsfilter", längster Wert der Seite) */
+  .hk-col-aufloesung{width:276px;}
+  /* gemessen 151 (Überschrift; längster Wert "30 Minuten" nur 115) */
+  .hk-col-luecke{width:156px;}
+  /* gemessen 106 ("12 Stunden") */
+  .hk-col-empfohlen{width:112px;}
   /* Abschnittstitel + Schwellwert-Dropdown ("Inaktive Entitäten") in
      einer Zeile, statt wie die übrigen Abschnitte nur eine Überschrift zu
      tragen — .settings-panel .hk-section-head .settings-section-title ist
@@ -29,20 +83,62 @@
   /* Alle Retention-Kacheln reservieren zwei Titelzeilen. So bleiben Wert und
      Untertext auch dann bündig, wenn nur einzelne Titel umbrechen. */
   .retention-summary .stat .label{min-height:3em;}
-  /* Inaktive-Entitäten-Tabelle (_stale_entities_body.html): Name und ID
-     hatten keine eigene Breitenbegrenzung (anders als z. B. in
-     entities_list.html/statistik.html) — bei langen Namen/IDs wuchs die
-     Entität-Spalte unbegrenzt und drängte "Letzter Wert"/"Vor" in den
-     Zeilenumbruch. display:block trennt Name/ID zusätzlich sauber in zwei
-     Zeilen (liefen vorher ohne Trenner zusammen), max-width+Ellipsis
-     begrenzt die Spaltenbreite. Auf #stale-entities-body statt global
-     gescopt, da table.dt/td.entity auch auf vielen anderen Seiten ohne
-     diese Begrenzung verwendet wird. */
-  #stale-entities-body td.entity .name{
-    display:block;max-width:260px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+  /* Entitätsspalte, für ALLE Tabellen dieser Seite: Name fett in eigener
+     Zeile, ID darunter in Monospace, beide bei Bedarf mit Ellipsis.
+
+     Galt bisher nur für #stale-entities-body. In den drei übrigen Tabellen
+     (Duplikate, Ausreißer, Konfiguration) fehlte sie ersatzlos — Name und ID
+     liefen dort in EINER Zeile ohne Trenner ineinander ("Demo
+     Trocknersensor.demo_trockner"), in derselben Schrift, Größe und
+     Strichstärke. Die ID war damit weder als ID erkennbar noch vom Namen zu
+     trennen.
+
+     Bewusst hier ausgeweitet statt in app.css gehoben: td.entity .name/.id
+     ist in entities_list.css, export.css und statistik.css je einzeln
+     definiert und dort schon leicht auseinandergelaufen (max-width 302/230/
+     keine, display:flex vs. block). Eine gemeinsame Regel wäre richtig, ist
+     aber ein Eingriff in drei funktionierende Seiten und gehört nicht in
+     diese Änderung. Hier wächst die vorhandene Housekeeping-Fassung nur von
+     einer Tabelle auf die Seite. */
+  /* Keine Unterstreichung und keine Linkfarbe — dieselbe Fassung wie
+     td.entity a in entities_list.css. color:inherit hält den Namen bei
+     --ink, unabhängig davon, ob die Entität schon einmal geöffnet wurde;
+     ohne das stünde eine besuchte violett neben ihren Nachbarn.
+
+     Die Unterstreichung musste am ANKER weg, nicht an der ID: die Linie
+     zeichnet das <a> und propagiert sie über in-flow-Blöcke hinweg, ein Kind
+     kann sie nicht abwählen.
+
+     Damit trägt der Name keinen sichtbaren Hinweis mehr, dass er klickbar
+     ist — der Mauszeiger hilft nicht, .entity-tooltip-host setzt für den
+     Tooltip cursor:help. Die Hover-Regel darunter ist deshalb kein Beiwerk,
+     sondern der einzige verbliebene Hinweis; sie gehört zwingend dazu, wenn
+     die Unterstreichung fällt. */
+  td.entity a{color:inherit;text-decoration:none;}
+  td.entity a:hover .name{color:var(--accent-line);}
+  td.entity .name{
+    display:block;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  #stale-entities-body td.entity .id{
-    display:block;max-width:260px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
+  td.entity .id{
+    display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;
   }
+  /* Inaktive Entitäten: dieselbe Bauart wie Ausreißer und Konfiguration —
+     feste Breiten auf den Wertspalten, Entität ohne Angabe und damit den Rest.
+
+     Vorher stand hier stattdessen max-width:260px auf Name und ID, weil die
+     Tabelle table-layout:auto war und die Spalte sonst mit dem längsten Namen
+     mitgewachsen wäre. Das kappte aber bei 260px, egal wie breit die Spalte
+     tatsächlich war: bei 378px Spaltenbreite standen Entity-IDs mit Auslassung
+     da, obwohl über 100px daneben frei waren. Mit fester Tabellenbreite
+     entfällt die Krücke, die Ellipsis greift an der echten Zellkante — die
+     Spalte ist damit 456px statt 260px breit (längste ID misst 531px, wird
+     also weiterhin gekürzt, aber erst dort, wo der Platz wirklich endet).
+
+     Breiten gemessen wie unten, Überschrift gegen längsten Wert:
+     "Letzter Wert" 173 (Wert), "Vor" 103 (Wert), "Datenpunkte" 113 (Kopf). */
+  #stale-entities-body table.dt{table-layout:fixed;min-width:620px;}
+  .hk-col-letzter-wert{width:176px;}
+  .hk-col-vor{width:108px;}
+  .hk-col-datenpunkte{width:118px;}

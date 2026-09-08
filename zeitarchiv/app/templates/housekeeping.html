@@ -83,7 +83,7 @@
           {% if outlier_rates.rows %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
             <colgroup>
-              <col class="stats-col-entity"><col class="stats-col-value"><col class="stats-col-value"><col class="stats-col-value">
+              <col><col class="hk-col-schwelle"><col class="hk-col-markiert"><col class="hk-col-quote">
             </colgroup>
             <thead><tr><th>Entität</th><th>Schwelle</th><th>Markiert</th><th>Quote</th></tr></thead>
             <tbody>
@@ -91,7 +91,11 @@
             <tr>
               <td class="entity" data-sort="{{ row.friendly_name }}">
                 <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+                  {% if row.friendly_name != row.entity_id %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  {% else %}
+                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+                  {% endif %}
                   <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
                 </a>
               </td>
@@ -136,7 +140,7 @@
           {% if gap_threshold_conflicts %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
             <colgroup>
-              <col class="stats-col-entity"><col class="stats-col-value"><col class="stats-col-value"><col class="stats-col-value">
+              <col><col class="hk-col-aufloesung"><col class="hk-col-luecke"><col class="hk-col-empfohlen">
             </colgroup>
             <thead><tr><th>Entität</th><th>Auflösung</th><th>Lücken-Erkennung</th><th>Empfohlen</th></tr></thead>
             <tbody>
@@ -144,7 +148,11 @@
             <tr>
               <td class="entity" data-sort="{{ row.friendly_name }}">
                 <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+                  {% if row.friendly_name != row.entity_id %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  {% else %}
+                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+                  {% endif %}
                   <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
                 </a>
               </td>
@@ -236,12 +244,11 @@
             <tbody>
             {% for c in unused_charts %}
             <tr data-hk-row>
-              <td class="label">{{ c.name }}</td>
+              <td class="label"><a href="charts/{{ c.id }}">{{ c.name }}</a></td>
               <td class="hk-col-typ"><span class="hk-badge chart">Chart</span></td>
               <td>{{ c.entity_count }} Entität{{ 'en' if c.entity_count != 1 else '' }}{% if c.type_label %} &middot; {{ c.type_label }}{% endif %} &middot; {{ c.range_label }}</td>
               <td>
                 <div class="hk-row-actions">
-                  <a class="btn" href="charts/{{ c.id }}">Öffnen</a>
                   <button type="button" class="btn btn-danger-outline" onclick="hkDeleteChart({{ c.id }}, this)">Löschen</button>
                 </div>
               </td>
@@ -249,12 +256,11 @@
             {% endfor %}
             {% for t in unused_tables %}
             <tr data-hk-row>
-              <td class="label">{{ t.name }}</td>
+              <td class="label"><a href="tables/{{ t.id }}">{{ t.name }}</a></td>
               <td class="hk-col-typ"><span class="hk-badge table">Tabelle</span></td>
               <td>{{ t.row_count }} Zeile{{ 'n' if t.row_count != 1 else '' }} &middot; {{ t.column_count }} Spalte{{ 'n' if t.column_count != 1 else '' }}</td>
               <td>
                 <div class="hk-row-actions">
-                  <a class="btn" href="tables/{{ t.id }}">Öffnen</a>
                   <button type="button" class="btn btn-danger-outline" onclick="hkDeleteTable({{ t.id }}, this)">Löschen</button>
                 </div>
               </td>
@@ -273,6 +279,11 @@
 </div>
 <script src="{{ asset('vendor/htmx.min.js') }}"></script>
 <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+{# Spaltenbreiten per Ziehgriff, wie auf Statistik, Export, Entitätenliste
+   und Bereinigung. Das Modul greift von selbst auf jede table.dt der Seite,
+   braucht also kein Attribut je Tabelle; vor sortable-table.js geladen, in
+   derselben Reihenfolge wie dort. #}
+<script src="{{ asset('js/resizable-tables.js') }}"></script>
 <script src="{{ asset('js/sortable-table.js') }}"></script>
 <script src="{{ asset('js/dd-picker.js') }}"></script>
 <script>
