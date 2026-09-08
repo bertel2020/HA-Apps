@@ -26,6 +26,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from .paths import entity_dir
@@ -434,6 +435,68 @@ def _maybe_append_year(data_dir: Path, entity_id: str, year: int, tz: ZoneInfo) 
     )
 
 
+def period_span(tz: ZoneInfo, year: int, month: int | None = None) -> tuple[float, float]:
+    """Anfang und (exklusives) Ende eines Kalenderjahres oder -monats als Zeitstempel.
+
+    Ein Kalenderzeitraum ist ein zusammenhängendes Intervall — zwei Grenzen
+    genügen also, wo die frühere Fassung jede einzelne Zeile in ein datetime
+    umwandelte, um Jahr und Monat abzulesen.
+
+    Nachgeprüft, weil die Gleichwertigkeit an Zeitumstellungen scheitern
+    KÖNNTE: über alle 598 Zonen der Zeitzonendatenbank und alle Monatsgrenzen
+    von 1970 bis 2040 sind beide Formulierungen deckungsgleich — auch an den
+    396 Grenzen, an denen die lokale Mitternacht des Ersten wegen einer
+    Umstellung gar nicht existiert (Africa/Cairo 2014-08 etwa springt direkt
+    auf 01:00). Dort sekundenweise über je drei Stunden abgetastet.
+    """
+    if month is None:
+        return (
+            datetime(year, 1, 1, tzinfo=tz).timestamp(),
+            datetime(year + 1, 1, 1, tzinfo=tz).timestamp(),
+        )
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return (
+        datetime(year, month, 1, tzinfo=tz).timestamp(),
+        datetime(next_year, next_month, 1, tzinfo=tz).timestamp(),
+    )
+
+
+def drop_rows_in_spans(path: Path, dataset_dir: Path | None, spans: list[tuple[float, float]]) -> None:
+    """Entfernt aus EINER Rollup-Datei alle Zeilen, deren bucket_start in eine
+    der Zeitspannen fällt. Bleibt keine Zeile übrig, verschwindet die Datei —
+    und mit ihr ein leer gewordenes Dataset-Verzeichnis.
+
+    Die Maske entsteht in pyarrow statt in Python. Die frühere Fassung baute je
+    Zeile zwei datetime-Objekte, um Jahr und Monat zu vergleichen; an einer
+    Stunden-Stufe mit 104.530 Zeilen gemessen waren das 52,6 der 79,1 ms eines
+    Beschnitts — mehr als Lesen (2,6 ms) und Schreiben (23,9 ms) zusammen.
+    Gelesen wird weiterhin die ganze Datei; das war nie der teure Teil.
+    """
+    if not spans:
+        return
+    table = pq.read_table(path)
+    if table.num_rows == 0:
+        # Eigener Ausgang, kein Schönheitsfehler: pc.all() liefert auf einer
+        # leeren Maske weder True noch False, sondern Null. Ohne diese Zeile
+        # fiele eine leere Datei in den Zweig "nichts bleibt übrig" und würde
+        # gelöscht — die frühere Fassung ließ sie liegen (all([]) ist True),
+        # und dabei bleibt es.
+        return
+    starts = table.column("bucket_start")
+    keep = None
+    for start_ts, end_ts in spans:
+        outside = pc.or_(pc.less(starts, start_ts), pc.greater_equal(starts, end_ts))
+        keep = outside if keep is None else pc.and_(keep, outside)
+    if pc.all(keep).as_py():
+        return
+    if not pc.any(keep).as_py():
+        path.unlink()
+        if dataset_dir is not None and not any(dataset_dir.iterdir()):
+            dataset_dir.rmdir()
+        return
+    pq.write_table(table.filter(keep), path, compression="zstd")
+
+
 def _remove_rows_for_month(path: Path, tz: ZoneInfo, year: int, month: int) -> None:
     """Entfernt Zeilen mit bucket_start im angegebenen Kalendermonat aus einer
     Rollup-Datei — für einen nachträglichen Archiv-Purge (cleanup.py), der den
@@ -452,20 +515,7 @@ def _remove_rows_for_month(path: Path, tz: ZoneInfo, year: int, month: int) -> N
             if not any(dataset_dir.iterdir()):
                 dataset_dir.rmdir()
             return
-    table = pq.read_table(path)
-    starts = table.column("bucket_start").to_pylist()
-    keep_mask = [
-        not (datetime.fromtimestamp(s, tz).year == year and datetime.fromtimestamp(s, tz).month == month)
-        for s in starts
-    ]
-    if all(keep_mask):
-        return
-    if not any(keep_mask):
-        path.unlink()
-        if dataset_dir is not None and not any(dataset_dir.iterdir()):
-            dataset_dir.rmdir()
-        return
-    pq.write_table(table.filter(keep_mask), path, compression="zstd")
+    drop_rows_in_spans(path, dataset_dir, [period_span(tz, year, month)])
 
 
 def _remove_row_for_year(path: Path, tz: ZoneInfo, year: int) -> None:
@@ -481,17 +531,7 @@ def _remove_row_for_year(path: Path, tz: ZoneInfo, year: int) -> None:
             if not any(dataset_dir.iterdir()):
                 dataset_dir.rmdir()
             return
-    table = pq.read_table(path)
-    starts = table.column("bucket_start").to_pylist()
-    keep_mask = [datetime.fromtimestamp(s, tz).year != year for s in starts]
-    if all(keep_mask):
-        return
-    if not any(keep_mask):
-        path.unlink()
-        if dataset_dir is not None and not any(dataset_dir.iterdir()):
-            dataset_dir.rmdir()
-        return
-    pq.write_table(table.filter(keep_mask), path, compression="zstd")
+    drop_rows_in_spans(path, dataset_dir, [period_span(tz, year)])
 
 
 def remove_month(

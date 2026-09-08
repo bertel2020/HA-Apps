@@ -27,7 +27,7 @@ import pyarrow.parquet as pq
 from .hotbuffer import hot_path, read_rows
 from .index import Index
 from .paths import entity_dir
-from .rollup import rollup_path
+from .rollup import drop_rows_in_spans, period_span, rollup_path
 
 RETENTION_DAYS = {
     "30d": 30,
@@ -71,20 +71,7 @@ def _prune_rollup_file_by_month(path: Path, tz: ZoneInfo, deleted_months: set[tu
             if not any(dataset_dir.iterdir()):
                 dataset_dir.rmdir()
             return
-    table = pq.read_table(path)
-    starts = table.column("bucket_start").to_pylist()
-    keep_mask = [
-        (datetime.fromtimestamp(s, tz).year, datetime.fromtimestamp(s, tz).month) not in deleted_months
-        for s in starts
-    ]
-    if all(keep_mask):
-        return
-    if not any(keep_mask):
-        path.unlink()
-        if dataset_dir is not None and not any(dataset_dir.iterdir()):
-            dataset_dir.rmdir()
-        return
-    pq.write_table(table.filter(keep_mask), path, compression="zstd")
+    drop_rows_in_spans(path, dataset_dir, [period_span(tz, y, m) for y, m in deleted_months])
 
 
 def _prune_year_rollup(data_dir: Path, entity_id: str, tz: ZoneInfo, deleted_months: set[tuple[int, int]]) -> None:
@@ -111,17 +98,7 @@ def _prune_year_rollup(data_dir: Path, entity_id: str, tz: ZoneInfo, deleted_mon
             if not any(dataset_dir.iterdir()):
                 dataset_dir.rmdir()
             return
-    table = pq.read_table(path)
-    starts = table.column("bucket_start").to_pylist()
-    keep_mask = [datetime.fromtimestamp(s, tz).year not in fully_gone_years for s in starts]
-    if all(keep_mask):
-        return
-    if not any(keep_mask):
-        path.unlink()
-        if dataset_dir is not None and not any(dataset_dir.iterdir()):
-            dataset_dir.rmdir()
-        return
-    pq.write_table(table.filter(keep_mask), path, compression="zstd")
+    drop_rows_in_spans(path, dataset_dir, [period_span(tz, y) for y in fully_gone_years])
 
 
 def _update_first_ts(data_dir: Path, index: Index, entity_id: str, tz: ZoneInfo, now: datetime) -> None:

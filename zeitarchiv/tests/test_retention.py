@@ -251,3 +251,155 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+# --- Beschnitt über Kalenderintervalle statt Zeile für Zeile (ZP-010) -------
+
+def _alte_maske_monate(starts: list[float], monate: set[tuple[int, int]]) -> list[bool]:
+    """Die Fassung vor ZP-010, wortgetreu: zwei datetime-Objekte je Zeile.
+
+    Steht hier als Referenz, nicht als Erinnerungsstück — der Umbau ist nur
+    dann harmlos, wenn er für jede Eingabe DASSELBE liefert, und das lässt
+    sich nur gegen das Original prüfen.
+    """
+    return [
+        (datetime.fromtimestamp(s, TZ).year, datetime.fromtimestamp(s, TZ).month) not in monate
+        for s in starts
+    ]
+
+
+def _schreibe(path: Path, starts: list[float]) -> None:
+    pq.write_table(
+        pa.table({"bucket_start": starts, "value": [1.0] * len(starts)}), path
+    )
+
+
+def test_interval_pruning_matches_the_row_by_row_original() -> None:
+    """Differenztest gegen die alte Zeilen-Maske über eine Fallmatrix.
+
+    Vor ZP-010 gab es für diese vier Funktionen keinen einzigen Test — eine
+    grüne Suite sagte über den löschenden Pfad also nichts."""
+    faelle = [
+        ("gemischt über Jahresgrenze", [_ts(2024, 12, 31, 23), _ts(2025, 1, 1, 0), _ts(2025, 1, 31, 23)]),
+        ("nur Dezember", [_ts(2024, 12, 1, 0), _ts(2024, 12, 15, 12), _ts(2024, 12, 31, 23)]),
+        ("Sommerzeitbeginn", [_ts(2024, 3, 31, 1), _ts(2024, 3, 31, 4), _ts(2024, 4, 1, 0)]),
+        ("Winterzeitende", [_ts(2024, 10, 27, 1), _ts(2024, 10, 27, 4), _ts(2024, 11, 1, 0)]),
+        ("exakt auf den Grenzen", [_ts(2024, 5, 1, 0), _ts(2024, 6, 1, 0)]),
+        ("eine Sekunde vor der Grenze", [_ts(2024, 6, 1, 0) - 1, _ts(2024, 6, 1, 0)]),
+        ("alles im gelöschten Monat", [_ts(2024, 5, d, 12) for d in range(1, 29)]),
+        ("nichts im gelöschten Monat", [_ts(2023, 5, 1, 12), _ts(2025, 5, 1, 12)]),
+        ("eine einzige Zeile", [_ts(2024, 5, 15, 12)]),
+        ("leere Datei", []),
+    ]
+    # Dezember gehört zwingend dazu: Nur dort wechselt period_span() das Jahr,
+    # und ein Fehler darin bliebe sonst unbemerkt — das Intervall wäre leer und
+    # es würde stillschweigend NICHTS gelöscht.
+    monatsmengen = [{(2024, 5)}, {(2024, 3)}, {(2024, 10)}, {(2025, 1)},
+                    {(2024, 12)}, {(2024, 12), (2025, 1)},
+                    {(2024, 5), (2024, 6)}, {(1999, 1)}]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, starts in faelle:
+            for monate in monatsmengen:
+                erwartet_maske = _alte_maske_monate(starts, monate)
+                if starts and all(erwartet_maske):
+                    erwartet = list(starts)                       # unverändert
+                elif starts and not any(erwartet_maske):
+                    erwartet = None                               # Datei entfällt
+                else:
+                    erwartet = [s for s, k in zip(starts, erwartet_maske) if k]
+
+                path = Path(tmp) / "monat.parquet"
+                _schreibe(path, starts)
+                rollup.drop_rows_in_spans(
+                    path, None, [rollup.period_span(TZ, j, m) for j, m in monate]
+                )
+
+                if erwartet is None:
+                    assert not path.exists(), f"{name} / {sorted(monate)}: Datei müsste weg sein"
+                    continue
+                assert path.exists(), f"{name} / {sorted(monate)}: Datei wurde zu Unrecht gelöscht"
+                tatsaechlich = pq.read_table(path).column("bucket_start").to_pylist()
+                assert tatsaechlich == erwartet, f"{name} / {sorted(monate)}"
+
+
+def test_an_empty_rollup_file_is_left_alone() -> None:
+    """pc.all() liefert auf einer leeren Maske weder True noch False, sondern
+    Null. Ohne eigenen Ausgang fiele eine leere Datei in den Zweig "nichts
+    bleibt übrig" und würde GELÖSCHT — die Fassung davor ließ sie liegen
+    (all([]) ist True). Genau daran ist mein erster Entwurf gescheitert."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "monat.parquet"
+        _schreibe(path, [])
+        rollup.drop_rows_in_spans(path, None, [rollup.period_span(TZ, 2024, 5)])
+        assert path.exists(), "eine leere Rollup-Datei darf nicht verschwinden"
+
+
+def test_a_calendar_month_is_a_clean_interval_in_every_timezone() -> None:
+    """period_span() ersetzt "Jahr und Monat dieser Zeile" durch ein Intervall.
+    Das gilt nur, wenn Monatsgrenzen überall sauber liegen — und es gibt
+    Zonen, in denen die lokale Mitternacht des Ersten wegen einer Umstellung
+    gar nicht existiert (Africa/Cairo 2014-08 springt auf 01:00). Geprüft
+    werden genau diese Grenzen, sekundenweise."""
+    from zoneinfo import available_timezones
+
+    kandidaten = ["Africa/Cairo", "Africa/Casablanca", "Africa/Algiers", "America/Santiago",
+                  "Asia/Beirut", "Europe/Berlin", "Pacific/Apia"]
+    vorhanden = available_timezones()
+    geprueft = 0
+    for name in [z for z in kandidaten if z in vorhanden]:
+        tz = ZoneInfo(name)
+        for jahr in range(2000, 2031):
+            for monat in range(1, 13):
+                a, b = rollup.period_span(tz, jahr, monat)
+                lokal = datetime.fromtimestamp(a, tz)
+                if (lokal.day, lokal.hour) == (1, 0):
+                    continue  # unauffällige Grenze, die decken die Fälle oben ab
+                geprueft += 1
+                for t in range(int(a) - 3600, int(a) + 3601):
+                    d = datetime.fromtimestamp(t, tz)
+                    assert (a <= t < b) == ((d.year, d.month) == (jahr, monat)), f"{name} {jahr}-{monat}"
+    assert geprueft, "keine einzige auffällige Monatsgrenze gefunden — Prüfung wäre wirkungslos"
+
+
+def _jahres_baum(tmp: Path, entity_id: str, archiv_monate: list[tuple[int, int]],
+                 jahre: list[int]) -> None:
+    """Archivmonate als Dateien + jahr.parquet mit einer Zeile je Jahr."""
+    archiv = tmp / "archive" / entity_id
+    archiv.mkdir(parents=True, exist_ok=True)
+    for jahr, monat in archiv_monate:
+        pq.write_table(pa.table({"ts": [_ts(jahr, monat, 1, 12)], "value": [1.0]}),
+                       archiv / f"{jahr:04d}-{monat:02d}.parquet")
+    ziel = tmp / "rollup" / entity_id
+    ziel.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.table({"bucket_start": [_ts(j, 1, 1, 0) for j in jahre],
+                             "value": [float(j) for j in jahre]}),
+                   ziel / "jahr.parquet")
+
+
+def test_the_year_rollup_row_goes_only_when_the_whole_year_is_gone() -> None:
+    """Eine Jahreszeile fasst zwölf Monate zusammen — sie darf erst weg, wenn
+    KEIN archivierter Monat des Jahres mehr übrig ist.
+
+    Der Test entstand, weil eine Mutation zeigte, dass sich _prune_year_rollup()
+    komplett abschalten ließ, ohne dass ein einziger Test anschlug."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        entity_id = "sensor.zaehler"
+
+        # 2023 ist restlos aus dem Archiv verschwunden, 2024 nur teilweise.
+        _jahres_baum(tmp, entity_id, archiv_monate=[(2024, 6)], jahre=[2023, 2024])
+        retention._prune_year_rollup(
+            tmp, entity_id, TZ, {(2023, m) for m in range(1, 13)} | {(2024, 1)}
+        )
+        uebrig = pq.read_table(rollup.rollup_path(tmp, entity_id, "jahr"))
+        jahre = [datetime.fromtimestamp(s, TZ).year for s in uebrig.column("bucket_start").to_pylist()]
+        assert jahre == [2024], f"2023 müsste weg sein, 2024 bleiben — bekommen: {jahre}"
+
+        # Gegenprobe: bleibt ein Monat des Jahres im Archiv, bleibt die Zeile.
+        shutil.rmtree(tmp / "rollup")
+        shutil.rmtree(tmp / "archive")
+        _jahres_baum(tmp, entity_id, archiv_monate=[(2023, 7)], jahre=[2023])
+        retention._prune_year_rollup(tmp, entity_id, TZ, {(2023, 1)})
+        uebrig = pq.read_table(rollup.rollup_path(tmp, entity_id, "jahr"))
+        assert uebrig.num_rows == 1, "solange ein Monat archiviert ist, bleibt die Jahreszeile"
