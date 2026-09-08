@@ -17,6 +17,19 @@
   }
   .seg button:last-child{border-right:none;}
   .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  /* Alle Karten und abgesetzten Bereiche dieser Seite tragen denselben
+     Schatten wie die .stat-Kacheln darüber und die Übersichtskarten auf
+     /dashboards, /charts, /tables — sie standen als einzige Flächen der Seite
+     flach auf dem Grund, seit der einen Verlauf hat (body::before in app.css).
+
+     Hier steht nur .card: die freistehenden Tabellen bekommen ihren Schatten
+     app-weit (.tbl-wrap in app.css), und die Tabelle INNERHALB der
+     Speicherkarte wird dort auch gleich wieder ausgenommen.
+
+     Ausgenommen bleibt die Zeitraum-Auswahl (.seg) — sie ist ein
+     Bedienelement, keine Fläche, und ein Schatten läse sich dort als
+     Schaltflächen-Relief. */
+  .card{box-shadow:var(--shadow);}
   .storage-card{display:flex;gap:32px;flex-wrap:wrap;align-items:center;}
   #storage-pie{flex:0 0 260px;width:260px;height:260px;}
   .storage-card .tbl-wrap{flex:1;min-width:280px;}

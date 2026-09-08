@@ -3,6 +3,12 @@
     background:var(--bg);color:var(--ink);font-family:var(--font-display);margin:0;
     padding:28px 20px 80px;font-size:calc(14.5px * var(--font-scale, 1));line-height:1.5;
   }
+  /* Kein Seitenverlauf: diese Seite ist als Dokument gedacht, das gedruckt
+     oder als PDF gespeichert wird (siehe Kommentar in
+     _energiedashboard_report.html), und trägt bewusst keinen App-Rahmen.
+     app.css setzt den Verlauf an body::before — hier zurückgenommen, statt
+     ihn dort um einen Sonderfall zu erweitern. */
+  body::before{display:none;}
   .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
 
   .toolbar{max-width:760px;margin:0 auto 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;}

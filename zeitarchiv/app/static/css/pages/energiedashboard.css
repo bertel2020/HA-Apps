@@ -83,7 +83,15 @@
   .edash-setup-cta p{color:var(--ink-muted);font-size:calc(13.5px * var(--font-scale, 1));max-width:52ch;margin:8px auto 18px;}
 
   .edash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;}
-  .edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px;min-width:0;}
+  /* Schatten wie .settings-section und die Übersichtskarten: die Panels dieser
+     Seite waren die letzten großen Kartenflächen ohne, seit der Seitengrund
+     einen Verlauf trägt (body::before in app.css).
+
+     Die .edash-kpi-Kacheln darin bekommen BEWUSST keinen: sie sind im
+     Ruhezustand flach und heben sich erst beim Überfahren
+     (transform + box-shadow, siehe .edash-kpi:hover) — ein Ruheschatten nähme
+     genau dieser Reaktion ihre Wirkung. */
+  .edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px;min-width:0;box-shadow:var(--shadow);}
   .edash-card.edash-span3{grid-column:span 3;}
   .edash-card.edash-span2{grid-column:span 2;}
   .edash-card.edash-ring-card{grid-column:span 1;}

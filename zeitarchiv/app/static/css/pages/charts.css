@@ -8,9 +8,17 @@
      bedeutungsfrei: die Übersichten haben, anders als das Energiedashboard,
      keine Rollen, an die eine Farbe gebunden wäre.
      Hover ersetzt den Verlauf, statt ihn zu ergänzen — zwei übereinander
-     liegende Ecken derselben Stelle ergäben nur einen Farbmatsch. */
+     liegende Ecken derselben Stelle ergäben nur einen Farbmatsch.
+
+     Dazu var(--shadow) — dasselbe, das die .stat-Kacheln schon tragen. Die
+     Karten hier standen als einzige Kachel-Flächen der App flach auf dem
+     Grund; seit der Seitengrund einen Verlauf hat (body::before in app.css),
+     fiel das zusätzlich auf. Bewusst nur diese drei Übersichten und nicht
+     .card allgemein: die übrigen Kartenflächen (Einstellungen, Housekeeping,
+     Import) sind Formularflächen, keine anklickbaren Kacheln. */
   .chart-card{
     background:var(--tile-wash), var(--surface);
+    box-shadow:var(--shadow);
     transition:background .16s ease, border-color .16s ease;
   }
   .chart-card:hover{

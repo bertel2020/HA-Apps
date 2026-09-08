@@ -1,6 +1,9 @@
 <style>
   .report-cards{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:10px;margin-bottom:20px}
-  .report-card{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:12px 14px}
+  /* Schatten wie .status-card/.tbl-wrap app-weit (app.css): diese drei Kacheln
+     stehen frei auf dem Seitengrund und wären sonst die einzigen Status-
+     Kacheln der App ohne. */
+  .report-card{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:12px 14px;box-shadow:var(--shadow)}
   .report-card strong{display:block;font-family:var(--font-mono);font-size:calc(20px * var(--font-scale,1))}
   .report-card span{font-size:calc(12px * var(--font-scale,1));color:var(--ink-faint)}
   /* Filter + "Alle Reports löschen" auf einer gemeinsamen Zeile statt eines
