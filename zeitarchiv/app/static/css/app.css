@@ -1021,7 +1021,17 @@ table.dt th.dt-sort-desc::after{content:" ↑";}
    Tabelle gehören Zeilen/Seiten-Angabe optisch stärker zur Tabelle als zu
    dem, was danach kommt; der übliche 16px-Abstand zur nächsten Aktionszeile
    (siehe .toolbar) bleibt unverändert bestehen. */
-.sortable-table-pager{margin-top:4px;}
+/* Ganze Zeile rechtsbündig, wie bei den Pagern mit Seitengrößen-Auswahl:
+   dort sitzen Zählstand und Blätter-Knöpfe seit der Vertauschung gemeinsam an
+   der rechten Kante, links steht nur noch die Seitengröße. Dieser Pager ist
+   flach aufgebaut (sortable-table.js erzeugt Zählstand und Knöpfe als
+   Geschwister, ohne Gruppen-<div> und ohne select) und hat links nichts zu
+   halten — er bekommt deshalb kein order, sondern schlicht flex-end.
+
+   Auf dem Telefon bleibt es beim Zählstand links: die Regel dort
+   (.pager-range{margin-right:auto} im 640px-Block) ist auf die umbrechende
+   Zeile hin ausgemessen und gewinnt, weil sie später kommt. */
+.sortable-table-pager{margin-top:4px;justify-content:flex-end;}
 table.dt td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--ink-muted);vertical-align:top;font-variant-numeric:tabular-nums;}
 table.dt tr:last-child td{border-bottom:none;}
 table.dt tbody tr:hover td{background:var(--surface-alt);}
@@ -1470,6 +1480,11 @@ button[data-tooltip]{cursor:pointer;}
 .btn-danger-outline:disabled{border-color:var(--border);color:var(--ink-faint);}
 .navbtn{width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;font-size:calc(14px * var(--font-scale, 1));line-height:1;}
 .navbtn:disabled{opacity:.35;cursor:default;}
+/* Die Pfeile eine Stufe kleiner wie der übrige Pager. Nur dort: dieselbe
+   Klasse trägt auch der Monatswechsel im Kalender-Popover, der für sich
+   steht und nicht mitschrumpfen soll. Die 28×28 der Schaltfläche bleiben —
+   sie sind die Trefffläche, nicht die Schriftgröße. */
+.pager .navbtn{font-size:calc(13px * var(--font-scale, 1));}
 
 /* Pager */
 /* Display-Schrift mit tabellarischen Ziffern statt Monospace: die Zeile ist
@@ -1480,7 +1495,21 @@ button[data-tooltip]{cursor:pointer;}
    rechts), die zusammen 402px brauchen — auf dem Telefon stehen 358px zur
    Verfügung, und ohne Umbruch schob die rechte Gruppe die Seite seitwärts.
    Wirkt nur, wenn es eng wird; am Schreibtisch bleibt der Pager einzeilig. */
-.pager{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;font-variant-numeric:tabular-nums;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);}
+/* Zeilen/Seite links, Blättern rechts. Über order statt über die Reihenfolge
+   im Markup, weil dieselbe Zeile in acht Vorlagen steht und dort in zwei
+   Bauformen: mit Gruppen-<div> um den select (Entitäten) und mit blankem
+   <select> (Backup, Export, Berichte …). Beide Selektoren decken genau diese
+   zwei ab und lassen den flachen Pager aus sortable-table.js unberührt — der
+   hat keine Seitengröße, und ein pauschales :last-child hätte dort den
+   "»"-Knopf nach vorn gezogen.
+   Preis der Lösung: order verschiebt nur das Bild, nicht die Tabulator-
+   Reihenfolge. Wer sich durchtabbt, erreicht das Blättern vor der
+   Seitengröße, obwohl sie links davon steht. Für eine Reihe aus fünf
+   gleichartigen Bedienelementen ist das vertretbar; wer es sauber will, muss
+   die acht Vorlagen umbauen. */
+.pager > select,
+.pager > div:has(select){order:-1;}
 .pager-page{white-space:nowrap;}
 .pager-range{color:var(--ink-faint);}
 /* Zeilen/Seite-Auswahl direkt im Pager statt oben im Toolbar (Konzept-
@@ -1489,7 +1518,7 @@ button[data-tooltip]{cursor:pointer;}
    select die generische Toolbar-Regel, hier soll er sich wie ein weiteres
    Pager-Detail lesen, nicht wie ein eigenständiges Steuerelement). */
 .pager select{
-  font-family:var(--font-display);font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);
+  font-family:var(--font-display);font-variant-numeric:tabular-nums;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);
   padding:3px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
   min-height:0;box-sizing:border-box;cursor:pointer;
 }
@@ -1500,7 +1529,7 @@ button[data-tooltip]{cursor:pointer;}
    Spinner-Pfeile ausgeblendet, da Klick-Pfeile fürs Wandern über viele Seiten
    ohnehin nicht taugen (dafür gibt es die navbtn-Buttons daneben). */
 .pager-page-input{
-  width:3.2em;font-family:var(--font-display);font-variant-numeric:tabular-nums;font-size:calc(12px * var(--font-scale, 1));color:var(--ink);
+  width:3.2em;font-family:var(--font-display);font-variant-numeric:tabular-nums;font-size:calc(11px * var(--font-scale, 1));color:var(--ink);
   padding:2px 4px;border-radius:5px;border:1px solid var(--border);background:var(--surface);
   text-align:center;box-sizing:border-box;
 }
@@ -1518,8 +1547,15 @@ button[data-tooltip]{cursor:pointer;}
    verliert. Der Abstand ist ein Inline-Stil in den Templates, deshalb
    !important — dieselbe Begründung wie bei .pager{justify-content}. */
 @media (max-width:640px){
-  .pager{font-size:calc(11px * var(--font-scale, 1));}
-  .pager select,.pager-page-input{font-size:calc(11px * var(--font-scale, 1));}
+  .pager{font-size:calc(10px * var(--font-scale, 1));}
+  .pager select,.pager-page-input{font-size:calc(10px * var(--font-scale, 1));}
+  /* Die Vertauschung oben gilt nur am Schreibtisch. Hier bricht die Reihe
+     ohnehin um, und die Aufteilung darunter ("1–20 von 86" links, Blättern
+     rechts, Seitengröße in der zweiten Zeile) ist auf diese Reihenfolge hin
+     ausgemessen — mit order:-1 stünde die Seitengröße vor dem Zählstand in
+     der ersten Zeile. */
+  .pager > select,
+  .pager > div:has(select){order:0;}
   .pager > div{gap:7px!important;}
   /* Die Blätter-Knöpfe bleiben bei 28px: sie sind die Treffflächen der Reihe,
      und die Breite kommt aus Text und Abständen, nicht aus ihnen. */

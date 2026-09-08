@@ -69,9 +69,28 @@
       '<span class="pager-range">' + start + '–' + end + ' von ' + rows.length + '</span>' +
       '<button class="btn navbtn" type="button" data-page-action="first"' + (page <= 1 ? ' disabled' : '') + ' title="Erste Seite">«</button>' +
       '<button class="btn navbtn" type="button" data-page-action="prev"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
-      '<span class="pager-page">Seite ' + page + ' / ' + totalPages + '</span>' +
+      // Direkte Seiteneingabe wie in den serverseitigen Pagern (siehe
+      // .pager-page-input in _entities_table.html u. a.) — ohne sie muss man
+      // sich über viele Seiten durchklicken. BEWUSST ohne data-page-action:
+      // der Klick-Handler darunter ruft für jedes so ausgezeichnete Element
+      // updatePager() auf, das den Pager neu schreibt — der Klick ins Feld
+      // würde es also im selben Moment ersetzen und den Fokus verlieren.
+      '<span class="pager-page">Seite <input type="number" class="pager-page-input" ' +
+        'min="1" max="' + totalPages + '" value="' + page + '" aria-label="Seite"> / ' + totalPages + '</span>' +
       '<button class="btn navbtn" type="button" data-page-action="next"' + (page >= totalPages ? ' disabled' : '') + '>›</button>' +
       '<button class="btn navbtn" type="button" data-page-action="last"' + (page >= totalPages ? ' disabled' : '') + ' title="Letzte Seite">»</button>';
+    const pageInput = pager.querySelector('.pager-page-input');
+    if (pageInput) {
+      pageInput.addEventListener('change', () => {
+        const gewuenscht = parseInt(pageInput.value, 10);
+        // Bei Unsinn ("abc", leer) auf die aktuelle Seite zurückfallen statt
+        // auf 1 — sonst verliert ein Vertipper die Stelle in einer langen Liste.
+        table.dataset.page = String(
+          Math.min(Math.max(1, Number.isFinite(gewuenscht) ? gewuenscht : page), totalPages)
+        );
+        updatePager(table);
+      });
+    }
     pager.querySelectorAll('[data-page-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.pageAction;
