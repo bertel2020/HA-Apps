@@ -95,6 +95,18 @@ def test_the_values_table_stays_a_table_on_phones() -> None:
     # die Polsterung kommt aus `table.dt.compact td` (0-2-2) und schlüge eine
     # Regel aus Klasse + :first-child (0-2-1).
     assert "table.dt.compact.rows-values-table td:first-child{padding-left:8px" in css
+    # Feste px-Breite, kein kleiner Prozentwert: bei table-layout:fixed skaliert
+    # der Browser ALLE Spalten proportional, wenn die Summe nicht aufgeht — 4 %
+    # ergaben nachgemessen 45px bei 1.120px Tabellenbreite, aber nur 28px bei
+    # 700px. Mit 38px bleibt sie über den ganzen gemessenen Bereich konstant.
+    assert ".rows-values-table col:nth-child(1){width:38px;}" in css
+    # Die übrigen drei müssen auf 100 % summieren, sonst wächst Spalte 1 wieder
+    # mit (das war der Fehler des ersten Anlaufs).
+    prozente = [
+        int(css.split(f".rows-values-table col:nth-child({n}){{width:")[1].split("%")[0])
+        for n in (2, 3, 4)
+    ]
+    assert sum(prozente) == 100, prozente
 
 
 def test_the_action_bar_is_the_head_of_the_table() -> None:

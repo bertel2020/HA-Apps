@@ -77,10 +77,30 @@
      unter 640px werden sie auf auto zurückgenommen, und Inline-Styles ließen
      sich nur mit !important überschreiben. */
   .rows-values-table{table-layout:fixed;}
-  .rows-values-table col:nth-child(1){width:13%;}
-  .rows-values-table col:nth-child(2){width:20%;}
-  .rows-values-table col:nth-child(3){width:21%;}
-  .rows-values-table col:nth-child(4){width:46%;}
+  /* Die Markierungsspalte hat eine feste Breite in px, die übrigen drei teilen
+     sich den Rest in ihrem bisherigen Verhältnis (20/21/46 von 87 % sind
+     23/24/53 von 100 %). Sie trug vorher 13 %, am Schreibtisch also 145 px für
+     ein 16 px breites Kästchen bzw. einen 20 px breiten ✎-Knopf.
+
+     px und nicht ein kleiner Prozentwert: bei table-layout:fixed skaliert der
+     Browser ALLE Spalten proportional, wenn die Summe nicht aufgeht — 4 %
+     ergaben nachgemessen 45 px bei 1.120 px Tabellenbreite, aber nur 28 px bei
+     700 px, und darunter passt der Inhalt nicht mehr. Mit fester Breite bleibt
+     sie über den ganzen gemessenen Bereich (700/768/900/1.120 px) konstant bei
+     38 px; die drei Prozentspalten fangen den Unterschied auf.
+     38 = 8 links + 20 Inhalt + 6 rechts + 4 Luft. */
+  .rows-values-table col:nth-child(1){width:38px;}
+  .rows-values-table col:nth-child(2){width:23%;}
+  .rows-values-table col:nth-child(3){width:24%;}
+  .rows-values-table col:nth-child(4){width:53%;}
+  /* Knappere Polsterung als die 2x14px aus `table.dt.compact td` (app.css) —
+     die machten aus 16-20px Inhalt eine 48px breite Spalte. table.dt.compact
+     muss im Selektor stehen: jene Regel ist 0-2-2 und schlüge eine aus Klasse
+     und :first-child (0-2-1) — dieselbe Falle wie td.label gegen table.dt td
+     in den Housekeeping-Tabellen. Die Trefffläche bleibt gleich, die bestimmt
+     die feste Zeilenhöhe von 30px. */
+  table.dt.compact.rows-values-table th:first-child,
+  table.dt.compact.rows-values-table td:first-child{padding-left:8px;padding-right:6px;}
   .entity-stats-table{table-layout:fixed;}
   .entity-stats-table th.num,.entity-stats-table td.num{text-align:right;}
   .entity-stats-table td{white-space:nowrap;}
@@ -325,18 +345,8 @@
        stehen mehrere eigenständige Badges nebeneinander. */
     .rows-values-table td:nth-child(2),
     .rows-values-table td:nth-child(3){white-space:nowrap;}
-    /* Markierungsspalte auf das Nötigste: ihr Inhalt ist 16px breit
-       (Auswahlkästchen) bzw. 18px (der ✎-Knopf im Korrigieren-Modus), die
-       Zellenpolsterung von 2×14px machte daraus 48px. Mit 8px/6px sind es 34px
-       — 14px weniger Seitwärtsscroll, ohne dass die Trefffläche kleiner wird:
-       die bestimmt die feste Zeilenhöhe von 30px, nicht die Spaltenbreite.
-
-       table.dt.compact muss im Selektor stehen: die Polsterung kommt aus
-       `table.dt.compact td` in app.css (0-2-2) und schlüge eine Regel aus nur
-       Klasse + :first-child (0-2-1) — dieselbe Falle wie td.label gegen
-       table.dt td in den Housekeeping-Tabellen. */
-    table.dt.compact.rows-values-table th:first-child,
-    table.dt.compact.rows-values-table td:first-child{padding-left:8px;padding-right:6px;}
+    /* Die knappe Polsterung der Markierungsspalte steht bei den Grundregeln
+       oben — sie gilt in beiden Breiten. */
   }
 
   /* Der Pager dieser Seite steht auf dem Telefon linksbündig — anders als der
