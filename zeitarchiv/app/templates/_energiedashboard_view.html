@@ -458,6 +458,17 @@
         <div class="edash-kpi-delta" x-show="deltaText('erzeugung')" x-text="deltaText('erzeugung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkErzeugung"></div>
       </a>
+      <a class="edash-kpi"
+         {% if config.netzbezug %}:href="`{{ app_root }}/entities/{{ config.netzbezug }}?range=${range}&offset=${offset}`"{% endif %}>
+        <div class="edash-kpi-accent" style="background:var(--chart-1);"></div>
+        <div class="edash-kpi-head">
+          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+          <div class="edash-kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+        </div>
+        <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
+        <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
+        <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
+      </a>
       <a class="edash-kpi{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
          {% if single_verbraucher_id %}:href="`{{ app_root }}/entities/{{ single_verbraucher_id }}?range=${range}&offset=${offset}`"
          {% elif verbraucher_list|length > 1 %}@click="$refs.verbraucherPickerDialog.showModal()"
@@ -472,15 +483,15 @@
         <div class="edash-kpi-spark" x-ref="sparkVerbrauch"></div>
       </a>
       <a class="edash-kpi"
-         {% if config.netzbezug %}:href="`{{ app_root }}/entities/{{ config.netzbezug }}?range=${range}&offset=${offset}`"{% endif %}>
-        <div class="edash-kpi-accent" style="background:var(--chart-1);"></div>
+         {% if config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}?range=${range}&offset=${offset}`"{% endif %}>
+        <div class="edash-kpi-accent" style="background:var(--chart-2);"></div>
         <div class="edash-kpi-head">
-          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
-          <div class="edash-kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+          <div class="edash-kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
         </div>
-        <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
-        <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
-        <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
+        <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
+        <div class="edash-kpi-delta" x-show="deltaText('einspeisung')" x-text="deltaText('einspeisung')"></div>
+        <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
       </a>
       <a class="edash-kpi has-tooltip tooltip-lines{{ ' is-pickable' if speicher_link_entities|length > 1 else '' }}"
          x-show="kpi.speicher_netto != null" :data-tooltip="speicherBreakdownText()"
@@ -495,17 +506,6 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.speicher_netto, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('speicher_netto')" x-text="deltaText('speicher_netto')"></div>
         <div class="edash-kpi-spark" x-ref="sparkSpeicher"></div>
-      </a>
-      <a class="edash-kpi"
-         {% if config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}?range=${range}&offset=${offset}`"{% endif %}>
-        <div class="edash-kpi-accent" style="background:var(--chart-2);"></div>
-        <div class="edash-kpi-head">
-          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
-          <div class="edash-kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
-        </div>
-        <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
-        <div class="edash-kpi-delta" x-show="deltaText('einspeisung')" x-text="deltaText('einspeisung')"></div>
-        <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
       </a>
     </div>
 

@@ -2,7 +2,7 @@
   /* Mobil: die nowrap-Badges drückten den <h1> (word-break:break-word, app.css)
      auf Mindestbreite — "Energiedashboard" brach Buchstabe für Buchstabe um.
      Der Titel behält mindestens 60% der Zeile (der Stift passt daneben), die
-     Badges rutschen als eigene Zeile darunter und beginnen links. */
+     Badges rutschen als eigene Zeile darunter und stehen dort rechtsbündig. */
   @media(max-width:560px){
     .edash-title-row{flex-wrap:wrap;row-gap:8px;}
     /* Titel nur so breit wie sein Text, damit der Bearbeiten-Stift direkt
@@ -14,8 +14,11 @@
     .edash-title-row h1{flex:0 1 auto;min-width:0;}
     .edash-title-row .edash-badge-group{flex-basis:100%;}
     /* Höhere Spezifität als die Desktop-Regel .edash-badge-group{margin-left:
-       auto} weiter unten — bei gleicher Spezifität gewänne die spätere. */
-    .edash-title-row .edash-badge-group{margin-left:0;flex-wrap:wrap;}
+       auto} weiter unten — bei gleicher Spezifität gewänne die spätere.
+       justify-content statt margin-left, weil die Gruppe jetzt die ganze
+       Zeile einnimmt (flex-basis:100%) und die Badges als Ganzes rechts
+       stehen sollen, nicht nur nach rechts geschoben werden. */
+    .edash-title-row .edash-badge-group{margin-left:0;flex-wrap:wrap;justify-content:flex-end;}
     /* Datenqualität-Chip nur als Symbol (✓/!) — der Text passt neben den
        CO2-/Kosten-Badges nicht mehr in eine Zeile. Bedeutung bleibt über
        title/aria-label am Button (_energiedashboard_view.html) erhalten;
