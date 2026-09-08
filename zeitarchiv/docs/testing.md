@@ -45,6 +45,7 @@ der Testumgebung nicht installiert ist).
 | `test_rollup.py`, `test_rotate.py` | Bucket-Berechnung, Hot-→-Archiv-Übergang |
 | `test_retention.py`, `test_cleanup.py` | Aufbewahrung, Soft-Delete/Purge |
 | `test_backup.py`, `test_backup_scheduler.py` | Backup-Format, Restore-Validierung, Zeitplan |
+| `test_notices_route_latest_backup.py`, `test_api_get_notices.py` | `latest_backup`-Feld in `/api/notices` (letzter *erfolgreicher* Job, nicht der letzte überhaupt) bzw. dessen Parsing im HA-Integrations-API-Client |
 | `test_storage_coordinator.py` | `StorageCoordinator`-Sperren (Nebenläufigkeit, Timeout/`CoordinatorBusy`) |
 | `test_http_middleware.py` | Security-Header, `X-Request-ID`, Access-Log-Korrelation (globale ASGI-Middleware in `main.py`) |
 | `test_energiedashboard_config_schema.py` | `energiedashboard_config`-`schema_version` (Downgrade-Schutz) |

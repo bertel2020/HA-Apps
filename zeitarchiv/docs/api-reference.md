@@ -69,15 +69,28 @@ Einfluss auf Auth oder Schreibpfad, fehlt er, ändert sich nichts.
 
 ## `GET /api/notices`
 
-Authentifiziert wie `/api/write`. Antwort: `{"notices": [...]}` — dieselbe
-gefilterte (stummschaltungsbereinigte) Meldungsliste wie im Glocken-Icon der
-Zeitarchiv-UI (siehe `notices.py`, `collect_notices()`). Jede Meldung:
-`id`, `severity` (`info`/`warn`/`error`), `title`, `detail`, `meta`, `link`,
-`mutable`.
+Authentifiziert wie `/api/write`. Antwort: `{"notices": [...], "latest_backup":
+{...} | null}`.
+
+`notices` ist dieselbe gefilterte (stummschaltungsbereinigte) Meldungsliste
+wie im Glocken-Icon der Zeitarchiv-UI (siehe `notices.py`,
+`collect_notices()`). Jede Meldung: `id`, `severity` (`info`/`warn`/`error`),
+`title`, `detail`, `meta`, `link`, `mutable`.
+
+`latest_backup` beschreibt das letzte **erfolgreiche** Backup —
+`filename`, `size_bytes`, `finished_at` (Unix-Zeitstempel) — oder `null`,
+wenn noch keines gelungen ist (siehe `notices.latest_backup_info()`,
+`Index.get_last_successful_backup_job()`). Bewusst nur der letzte
+erfolgreiche Lauf, nicht der letzte Lauf überhaupt: ein fehlgeschlagener
+oder noch laufender Job hat keine reale, kopierbare Datei.
 
 Grundlage für die HA-Integration: sie pollt diesen Endpunkt (60s) und macht
-daraus Home-Assistant-Repairs (kritische Fälle) sowie `binary_sensor`-
-Entities (automatisierbare Dauerzustände) am Zeitarchiv-Gerät.
+aus `notices` Home-Assistant-Repairs (kritische Fälle) sowie
+`binary_sensor`-Entities (automatisierbare Dauerzustände) am
+Zeitarchiv-Gerät, und aus `latest_backup` die Sensor-Entity „Letztes
+Backup" — Grundlage für ein Automations-Blueprint, das ein Offsite-Ziel
+für die Backup-Datei anstößt (Zeitarchiv selbst spricht kein
+S3/WebDAV/SMB).
 
 ## `GET /api/query` (Ingress-intern)
 

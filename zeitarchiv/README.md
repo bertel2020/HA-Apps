@@ -182,7 +182,10 @@ dauerhaft stummschalten; echte Fehler nie. Ein rotierender Praxis-Tipp
 ergänzt die Meldungen, lässt sich einzeln ausblenden oder komplett
 abschalten. Dieselben Meldungen stehen der Home-Assistant-Integration über
 `GET /api/notices` zur Verfügung — Grundlage für Home-Assistant-Repairs und
-automatisierbare `binary_sensor`-Entities am Zeitarchiv-Gerät.
+automatisierbare `binary_sensor`-Entities am Zeitarchiv-Gerät. Derselbe
+Endpunkt meldet auch das letzte erfolgreiche Backup; die Integration macht
+daraus eine eigene Sensor-Entity als Automations-Trigger für ein
+Offsite-Ziel (siehe unten).
 
 **Laufende Vorgänge.** Aktionen, die spürbar dauern — Importe, Bereinigung,
 Backup, Aufbewahrung, Rotation, Index-Optimierung —, zeigen ihren Stand am
@@ -271,6 +274,12 @@ importieren. Eine Wiederherstellung wird vor der Anwendung geprüft
 (Prüfsummen, ZIP-Struktur, Index-Integrität) und ist rollback-fähig: Der
 bisherige Datenbestand wird vor dem Überschreiben verschoben, nicht
 gelöscht.
+
+Zeitarchiv spricht selbst kein S3/WebDAV/SMB — für ein Offsite-Ziel meldet
+die App stattdessen das letzte erfolgreiche Backup an die
+Home-Assistant-Integration, die daraus eine Sensor-Entity und ein
+Automations-Blueprint macht (siehe Integrations-README). Die eigentliche
+Übertragung übernimmt dann eine eigene Automation, z. B. mit `rclone`.
 
 ## Sicherheit und Netzwerk
 

@@ -139,7 +139,7 @@ Existenz-Check in `Index.__init__()`.
 | `ingested_events` | Idempotenz-Ledger des Schreibpfads (siehe [ingestion.md](ingestion.md)); Einträge älter als 7 Tage werden periodisch geprunt |
 | `settings` | Generischer Key-Value-Store: globale Auflösungs-/Aufbewahrungs-Standards, Loglevel, Farbschema, API-Token, sowie **gecachte teure Vorschauen** und **HA-Integrations-Status** (siehe unten) |
 | `stats_snapshots`, `memory_snapshots` | Stündliche Schnappschüsse für Statistik-Verlaufsgrafiken |
-| `backup_jobs`, `retention_jobs` | Dauerhafte Job-Historie (Status, Fehler, Kennzahlen) — überlebt Neustarts, im Gegensatz zu einem reinen "letzter Lauf"-Zeitstempel |
+| `backup_jobs`, `retention_jobs` | Dauerhafte Job-Historie (Status, Fehler, Kennzahlen) — überlebt Neustarts, im Gegensatz zu einem reinen "letzter Lauf"-Zeitstempel. `backup_jobs` ist außerdem Grundlage für `Index.get_last_successful_backup_job()` — das `latest_backup`-Feld in `/api/notices` (siehe [api-reference.md](api-reference.md)) |
 | `saved_charts` | Gespeicherte Chart-**Abfragen** (Entitäten + Zeitraum-Einstellungen), kein Datenschnappschuss — Werte werden bei jedem Aufruf live nachgeladen |
 | `saved_tables`, `table_columns`, `table_rows` | Vergleichstabellen: Struktur (Zeilen=Größen, Spalten=Zeiträume) getrennt von `style_json` (rein optische Darstellung, siehe [frontend.md](frontend.md)) |
 | `dashboards`, `dashboard_pins` | Mehrere benannte Dashboards (Favorit, Standard, Präziser Modus, Lücken auffüllen); eine gemeinsame Pin-Tabelle für Charts, Tabellen UND direkt gepinnte Entitäten ("Werte-Kacheln", `item_type`/`item_id`/`item_entity_id`), da alle drei gemeinsam sortiert werden müssen |
