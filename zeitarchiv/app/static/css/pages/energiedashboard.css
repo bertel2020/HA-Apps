@@ -106,10 +106,6 @@
      ohnehin vom Titel), Pills und Navigation zentrieren sich darin je
      einzeln, weil beide zusammen (~250px + ~270px) nicht in eine Zeile
      passen und sonst nur die erste Zeile mittig säße. */
-  @media(max-width:560px){
-    .edash-period-controls{flex:1 1 100%;justify-content:center;}
-    .edash-period-nav{flex:1 1 100%;justify-content:center;}
-  }
   .edash-period-pills{display:flex;align-items:center;gap:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:3px;}
   .edash-period-pills button{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));padding:5px 10px;border-radius:6px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;}
   .edash-period-pills button.is-active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600;}
@@ -123,10 +119,45 @@
      sichtbar hin und her, weil .edash-card-head sie per
      justify-content:space-between am rechten Rand verankert. */
   .edash-period-nav-label{min-width:210px;text-align:center;font-variant-numeric:tabular-nums;}
+  /* HINTER den Grundregeln oben, nicht davor: .edash-period-nav-label und
+     .edash-period-nav sind gleich spezifisch, ein Media Query hebt die
+     Spezifität nicht an — stünde dieser Block vorher, gewänne die
+     Grundregel und die Mindestbreite bliebe stehen. Genau das ist beim
+     ersten Anlauf passiert (gemessen: min-width weiterhin 210px). */
+  @media(max-width:560px){
+    .edash-period-controls{flex:1 1 100%;justify-content:center;}
+    /* Die Navigation nimmt NICHT mehr eine ganze Zeile für sich. Vorher
+       (flex:1 1 100%) blieb für den Bericht-Knopf nur eine dritte Zeile, in
+       der er als einziges Element stand — ein Symbol ohne Nachbarn und ohne
+       Beschriftung. Jetzt teilt er sich die Zeile mit den Pfeilen, zu denen
+       er inhaltlich gehört: er berichtet über genau die Periode, die dort
+       eingestellt ist.
+
+       Dass die Navigation überhaupt die volle Breite brauchte, lag allein an
+       der min-width des Labels (siehe dort) — gemessen bei 375px: verfügbar
+       305px, Navigation 305px, also kein Platz mehr daneben. Ohne die
+       Mindestbreite sind es rund 160px, mit Knopf gut 200px.
+
+       justify-content:center bleibt hier nicht nötig: die Zeile wird von
+       .edash-period-controls oben zentriert, und die Navigation ist jetzt nur
+       noch so breit wie ihr Inhalt. */
+    .edash-period-nav{flex:0 1 auto;}
+    /* Die Mindestbreite ist eine reine Desktop-Maßnahme gegen das Wandern der
+       rechtsbündigen Werkzeugleiste (Begründung bei .edash-period-nav-label).
+       Auf dem Telefon steht rechts davon nichts, was wandern könnte — die
+       Steuerelemente sind ohnehin zentriert. Dort ist sie also nur totes
+       Gewicht: "September 2026" braucht rund 100px, reserviert waren 210px.
+       Preis: das Datum sitzt nicht mehr exakt mittig, weil der Knopf rechts
+       daneben mitzählt. */
+    .edash-period-nav-label{min-width:0;}
+  }
   /* Energiebericht-Link (ROADMAP.md 1.7) — dieselbe kleine Quadrat-Button-
-     Optik wie die ‹/›-Pfeile in .edash-period-nav nebenan, aber ein eigenes
-     <a target="_blank">, kein <button>, da er eine eigenständige Seite in
-     neuem Tab öffnet statt eine Aktion auf DIESER Seite auszulösen. */
+     Optik wie die ‹/›-Pfeile in .edash-period-nav nebenan, aber ein <a> statt
+     eines <button>, da er auf eine eigenständige Seite führt statt eine
+     Aktion auf DIESER Seite auszulösen. Bewusst OHNE target="_blank": der
+     Bericht trägt einen eigenen Zurück-Link (siehe die Begründung im Template
+     bei .edash-report-btn und _energiedashboard_report.html). Hier stand
+     dazu einmal das Gegenteil. */
   .edash-report-btn{
     width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;
     border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink-faint);
