@@ -520,6 +520,13 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         if chart_type not in (None, "line", "bar"):
             raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
         now = datetime.now(deps.tz)
+        # Ein Cache für beide Abfragen dieses Requests: Mit "Vergleichen" wird
+        # dieselbe Entität zweimal abgefragt, nur mit verschobenem Fenster —
+        # ohne ihn liest der zweite Aufruf jahr.parquet/monat.parquet erneut.
+        # Gemessen bei Zeitraum "Dekade": 81,6 -> 6,9 ms. query_raw_series()
+        # nimmt bewusst keinen: Rohwerte gibt es nur für kurze Zeiträume, die
+        # keine groben Rollup-Stufen anfassen.
+        read_cache = query_mod.QueryReadCache()
         # Kein frühes return im raw-Zweig mehr: die Markierungen unten gelten
         # für beide Pfade, und ein zweiter Ausgang hätte sie im
         # Rohwert-Modus stillschweigend übersprungen — ausgerechnet dort, wo
@@ -533,6 +540,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             result = query_mod.query_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset, continuous=continuous, chart_type=chart_type,
+                read_cache=read_cache,
             )
         if compare and not raw:
             compare_result = query_mod.query_series(
@@ -541,6 +549,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 continuous=continuous,
                 year_over_year=compare_mode == "year",
                 chart_type=chart_type,
+                read_cache=read_cache,
             )
             result.update(
                 compare_points=compare_result["points"],

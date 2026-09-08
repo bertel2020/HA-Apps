@@ -354,3 +354,46 @@ def test_cached_rollup_rows_survive_a_second_pass_unchanged(tmp_path: Path) -> N
 
     assert durchlauf() == durchlauf()
     index.close()
+
+
+def test_the_single_chart_shares_one_cache_between_series_and_comparison(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Mit „Vergleichen" fragt /api/query dieselbe Entität zweimal ab, nur mit
+    verschobenem Fenster. Ohne gemeinsamen Cache öffnet der zweite Aufruf
+    jahr.parquet und monat.parquet erneut — bei Zeitraum „Dekade" gemessen
+    81,6 statt 6,9 ms. Der Rohwert-Zweig bleibt bewusst außen vor: Rohwerte
+    gibt es nur für kurze Zeiträume, die keine groben Stufen anfassen."""
+    entity_id = "sensor.zaehler"
+    index = _zaehler_mit_jahren(tmp_path, entity_id, 2014, 2025)
+    ts = datetime.now(TZ).replace(minute=0, second=0, microsecond=0).timestamp()
+    hotbuffer.append(tmp_path, entity_id, ts, 5.0, TZ)
+    index.record_write(entity_id, ts)
+
+    router = create_api_router(ApiDependencies(
+        data_dir=tmp_path,
+        index=index,
+        tz=TZ,
+        coordinator=StorageCoordinator(),
+        ingestion=None,  # Für diesen reinen Lese-Endpunkt nicht benötigt.
+        api_token=lambda: "test",
+        app_version="test",
+        collect_notices=lambda: [],
+    ), ApiState())
+    endpoint = next(route.endpoint for route in router.routes if route.path == "/api/query")
+
+    gelesen: list[str] = []
+    original = pq.read_table
+
+    def aufzeichnend(path, *args, **kwargs):
+        gelesen.append(Path(path).name)
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(query.pq, "read_table", aufzeichnend)
+    result = endpoint(entity_id=entity_id, range="decade", compare=True)
+    index.close()
+
+    assert "compare_points" in result, "der Vergleichszweig muss gelaufen sein"
+    grob = Counter(name for name in gelesen if name in ("monat.parquet", "jahr.parquet"))
+    assert grob["jahr.parquet"] <= 1, grob
+    assert grob["monat.parquet"] <= 1, grob
