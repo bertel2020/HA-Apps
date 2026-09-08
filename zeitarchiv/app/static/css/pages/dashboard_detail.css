@@ -14,9 +14,12 @@
      Modus kombinierbar, deshalb eine eigene Klasse statt in is-precise mit
      eingebaut. */
   .dashboard-grid.is-dense{grid-auto-flow:dense;}
+  /* Schatten wie auf allen anderen Kartenflächen der App (siehe app.css) —
+     die Kacheln liegen damit auf dem Seitengrund statt flach darin. */
   .dtile{
     position:relative;min-width:0;grid-column:span var(--tile-cols,1);grid-row:span var(--tile-rows,1);
     border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:visible;cursor:grab;
+    box-shadow:var(--shadow);
   }
   .dtile[data-grid-cols="2"]{grid-column:span 2;}
   .dtile[data-grid-cols="3"]{grid-column:span 3;}
@@ -24,7 +27,9 @@
   .dtile[data-grid-rows="3"]{grid-row:span 3;}
   .dtile.dragging{opacity:.4;}
   .dtile:has(.dtile-menu.is-open){z-index:20;}
-  .dtile-add{cursor:default;}
+  /* Der Platzhalter zum Hinzufügen bleibt flach: ein leerer, gestrichelter
+     Platz soll nicht so substanziell wirken wie eine belegte Kachel. */
+  .dtile-add{cursor:default;box-shadow:none;}
   .dtile-body{display:flex;flex-direction:column;height:100%;box-sizing:border-box;color:inherit;text-decoration:none;padding:14px 14px 10px;overflow:hidden;border-radius:inherit;}
   .dtile-title{font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);margin-bottom:8px;padding-right:30px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .dtile-chart{height:auto;min-height:160px;flex:1;}
