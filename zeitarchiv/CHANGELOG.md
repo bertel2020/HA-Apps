@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.89.0 - 2026-09-08
+
+### Neu
+
+- Zeitarchiv meldet der Home-Assistant-Integration jetzt auch das letzte
+  erfolgreiche Backup — Grundlage für einen neuen Sensor und ein
+  Automations-Blueprint, um Backups automatisch an ein externes Ziel zu
+  kopieren (siehe Integrations-Changelog).
+
+### Geändert
+
+- Die Übersichts-Kacheln im Dashboard tragen jetzt denselben Schatten wie
+  alle anderen Kartenflächen der App.
+
+### Behoben
+
+- Die Titel der Werte-Kacheln sehen jetzt genauso aus wie auf Chart- und
+  Tabellen-Kacheln — vorher wirkten sie durch andere Schriftgröße und Farbe
+  wie eine schwächere Sorte.
+- Der Bericht-Knopf im Energiedashboard erscheint auf dem Telefon nicht
+  mehr, da die Berichtsseite dort ohnehin nicht nutzbar ist (sie lief
+  seitlich aus dem Bild). Die Perioden-Navigation steht mobil wieder auf
+  eigener Zeile.
+
 ## 0.88.1 - 2026-09-08
 
 ### Geändert
