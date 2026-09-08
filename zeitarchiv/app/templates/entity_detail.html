@@ -29,6 +29,8 @@
       {% endif %}
     </p>
 
+    {% with active = 'verlauf' %}{% include "_entity_tabs.html" %}{% endwith %}
+
     <div class="toolbars">
       <!-- Zeitraum + Navigation zuerst (bestimmt WELCHER Ausschnitt gezeigt
            wird), Vergleichen + Optionen-Menü ans Ende der Zeile — alles
@@ -253,9 +255,12 @@
             </div>
             <div class="menu-divider"></div>
             <div class="menu-section-label">Aktionen</div>
+            {# "Werte bearbeiten" und "Konfiguration" standen hier einmal daneben.
+               Beide sind Seiten, keine Aktionen — sie liegen jetzt in der
+               Reiterzeile unter dem Titel (siehe _entity_tabs.html), die
+               zugleich zeigt, auf welcher der drei Seiten man gerade ist.
+               "Als Chart speichern" bleibt: das tut etwas auf DIESER Seite. #}
             <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
-            <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup">Werte bearbeiten <span class="menu-row-arrow">→</span></a>
-            <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/config">Konfiguration <span class="menu-row-arrow">→</span></a>
             <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
           </div>
         </div>
@@ -352,6 +357,7 @@
   <script src="{{ asset('js/calendar-picker.js') }}"></script>
   <script src="{{ asset('js/period-navigation.js') }}"></script>
   <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
+  <script src="{{ asset('js/menu-popover-clamp.js') }}"></script>
   <script>
     const ENTITY_ID = {{ entity_id | tojson }};
     const DISPLAY_NAME = {{ display_name | tojson }};

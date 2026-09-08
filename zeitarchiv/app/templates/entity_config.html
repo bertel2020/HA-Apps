@@ -8,11 +8,25 @@
   
   {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page">
-    <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
+    {# .h1-row wie auf Verlauf und Werte bearbeiten — dort hebt die Regel
+       .h1-row h1 den Standard-Abstand von 4px unter der Überschrift auf.
+       Ohne den Wrapper stand die Unterzeile hier 4px tiefer als auf den
+       beiden Schwesterseiten, was beim Wechseln über die Reiter als Sprung
+       sichtbar war. #}
+    <div class="h1-row">
+      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
+      <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
+              title="Favorit" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
+    </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      <a href="{{ app_root }}/entities/{{ entity_id }}">← zurück zum Verlauf</a>
+      Typ: <strong>{{ type_label }}</strong> &middot;
+      {# Siehe cleanup.html: der Verlauf ist jetzt ein Reiter, hier steht
+         stattdessen der Weg eine Ebene höher. #}
+      <a href="{{ app_root }}/entities">← zurück zu Entitäten</a>
     </p>
+
+    {% with active = 'konfig' %}{% include "_entity_tabs.html" %}{% endwith %}
 
     <div class="stat-row">
       <div class="stat"><div class="label">Typ</div><div class="value">{{ type_label }}</div></div>
@@ -62,6 +76,8 @@
       </section>
     </div>
   </div>
+
+  <script src="{{ asset('js/favorite-toggle.js') }}"></script>
 
   <script src="{{ asset('vendor/htmx.min.js') }}"></script>
   <script src="{{ asset('js/resizable-tables.js') }}"></script>

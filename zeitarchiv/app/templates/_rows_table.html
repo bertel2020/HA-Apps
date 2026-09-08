@@ -11,7 +11,6 @@
     {% include "_calendar_popover.html" %}
   </div>
   <button class="btn navbtn" {% if range == 'all' or offset >= 0 %}disabled{% endif %} onclick="stepOffset(1)" aria-label="Nächster Zeitraum">›</button>
-  <button class="chip" {% if offset == 0 %}disabled{% endif %} onclick="setOffset(0)">Jetzt</button>
   <script>
     // Das komplette serverseitig berechnete Fenster im .page-Scope nachziehen.
     // Es steuert sowohl calendarPicker() als auch den stabilen Zoom-Anker beim
@@ -84,11 +83,89 @@
   </div>
 </div>
 
+{% include "_rows_filter_menu.html" %}
+
+{# Aktionszeile als KOPF der Tabelle statt als Zeile darunter. Gemessen bei
+   1.280x900: das erste Auswahlkästchen lag bei y=456, "Löschen" bei y=1215 —
+   759px auseinander, der Knopf also nicht im Bild, während man die oberen
+   Zeilen ankreuzt.
+
+   Sie bleibt in DIESEM Fragment (statt nach #controls zu wandern): ihre Knöpfe
+   hängen an serverseitigem Zustand (undo_available, aktiver Filter) und
+   bräuchten dort einen vierten hx-swap-oob-Block.
+
+   Sie steht bewusst VOR .tbl-wrap und nicht darin: .tbl-wrap scrollt
+   waagerecht (auf dem Telefon um 54px), eine Leiste darin würde mitwandern.
+   Den optischen Anschluss stellt stattdessen .rows-actionbar + .tbl-wrap in
+   pages/cleanup.css her — dieselbe Optik wie .table-resize-actions, die die
+   App schon am oberen Rand jeder Tabelle trägt.
+
+   Sie verschwindet NICHT bei leerer Auswahl: eine Leiste, die erst beim ersten
+   Kreuz erscheint, verschöbe die Tabelle unter dem Finger. Stattdessen wird
+   "0 ausgewählt" blass und "Löschen" gesperrt — dieselbe Entscheidung wie bei
+   .toolbars in entity_detail.css (fester Platz, nur aktiviert/deaktiviert). #}
+<div class="rows-actionbar">
+  {% if mode == 'correct' %}
+  ✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.
+  {% else %}
+  <strong><span id="selected-count">0</span> ausgewählt</strong>
+  <button class="btn btn-danger needs-selection" disabled
+          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
+          hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
+          hx-disabled-elt="this"
+          hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
+    Löschen
+  </button>
+  {# Rechts steht, was NICHT an der Auswahl hängt: "Rückgängig" gilt für die
+     ganze Tabelle, die Sammelaktionen für den gerade gewählten Filter.
+     Nebeneinander in einer Reihe sahen sie bisher genauso verbindlich aus wie
+     "Löschen", das ohne Auswahl gar nichts tut. #}
+  <span class="rows-actionbar-right">
+    {% if filter == 'duplicates' %}
+    <button class="btn btn-danger-outline"
+            {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"{% endif %}
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/duplicates-preview"
+            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
+      Duplikate automatisch entfernen
+    </button>
+    {% endif %}
+    {% if filter == 'repetitions' %}
+    <button class="btn btn-danger-outline"
+            {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"{% endif %}
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/repetitions-preview"
+            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
+      Wiederholungen verdichten
+    </button>
+    {% endif %}
+    {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
+       (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
+       über seinen Beschriftungstext suchen. #}
+    <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
+            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
+      Rückgängig (letzte Löschung)
+    </button>
+  </span>
+  {% endif %}
+</div>
+
 {% if rows %}
 <div class="tbl-wrap">
-  <table class="dt compact" style="table-layout:fixed;">
+  {# data-cards="off": Diese Tabelle bleibt auf dem Telefon eine Tabelle und
+     scrollt waagerecht, statt zu Zeilenkarten zu werden. Karten lohnen sich,
+     wo eine breite Liste sonst auf die Namensspalte zusammenschrumpft
+     (Entitäten, Export) — hier sind es vier schmale Spalten mit einer
+     Naturbreite von 359 px bei 343 px Platz, also 16 px Scroll gegen
+     21 einzelne Karten je Seite. Die Zeitstempel-Spalte ist außerdem der
+     Grund, überhaupt zu scrollen: als Karte steht jeder Wert einzeln, das
+     Vergleichen aufeinanderfolgender Zeitstempel (worum es beim Bereinigen
+     geht) ist damit vorbei. #}
+  <table class="dt compact rows-values-table" data-cards="off">
+    {# Breiten stehen in pages/cleanup.css statt inline: unter 640px werden sie
+       dort auf auto zurückgenommen, und ein Inline-Style ließe sich nur mit
+       !important überschreiben. #}
     <colgroup>
-      <col style="width:13%"><col style="width:20%"><col style="width:21%"><col style="width:46%">
+      <col><col><col><col>
     </colgroup>
     <tr>
       {% if mode == 'correct' %}
@@ -142,42 +219,3 @@
   </select>
 </div>
 {% endif %}
-
-<div class="actionbar">
-  {% if mode == 'correct' %}
-  <span style="color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));">✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.</span>
-  {% else %}
-  <strong><span id="selected-count">0</span> ausgewählt</strong>
-  <button class="btn btn-danger needs-selection" disabled
-          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
-          hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
-          hx-disabled-elt="this"
-          hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
-    Löschen
-  </button>
-  {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
-     (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
-     über seinen Beschriftungstext suchen. #}
-  <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
-          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
-          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-    Rückgängig (letzte Löschung)
-  </button>
-  {% if filter == 'duplicates' %}
-  <button class="btn btn-danger-outline"
-          {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"{% endif %}
-          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/duplicates-preview"
-          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-    Duplikate automatisch entfernen
-  </button>
-  {% endif %}
-  {% if filter == 'repetitions' %}
-  <button class="btn btn-danger-outline"
-          {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"{% endif %}
-          hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/repetitions-preview"
-          hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-    Wiederholungen verdichten
-  </button>
-  {% endif %}
-  {% endif %}
-</div>

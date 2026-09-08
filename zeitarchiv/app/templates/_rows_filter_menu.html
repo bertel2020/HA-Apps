@@ -1,0 +1,50 @@
+{# Markierungs-Filter der Bearbeitungsseite: EIN Dropdown statt einer Reihe
+   von .filter-chip-Pillen.
+
+   Warum kein Pillen-Streifen mehr: .filter-chip ist app-weit die
+   MEHRFACH-Auswahl (Typ-Filter der Startseite, Kennzahlen in der Legende) —
+   hier war es eine Einfachauswahl aus Radios, also dieselbe Optik bei anderer
+   Bedienung. Dazu kam eine dritte Knopfsprache in der dritten Zeile
+   untereinander (weiche Pillen, harte Segmentleiste, runde Pillen) und ein
+   "Alle", das im Alarmrot der Markierungsfilter leuchtete, obwohl es der
+   neutrale Grundzustand ist. Als Dropdown passt der Filter in die
+   Zeitraum-Zeile, spart die eigene Zeile ganz und bricht auf dem Telefon
+   nicht mehr in zwei ausgefranste Reihen um.
+
+   Die Zahl je Eintrag ist der eigentliche Gewinn: sie steht in derselben
+   Antwort wie die Zeilen (counts.*, dieselbe Quelle wie die Kennzahlen-
+   Tabelle darüber) und kostet keine zusätzliche Abfrage. Kategorien ohne
+   Treffer sind damit vorher erkennbar und gar nicht erst wählbar — vorher
+   sahen alle fünf gleich aus und man landete auf einer leeren Tabelle.
+
+   Wie #rows-nav liegt dieses Element in Wirklichkeit oben in #controls,
+   außerhalb des hx-targets — deshalb hx-swap-oob, damit die Zahlen bei jedem
+   Zeitraum-/Seitenwechsel mitwandern. #}
+{% set optionen = [
+     {'wert': 'all', 'text': 'Alle', 'anzahl': counts['all']},
+     ({'wert': 'outliers', 'text': 'Ausreißer', 'anzahl': counts['outliers']} if outlier_detection_enabled else none),
+     ({'wert': 'gaps', 'text': 'Lücken', 'anzahl': counts['gaps']} if gap_detection_enabled else none),
+     {'wert': 'duplicates', 'text': 'Duplikate', 'anzahl': counts['duplicates']},
+     {'wert': 'repetitions', 'text': 'Wiederholungen', 'anzahl': counts['repetitions']},
+     ({'wert': 'counter_decreases', 'text': 'Zählerrückgänge', 'anzahl': counts['counter_decreases']} if counter_decrease_enabled else none),
+   ] | reject('none') | list %}
+{% set aktuell = (optionen | selectattr('wert', 'equalto', filter) | map(attribute='text') | first) | default('Alle') %}
+<span class="dd-picker-wrap rows-filter" id="rows-filter-menu" hx-swap-oob="true">
+  <button type="button" class="btn dd-picker-btn{{ ' is-active' if filter != 'all' }}" id="rows-filter-btn"
+          onclick="toggleDDPicker('rows-filter')">Markierung: {{ aktuell }} &#9662;</button>
+  <div class="dd-picker-popover" id="rows-filter-popover">
+    {% for opt in optionen %}
+    {# Ohne Treffer nicht anklickbar statt nur ausgegraut: ein Filter, der
+       garantiert eine leere Tabelle liefert, ist keine sinnvolle Auswahl.
+       Der gerade aktive Eintrag bleibt anklickbar, auch wenn er auf 0 steht
+       (Zeitraumwechsel kann ihn leeren) — sonst ließe er sich nicht mehr
+       schließen bzw. wäre der Zustand nicht mehr erklärbar. #}
+    {% set leer = opt.anzahl == 0 and opt.wert != filter %}
+    <div class="dd-picker-row dd-picker-row-count{{ ' active' if opt.wert == filter }}{{ ' is-empty' if leer }}{{ ' has-issues' if opt.anzahl and opt.wert != 'all' }}"
+         {% if not leer %}onclick="selectDDOption('rows-filter', '{{ opt.wert }}', 'Markierung: {{ opt.text }}'); resetPage();"{% endif %}>
+      <span>{{ opt.text }}</span><span class="n">{{ opt.anzahl | format_int }}</span>
+    </div>
+    {% if opt.wert == 'all' %}<div class="dd-picker-sep"></div>{% endif %}
+    {% endfor %}
+  </div>
+</span>

@@ -2746,6 +2746,9 @@ def _entity_config_context(entity) -> dict:
         "entity_id": entity_id,
         "friendly_name": entity["friendly_name"],
         "custom_name": entity["custom_name"] or "",
+        # Für den Favoritenstern im Seitenkopf: die drei Entitätsseiten tragen
+        # seit der Reiterzeile denselben Kopf, und dort gehört er dazu.
+        "is_favorite": bool(entity["is_favorite"]),
         "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
@@ -4490,6 +4493,9 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "entity_id": entity_id,
             "friendly_name": entity["friendly_name"],
             "custom_name": entity["custom_name"] or "",
+            # Für die Unterzeile: die drei Entitätsseiten tragen seit der
+            # Reiterzeile denselben Kopf, und dort steht der Typ.
+            "type_label": format_type(entity["aggregation_type"]),
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",

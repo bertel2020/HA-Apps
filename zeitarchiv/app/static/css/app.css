@@ -307,6 +307,25 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .crumb a{color:inherit;}
 h1{font-size:calc(24px * var(--font-scale, 1));font-weight:700;margin:0 0 4px;word-break:break-word;}
 h1.raw{font-family:var(--font-mono);font-size:calc(20px * var(--font-scale, 1));}
+/* Kopfzeile der drei Entitätsseiten: Überschrift und Favoritenstern in einer
+   Reihe. Hier und nicht je Seite, weil Verlauf, Werte bearbeiten und
+   Konfiguration seit der Reiterzeile (siehe .entity-tabs weiter unten)
+   denselben Kopf tragen sollen — die Konfiguration hatte weder den Wrapper
+   noch den Stern, ihre Unterzeile stand dadurch 4px tiefer als auf den
+   Schwesterseiten und der Sprung war beim Reiterwechsel sichtbar.
+
+   Der Stern ist über .h1-row gescopt und NICHT global: dieselbe Klasse trägt
+   auf den Übersichtsseiten (Dashboards, Tabellen, Charts) einen kleineren
+   Stern in der Kartenecke. In pages/entity_detail.css und pages/cleanup.css
+   stehen noch die alten, wertgleichen Kopien — die dürfen weg, sobald dort
+   niemand mehr gleichzeitig arbeitet. */
+.h1-row{display:flex;align-items:center;gap:10px;}
+.h1-row h1{margin:0;}
+.h1-row .fav-star{
+  background:none;border:none;cursor:pointer;font-size:calc(22px * var(--font-scale, 1));line-height:1;padding:2px;
+  color:var(--ink-faint);opacity:.5;
+}
+.h1-row .fav-star.active,.h1-row .fav-star:hover{color:#D9A22B;opacity:1;}
 h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 12px;}
 .sub{color:var(--ink-muted);font-size:calc(13.5px * var(--font-scale, 1));margin:0 0 20px;}
 .sub a{color:var(--accent-line);}
@@ -766,10 +785,21 @@ button.dd-picker-clear{
    ragte dann über den LINKEN Rand hinaus (bei 375 px gemessen: linke Kante bei
    −45 px, die ersten Zeichen jeder Zeile abgeschnitten). Dass es dort
    stattdessen rechts anstößt, ist ein älterer, eigener Punkt: .menu-popover
-   ist auf jeder Seite 290 px breit und kennt keine Mobil-Variante — das gilt
-   unabhängig von dieser Regel und ist nicht hier zu reparieren. */
+   ist auf jeder Seite 290 px breit und kennt keine Mobil-Variante. Er wird
+   nicht hier repariert, sondern von static/js/menu-popover-clamp.js — genau
+   weil ein fest breites Popover an einem beweglichen Anker in CSS nicht zu
+   klemmen ist (die Ankerposition ist dort nicht bekannt). Dieselbe Aufteilung
+   wie beim Kalender-Popover. */
 @media (min-width:641px){
   .toolbar-right .menu-popover{left:auto;right:0;}
+}
+/* Unter 640px ist das Optionen-Menü höher als das Telefon: gemessen 621 px
+   Menü ab y=371 auf einem 812 px hohen Bildschirm, also 180 px unter der Falz.
+   Die Seite ließe sich zwar dorthin scrollen, aber dann steht das Menü ohne
+   seinen Auslöser da. Innen scrollen statt außen — dieselbe Lösung wie bei
+   .list-settings-popover. */
+@media (max-width:640px){
+  .menu-popover{max-height:70vh;overflow-y:auto;}
 }
 .menu-section-label{
   font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;
@@ -1571,6 +1601,46 @@ button[data-tooltip]{cursor:pointer;}
      zweite braucht keinen. */
   .pager > div:has(.pager-range){flex-grow:1;}
   .pager-range{margin-right:auto;}
+}
+
+/* Reiterzeile der Entitätsseiten (_entity_tabs.html) — Verlauf, Werte
+   bearbeiten, Konfiguration. In app.css und nicht je Seite, weil sie auf
+   allen drei Seiten identisch stehen muss.
+
+   Optik von .topnav-link übernommen (Akzentfarbe plus 2px-Linie am aktiven
+   Eintrag) und BEWUSST nicht von .seg: als segmentierte Leiste stünde sie auf
+   der Verlaufsseite unmittelbar über der Zeitraumauswahl, die genauso
+   aussieht — zwei gleich wirkende Leisten übereinander, von denen die eine
+   navigiert und die andere filtert.
+
+   Waagerecht scrollend statt umbrechend: die drei Beschriftungen brauchen
+   gemessen 294px und passen bei 375px Viewport (341px Zeile) knapp in eine
+   Zeile; darunter oder bei längeren Beschriftungen scrollt die Zeile in sich,
+   ohne die Seite breiter zu machen — dieselbe Technik wie .seg. Der
+   Scrollbalken bleibt verborgen, sonst säße unter drei Wörtern eine
+   Bildlaufleiste.
+
+   Der Abstand NACH der Zeile steht hier und nicht bei den Inhalten der drei
+   Seiten: sonst hinge er davon ab, was dort zufällig als erstes folgt. Genau
+   das war der Zustand davor — .entity-stats-groups (Werte bearbeiten) brachte
+   14px mit, .toolbars (Verlauf) und .stat-row (Konfiguration) nichts, also
+   klebten zwei der drei Seiten direkt unter der Linie. */
+.entity-tabs{
+  display:flex;align-items:center;gap:22px;margin:14px 0;
+  border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;
+}
+.entity-tabs::-webkit-scrollbar{display:none;}
+.entity-tab{
+  position:relative;padding:9px 1px 10px;white-space:nowrap;text-decoration:none;
+  font-size:calc(13.5px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);
+}
+.entity-tab:hover{color:var(--accent-line);}
+.entity-tab.is-active{color:var(--accent-line);font-weight:600;}
+/* bottom:-1px legt die Linie ÜBER den 1px-Rand der Zeile, statt darunter —
+   sonst stünden zwei Linien mit 1px Versatz untereinander. */
+.entity-tab.is-active::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:var(--accent-line);border-radius:2px 2px 0 0;
 }
 
 /* Aktionsleiste unter Tabellen */

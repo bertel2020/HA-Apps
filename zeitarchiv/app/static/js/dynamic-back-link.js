@@ -45,6 +45,17 @@
     const hereRel = stripRoot(location.pathname, root);
     if (refRel === hereRel) return;
 
+    // Kein Rücklink zwischen den Seiten DERSELBEN Entität (Verlauf, Werte
+    // bearbeiten, Konfiguration): diesen Weg trägt die Reiterzeile
+    // (_entity_tabs.html), und zwar in beide Richtungen. Ohne diese Ausnahme
+    // erschien nach jedem Reiterklick ein "← zurück zur Entität" neben dem
+    // statischen "← zurück zu Entitäten" — zwei Rücklinks für einen Wechsel,
+    // den man gerade selbst über die Reiter gemacht hat.
+    const AUF_ENTITAET = /^\/entities\/([^/]+)/;
+    const refEntitaet = (refRel.match(AUF_ENTITAET) || [])[1];
+    const hierEntitaet = (hereRel.match(AUF_ENTITAET) || [])[1];
+    if (refEntitaet && refEntitaet === hierEntitaet) return;
+
     // Nicht doppeln, wenn der statische Link daneben schon exakt dorthin zeigt.
     const alreadyLinked = Array.from(container.querySelectorAll('a')).some((a) => {
       try { return new URL(a.href, location.href).pathname === ref.pathname; } catch (e) { return false; }

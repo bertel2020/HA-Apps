@@ -1,0 +1,21 @@
+{# Die drei Seiten EINER Entität als waagerechte Reiter: Verlauf
+   (entity_detail.html), Werte bearbeiten (cleanup.html), Konfiguration
+   (entity_config.html). Vorher lagen die beiden letzten nur im Optionen-Menü
+   des Verlaufs — zwei Klicks tief, unsichtbar solange das Menü zu war, und
+   ohne jeden Hinweis darauf, wo man gerade ist.
+
+   Als eigenes Teil-Template, weil die Zeile auf ALLEN DREI Seiten stehen
+   muss: stünde sie nur auf dem Verlauf, wäre sie eine Einbahnstraße.
+
+   Aufrufer setzen `active` auf 'verlauf', 'werte' oder 'konfig'. #}
+<nav class="entity-tabs" aria-label="Ansichten dieser Entität">
+  <a class="entity-tab{{ ' is-active' if active == 'verlauf' }}"
+     href="{{ app_root }}/entities/{{ entity_id }}"
+     {% if active == 'verlauf' %}aria-current="page"{% endif %}>Verlauf</a>
+  <a class="entity-tab{{ ' is-active' if active == 'werte' }}"
+     href="{{ app_root }}/entities/{{ entity_id }}/cleanup"
+     {% if active == 'werte' %}aria-current="page"{% endif %}>Werte bearbeiten</a>
+  <a class="entity-tab{{ ' is-active' if active == 'konfig' }}"
+     href="{{ app_root }}/entities/{{ entity_id }}/config"
+     {% if active == 'konfig' %}aria-current="page"{% endif %}>Konfiguration</a>
+</nav>

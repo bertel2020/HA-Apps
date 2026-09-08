@@ -19,7 +19,68 @@
      Tabelle selbst (.tbl-wrap), wie jede andere Tabelle in der App. Das
      äußere Element wird bei jedem Tabellen-Request per htmx OOB komplett
      ersetzt, bleibt optisch aber ein stabiler Teil des Seitenkopfs. */
-  .entity-stats-groups{margin:14px 0 2px;}
+  /* Kein margin-top mehr: den Abstand zur Reiterzeile darüber setzt jetzt
+     .entity-tabs (app.css), damit er auf allen drei Entitätsseiten gleich
+     ist. Bliebe er hier stehen, käme er doppelt. */
+  .entity-stats-groups{margin:0 0 2px;}
+  /* Markierungsfilter (siehe _rows_filter_menu.html) — sitzt am rechten Ende
+     DERSELBEN Zeile wie Zeitraumauswahl und Perioden-Navigation, statt wie
+     zuvor als Pillenreihe eine eigene zweite Zeile zu belegen. Gemessen bei
+     1.120 px: Segmentleiste 396 + Navigation 202 + Knopf ~190 = 806, also
+     reichlich Luft; die Pillenreihe brauchte 596 in einer zweiten Zeile. */
+  .rows-filter{margin-left:auto;}
+  /* Zwei Spalten je Eintrag: Name links, Trefferzahl rechts. .dd-picker-row
+     bringt nur "flex + gap" mit — ohne space-between klebte die Zahl am
+     Namen statt eine lesbare Zahlenspalte zu bilden. */
+  .dd-picker-row-count{justify-content:space-between;gap:14px;}
+  .dd-picker-row-count .n{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  /* Treffer rot wie in der Kennzahlen-Tabelle darüber (dort .has-issues) —
+     beide zeigen dieselben Zahlen und sollen dieselbe Aussage machen. Nur die
+     Zahl, nicht die ganze Zeile: rot eingefärbte Menüeinträge läsen sich als
+     gefährliche Aktion. */
+  .dd-picker-row-count.has-issues .n{color:var(--danger);font-weight:600;}
+  /* Ohne Treffer: gedämpft und nicht anklickbar (kein onclick im Template).
+     Vorher sahen alle Kategorien gleich aus, und die Auswahl einer leeren
+     endete zwangsläufig auf "Keine Werte in diesem Zeitraum/Filter". */
+  .dd-picker-row-count.is-empty{opacity:.42;cursor:default;}
+  .dd-picker-row-count.is-empty:hover{background:none;}
+  .dd-picker-row-count.active .n{color:inherit;}
+  /* Der Auslöser zeigt an, dass überhaupt gefiltert wird — sonst müsste man
+     das Menü öffnen, um zu sehen, warum die Tabelle so kurz ist. Dieselbe
+     Auszeichnung wie .list-settings .btn.is-active in app.css. */
+  .rows-filter .btn.is-active{color:var(--accent-line);border-color:var(--accent-line);}
+
+  /* Aktionszeile als Kopf der Tabelle (siehe _rows_table.html). Optik bewusst
+     die von .table-resize-actions ("Spaltenbreiten zurücksetzen", app.css):
+     getönter Grund, gemeinsamer Rahmen, oben abgerundet — damit sie sich als
+     Teil der Tabelle liest und nicht als dritte Werkzeugzeile unter Reitern
+     und Zeitraumauswahl. Der Unterschied ist der eigentliche Punkt: unten war
+     sie eine lose Reihe, oben ohne diese Anbindung wäre sie es wieder. */
+  .rows-actionbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:8px 12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);
+    background:var(--surface-alt);border:1px solid var(--border);border-bottom:none;
+    border-radius:12px 12px 0 0;
+  }
+  /* Die Tabelle darunter gibt ihre oberen Ecken ab — beide zusammen ergeben
+     einen Rahmen. Geschwister-Selektor statt einer eigenen Klasse an der
+     .tbl-wrap, weil die Leiste im Korrigieren-Modus dieselbe bleibt. */
+  .rows-actionbar + .tbl-wrap{border-top-left-radius:0;border-top-right-radius:0;}
+  .rows-actionbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  /* Ohne Auswahl blass statt weg: eine Leiste, die erst beim ersten Kreuz
+     erscheint, verschöbe die Tabelle unter dem Finger. Die Klasse setzt
+     updateSelectedCount() in pages/cleanup.js. */
+  .rows-actionbar strong{color:var(--ink-faint);font-weight:600;}
+  .rows-actionbar.has-selection strong{color:var(--ink);}
+
+  /* Spaltenbreiten der Werte-Tabelle. Bewusst hier statt inline am <col>:
+     unter 640px werden sie auf auto zurückgenommen, und Inline-Styles ließen
+     sich nur mit !important überschreiben. */
+  .rows-values-table{table-layout:fixed;}
+  .rows-values-table col:nth-child(1){width:13%;}
+  .rows-values-table col:nth-child(2){width:20%;}
+  .rows-values-table col:nth-child(3){width:21%;}
+  .rows-values-table col:nth-child(4){width:46%;}
   .entity-stats-table{table-layout:fixed;}
   .entity-stats-table th.num,.entity-stats-table td.num{text-align:right;}
   .entity-stats-table td{white-space:nowrap;}
@@ -35,14 +96,43 @@
      komplett (nur der "mode"-Wert im Formular unterscheidet, welche
      Zeilen-Aktion _rows_table.html rendert, siehe dortiger Kommentar),
      "Hinzufügen" ist ein eigenständiges, schlankes Formular ohne Tabelle. */
-  .edit-tabs{display:flex;gap:8px;margin:18px 0 4px;border-bottom:1px solid var(--border);}
+  /* Bereinigen/Korrigieren/Hinzufügen sind Modi INNERHALB von "Werte
+     bearbeiten" und stehen damit eine Ebene unter der Reiterzeile der
+     Entitätsseiten (.entity-tabs in app.css). Sie trugen bis dahin exakt
+     deren Optik — Unterstrich in --accent-line über einer durchgehenden
+     1px-Linie —, wodurch auf dieser Seite zwei gleich gewichtete
+     Reiterzeilen übereinander standen und die Ebenen nicht zu unterscheiden
+     waren.
+
+     Abgestuft über eine ANDERE Form, nicht nur über eine andere Größe: eine
+     weich getönte Pille (--accent-line-soft, kein Rahmen) statt Unterstrich,
+     dazu ein Schriftgrad kleiner. Die durchgehende Linie fällt weg — sie ist
+     das eigentliche Merkmal einer obersten Reiterzeile.
+
+     Warum gerade diese Form: auf derselben Seite sind drei Nachbarn schon
+     belegt — .entity-tabs (Unterstrich mit Linie), .seg der Zeitraumauswahl
+     (harte Segmentleiste, Monospace, Vollton bei aktiv) und .filter-chip der
+     Markierungsfilter (umrandete runde Pille, Vollton bei aktiv). Rahmenlos
+     mit weicher Tönung und 7px-Radius ist von allen dreien unterscheidbar
+     und folgt dem vorhandenen Muster von .dtile-choice-cell.is-selected. */
+  /* overflow-x wie bei .entity-tabs: die Pillen brauchen mehr Breite als die
+     frühere Unterstrich-Fassung (Innenabstand statt nur Schrift), und bei
+     375px füllten sie die Zeile aufs Pixel genau aus — eine Stufe größere
+     Schrift oder ein längeres Wort hätte die Seite seitwärts geschoben.
+     Zusammen mit dem knapperen Innenabstand (9px statt 11px) bleibt jetzt
+     wieder Luft, und im Notfall scrollt die Zeile in sich statt die Seite. */
+  /* 12px statt 4px nach unten: seit die Zeile Pillen statt Unterstriche
+     trägt, hat sie keine Grundlinie mehr, die sie optisch vom Folgenden
+     abgrenzt — bei 4px klebte die Zeitraumleiste direkt darunter. */
+  .edit-tabs{display:flex;gap:4px;margin:18px 0 12px;overflow-x:auto;scrollbar-width:none;}
+  .edit-tabs::-webkit-scrollbar{display:none;}
   .edit-tabs button{
-    font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
-    background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;margin-bottom:-1px;
-    cursor:pointer;
+    flex:none;
+    font-family:var(--font-display);font-size:calc(12.5px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);
+    background:none;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;
   }
-  .edit-tabs button.active{color:var(--accent-line);border-bottom-color:var(--accent-line);}
-  .edit-tabs button:hover:not(.active){color:var(--ink);}
+  .edit-tabs button.active{background:var(--accent-line-soft);color:var(--accent-line);font-weight:600;}
+  .edit-tabs button:hover:not(.active){background:var(--surface-alt);color:var(--ink);}
 
   .add-value-card{max-width:480px;margin-top:16px;}
   .add-value-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;}
@@ -126,6 +216,14 @@
   .seg button:last-child{border-right:none;}
   .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
   .nav{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  /* Unter 480px steht .nav ("‹ Heute ›") allein in seiner Zeile (.toolbar
+     ist hier ohnehin schon senkrecht gestapelt, siehe #controls oben) —
+     zentriert statt linksbündig, weil sie rein informativ ist (kein Ziel
+     wie links/rechts). Dieselbe Begründung wie beim analogen Fix in
+     entity_detail.css. */
+  @media (max-width:480px){
+    .nav{width:100%;justify-content:center;}
+  }
   .period-label{
     min-width:130px;text-align:center;white-space:nowrap;
     font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;border-radius:6px;
@@ -202,3 +300,53 @@
     box-shadow:0 2px 8px rgba(0,0,0,.25);
   }
   .js-tooltip.open{display:block;}
+
+  /* Mobile Werte-Tabelle. BEWUSST am Dateiende, hinter den .rows-values-table-
+     Grundregeln weiter oben: ein Media Query hebt die Spezifität nicht an, bei
+     Gleichstand gewinnt die spätere Regel. Stünde der Block vor ihnen, bliebe
+     table-layout:fixed stehen und die Prozentbreiten mit ihm (dieselbe Falle
+     wie beim Sticky-Header in table_editor.html, .hk-col-typ und der
+     Perioden-Navigation im Energiedashboard).
+
+     table-layout:auto statt der Prozentspalten, weil Prozente auf 343 px
+     Platz keine brauchbaren Spalten mehr ergeben: 20 % sind 69 px für einen
+     Zeitstempel, der 125 px braucht. Mit auto messen die Spalten ihren
+     Inhalt aus (gemessen 49/125/60/127 = 359 px), die Tabelle scrollt also
+     16 px in ihrer .tbl-wrap statt umzubrechen. */
+  @media (max-width:640px){
+    .rows-values-table{table-layout:auto;width:100%;}
+    .rows-values-table col{width:auto;}
+    /* Zeitstempel und Wert dürfen nicht umbrechen. Sie sind zwar der Grund für
+       die 359 px, aber die Alternative ist keine schmalere Tabelle, sondern
+       eine doppelt so hohe Zeile: der Zeitstempel bricht zwischen Datum und
+       Uhrzeit, und der Wert trennt sich von seiner Einheit ("9,19" über
+       "°C") — die .value-unit ist ein eigenes <span> und damit eine eigene
+       Umbruchgelegenheit. Die Status-Spalte darf weiter umbrechen: dort
+       stehen mehrere eigenständige Badges nebeneinander. */
+    .rows-values-table td:nth-child(2),
+    .rows-values-table td:nth-child(3){white-space:nowrap;}
+    /* Markierungsspalte auf das Nötigste: ihr Inhalt ist 16px breit
+       (Auswahlkästchen) bzw. 18px (der ✎-Knopf im Korrigieren-Modus), die
+       Zellenpolsterung von 2×14px machte daraus 48px. Mit 8px/6px sind es 34px
+       — 14px weniger Seitwärtsscroll, ohne dass die Trefffläche kleiner wird:
+       die bestimmt die feste Zeilenhöhe von 30px, nicht die Spaltenbreite.
+
+       table.dt.compact muss im Selektor stehen: die Polsterung kommt aus
+       `table.dt.compact td` in app.css (0-2-2) und schlüge eine Regel aus nur
+       Klasse + :first-child (0-2-1) — dieselbe Falle wie td.label gegen
+       table.dt td in den Housekeeping-Tabellen. */
+    table.dt.compact.rows-values-table th:first-child,
+    table.dt.compact.rows-values-table td:first-child{padding-left:8px;padding-right:6px;}
+  }
+
+  /* Der Pager dieser Seite steht auf dem Telefon linksbündig — anders als der
+     app-weite Standard, der ihn dort rechts ausrichtet
+     (.pager{justify-content:flex-end!important} in app.css). Dessen Begründung
+     ist die Kartenform: in einer Karten-Liste stehen die Werte an der rechten
+     Kante, und der Pager schließt daran an. Diese Seite hat seit
+     data-cards="off" keine Karten mehr, sondern eine linksbündige Tabelle —
+     die Seitengröße stand damit als einziges Element rechts unter einer Liste,
+     die links beginnt. !important, weil die app-weite Regel eines trägt. */
+  @media (max-width:640px){
+    #rows-table .pager{justify-content:flex-start!important;}
+  }

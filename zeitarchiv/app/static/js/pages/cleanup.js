@@ -126,7 +126,16 @@
     // zugreift.
     function setRange(key) {
       const field = document.getElementById('range-field');
-      if (key === field.value) return;
+      // Zweitfunktion der schon aktiven Stufe: zurück auf die laufende
+      // Periode — dieselbe Geste wie im übergeordneten Verlauf (setRange() in
+      // entity_detail.js) und im Energiedashboard. Sie ersetzt den früheren
+      // "Jetzt"-Knopf, der dauerhaft Platz in der Leiste belegte und die
+      // meiste Zeit deaktiviert war. Steht die Ansicht schon auf "jetzt",
+      // passiert wie bisher nichts.
+      if (key === field.value) {
+        if (parseInt(document.getElementById('offset-field').value || '0', 10) !== 0) setOffset(0);
+        return;
+      }
       resetPage();
       const pageData = Alpine.$data(document.querySelector('.page'));
       // Dieselbe stabile Zoom-Logik wie im übergeordneten Verlauf: Als Anker
@@ -207,6 +216,11 @@
       const el = document.getElementById('selected-count');
       if (el) el.textContent = count;
       document.querySelectorAll('.needs-selection').forEach(btn => btn.disabled = count === 0);
+      // Der Zählstand steht ohne Auswahl blass da (siehe .rows-actionbar in
+      // pages/cleanup.css) — die Leiste bleibt, damit die Tabelle darunter
+      // beim ersten Kreuz nicht wegrutscht, soll aber auch nicht so aussehen,
+      // als läge dort etwas an.
+      document.querySelectorAll('.rows-actionbar').forEach(bar => bar.classList.toggle('has-selection', count > 0));
     }
     // Header-Checkbox markiert/entmarkiert alle Zeilen der aktuell angezeigten
     // Seite (serverseitiges Paging hier, Abschnitt 04/10 — im DOM stehen ohnehin
