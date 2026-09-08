@@ -33,7 +33,7 @@ from .paths import entity_dir
 FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde"}
 
 
-@dataclass
+@dataclass(frozen=True)
 class FineRow:
     bucket_start: float  # Unix-Timestamp (UTC) des Bucket-Anfangs
     value: float | None = None  # Zähler/Standard: Summe bzw. Mittelwert

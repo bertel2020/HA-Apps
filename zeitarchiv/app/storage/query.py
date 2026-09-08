@@ -50,6 +50,14 @@ BAR_RESOLUTION = {
     "decade": "jahr",
 }
 
+# Rollup-Stufen, die ein Request vollständig im Speicher halten darf (siehe
+# QueryReadCache.read_rollup_rows). Eine Monatsstufe hat zwölf Zeilen je Jahr,
+# eine Jahresstufe eine — auch ein Jahrzehnt Historie bleibt winzig. Die feinen
+# Stufen sind bewusst NICHT dabei: gemessen wiegen monat+jahr über 86 Entitäten
+# zusammen 627 KiB, eine einzelne stunde.parquet dagegen 5,7 MiB. Dort ist der
+# gefilterte Read mit Row-Group-Pushdown die richtige Antwort, nicht ein Cache.
+CACHEABLE_ROLLUP_LEVELS = ("monat", "jahr")
+
 
 class QueryReadCache:
     """Request-lokaler Cache für unveränderliche Lese-Snapshots.
@@ -62,6 +70,12 @@ class QueryReadCache:
 
     def __init__(self) -> None:
         self._hot_rows: dict[Path, list[tuple[float, float]]] = {}
+        # Schlüssel (entity_id, level) statt Pfad: rollup_path() geht über
+        # entity_dir(), und das ruft für jeden Pfad Path.resolve() auf
+        # (Symlink-Schutz) — ein realpath-Syscall. Bei einer Vergleichstabelle
+        # war genau das der größte Restposten, nachdem die wiederholten
+        # Dateizugriffe weg waren; ein Pfad-Schlüssel hätte ihn stehenlassen.
+        self._rollup_rows: dict[tuple[str, str], list[rollup.FineRow]] = {}
         # Ablage für beliebige weitere request-lokale Zwischenergebnisse
         # AUFRUFENDER Module — der Hot-Row-Cache oben spart nur das erneute
         # Parsen einer Datei, nicht die darauf aufbauende Aggregation. Wer
@@ -78,6 +92,25 @@ class QueryReadCache:
         if path not in self._hot_rows:
             self._hot_rows[path] = read_rows(path)
         return self._hot_rows[path]
+
+    def read_rollup_rows(self, data_dir: Path, entity_id: str, level: str) -> list[rollup.FineRow]:
+        """Liefert eine grobe Rollup-Stufe VOLLSTÄNDIG und liest sie je Request
+        höchstens einmal.
+
+        Ohne das öffnet eine Dekaden-Ansicht dieselbe jahr.parquet bis zu elfmal
+        (einmal je Kalenderjahr, siehe _query_year_level) — und eine
+        Vergleichstabelle wiederholt das für jede Entität in jeder Spalte.
+        Vollständig statt gefiltert, weil sich der Nutzen erst über mehrere
+        Fenster einstellt: Jede Spalte fragt einen anderen Zeitraum ab, ein nach
+        Fenstergrenzen geschlüsselter Cache träfe deshalb nie.
+        """
+        key = (entity_id, level)
+        if key not in self._rollup_rows:
+            path = rollup.rollup_path(data_dir, entity_id, level)
+            self._rollup_rows[key] = (
+                _rollup_rows_from_table(pq.read_table(path)) if path.exists() else []
+            )
+        return self._rollup_rows[key]
 
 
 def _hot_rows(path: Path, read_cache: QueryReadCache | None) -> list[tuple[float, float]]:
@@ -397,20 +430,14 @@ def _query_live_fine(
     return fine
 
 
-def _read_rollup_rows(
-    data_dir: Path, entity_id: str, level: str, start_ts: float, end_ts: float
-) -> list[rollup.FineRow]:
-    path = rollup.rollup_path(data_dir, entity_id, level)
-    if not path.exists():
-        return []
-    table = pq.read_table(
-        path,
-        filters=[("bucket_start", ">=", start_ts), ("bucket_start", "<", end_ts)],
-    )
-    # to_pylist() statt .column(col)[i].as_py() pro Zelle (siehe
-    # PERFORMANCE.md, ZP-007) — eine vektorisierte Konvertierung je Spalte
-    # statt table.num_rows einzelner Zugriffe je Spalte, analog zum
-    # bestehenden Muster in rollup.append_completed_month().
+def _rollup_rows_from_table(table) -> list[rollup.FineRow]:
+    """Baut FineRow-Zeilen aus einer gelesenen Rollup-Tabelle.
+
+    to_pylist() statt .column(col)[i].as_py() pro Zelle (siehe PERFORMANCE.md,
+    ZP-007) — eine vektorisierte Konvertierung je Spalte statt table.num_rows
+    einzelner Zugriffe je Spalte, analog zum bestehenden Muster in
+    rollup.append_completed_month().
+    """
     columns = table.column_names
     present = [col for col in ("value", "min_value", "max_value", "on_seconds") if col in columns]
     bucket_starts = table.column("bucket_start").to_pylist()
@@ -422,6 +449,32 @@ def _read_rollup_rows(
             kwargs[col] = values_by_col[col][i]
         rows.append(rollup.FineRow(**kwargs))
     return rows
+
+
+def _read_rollup_rows(
+    data_dir: Path, entity_id: str, level: str, start_ts: float, end_ts: float,
+    read_cache: QueryReadCache | None = None,
+) -> list[rollup.FineRow]:
+    """Liest einen Zeitausschnitt einer Rollup-Stufe.
+
+    Die Stufenprüfung steht hier und nicht bei den Aufrufern: Ein Cache über
+    eine feine Stufe wäre ein Speicherproblem (siehe CACHEABLE_ROLLUP_LEVELS),
+    und eine solche Entscheidung soll nicht an jeder Aufrufstelle erneut
+    richtig getroffen werden müssen.
+    """
+    if read_cache is not None and level in CACHEABLE_ROLLUP_LEVELS:
+        return [
+            row for row in read_cache.read_rollup_rows(data_dir, entity_id, level)
+            if start_ts <= row.bucket_start < end_ts
+        ]
+    path = rollup.rollup_path(data_dir, entity_id, level)
+    if not path.exists():
+        return []
+    table = pq.read_table(
+        path,
+        filters=[("bucket_start", ">=", start_ts), ("bucket_start", "<", end_ts)],
+    )
+    return _rollup_rows_from_table(table)
 
 
 def _aggregate_rollup_rows(
@@ -652,7 +705,8 @@ def _query_year_level(
     )
     if resolution == "monat":
         completed = _read_rollup_rows(
-            data_dir, entity_id, "monat", window_start.timestamp(), completed_month_end.timestamp()
+            data_dir, entity_id, "monat", window_start.timestamp(), completed_month_end.timestamp(),
+            read_cache,
         )
         if live_row is not None:
             completed.append(live_row)
@@ -670,13 +724,16 @@ def _query_year_level(
 
         row = None
         if aggregation_type == "counter" and clip_start == year_start and clip_end == year_end:
-            jahr_rows = _read_rollup_rows(data_dir, entity_id, "jahr", year_start.timestamp(), year_end.timestamp())
+            jahr_rows = _read_rollup_rows(
+                data_dir, entity_id, "jahr", year_start.timestamp(), year_end.timestamp(), read_cache
+            )
             if jahr_rows:
                 row = jahr_rows[0]
 
         if row is None:
             monat_rows = _read_rollup_rows(
-                data_dir, entity_id, "monat", clip_start.timestamp(), min(clip_end, completed_month_end).timestamp()
+                data_dir, entity_id, "monat", clip_start.timestamp(),
+                min(clip_end, completed_month_end).timestamp(), read_cache,
             )
             year_rows = list(monat_rows)
             if live_row is not None and clip_start.timestamp() <= live_row.bucket_start < clip_end.timestamp():

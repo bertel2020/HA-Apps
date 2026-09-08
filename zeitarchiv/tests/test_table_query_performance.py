@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -9,7 +10,11 @@ from zoneinfo import ZoneInfo
 
 
 
-from app.storage import hotbuffer, query
+import pytest
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from app.storage import hotbuffer, query, rollup
 from app.api_routes import (
     ApiDependencies,
     ApiState,
@@ -178,3 +183,174 @@ def test_fixed_tooltip_script_loaded_wherever_data_tooltip_fixed_is_used() -> No
 
 def test_dashboard_only_computes_visible_table_slice() -> None:
     assert "computeValues(base, visibleCols, visibleRows)" in DASHBOARD
+
+
+# --- Rollup-Cache für grobe Stufen (PERFORMANCE.md, ZP-008) -----------------
+
+DEKADE_SPALTEN = (
+    {"offset": 0},
+    {"offset": -1},
+    {"offset": 0, "year_over_year": True},
+    # "Rollierend" ist hier keine Zugabe, sondern der einzige Fall, der die
+    # Beschneidung angeschnittener Jahre auslöst (clip_start > year_start in
+    # _query_year_level). Ohne ihn liefe der Test nur über volle Kalenderjahre
+    # und übersähe genau die Zeilen, die der Cache spaltenübergreifend teilt.
+    {"offset": 0, "continuous": True},
+)
+
+
+def _zaehler_mit_jahren(tmp_path: Path, entity_id: str, von: int, bis: int) -> Index:
+    """Legt eine Zähler-Entität mit Monats- und Jahres-Rollups an, im
+    Legacy-Format (je Stufe genau eine Datei) — so sieht eine Installation aus,
+    die seit dem Update noch keinen Monat rotiert hat."""
+    index = Index(tmp_path / "index.sqlite")
+    index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+    monate, jahre = [], []
+    for jahr in range(von, bis + 1):
+        for monat in range(1, 13):
+            monate.append((datetime(jahr, monat, 1, tzinfo=TZ).timestamp(), float(jahr * 12 + monat)))
+        jahre.append((datetime(jahr, 1, 1, tzinfo=TZ).timestamp(), float(jahr)))
+    ziel = rollup.rollup_dir(tmp_path, entity_id)
+    ziel.mkdir(parents=True, exist_ok=True)
+    for stufe, zeilen in (("monat", monate), ("jahr", jahre)):
+        pq.write_table(
+            pa.table({"bucket_start": [t for t, _ in zeilen], "value": [v for _, v in zeilen]}),
+            ziel / f"{stufe}.parquet",
+        )
+    return index
+
+
+def _serien(tmp_path: Path, index: Index, entity_id: str, bereich: str, *, mit_cache: bool) -> list:
+    cache = query.QueryReadCache() if mit_cache else None
+    now = datetime(2026, 9, 8, 12, tzinfo=TZ)
+    return [
+        query.query_series(tmp_path, index, entity_id, bereich, TZ, now, read_cache=cache, **spalte)["points"]
+        for spalte in DEKADE_SPALTEN
+    ]
+
+
+def test_the_decade_view_opens_each_coarse_rollup_level_only_once(monkeypatch, tmp_path: Path) -> None:
+    """Vor ZP-008 las _query_year_level() jahr.parquet einmal je Kalenderjahr —
+    bei drei Spalten also bis zu 33-mal dieselbe Datei. Der Request-Cache macht
+    daraus einen Zugriff je (Entität, Stufe)."""
+    entity_id = "sensor.zaehler"
+    index = _zaehler_mit_jahren(tmp_path, entity_id, 2014, 2025)
+
+    gelesen: list[str] = []
+    original = pq.read_table
+
+    def aufzeichnend(path, *args, **kwargs):
+        gelesen.append(Path(path).name)
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(query.pq, "read_table", aufzeichnend)
+    _serien(tmp_path, index, entity_id, "decade", mit_cache=True)
+    index.close()
+
+    grob = Counter(name for name in gelesen if name in ("monat.parquet", "jahr.parquet"))
+    assert grob["jahr.parquet"] == 1, grob
+    assert grob["monat.parquet"] <= 1, grob
+
+
+def test_the_cache_never_changes_what_a_decade_query_returns(tmp_path: Path) -> None:
+    """Der Cache ist eine reine Beschleunigung: Er liest vollständig statt
+    gefiltert und filtert danach in Python — heraus kommen dieselben Punkte."""
+    entity_id = "sensor.zaehler"
+    index = _zaehler_mit_jahren(tmp_path, entity_id, 2014, 2025)
+    for bereich in ("year", "decade"):
+        ohne = _serien(tmp_path, index, entity_id, bereich, mit_cache=False)
+        mit = _serien(tmp_path, index, entity_id, bereich, mit_cache=True)
+        assert mit == ohne, bereich
+    index.close()
+
+
+def test_the_cache_also_holds_for_segmented_rollups(tmp_path: Path) -> None:
+    """Bestehende Installationen, die seit dem Update einen Monat rotiert
+    haben, haben Dataset-VERZEICHNISSE statt Einzeldateien (rollup._segment_dir).
+    Beide Formate müssen dasselbe liefern — sonst hinge das Ergebnis davon ab,
+    wann jemand aktualisiert hat."""
+    entity_id = "sensor.temp"
+    index = Index(tmp_path / "index.sqlite")
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    for jahr in (2024, 2025):
+        for monat in (6, 7):
+            start = datetime(jahr, monat, 1, tzinfo=TZ)
+            ts = [(start.timestamp() + i * 3600) for i in range(24 * 20)]
+            rollup.append_completed_month(
+                tmp_path, entity_id, "standard",
+                pa.table({"ts": ts, "value": [float(i % 17) for i in range(len(ts))]}),
+                jahr, monat, TZ,
+            )
+    assert rollup.rollup_path(tmp_path, entity_id, "monat").is_dir()
+
+    ohne = _serien(tmp_path, index, entity_id, "decade", mit_cache=False)
+    mit = _serien(tmp_path, index, entity_id, "decade", mit_cache=True)
+    assert mit == ohne
+    index.close()
+
+
+def test_the_fine_rollup_levels_stay_out_of_the_cache(monkeypatch, tmp_path: Path) -> None:
+    """Die Begrenzung auf monat/jahr ist kein Detail, sondern der Grund, warum
+    der Cache harmlos ist: monat+jahr wiegen über 86 Entitäten zusammen rund
+    627 KiB, eine einzelne stunde.parquet dagegen 5,7 MiB. Eine spätere
+    Erweiterung auf die feinen Stufen soll hier auflaufen."""
+    assert query.CACHEABLE_ROLLUP_LEVELS == ("monat", "jahr")
+
+    entity_id = "sensor.temp"
+    index = Index(tmp_path / "index.sqlite")
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    ziel = rollup.rollup_dir(tmp_path, entity_id)
+    ziel.mkdir(parents=True, exist_ok=True)
+    start = datetime(2026, 7, 1, tzinfo=TZ).timestamp()
+    pq.write_table(
+        pa.table({"bucket_start": [start + i * 3600 for i in range(200)],
+                  "value": [float(i) for i in range(200)]}),
+        ziel / "stunde.parquet",
+    )
+
+    cache = query.QueryReadCache()
+    zuerst = query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 200 * 3600, cache)
+    assert zuerst
+
+    gelesen: list[str] = []
+    original = pq.read_table
+
+    def aufzeichnend(path, *args, **kwargs):
+        gelesen.append(Path(path).name)
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(query.pq, "read_table", aufzeichnend)
+    query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 200 * 3600, cache)
+    index.close()
+    assert gelesen == ["stunde.parquet"], "feine Stufe darf nicht aus dem Cache kommen"
+
+
+def test_rollup_rows_cannot_be_mutated_at_all(tmp_path: Path) -> None:
+    """Der Cache reicht DIESELBEN Zeilen-Objekte an mehrere Spalten weiter.
+    Würde eine Spalte eine Zeile verändern, sähe die nächste die Änderung —
+    ein Fehler, der von der Spaltenreihenfolge abhinge und deshalb kaum
+    reproduzierbar wäre. rollup.FineRow ist darum frozen: Der Versuch scheitert
+    laut, statt still falsche Zahlen zu erzeugen. Ein Test, der stattdessen nur
+    zwei Durchläufe vergleicht, fängt genau die kumulativen Fälle und lässt die
+    übrigen durch — gemessen, nicht vermutet."""
+    zeile = rollup.FineRow(bucket_start=1.0, value=2.0)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        zeile.value = 99.0
+
+
+def test_cached_rollup_rows_survive_a_second_pass_unchanged(tmp_path: Path) -> None:
+    """Zweite Sicherung neben der Unveränderlichkeit oben: Derselbe Cache,
+    zweimal dieselben Spalten — das Ergebnis darf sich nicht verschieben."""
+    entity_id = "sensor.zaehler"
+    index = _zaehler_mit_jahren(tmp_path, entity_id, 2014, 2025)
+    cache = query.QueryReadCache()
+    now = datetime(2026, 9, 8, 12, tzinfo=TZ)
+
+    def durchlauf():
+        return [
+            query.query_series(tmp_path, index, entity_id, "decade", TZ, now, read_cache=cache, **spalte)["points"]
+            for spalte in DEKADE_SPALTEN
+        ]
+
+    assert durchlauf() == durchlauf()
+    index.close()
