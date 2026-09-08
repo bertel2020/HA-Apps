@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.87.0 - 2026-09-08
+
+### Neu
+
+- **Einzelne Serien eines Charts lassen sich aus- und wieder einblenden.** Das
+  Auge in der Liste „Angezeigte Namen & Reihenfolge" nimmt eine Serie aus
+  Chart, Legende und Statistik, ohne die Entität abzuwählen; die übrigen
+  behalten dabei ihre Farben. Der Zustand wird mit dem Chart gespeichert und
+  gilt auch für angeheftete Dashboard-Kacheln.
+
+### Geändert
+
+- **Die Serienliste im Chart-Editor ist aufgebaut wie die Zeilenliste im
+  Tabellen-Editor** — je Eintrag eine Karte, mit einem Farbpunkt in der Farbe,
+  in der die Serie im Chart gezeichnet wird.
+- **Die Entitätsspalte im Housekeeping ist wieder lesbar.** Bei Duplikaten,
+  Ausreißern und Konfiguration liefen Name und Entity-ID in einer Zeile
+  ineinander; jetzt steht der Name über der ID wie in allen übrigen
+  Entitätstabellen. Die Spaltenbreiten passen zum Inhalt und lassen sich wie
+  anderswo ziehen. Bei den ungenutzten Elementen öffnet der Name selbst, der
+  „Öffnen"-Knopf entfällt.
+- **Unter Tabellen steht die Seitengröße links und das Blättern rechts**, die
+  Zeile ist eine Spur kleiner gesetzt, und die Seitenzahl lässt sich jetzt
+  überall direkt eingeben statt sich durchzuklicken.
+- **Dekaden- und Jahresspalten in Vergleichstabellen sowie das Chart einer
+  Entität laden deutlich schneller** — beide lasen dieselben Daten mehrfach,
+  einmal je Spalte bzw. je Vergleichszeitraum.
+
 ## 0.86.0 - 2026-09-07
 
 ### Geändert
