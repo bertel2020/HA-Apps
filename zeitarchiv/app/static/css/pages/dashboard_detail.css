@@ -32,14 +32,20 @@
   /* Werte-Kachel (item_type='entity') — reiner aktueller Wert statt Chart/
      Tabelle, siehe _dashboard_tiles_context() in main.py. */
   /* Dreiteiliges Layout über die volle Kachelhöhe: Titel bleibt oben (eigene
-     Zeile, linksbündig, .stat .label-Optik), Sparkline bleibt unten (eigene
+     Zeile, linksbündig), Sparkline bleibt unten (eigene
      Zeile, volle Breite), der Wert (mit Einheit/Alter) füllt den Rest der
      Höhe (flex:1) und wird darin auf beiden Achsen zentriert. Titel/Sparkline
      bekommen dadurch flex:none, damit nur die Wert-Zeile wächst/schrumpft. */
   .dtile-entity-body{display:flex;flex-direction:column;gap:4px;}
+  /* Nur Layout, keine eigene Schrift: der Titel sieht aus wie auf jeder
+     anderen Kachel (13,5px, --ink, 600 aus .dtile-title). Er war bis 0.88.1
+     kleiner und grau nach dem Vorbild von .stat .label — im Kachelraster
+     standen dadurch aber zwei Sorten Kacheltitel nebeneinander, und die
+     Werte-Kacheln lasen sich wie eine schwächere Sorte statt wie
+     gleichrangige. margin-bottom:0, weil .dtile-entity-body seinen Abstand
+     über gap setzt. */
   .dtile-entity-body .dtile-title{
     flex:none;text-align:left;margin-bottom:0;padding-top:4px;
-    font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:500;
   }
   .dtile-entity-value{
     flex:1;min-height:0;display:flex;align-content:center;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;
