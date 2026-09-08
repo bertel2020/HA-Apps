@@ -15,12 +15,54 @@
      derselben Höhe wie das (jetzt größere) Logo sitzt, nicht darunter. #}
 {% block topnav %}{% endblock %}
 {% block content %}
-{% macro kpi_delta(compare) %}
+{# invert: true für Kennzahlen, bei denen weniger besser ist (Netzbezug,
+   Verbrauch) — die Pfeilrichtung folgt weiterhin dem reinen Vorzeichen,
+   nur die Farbe (up=grün/down=rot) richtet sich nach Günstigkeit. #}
+{% macro kpi_delta(compare, invert=false) %}
   {%- if compare and compare.pct is not none -%}
-    <div class="kpi-delta {{ 'up' if compare.pct >= 0 else 'down' }}">{{ '▲' if compare.pct >= 0 else '▼' }} {{ compare.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
+    {%- set favorable = (compare.pct >= 0) != invert -%}
+    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ '▲' if compare.pct >= 0 else '▼' }} {{ compare.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
   {%- elif compare and compare.abs is not none -%}
-    <div class="kpi-delta {{ 'up' if compare.abs >= 0 else 'down' }}">{{ '▲' if compare.abs >= 0 else '▼' }} {{ compare.abs | abs | format_value(1) }} kWh ggü. {{ compare_label }}</div>
+    {%- set favorable = (compare.abs >= 0) != invert -%}
+    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ '▲' if compare.abs >= 0 else '▼' }} {{ compare.abs | abs | format_value(1) }} kWh ggü. {{ compare_label }}</div>
   {%- endif -%}
+{% endmacro %}
+
+{# Ein Chart-Block für "Erzeugung & Verbrauch im Detail" — comp_a/comp_b sind
+   die zwei Bestandteile (z. B. Eigenverbrauch/Einspeisung), deren Summe je
+   Balken der tatsächlich gemessene Gesamtwert ist (siehe _bar_chart_geometry
+   in energiedashboard_routes.py: massiver Hintergrundbalken = Summe,
+   zwei transluzente Balken davor = Aufteilung). Zwei Perioden nebeneinander
+   je Gruppe (Vorperiode/aktuelle Periode), keine Überlappung — dieselbe
+   Vormonat/Vorjahr-Bezeichnung wie überall sonst im Bericht (compare_label),
+   keine eigene "Name der Vorperiode"-Berechnung nur für diesen Chart. #}
+{% macro detail_chart(title, chart, comp_a_color, comp_a_label, comp_b_color, comp_b_label) %}
+  <div class="detail-chart">
+    <div class="detail-chart-head">
+      <div class="detail-chart-title">{{ title }}</div>
+      <div class="detail-chart-legend">
+        <span class="legend-item"><span class="swatch" style="background:var({{ comp_a_color }});"></span>{{ comp_a_label }}</span>
+        <span class="legend-item"><span class="swatch" style="background:var({{ comp_b_color }});"></span>{{ comp_b_label }}</span>
+        <span class="legend-item"><span class="swatch swatch-line"></span>Ø {{ compare_label }}</span>
+        <span class="legend-item"><span class="swatch swatch-line current"></span>Ø {{ period_title }}</span>
+      </div>
+    </div>
+    <svg class="detail-bar-svg" viewBox="{{ chart.view_box }}" preserveAspectRatio="none">
+      {% for bar in chart.bars %}
+        <rect class="backing" x="{{ bar.previous.x }}" y="{{ bar.previous.backing_y }}" width="{{ bar.previous.w }}" height="{{ bar.previous.backing_h }}"/>
+        <rect style="fill:var({{ comp_a_color }});" opacity=".6" x="{{ bar.previous.x }}" y="{{ bar.previous.a_y }}" width="{{ bar.previous.w }}" height="{{ bar.previous.a_h }}"/>
+        <rect style="fill:var({{ comp_b_color }});" opacity=".6" x="{{ bar.previous.x }}" y="{{ bar.previous.b_y }}" width="{{ bar.previous.w }}" height="{{ bar.previous.b_h }}"/>
+        <rect class="backing current" x="{{ bar.current.x }}" y="{{ bar.current.backing_y }}" width="{{ bar.current.w }}" height="{{ bar.current.backing_h }}"/>
+        <rect style="fill:var({{ comp_a_color }});" opacity=".6" x="{{ bar.current.x }}" y="{{ bar.current.a_y }}" width="{{ bar.current.w }}" height="{{ bar.current.a_h }}"/>
+        <rect style="fill:var({{ comp_b_color }});" opacity=".6" x="{{ bar.current.x }}" y="{{ bar.current.b_y }}" width="{{ bar.current.w }}" height="{{ bar.current.b_h }}"/>
+      {% endfor %}
+      <line class="avg-line" x1="0" x2="{{ chart.width }}" y1="{{ chart.avg_y_previous }}" y2="{{ chart.avg_y_previous }}"/>
+      <line class="avg-line current" x1="0" x2="{{ chart.width }}" y1="{{ chart.avg_y_current }}" y2="{{ chart.avg_y_current }}"/>
+    </svg>
+    <div class="detail-bar-labels" style="grid-template-columns:repeat({{ chart.bars | length }}, 1fr);">
+      {% for bar in chart.bars %}<span>{{ bar.label }}</span>{% endfor %}
+    </div>
+  </div>
 {% endmacro %}
 
 <div class="toolbar">
@@ -70,34 +112,47 @@
     <div class="kpi-grid">
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-3);"></div>
-        <div class="kpi-label">Erzeugung</div>
+        <div class="kpi-head">
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
+          <div class="kpi-label">Erzeugung</div>
+        </div>
         <div class="kpi-value">{{ current.kpi.erzeugung | format_value(1) }} kWh</div>
         {{ kpi_delta(kpi_compare.erzeugung) }}
       </div>
       <div class="kpi">
-        <div class="kpi-accent" style="background:var(--chart-7);"></div>
-        <div class="kpi-label">Verbrauch</div>
-        <div class="kpi-value">{{ current.kpi.verbrauch | format_value(1) }} kWh</div>
-        {{ kpi_delta(kpi_compare.verbrauch) }}
+        <div class="kpi-accent" style="background:var(--chart-1);"></div>
+        <div class="kpi-head">
+          <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+          <div class="kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+        </div>
+        <div class="kpi-value">{{ current.kpi.netzbezug | format_value(1) }} kWh</div>
+        {{ kpi_delta(kpi_compare.netzbezug, invert=true) }}
       </div>
       <div class="kpi">
-        <div class="kpi-accent" style="background:var(--chart-1);"></div>
-        <div class="kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
-        <div class="kpi-value">{{ current.kpi.netzbezug | format_value(1) }} kWh</div>
-        {%- if kpi_compare.netzbezug and kpi_compare.netzbezug.pct is not none %}
-        <div class="kpi-delta {{ 'down' if kpi_compare.netzbezug.pct >= 0 else 'up' }}">{{ '▲' if kpi_compare.netzbezug.pct >= 0 else '▼' }} {{ kpi_compare.netzbezug.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
-        {%- endif %}
+        <div class="kpi-accent" style="background:var(--chart-7);"></div>
+        <div class="kpi-head">
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg>
+          <div class="kpi-label">Verbrauch</div>
+        </div>
+        <div class="kpi-value">{{ current.kpi.verbrauch | format_value(1) }} kWh</div>
+        {{ kpi_delta(kpi_compare.verbrauch, invert=true) }}
       </div>
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-2);"></div>
-        <div class="kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
+        <div class="kpi-head">
+          <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+          <div class="kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
+        </div>
         <div class="kpi-value">{{ current.kpi.einspeisung | format_value(1) }} kWh</div>
         {{ kpi_delta(kpi_compare.einspeisung) }}
       </div>
       {% if current.kpi.autarkie is not none %}
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-1);"></div>
-        <div class="kpi-label">Autarkie</div>
+        <div class="kpi-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--chart-1)" stroke-width="2.2"/><path d="M8 12l3 3 5-6" stroke="var(--chart-1)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="kpi-label">Autarkie</div>
+        </div>
         <div class="kpi-value">{{ current.kpi.autarkie | format_value(0) }} %</div>
         {%- if autarkie_delta_pkt is not none %}
         <div class="kpi-delta {{ 'up' if autarkie_delta_pkt >= 0 else 'down' }}">{{ '▲' if autarkie_delta_pkt >= 0 else '▼' }} {{ autarkie_delta_pkt | abs | format_value(1) }} Pkt. ggü. {{ compare_label }}</div>
@@ -107,7 +162,10 @@
       {% if current.kpi.eigenverbrauch is not none %}
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-3);"></div>
-        <div class="kpi-label">Eigenverbrauch</div>
+        <div class="kpi-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--chart-3)" opacity=".85"/></svg>
+          <div class="kpi-label">Eigenverbrauch</div>
+        </div>
         <div class="kpi-value">{{ current.kpi.eigenverbrauch | format_value(0) }} %</div>
         {%- if eigenverbrauch_delta_pkt is not none %}
         <div class="kpi-delta {{ 'up' if eigenverbrauch_delta_pkt >= 0 else 'down' }}">{{ '▲' if eigenverbrauch_delta_pkt >= 0 else '▼' }} {{ eigenverbrauch_delta_pkt | abs | format_value(1) }} Pkt. ggü. {{ compare_label }}</div>
@@ -116,6 +174,14 @@
       {% endif %}
     </div>
   </div>
+
+  {% if detail_charts %}
+  <div class="section">
+    <div class="section-title">Erzeugung &amp; Verbrauch im Detail</div>
+    {{ detail_chart("Stromertrag", detail_charts.stromertrag, "--chart-3", "Eigenverbrauch", "--chart-2", config.einspeisung_name or "Einspeisung") }}
+    {{ detail_chart("Verbrauch", detail_charts.verbrauch, "--chart-1", config.netzbezug_name or "Netzbezug", "--chart-3", "Eigenversorgung") }}
+  </div>
+  {% endif %}
 
   {% if current.kpi.speicher_laden is not none or current.kpi.speicher_entladen is not none or current.kpi.speicher_soc is not none %}
   <div class="section">
@@ -280,6 +346,55 @@
           <td>{{ row.verbrauch | format_value(0) }}</td>
           <td>{{ row.netzbezug | format_value(0) }}</td>
           <td>{{ (row.autarkie | format_value(0) ~ " %") if row.autarkie is not none else "–" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if staerkster_schwaechster %}
+  <div class="section">
+    <div class="section-title">Stärkster &amp; schwächster Tag</div>
+    <table class="report-table records-table">
+      <thead><tr><th>Kennzahl</th><th>Stärkster Tag</th><th>Schwächster Tag</th></tr></thead>
+      <tbody>
+        {% for row in staerkster_schwaechster %}
+        <tr>
+          <td>
+            <span class="records-label">
+              {%- if row.role == "erzeugung" -%}
+              <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
+              {%- elif row.role == "netzbezug" -%}
+              <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+              {%- elif row.role == "verbrauch" -%}
+              <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg>
+              {%- elif row.role == "einspeisung" -%}
+              <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+              {%- elif row.role == "autarkie" -%}
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--chart-1)" stroke-width="2.2"/><path d="M8 12l3 3 5-6" stroke="var(--chart-1)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {%- elif row.role == "eigenverbrauch" -%}
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--chart-3)" opacity=".85"/></svg>
+              {%- endif -%}
+              {{ row.label }}
+            </span>
+          </td>
+          <td>
+            {%- if row.best -%}
+            <div class="records-cell">
+              <span>{{ row.best.date_label }} · {{ row.best.value | format_value(row.decimals) }} {{ row.unit }}</span>
+              <span class="kpi-delta up">{{ '▲' if row.best.delta >= 0 else '▼' }} {{ row.best.delta | abs | format_value(1) }} {{ '%-Pkt.' if row.is_pkt else '%' }} ggü. Ø {{ row.avg | format_value(row.decimals) }} {{ row.unit }}</span>
+            </div>
+            {%- else -%}–{%- endif -%}
+          </td>
+          <td>
+            {%- if row.worst -%}
+            <div class="records-cell">
+              <span>{{ row.worst.date_label }} · {{ row.worst.value | format_value(row.decimals) }} {{ row.unit }}</span>
+              <span class="kpi-delta down">{{ '▲' if row.worst.delta >= 0 else '▼' }} {{ row.worst.delta | abs | format_value(1) }} {{ '%-Pkt.' if row.is_pkt else '%' }} ggü. Ø {{ row.avg | format_value(row.decimals) }} {{ row.unit }}</span>
+            </div>
+            {%- else -%}–{%- endif -%}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

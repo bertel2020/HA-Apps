@@ -18,6 +18,7 @@ siehe rollup.py) — kein eigener Subtraktions-/Aggregations-Code."""
 from __future__ import annotations
 
 import bisect
+import calendar
 import json
 import statistics
 from collections.abc import Callable
@@ -138,6 +139,27 @@ _COARSER_RANGE = {"hour": "day", "month": "year"}
 # Tageslastprofil-Heatmap: datetime.weekday() liefert 0=Montag.
 _WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 HEATMAP_DAYS = 7
+
+# Energiebericht, "Erzeugung & Verbrauch im Detail": feste abstrakte
+# Koordinaten für die serverseitig gerenderten SVG-Balken-Charts (dasselbe
+# Prinzip wie _sparkline_paths() in main.py — Geometrie komplett in Python,
+# das Template rendert nur fertige Zahlen). Die viewBox skaliert per CSS
+# (width:100%, preserveAspectRatio="none") responsiv, Python muss die
+# tatsächliche Renderbreite nie kennen.
+_CHART_VB_W = 600.0
+_CHART_VB_H = 200.0
+_CHART_BASELINE_Y = 170.0
+_CHART_TOP_PAD = 10.0
+# Kalendergruppen für den Monatsbericht — 5 statt 31 Balken (siehe
+# Mockup-Notizen): 4× 7 Tage + eine letzte Gruppe bis Monatsende
+# (2-3 Tage), damit auch Februar sauber aufgeht.
+_WEEK_GROUP_STARTS = (1, 8, 15, 22, 29)
+
+# "Stärkster & schwächster Tag": ein Tag mit Erzeugung UND Verbrauch unter
+# dieser Schwelle gilt als Sensor-/Datenausfall, nicht als echter Rekord
+# (siehe _is_outage_day) — 0.01 kWh statt exakt 0, um Rundungsrauschen aus
+# der Zähler-Deltabildung nicht als "hat doch Daten" fehlzudeuten.
+_OUTAGE_EPSILON_KWH = 0.01
 
 
 DEFAULT_HUB_NAME = "Haus"
@@ -601,6 +623,361 @@ class EnergieDashboardService:
             for ts, value in one_series.items():
                 merged[ts] = merged.get(ts, 0.0) + factor * value
         return merged
+
+    def _detail_bucket_series(
+        self, config: dict, range_key: str, offset: int, now: datetime,
+        read_cache: query_mod.QueryReadCache, continuous: bool = False,
+    ) -> dict[str, dict[float, float]]:
+        """Feinstufige Bucket-Serien (Tag bei 'month', Monat bei 'year') für
+        Erzeugung/Netzbezug/Einspeisung/Verbrauch/Eigenverbrauch/
+        Eigenversorgung EINER Periode — Grundlage für die Detail-Charts und
+        die Stärkster/schwächster-Tag-Tabelle im Energiebericht.
+
+        Eigene _entity_series()-Aufrufe statt Zugriff auf compute_flow()-
+        interne Variablen (die dort lokal bleiben und nicht zurückgegeben
+        werden) — kostet nichts extra: jeder Aufruf hier für eine
+        (entity_id, range_key, offset, continuous)-Kombination, die
+        compute_flow() im selben Request bereits für 'current' geladen hat,
+        trifft denselben read_cache-Memo (siehe _entity_series-Docstring).
+
+        Verbrauch wird NICHT über die Verbraucher-Gruppen aufgebaut (der
+        aufwendigste, fehleranfälligste Teil von compute_flow()), sondern
+        über dieselbe Bilanz-Identität wie in _monatsverlauf_for_year():
+        bus_in (Netzbezug+Erzeugung+Speicherentladung) minus Einspeisung
+        minus Speicherladung. Eigenverbrauch/Eigenversorgung sind dieselbe
+        physikalische Größe (selbst genutzter PV-Strom) von zwei Seiten
+        betrachtet, aber NICHT identisch, sobald ein Speicher mitspielt —
+        Eigenversorgung = Verbrauch-Netzbezug enthält zusätzlich die
+        Netto-Speicherentladung, Eigenverbrauch = Erzeugung-Einspeisung
+        nicht. Beide unabhängig auf 0 gekappt (Messungenauigkeiten können
+        sie sonst leicht negativ werden lassen), wie pv_eigenverbrauch_series
+        in compute_flow() es bereits für die eine Seite tut.
+
+        continuous muss für die Vorperiode (offset-1) DIESELBE Regel
+        befolgen wie compute_period_comparison() für die aktuelle Periode
+        (True nur bei offset==0, sonst False) — sonst widerspricht ein
+        Chart, der diese Funktion für die Vorperiode aufruft, der
+        "vs. Vormonat/Vorjahr"-Prozentzahl der KPI-Kachel auf derselben
+        Seite. Aufrufstellen reichen das explizit durch, statt es hier
+        selbst aus offset abzuleiten (siehe _report_detail_charts)."""
+        def series(entity_id: str | None) -> dict[float, float]:
+            if not entity_id:
+                return {}
+            return self._entity_series(entity_id, range_key, offset, now, read_cache, continuous=continuous)[0]
+
+        netzbezug_series = series(config.get("netzbezug"))
+        erzeuger_ids = [e.get("entity_id") for e in (config.get("erzeuger") or []) if e.get("entity_id")]
+        erzeugung_series = self._series_merge(*[series(eid) for eid in erzeuger_ids]) if erzeuger_ids else {}
+        einspeisung_series = series(config.get("einspeisung"))
+
+        speicher_list = config.get("speicher") or []
+        laden_ids = [sp.get("laden_entity_id") for sp in speicher_list if sp.get("laden_entity_id")]
+        entladen_ids = [sp.get("entladen_entity_id") for sp in speicher_list if sp.get("entladen_entity_id")]
+        speicher_laden_series = self._series_merge(*[series(eid) for eid in laden_ids]) if laden_ids else {}
+        speicher_entladen_series = self._series_merge(*[series(eid) for eid in entladen_ids]) if entladen_ids else {}
+
+        bus_in_series = self._series_merge(netzbezug_series, erzeugung_series, speicher_entladen_series)
+        verbrauch_series = self._series_merge(
+            bus_in_series, einspeisung_series, speicher_laden_series, factors=[1.0, -1.0, -1.0],
+        )
+        eigenverbrauch_series = {
+            ts: max(v, 0.0)
+            for ts, v in self._series_merge(erzeugung_series, einspeisung_series, factors=[1.0, -1.0]).items()
+        }
+        eigenversorgung_series = {
+            ts: max(v, 0.0)
+            for ts, v in self._series_merge(verbrauch_series, netzbezug_series, factors=[1.0, -1.0]).items()
+        }
+        return {
+            "erzeugung": erzeugung_series,
+            "netzbezug": netzbezug_series,
+            "einspeisung": einspeisung_series,
+            "verbrauch": verbrauch_series,
+            "eigenverbrauch": eigenverbrauch_series,
+            "eigenversorgung": eigenversorgung_series,
+        }
+
+    def _month_scope_groups(
+        self, series_by_role: dict[str, dict[float, float]], window_start: datetime, tz: ZoneInfo,
+    ) -> list[dict]:
+        """Fasst Tages-Buckets zu 5 Wochen-Gruppen zusammen (1.–7./8.–14./
+        15.–21./22.–28./29.–Monatsende). day_count trägt die tatsächliche
+        Kalenderlänge der Gruppe (nicht die Anzahl Tage MIT Daten) — nur so
+        bleibt die "typische 7-Tage-Woche"-Normalisierung der Ø-Linie
+        (siehe _report_detail_charts) unabhängig von Datenlücken."""
+        days_in_month = calendar.monthrange(window_start.year, window_start.month)[1]
+        groups: list[dict] = []
+        for start_day in _WEEK_GROUP_STARTS:
+            if start_day > days_in_month:
+                break
+            end_day = min(start_day + 6, days_in_month)
+            group: dict = {
+                "label": f"{start_day}.–{end_day}." if end_day > start_day else f"{start_day}.",
+                "day_count": end_day - start_day + 1,
+            }
+            for role, series in series_by_role.items():
+                total = 0.0
+                for ts, value in series.items():
+                    day = datetime.fromtimestamp(ts, tz).day
+                    if start_day <= day <= end_day:
+                        total += value
+                group[role] = total
+            groups.append(group)
+        return groups
+
+    @staticmethod
+    def _year_scope_groups(series_by_role: dict[str, dict[float, float]], tz: ZoneInfo) -> list[dict]:
+        """Die Monats-Buckets aus _detail_bucket_series() sind bei range='year'
+        bereits in der richtigen Granularität — hier nur noch nach Monat
+        sortiert und mit Label versehen, keine echte Umgruppierung."""
+        all_ts = sorted({ts for series in series_by_role.values() for ts in series})
+        groups: list[dict] = []
+        for ts in all_ts:
+            local = datetime.fromtimestamp(ts, tz)
+            group: dict = {
+                "label": _MONTH_NAMES_DE[local.month - 1][:3],
+                "day_count": calendar.monthrange(local.year, local.month)[1],
+            }
+            for role, series in series_by_role.items():
+                group[role] = series.get(ts, 0.0)
+            groups.append(group)
+        return groups
+
+    @staticmethod
+    def _bar_chart_geometry(
+        current_groups: list[dict], previous_groups: list[dict],
+        comp_a: str, comp_b: str, current_avg: float, previous_avg: float,
+    ) -> dict:
+        """Fertige SVG-Balken-Geometrie in der festen _CHART_VB_W×_CHART_VB_H-
+        viewBox: ein massiver Hintergrundbalken je Periode zeigt die echte
+        Gesamtsumme (comp_a+comp_b), zwei transluzente Balken davor zerlegen
+        sie in ihre Bestandteile; je Periode eine gestrichelte Ø-Linie.
+        current_avg/previous_avg werden vom Aufrufer übergeben statt hier
+        berechnet — die Normalisierung unterscheidet sich je Zeitraum
+        (Monat: hochgerechnet auf eine typische 7-Tage-Woche wegen der
+        kürzeren letzten Gruppe; Jahr: einfacher Schnitt über die
+        vorhandenen Monate), das ist reine Aufrufer-Logik, keine Geometrie."""
+        usable_h = _CHART_BASELINE_Y - _CHART_TOP_PAD
+        all_totals = [g[comp_a] + g[comp_b] for g in current_groups + previous_groups]
+        max_total = max(all_totals) if all_totals else 0.0
+        n = len(current_groups)
+        group_w = _CHART_VB_W / n if n else _CHART_VB_W
+        bar_w = group_w * 0.32
+        inner_gap = group_w * 0.06
+        outer_pad = (group_w - 2 * bar_w - inner_gap) / 2
+
+        def scaled(v: float) -> float:
+            return (v / max_total * usable_h) if max_total > 0 else 0.0
+
+        def bar(x: float, group: dict) -> dict:
+            # comp_b STAPELT sich auf comp_a (von der Grundlinie aus), nicht
+            # beide unabhängig von der Grundlinie aus — sonst überdeckt der
+            # jeweils größere Anteil den kleineren komplett (beide starten
+            # bei derselben y-Koordinate), statt eine erkennbare Aufteilung
+            # zu zeigen. b_y schließt exakt an backing_y an (a_h+b_h==total_h).
+            total_h = scaled(group[comp_a] + group[comp_b])
+            a_h = scaled(group[comp_a])
+            b_h = scaled(group[comp_b])
+            a_y = _CHART_BASELINE_Y - a_h
+            b_y = a_y - b_h
+            return {
+                "x": round(x, 1), "w": round(bar_w, 1),
+                "backing_y": round(_CHART_BASELINE_Y - total_h, 1), "backing_h": round(total_h, 1),
+                "a_y": round(a_y, 1), "a_h": round(a_h, 1),
+                "b_y": round(b_y, 1), "b_h": round(b_h, 1),
+            }
+
+        bars = []
+        for i, (cur, prev) in enumerate(zip(current_groups, previous_groups)):
+            gx = i * group_w + outer_pad
+            bars.append({
+                "label": cur["label"],
+                "previous": bar(gx, prev),
+                "current": bar(gx + bar_w + inner_gap, cur),
+            })
+        return {
+            "bars": bars,
+            "avg_y_current": round(_CHART_BASELINE_Y - scaled(current_avg), 1),
+            "avg_y_previous": round(_CHART_BASELINE_Y - scaled(previous_avg), 1),
+            "baseline_y": _CHART_BASELINE_Y,
+            "view_box": f"0 0 {_CHART_VB_W:g} {_CHART_VB_H:g}",
+            "width": _CHART_VB_W,
+        }
+
+    def _report_detail_charts(
+        self, config: dict, range_key: str, offset: int, now: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> dict | None:
+        """Fertige Chart-Geometrie für die zwei Balken-Charts in "Erzeugung &
+        Verbrauch im Detail": Stromertrag (Eigenverbrauch/Einspeisung) und
+        Verbrauch (Netzbezug/Eigenversorgung). None, wenn weder Erzeuger
+        noch Netzbezug konfiguriert sind — der Abschnitt entfällt dann im
+        Template wie die übrigen optionalen Abschnitte.
+
+        continuous folgt exakt derselben Regel wie compute_period_comparison()
+        (True nur bei offset==0) — für BEIDE Perioden, sonst widerspräche der
+        Vorperioden-Balken hier der "vs. Vormonat/Vorjahr"-Prozentzahl in der
+        KPI-Kachel auf derselben Seite (siehe _detail_bucket_series-Docstring)."""
+        if not (config.get("erzeuger") or config.get("netzbezug")):
+            return None
+        continuous = offset == 0
+        current = self._detail_bucket_series(config, range_key, offset, now, read_cache, continuous)
+        previous = self._detail_bucket_series(config, range_key, offset - 1, now, read_cache, continuous)
+
+        if range_key == "month":
+            window_start, _window_end, _natural_end = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
+                range_key, now.astimezone(self.deps.tz), offset, continuous,
+            )
+            prev_window_start, _pwe, _pne = query_mod._window(  # noqa: SLF001
+                range_key, now.astimezone(self.deps.tz), offset - 1, continuous,
+            )
+            current_groups = self._month_scope_groups(current, window_start, self.deps.tz)
+            previous_groups = self._month_scope_groups(previous, prev_window_start, self.deps.tz)
+        else:
+            current_groups = self._year_scope_groups(current, self.deps.tz)
+            previous_groups = self._year_scope_groups(previous, self.deps.tz)
+
+        def weekly_avg(groups: list[dict], comp_a: str, comp_b: str) -> float:
+            total = sum(g[comp_a] + g[comp_b] for g in groups)
+            days = sum(g["day_count"] for g in groups) or 1
+            return total / days * 7
+
+        def monthly_avg(groups: list[dict], comp_a: str, comp_b: str) -> float:
+            total = sum(g[comp_a] + g[comp_b] for g in groups)
+            return total / len(groups) if groups else 0.0
+
+        avg_fn = weekly_avg if range_key == "month" else monthly_avg
+
+        return {
+            "is_month": range_key == "month",
+            "stromertrag": self._bar_chart_geometry(
+                current_groups, previous_groups, "eigenverbrauch", "einspeisung",
+                avg_fn(current_groups, "eigenverbrauch", "einspeisung"),
+                avg_fn(previous_groups, "eigenverbrauch", "einspeisung"),
+            ),
+            "verbrauch": self._bar_chart_geometry(
+                current_groups, previous_groups, "netzbezug", "eigenversorgung",
+                avg_fn(current_groups, "netzbezug", "eigenversorgung"),
+                avg_fn(previous_groups, "netzbezug", "eigenversorgung"),
+            ),
+        }
+
+    @staticmethod
+    def _is_outage_day(erzeugung_val: float, verbrauch_val: float) -> bool:
+        """Ein Tag gilt als Sensor-/Datenausfall (nicht als echter Rekord-
+        Kandidat), wenn AN DIESEM TAG sowohl Erzeugung als auch Verbrauch
+        praktisch bei 0 liegen — ein Haushalt hat immer eine Grundlast,
+        beide gleichzeitig bei 0 ist real unplausibel. Bewusst NICHT nur
+        eine einzelne Kennzahl geprüft (z. B. Netzbezug=0 ist für sich genommen
+        ein völlig plausibler, sehr guter Tag)."""
+        return erzeugung_val < _OUTAGE_EPSILON_KWH and verbrauch_val < _OUTAGE_EPSILON_KWH
+
+    def _strongest_weakest_row(
+        self, values_by_day: dict[float, float], erzeugung_by_day: dict[float, float],
+        verbrauch_by_day: dict[float, float], invert: bool, tz: ZoneInfo, as_points: bool = False,
+    ) -> dict:
+        """Bester/schlechtester Tag einer Kennzahl über die vorhandenen Tage.
+
+        invert=True für Kennzahlen, bei denen weniger besser ist (Netzbezug,
+        Verbrauch) — "bester Tag" ist dann der mit dem NIEDRIGSTEN Wert.
+        Ausfalltage (siehe _is_outage_day) sind von BEIDEN Seiten
+        ausgeschlossen, nicht nur vom schlechtesten: sonst könnte ein toter
+        Sensor (z. B. Verbrauch=0 durch Ausfall) als "bester" Verbrauchstag
+        gewinnen, weil dort weniger besser ist. Gibt es keinen einzigen
+        gültigen Tag, sind best/worst beide None — das Template zeigt dann
+        "–" statt eines falschen Werts."""
+        valid = [
+            ts for ts, v in values_by_day.items()
+            if v is not None and not self._is_outage_day(erzeugung_by_day.get(ts, 0.0), verbrauch_by_day.get(ts, 0.0))
+        ]
+        if not valid:
+            return {"best": None, "worst": None, "avg": None}
+        avg = sum(values_by_day[ts] for ts in valid) / len(valid)
+        valid.sort()  # bei Gleichstand gewinnt der chronologisch erste Tag
+        best_fn = min if invert else max
+        worst_fn = max if invert else min
+
+        def entry(ts: float) -> dict:
+            v = values_by_day[ts]
+            local = datetime.fromtimestamp(ts, tz)
+            delta = (v - avg) if as_points else ((v - avg) / avg * 100 if avg else None)
+            return {
+                "date_label": f"{local.day}. {_MONTH_NAMES_DE[local.month - 1][:3]}",
+                "value": v,
+                "delta": round(delta, 1) if delta is not None else None,
+            }
+
+        return {
+            "best": entry(best_fn(valid, key=lambda ts: values_by_day[ts])),
+            "worst": entry(worst_fn(valid, key=lambda ts: values_by_day[ts])),
+            "avg": round(avg, 1),
+        }
+
+    def _staerkster_schwaechster_tag(
+        self, config: dict, range_key: str, offset: int, now: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> list[dict]:
+        """Bester/schlechtester Tag je Kennzahl (Stromertrag, Netzbezug,
+        Verbrauch, Einspeisung, Autarkie, Eigenverbrauch — letztere zwei als
+        Tagesquote in %, nicht in kWh) für die aktuelle Berichtsperiode.
+
+        Bei range='year' Tagesserien aller (bereits vergangenen) Monate des
+        Jahres zusammengeführt — dieselbe Monatsschleife wie
+        _anomalien_for_months(), deren compute_flow()-Aufrufe für 'current'
+        im selben Request bereits denselben read_cache gefüllt haben,
+        wodurch die entsprechenden _entity_series()-Treffer hier aus dem
+        Memo kommen statt neu zu laden."""
+        if range_key == "month":
+            series = self._detail_bucket_series(config, "month", offset, now, read_cache)
+        else:
+            window_start, _we, _ne = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
+                "year", now.astimezone(self.deps.tz), offset,
+            )
+            base_total_months = now.year * 12 + (now.month - 1)
+            series: dict[str, dict[float, float]] = {}
+            for month in range(1, 13):
+                month_offset = (window_start.year * 12 + (month - 1)) - base_total_months
+                if month_offset > 0:
+                    break
+                month_series = self._detail_bucket_series(config, "month", month_offset, now, read_cache)
+                for role, role_series in month_series.items():
+                    series.setdefault(role, {}).update(role_series)
+
+        erzeugung_by_day = series.get("erzeugung", {})
+        verbrauch_by_day = series.get("verbrauch", {})
+        netzbezug_by_day = series.get("netzbezug", {})
+        eigenverbrauch_by_day = series.get("eigenverbrauch", {})
+
+        autarkie_pct_by_day = {
+            ts: (verbrauch_by_day[ts] - netzbezug_by_day.get(ts, 0.0)) / verbrauch_by_day[ts] * 100
+            for ts in verbrauch_by_day if verbrauch_by_day[ts] > 0
+        }
+        eigenverbrauch_pct_by_day = {
+            ts: eigenverbrauch_by_day.get(ts, 0.0) / erzeugung_by_day[ts] * 100
+            for ts in erzeugung_by_day if erzeugung_by_day[ts] > 0
+        }
+
+        tz = self.deps.tz
+        rows = []
+        for label, role, invert in (
+            ("Stromertrag", "erzeugung", False),
+            ("Netzbezug", "netzbezug", True),
+            ("Verbrauch", "verbrauch", True),
+            ("Einspeisung", "einspeisung", False),
+        ):
+            result = self._strongest_weakest_row(
+                series.get(role, {}), erzeugung_by_day, verbrauch_by_day, invert, tz,
+            )
+            rows.append({"label": label, "role": role, "unit": "kWh", "decimals": 1, "is_pkt": False, **result})
+        for label, role, values_by_day in (
+            ("Autarkie", "autarkie", autarkie_pct_by_day),
+            ("Eigenverbrauch", "eigenverbrauch", eigenverbrauch_pct_by_day),
+        ):
+            result = self._strongest_weakest_row(
+                values_by_day, erzeugung_by_day, verbrauch_by_day, False, tz, as_points=True,
+            )
+            rows.append({"label": label, "role": role, "unit": "%", "decimals": 0, "is_pkt": True, **result})
+        return rows
 
     @staticmethod
     def _sparkline(series: dict[float, float]) -> list[float]:
@@ -2535,6 +2912,15 @@ class EnergieDashboardService:
                 period_range_text = f"1.–{display_end.day}. {_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
                 monatsverlauf = []
                 anomalien_report = [{"month": None, **a} for a in (current.get("anomalien") or [])]
+            detail_charts = self._report_detail_charts(config, range, offset, now, read_cache)
+            staerkster_schwaechster = [
+                row for row in self._staerkster_schwaechster_tag(config, range, offset, now, read_cache)
+                # Autarkie/Eigenverbrauch nur, wenn die KPI-Kachel selbst
+                # existiert (dieselbe Bedingung wie im KPI-Grid) — ein
+                # System ohne Erzeuger hat schlicht keine dieser Quoten.
+                if row["label"] != "Autarkie" or current["kpi"].get("autarkie") is not None
+                if row["label"] != "Eigenverbrauch" or current["kpi"].get("eigenverbrauch") is not None
+            ]
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_report.html",
                 {
@@ -2551,6 +2937,8 @@ class EnergieDashboardService:
                     "eigenverbrauch_delta_pkt": eigenverbrauch_delta_pkt,
                     "monatsverlauf": monatsverlauf,
                     "anomalien_report": anomalien_report,
+                    "detail_charts": detail_charts,
+                    "staerkster_schwaechster": staerkster_schwaechster,
                     "generated_at": now,
                     "month_names": _MONTH_NAMES_DE,
                     # app_root deckt auch diese Seite ab, obwohl sie eine Ebene

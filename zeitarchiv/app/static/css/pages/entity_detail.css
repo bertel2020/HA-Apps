@@ -137,13 +137,11 @@
   @media (max-width:480px){
     #chart{height:280px;}
     .card{padding:14px;}
-    /* Unter 480px bricht die Toolbar zuverlässig in drei eigene Zeilen um
-       (Zeitraum-Segmente, Navigation, Vergleichen/Optionen) — anders als im
-       641px-Übergangsbereich (siehe Kommentar bei .toolbar-right im
-       Template), wo eine Restzeile noch nach Versehen aussehen könnte, steht
-       hier jede Gruppe zuverlässig allein auf ihrer Zeile. Navigation mittig,
-       weil sie rein informativ ist (kein Ziel wie links/rechts); Vergleichen/
-       Optionen rechtsbündig wie am Desktop, aus demselben Grund wie dort. */
+    /* Unter 480px bricht die Toolbar zuverlässig in eigene Zeilen um
+       (Zeitraum-Segmente, Navigation, Vergleichen/Optionen) — die
+       Rechtsbündigkeit der Vergleichen/Optionen-Gruppe selbst steht in
+       app.css (dort auch von chart_editor.html genutzt, siehe Kommentar
+       dort). Hier nur die Navigation: mittig, weil sie rein informativ ist
+       (kein Ziel wie links/rechts). */
     .nav{width:100%;justify-content:center;}
-    .toolbar-right{margin-left:auto;}
   }

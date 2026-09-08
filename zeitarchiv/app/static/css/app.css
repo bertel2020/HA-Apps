@@ -773,6 +773,16 @@ button.dd-picker-clear{
 @media (min-width:641px){
   .toolbar-right{margin-left:auto;}
 }
+/* Unter 480px bricht die Toolbar zuverlässig in eigene Zeilen um (siehe
+   .nav-Kommentar in entity_detail.css/cleanup.css) — anders als im
+   641px-Übergangsbereich oben, wo eine Restzeile noch nach Versehen
+   aussehen könnte, steht die Gruppe hier zuverlässig allein auf ihrer
+   Zeile. Hier statt in einer der Seiten-Dateien, weil sowohl die
+   Entitäts-Detailseite als auch der Chart-Editor dieselbe Gruppe tragen
+   (siehe test_the_toolbar_group_lives_in_the_shared_stylesheet). */
+@media (max-width:480px){
+  .toolbar-right{margin-left:auto;}
+}
 /* Die Menüs dieser Gruppe klappen nach LINKS auf. .menu-popover ist sonst mit
    left:0 am Anker verankert und 290 px breit — am rechten Rand ragte das
    Optionen-Menü dadurch aus dem Fenster (gemessen: rechte Kante bei 1163 px in
