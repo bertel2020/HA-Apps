@@ -175,6 +175,18 @@
     cursor:pointer;text-decoration:none;
   }
   .edash-report-btn:hover{color:var(--accent-line);border-color:var(--accent-line);}
+  /* Unter 700px gar nicht erst anbieten. Der Bericht ist eine eigenständige,
+     druckoptimierte Seite ohne mobiles Layout — sein Kennzahlen-Raster steht
+     auf repeat(3,1fr), und 1fr kann nicht unter den Inhalt schrumpfen:
+     gemessen laufen bei 375px 299px aus dem Fenster, bei 640px noch 14px, ab
+     674px passt es. Ein Knopf, der auf dem Telefon in eine Seite führt, die
+     dort nicht funktioniert, ist die schlechtere Antwort als kein Knopf —
+     700px, weil es ein bestehender Breakpoint dieser App ist und über der
+     gemessenen Grenze liegt. Fällt weg, sobald der Bericht ein mobiles
+     Layout bekommt. */
+  @media (max-width:700px){
+    .edash-report-btn{display:none;}
+  }
 
   /* Autarkiegrad/Eigenverbrauchsquote/Speicher-SOC als Ring-Gauges — SVG-
      Technik (Kreis + zweiter Kreis mit stroke-dasharray/-dashoffset als
