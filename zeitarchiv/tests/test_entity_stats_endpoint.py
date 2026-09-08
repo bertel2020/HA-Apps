@@ -82,6 +82,7 @@ def anlage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         api_token=lambda: "test-token",
         app_version="0.0.0-test",
         collect_notices=lambda: [],
+        latest_backup=lambda: None,
     )
     app = FastAPI()
     app.include_router(api_routes.create_api_router(deps, api_routes.ApiState()))

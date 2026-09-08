@@ -706,6 +706,7 @@ app.include_router(
                 _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
                 _background.last_backup_worker_tick, _background.backup_progress.running,
             ),
+            latest_backup=lambda: notices_mod.latest_backup_info(index),
         ),
         _api_state,
     )

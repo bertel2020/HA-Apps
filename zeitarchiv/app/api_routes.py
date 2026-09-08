@@ -131,6 +131,7 @@ class ApiDependencies:
     api_token: Callable[[], str]
     app_version: str
     collect_notices: Callable[[], list[dict]]
+    latest_backup: Callable[[], dict | None]
 
 
 def expire_write_capture(capture: dict, now: float | None = None) -> bool:
@@ -378,7 +379,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             getattr(request.state, "request_id", "-"),
             x_zeitarchiv_integration_version,
         )
-        return {"notices": deps.collect_notices()}
+        return {"notices": deps.collect_notices(), "latest_backup": deps.latest_backup()}
 
     @router.post("/api/write")
     def write(

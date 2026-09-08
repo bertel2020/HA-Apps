@@ -86,6 +86,7 @@ def _write_endpoint(state: ApiState, result: str = "written"):
             api_token=lambda: "test-token",
             app_version="test",
             collect_notices=lambda: [],
+            latest_backup=lambda: None,
         ),
         state,
     )

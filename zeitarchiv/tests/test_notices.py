@@ -17,6 +17,7 @@ from app.notices import (
     SCHEDULER_STALLED_SECONDS,
     build_notices,
     gap_threshold_conflicts,
+    latest_backup_info,
 )
 from app.storage.index import Index
 
@@ -262,6 +263,38 @@ def test_backup_worker_stalled_notice_absent_when_not_in_progress_despite_old_ti
 
         ids = [n["id"] for n in notices]
         assert "system.backup_worker_stalled" not in ids
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_latest_backup_info_is_none_without_any_successful_backup() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        assert latest_backup_info(index) is None
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_latest_backup_info_shapes_last_successful_job() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        job_id = index.create_backup_job("manual")
+        index.update_backup_job(
+            job_id, status="success", finished_at=200.0,
+            filename="zeitarchiv-2026-09-05.zip", size_bytes=12345,
+        )
+
+        assert latest_backup_info(index) == {
+            "filename": "zeitarchiv-2026-09-05.zip",
+            "size_bytes": 12345,
+            "finished_at": 200.0,
+        }
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

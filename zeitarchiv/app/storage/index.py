@@ -1647,6 +1647,18 @@ class Index:
                 (safe_limit,),
             ).fetchall()
 
+    def get_last_successful_backup_job(self) -> sqlite3.Row | None:
+        """Letzter ERFOLGREICHER Backup-Lauf — im Unterschied zu
+        list_backup_jobs() (jeder Status, für die Verlaufsanzeige) hier
+        gezielt nur 'success': ein fehlgeschlagener oder noch laufender Job
+        hat keine reale, kopierbare Datei. Grundlage für /api/notices'
+        "latest_backup"-Feld (siehe notices.latest_backup_info())."""
+        with self._lock, self._conn:
+            return self._conn.execute(
+                "SELECT * FROM backup_jobs WHERE status = 'success' "
+                "ORDER BY created_at DESC, id DESC LIMIT 1",
+            ).fetchone()
+
     def recover_interrupted_backup_jobs(self, now: float | None = None) -> int:
         finished_at = time.time() if now is None else now
         with self._lock, self._conn:

@@ -87,6 +87,7 @@ def test_table_batch_endpoint_returns_columns_in_request_order(tmp_path: Path) -
         api_token=lambda: "test",
         app_version="test",
         collect_notices=lambda: [],
+        latest_backup=lambda: None,
     ), ApiState())
     endpoint = next(route.endpoint for route in router.routes if route.path == "/api/query-table")
     result = endpoint(TableQueryRequest(
@@ -379,6 +380,7 @@ def test_the_single_chart_shares_one_cache_between_series_and_comparison(
         api_token=lambda: "test",
         app_version="test",
         collect_notices=lambda: [],
+        latest_backup=lambda: None,
     ), ApiState())
     endpoint = next(route.endpoint for route in router.routes if route.path == "/api/query")
 

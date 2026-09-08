@@ -52,6 +52,31 @@ def test_backup_jobs_survive_and_running_job_is_recovered() -> None:
     assert job["finished_at"] == 200.0
 
 
+def test_get_last_successful_backup_job_ignores_failed_and_running_jobs() -> None:
+    db_path = Path(tempfile.mkdtemp(prefix="zeitarchiv-scheduler-test-")) / "index.sqlite"
+    index = Index(db_path)
+    failed_id = index.create_backup_job("manual")
+    index.update_backup_job(failed_id, status="failed", finished_at=100.0, error="boom")
+    success_id = index.create_backup_job("manual")
+    index.update_backup_job(
+        success_id, status="success", finished_at=200.0,
+        filename="zeitarchiv-2026-09-05.zip", size_bytes=12345,
+    )
+    running_id = index.create_backup_job("manual")
+    index.update_backup_job(running_id, status="running", started_at=300.0)
+
+    job = index.get_last_successful_backup_job()
+    assert job["filename"] == "zeitarchiv-2026-09-05.zip"
+    assert job["size_bytes"] == 12345
+
+
+def test_get_last_successful_backup_job_returns_none_without_any_success() -> None:
+    db_path = Path(tempfile.mkdtemp(prefix="zeitarchiv-scheduler-test-")) / "index.sqlite"
+    index = Index(db_path)
+    index.create_backup_job("manual")
+    assert index.get_last_successful_backup_job() is None
+
+
 def test_retention_jobs_persist_results_and_recover_interruption() -> None:
     db_path = Path(tempfile.mkdtemp(prefix="zeitarchiv-retention-job-test-")) / "index.sqlite"
     index = Index(db_path)

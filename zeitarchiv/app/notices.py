@@ -952,6 +952,24 @@ def collect_notices(
     ]
 
 
+def latest_backup_info(index) -> dict | None:
+    """Letztes ERFOLGREICHES Backup für /api/notices ("latest_backup"), die
+    Grundlage für sensor.zeitarchiv_latest_backup in der HA-Integration und
+    das Blueprint blueprints/automation/zeitarchiv/backup_upload.yaml dort.
+    Bewusst getrennt von der "Backup fehlgeschlagen"-Meldung in
+    build_notices(): die braucht den letzten Lauf überhaupt (für eine
+    Warnung), diese hier den letzten erfolgreichen (für eine kopierbare
+    Datei)."""
+    job = index.get_last_successful_backup_job()
+    if job is None:
+        return None
+    return {
+        "filename": job["filename"],
+        "size_bytes": job["size_bytes"],
+        "finished_at": job["finished_at"],
+    }
+
+
 def mute_notice(index, notice_id: str, title: str, detail: str, meta: str, until: float | None = None) -> None:
     mutes = _load_mutes(index)
     mutes[notice_id] = {
