@@ -1760,6 +1760,13 @@ button[data-tooltip]{cursor:pointer;}
 .settings-compact-row-text{min-width:0;}
 .settings-compact-label{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
 .settings-compact-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+/* Mehrere Bedienelemente einer Einstellungszeile. Sie MÜSSEN umbrechen dürfen:
+   .settings-compact-row bricht zwar selbst um, aber eine Gruppe ohne
+   flex-wrap ist als Flex-Element nicht schmaler zu bekommen als ihr breitester
+   Zustand — bei „Tipps anzeigen" (zwei Knöpfe) waren das 206 px gegen 155 px
+   Rest, und die Seite lief bei 375 px um 49 px über den rechten Rand. Mit
+   Umbruch schrumpft die Gruppe auf den breiteren der beiden Knöpfe. */
+.settings-compact-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 /* Reiner Lesewert (nicht interaktiv) in einer Kompaktzeile — dieselbe
    schlichte Mono-Darstellung wie .status-card-mono, bewusst OHNE Rahmen/
    Hintergrund von .val, sonst wirkt ein reiner Anzeigewert wie ein Button. */

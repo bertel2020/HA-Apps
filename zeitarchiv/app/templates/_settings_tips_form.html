@@ -8,7 +8,7 @@
       <div class="settings-compact-label">Tipps anzeigen {{ hint_button('Tipps anzeigen') }}</div>
       {% call hint_body('settings-compact-hint') %}Wechselnder Praxis-Tipp im Meldungs-Center{% endcall %}
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
+    <div class="settings-compact-actions">
       <button type="button" class="btn btn-sm" onclick="document.getElementById('tips-list-dialog').showModal()">Alle Tipps</button>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="tips-enabled-btn" onclick="toggleDDPicker('tips-enabled')">{% for k, l in tips_on_off_options %}{% if k == tips_enabled %}{{ l }}{% endif %}{% endfor %} ▾</button>
