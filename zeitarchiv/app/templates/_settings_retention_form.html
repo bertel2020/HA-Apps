@@ -1,3 +1,4 @@
+{% from "_hints.html" import hint_button, hint_body %}
 <p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">Löscht Werte nach Ablauf ihrer Aufbewahrungsfrist &mdash; <strong>endgültig</strong>. „Unbegrenzt“-Entitäten sind ausgenommen.</p>
 
 <div class="settings-subsection">
@@ -27,7 +28,15 @@
 </div>
 
 <div class="settings-subsection">
-<h3 class="settings-subsection-title">Automatische Durchsetzung</h3>
+{# Knopf und Hinweis hängen an DERSELBEN Bedingung: ohne Zeitplan gibt es
+   nichts zu erklären, und ein Knopf ohne Hinweis dahinter tut beim Klicken
+   nichts (hint-toggle.js findet dann kein Ziel). #}
+<h3 class="settings-subsection-title">Automatische Durchsetzung{% if retention_enforcement_schedule != 'off' %} {{ hint_button('Automatische Durchsetzung') }}{% endif %}</h3>
+{# Stand bis 0.88.0 als Fußnote unter dem Zeitplan-Formular. Dort fand
+   hint-toggle.js ihn nicht — der Knopf sucht den Hinweis direkt hinter der
+   Überschrift (siehe _hints.html) —, und als Beschreibung des Abschnitts steht
+   er hier ohnehin richtiger. #}
+{% if retention_enforcement_schedule != 'off' %}{% call hint_body() %}Läuft im Hintergrund, verpasste Läufe werden nachgeholt.{% endcall %}{% endif %}
 <div class="status-grid">
   <div class="status-card">
     <span class="status-card-label">Begrenzte Entitäten</span>
@@ -122,9 +131,6 @@
     {% endif %}
   </div>
 </form>
-{% if retention_enforcement_schedule != 'off' %}
-<p class="hint" style="margin-top:8px;">Läuft im Hintergrund, verpasste Läufe werden nachgeholt.</p>
-{% endif %}
 
 {# Beide Aktionen laufen synchron im Request und dauern bestandsabhängig
    spürbar lange, liefern dabei aber keine Zahl, gegen die ein Balken laufen

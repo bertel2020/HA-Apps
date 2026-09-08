@@ -48,9 +48,11 @@ def test_the_rolling_window_switch_is_not_described_as_a_drawing_option() -> Non
     # zwangsläufig.
     import re
 
+    # Seit dem Info-Knopf steht der Hinweis in einem hint_body()-Aufruf statt in
+    # einem <div>, und die Beschriftung trägt das Knopf-Makro hinter sich.
     hinweis = re.search(
-        r'<div class="settings-compact-label">Rollierend</div>.*?'
-        r'<div class="settings-compact-hint">(.*?)</div>',
+        r'<div class="settings-compact-label">Rollierend \{\{ hint_button.*?'
+        r"\{% call hint_body\('settings-compact-hint'\) %\}(.*?)\{% endcall %\}",
         SETTINGS_FORM, re.S,
     )
     assert hinweis, "Zeile „Rollierend“ mit Hinweis nicht gefunden"

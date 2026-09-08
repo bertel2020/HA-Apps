@@ -286,7 +286,9 @@ nebenbei das Aussehen ändert (`tests/test_hint_roles.py`). Die Beschriftung
 über einer Kartenzahl war nie ein Hinweis und heißt `status-card-label`.
 
 `.hint-toggle` ist der 16-px-Knopf im Label; seine Trefferfläche wächst über
-ein Pseudoelement auf 44 × 44 px, ohne im Layout Platz zu belegen.
+ein Pseudoelement auf 44 × 44 px, ohne im Layout Platz zu belegen. Aufgeklappt
+ist der Hinweis am Schreibtisch von selbst, unter 700 px steht er zu — dieselbe
+Aufteilung wie bei den anderen einklappbaren Blöcken der App.
 
 ### Einstellungen (`.settings-layout`)
 

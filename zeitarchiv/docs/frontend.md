@@ -134,6 +134,16 @@ deshalb hinter einem Info-Knopf und klappen bei Bedarf auf — inline, nicht als
 Popover: keine Überlagerung, keine Positionsrechnung, und mit `dd-picker` gibt
 es bereits eine Popover-Mechanik.
 
+**Der Standardzustand hängt an der Breite:** am Schreibtisch aufgeklappt, unter
+700 px zu. Bis 0.88.0 war er überall gleich (immer zu) — der Platzdruck, der
+das Wegklappen nötig macht, besteht aber nur auf schmalen Geräten; auf der
+Entität-Konfiguration waren es 557 von 2.806 px, am Schreibtisch fällt derselbe
+Text nicht ins Gewicht. Damit verhält sich der Info-Knopf wie die beiden
+anderen einklappbaren Blöcke der App (Protokollierungs-Karte auf der Log-Seite,
+„So funktioniert …"-Anleitungen auf Import), bis hin zum selben Breakpoint. Der
+Knopf bleibt auf beiden Breiten bedienbar; ein Breitenwechsel setzt auf den
+Standard der neuen Breite zurück.
+
 Voraussetzung war eine Unterscheidung, die es vorher nicht gab: alle Hinweise
 trugen dieselbe Klasse `.hint`, obwohl drei verschiedene Dinge darin steckten.
 Die Rolle steht **zusätzlich** zur Kontextklasse (`hint`, `tbl-hint`,

@@ -1,11 +1,12 @@
+{% from "_hints.html" import hint_button, hint_body %}
 {# Globaler Ein/Aus-Schalter für den rotierenden Tipp im Meldungs-Center —
    eigenes Partial (wie die übrigen An/Aus-Felder in _settings_darstellung_form.html),
    damit ein Toggle nur dieses kleine Fragment statt der ganzen Seite neu lädt. #}
 <div class="settings-compact-list">
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Tipps anzeigen</div>
-      <div class="settings-compact-hint">Wechselnder Praxis-Tipp im Meldungs-Center</div>
+      <div class="settings-compact-label">Tipps anzeigen {{ hint_button('Tipps anzeigen') }}</div>
+      {% call hint_body('settings-compact-hint') %}Wechselnder Praxis-Tipp im Meldungs-Center{% endcall %}
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <button type="button" class="btn btn-sm" onclick="document.getElementById('tips-list-dialog').showModal()">Alle Tipps</button>

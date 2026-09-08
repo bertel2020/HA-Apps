@@ -1,3 +1,4 @@
+{% from "_hints.html" import hint_button, hint_body %}
 <div id="backup-status">
   {% if backup_message %}
   {# Als Popup statt eines Banners ganz oben auf der Seite — backup_message
@@ -59,8 +60,8 @@
   </div>
   {% endif %}
   {% if backup_rollbacks %}
-  <h3 style="margin:24px 0 10px;">Restore-Rollbacks</h3>
-  <p class="hint">Diese Verzeichnisse enthalten den Datenstand unmittelbar vor einer Wiederherstellung.</p>
+  <h3 style="margin:24px 0 10px;">Restore-Rollbacks {{ hint_button('Restore-Rollbacks') }}</h3>
+  {% call hint_body() %}Diese Verzeichnisse enthalten den Datenstand unmittelbar vor einer Wiederherstellung.{% endcall %}
   {% for rollback in backup_rollbacks %}
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--border);">
     <code>{{ rollback }}</code>

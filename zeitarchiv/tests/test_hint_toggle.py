@@ -6,8 +6,13 @@ ein Fünftel der Seite. Sie stehen jetzt hinter einem Knopf im Label bzw. in der
 Überschrift; Warnungen und Statuszeilen bleiben ungefragt sichtbar.
 
 Aufklappen statt Popover, damit es keine zweite Überlagerungs-Mechanik neben
-dd-picker gibt. Auf allen Breiten gleich — ein Text für alle Bildschirme war
-schon die Leitlinie der Kürzung in 0.83.0.
+dd-picker gibt.
+
+Seit 0.88.0 hängt der Standardzustand an der Breite: am Schreibtisch
+aufgeklappt, unter 700px zu. Vorher war er überall gleich (immer zu), begründet
+mit „ein Text für alle Bildschirme" — der Platzdruck, der das Wegklappen nötig
+macht, besteht aber nur schmal. Dieselbe Aufteilung wie bei den beiden anderen
+einklappbaren Blöcken der App (Protokollierungs-Karte, Import-Anleitungen).
 """
 
 from __future__ import annotations
@@ -54,8 +59,16 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
     seiten = {
         "entity_config.html": ["_entity_config_form.html"],
         "energiedashboard.html": ["_energiedashboard_setup.html"],
-        "housekeeping.html": ["_settings_storage_index_form.html"],
-        "settings.html": ["_settings_storage_index_form.html"],
+        "backup.html": ["_settings_backup_ready.html"],
+        "housekeeping.html": [
+            "_settings_storage_index_form.html",
+            "_settings_retention_form.html",
+        ],
+        "settings.html": [
+            "_settings_storage_index_form.html",
+            "_settings_darstellung_form.html",
+            "_settings_tips_form.html",
+        ],
         "statistik_index.html": [],
         "table_editor.html": [],
     }
@@ -67,6 +80,15 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
     # es einbindet.
     getragen = set(seiten) | {p for teile in seiten.values() for p in teile}
     assert set(_mit_knopf()) <= getragen, set(_mit_knopf()) - getragen
+
+
+def test_the_default_state_follows_the_width() -> None:
+    """Am Schreibtisch aufgeklappt, unter 700px zu — derselbe Breakpoint wie bei
+    den beiden anderen einklappbaren Blöcken. Der serverseitig gerenderte
+    `hidden`-Zustand wird beim Laden korrigiert, auch nach einem htmx-Tausch."""
+    assert "matchMedia('(max-width:700px)')" in JS
+    assert "ziel.hidden = SCHMAL.matches;" in JS
+    assert "htmx:afterSwap" in JS
 
 
 def test_no_warning_and_no_status_line_can_be_folded_away() -> None:

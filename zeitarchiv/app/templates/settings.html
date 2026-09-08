@@ -15,8 +15,8 @@
       {% include "_settings_nav.html" %}
       <div class="settings-panel">
         <section id="darstellung" class="settings-section">
-          <h2 class="settings-section-title">Darstellung</h2>
-          <p class="settings-section-description">Aussehen der App sowie Standardwerte für Chart-Optionen festlegen.</p>
+          <h2 class="settings-section-title">Darstellung {{ hint_button('Darstellung') }}</h2>
+          {% call hint_body('settings-section-description') %}Aussehen der App sowie Standardwerte für Chart-Optionen festlegen.{% endcall %}
           <div id="darstellung-form">
             {% include "_settings_darstellung_form.html" %}
           </div>
@@ -31,8 +31,8 @@
         </section>
 
         <section id="meldungen" class="settings-section">
-          <h2 class="settings-section-title">Meldungen</h2>
-          <p class="settings-section-description">Stummgeschaltete Meldungen aus dem Meldungs-Center (Glocken-Icon oben) &mdash; nur Empfehlungen lassen sich stumm schalten, keine Fehler.</p>
+          <h2 class="settings-section-title">Meldungen {{ hint_button('Meldungen') }}</h2>
+          {% call hint_body('settings-section-description') %}Stummgeschaltete Meldungen aus dem Meldungs-Center (Glocken-Icon oben) &mdash; nur Empfehlungen lassen sich stumm schalten, keine Fehler.{% endcall %}
           <div class="settings-subsection">
             <div id="tips-settings-form">
               {% include "_settings_tips_form.html" %}
@@ -40,8 +40,8 @@
             <dialog id="tips-list-dialog" class="detail-dialog" aria-labelledby="tips-list-title">
               <div class="detail-dialog-header">
                 <div>
-                  <h2 id="tips-list-title">Alle Tipps</h2>
-                  <p class="hint">Nur der heutige Tipp lässt sich ausblenden — morgen ist ohnehin ein anderer dran.</p>
+                  <h2 id="tips-list-title">Alle Tipps {{ hint_button('Alle Tipps') }}</h2>
+                  {% call hint_body() %}Nur der heutige Tipp lässt sich ausblenden — morgen ist ohnehin ein anderer dran.{% endcall %}
                 </div>
                 <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
               </div>
@@ -66,8 +66,8 @@
         </section>
 
         <section id="diagnose" class="settings-section">
-          <h2 class="settings-section-title">Diagnose</h2>
-          <p class="settings-section-description">Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.</p>
+          <h2 class="settings-section-title">Diagnose {{ hint_button('Diagnose') }}</h2>
+          {% call hint_body('settings-section-description') %}Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.{% endcall %}
           {% include "_settings_debug_tools.html" %}
           <div class="settings-subsection">
             <h3 class="settings-subsection-title">Diagnosebericht {{ hint_button('Diagnosebericht') }}</h3>

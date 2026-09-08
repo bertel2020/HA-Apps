@@ -36,6 +36,41 @@ function hinweisZu(knopf) {
   return dahinter && dahinter.matches(HINWEIS) ? dahinter : null;
 }
 
+/* Ausgeklappt am Schreibtisch, eingeklappt auf dem Telefon.
+   Bis 0.88.0 war der Zustand auf allen Breiten gleich (immer zu) — die
+   Begründung dafür war „ein Text für alle Bildschirme". Der Platzdruck, der
+   das Wegklappen überhaupt nötig macht, besteht aber nur auf schmalen
+   Geräten: auf der Entität-Konfiguration waren es 557 von 2.806 px, am
+   Schreibtisch fällt derselbe Text nicht ins Gewicht. Dieselbe Aufteilung wie
+   bei den beiden anderen einklappbaren Blöcken der App (Protokollierungs-
+   Karte in logs.js, Import-Anleitungen in pages/import.js), inklusive
+   desselben Breakpoints.
+
+   Der Knopf bleibt auf beiden Breiten bedienbar: am Schreibtisch klappt er
+   einen Hinweis wieder zu, wenn er stört. Beim Wechsel schmal→breit fällt der
+   selbst gewählte Zustand weg und der Standard der neuen Breite gilt — sonst
+   käme ein auf dem Telefon aufgeklappter Hinweis am Schreibtisch zugeklappt
+   wieder. */
+const SCHMAL = window.matchMedia('(max-width:700px)');
+
+function standardZustand() {
+  document.querySelectorAll(HINWEIS).forEach(function (ziel) {
+    ziel.hidden = SCHMAL.matches;
+  });
+  document.querySelectorAll('.hint-toggle').forEach(function (knopf) {
+    const ziel = hinweisZu(knopf);
+    if (ziel) knopf.setAttribute('aria-expanded', String(!ziel.hidden));
+  });
+}
+
+SCHMAL.addEventListener('change', standardZustand);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', standardZustand);
+else standardZustand();
+/* htmx tauscht die Formulare komplett aus — die frisch gerenderten Absätze
+   kommen mit dem serverseitigen hidden und müssten sonst am Schreibtisch von
+   Hand wieder aufgeklappt werden. */
+document.addEventListener('htmx:afterSwap', standardZustand);
+
 document.addEventListener('click', function (event) {
   const knopf = event.target.closest('.hint-toggle');
   if (!knopf) return;
