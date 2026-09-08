@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.88.1 - 2026-09-08
+
+### Geändert
+
+- **Erklärtexte klappen am Schreibtisch von selbst auf.** Hinter dem
+  Info-Knopf verschwinden sie nur noch dort, wo der Platz knapp ist — auf dem
+  Telefon. Der Knopf klappt sie weiterhin auf beiden Größen zu und wieder auf.
+- **Die Einstellungen sind durchgängig gleich aufgebaut**: jede Einstellung
+  nennt ihre Erklärung über denselben Info-Knopf, auch die kurzen Zeilen unter
+  „Darstellung".
+- Die Zeile mit „Löschen" und „Rückgängig" über der Werteliste liegt jetzt
+  sichtbar auf derselben Ebene wie die Tabelle darunter.
+
+### Behoben
+
+- **Die Zeile „Tipps anzeigen" lief auf dem Telefon aus dem Bild** — die Seite
+  ließ sich seitwärts schieben, und der Schalter stand zur Hälfte außerhalb.
+
 ## 0.88.0 - 2026-09-08
 
 ### Neu
