@@ -273,7 +273,19 @@
     // item-id sitzt auf der äußeren .dtile (auch Drag&Drop-Handle, siehe
     // setupDragAndDrop), die restlichen Daten auf dem inneren Link selbst.
     const chartId = el.closest('.dtile').dataset.itemId;
-    const entityIds = JSON.parse(el.dataset.entityIds || '[]');
+    // Volle Auswahl UND die ausgeblendeten getrennt: abgefragt und gezeichnet
+    // werden nur die sichtbaren, die Farbe hängt aber an der Position in der
+    // vollen Auswahl (colorIndexFor unten) — sonst wäre dieselbe Serie auf der
+    // Chart-Seite und auf der Kachel unterschiedlich eingefärbt, sobald eine
+    // Serie ausgeblendet ist. Gleiche Regel wie colorIndexFor() in
+    // pages/chart_editor.js.
+    const allEntityIds = JSON.parse(el.dataset.entityIds || '[]');
+    const hiddenEntityIds = JSON.parse(el.dataset.hiddenEntityIds || '[]');
+    const entityIds = allEntityIds.filter(id => !hiddenEntityIds.includes(id));
+    const colorIndexFor = (entityId) => {
+      const idx = allEntityIds.indexOf(entityId);
+      return idx === -1 ? 0 : idx;
+    };
     const entityNames = JSON.parse(el.dataset.entityNames || '{}');
     const range = el.dataset.range || 'day';
     const continuous = el.dataset.continuous === 'true';
@@ -354,7 +366,7 @@
       const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
       return {
         name: entityNames[s.entity_id] || s.friendly_name,
-        color: PALETTE[i % PALETTE.length],
+        color: PALETTE[colorIndexFor(s.entity_id) % PALETTE.length],
         last: values.length ? formatted(values[values.length - 1]) : '—',
         min: minima.length ? formatted(Math.min(...minima)) : '—',
         max: maxima.length ? formatted(Math.max(...maxima)) : '—',
@@ -407,7 +419,7 @@
     // der Linie-/Balken-Aufbereitung unten heraus, die bei AN/AUS-Intervallen
     // ohnehin keinen Sinn ergäbe.
     if (timeline) {
-      renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface);
+      renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
       return;
     }
 
@@ -477,7 +489,7 @@
       : '';
 
     const echartsSeries = series.map((s, i) => {
-      const color = PALETTE[i % PALETTE.length];
+      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
       let lineData;
       // Die Punkte, über die der Durchschnitt geht: das GEZEICHNETE, aber
@@ -687,11 +699,11 @@
   // Zeilen-Beschriftung (der Name steht schon in der Kachel-Legende, siehe
   // renderTile()) — bei mehreren Zeilen in einer kleinen Kachel wäre dafür
   // ohnehin kaum Platz.
-  function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface) {
+  function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor) {
     const categories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
     const items = [];
     series.forEach((s, catIndex) => {
-      const color = PALETTE[catIndex % PALETTE.length];
+      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
       const points = s.points || [];
       for (let i = 0; i < points.length; i++) {
         const start = points[i].ts;

@@ -55,13 +55,28 @@
           <p class="sub" style="margin:4px 0 0;">Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.</p>
           <div class="entity-names-list" id="entity-names-list">
             <template x-for="(id, idx) in selectedEntityIds" :key="id">
-              <div class="entity-name-row" draggable="true" :data-entity-id="id">
+              <div class="entity-name-row" draggable="true" :data-entity-id="id"
+                   :class="{'entity-name-row-hidden': hiddenEntityIds.includes(id)}">
                 <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true"></span>
+                <!-- Farbpunkt statt des Buchstabens der Zeilenkarte im Tabellen-Editor:
+                     die Palette ist fest über die Position vergeben (siehe PALETTE in
+                     chart_editor.js), der Punkt verbindet den Eintrag damit sichtbar mit
+                     Legende und Kurve. -->
+                <span class="entity-name-dot" aria-hidden="true"
+                      :style="'--dot:var(--chart-' + (idx % 8 + 1) + ')'"></span>
                 <span class="entity-name-default" x-text="labelFor(id)"></span>
                 <input type="text" :placeholder="labelFor(id)" x-model="entityNames[id]" @input="render()">
-                <span class="entity-name-move">
-                  <button type="button" title="Nach oben" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
-                  <button type="button" title="Nach unten" :disabled="idx === selectedEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
+                <span class="entity-name-right">
+                  <button type="button" class="entity-name-hide" :class="{active: hiddenEntityIds.includes(id)}"
+                          :title="hiddenEntityIds.includes(id) ? 'Serie einblenden' : 'Serie ausblenden'"
+                          @click="toggleEntityHidden(id)">
+                    <svg x-show="!hiddenEntityIds.includes(id)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg x-show="hiddenEntityIds.includes(id)" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                  <span class="entity-name-move">
+                    <button type="button" title="Nach oben" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
+                    <button type="button" title="Nach unten" :disabled="idx === selectedEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
+                  </span>
                 </span>
               </div>
             </template>
@@ -336,6 +351,7 @@
     const CONTINUOUS = {{ continuous | tojson }};
     const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
     const ENTITY_NAMES = {{ entity_names | tojson }};
+    const HIDDEN_ENTITY_IDS = {{ hidden_entity_ids | tojson }};
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
     const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
     const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};

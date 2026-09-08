@@ -312,6 +312,13 @@
         // Auf/Ab-Buttons in der "Angezeigte Namen"-Liste änderbar sein, was ein
         // Set nicht abbilden kann.
         selectedEntityIds: [...SELECTED_ENTITY_IDS],
+        // Ausgeblendete Serien — eigene Liste statt eines Flags je Eintrag,
+        // weil selectedEntityIds bewusst ein flaches Array von IDs ist (siehe
+        // Kommentar oben). Die Entität bleibt ausgewählt und behält ihren
+        // Platz in der Reihenfolge, sie wird nur nicht abgefragt und nicht
+        // gezeichnet — dieselbe Bedeutung wie hidden bei Spalten und Zeilen
+        // im Tabellen-Editor.
+        hiddenEntityIds: [...HIDDEN_ENTITY_IDS],
         name: CHART_NAME,
         entityNames: {...ENTITY_NAMES},
         series: [],
@@ -390,6 +397,23 @@
         get selectedCount() { return this.selectedEntityIds.length; },
         get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
         labelFor(entityId) { return ENTITY_LABELS[entityId] || entityId; },
+        get visibleEntityIds() {
+          return this.selectedEntityIds.filter(id => !this.hiddenEntityIds.includes(id));
+        },
+        // Farbe hängt an der Position in der GESAMTEN Liste, nicht am Index
+        // der geladenen Serien: sonst rutschten beim Ausblenden einer Serie
+        // alle folgenden eine Farbe weiter, und ein kurzes Ein-/Ausblenden
+        // färbte das halbe Chart um.
+        colorIndexFor(entityId) {
+          const idx = this.selectedEntityIds.indexOf(entityId);
+          return idx === -1 ? 0 : idx;
+        },
+        toggleEntityHidden(entityId) {
+          const idx = this.hiddenEntityIds.indexOf(entityId);
+          if (idx === -1) this.hiddenEntityIds.push(entityId);
+          else this.hiddenEntityIds.splice(idx, 1);
+          this.load();
+        },
         get hasData() { return this.series.some(s => s.points.length > 0); },
         // "Punkte" markiert einzelne Datenpunkte auf einer Linie — für
         // Balken-Serien (Zähler/Schalter, siehe chart_type-Kommentar bei
@@ -470,7 +494,7 @@
             return {
               entityId: s.entity_id,
               name: this.entityNames[s.entity_id] || s.friendly_name,
-              color: PALETTE[i % PALETTE.length],
+              color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length],
               last: values.length ? formatted(values[values.length - 1]) : '—',
               min: minima.length ? formatted(Math.min(...minima)) : '—',
               max: maxima.length ? formatted(Math.max(...maxima)) : '—',
@@ -605,7 +629,10 @@
         },
 
         async load() {
-          if (this.selectedEntityIds.length === 0) {
+          // Ausgeblendete Serien werden gar nicht erst geholt — sie sollen
+          // weder gezeichnet noch in der Statistik gezählt werden, und eine
+          // Abfrage für Daten, die niemand sieht, wäre reine Last.
+          if (this.visibleEntityIds.length === 0) {
             this.series = [];
             this.autoResolutionLabel = '';
             this.$nextTick(() => this.render());
@@ -620,7 +647,7 @@
           const requestId = ++this._requestId;
           this.loading = true;
           const params = new URLSearchParams({
-            entity_ids: this.selectedEntityIds.join(','),
+            entity_ids: this.visibleEntityIds.join(','),
             range: this.range, offset: '0', continuous: String(this.continuous),
             compare: String(this.compare), compare_mode: this.compareMode,
             raw: String(this.raw),
@@ -762,7 +789,7 @@
           // Ganzes, siehe setCompareMode()/disableCompare()).
           const legendSelected = {};
           this.series.forEach((s, i) => {
-            const color = PALETTE[i % PALETTE.length];
+            const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
             // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
             // sonst "line", im Raw-Modus immer "line") statt hier redundant aus
             // aggregation_type neu abgeleitet zu werden — sonst würde z. B. ein
@@ -1035,7 +1062,7 @@
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const data = [];
           this.series.forEach((s, catIndex) => {
-            const color = PALETTE[catIndex % PALETTE.length];
+            const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
             const points = s.points;
             for (let i = 0; i < points.length; i++) {
               const start = points[i].ts;
@@ -1128,6 +1155,10 @@
             range_key: this.range,
             continuous: this.continuous,
             entity_names: entityNames,
+            // Nur ausgeblendete IDs mitschicken, die überhaupt noch ausgewählt
+            // sind — sonst hielte eine abgewählte Entität ihren Ausblend-Zustand
+            // stumm fest, bis sie irgendwann wieder angehakt wird.
+            hidden_entity_ids: this.hiddenEntityIds.filter(id => this.selectedEntityIds.includes(id)),
             resolution_preset: this.resolutionPreset,
             dynamic_y_axis: this.dynamicYAxis,
             chart_stats: this.chartStats,

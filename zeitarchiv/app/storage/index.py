@@ -781,6 +781,17 @@ class Index:
             # nur Einträge mit tatsächlicher Überschreibung, fehlende Entitäten
             # fallen weiterhin auf ihren friendly_name zurück.
             self._conn.execute("ALTER TABLE saved_charts ADD COLUMN entity_names TEXT NOT NULL DEFAULT '{}'")
+        if "hidden_entity_ids" not in sc_columns:
+            # Ausgeblendete Serien — JSON-Liste von entity_ids. Die Entität
+            # bleibt in entity_ids und behält damit Reihenfolge und Farbe (die
+            # hängt an der Position, siehe colorIndexFor() in
+            # chart_editor.js), wird aber nicht abgefragt und nicht
+            # gezeichnet. Eigene Spalte statt eines Markers in entity_ids,
+            # damit alter Code, der nur entity_ids liest, unverändert die
+            # vollständige Auswahl sieht.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN hidden_entity_ids TEXT NOT NULL DEFAULT '[]'"
+            )
         if "dashboard_position" not in sc_columns:
             # Historische Zwischenlösung (siehe Migration unten) — Dashboard-
             # Kacheln leben inzwischen in der typübergreifenden dashboard_pins-
@@ -1794,6 +1805,7 @@ class Index:
         range_key: str,
         continuous: bool,
         entity_names: dict[str, str] | None = None,
+        hidden_entity_ids: list[str] | None = None,
         resolution_preset: str = "auto",
         dynamic_y_axis: bool = True,
         dashboard_animation: bool = True,
@@ -1810,13 +1822,15 @@ class Index:
             self._ensure_valid_name_locked("saved_charts", name)
             cur = self._conn.execute(
                 "INSERT INTO saved_charts "
-                "(name, entity_ids, range_key, continuous, entity_names, resolution_preset, "
+                "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
+                "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
-                    json.dumps(entity_names or {}), resolution_preset,
+                    json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
+                    resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
@@ -1833,6 +1847,7 @@ class Index:
         range_key: str,
         continuous: bool,
         entity_names: dict[str, str] | None = None,
+        hidden_entity_ids: list[str] | None = None,
         resolution_preset: str = "auto",
         dynamic_y_axis: bool = True,
         dashboard_animation: bool = True,
@@ -1848,12 +1863,14 @@ class Index:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
             self._conn.execute(
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
-                "entity_names = ?, resolution_preset = ?, dynamic_y_axis = ?, dashboard_animation = ?, "
+                "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
+                "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
-                    json.dumps(entity_names or {}), resolution_preset,
+                    json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
+                    resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
@@ -1875,6 +1892,9 @@ class Index:
         d["show_values"] = bool(d.get("show_values", 0))
         d["average_line"] = bool(d.get("average_line", 0))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
+        d["hidden_entity_ids"] = (
+            json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []
+        )
         d["is_favorite"] = bool(d["is_favorite"])
         return d
 

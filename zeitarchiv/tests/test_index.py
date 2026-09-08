@@ -788,6 +788,47 @@ def test_get_or_create_entity_uses_configured_default_resolution_and_retention()
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_hidden_series_survive_save_and_default_to_none() -> None:
+    """Ausgeblendete Serien eines Charts.
+
+    Die Entität bleibt in entity_ids — Reihenfolge und Farbe hängen daran
+    (colorIndexFor() in chart_editor.js) — und steht zusätzlich in
+    hidden_entity_ids. Ein Chart aus der Zeit vor dieser Spalte hat dort
+    nichts stehen und muss als "nichts ausgeblendet" gelesen werden, nicht
+    als None.
+    """
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+
+        ohne = index.get_saved_chart(
+            index.create_saved_chart("Ohne", ["sensor.a"], "day", continuous=False)
+        )
+        assert ohne["hidden_entity_ids"] == []
+
+        chart_id = index.create_saved_chart(
+            "Mit", ["sensor.a", "sensor.b", "sensor.c"], "day", continuous=False,
+            hidden_entity_ids=["sensor.b"],
+        )
+        mit = index.get_saved_chart(chart_id)
+        assert mit["entity_ids"] == ["sensor.a", "sensor.b", "sensor.c"]
+        assert mit["hidden_entity_ids"] == ["sensor.b"]
+
+        index.update_saved_chart(
+            chart_id, "Mit", ["sensor.a", "sensor.b", "sensor.c"], "day",
+            continuous=False, hidden_entity_ids=["sensor.a", "sensor.c"],
+        )
+        assert index.get_saved_chart(chart_id)["hidden_entity_ids"] == ["sensor.a", "sensor.c"]
+
+        # Zurücknehmen muss die Liste wirklich leeren, nicht den alten Stand halten.
+        index.update_saved_chart(
+            chart_id, "Mit", ["sensor.a", "sensor.b", "sensor.c"], "day", continuous=False
+        )
+        assert index.get_saved_chart(chart_id)["hidden_entity_ids"] == []
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_saved_charts_create_list_get_update_delete() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:

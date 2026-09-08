@@ -3187,6 +3187,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "show_values": chart["show_values"] if chart else False,
         "average_line": chart["average_line"] if chart else False,
         "entity_names": chart["entity_names"] if chart else {},
+        "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
@@ -3235,6 +3236,7 @@ class _SaveChartBody(BaseModel):
     range_key: str
     continuous: bool = False
     entity_names: dict[str, str] = {}
+    hidden_entity_ids: list[EntityId] = []
     resolution_preset: str = "auto"
     dynamic_y_axis: bool = True
     chart_stats: bool = True
@@ -3244,6 +3246,16 @@ class _SaveChartBody(BaseModel):
     decimals: str = "auto"
     show_values: bool = False
     average_line: bool = False
+
+
+def _hidden_for(body: _SaveChartBody) -> list[str]:
+    """Ausgeblendete Serien, auf die tatsächlich ausgewählten begrenzt.
+
+    Der Editor filtert schon beim Absenden, hier noch einmal: eine ID, die
+    nicht in entity_ids steht, hätte im Chart keine Entsprechung und würde
+    stumm mitgespeichert, bis sie irgendwann wieder auftaucht."""
+    erlaubt = set(body.entity_ids)
+    return [eid for eid in body.hidden_entity_ids if eid in erlaubt]
 
 
 @app.post("/charts")
@@ -3267,7 +3279,8 @@ def charts_create(body: _SaveChartBody) -> dict:
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
-        entity_names, body.resolution_preset, body.dynamic_y_axis,
+        entity_names, hidden_entity_ids=_hidden_for(body),
+        resolution_preset=body.resolution_preset, dynamic_y_axis=body.dynamic_y_axis,
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
@@ -3307,8 +3320,9 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
-        body.continuous, entity_names, body.resolution_preset,
-        body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
+        body.continuous, entity_names, hidden_entity_ids=_hidden_for(body),
+        resolution_preset=body.resolution_preset,
+        dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line,
@@ -3343,7 +3357,9 @@ def charts_duplicate(chart_id: int) -> dict:
     new_id = index.create_saved_chart(
         index.copy_name_for("saved_charts", chart["name"]),
         chart["entity_ids"], chart["range_key"], chart["continuous"],
-        chart["entity_names"], chart["resolution_preset"], chart["dynamic_y_axis"],
+        chart["entity_names"], hidden_entity_ids=chart["hidden_entity_ids"],
+        resolution_preset=chart["resolution_preset"],
+        dynamic_y_axis=chart["dynamic_y_axis"],
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
@@ -3492,6 +3508,13 @@ def _dashboard_tiles_context(
                 "kind": "chart", "id": c["id"], "name": c["name"],
                 "entity_ids": c["entity_ids"], "range_key": c["range_key"],
                 "continuous": c["continuous"], "entity_names": c["entity_names"],
+                # Ausgeblendete Serien reichen bis in die Kachel: sie sollen
+                # dort weder gezeichnet noch in der Legende gezählt werden.
+                # Die Liste (statt einer schon gefilterten entity_ids) geht
+                # mit, weil die Farbe an der Position in der VOLLEN Auswahl
+                # hängt — sonst wären dieselben Serien auf Chart-Seite und
+                # Kachel unterschiedlich eingefärbt.
+                "hidden_entity_ids": c["hidden_entity_ids"],
                 "resolution_preset": c["resolution_preset"],
                 "dynamic_y_axis": c["dynamic_y_axis"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
