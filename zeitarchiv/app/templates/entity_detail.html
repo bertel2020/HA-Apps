@@ -162,7 +162,7 @@
             </label>
             <div class="menu-divider"></div>
             <div class="menu-section-label">Darstellung</div>
-            <div class="menu-row">
+            <div class="menu-row menu-row-stack">
               <span class="menu-row-label">Diagrammtyp</span>
               <div class="seg">
                 <button :class="{active: chartType === 'line'}" @click="setChartType('line')">Linie</button>
@@ -171,8 +171,13 @@
                      .seg button:last-child (Rahmen-Regel) sonst weiter auf diesem
                      unsichtbaren letzten Button statt auf "Balken" greifen, sichtbar
                      als überzähliger Trennstrich hinter Balken. Nur bei Schalter-
-                     Entitäten (binary_sensor/switch/input_boolean) — ein Zeitstrahl
-                     aus 0/1-Werten ergäbe bei anderen Typen keinen Sinn. -->
+                     Entitäten (binary_sensor/switch/input_boolean/device_tracker/
+                     person) — ein Zeitstrahl aus 0/1-Werten ergäbe bei anderen
+                     Typen keinen Sinn. Zeile bewusst als menu-row-stack (Label
+                     über statt neben dem Segment, wie bei Nachkommastellen
+                     unten): mit dem dritten Button "Zeitstrahl" quetscht das
+                     Label sonst auf schmalen Bildschirmen auf wenige Pixel und
+                     bricht buchstabenweise um. -->
                 {% if aggregation_type == 'switch' %}
                 <button :class="{active: chartType === 'timeline'}" @click="setChartType('timeline')">Zeitstrahl</button>
                 {% endif %}
