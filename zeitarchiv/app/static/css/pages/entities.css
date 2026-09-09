@@ -51,10 +51,13 @@
   .dtile-entity-number{font-family:var(--font-display);font-size:calc(28px * var(--font-scale, 1));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
   .dtile-entity-unit{font-size:calc(14px * var(--font-scale, 1));color:var(--ink-muted);}
   .dtile-entity-age{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;white-space:nowrap;}
-  /* Nur der Kartenrahmen zeigt "veraltet" an, Wert/Text bleiben immer
-     neutral — siehe identische Regeln/Begründung in dashboard_detail.html. */
-  .dtile-entity.is-warn{border-width:2px;border-color:#D9A22B;}
-  .dtile-entity.is-stale{border-width:2px;border-color:var(--danger);}
+  /* Kartenrahmen zeigt "veraltet" an, der Hauptwert bleibt immer neutral;
+     bei is-warn/is-stale färbt sich zusätzlich die Altersangabe mit — siehe
+     identische Regeln/Begründung in dashboard_detail.html. */
+  .dtile-entity.is-warn{--warn-tint:color-mix(in srgb, #D9A22B 55%, var(--border-strong));border-width:1px;border-color:var(--warn-tint);}
+  .dtile-entity.is-warn .dtile-entity-age{color:var(--warn-tint);}
+  .dtile-entity.is-stale{--stale-tint:color-mix(in srgb, var(--danger) 55%, var(--border-strong));border-width:1px;border-color:var(--stale-tint);}
+  .dtile-entity.is-stale .dtile-entity-age{color:var(--stale-tint);}
   /* .sparkline/.area/.line selbst kommen aus app.css (dieselbe Optik wie die
      Statistik-Kacheln dieser Seite) — dieser Wrapper regelt nur den Abstand
      zur Werte-Zeile darüber. */
@@ -66,7 +69,8 @@
      neuen Farbwerte. cursor:help, weil jede Kennzahl einen erklärenden
      Tooltip trägt (data-tooltip-fixed, siehe unten). */
   .dtile-entity-stats{
-    flex:none;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 9px;margin-top:2px;
+    flex:none;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 9px;margin-top:4px;padding-top:6px;
+    border-top:1px solid var(--border);
     font-size:calc(11.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;line-height:1.35;
   }
   .dtile-entity-stat{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap;cursor:help;}

@@ -58,23 +58,36 @@
   .dtile-entity-main{display:flex;align-items:baseline;gap:5px;}
   .dtile-entity-number{font-family:var(--font-display);font-size:calc(28px * var(--font-scale, 1));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
   .dtile-entity-unit{font-size:calc(14px * var(--font-scale, 1));color:var(--ink-muted);}
-  /* Wie .stat .sub-value: kein Mono, dieselbe dezente Farbe/Größe — bleibt
-     unabhängig vom Alter immer neutral, siehe .dtile-entity.is-warn/is-stale
-     unten (nur der Kartenrahmen zeigt "veraltet" an, nicht der Text). Kein
+  /* Wie .stat .sub-value: kein Mono, dieselbe dezente Farbe/Größe. Der
+     Hauptwert bleibt unabhängig vom Alter immer neutral (Konzept-Wunsch,
+     siehe unten) — nur die Altersangabe selbst färbt sich bei is-stale mit,
+     siehe .dtile-entity.is-stale .dtile-entity-age unten. Kein
      margin-left:auto mehr — sitzt jetzt als normales, mitzentriertes Element
      neben Wert/Einheit statt separat rechtsbündig. */
   .dtile-entity-age{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;white-space:nowrap;}
-  /* Letzter Wert älter als 15 Minuten (gelb) bzw. eine Stunde (rot) — nur der
-     Kartenrahmen hebt das hervor, der Wert selbst bleibt immer schwarz
-     (Konzept-Wunsch). is-warn/is-stale werden sowohl beim Server-Rendern
-     (Erstanzeige) als auch client-seitig nach jedem Live-Fetch gesetzt
-     (dashboard-tiles.js renderEntityTile()) — Letzteres ist die verlässliche
-     Quelle, siehe der last_value-Bug, der zum Umstieg auf Live-Fetches
-     geführt hat. #D9A22B dieselbe Gold-Farbe wie der Favoriten-Stern
-     (.fav-star.active), da die App keine eigene Gelb/Warn-Variable kennt;
-     Rot wiederverwendet die bestehende --danger-Variable. */
-  .dtile-entity.is-warn{border-width:2px;border-color:#D9A22B;}
-  .dtile-entity.is-stale{border-width:2px;border-color:var(--danger);}
+  /* Letzter Wert älter als 15 Minuten (gelb) bzw. eine Stunde (rot). Der
+     Hauptwert bleibt immer schwarz (Konzept-Wunsch); Kartenrahmen und
+     Altersangabe heben das Alter hervor. is-warn/is-stale werden sowohl beim
+     Server-Rendern (Erstanzeige) als auch client-seitig nach jedem Live-Fetch
+     gesetzt (dashboard-tiles.js renderEntityTile()) — Letzteres ist die
+     verlässliche Quelle, siehe der last_value-Bug, der zum Umstieg auf
+     Live-Fetches geführt hat. #D9A22B dieselbe Gold-Farbe wie der
+     Favoriten-Stern (.fav-star.active), da die App keine eigene Gelb/Warn-
+     Variable kennt; Rot wiederverwendet die bestehende --danger-Variable.
+
+     border-width wie jede normale Kachel (1px) statt eigens verdickt, Farbe
+     zu --border-strong hin gemischt statt voller Sättigung: das kräftige Rot
+     wirkte auf einer Kachel mit unauffälligem Wert wie ein Fehlerzustand
+     statt wie ein Altershinweis, Gold bekommt zur Konsistenz dieselbe
+     Behandlung. color-mix() statt hartkodierter Töne, damit es automatisch
+     zum aktiven Schema/Hell-Dunkel passt statt für alle acht Schema-Varianten
+     einzeln gepflegt zu werden. Je eine eigene Custom Property, damit die
+     Altersangabe darunter denselben Ton übernimmt, ohne den
+     color-mix()-Ausdruck doppelt zu pflegen. */
+  .dtile-entity.is-warn{--warn-tint:color-mix(in srgb, #D9A22B 55%, var(--border-strong));border-width:1px;border-color:var(--warn-tint);}
+  .dtile-entity.is-warn .dtile-entity-age{color:var(--warn-tint);}
+  .dtile-entity.is-stale{--stale-tint:color-mix(in srgb, var(--danger) 55%, var(--border-strong));border-width:1px;border-color:var(--stale-tint);}
+  .dtile-entity.is-stale .dtile-entity-age{color:var(--stale-tint);}
   /* .sparkline/.area/.line selbst kommen aus app.css (dieselbe Optik wie die
      Statistik-Kacheln der Übersichtsseite) — dieser Wrapper regelt nur den
      Abstand zur Werte-Zeile darüber. */
@@ -86,7 +99,8 @@
      neuen Farbwerte. cursor:help, weil jede Kennzahl einen erklärenden
      Tooltip trägt (data-tooltip-fixed, siehe unten). */
   .dtile-entity-stats{
-    flex:none;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 9px;margin-top:2px;
+    flex:none;display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 9px;margin-top:4px;padding-top:6px;
+    border-top:1px solid var(--border);
     font-size:calc(11.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;line-height:1.35;
   }
   .dtile-entity-stat{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap;cursor:help;}

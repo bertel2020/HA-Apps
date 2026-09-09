@@ -2036,22 +2036,33 @@ class Index:
         Umschalten plötzlich nur noch halb so groß wirken. Beim Ausschalten
         umgekehrt auf die alte Obergrenze (3) gekappt statt rechnerisch
         halbiert — eine im Präzisen Modus z. B. auf 5 gesetzte Kachel hat
-        kein eindeutiges "halbes" Äquivalent im gröberen Gitter."""
+        kein eindeutiges "halbes" Äquivalent im gröberen Gitter.
+
+        Verdoppelt wird nur bei einem tatsächlichen Wechsel aus->an: ein
+        wiederholter Aufruf mit precise=True, während der Modus schon an ist
+        (z. B. Doppelklick/doppelter Request), darf die Kacheln nicht ein
+        zweites Mal verdoppeln — sonst wachsen sie unbegrenzt (z. B. 4->8->16)
+        und sprengen das auf 6 Spalten begrenzte Grid (.dashboard-grid.is-
+        precise), was zu 0px-breiten Spalten und überlappenden Kacheln führt.
+        MIN(..., 6) danach zusätzlich als Sicherheitsnetz, falls doch einmal
+        ein Wert außer der Reihe zustande kommt."""
         with self._lock, self._conn:
-            exists = self._conn.execute(
-                "SELECT 1 FROM dashboards WHERE id = ?", (dashboard_id,)
+            row = self._conn.execute(
+                "SELECT precise_mode FROM dashboards WHERE id = ?", (dashboard_id,)
             ).fetchone()
-            if exists is None:
+            if row is None:
                 return False
+            was_precise = bool(row["precise_mode"])
             self._conn.execute(
                 "UPDATE dashboards SET precise_mode = ? WHERE id = ?", (1 if precise else 0, dashboard_id)
             )
-            if precise:
+            if precise and not was_precise:
                 self._conn.execute(
-                    "UPDATE dashboard_pins SET grid_cols = grid_cols * 2, grid_rows = grid_rows * 2 "
+                    "UPDATE dashboard_pins SET "
+                    "grid_cols = MIN(grid_cols * 2, 6), grid_rows = MIN(grid_rows * 2, 6) "
                     "WHERE dashboard_id = ?", (dashboard_id,),
                 )
-            else:
+            elif not precise:
                 self._conn.execute(
                     "UPDATE dashboard_pins SET grid_cols = MIN(grid_cols, 3), grid_rows = MIN(grid_rows, 3) "
                     "WHERE dashboard_id = ?", (dashboard_id,),
