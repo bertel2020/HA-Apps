@@ -315,6 +315,10 @@
     // zeichnet sie mit, damit ein angeheftetes Chart nicht anders aussieht als
     // dasselbe Chart auf seiner eigenen Seite.
     const averageLine = el.dataset.averageLine === 'true';
+    // "Fläche" (Optionen-Menü der Chart-Seite, chart_editor.js) — dieselbe
+    // dezente Füllfläche wie auf der eigenen Chart-Seite, damit ein
+    // angeheftetes Chart nicht anders aussieht als dasselbe Chart dort.
+    const areaFill = el.dataset.areaFill !== 'false';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -565,8 +569,9 @@
         cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
-        // dank der niedrigen Deckkraft nicht.
-        cfg.areaStyle = {color, opacity: 0.08};
+        // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
+        // "Fläche"), Default an — siehe chart_editor.js.
+        if (areaFill) cfg.areaStyle = {color, opacity: 0.08};
       } else {
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
       }

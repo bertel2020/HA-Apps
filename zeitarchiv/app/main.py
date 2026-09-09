@@ -3185,6 +3185,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "decimals": chart["decimals"] if chart else "auto",
         "show_values": chart["show_values"] if chart else False,
         "average_line": chart["average_line"] if chart else False,
+        "area_fill": chart["area_fill"] if chart else True,
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
@@ -3245,6 +3246,7 @@ class _SaveChartBody(BaseModel):
     decimals: str = "auto"
     show_values: bool = False
     average_line: bool = False
+    area_fill: bool = True
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3283,7 +3285,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line,
+        average_line=body.average_line, area_fill=body.area_fill,
     )
     return {"id": chart_id}
 
@@ -3324,7 +3326,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line,
+        average_line=body.average_line, area_fill=body.area_fill,
     )
     return {"id": chart_id}
 
@@ -3362,7 +3364,7 @@ def charts_duplicate(chart_id: int) -> dict:
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
-        average_line=chart["average_line"],
+        average_line=chart["average_line"], area_fill=chart["area_fill"],
     )
     return {"id": new_id}
 
@@ -3538,7 +3540,7 @@ def _dashboard_tiles_context(
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
                 "legend_style": c["legend_style"], "chart_type": c["chart_type"],
                 "show_values": c["show_values"], "decimals": c["decimals"],
-                "average_line": c["average_line"],
+                "average_line": c["average_line"], "area_fill": c["area_fill"],
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

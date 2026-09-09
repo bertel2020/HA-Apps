@@ -350,6 +350,7 @@
         showPoints: false,
         showValues: SHOW_VALUES,
         averageLine: AVERAGE_LINE,
+        areaFill: AREA_FILL,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -862,6 +863,11 @@
               // 'none') — siehe entity_detail.html, ECharts' interne Options-
               // Normalisierung stürzt sonst ab.
               if (!this.showPoints) main.symbol = 'none';
+              // Dezente Füllfläche unter der Linie (Optionen-Menü, "Fläche") —
+              // dieselbe Opacity wie auf der Dashboard-Kachel (dashboard-
+              // tiles.js), damit ein angeheftetes Chart nicht anders aussieht
+              // als auf seiner eigenen Seite.
+              if (this.areaFill) main.areaStyle = {color, opacity: 0.08};
             }
             // Durchschnittslinie (Optionen-Menü, "Darstellung") — je Serie eine,
             // in deren eigener Farbe und auf deren eigener y-Achse
@@ -930,6 +936,11 @@
               if (chartType === 'line') {
                 cmp.smooth = true;
                 if (!this.showPoints) cmp.symbol = 'none';
+                // Niedrigere Deckkraft als die Hauptserie (main, s. o.) — die
+                // Vergleichs-Nebenserie ist ohnehin schon gestrichelt/blasser
+                // (lineStyle.opacity 0.5 oben), zwei überlagerte Flächen in
+                // gleicher Stärke würden sich sonst gegenseitig zumatschen.
+                if (this.areaFill) cmp.areaStyle = {color, opacity: 0.05};
               }
               echartsSeries.push(cmp);
             }
@@ -1168,6 +1179,7 @@
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
+            area_fill: this.areaFill,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

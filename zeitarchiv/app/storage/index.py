@@ -864,6 +864,18 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN average_line INTEGER NOT NULL DEFAULT 0"
             )
+        if "area_fill" not in sc_columns:
+            # "Fläche" (Optionen-Menü, "Darstellung") — dezente Füllfläche unter
+            # Linien-Serien. War auf der Dashboard-Kachel (dashboard-tiles.js)
+            # schon immer fest an, auf der Chart-Seite selbst (chart_editor.js)
+            # dagegen bislang gar nicht vorhanden — dieselbe Inkonsistenz wie
+            # seinerzeit bei show_values. Default AN (nicht 0 wie show_values/
+            # average_line): das entspricht dem bisherigen, unveränderten
+            # Verhalten der Dashboard-Kachel, bestehende Charts sehen dort mit
+            # der neuen Spalte also unverändert aus.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN area_fill INTEGER NOT NULL DEFAULT 1"
+            )
         if "decimals" not in sc_columns:
             # Nachkommastellen-Übersteuerung (Optionen-Menü, "Darstellung") —
             # "auto" übernimmt weiterhin je Serie deren eigene entities.decimals-
@@ -1832,6 +1844,7 @@ class Index:
         decimals: str = "auto",
         show_values: bool = False,
         average_line: bool = False,
+        area_fill: bool = True,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1841,8 +1854,8 @@ class Index:
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, decimals, show_values, average_line, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, decimals, show_values, average_line, area_fill, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1850,7 +1863,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), now, now,
+                    int(average_line), int(area_fill), now, now,
                 ),
             )
             return cur.lastrowid
@@ -1874,6 +1887,7 @@ class Index:
         decimals: str = "auto",
         show_values: bool = False,
         average_line: bool = False,
+        area_fill: bool = True,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -1882,7 +1896,7 @@ class Index:
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, average_line = ?, updated_at = ? WHERE id = ?",
+                "show_values = ?, average_line = ?, area_fill = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1890,7 +1904,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), time.time(), chart_id,
+                    int(average_line), int(area_fill), time.time(), chart_id,
                 ),
             )
 
@@ -1907,6 +1921,7 @@ class Index:
         d["decimals"] = d.get("decimals") or "auto"
         d["show_values"] = bool(d.get("show_values", 0))
         d["average_line"] = bool(d.get("average_line", 0))
+        d["area_fill"] = bool(d.get("area_fill", 1))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []
