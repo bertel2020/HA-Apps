@@ -104,7 +104,7 @@ def test_health_probe_401_is_labelled_not_warned() -> None:
     log_http_request("GET", "/api/health", 401, 2.5, request_id="health-401-test")
     lines = local_log_lines(search="health-401-test", limit=50)
     assert any(
-        "INFO" in line and "event=healthcheck_probe" in line and "Healthcheck-Sonde" in line
+        "INFO" in line and "event=healthcheck_probe" in line and "Healthcheck" in line
         for line in lines
     )
     assert not any("WARNING" in line for line in lines)

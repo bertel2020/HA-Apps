@@ -280,7 +280,7 @@ def log_http_request(
         # statt WARNING, damit das im Protokoll nicht wie ein echter
         # Unauthorized-Zugriff aussieht.
         log.info(
-            "%s %s -> %d (Healthcheck-Sonde, kein Token nötig) · %.1f ms · event=healthcheck_probe request_id=%s",
+            "%s %s -> %d (Healthcheck, kein Token nötig) · %.1f ms · event=healthcheck_probe request_id=%s",
             method, path, status, duration_ms, request_field,
         )
         return
