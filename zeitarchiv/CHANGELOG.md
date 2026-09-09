@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.91.1 - 2026-09-09
+
+### Behoben
+
+- Die Konfigurationsseite einer Entität (inkl. „Entität entfernen") konnte
+  bei sehr datenreichen Entitäten mit einem Fehler abbrechen, statt zu
+  laden. Betroffen waren Entitäten mit sehr vielen Werten in den letzten
+  60 Tagen.
+
 ## 0.91.0 - 2026-09-09
 
 ### Neu
