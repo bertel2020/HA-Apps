@@ -78,6 +78,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
+from . import demo_mode
 from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
@@ -165,7 +166,10 @@ EntityId = Annotated[
 ]
 
 APP_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("ZEITARCHIV_DATA_DIR", "/data"))
+BASE_DIR = Path(os.environ.get("ZEITARCHIV_DATA_DIR", "/data"))
+_OPTIONS = demo_mode.load_options(BASE_DIR)  # Auflösung siehe demo_mode.py (DEMO_MODUS_PLAN.md)
+DEMO_MODE = demo_mode.resolve_demo_mode(_OPTIONS)
+DATA_DIR = demo_mode.demo_dir(BASE_DIR) if DEMO_MODE else BASE_DIR
 # Entpackter Symcon-db-Ordner aus einem ZIP-Upload (Konzept Abschnitt 03) — kein
 # Bind-Mount mehr nötig, bleibt bis zum expliziten /import/delete erhalten.
 SYMCON_IMPORT_DIR = DATA_DIR / "symcon_import"
@@ -210,14 +214,6 @@ BACKUP_WEEKDAY_OPTIONS = [
 ]
 
 
-def _load_options() -> dict:
-    options_path = DATA_DIR / "options.json"
-    if options_path.exists():
-        return json.loads(options_path.read_text(encoding="utf-8"))
-    return {}
-
-
-_OPTIONS = _load_options()
 TZ = load_timezone(_OPTIONS, on_invalid=logger.error)
 
 # Je eine Stufe unter/über "Normal" (Einstellungen, Bereich "Darstellung").
@@ -343,6 +339,18 @@ def _app_root_context(request: Request) -> dict:
     return {"app_root": app_root}
 
 
+def _collect_all_notices() -> list[dict]:
+    """Ein Aufhänger für drei gleichlautende collect_notices()-Aufrufstellen
+    statt derselben elf Argumente je einmal (_background existiert erst
+    später im Modul — unproblematisch, gebunden wird erst beim Aufruf)."""
+    return collect_notices(
+        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+        _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+        _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+        _background.last_backup_worker_tick, _background.backup_progress.running, _background.demo_dir_info_cached,
+    )
+
+
 def _notices_context(request: Request) -> dict:
     """Für das Hinweis-Center (Glocken-Icon) in _topnav.html — läuft wie
     _app_root_context automatisch für JEDE TemplateResponse mit, statt dass
@@ -350,12 +358,7 @@ def _notices_context(request: Request) -> dict:
     in ihren Kontext aufnehmen müsste. collect_notices() fragt bewusst nur
     günstige Werte ab (PRAGMA-Stats, LIMIT-1-Queries), siehe notices.py."""
     return {
-        "notices": collect_notices(
-            index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
-            _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-            _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-            _background.last_backup_worker_tick, _background.backup_progress.running,
-        ),
+        "notices": _collect_all_notices(),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
         # Rein im Arbeitsspeicher (siehe activity_snapshot()) — kein Datei-
         # oder Datenbankzugriff, deshalb tragbar in einem Kontextprozessor,
@@ -636,6 +639,7 @@ _background = BackgroundService(BackgroundDependencies(
     tz=TZ,
     index=index,
     coordinator=storage_coordinator,
+    base_dir=BASE_DIR, demo_mode_active=DEMO_MODE,
     backups_dir=BACKUPS_DIR,
     symcon_import_dir=SYMCON_IMPORT_DIR,
     csv_import_dir=CSV_IMPORT_DIR,
@@ -693,20 +697,13 @@ _ENTITY_TRACE_DURATION_SECONDS = 15 * 60
 app.include_router(
     api_routes.create_api_router(
         api_routes.ApiDependencies(
-            data_dir=DATA_DIR,
-            index=index,
-            tz=TZ,
-            coordinator=storage_coordinator,
-            ingestion=ingestion_service,
+            data_dir=DATA_DIR, index=index, tz=TZ,
+            coordinator=storage_coordinator, ingestion=ingestion_service,
             api_token=_current_api_token,
             app_version=APP_VERSION,
-            collect_notices=lambda: collect_notices(
-                index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
-                _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-                _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-                _background.last_backup_worker_tick, _background.backup_progress.running,
-            ),
+            collect_notices=_collect_all_notices,
             latest_backup=lambda: notices_mod.latest_backup_info(index),
+            demo_mode_active=DEMO_MODE,
         ),
         _api_state,
     )
@@ -1264,6 +1261,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
                 index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
                 _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
                 _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+                demo_dir_info=_background.demo_dir_info_cached,
             )
             if n["id"] == notice_id
         ),
@@ -1280,12 +1278,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     seconds = notices_mod.SNOOZE_PRESETS[duration]
     until = time.time() + seconds if seconds is not None else None
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
-    remaining = collect_notices(
-        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
-        _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-        _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-        _background.last_backup_worker_tick, _background.backup_progress.running,
-    )
+    remaining = _collect_all_notices()
     return {"success": True, "remaining_count": len(remaining)}
 
 
@@ -5126,6 +5119,7 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     tz=TZ,
     index=index,
     coordinator=storage_coordinator,
+    base_dir=BASE_DIR, demo_mode_active=DEMO_MODE,
     templates=templates,
     retention_default_time=RETENTION_DEFAULT_TIME,
     retention_default_weekday=RETENTION_DEFAULT_WEEKDAY,

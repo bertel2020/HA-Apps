@@ -237,6 +237,17 @@
         </div>
       </section>
 
+      {# Demo-Modus (DEMO_MODUS_PLAN.md) — Abschnitt existiert nur, wenn
+         demo_state gesetzt ist: entweder läuft die Instanz gerade im
+         Demo-Modus, oder es liegt noch eine ungenutzte Demo-Instanz auf der
+         Platte (demo_mode.current_demo_state()). Bei normalem Betrieb ohne
+         Demo-Daten fehlt der Abschnitt komplett — kostet dann nichts. #}
+      {% if demo_state %}
+      <section id="demo-daten" class="settings-section">
+        {% include "_housekeeping_demo_data_body.html" %}
+      </section>
+      {% endif %}
+
       <section id="rotation" class="settings-section">
         <h2 class="settings-section-title">Rotation {{ hint_button('Rotation') }}</h2>
         {# Stand bis hierher als erste Zeile in _settings_rotation_form.html.

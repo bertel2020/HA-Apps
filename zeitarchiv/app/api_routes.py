@@ -132,6 +132,12 @@ class ApiDependencies:
     app_version: str
     collect_notices: Callable[[], list[dict]]
     latest_backup: Callable[[], dict | None]
+    # Grundlage für sensor.zeitarchiv_betriebsmodus (Integration) — siehe
+    # DEMO_MODUS_PLAN.md Punkt 11. Default False, damit die zahlreichen
+    # Test-Konstruktionsstellen dieser Dataclass (Schreib-/Lese-Endpunkte,
+    # die mit Demo-Modus nichts zu tun haben) nicht alle angefasst werden
+    # müssen — main.py setzt ihn explizit auf DEMO_MODE.
+    demo_mode_active: bool = False
 
 
 def expire_write_capture(capture: dict, now: float | None = None) -> bool:
@@ -379,7 +385,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             getattr(request.state, "request_id", "-"),
             x_zeitarchiv_integration_version,
         )
-        return {"notices": deps.collect_notices(), "latest_backup": deps.latest_backup()}
+        return {
+            "notices": deps.collect_notices(),
+            "latest_backup": deps.latest_backup(),
+            "demo_mode": deps.demo_mode_active,
+        }
 
     @router.post("/api/write")
     def write(
