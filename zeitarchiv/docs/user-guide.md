@@ -588,14 +588,16 @@ Bestand der Entität und läuft deshalb nur auf Klick.
 
 ### Anzeigemodus
 
-Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`):
+Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`, `person`):
 
 - **AN/AUS (Rohwert)** zeigt den Zustand als 0/1.
 - **Zeit (Dauer)** zeigt stattdessen die kumulierte Einschaltdauer je Zeitraum,
   lesbar formatiert (z. B. `1h 29m`) — sinnvoll bei Anwesenheits-, Tür- und
   Bewegungssensoren.
 
-Als Schalter gelten die Domains `binary_sensor`, `switch` und `input_boolean`.
+Als Schalter gelten die Domains `binary_sensor`, `switch`, `input_boolean`,
+`device_tracker` und `person` — bei Letzteren gilt `home` als „an", jeder
+andere Zustand (`not_home` oder eine benannte Zone) als „aus".
 
 ### Was rückwirkend wirkt — und was nicht
 
