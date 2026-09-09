@@ -2138,7 +2138,7 @@ class Index:
     # damit denselben Kachel-Grenzwert, siehe DASHBOARD_TILE_LIMIT — jeweils
     # pro Dashboard gezählt). ---------------------------------------------
 
-    DASHBOARD_TILE_LIMIT = 18
+    DASHBOARD_TILE_LIMIT = 30
 
     def list_dashboard_pins(self, dashboard_id: int) -> list[dict]:
         """Angeheftete Kacheln eines Dashboards in Reihenfolge — item_type ist
@@ -2156,12 +2156,18 @@ class Index:
 
     def count_dashboard_pins(self, dashboard_id: int | None = None) -> int:
         """Ohne dashboard_id: Gesamtzahl über alle Dashboards (Statistik-Seite).
-        Mit dashboard_id: Belegung des Kachel-Limits eines einzelnen Dashboards."""
+        Mit dashboard_id: Belegung des Kachel-Limits eines einzelnen Dashboards.
+        Sektions-Trenner (item_type='section') zählen bewusst nicht mit — sie
+        rendern weder Chart noch Tabelle noch Live-Fetch, tragen also nichts zu
+        der Rendering-Last bei, die DASHBOARD_TILE_LIMIT eigentlich begrenzt."""
         with self._lock, self._conn:
             if dashboard_id is None:
-                return self._conn.execute("SELECT COUNT(*) FROM dashboard_pins").fetchone()[0]
+                return self._conn.execute(
+                    "SELECT COUNT(*) FROM dashboard_pins WHERE item_type != 'section'"
+                ).fetchone()[0]
             return self._conn.execute(
-                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'",
+                (dashboard_id,),
             ).fetchone()[0]
 
     def is_pinned(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
@@ -2193,15 +2199,18 @@ class Index:
 
     def pin_item_to_dashboard(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
         """Heftet ein Chart oder eine Vergleichstabelle als neue letzte Kachel
-        eines Dashboards an — False, wenn das Limit von 18 gleichzeitigen
-        Kacheln (Konzept "Offene Punkte": Performance, viele ECharts-Instanzen/
-        Tabellen auf einer Seite) für DIESES Dashboard schon erreicht ist, dann
-        bleibt alles unverändert. UNIQUE(dashboard_id, item_type, item_id)
-        verhindert nebenbei ein doppeltes Anheften auf demselben Dashboard —
-        dasselbe Objekt auf einem ANDEREN Dashboard ist dagegen erlaubt."""
+        eines Dashboards an — False, wenn das Limit von DASHBOARD_TILE_LIMIT
+        gleichzeitigen Kacheln (Konzept "Offene Punkte": Performance, viele
+        ECharts-Instanzen/Tabellen auf einer Seite) für DIESES Dashboard schon
+        erreicht ist, dann bleibt alles unverändert. Sektions-Trenner zählen
+        nicht mit, siehe count_dashboard_pins(). UNIQUE(dashboard_id, item_type,
+        item_id) verhindert nebenbei ein doppeltes Anheften auf demselben
+        Dashboard — dasselbe Objekt auf einem ANDEREN Dashboard ist dagegen
+        erlaubt."""
         with self._lock, self._conn:
             count = self._conn.execute(
-                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'",
+                (dashboard_id,),
             ).fetchone()[0]
             if count >= self.DASHBOARD_TILE_LIMIT:
                 return False
@@ -2275,6 +2284,66 @@ class Index:
                 (dashboard_id, item_type, item_id),
             )
 
+    # -- Sektionen (item_type='section') — benannte Trenner zur Gliederung
+    # gepinnter Kacheln, selbst ein weiterer Eintrag in derselben Reihenfolge
+    # wie Charts/Tabellen/Werte-Kacheln, kein eigenes Datenmodell. Eine Kachel
+    # "gehört" zu dem Trenner, der ihr in list_dashboard_pins() (sortiert nach
+    # position) zuletzt vorausgeht — main.py leitet die Gruppierung beim
+    # Rendern rein aus dieser Reihenfolge ab, hier wird nichts dergleichen
+    # gespeichert. item_id trägt hier die eigene Zeilen-id (zweistufig
+    # eingesetzt, siehe add_dashboard_section()) statt wie bei Charts/Tabellen
+    # auf ein anderes Objekt zu verweisen — nötig, damit
+    # UNIQUE(dashboard_id, item_type, item_id, item_entity_id) mehrere
+    # Sektionen desselben Dashboards zulässt (item_entity_id bleibt NULL,
+    # gleichnamige Sektionen sind erlaubt). -------------------------------
+
+    def add_dashboard_section(self, dashboard_id: int, name: str) -> int | None:
+        """Fügt einen Sektions-Trenner als neue letzte Zeile an. None bei
+        leerem Namen (Aufrufer validiert zusätzlich, das hier ist die letzte
+        Absicherung)."""
+        name = name.strip()[:MAX_CUSTOM_NAME_LENGTH]
+        if not name:
+            return None
+        with self._lock, self._conn:
+            max_pos = self._conn.execute(
+                "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
+            cursor = self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, title) "
+                "VALUES (?, 'section', 0, ?, ?)",
+                (dashboard_id, (max_pos or 0) + 1, name),
+            )
+            new_id = cursor.lastrowid
+            # item_id=0 war nur ein Platzhalter für den INSERT (item_id steht
+            # erst danach fest) — auf die eigene id nachgezogen, siehe
+            # Erklärung oben. Eine zweite Sektion böte sonst mit demselben
+            # item_id=0/item_entity_id=NULL ein Duplikat der UNIQUE-Tupel.
+            self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (new_id, new_id))
+            return new_id
+
+    def rename_dashboard_section(self, dashboard_id: int, section_id: int, name: str) -> bool:
+        name = name.strip()[:MAX_CUSTOM_NAME_LENGTH]
+        if not name:
+            return False
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET title = ? WHERE id = ? AND dashboard_id = ? AND item_type = 'section'",
+                (name, section_id, dashboard_id),
+            )
+            return cursor.rowcount > 0
+
+    def remove_dashboard_section(self, dashboard_id: int, section_id: int) -> bool:
+        """Löst die Sektion auf: nur der Trenner verschwindet, die Kacheln
+        bleiben unangetastet an ihrer position stehen und rutschen dadurch von
+        selbst in die vorausgehende Sektion (oder werden "ohne Sektion", falls
+        es die erste war) — siehe Kommentar oben, keine Nachbearbeitung nötig."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "DELETE FROM dashboard_pins WHERE id = ? AND dashboard_id = ? AND item_type = 'section'",
+                (section_id, dashboard_id),
+            )
+            return cursor.rowcount > 0
+
     # -- Werte-Kacheln (item_type='entity') — eine Entität direkt angeheftet,
     # ohne zuerst ein Chart/eine Tabelle anzulegen (Konzept-Erweiterung).
     # Eigene Methoden statt die obigen chart/table-Funktionen um item_entity_id
@@ -2288,7 +2357,8 @@ class Index:
         Beschränkung der Tabelle)."""
         with self._lock, self._conn:
             count = self._conn.execute(
-                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'",
+                (dashboard_id,),
             ).fetchone()[0]
             if count >= self.DASHBOARD_TILE_LIMIT:
                 return False

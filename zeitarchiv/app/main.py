@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import (
     FileResponse,
@@ -3498,7 +3498,19 @@ def _dashboard_tiles_context(
     entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
     tiles = []
+    # Sektionen (item_type='section') gruppieren die Kacheln rein über ihre
+    # Position in derselben Liste — keine Kachel trägt eine section_id. Die
+    # erste, kopflose Gruppe sammelt alles vor dem ersten Trenner ("ohne
+    # Sektion"); jeder weitere Trenner eröffnet eine neue Gruppe mit eigenem
+    # Mini-Raster (siehe _dashboard_tiles.html) statt eines gemeinsamen, vollen
+    # Rasters — das hält Sektionsköpfe im präzisen Modus kompakt (kein
+    # Rasterelement mit fester grid-auto-rows-Höhe) und "Lücken auffüllen" pro
+    # Sektion begrenzt.
+    groups: list[dict] = [{"title": None, "section_id": None, "tiles": []}]
     for p in pins:
+        if p["item_type"] == "section":
+            groups.append({"title": p["title"] or "", "section_id": p["id"], "tiles": []})
+            continue
         if p["item_type"] == "chart":
             c = index.get_saved_chart(p["item_id"])
             if c is None:
@@ -3528,6 +3540,7 @@ def _dashboard_tiles_context(
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"],
             })
+            groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":
             t = index.get_saved_table(p["item_id"])
             if t is None:
@@ -3537,6 +3550,7 @@ def _dashboard_tiles_context(
                 "columns": t["columns"], "rows": t["rows"], "style": t["style"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
+            groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "entity":
             e = index.get_entity(p["item_entity_id"])
             if e is None:
@@ -3596,6 +3610,14 @@ def _dashboard_tiles_context(
                 "sparkline_resolution": p["sparkline_resolution"],
                 **metric_context,
             })
+            groups[-1]["tiles"].append(tiles[-1])
+    # Eine leere kopflose Erstgruppe (alle Kacheln liegen bereits hinter einem
+    # Trenner) wird nicht mitgerendert — sonst stünde ein leeres, unbenanntes
+    # Mini-Raster über der ersten echten Sektion. Bleibt sie die einzige
+    # Gruppe (frisches Dashboard ganz ohne Sektionen/Kacheln), muss sie
+    # stehen bleiben, sie trägt dann die "+"-Kachel.
+    if not groups[0]["tiles"] and len(groups) > 1:
+        groups.pop(0)
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
     pinned_entity_ids = {p["item_entity_id"] for p in pins if p["item_type"] == "entity"}
@@ -3622,7 +3644,7 @@ def _dashboard_tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
-        "tiles": tiles,
+        "groups": groups,
         "auto_open_entity_id": auto_open_entity_id,
         "entity_pin_options": [
             {**row, "pinned": row["entity_id"] in pinned_entity_ids}
@@ -3659,6 +3681,44 @@ def _get_dashboard_or_404(dashboard_id: int) -> dict:
     if dashboard is None:
         raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
     return dashboard
+
+
+# -- Sektionen: Formular-POSTs statt JSON-Body, damit der "+ Sektion"-Reiter
+# in _dashboard_tiles.html ein normales <form hx-post=…> bleiben kann wie die
+# übrigen Picker-Einträge dort — kein zusätzlicher JS-Mechanismus nötig.
+@app.post("/dashboard/section/add", response_class=HTMLResponse)
+def dashboard_section_add(request: Request, dashboard_id: int = Form(1), name: str = Form(...)) -> HTMLResponse:
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+    index.add_dashboard_section(dashboard_id, name)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
+
+
+@app.post("/dashboard/section/{section_id}/rename", response_class=HTMLResponse)
+def dashboard_section_rename(
+    request: Request, section_id: int, dashboard_id: int = Form(1), name: str = Form(...)
+) -> HTMLResponse:
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+    if not index.rename_dashboard_section(dashboard_id, section_id, name):
+        raise HTTPException(status_code=404, detail="Sektion nicht gefunden")
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
+
+
+@app.post("/dashboard/section/{section_id}/remove", response_class=HTMLResponse)
+def dashboard_section_remove(request: Request, section_id: int, dashboard_id: int = 1) -> HTMLResponse:
+    """Löst die Sektion auf — die Kacheln bleiben erhalten, siehe
+    index.remove_dashboard_section()."""
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    index.remove_dashboard_section(dashboard_id, section_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.post("/charts/{chart_id}/pin", response_class=HTMLResponse)

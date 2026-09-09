@@ -71,6 +71,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
         ],
         "statistik_index.html": [],
         "table_editor.html": [],
+        "dashboard_editor.html": [],
     }
     quellen = _templates()
     for seite in seiten:

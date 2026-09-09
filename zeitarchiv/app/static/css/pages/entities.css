@@ -9,6 +9,64 @@
   .dashboard-grid.is-precise{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:calc(var(--dashboard-row-height) / 2);}
   /* Lücken auffüllen — siehe identische Regel/Begründung in dashboard_detail.html. */
   .dashboard-grid.is-dense{grid-auto-flow:dense;}
+  /* Sektionen (Gruppen + Kopf) — siehe identische Regeln/Begründung in dashboard_detail.html. */
+  .dashboard-shell{display:flex;flex-direction:column;gap:26px;}
+  .dgroup{display:flex;flex-direction:column;gap:12px;}
+  .dgroup.dragging{opacity:.4;}
+  .dsection{display:flex;align-items:center;gap:8px;padding:2px 2px 0;position:relative;cursor:grab;}
+  .dsection.dragging{opacity:.4;}
+  .dsection::after{content:'';flex:1;height:1px;background:var(--border);margin-left:8px;}
+  .dsection-grip{color:var(--ink-faint);font-family:var(--font-mono);font-size:13px;opacity:0;transition:opacity .12s;}
+  .dsection:hover .dsection-grip{opacity:1;}
+  .dsection-title{
+    font-size:calc(12px * var(--font-scale, 1));font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--accent-line);margin:0;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw;
+  }
+  .dsection-rename-form{flex:none;display:flex;align-items:center;gap:5px;}
+  .dsection-rename-input{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));padding:3px 7px;border-radius:6px;
+    border:1px solid var(--accent-line);background:var(--surface);color:var(--ink);min-width:160px;
+  }
+  .dsection-rename-submit{
+    width:22px;height:22px;padding:0;border:1px solid var(--accent-line);border-radius:999px;
+    background:var(--accent-line);color:var(--accent-contrast);font-size:calc(12px * var(--font-scale, 1));
+    line-height:1;cursor:pointer;flex:none;
+  }
+  .dsection-count{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);flex:none;white-space:nowrap;}
+  .dsection-menu{position:relative;flex:none;}
+  .dsection-menu-btn{
+    width:22px;height:22px;padding:0;border:1px solid var(--border);border-radius:999px;
+    background:var(--surface);color:var(--ink-faint);font-size:calc(16px * var(--font-scale, 1));line-height:1;cursor:pointer;
+  }
+  .dsection-menu-btn:hover,.dsection.is-open .dsection-menu-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  .dsection-menu-popover{
+    position:absolute;top:28px;right:0;width:240px;padding:6px;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);cursor:default;z-index:5;
+  }
+  .dsection-menu-item{
+    display:block;width:100%;box-sizing:border-box;padding:7px 8px;border:0;border-radius:6px;background:transparent;
+    color:var(--ink);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));text-align:left;cursor:pointer;
+  }
+  .dsection-menu-item:hover{background:var(--surface-alt);}
+  .dsection-menu-item-danger{color:var(--danger);}
+  .dsection-menu-item-danger:hover{background:var(--danger-soft);}
+  .dsection-menu-divider{height:1px;background:var(--border);margin:6px -2px;}
+  /* Ein-/Ausklappen — siehe identische Regeln/Begründung in dashboard_detail.html. */
+  .dsection-toggle{background:none;border:0;padding:3px;margin:-3px 0;cursor:pointer;color:var(--ink-muted);display:flex;border-radius:6px;flex:none;}
+  .dsection-toggle:hover{background:var(--surface-alt);}
+  .dsection-toggle svg{transition:transform .15s ease;}
+  .dgroup.collapsed .dsection-toggle svg{transform:rotate(-90deg);}
+  .dsection-hidden-count{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);flex:none;white-space:nowrap;}
+  .dgroup.collapsed [data-section-grid]{display:none;}
+  .dgroup.collapsed [data-section-grid].has-anchored-add{display:grid;}
+  .dgroup.collapsed [data-section-grid].has-anchored-add .dtile:not(.dtile-add){display:none;}
+  /* "Sektion"-Reiter im "+"-Picker — siehe identische Regel/Begründung in dashboard_detail.html. */
+  .dtile-picker-section-form{padding:10px 16px 4px;display:flex;flex-direction:column;gap:8px;}
+  .dtile-picker-section-input{
+    width:100%;box-sizing:border-box;font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));
+    padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
+  }
+  .dtile-picker-section-submit{align-self:flex-start;}
   /* Schatten wie auf allen anderen Kartenflächen der App (siehe app.css) —
      die Kacheln liegen damit auf dem Seitengrund statt flach darin. */
   .dtile{

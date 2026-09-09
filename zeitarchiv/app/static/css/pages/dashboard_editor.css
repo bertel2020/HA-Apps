@@ -1,13 +1,19 @@
   [x-cloak]{display:none!important;}
   .dash-editor-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
   .dash-editor-title-row h2{margin:0;font-size:calc(19px * var(--font-scale, 1));}
-  .field input[type="text"]{width:100%;max-width:420px;}
+  /* Auf die tatsächlich benötigte Breite bemessen statt eines geschätzten
+     Pixelwerts (vorher 420px) oder der ungestylten Browser-Vorgabe (~20
+     Zeichen, zu schmal für den bis zu 50 Zeichen langen Dashboard-Namen):
+     50ch entspricht genau max_name_length (MAX_SAVED_NAME_LENGTH). Engere
+     Fenster/größere Schrift dürfen darunter bleiben (width:100%). */
+  .field input[type="text"]{width:100%;max-width:50ch;}
   .field-switch-row{display:flex;align-items:center;gap:10px;}
-  .switch{position:relative;display:inline-block;width:40px;height:22px;flex:none;}
-  .switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;}
-  .switch-track{position:absolute;inset:0;background:var(--border);border-radius:999px;transition:background .15s;pointer-events:none;}
-  .switch-thumb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:var(--surface);border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s;}
-  .switch input:checked + .switch-track{background:var(--accent-line);}
-  .switch input:checked + .switch-track .switch-thumb{transform:translateX(18px);}
-  .switch input:focus-visible + .switch-track{outline:2px solid var(--accent-line);outline-offset:2px;}
-  .switch input:disabled{cursor:default;}
+  /* Toggle-Schalter: .menu-toggle aus app.css (dieselbe Komponente wie in
+     entity_detail.html/chart_editor.html/_dashboard_tile_menu.html), kein
+     eigener .switch mehr — stand hier bis 0.8x als Parallelstruktur mit
+     abweichender Größe (40x22 statt 34x20) und ohne :disabled-Abdunkelung. */
+  /* .save-row: dieselbe Regel wie chart_editor.css/table_editor.css (dort
+     bewusst dupliziert statt zentral in app.css, siehe Kommentar dort) —
+     fehlte hier bisher komplett, wodurch Speichern/Abbrechen/Löschen nur im
+     normalen Inline-Fluss liefen (~4px statt 10px Abstand, kein margin-top). */
+  .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}

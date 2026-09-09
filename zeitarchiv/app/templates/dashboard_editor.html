@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_hints.html" import hint_button, hint_body %}
 {% block title %}Zeitarchiv — {{ dashboard.name if dashboard else "Neues Dashboard" }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/dashboard_editor.css') }}">
@@ -23,35 +24,35 @@
       {% if dashboard %}
       <div class="field">
         <div class="field-switch-row">
-          <label class="switch">
+          <span class="menu-toggle">
             <input type="checkbox" id="dash-locked" x-model="locked">
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-          </label>
-          <label for="dash-locked">Fixiert</label>
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+          <label for="dash-locked">Fixiert {{ hint_button('Fixiert') }}</label>
         </div>
-        <p class="sub" style="margin-top:6px;">Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.</p>
+        {% call hint_body() %}Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.{% endcall %}
       </div>
 
       <div class="field">
         <div class="field-switch-row">
-          <label class="switch">
+          <span class="menu-toggle">
             <input type="checkbox" id="dash-precise" x-model="preciseMode">
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-          </label>
-          <label for="dash-precise">Präziser Modus</label>
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+          <label for="dash-precise">Präziser Modus {{ hint_button('Präziser Modus') }}</label>
         </div>
-        <p class="sub" style="margin-top:6px;">Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.</p>
+        {% call hint_body() %}Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.{% endcall %}
       </div>
 
       <div class="field">
         <div class="field-switch-row">
-          <label class="switch">
+          <span class="menu-toggle">
             <input type="checkbox" id="dash-fill-gaps" x-model="fillGaps">
-            <span class="switch-track"><span class="switch-thumb"></span></span>
-          </label>
-          <label for="dash-fill-gaps">Lücken auffüllen</label>
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+          <label for="dash-fill-gaps">Lücken auffüllen {{ hint_button('Lücken auffüllen') }}</label>
         </div>
-        <p class="sub" style="margin-top:6px;">Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.</p>
+        {% call hint_body() %}Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.{% endcall %}
       </div>
       {% endif %}
 
@@ -68,6 +69,7 @@
 
   <script src="{{ asset('js/confirm-dialog.js') }}"></script>
   <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
+  <script src="{{ asset('js/hint-toggle.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const DASHBOARD_ID = {{ dashboard.id | tojson if dashboard else 'null' }};

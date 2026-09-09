@@ -1,11 +1,11 @@
 {% from "_icons.html" import custom_name_icon %}
 <!-- Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene Punkte", erweitert
-     um Vergleichstabellen UND um mehrere unabhängige Dashboards) — eigenes
-     Fragment statt inline in entities.html/dashboard_detail.html, weil
-     Pin/Unpin/Reorder (main.py charts_pin()/tables_pin()/unpin()/
-     dashboard_reorder()) genau dieses Fragment zurückgeben und per htmx
-     (hx-target="#dashboard-grid" hx-swap="outerHTML") ersetzen, ohne die
-     ganze Seite neu zu laden.
+     um Vergleichstabellen, mehrere unabhängige Dashboards UND Sektionen) —
+     eigenes Fragment statt inline in entities.html/dashboard_detail.html, weil
+     Pin/Unpin/Reorder/Sektion (main.py charts_pin()/tables_pin()/unpin()/
+     dashboard_reorder()/dashboard_section_*()) genau dieses Fragment
+     zurückgeben und per htmx (hx-target="#dashboard-grid" hx-swap="outerHTML")
+     ersetzen, ohne die ganze Seite neu zu laden.
 
      Die URLs laufen über app_root, absolut und tiefenunabhängig. Vorher stand
      hier ein relativer Rückweg ("." auf "/", ".." auf "/dashboards/{id}"), den
@@ -22,171 +22,251 @@
      "+"-Kachel ist nur ein Picker über die jeweils noch nicht angehefteten
      Einträge, keine Editor-Seite. Nur EINE leere "+"-Kachel gleichzeitig
      sichtbar (progressive Anzeige statt eines sofort leeren Rasters), bis
-     zum Limit von 18 (can_add_tile, index.DASHBOARD_TILE_LIMIT, pro
-     Dashboard gezählt). Reihenfolge per Drag&Drop änderbar (dashboard-
+     zum Limit von DASHBOARD_TILE_LIMIT (pro Dashboard gezählt, Sektionen
+     zählen nicht mit). Reihenfolge per Drag&Drop änderbar (dashboard-
      tiles.js, native HTML5-DnD statt einer zusätzlichen Bibliothek), Charts
      und Tabellen gemischt sortierbar — die "+"-Kachel bleibt dabei bewusst
-     NICHT draggable, sie ist immer die letzte. Das Raster bleibt auch ohne
-     gespeicherte Objekte sichtbar: Die leere "+"-Kachel führt dann direkt
-     zum Anlegen des ersten Charts oder der ersten Tabelle. -->
+     NICHT draggable, sie hängt immer an der zuletzt stehenden Gruppe. Das
+     Raster bleibt auch ohne gespeicherte Objekte sichtbar: Die leere
+     "+"-Kachel führt dann direkt zum Anlegen des ersten Charts/der ersten
+     Tabelle/der ersten Sektion.
+
+     Sektionen (item_type='section' in dashboard_pins, siehe
+     _dashboard_tiles_context()/index.py) sind selbst nur ein weiterer
+     Eintrag in derselben Reihenfolge — eine Kachel "gehört" zu dem Trenner,
+     der ihr zuletzt vorausgeht, ohne dass das irgendwo gespeichert wäre.
+     Jede Gruppe (group in groups) bekommt ihr EIGENES <div class="dashboard-
+     grid" data-section-grid> statt eines gemeinsamen, vollen Rasters für die
+     ganze Seite: ein Sektionskopf ALS Rasterelement bekäme zwangsweise
+     dieselbe feste grid-auto-rows-Höhe wie jede Kachel (im präzisen Modus
+     genauso wie normal) und stünde als leerer, zu hoher Balken da. Als reines
+     Fließelement vor seinem eigenen Mini-Raster bleibt er in jedem Modus so
+     kompakt wie sein Text — und "Lücken auffüllen" (grid-auto-flow: dense)
+     kann dadurch nie eine Kachel über eine Sektionsgrenze hinweg verschieben,
+     weil jede Sektion ein eigenständiges Rastermodell ist. Die kopflose erste
+     Gruppe (group.title is none) sammelt alles vor dem ersten Trenner — ganz
+     ohne Sektionen ist sie die einzige Gruppe und die Seite sieht exakt wie
+     vor Einführung der Sektionen aus (reines Opt-in). -->
 {% set dashboard_id = dashboard_id | default(1) %}
 {% set href_base = app_root ~ '/' %}
-<div id="dashboard-grid" class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}" data-app-root="{{ app_root }}" data-dashboard-id="{{ dashboard_id }}" data-precise="{{ 'true' if dashboard_precise else 'false' }}">
-  {% for tile in tiles %}
-  {% if tile.kind == 'chart' %}
-  <div class="dtile" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="chart" data-item-id="{{ tile.id }}"
-       data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
-       style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
-       {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
-    {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
-    <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
-       data-entity-ids='{{ tile.entity_ids | tojson }}'
-       data-entity-names='{{ tile.entity_names | tojson }}'
-      data-hidden-entity-ids='{{ tile.hidden_entity_ids | default([]) | tojson }}'
-       data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
-       data-resolution-preset="{{ tile.resolution_preset }}"
-       data-dynamic-y-axis="{{ 'true' if tile.dynamic_y_axis else 'false' }}"
-       data-show-legend="{{ 'true' if tile.show_legend else 'false' }}"
-       data-chart-stats="{{ 'true' if tile.chart_stats else 'false' }}"
-       data-legend-metrics='{{ tile.legend_metrics | tojson }}'
-       data-legend-style="{{ tile.legend_style }}"
-       data-chart-type="{{ tile.chart_type }}"
-       data-show-values="{{ 'true' if tile.show_values else 'false' }}"
-       data-average-line="{{ 'true' if tile.average_line else 'false' }}"
-       data-decimals="{{ tile.decimals }}"
-       data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
-      <div class="dtile-title">{{ tile.name }}</div>
-      <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>
-      <div class="dtile-legend"></div>
-    </a>
-  </div>
-  {% elif tile.kind == 'table' %}
-  <div class="dtile dtile-table" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="table" data-item-id="{{ tile.id }}"
-       data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
-       style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
-       {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
-    {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
-    <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}" draggable="false"
-       data-columns='{{ tile.columns | tojson }}' data-rows='{{ tile.rows | tojson }}' data-style='{{ tile.style | tojson }}'>
-      <div class="dtile-title">{{ tile.name }}</div>
-      <div class="dtile-table-preview"><div class="dtile-loading">&hellip;</div></div>
-    </a>
-  </div>
-  {% else %}
-  <div class="dtile dtile-entity{{ ' is-warn' if tile.staleness == 'warn' else '' }}{{ ' is-stale' if tile.staleness == 'stale' else '' }}"
-       draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="entity" data-item-id="0"
-       data-item-entity-id="{{ tile.entity_id }}"
-       data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
-       style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
-       {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
-    {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
-    <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
-       data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
-       data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"
-       data-show-age="{{ 'true' if tile.show_age else 'false' }}"
-       data-sparkline-resolution="{{ tile.sparkline_resolution }}"
-       data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
-       data-primary-metric="{{ tile.primary_metric }}"
-       data-stats-metrics="{{ tile.stats_metrics | join(',') }}">
-      <div class="dtile-title">{{ tile.name }}</div>
-      <div class="dtile-entity-value">
-        <span class="dtile-entity-main">
-          {# Kennzeichen nur, wenn die große Zahl NICHT der aktuelle Wert ist —
-             sonst wäre "16,8 °C" nicht von einem Momentanwert zu
-             unterscheiden. #}
-          {% if tile.primary_label %}<span class="dtile-entity-metric">{{ tile.primary_label }}</span>{% endif %}
-          <span class="dtile-entity-number">{{ tile.value_text }}</span>
-          {% if tile.unit %}<span class="dtile-entity-unit">{{ tile.unit }}</span>{% endif %}
-        </span>
-        {# Der Zeitraum steht genau einmal auf der Kachel (siehe
-           _tile_metric_context() in main.py): hier nur, wenn es keine
-           Kennzahlen-Zeile gibt, die ihn sonst trägt. #}
-        {% if tile.show_period_in_value_row %}
-        <span class="dtile-entity-period">{{ tile.range_label }}</span>
-        {% elif tile.show_age %}
-        <span class="dtile-entity-age" title="Letzte Aktualisierung">{{ tile.age_text }}</span>
-        {% endif %}
-      </div>
-      {% if tile.stats_metrics %}
-      {# Werte füllt renderEntityTile() nach — serverseitig stünden sie nur mit
-         einer zweiten Abfrage je Kachel zur Verfügung. Die Zeile wird hier
-         trotzdem schon aufgebaut, damit die Kachel beim Nachfüllen nicht in
-         der Höhe springt. #}
-      <div class="dtile-entity-stats">
-        {% for metric in tile.stats_metrics %}
-        {% if not loop.first %}<span class="sep">&middot;</span>{% endif %}
-        <span class="dtile-entity-stat" data-metric="{{ metric }}">
-          <span class="k">{{ tile.metric_labels[metric] }}</span><span class="v">&ndash;</span>
-        </span>
-        {% endfor %}
-        <span class="dtile-entity-period">{{ tile.range_label }}</span>
+<div id="dashboard-grid" class="dashboard-shell" data-app-root="{{ app_root }}" data-dashboard-id="{{ dashboard_id }}" data-precise="{{ 'true' if dashboard_precise else 'false' }}">
+  {% for group in groups %}
+  {% set is_last_group = loop.last %}
+  <div class="dgroup" {% if group.section_id %}data-section-id="{{ group.section_id }}"{% endif %}>
+    {% if group.title is not none %}
+    <div class="dsection" data-item-type="section" data-item-id="{{ group.section_id }}"
+         draggable="{{ 'false' if dashboard_locked else 'true' }}"
+         {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}
+         x-data="{menuOpen: false, editing: false}" :class="{'is-open': menuOpen}">
+      <span class="dsection-grip">⠿</span>
+      <!-- Ein-/Ausklappen ist rein clientseitig (dashboard-tiles.js) und nur
+           lokal im Browser gemerkt (localStorage) — kein Server-Roundtrip,
+           kein Sync über Geräte, dieselbe Konvention wie Sortierung/
+           Favoriten auf der Dashboard-Liste (card-browser.js). -->
+      <button type="button" class="dsection-toggle" draggable="false" @pointerdown.stop
+              aria-label="Sektion ein-/ausklappen" title="Ein-/ausklappen">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <h2 class="dsection-title" x-show="!editing">{{ group.title }}</h2>
+      {% if not dashboard_locked %}
+      <form x-show="editing" x-cloak draggable="false" @pointerdown.stop @submit="editing = false"
+            hx-post="{{ href_base }}dashboard/section/{{ group.section_id }}/rename" hx-target="#dashboard-grid" hx-swap="outerHTML"
+            class="dsection-rename-form">
+        <input type="hidden" name="dashboard_id" value="{{ dashboard_id }}">
+        <input type="text" name="name" class="dsection-rename-input" value="{{ group.title }}" maxlength="40" required
+               x-ref="renameInput" @keydown.escape="editing = false"
+               x-init="$watch('editing', v => { if (v) $nextTick(() => { $refs.renameInput.focus(); $refs.renameInput.select(); }) })">
+        <button type="submit" class="dsection-rename-submit" title="Speichern" aria-label="Umbenennen speichern">✓</button>
+      </form>
+      {% endif %}
+      <span class="dsection-count">{{ group.tiles | length }} Kachel{{ '' if group.tiles | length == 1 else 'n' }}</span>
+      <span class="dsection-hidden-count" hidden></span>
+      {% if not dashboard_locked %}
+      <div class="dsection-menu" @click.outside="menuOpen = false">
+        <button type="button" class="dsection-menu-btn" draggable="false" @pointerdown.stop @click="menuOpen = !menuOpen"
+                :aria-expanded="menuOpen.toString()" aria-haspopup="menu" aria-label="Sektionsmenü öffnen" title="Sektionsmenü">⋮</button>
+        <div class="dsection-menu-popover" x-show="menuOpen" x-cloak role="menu" @pointerdown.stop>
+          <button type="button" class="dsection-menu-item" role="menuitem" @click="menuOpen = false; editing = true">Umbenennen</button>
+          <div class="dsection-menu-divider"></div>
+          <button type="button" class="dsection-menu-item dsection-menu-item-danger" role="menuitem"
+                  hx-post="{{ href_base }}dashboard/section/{{ group.section_id }}/remove?dashboard_id={{ dashboard_id }}"
+                  hx-target="#dashboard-grid" hx-swap="outerHTML"
+                  hx-confirm="Diese Sektion wirklich entfernen? Die Kacheln bleiben erhalten und rutschen in die vorherige Sektion (oder werden „ohne Sektion“, falls es die erste war)."
+                  @click="menuOpen = false">Sektion entfernen</button>
+        </div>
       </div>
       {% endif %}
-      {% if tile.show_sparkline %}
-      <div class="dtile-entity-sparkline"><div class="dtile-loading">&hellip;</div></div>
+    </div>
+    {% endif %}
+    <div class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}{{ ' has-anchored-add' if is_last_group and can_add_tile else '' }}" data-section-grid>
+      {% for tile in group.tiles %}
+      {% if tile.kind == 'chart' %}
+      <div class="dtile" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="chart" data-item-id="{{ tile.id }}"
+           data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
+           style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
+           {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+        {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
+        <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
+           data-entity-ids='{{ tile.entity_ids | tojson }}'
+           data-entity-names='{{ tile.entity_names | tojson }}'
+          data-hidden-entity-ids='{{ tile.hidden_entity_ids | default([]) | tojson }}'
+           data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
+           data-resolution-preset="{{ tile.resolution_preset }}"
+           data-dynamic-y-axis="{{ 'true' if tile.dynamic_y_axis else 'false' }}"
+           data-show-legend="{{ 'true' if tile.show_legend else 'false' }}"
+           data-chart-stats="{{ 'true' if tile.chart_stats else 'false' }}"
+           data-legend-metrics='{{ tile.legend_metrics | tojson }}'
+           data-legend-style="{{ tile.legend_style }}"
+           data-chart-type="{{ tile.chart_type }}"
+           data-show-values="{{ 'true' if tile.show_values else 'false' }}"
+           data-average-line="{{ 'true' if tile.average_line else 'false' }}"
+           data-decimals="{{ tile.decimals }}"
+           data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
+          <div class="dtile-title">{{ tile.name }}</div>
+          <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>
+          <div class="dtile-legend"></div>
+        </a>
+      </div>
+      {% elif tile.kind == 'table' %}
+      <div class="dtile dtile-table" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="table" data-item-id="{{ tile.id }}"
+           data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
+           style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
+           {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+        {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
+        <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}" draggable="false"
+           data-columns='{{ tile.columns | tojson }}' data-rows='{{ tile.rows | tojson }}' data-style='{{ tile.style | tojson }}'>
+          <div class="dtile-title">{{ tile.name }}</div>
+          <div class="dtile-table-preview"><div class="dtile-loading">&hellip;</div></div>
+        </a>
+      </div>
+      {% else %}
+      <div class="dtile dtile-entity{{ ' is-warn' if tile.staleness == 'warn' else '' }}{{ ' is-stale' if tile.staleness == 'stale' else '' }}"
+           draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="entity" data-item-id="0"
+           data-item-entity-id="{{ tile.entity_id }}"
+           data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
+           style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
+           {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+        {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
+        <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
+           data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
+           data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"
+           data-show-age="{{ 'true' if tile.show_age else 'false' }}"
+           data-sparkline-resolution="{{ tile.sparkline_resolution }}"
+           data-range="{{ tile.range_key }}" data-continuous="{{ 'true' if tile.continuous else 'false' }}"
+           data-primary-metric="{{ tile.primary_metric }}"
+           data-stats-metrics="{{ tile.stats_metrics | join(',') }}">
+          <div class="dtile-title">{{ tile.name }}</div>
+          <div class="dtile-entity-value">
+            <span class="dtile-entity-main">
+              {# Kennzeichen nur, wenn die große Zahl NICHT der aktuelle Wert ist —
+                 sonst wäre "16,8 °C" nicht von einem Momentanwert zu
+                 unterscheiden. #}
+              {% if tile.primary_label %}<span class="dtile-entity-metric">{{ tile.primary_label }}</span>{% endif %}
+              <span class="dtile-entity-number">{{ tile.value_text }}</span>
+              {% if tile.unit %}<span class="dtile-entity-unit">{{ tile.unit }}</span>{% endif %}
+            </span>
+            {# Der Zeitraum steht genau einmal auf der Kachel (siehe
+               _tile_metric_context() in main.py): hier nur, wenn es keine
+               Kennzahlen-Zeile gibt, die ihn sonst trägt. #}
+            {% if tile.show_period_in_value_row %}
+            <span class="dtile-entity-period">{{ tile.range_label }}</span>
+            {% elif tile.show_age %}
+            <span class="dtile-entity-age" title="Letzte Aktualisierung">{{ tile.age_text }}</span>
+            {% endif %}
+          </div>
+          {% if tile.stats_metrics %}
+          {# Werte füllt renderEntityTile() nach — serverseitig stünden sie nur mit
+             einer zweiten Abfrage je Kachel zur Verfügung. Die Zeile wird hier
+             trotzdem schon aufgebaut, damit die Kachel beim Nachfüllen nicht in
+             der Höhe springt. #}
+          <div class="dtile-entity-stats">
+            {% for metric in tile.stats_metrics %}
+            {% if not loop.first %}<span class="sep">&middot;</span>{% endif %}
+            <span class="dtile-entity-stat" data-metric="{{ metric }}">
+              <span class="k">{{ tile.metric_labels[metric] }}</span><span class="v">&ndash;</span>
+            </span>
+            {% endfor %}
+            <span class="dtile-entity-period">{{ tile.range_label }}</span>
+          </div>
+          {% endif %}
+          {% if tile.show_sparkline %}
+          <div class="dtile-entity-sparkline"><div class="dtile-loading">&hellip;</div></div>
+          {% endif %}
+        </a>
+      </div>
       {% endif %}
-    </a>
-  </div>
-  {% endif %}
-  {% endfor %}
-  {% if can_add_tile %}
-  <!-- Größeres, tab-basiertes "Kachel hinzufügen"-Popup statt der früheren,
-       auf einmal alle drei Abschnitte (Chart/Tabelle/Werte-Kachel) unter-
-       einander stapelnden Liste in einem schmalen Popover — bei vielen
-       gespeicherten Charts/Tabellen wurde das schnell unübersichtlich lang.
-       Ein gemeinsames Suchfeld filtert jeweils nur die gerade aktive
-       Registerkarte, dieselbe x-show-Filterung wie zuvor nur bei der
-       Entitäten-Suche. -->
-  <div class="dtile dtile-add" x-data="{open: false, tab: 'chart', search: ''}" x-cloak>
-    <button type="button" class="dtile-add-btn" @click="open = !open" title="Chart, Tabelle oder Entität anheften">+</button>
-    <div class="dtile-picker-overlay" x-show="open" @pointerdown.stop @click.self="open = false" @keydown.escape.window="open = false">
-      <div class="dtile-picker-modal">
-        <div class="dtile-picker-header">
-          <p class="dtile-picker-title">Kachel hinzufügen</p>
-          <button type="button" class="dtile-picker-close" @click="open = false" aria-label="Schließen">✕</button>
-        </div>
-        <div class="dtile-picker-tabs" role="tablist">
-          <button type="button" role="tab" :class="{active: tab === 'chart'}" @click="tab = 'chart'; search = ''">Charts</button>
-          <button type="button" role="tab" :class="{active: tab === 'table'}" @click="tab = 'table'; search = ''">Tabellen</button>
-          <button type="button" role="tab" :class="{active: tab === 'entity'}" @click="tab = 'entity'; search = ''">Werte</button>
-        </div>
-        <input type="search" class="dtile-picker-search" placeholder="Suchen …" x-model="search">
-        <div class="dtile-picker-list">
-          <div x-show="tab === 'chart'">
-            {% for c in unpinned_charts %}
-            <button type="button" class="dtile-picker-item"
-                    x-show='!search || {{ c.name | lower | tojson }}.includes(search.toLowerCase())'
-                    hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}"
-                    hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
-              {{ c.name }}
-            </button>
-            {% endfor %}
-            <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}charts/new">+ Neuer Chart</a>
-          </div>
-          <div x-show="tab === 'table'">
-            {% for t in unpinned_tables %}
-            <button type="button" class="dtile-picker-item"
-                    x-show='!search || {{ t.name | lower | tojson }}.includes(search.toLowerCase())'
-                    hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}"
-                    hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
-              {{ t.name }}
-            </button>
-            {% endfor %}
-            <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}tables/new">+ Neue Tabelle</a>
-          </div>
-          <div x-show="tab === 'entity'">
-            {% for e in unpinned_entities %}
-            <button type="button" class="dtile-picker-item"
-                    x-show='!search || {{ (e.label ~ " " ~ e.entity_id) | lower | tojson }}.includes(search.toLowerCase())'
-                    hx-post="{{ href_base }}dashboard/pin-entity/{{ e.entity_id }}?dashboard_id={{ dashboard_id }}"
-                    hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
-              {{ e.label }}{% if e.is_custom %}{{ custom_name_icon() }}{% endif %}
-            </button>
-            {% endfor %}
+      {% endfor %}
+      {% if is_last_group and can_add_tile %}
+      <!-- Größeres, tab-basiertes "Kachel hinzufügen"-Popup statt der früheren,
+           auf einmal alle drei Abschnitte (Chart/Tabelle/Werte-Kachel) unter-
+           einander stapelnden Liste in einem schmalen Popover — bei vielen
+           gespeicherten Charts/Tabellen wurde das schnell unübersichtlich lang.
+           Ein gemeinsames Suchfeld filtert jeweils nur die gerade aktive
+           Registerkarte, dieselbe x-show-Filterung wie zuvor nur bei der
+           Entitäten-Suche. Vierter Reiter "Sektion" legt keinen bestehenden
+           Eintrag an, sondern einen neuen Trenner (reines Formular statt
+           Objekt-Liste) — siehe dashboard_section_add() in main.py. -->
+      <div class="dtile dtile-add" x-data="{open: false, tab: 'chart', search: ''}" x-cloak>
+        <button type="button" class="dtile-add-btn" @click="open = !open" title="Chart, Tabelle, Werte-Kachel oder Sektion hinzufügen">+</button>
+        <div class="dtile-picker-overlay" x-show="open" @pointerdown.stop @click.self="open = false" @keydown.escape.window="open = false">
+          <div class="dtile-picker-modal">
+            <div class="dtile-picker-header">
+              <p class="dtile-picker-title">Kachel hinzufügen</p>
+              <button type="button" class="dtile-picker-close" @click="open = false" aria-label="Schließen">✕</button>
+            </div>
+            <div class="dtile-picker-tabs" role="tablist">
+              <button type="button" role="tab" :class="{active: tab === 'chart'}" @click="tab = 'chart'; search = ''">Charts</button>
+              <button type="button" role="tab" :class="{active: tab === 'table'}" @click="tab = 'table'; search = ''">Tabellen</button>
+              <button type="button" role="tab" :class="{active: tab === 'entity'}" @click="tab = 'entity'; search = ''">Werte</button>
+              <button type="button" role="tab" :class="{active: tab === 'section'}" @click="tab = 'section'; search = ''">Sektion</button>
+            </div>
+            <input type="search" class="dtile-picker-search" placeholder="Suchen …" x-show="tab !== 'section'" x-model="search">
+            <div class="dtile-picker-list">
+              <div x-show="tab === 'chart'">
+                {% for c in unpinned_charts %}
+                <button type="button" class="dtile-picker-item"
+                        x-show='!search || {{ c.name | lower | tojson }}.includes(search.toLowerCase())'
+                        hx-post="{{ href_base }}charts/{{ c.id }}/pin?dashboard_id={{ dashboard_id }}"
+                        hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+                  {{ c.name }}
+                </button>
+                {% endfor %}
+                <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}charts/new">+ Neuer Chart</a>
+              </div>
+              <div x-show="tab === 'table'">
+                {% for t in unpinned_tables %}
+                <button type="button" class="dtile-picker-item"
+                        x-show='!search || {{ t.name | lower | tojson }}.includes(search.toLowerCase())'
+                        hx-post="{{ href_base }}tables/{{ t.id }}/pin?dashboard_id={{ dashboard_id }}"
+                        hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+                  {{ t.name }}
+                </button>
+                {% endfor %}
+                <a class="dtile-picker-item dtile-picker-new" href="{{ href_base }}tables/new">+ Neue Tabelle</a>
+              </div>
+              <div x-show="tab === 'entity'">
+                {% for e in unpinned_entities %}
+                <button type="button" class="dtile-picker-item"
+                        x-show='!search || {{ (e.label ~ " " ~ e.entity_id) | lower | tojson }}.includes(search.toLowerCase())'
+                        hx-post="{{ href_base }}dashboard/pin-entity/{{ e.entity_id }}?dashboard_id={{ dashboard_id }}"
+                        hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">
+                  {{ e.label }}{% if e.is_custom %}{{ custom_name_icon() }}{% endif %}
+                </button>
+                {% endfor %}
+              </div>
+              <div x-show="tab === 'section'">
+                <form hx-post="{{ href_base }}dashboard/section/add" hx-target="#dashboard-grid" hx-swap="outerHTML" @submit="open = false" class="dtile-picker-section-form">
+                  <input type="hidden" name="dashboard_id" value="{{ dashboard_id }}">
+                  <input type="text" name="name" class="dtile-picker-section-input" placeholder="Name der Sektion, z. B. „Klima“" maxlength="40" required>
+                  <button type="submit" class="btn dtile-picker-section-submit">Sektion hinzufügen</button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
+  {% endfor %}
 </div>
