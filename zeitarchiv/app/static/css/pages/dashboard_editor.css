@@ -17,3 +17,10 @@
      fehlte hier bisher komplett, wodurch Speichern/Abbrechen/Löschen nur im
      normalen Inline-Fluss liefen (~4px statt 10px Abstand, kein margin-top). */
   .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
+  /* Löschen/Abbrechen/Speichern laufen am Schreibtisch im normalen Fluss
+     (linksbündig); auf dem schmalen Smartphone-Bildschirm sollen sie am
+     rechten Rand liegen statt am linken zu kleben, dieselbe Konvention wie
+     bestehende Dialog-Fußzeilen (.confirm-actions, .edash-dialog-footer). */
+  @media (max-width:480px){
+    .save-row{justify-content:flex-end;}
+  }

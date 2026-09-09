@@ -57,11 +57,11 @@
       {% endif %}
 
       <div class="save-row">
-        <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
-        <a class="btn" href="{{ app_root }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">Abbrechen</a>
         {% if dashboard and not dashboard.is_default %}
         <button type="button" class="btn btn-danger" @click="deleteDashboard()">Löschen</button>
         {% endif %}
+        <a class="btn" href="{{ app_root }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">Abbrechen</a>
+        <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
         <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
       </div>
     </div>
