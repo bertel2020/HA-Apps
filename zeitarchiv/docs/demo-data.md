@@ -103,6 +103,21 @@ Nacht (in der Simulation meist gegen 2–3 Uhr der Fall), schaltet
 anliegt — ein bewusst realistischer Effekt der gewählten Speichergröße,
 kein Fehlerzustand.
 
+Beide Speicher (Balkonkraftwerk und Heimspeicher) rechnen mit einem
+Round-Trip-Wirkungsgrad von ~92 % (97 % Laden × 95 % Entladen,
+`BALKON_CHARGE_EFFICIENCY`/`BALKON_DISCHARGE_EFFICIENCY` bzw. die
+`HEIM_*`-Pendants) statt verlustfrei 1:1 durchzureichen: `geladen_*`/
+`entladen_*` bilden die gemessene Lade-/Entladeleistung ab (wie ein reales
+Gerät sie meldet), der interne Füllstand ändert sich um den durch den
+Wirkungsgrad reduzierten Betrag. Ohne diesen Verlust hätte
+`entladen_gesamt` `geladen_gesamt` über eine lange simulierte Historie
+einholen oder sogar überholen können — ein rechnerischer Wirkungsgrad über
+100 % ist aber physikalisch unmöglich. Aus demselben Grund werden die
+Anfangswerte von `geladen_gesamt`/`entladen_gesamt` beim allerersten Lauf
+nicht mehr unabhängig gewürfelt, sondern `entladen_gesamt` aus
+`geladen_gesamt`, dem Wirkungsgrad und dem gewürfelten Anfangs-Füllstand
+abgeleitet.
+
 Der Heimspeicher ist ein dritter, deutlich größerer Speicher (10 kWh) —
 anders als das unabhängige Balkonkraftwerk aber direkt an die Dachanlage
 gekoppelt, wie bei einem Hybrid-Wechselrichter-Setup üblich: Er hat keine

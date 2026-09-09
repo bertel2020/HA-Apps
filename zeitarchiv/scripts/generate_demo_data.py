@@ -479,6 +479,13 @@ BALKON_MODULE_PEAK_W = 950.0  # vor Wechselrichter-Kappung, daher > Nennleistung
 BALKON_INVERTER_CAP_W = 800.0
 BALKON_DISCHARGE_TARGET_W = 220.0
 BALKON_MIN_SOC = 0.05
+# Round-Trip ~92 % (0.97 × 0.95) statt der bisherigen 100 % — ohne Verlust
+# konnte geladen_gesamt/entladen_gesamt über die simulierte Historie nahezu
+# gleichauf liegen bzw. sogar knapp unterschritten werden, ein rechnerischer
+# Wirkungsgrad >100 % ist aber physikalisch unmöglich. Werte grob an reale
+# Li-Ion-Heimspeicher + Wechselrichter angelehnt, keine Messung zugrunde.
+BALKON_CHARGE_EFFICIENCY = 0.97
+BALKON_DISCHARGE_EFFICIENCY = 0.95
 
 
 def gen_balkon_pv_power(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
@@ -508,6 +515,9 @@ HEIM_CAPACITY_KWH = 10.0
 HEIM_MAX_CHARGE_W = 3000.0
 HEIM_MAX_DISCHARGE_W = 3000.0
 HEIM_MIN_SOC = 0.05
+# Gleiche Begründung wie BALKON_CHARGE_EFFICIENCY/BALKON_DISCHARGE_EFFICIENCY oben.
+HEIM_CHARGE_EFFICIENCY = 0.97
+HEIM_DISCHARGE_EFFICIENCY = 0.95
 
 
 def simulate_household(
@@ -576,7 +586,16 @@ def simulate_household(
     balkon_soc_kwh = balkon_seed.get("soc_kwh", rng.uniform(0.3, 1.6))
     balkon_ertrag_gesamt_total = balkon_seed.get("ertrag_gesamt", rng.uniform(50, 800))
     balkon_geladen_gesamt_total = balkon_seed.get("geladen_gesamt", rng.uniform(60, 900))
-    balkon_entladen_gesamt_total = balkon_seed.get("entladen_gesamt", rng.uniform(50, 850))
+    # entladen_gesamt NICHT unabhängig würfeln (früherer Bug): der Startwert
+    # lag dadurch teils höher als geladen_gesamt und täuschte rechnerisch
+    # einen Wirkungsgrad über 100 % vor. Stattdessen aus dem ableiten, was
+    # laut geladen_gesamt und Wirkungsgrad jemals im Speicher war, abzüglich
+    # dessen, was aktuell noch drin ist (soc_kwh minus Leerlauf-Reserve).
+    balkon_min_kwh = BALKON_CAPACITY_KWH * BALKON_MIN_SOC
+    balkon_entladen_gesamt_default = max(0.0, (
+        balkon_geladen_gesamt_total * BALKON_CHARGE_EFFICIENCY - (balkon_soc_kwh - balkon_min_kwh)
+    ) * BALKON_DISCHARGE_EFFICIENCY)
+    balkon_entladen_gesamt_total = balkon_seed.get("entladen_gesamt", balkon_entladen_gesamt_default)
     # Tages-Reset-Zähler knüpfen nur an, wenn der letzte Lauf am selben
     # Kalendertag endete — sonst startet der neue Tag ohnehin bei 0.
     balkon_day = start.date().isoformat()
@@ -592,7 +611,13 @@ def simulate_household(
 
     heim_soc_kwh = heim_seed.get("soc_kwh", rng.uniform(2.0, 8.0))
     heim_geladen_gesamt_total = heim_seed.get("geladen_gesamt", rng.uniform(200, 3000))
-    heim_entladen_gesamt_total = heim_seed.get("entladen_gesamt", rng.uniform(150, 2800))
+    # Gleiche Ableitung wie beim Balkonkraftwerk-Speicher oben, statt eines
+    # von geladen_gesamt/soc_kwh unabhängigen Zufallswerts.
+    heim_min_kwh = HEIM_CAPACITY_KWH * HEIM_MIN_SOC
+    heim_entladen_gesamt_default = max(0.0, (
+        heim_geladen_gesamt_total * HEIM_CHARGE_EFFICIENCY - (heim_soc_kwh - heim_min_kwh)
+    ) * HEIM_DISCHARGE_EFFICIENCY)
+    heim_entladen_gesamt_total = heim_seed.get("entladen_gesamt", heim_entladen_gesamt_default)
     heim_day = start.date().isoformat()
     if heim_heute_seed_day == heim_day:
         heim_geladen_heute_total = heim_heute_seed_values.get("geladen_heute", 0.0)
@@ -672,10 +697,18 @@ def simulate_household(
         charge_kwh = 0.0
         discharge_kwh = 0.0
         if balkon_pv_w > 0:
+            # geladen_*/entladen_* bilden die gemessene Lade-/Entladeleistung
+            # ab, wie ein reales Gerät sie meldet — VOR dem jeweiligen
+            # Wirkungsgrad. Der interne Füllstand (balkon_soc_kwh) ändert sich
+            # deshalb um weniger (Laden) bzw. mehr (Entladen) als die
+            # gemeldete Leistung, sonst würde der Speicher bei vollem
+            # Füllstand mehr melden, als noch reinpasst, bzw. beim Entladen
+            # mehr rausgeben, als er tatsächlich verliert.
             capacity_left_kwh = max(0.0, BALKON_CAPACITY_KWH - balkon_soc_kwh)
-            charge_kwh = min((balkon_pv_w / 1000) * step_hours, capacity_left_kwh)
+            max_metered_charge_kwh = capacity_left_kwh / BALKON_CHARGE_EFFICIENCY
+            charge_kwh = min((balkon_pv_w / 1000) * step_hours, max_metered_charge_kwh)
             balkon_charge_w = charge_kwh / step_hours
-            balkon_soc_kwh += charge_kwh
+            balkon_soc_kwh += charge_kwh * BALKON_CHARGE_EFFICIENCY
             balkon_discharge_w = 0.0
             # Überschuss, sobald der Speicher voll ist, geht direkt raus statt
             # verworfen zu werden — wie bei einem realen Gerät ohne Abregelung.
@@ -685,10 +718,11 @@ def simulate_household(
             min_kwh = BALKON_CAPACITY_KWH * BALKON_MIN_SOC
             if balkon_soc_kwh > min_kwh:
                 target_w = max(0.0, BALKON_DISCHARGE_TARGET_W + rng.uniform(-8, 8))
-                max_w_from_capacity = (balkon_soc_kwh - min_kwh) / step_hours * 1000
+                max_metered_kwh_from_capacity = (balkon_soc_kwh - min_kwh) * BALKON_DISCHARGE_EFFICIENCY
+                max_w_from_capacity = max_metered_kwh_from_capacity / step_hours * 1000
                 balkon_discharge_w = min(target_w, max_w_from_capacity)
                 discharge_kwh = (balkon_discharge_w / 1000) * step_hours
-                balkon_soc_kwh -= discharge_kwh
+                balkon_soc_kwh -= discharge_kwh / BALKON_DISCHARGE_EFFICIENCY
             else:
                 balkon_discharge_w = 0.0
             balkon_hausabgabe_w = balkon_discharge_w
@@ -727,20 +761,24 @@ def simulate_household(
         heim_geladen_kwh = 0.0
         heim_entladen_kwh = 0.0
         if pv_w > net_remaining_load_w:
+            # Wirkungsgrad-Aufteilung wie beim Balkonkraftwerk-Speicher oben:
+            # heim_geladen_kwh ist die gemeldete (Vor-Wirkungsgrad-)
+            # Ladeleistung, heim_soc_kwh die tatsächliche Füllstandsänderung.
             surplus_w = pv_w - net_remaining_load_w
             heim_capacity_left_kwh = max(0.0, HEIM_CAPACITY_KWH - heim_soc_kwh)
-            heim_charge_w = min(surplus_w, HEIM_MAX_CHARGE_W, heim_capacity_left_kwh / step_hours * 1000)
+            heim_max_metered_charge_kwh = heim_capacity_left_kwh / HEIM_CHARGE_EFFICIENCY
+            heim_charge_w = min(surplus_w, HEIM_MAX_CHARGE_W, heim_max_metered_charge_kwh / step_hours * 1000)
             heim_geladen_kwh = (heim_charge_w / 1000) * step_hours
-            heim_soc_kwh += heim_geladen_kwh
+            heim_soc_kwh += heim_geladen_kwh * HEIM_CHARGE_EFFICIENCY
             heim_discharge_w = 0.0
         else:
             deficit_w = net_remaining_load_w - pv_w
             heim_charge_w = 0.0
             heim_min_kwh = HEIM_CAPACITY_KWH * HEIM_MIN_SOC
-            heim_available_kwh = max(0.0, heim_soc_kwh - heim_min_kwh)
-            heim_discharge_w = min(deficit_w, HEIM_MAX_DISCHARGE_W, heim_available_kwh / step_hours * 1000)
+            heim_available_metered_kwh = max(0.0, heim_soc_kwh - heim_min_kwh) * HEIM_DISCHARGE_EFFICIENCY
+            heim_discharge_w = min(deficit_w, HEIM_MAX_DISCHARGE_W, heim_available_metered_kwh / step_hours * 1000)
             heim_entladen_kwh = (heim_discharge_w / 1000) * step_hours
-            heim_soc_kwh -= heim_entladen_kwh
+            heim_soc_kwh -= heim_entladen_kwh / HEIM_DISCHARGE_EFFICIENCY
 
         heim_geladen_gesamt_total += heim_geladen_kwh
         heim_geladen_heute_total += heim_geladen_kwh
