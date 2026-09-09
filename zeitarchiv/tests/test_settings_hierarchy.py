@@ -19,7 +19,11 @@ def test_settings_main_areas_are_second_level_sections() -> None:
     # rotation/speicherplatz/aufbewahrung zogen mit 0.75.0 nach Housekeeping;
     # protokollierung ist seit der Einbettung in logs.html keine eigene
     # settings.html-Sektion mehr (siehe test_logs_template.py). meldungen kam
-    # mit den Tipps/Meldungen-Einstellungen neu dazu.
+    # mit den Tipps/Meldungen-Einstellungen neu dazu. demo-daten zog
+    # umgekehrt von Housekeeping HIERHER (zwischen Diagnose und Über),
+    # existiert im gerenderten HTML aber nur mit aktivem Demo-Modus/liegen-
+    # gebliebenen Demo-Daten (siehe demo_mode.current_demo_state()) — der
+    # Abschnitts-Tag selbst steht trotzdem immer im Template-Quelltext.
     source = (TEMPLATES / "settings.html").read_text(encoding="utf-8")
     section_ids = (
         "darstellung",
@@ -27,11 +31,15 @@ def test_settings_main_areas_are_second_level_sections() -> None:
         "meldungen",
         "verbindung",
         "diagnose",
+        "demo-daten",
         "ueber",
     )
     for section_id in section_ids:
         assert f'<section id="{section_id}" class="settings-section">' in source
-    assert source.count('class="settings-section-title"') == len(section_ids)
+    # demo-daten trägt seine <h2 class="settings-section-title"> im
+    # eingebundenen Partial (_housekeeping_demo_data_body.html, je nach
+    # Zustand), nicht inline in settings.html — deshalb hier nicht mitgezählt.
+    assert source.count('class="settings-section-title"') == len(section_ids) - 1
     assert 'style="margin-top:28px;padding-top:22px' not in source
 
 

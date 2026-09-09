@@ -8,9 +8,6 @@
   <a href="{{ prefix }}housekeeping#konfiguration" {% if nav_active == 'konfiguration' %}class="active"{% endif %}>Konfiguration</a>
   <a href="{{ prefix }}housekeeping#speicherplatz" {% if nav_active == 'speicherplatz' %}class="active"{% endif %}>Speicherplatz</a>
   <a href="{{ prefix }}housekeeping#aufbewahrung" {% if nav_active == 'aufbewahrung' %}class="active"{% endif %}>Aufbewahrung</a>
-  {% if demo_state %}
-  <a href="{{ prefix }}housekeeping#demo-daten" id="demo-nav-entry" {% if nav_active == 'demo-daten' %}class="active"{% endif %}>Demo-Daten</a>
-  {% endif %}
   <a href="{{ prefix }}housekeeping#rotation" {% if nav_active == 'rotation' %}class="active"{% endif %}>Rotation</a>
   <a href="{{ prefix }}housekeeping#ungenutzt" {% if nav_active == 'ungenutzt' %}class="active"{% endif %}>Ungenutzte Elemente</a>
 </nav>

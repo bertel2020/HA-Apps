@@ -5,7 +5,7 @@
 Dieses Modul kennt bewusst NUR das Dateisystem, nie den laufenden `Index`
 einer Demo-Instanz: `demo_dir_info()`/`remove_demo_dir()` müssen auch dann
 sicher aufrufbar sein, wenn der aktuell laufende Prozess NICHT im Demo-Modus
-läuft (Zustand "ungenutzt" — siehe Housekeeping → Demo-Daten) und deshalb
+läuft (Zustand "ungenutzt" — siehe Einstellungen → Demo-Daten) und deshalb
 keine offene Verbindung zur Demo-`index.sqlite` hat. `Index.__init__()`
 öffnet seine Datei immer lese-schreibend (legt sie bei Bedarf sogar neu an)
 und führt Migrationen aus — für einen bloßen Blick von außen wäre das ein

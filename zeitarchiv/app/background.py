@@ -486,9 +486,10 @@ class BackgroundService:
     def _refresh_demo_dir_info_if_stale(self, *, force: bool = False) -> None:
         """Nur relevant, wenn DIESE Instanz NICHT im Demo-Modus läuft (siehe
         demo_mode.py-Moduldoc) — sonst bleibt demo_dir_info_cached auf dem
-        Stand von vor dem Umschalten stehen, was aber niemand liest: Housekeeping
-        fragt im Demo-Modus stattdessen live index.get_overview() ab (Zustand
-        "aktiv", siehe housekeeping_routes._demo_data_context())."""
+        Stand von vor dem Umschalten stehen, was aber niemand liest: die
+        Einstellungen-Seite fragt im Demo-Modus stattdessen live
+        index.get_overview() ab (Zustand "aktiv", siehe
+        housekeeping_routes.demo_data_context())."""
         if self.demo_mode_active:
             return
         now = time.time()
@@ -849,8 +850,9 @@ class BackgroundService:
         # Generierung"): NICHT synchron vor dem ersten Request — eine volle
         # Historie dauert deutlich länger als ein Healthcheck-Timeout
         # verträgt. Läuft stattdessen über denselben Hintergrund-Thread wie
-        # "Jetzt ergänzen"/"Neu erzeugen" (demo_mode.demo_progress), Housekeeping
-        # zeigt währenddessen den Fortschrittsbalken. entity_count == 0 statt
+        # "Jetzt ergänzen"/"Neu erzeugen" (demo_mode.demo_progress), die
+        # Einstellungen-Seite zeigt währenddessen den Fortschrittsbalken.
+        # entity_count == 0 statt
         # eines Dateisystem-Checks — der Index ist an dieser Stelle ohnehin
         # schon offen; nur EXAKT leer löst aus, eine bereits (auch nur
         # teilweise) gefüllte Demo-Instanz aus einem vorigen Lauf wird beim

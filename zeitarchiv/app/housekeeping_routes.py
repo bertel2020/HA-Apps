@@ -140,6 +140,79 @@ class HousekeepingDependencies:
     storage_reconcile_last: Callable[[], dict | None]
 
 
+def demo_progress_context() -> dict:
+    """Flach, NUR für _job_progress.html — wie _purge_progress_context().
+    Bewusst getrennt von demo_data_context() unten: würden done/total/
+    error/result usw. direkt in dessen (mit den übrigen Einstellungen-
+    Abschnitten geteilten) Kontext gemischt, kollidierten sie mit
+    gleichnamigen Schlüsseln aus _settings_purge_context() & Co., sobald
+    beide gleichzeitig in einem TemplateResponse-Kontext zusammengeführt
+    werden. Modulweit statt in create_housekeeping_router() verschachtelt,
+    damit settings_view() (main.py, Demo-Daten sitzt auf der Einstellungen-
+    Seite, siehe DEMO_MODUS_PLAN.md) sie ohne HousekeepingDependencies
+    aufrufen kann — braucht ohnehin keine deps."""
+    return {
+        **demo_mode.demo_progress.snapshot(),
+        "progress_id": "demo-progress",
+        "poll_url": "housekeeping/demo-data/progress",
+    }
+
+
+def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> dict:
+    """Einstellungen → Demo-Daten (DEMO_MODUS_PLAN.md) — drei mögliche
+    Zustände, siehe demo_mode.current_demo_state(). "aktiv" und "ungenutzt"
+    lesen ihre Zahlen aus komplett unterschiedlichen Quellen: der laufende
+    Index (aktiv) bzw. ein reiner Dateisystem-Blick (ungenutzt) — dort wird
+    NIE Index() gegen ein Verzeichnis geöffnet, das die laufende Instanz
+    gerade nicht selbst verwendet (siehe demo_mode.py-Moduldoc).
+    demo_progress bleibt absichtlich NAMESPACED (nicht wie
+    demo_progress_context() oben flach) — dieser Kontext hier landet
+    gemeinsam mit allen anderen Einstellungen-Abschnitten in EINEM Dict,
+    flache done/total/error/result-Schlüssel wären dort ein Kollisionsrisiko.
+    Modulweit statt verschachtelt (siehe demo_progress_context() oben) —
+    braucht nur index/base_dir/demo_mode_active, keine restlichen deps."""
+    dir_info = None if demo_mode_active else demo_mode.demo_dir_info(base_dir)
+    state = demo_mode.current_demo_state(demo_mode_active, dir_info)
+    if state is None:
+        return {"demo_state": None}
+
+    progress = demo_mode.demo_progress.snapshot()
+    context: dict = {
+        "demo_state": state,
+        "demo_generating": progress["running"],
+        "demo_progress": demo_progress_context(),
+    }
+    now = time.time()
+    if state == "active":
+        overview = index.get_overview()
+        last_run_raw = index.get_setting("demo_append_last_run", "")
+        last_run = float(last_run_raw) if last_run_raw else None
+        interval = index.get_setting("demo_append_interval", "off")
+        if interval not in DEMO_APPEND_INTERVAL_LABELS:
+            interval = "off"
+        interval_seconds = demo_mode.DEMO_APPEND_INTERVAL_SECONDS.get(interval)
+        next_run_label = (
+            f"in {format_uptime((last_run if last_run is not None else now) + interval_seconds - now)}"
+            if interval_seconds is not None else "—"
+        )
+        context.update({
+            "demo_entity_count_label": format_int(overview["entity_count"]),
+            "demo_row_count_label": format_int(overview["total_rows"]),
+            "demo_size_label": format_size(overview["total_size_bytes"]),
+            "demo_last_run_label": f"vor {format_uptime(now - last_run)}" if last_run else "Noch nie",
+            "demo_next_run_label": next_run_label,
+            "demo_append_interval": interval,
+            "demo_append_interval_options": list(DEMO_APPEND_INTERVAL_LABELS.items()),
+        })
+    else:  # "orphan"
+        context.update({
+            "demo_entity_count_label": format_int(dir_info["entity_count_approx"]),
+            "demo_size_label": format_size(dir_info["size_bytes"]),
+            "demo_newest_label": f"vor {format_uptime(now - dir_info['newest_mtime'])}",
+        })
+    return context
+
+
 def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     router = APIRouter()
 
@@ -390,73 +463,6 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         }
 
 
-    def _demo_progress_context() -> dict:
-        """Flach, NUR für _job_progress.html — wie _purge_progress_context().
-        Bewusst getrennt von _demo_data_context() unten: würden done/total/
-        error/result usw. direkt in dessen (mit den übrigen Housekeeping-
-        Abschnitten geteilten) Kontext gemischt, kollidierten sie mit
-        gleichnamigen Schlüsseln aus _settings_purge_context() &Co., sobald
-        beide gleichzeitig in housekeeping_view() zusammengeführt werden."""
-        return {
-            **demo_mode.demo_progress.snapshot(),
-            "progress_id": "demo-progress",
-            "poll_url": "housekeeping/demo-data/progress",
-        }
-
-    def _demo_data_context() -> dict:
-        """Housekeeping → Demo-Daten (DEMO_MODUS_PLAN.md) — drei mögliche
-        Zustände, siehe demo_mode.current_demo_state(). "aktiv" und
-        "ungenutzt" lesen ihre Zahlen aus komplett unterschiedlichen Quellen:
-        der laufende Index (aktiv) bzw. ein reiner Dateisystem-Blick
-        (ungenutzt) — dort wird NIE Index() gegen ein Verzeichnis geöffnet,
-        das die laufende Instanz gerade nicht selbst verwendet (siehe
-        demo_mode.py-Moduldoc). demo_progress bleibt absichtlich NAMESPACED
-        (nicht wie _demo_progress_context() oben flach) — dieser Kontext hier
-        landet gemeinsam mit allen anderen Housekeeping-Abschnitten in EINEM
-        Dict (siehe housekeeping_view()), flache done/total/error/result-
-        Schlüssel wären dort ein Kollisionsrisiko."""
-        dir_info = None if deps.demo_mode_active else demo_mode.demo_dir_info(deps.base_dir)
-        state = demo_mode.current_demo_state(deps.demo_mode_active, dir_info)
-        if state is None:
-            return {"demo_state": None}
-
-        progress = demo_mode.demo_progress.snapshot()
-        context: dict = {
-            "demo_state": state,
-            "demo_generating": progress["running"],
-            "demo_progress": _demo_progress_context(),
-        }
-        now = time.time()
-        if state == "active":
-            overview = deps.index.get_overview()
-            last_run_raw = deps.index.get_setting("demo_append_last_run", "")
-            last_run = float(last_run_raw) if last_run_raw else None
-            interval = deps.index.get_setting("demo_append_interval", "off")
-            if interval not in DEMO_APPEND_INTERVAL_LABELS:
-                interval = "off"
-            interval_seconds = demo_mode.DEMO_APPEND_INTERVAL_SECONDS.get(interval)
-            next_run_label = (
-                f"in {format_uptime((last_run if last_run is not None else now) + interval_seconds - now)}"
-                if interval_seconds is not None else "—"
-            )
-            context.update({
-                "demo_entity_count_label": format_int(overview["entity_count"]),
-                "demo_row_count_label": format_int(overview["total_rows"]),
-                "demo_size_label": format_size(overview["total_size_bytes"]),
-                "demo_last_run_label": f"vor {format_uptime(now - last_run)}" if last_run else "Noch nie",
-                "demo_next_run_label": next_run_label,
-                "demo_append_interval": interval,
-                "demo_append_interval_options": list(DEMO_APPEND_INTERVAL_LABELS.items()),
-            })
-        else:  # "orphan"
-            context.update({
-                "demo_entity_count_label": format_int(dir_info["entity_count_approx"]),
-                "demo_size_label": format_size(dir_info["size_bytes"]),
-                "demo_newest_label": f"vor {format_uptime(now - dir_info['newest_mtime'])}",
-            })
-        return context
-
-
     @router.get("/housekeeping/stale-entities", response_class=HTMLResponse)
     def housekeeping_stale_entities(request: Request, days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> HTMLResponse:
         """Von refreshStaleEntities() bzw. dem hx-trigger="change" auf
@@ -514,7 +520,6 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 **_settings_purge_context(),
                 **_settings_retention_context(),
                 **_settings_rotation_context(),
-                **_demo_data_context(),
             },
         )
 
@@ -813,7 +818,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "append"), logger)
         except JobBusy:
             logger.info("Demo-Daten-Generierung bereits aktiv · event=demo_generate_already_running")
-        return deps.templates.TemplateResponse(request, "_job_progress.html", _demo_progress_context())
+        return deps.templates.TemplateResponse(request, "_job_progress.html", demo_progress_context())
 
     @router.post("/housekeeping/demo-data/regenerate", response_class=HTMLResponse)
     def housekeeping_demo_data_regenerate(request: Request) -> HTMLResponse:
@@ -826,7 +831,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "regenerate"), logger)
         except JobBusy:
             logger.info("Demo-Daten-Generierung bereits aktiv · event=demo_generate_already_running")
-        return deps.templates.TemplateResponse(request, "_job_progress.html", _demo_progress_context())
+        return deps.templates.TemplateResponse(request, "_job_progress.html", demo_progress_context())
 
     @router.get("/housekeeping/demo-data/progress", response_class=HTMLResponse)
     def housekeeping_demo_data_progress(request: Request) -> HTMLResponse:
@@ -837,9 +842,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         if not stand["started"]:
             return HTMLResponse("")
         if stand["running"]:
-            return deps.templates.TemplateResponse(request, "_job_progress.html", _demo_progress_context())
+            return deps.templates.TemplateResponse(request, "_job_progress.html", demo_progress_context())
         return deps.templates.TemplateResponse(
-            request, "_housekeeping_demo_data_body.html", _demo_data_context()
+            request, "_housekeeping_demo_data_body.html",
+            demo_data_context(deps.index, deps.base_dir, deps.demo_mode_active),
         )
 
     @router.post("/housekeeping/demo-data/interval", response_class=HTMLResponse)
@@ -855,7 +861,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             raise HTTPException(status_code=400, detail="Ungültiges Intervall")
         deps.index.set_setting("demo_append_interval", str(interval))
         return deps.templates.TemplateResponse(
-            request, "_housekeeping_demo_data_body.html", _demo_data_context()
+            request, "_housekeeping_demo_data_body.html",
+            demo_data_context(deps.index, deps.base_dir, deps.demo_mode_active),
         )
 
     @router.post("/housekeeping/demo-data/remove", response_class=HTMLResponse)

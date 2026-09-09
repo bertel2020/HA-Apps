@@ -177,8 +177,8 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     "refresh_integration_version_check_if_stale": None,  # → Meldung "Integration veraltet"
     "_run_backup_schedule_if_due": None,       # → eigene Backup-Seite mit Verlauf
     "_run_retention_enforcement_if_due": None,  # → eigene Aufbewahrung-Seite mit Verlauf
-    "_refresh_demo_dir_info_if_stale": None,   # → Housekeeping → Demo-Daten (Belegter Platz/Meldung)
-    "_run_demo_append_if_due": None,           # → Housekeeping → Demo-Daten (Zuletzt/Nächste Ergänzung)
+    "_refresh_demo_dir_info_if_stale": None,   # → Einstellungen → Demo-Daten (Belegter Platz/Meldung)
+    "_run_demo_append_if_due": None,           # → Einstellungen → Demo-Daten (Zuletzt/Nächste Ergänzung)
 }
 
 #: Läuft NICHT im 30-Sekunden-Takt, sondern einmalig beim Start in einem

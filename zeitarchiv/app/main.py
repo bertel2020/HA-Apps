@@ -132,6 +132,7 @@ from .index_optimization import (
 from .housekeeping_routes import (
     HousekeepingDependencies,
     create_housekeeping_router,
+    demo_data_context,
 )
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -1236,6 +1237,7 @@ def settings_view(request: Request) -> HTMLResponse:
             **_debug_tools_context(),
             **_settings_notices_context(),
             **_settings_background_processes_context(),
+            **demo_data_context(index, BASE_DIR, DEMO_MODE),
         },
     )
 

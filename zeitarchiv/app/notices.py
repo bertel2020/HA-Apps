@@ -731,8 +731,8 @@ def build_notices(
                 f"{format_size(demo_dir_info['size_bytes'])} unter <DATA_DIR>/demo — "
                 "Demo-Modus ist deaktiviert, die Daten liegen ungenutzt."
             ),
-            "meta": "Housekeeping",
-            "link": "/housekeeping#demo-daten",
+            "meta": "Demo-Daten",
+            "link": "/settings#demo-daten",
         })
 
     # Ganz am Ende (niedrigste Priorität) — ein Tipp soll nie vor einer

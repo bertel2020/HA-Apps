@@ -2,7 +2,7 @@
 """CLI-Hülle um app/demo_generation.py::run_generation() — der eigentliche
 Simulationskern lebt dort, weil ihn seit dem Demo-Modus (siehe
 DEMO_MODUS_PLAN.md im Projekt-Wurzelverzeichnis) auch die App selbst braucht
-(Housekeeping → Demo-Daten), nicht nur diese CLI.
+(Einstellungen → Demo-Daten), nicht nur diese CLI.
 
 Erzeugt Demo-Daten für eine leere/neue Zeitarchiv-Instanz. Kein laufender
 Server nötig; einfach danach ZEITARCHIV_DATA_DIR auf das Zielverzeichnis
