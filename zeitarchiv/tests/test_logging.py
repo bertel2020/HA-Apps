@@ -95,6 +95,21 @@ def test_slow_success_is_warning_even_when_access_mode_only_keeps_errors() -> No
     assert any("WARNING" in line and "event=http_slow" in line for line in lines)
 
 
+def test_health_probe_401_is_labelled_not_warned() -> None:
+    # Der Docker-Healthcheck ruft /api/health absichtlich ohne Token auf und
+    # wertet die daraus resultierende 401 als Beweis, dass der Prozess lebt
+    # (siehe app/healthcheck.py) — im Protokoll soll das deshalb nicht wie
+    # ein echter Unauthorized-Zugriff aussehen, auch nicht im Modus "errors".
+    configure_logging("debug", "errors")
+    log_http_request("GET", "/api/health", 401, 2.5, request_id="health-401-test")
+    lines = local_log_lines(search="health-401-test", limit=50)
+    assert any(
+        "INFO" in line and "event=healthcheck_probe" in line and "Healthcheck-Sonde" in line
+        for line in lines
+    )
+    assert not any("WARNING" in line for line in lines)
+
+
 def test_ring_buffer_uses_iso_timestamp_with_timezone_offset() -> None:
     configure_logging("debug", "off")
     logging.getLogger("app.logging_test").warning("iso-timestamp-test")

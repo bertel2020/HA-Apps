@@ -272,6 +272,18 @@ def log_http_request(
         return
     log = logging.getLogger("zeitarchiv.access")
     message = "%s %s -> %d · %.1f ms · event=http_request request_id=%s"
+    if path == "/api/health" and status == 401:
+        # Der Docker-Healthcheck (app/healthcheck.py) ruft /api/health
+        # absichtlich ohne Token auf — eine 401 beweist dort nur, dass der
+        # Prozess antwortet und das Index-Lock zur Token-Prüfung frei war,
+        # gilt also als gesund, nicht als Fehler. Eigener Event-Name + INFO
+        # statt WARNING, damit das im Protokoll nicht wie ein echter
+        # Unauthorized-Zugriff aussieht.
+        log.info(
+            "%s %s -> %d (Healthcheck-Sonde, kein Token nötig) · %.1f ms · event=healthcheck_probe request_id=%s",
+            method, path, status, duration_ms, request_field,
+        )
+        return
     if status >= 500:
         log.error(message, method, path, status, duration_ms, request_field)
     elif status >= 400:
