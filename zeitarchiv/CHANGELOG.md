@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.90.0 - 2026-09-09
+
+### Neu
+
+- **`device_tracker`- und `person`-Entitäten sind jetzt archivierbar.** Sie
+  gelten wie Schalter: „Zuhause" wird als „an" gewertet, jeder andere
+  Zustand (unterwegs oder eine benannte Zone) als „aus" — nutzbar z. B. für
+  Anwesenheitsauswertungen im Anzeigemodus „Zeit (Dauer)".
+
+### Behoben
+
+- Im Optionen-Menü der Entität-Verlaufsseite quetschte sich die
+  Beschriftung „Diagrammtyp" bei Schalter-Entitäten (drittem Button
+  „Zeitstrahl") auf schmalen Bildschirmen unleserlich zusammen.
+- Der Demo-Daten-Generator (`scripts/generate_demo_data.py`) simulierte
+  Balkonkraftwerk- und Heimspeicher rechnerisch mit über 100 % Wirkungsgrad
+  (Entladung teils höher als Ladung) — jetzt mit realistischem
+  Round-Trip-Verlust; außerdem eine neue Beispielentität
+  `device_tracker.demo_smartphone`.
+
 ## 0.89.0 - 2026-09-08
 
 ### Neu
