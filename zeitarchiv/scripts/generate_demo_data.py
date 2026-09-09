@@ -175,6 +175,8 @@ DEMO_ENTITIES = [
                "sensor", "total_increasing", "m³"),
     DemoEntity("binary_sensor.demo_praesenz_wohnzimmer", "Demo Präsenz Wohnzimmer",
                "binary_sensor", None, None),
+    DemoEntity("device_tracker.demo_smartphone", "Demo Smartphone",
+               "device_tracker", None, None),
     DemoEntity("binary_sensor.demo_regensensor", "Demo Regensensor",
                "binary_sensor", None, None),
 ]
@@ -1088,6 +1090,7 @@ def main() -> None:
     rain_seed = 0.0
     water_seed: float | None = None
     presence_seed: float | None = None
+    device_presence_seed: float | None = None
     balkon_seed: dict[str, float] = {}
     balkon_heute_seed: tuple[str | None, dict[str, float]] = (None, {})
     balkon_online_seed = 0.0
@@ -1115,6 +1118,7 @@ def main() -> None:
             rain_seed = _read_last_value(args.data_dir, "binary_sensor.demo_regensensor") or 0.0
             water_seed = _read_last_value(args.data_dir, "sensor.demo_wasserzaehler")
             presence_seed = _read_last_value(args.data_dir, "binary_sensor.demo_praesenz_wohnzimmer")
+            device_presence_seed = _read_last_value(args.data_dir, "device_tracker.demo_smartphone")
             balkon_seed = _read_balkon_counter_seed(args.data_dir)
             balkon_heute_seed = _read_balkon_heute_seed(args.data_dir, tz)
             balkon_online_seed = _read_last_value(args.data_dir, "binary_sensor.demo_balkonkraftwerk_online") or 0.0
@@ -1191,6 +1195,7 @@ def main() -> None:
         "binary_sensor.demo_heimspeicher_online": household["heim_online"],
         "sensor.demo_wasserzaehler": gen_water_counter(start, now, rng, start_total=water_seed),
         "binary_sensor.demo_praesenz_wohnzimmer": gen_presence(start, now, rng, start_state=presence_seed),
+        "device_tracker.demo_smartphone": gen_presence(start, now, rng, start_state=device_presence_seed),
         "binary_sensor.demo_regensensor": household["regensensor"],
     }
 

@@ -14,7 +14,7 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 ## Was wird erzeugt
 
-52 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+53 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
 eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
 Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
@@ -73,6 +73,7 @@ wiederzuerkennen und gezielt löschbar):
 | `binary_sensor.demo_heimspeicher_online` | Schalter | — | An, solange geladen oder entladen wird; aus im Leerlauf (PV deckt den Hausverbrauch exakt, oder Speicher ist voll/leer und wird gerade nicht gebraucht) |
 | `sensor.demo_wasserzaehler` | Zähler (`total_increasing`) | m³ | Monoton steigend, sparsame zufällige Zuwächse tagsüber |
 | `binary_sensor.demo_praesenz_wohnzimmer` | Schalter | — | Heim/Weg mit tageszeitabhängiger Wahrscheinlichkeit und Trägheit (kein Umschalten alle paar Minuten) |
+| `device_tracker.demo_smartphone` | Schalter | — | Eigene, unabhängige Heim/Weg-Simulation (`gen_presence()`) — Beispiel für die Anwesenheits-Domains `device_tracker`/`person`, die wie Schalter archiviert werden (`home` → an, alles andere → aus) |
 | `binary_sensor.demo_regensensor` | Schalter | — | Ein-/mehrmalige Regenfenster an manchen Tagen, Wahrscheinlichkeit steigt mit der Bewölkung dieses Tages |
 
 Waschmaschine, Spülmaschine, Trockner und Wallbox haben je zwei bzw. drei
@@ -161,7 +162,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 52 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 53 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -232,7 +233,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 52 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 53 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben
