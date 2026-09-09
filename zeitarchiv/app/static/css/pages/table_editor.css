@@ -65,7 +65,7 @@
   .drag-handle:hover{opacity:1;}
   .tbl-col-card.dragging .drag-handle,.tbl-row-card.dragging .drag-handle{cursor:grabbing;}
   .tbl-col-add{
-    flex:none;width:64px;border:1px dashed var(--border);border-radius:10px;background:var(--surface);
+    flex:none;width:64px;border:1px dashed var(--border-strong);border-radius:10px;background:var(--surface-alt);
     color:var(--ink-muted);font-size:calc(22px * var(--font-scale, 1));cursor:pointer;
   }
   .tbl-col-add:hover{color:var(--accent-line);border-color:var(--accent-line);}
