@@ -26,6 +26,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Import und Export](#import-und-export)
 - [Backup / Restore](#backup--restore)
 - [Einstellungen im Detail](#einstellungen-im-detail)
+- [Demo-Modus](#demo-modus)
 - [Typische Aufgaben](#typische-aufgaben)
 - [Häufige Fragen](#häufige-fragen)
 
@@ -1553,6 +1554,7 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
 | **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
+| **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |
 | **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
 
 Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
@@ -1571,6 +1573,90 @@ Supervisor-Historie reicht weiter zurück und kann beim Laden etwas länger
 dauern. Zugangsdaten werden vor der Ausgabe maskiert. Write-Captures und
 Entity-Traces können trotzdem Entity-IDs und Messwerte enthalten und sollten
 nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
+
+## Demo-Modus
+
+Lässt die App komplett getrennt von den echten Archivdaten mit
+synthetischen Vorführ-/Testdaten laufen — ein Haushalt mit Dach-PV-Anlage,
+Wallbox, Balkonkraftwerk, Heimspeicher und rund 50 weiteren Sensoren, alle
+mit Präfix `demo_`. Praktisch für einen ersten Eindruck vor der
+Home-Assistant-Anbindung oder als dauerhafte Schaufenster-Instanz, z. B. für
+Screenshots oder zum Ausprobieren, ohne die eigene Anlage zu verändern.
+
+### Einschalten
+
+Demo-Modus ist eine Add-on-Option, kein Klick in der App selbst:
+
+1. In Home Assistant zu **Einstellungen → Add-ons → Zeitarchiv →
+   Konfiguration** wechseln.
+2. Die Option `demo_mode` aktivieren und speichern.
+3. Das Add-on neu starten (der Supervisor bietet das nach dem Speichern von
+   selbst an).
+
+Nach dem Neustart arbeitet die App ausschließlich mit den Demo-Daten — die
+echten archivierten Werte liegen unverändert in einem komplett eigenen
+Verzeichnis (`<Datenverzeichnis>/demo` statt des echten
+Datenverzeichnisses) und werden zu keinem Zeitpunkt gelesen, verändert oder
+überschrieben. Ist beim ersten Start in diesem Modus noch keine Demo-Historie
+vorhanden, erzeugt die App sie automatisch (rund 6 Monate, dauert im
+Hintergrund einige Sekunden — die App ist währenddessen normal erreichbar,
+zeigt aber erst danach vollständige Werte).
+
+Eine Änderung der Option braucht **immer** einen Neustart, wie jede
+Add-on-Konfigurationsänderung — es gibt keinen Umschalter, der ohne
+Neustart zwischen echten und Demo-Daten wechselt.
+
+### Der Abschnitt „Demo-Daten"
+
+Solange relevant, erscheint unter **Einstellungen** zwischen **Diagnose**
+und **Über Zeitarchiv** ein zusätzlicher Abschnitt „Demo-Daten" mit einem
+von drei Zuständen:
+
+**Demo-Modus aktiv.** Zeigt Umfang (Entitäten/Werte) und belegten Platz der
+Demo-Instanz, wann zuletzt automatisch ergänzt wurde und wann die nächste
+Ergänzung ansteht. Drei Bedienelemente:
+
+- **Automatisch ergänzen** (Auswahl: Aus, alle 5/15/30 Minuten, stündlich) —
+  hält die Demo-Instanz von selbst auf dem aktuellen Datum, ohne dass
+  jemand aktiv werden muss. Voreingestellt ist **Aus**.
+- **Jetzt ergänzen** — ergänzt sofort die Werte seit dem letzten Lauf, ohne
+  die vorhandene Historie anzutasten. Dasselbe passiert automatisch, wenn
+  „Automatisch ergänzen" fällig wird.
+- **Neu erzeugen** — verwirft die komplette Demo-Historie und würfelt sie
+  neu (mit Sicherheitsabfrage). Nützlich, um wieder bei „frischen" 6 Monaten
+  anzufangen.
+
+Ein „Entfernen" gibt es hier bewusst nicht: Solange die Instanz selbst im
+Demo-Modus läuft, würde ein Löschen die eigene laufende Datenbank unter sich
+wegziehen. Dafür zuerst den Demo-Modus wie oben beschrieben ausschalten und
+neu starten.
+
+**Demo-Daten werden erzeugt.** Erscheint kurz nach dem Einschalten (Erststart)
+sowie während „Jetzt ergänzen"/„Neu erzeugen" laufen — ein Fortschrittsbalken
+zeigt den Stand je Entität. Andere Seiten der App bleiben währenddessen
+normal nutzbar, zeigen aber erst nach Abschluss die neuen bzw. vollständigen
+Werte.
+
+**Demo-Modus ist aus, aber Demo-Daten liegen noch vor.** Erscheint, wenn die
+Option wieder deaktiviert wurde, ohne die Demo-Daten vorher zu entfernen —
+sie bleiben auf der Platte liegen, bis sie manuell entfernt werden. Zeigt
+belegten Platz, ungefähre Entitätenzahl und den Zeitpunkt der letzten
+Änderung, dazu den Knopf **Demo-Daten entfernen** (mit Sicherheitsabfrage,
+**endgültig**: Werte, Konfiguration und Index der Demo-Instanz werden
+vollständig gelöscht). Ein Hinweis in der Glocke erinnert zusätzlich daran,
+solange die Daten liegen bleiben.
+
+### Sicherheit und Grenzen
+
+- Demo- und echte Daten teilen sich nie ein Verzeichnis — auch beim
+  Umschalten nicht. Ein Ausschalten des Demo-Modus macht die echten Daten
+  wieder sichtbar, unverändert seit dem letzten Mal.
+- Der Demo-Modus ist für eine einzelne App-Instanz gedacht, nicht für den
+  Parallelbetrieb mit einer zweiten, die dasselbe Verzeichnis gleichzeitig
+  beschreibt.
+- Die verbundene Home-Assistant-Integration kann den Betriebsmodus (Produktiv/
+  Demo-Modus) einer Instanz über eine eigene Sensor-Entität anzeigen — siehe
+  deren [Dokumentation](https://github.com/bertel2020/HA-Zeitarchiv).
 
 ## Typische Aufgaben
 
@@ -1614,6 +1700,12 @@ Erst bei Bedarf über das Zahnrad-Symbol **Alle Werte löschen** oder
 Nummer sicher gehen."**
 → **System → Backup / Restore** → Backup erstellen → herunterladen oder im
 konfigurierten Zeitplan belassen.
+
+**"Ich möchte die App vorführen oder ausprobieren, ohne echte Daten zu
+riskieren."**
+→ Add-on-Konfiguration → Option `demo_mode` aktivieren → Add-on neu starten
+→ siehe [Demo-Modus](#demo-modus). Die echten Daten bleiben dabei
+unangetastet in einem komplett eigenen Verzeichnis.
 
 ## Häufige Fragen
 

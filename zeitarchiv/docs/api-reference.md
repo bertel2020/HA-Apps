@@ -70,7 +70,7 @@ Einfluss auf Auth oder Schreibpfad, fehlt er, ändert sich nichts.
 ## `GET /api/notices`
 
 Authentifiziert wie `/api/write`. Antwort: `{"notices": [...], "latest_backup":
-{...} | null}`.
+{...} | null, "demo_mode": bool}`.
 
 `notices` ist dieselbe gefilterte (stummschaltungsbereinigte) Meldungsliste
 wie im Glocken-Icon der Zeitarchiv-UI (siehe `notices.py`,
@@ -84,13 +84,19 @@ wenn noch keines gelungen ist (siehe `notices.latest_backup_info()`,
 erfolgreiche Lauf, nicht der letzte Lauf überhaupt: ein fehlgeschlagener
 oder noch laufender Job hat keine reale, kopierbare Datei.
 
+`demo_mode` spiegelt die Add-on-Option gleichen Namens (siehe
+[Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) — `true`, solange
+diese App-Instanz mit synthetischen Vorführ-/Testdaten statt der echten
+Archivdaten läuft. Fehlt das Feld (ältere App-Version vor 0.91.0), gilt für
+Konsumenten `false`.
+
 Grundlage für die HA-Integration: sie pollt diesen Endpunkt (60s) und macht
 aus `notices` Home-Assistant-Repairs (kritische Fälle) sowie
 `binary_sensor`-Entities (automatisierbare Dauerzustände) am
-Zeitarchiv-Gerät, und aus `latest_backup` die Sensor-Entity „Letztes
+Zeitarchiv-Gerät, aus `latest_backup` die Sensor-Entity „Letztes
 Backup" — Grundlage für ein Automations-Blueprint, das ein Offsite-Ziel
 für die Backup-Datei anstößt (Zeitarchiv selbst spricht kein
-S3/WebDAV/SMB).
+S3/WebDAV/SMB) — und aus `demo_mode` die Sensor-Entity „Betriebsmodus".
 
 ## `GET /api/query` (Ingress-intern)
 
