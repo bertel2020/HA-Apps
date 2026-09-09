@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.90.1 - 2026-09-09
+
+### Behoben
+
+- Kachelrahmen bei veralteten Werten wirken jetzt dezenter (dünner, blasser
+  statt kräftigem Rot/Gold), zusätzlich eine Trennlinie über der
+  Min/Ø/Max-Zeile zur klareren Abgrenzung.
+- „Präziser Modus" auf Dashboards konnte bei wiederholtem Aktivieren die
+  Kachelgrößen unbegrenzt verdoppeln und das Raster durcheinanderbringen
+  (überlappende Kacheln) — behoben.
+
 ## 0.90.0 - 2026-09-09
 
 ### Neu
