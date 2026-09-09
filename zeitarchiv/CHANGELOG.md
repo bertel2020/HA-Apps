@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.91.0 - 2026-09-09
+
+### Neu
+
+- **Neuer "Demo-Modus"** (Add-on-Option): eine eigene, komplett von den
+  echten Archivdaten getrennte Instanz mit synthetischen Vorführ-/
+  Testdaten — praktisch für den Erstkontakt vor der Home-Assistant-
+  Anbindung oder als dauerhafte Schaufenster-Instanz. Unter Einstellungen
+  → „Demo-Daten" lassen sich die Werte automatisch erzeugen und nach
+  Zeitplan ergänzen, jederzeit manuell ergänzen oder komplett neu
+  erzeugen, und rückstandslos wieder entfernen.
+- Die Home-Assistant-Integration kann künftig anzeigen, ob eine verbundene
+  Instanz gerade produktiv oder im Demo-Modus läuft (siehe deren eigenes
+  Changelog).
+
 ## 0.90.2 - 2026-09-09
 
 ### Behoben
