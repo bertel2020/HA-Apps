@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.92.0 - 2026-09-10
+
+### Neu
+
+- **Dashboards lassen sich jetzt in Sektionen gliedern** — frei benennbare
+  Trenner zum Strukturieren vieler Kacheln, einzeln ein- und ausklappbar.
+  Das Kachel-Limit je Dashboard steigt dafür von 18 auf 30.
+- Eigene Charts zeigen jetzt optional eine farbige Flächenfüllung unter
+  Linien-Diagrammen, wie schon von den Dashboard-Kacheln gewohnt — über
+  eine neue Option „Fläche" im Optionen-Menü an- und abschaltbar (Standard:
+  an).
+
+### Geändert
+
+- Die Buttons im Dialog „Dashboard bearbeiten" laufen jetzt in der
+  Reihenfolge Löschen/Abbrechen/Speichern statt umgekehrt, auf dem
+  Smartphone rechtsbündig.
+- Ein technischer Abruf des Docker-Healthchecks erscheint im Protokoll
+  nicht mehr als Warnung, sondern klar als solcher gekennzeichnet.
+
+### Behoben
+
+- Wurde der Demo-Modus eingeschaltet, verlangte die Home-Assistant-
+  Integration bei einer bestehenden Verbindung bislang unnötig eine
+  erneute Anmeldung — sie erkennt den Grund jetzt und zeigt stattdessen
+  einen Hinweis, dass die Verbindung pausiert ist.
+- Die „+"-Kachel zum Hinzufügen einer neuen Tabellenspalte war im hellen
+  Farbschema „Modern" kaum sichtbar.
+
 ## 0.91.1 - 2026-09-09
 
 ### Behoben
