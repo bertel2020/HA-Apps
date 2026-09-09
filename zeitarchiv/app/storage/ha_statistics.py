@@ -44,7 +44,11 @@ from .ha_import import EntityAvailability, HaApiError, HistoryFetchResult
 # das bleibt Aufgabe der aufrufenden Route (import_routes.py).
 logger = logging.getLogger(__name__)
 
-CORE_WS_URL = "ws://supervisor/core/websocket"
+#CORE_WS_URL = "ws://supervisor/core/websocket"
+HA_WS_URL = os.environ.get(
+    "HA_WS_URL",
+    "ws://supervisor/core/websocket"
+)
 REQUEST_TIMEOUT = 20
 # Deutlich kleinere Batches/Fenster als ha_import.ENTITY_BATCH_SIZE bei
 # "hour": ein Jahr Stundenwerte für 40 Entitäten in einer Antwort wäre
@@ -84,10 +88,19 @@ class StatisticMeta:
         return self.has_mean or self.has_sum
 
 
+#def _token() -> str:
+#    token = os.environ.get("SUPERVISOR_TOKEN")
+#    if not token:
+#        raise HaApiError("Supervisor ist in dieser Umgebung nicht verfügbar")
+#    return token
+
 def _token() -> str:
-    token = os.environ.get("SUPERVISOR_TOKEN")
+    token = (
+        os.environ.get("HA_ACCESS_TOKEN")
+        or os.environ.get("SUPERVISOR_TOKEN")
+    )
     if not token:
-        raise HaApiError("Supervisor ist in dieser Umgebung nicht verfügbar")
+        raise HaApiError("Kein Home-Assistant-Token konfiguriert")
     return token
 
 
@@ -122,7 +135,7 @@ def _ws_call(commands: list[dict]) -> list[dict]:
     logger.debug("HA-WS-Anfrage · Befehle=%d", len(commands))
     try:
         with connect(
-            CORE_WS_URL,
+            HA_WS_URL,
             open_timeout=REQUEST_TIMEOUT,
             close_timeout=5,
             max_size=MAX_MESSAGE_BYTES,
