@@ -4598,7 +4598,7 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
 
 def _rows_fragment(
     request: Request, entity_id: str, filter_: str, range_key: str, offset: int = 0, page: int = 1, page_size: int = 20,
-    mode: str = "cleanup",
+    mode: str = "cleanup", deleted_count: int | None = None,
 ) -> HTMLResponse:
     entity = index.get_entity(entity_id)
     decimals_int = decimals_to_int(entity["decimals"])
@@ -4775,6 +4775,7 @@ def _rows_fragment(
             "undo_available": bool(index.get_last_deleted_batch(entity_id)),
             "first_date": first_date,
             "last_date": last_date,
+            "deleted_count": deleted_count,
         },
     )
 
@@ -4815,7 +4816,10 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     def delete_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
             cleanup.soft_delete(index, entity_id, timestamps)
-            return _rows_fragment(request, entity_id, filter_, range_key, offset, page, page_size, mode)
+            return _rows_fragment(
+                request, entity_id, filter_, range_key, offset, page, page_size, mode,
+                deleted_count=len(timestamps) or None,
+            )
 
     result = await run_in_threadpool(delete_locked)
     if timestamps:
@@ -5059,10 +5063,10 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
-    marked_any = False
+    deleted_total = 0
 
     def delete_locked() -> HTMLResponse:
-        nonlocal marked_any
+        nonlocal deleted_total
         with storage_coordinator.entity(entity_id):
             rows = cleanup.iter_raw_rows(
                 DATA_DIR, index, entity_id,
@@ -5074,17 +5078,18 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
                 batch.append(ts)
                 if len(batch) >= 10_000:
                     index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
-                    marked_any = True
+                    deleted_total += len(batch)
                     batch = []
             if batch:
                 index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
-                marked_any = True
+                deleted_total += len(batch)
             return _rows_fragment(
-                request, entity_id, filter_, range_key, offset, page, page_size, mode
+                request, entity_id, filter_, range_key, offset, page, page_size, mode,
+                deleted_count=deleted_total or None,
             )
 
     result = await run_in_threadpool(delete_locked)
-    if marked_any:
+    if deleted_total:
         _background.invalidate_purge_preview()
     return result
 

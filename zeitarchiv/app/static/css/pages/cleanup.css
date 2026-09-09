@@ -77,6 +77,11 @@
      einen Rahmen. Geschwister-Selektor statt einer eigenen Klasse an der
      .tbl-wrap, weil die Leiste im Korrigieren-Modus dieselbe bleibt. */
   .rows-actionbar + .tbl-wrap{border-top-left-radius:0;border-top-right-radius:0;}
+  /* Einmalige Erfolgsmeldung nach Duplikate/Wiederholungen/Auswahl löschen,
+     siehe _rows_table.html. Gleiche Optik wie .add-value-status.ok (dort:
+     "Hinzufügen"-Rückmeldung) — beide sagen "Aktion erfolgreich", nur an
+     anderer Stelle der Seite. */
+  .rows-flash{margin:0 0 10px;font-size:calc(13px * var(--font-scale, 1));color:var(--accent-line);font-weight:600;}
   .rows-actionbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   /* Ohne Auswahl blass statt weg: eine Leiste, die erst beim ersten Kreuz
      erscheint, verschöbe die Tabelle unter dem Finger. Die Klasse setzt
@@ -246,6 +251,26 @@
   }
   .seg button:last-child{border-right:none;}
   .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  /* Laufender Zeitraum-Wechsel: #controls selbst trägt hx-get (siehe
+     cleanup.html), nicht die Range-Buttons — die schreiben nur ins
+     Hidden-Feld und lösen "change" aus. Ohne diese Regel blieb ein Wechsel
+     zu "Jahr"/"Gesamt" (potenziell teure Aggregation über Millionen
+     Rohwerte) unsichtbar: kein Spinner, kein "Lädt…", die Buttons wirkten
+     weiter uneingeschränkt klickbar. setRange() (cleanup.js) setzt .active
+     synchron auf den geklickten Button, BEVOR der Request losgeht — daher
+     reicht hier .active als Ziel, ganz ohne dass ein Template den
+     auslösenden Button selbst kennzeichnen müsste (gleiches Prinzip wie
+     .btn.htmx-request in app.css). */
+  #controls.htmx-request .seg button.active{opacity:.7;cursor:progress;}
+  #controls.htmx-request .seg button.active::after{
+    content:"";display:inline-block;width:.72em;height:.72em;margin-left:.55em;
+    vertical-align:-.06em;border-radius:50%;
+    border:2px solid currentColor;border-top-color:transparent;
+    animation:btn-spin .7s linear infinite;
+  }
+  @media (prefers-reduced-motion:reduce){
+    #controls.htmx-request .seg button.active::after{animation:none;}
+  }
   .nav{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
   /* Unter 480px steht .nav ("‹ Heute ›") allein in seiner Zeile (.toolbar
      ist hier ohnehin schon senkrecht gestapelt, siehe #controls oben) —

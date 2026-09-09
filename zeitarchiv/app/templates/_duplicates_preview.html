@@ -24,7 +24,8 @@
   <div class="actionbar" style="margin-top:14px;">
     <button class="btn btn-danger"
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
-            hx-include="#confirm-duplicates-form input, #controls" hx-target="#rows-table" hx-swap="innerHTML">
+            hx-include="#confirm-duplicates-form input, #controls" hx-target="#rows-table" hx-swap="innerHTML"
+            hx-disabled-elt="this">
       Ja, {{ total_to_delete }} Zeile(n) entfernen
     </button>
     <button class="btn"

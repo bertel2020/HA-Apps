@@ -85,6 +85,15 @@
 
 {% include "_rows_filter_menu.html" %}
 
+{% if deleted_count %}
+{# Einmalige Rückmeldung nach Duplikate/Wiederholungen/Auswahl löschen — bis
+   dahin verriet nur die veränderte Zeilenzahl/Kennzahl, dass überhaupt etwas
+   passiert war. Lebt hier statt in #rows-summary (oob), weil sie nur bei
+   EINEM Request gesetzt ist (deleted_count kommt aus _rows_fragment()) und
+   beim nächsten normalen Neuladen automatisch wieder verschwindet. #}
+<p class="rows-flash" role="status">✓ {{ deleted_count | format_int }} Zeile(n) gelöscht.</p>
+{% endif %}
+
 {# Aktionszeile als KOPF der Tabelle statt als Zeile darunter. Gemessen bei
    1.280x900: das erste Auswahlkästchen lag bei y=456, "Löschen" bei y=1215 —
    759px auseinander, der Knopf also nicht im Bild, während man die oberen
