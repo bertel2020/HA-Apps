@@ -922,6 +922,41 @@ def test_dashboard_tile_size_is_persisted_and_validated() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_dashboard_precise_mode_only_doubles_pin_sizes_once() -> None:
+    """Regression: set_dashboard_precise_mode() verdoppelte früher Kachel-
+    größen bei JEDEM Aufruf mit precise=True, auch wenn der Modus schon an
+    war — ein wiederholter Aufruf (z. B. doppelter Request) verdoppelte ein
+    zweites Mal, unbegrenzt (4->8->16 ...), und sprengte damit das auf 6
+    Spalten begrenzte Grid. Jetzt nur noch bei echtem Wechsel aus->an, mit
+    Kappung auf 6 als Sicherheitsnetz."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        chart_id = index.create_saved_chart("Dashboard", ["sensor.a"], "day", continuous=False)
+        assert index.pin_item_to_dashboard(1, "chart", chart_id) is True
+        assert index.set_dashboard_pin_size(1, "chart", chart_id, 3, 3) is True
+
+        assert index.set_dashboard_precise_mode(1, True) is True
+        pin = index.list_dashboard_pins(1)[0]
+        assert (pin["grid_cols"], pin["grid_rows"]) == (6, 6)
+
+        # Wiederholter Aufruf bei bereits aktivem Modus darf NICHT nochmal
+        # verdoppeln — das war der eigentliche Bug.
+        assert index.set_dashboard_precise_mode(1, True) is True
+        pin = index.list_dashboard_pins(1)[0]
+        assert (pin["grid_cols"], pin["grid_rows"]) == (6, 6)
+
+        # Ausschalten kappt auf die alte Obergrenze (3) statt rechnerisch zu
+        # halbieren.
+        assert index.set_dashboard_precise_mode(1, False) is True
+        pin = index.list_dashboard_pins(1)[0]
+        assert (pin["grid_cols"], pin["grid_rows"]) == (3, 3)
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_dashboard_tile_limit_is_eighteen() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
