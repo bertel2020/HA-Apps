@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.90.2 - 2026-09-09
+
+### Behoben
+
+- Im Bearbeitungsbereich → „Bereinigen" fehlte bislang jede Rückmeldung beim
+  Wechsel auf „Jahr"/„Gesamt" sowie nach dem Entfernen von Duplikaten oder
+  Wiederholungen — jetzt zeigt ein Lade-Ring den laufenden Vorgang, und nach
+  dem Löschen erscheint kurz eine Erfolgsmeldung mit der Anzahl der
+  entfernten Zeilen.
+
 ## 0.90.1 - 2026-09-09
 
 ### Behoben
