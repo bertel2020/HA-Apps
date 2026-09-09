@@ -896,6 +896,85 @@ def month_start(dt: datetime) -> datetime:
     return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+# --- Sporadische Datenqualitätsprobleme --------------------------------------
+#
+# Ohne diese Nachbearbeitung liefert simulate_household() so gut wie nie
+# exakte Zeitstempel-Duplikate oder eine längere Folge gerundet gleicher
+# Werte (Rauschterme sorgen fast immer für minimale Abweichungen) — eine
+# frische Demo-Instanz hätte für die "Bereinigen"-Werkzeuge im Reiter "Werte
+# bearbeiten" (Duplikate entfernen, Wiederholungen verdichten) damit so gut
+# wie nie etwas zu tun. Bewusst GERINGE, pro Entität geprüfte
+# Wahrscheinlichkeiten (nicht pro Zeile): beide Werkzeuge sollen an einer
+# typischen Demo-Instanz etwas zu tun bekommen, ohne dass die Historie
+# insgesamt unrealistisch fehlerhaft wirkt.
+DUPLICATE_CHANCE = 0.12
+DUPLICATE_BURST_RANGE = (1, 3)
+STUCK_CHANCE = 0.18
+STUCK_RUN_STEPS_RANGE = (3, 14)  # bei 5-Minuten-Schritten ~15-70 Minuten "eingefroren"
+STUCK_BURST_RANGE = (1, 2)
+
+
+def inject_data_quality_issues(
+    entity: DemoEntity, rows: list[Row], rng: random.Random, month_boundary_ts: float
+) -> list[Row]:
+    """Streut sporadisch Zeitstempel-Duplikate und "eingefrorene" (gerundet
+    gleiche) Folgewert-Serien in eine bereits fertig simulierte Zeitreihe ein.
+
+    Bewusst als Nachbearbeitung der fertigen (ts, value)-Liste, NICHT in
+    simulate_household() selbst: die dort laufenden Zählerstände/
+    Speicherfüllstände dürfen durch rein auf der Anzeige sichtbare
+    Duplikate/Einfrierungen nicht beeinflusst werden — sonst zeigte z. B. ein
+    eingefrorener Zählerwert beim nächsten Schritt einen Sprung zurück auf
+    den "eigentlich" simulierten Wert. Als Post-Processing bleibt die
+    zugrunde liegende Simulation unverändert, nur die AUSGABE bekommt
+    zusätzliche Zeilen bzw. an einzelnen Stellen abweichende Werte.
+
+    Wirkt nur auf sensor-Entitäten: binary_sensor/device_tracker schreiben
+    in simulate_household()/gen_presence() ohnehin nur bei Zustandswechsel
+    (siehe dortiger Kommentar) — ein künstliches Duplikat oder ein
+    "eingefrorener" Folgewert wäre dort kein realistisches Sensor-Verhalten,
+    sondern nur ein Bruch der eigenen Transitions-Logik.
+    """
+    if entity.domain != "sensor" or len(rows) < 20:
+        return rows
+
+    result = list(rows)
+
+    # Zeitstempel-Duplikate NUR vor dem laufenden Kalendermonat einfügen:
+    # import_rows() (symcon_import.py) zieht innerhalb EINES Imports mehrere
+    # Zeilen mit gleichem Zeitstempel zusammen, sobald der betroffene Monat
+    # schon Daten hat (_new_rows_for_merge()/_new_rows_for_archive(), wegen
+    # überlappender --append-Läufe nötig) — nur ein brandneuer, noch
+    # unbeschriebener Monat (to_import-Zweig in import_rows()) übernimmt
+    # beide Vorkommen unverändert. Der laufende Monat hat (außer bei einer
+    # brandneuen Instanz) praktisch immer schon Daten, ein hier eingefügtes
+    # Duplikat käme dort also nie tatsächlich an.
+    duplicate_eligible_end = sum(1 for ts, _value in result if ts < month_boundary_ts)
+    if duplicate_eligible_end >= 2 and rng.random() < DUPLICATE_CHANCE:
+        for _ in range(rng.randint(*DUPLICATE_BURST_RANGE)):
+            idx = rng.randrange(1, duplicate_eligible_end)
+            result.insert(idx + 1, result[idx])
+            duplicate_eligible_end += 1
+
+    # "Eingefrorene" Folgewerte sind von der obigen Einschränkung NICHT
+    # betroffen: jede Zeile behält ihren eigenen, echten (weiterhin
+    # eindeutigen) Zeitstempel, nur ihr Wert wird überschrieben — die
+    # Zeitstempel-Deduplizierung oben greift hier nicht. Funktioniert daher
+    # überall, auch im laufenden Monat bzw. bei --append.
+    if len(result) >= 20 and rng.random() < STUCK_CHANCE:
+        for _ in range(rng.randint(*STUCK_BURST_RANGE)):
+            run_len = rng.randint(*STUCK_RUN_STEPS_RANGE)
+            if len(result) < run_len + 2:
+                continue
+            start = rng.randrange(0, len(result) - run_len)
+            frozen_value = result[start][1]
+            for offset in range(1, run_len + 1):
+                ts, _value = result[start + offset]
+                result[start + offset] = (ts, frozen_value)
+
+    return result
+
+
 def write_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity, rows: list[Row]) -> None:
     index.get_or_create_entity(
         entity.entity_id, entity.domain, entity.state_class, entity.unit,
@@ -1237,8 +1316,9 @@ def main() -> None:
         "binary_sensor.demo_regensensor": household["regensensor"],
     }
 
+    month_boundary_ts = month_start(now).timestamp()
     for entity in DEMO_ENTITIES:
-        rows = rows_by_key[entity.entity_id]
+        rows = inject_data_quality_issues(entity, rows_by_key[entity.entity_id], rng, month_boundary_ts)
         write_entity(args.data_dir, index, tz, entity, rows)
         print(f"{entity.entity_id}: {len(rows)} Werte geschrieben")
 

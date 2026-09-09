@@ -161,6 +161,21 @@ Der aktuelle, noch laufende Monat landet — wie bei echten Daten — im Hot
 Buffer statt in einem Monatsarchiv; die Entität zeigt also auch „heute"
 plausible, aktuelle Werte.
 
+Zusätzlich streut das Skript **sporadisch** Zeitstempel-Duplikate und kurze
+Serien „eingefrorener" (gerundet gleicher) Folgewerte in einzelne
+`sensor.*`-Entitäten ein — sonst hätten „Duplikate entfernen"/
+„Wiederholungen verdichten" im Reiter „Werte bearbeiten" → „Bereinigen" an
+einer frischen Demo-Instanz so gut wie nie etwas zu tun (die Simulation
+selbst erzeugt kaum exakte Dopplungen). Betrifft pro Lauf nur eine Handvoll,
+per Zufalls-Seed reproduzierbar bestimmte Entitäten, keine
+`binary_sensor`-/`device_tracker`-Entitäten (die schreiben ohnehin nur bei
+Zustandswechsel, siehe Tabelle oben). Zeitstempel-Duplikate landen dabei
+bewusst nur in bereits abgeschlossenen Monaten, nie im laufenden — ein
+Duplikat innerhalb des laufenden Monats würde `import_rows()` beim
+Schreiben in den Hot Buffer ohnehin wieder auf ein Vorkommen zusammenziehen
+(dieselbe Deduplizierung, die überlappende `--append`-Läufe unkritisch
+macht), käme dort also nie tatsächlich an.
+
 ## Voraussetzungen
 
 - Python-Umgebung der App (`addon/.venv`, siehe
