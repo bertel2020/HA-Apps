@@ -51,6 +51,9 @@ logger = logging.getLogger(__name__)
 # — von dort nicht importierbar, weil das Addon in einem eigenen Python-Prozess
 # ohne Home-Assistant-Paket läuft.
 SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+# Anwesenheits-Domains: eigenes State-Vokabular ("home"/"not_home"/Zonenname
+# statt "on"/"off"), werden aber genauso auf 1/0 abgebildet, siehe _parse_state.
+PRESENCE_DOMAINS = {"device_tracker", "person"}
 IGNORED_STATES = {"unavailable", "unknown", "none", ""}
 
 CORE_API_BASE = "http://supervisor/core/api"
@@ -165,6 +168,8 @@ def _parse_state(state: str, domain: str) -> float | None:
         if normalized not in ("on", "off"):
             return None
         return 1.0 if normalized == "on" else 0.0
+    if domain in PRESENCE_DOMAINS:
+        return 1.0 if normalized == "home" else 0.0
     try:
         value = float(state)
         return round(value, 3) if math.isfinite(value) else None

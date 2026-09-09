@@ -36,6 +36,14 @@ def test_no_state_class_and_unknown_domain_falls_back_to_standard() -> None:
     assert derive_type("sensor", None) == "standard"
 
 
+def test_device_tracker_is_switch() -> None:
+    assert derive_type("device_tracker", None) == "switch"
+
+
+def test_person_is_switch() -> None:
+    assert derive_type("person", None) == "switch"
+
+
 def _run_all() -> None:
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

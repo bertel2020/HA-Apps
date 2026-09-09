@@ -19,6 +19,10 @@ from pathlib import Path
 from .paths import validate_entity_id
 
 SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+# Anwesenheits-Domains (device_tracker/person) — eigenes State-Vokabular
+# ("home"/"not_home"/Zonenname), werden für den Zeitarchiv-Typ aber wie
+# SWITCH_DOMAINS behandelt, siehe ha_import._parse_state()/events.build_event().
+PRESENCE_DOMAINS = {"device_tracker", "person"}
 COUNTER_STATE_CLASSES = {"total", "total_increasing"}
 
 DEFAULT_RESOLUTION = "raw"
@@ -586,7 +590,7 @@ def filter_deleted_occurrences(
 
 def derive_type(domain: str, state_class: str | None) -> str:
     """Leitet den Zeitarchiv-Typ aus Domain/state_class ab (Konzept Abschnitt 03)."""
-    if domain in SWITCH_DOMAINS:
+    if domain in SWITCH_DOMAINS or domain in PRESENCE_DOMAINS:
         return "switch"
     if state_class in COUNTER_STATE_CLASSES:
         return "counter"

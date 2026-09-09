@@ -21,6 +21,13 @@ def test_parse_state_normalizes_switch_domains_to_one_zero() -> None:
     assert ha_import._parse_state("open", "binary_sensor") is None
 
 
+def test_parse_state_normalizes_presence_domains_to_one_zero() -> None:
+    assert ha_import._parse_state("home", "device_tracker") == 1.0
+    assert ha_import._parse_state("HOME", "person") == 1.0
+    assert ha_import._parse_state("not_home", "device_tracker") == 0.0
+    assert ha_import._parse_state("arbeit", "person") == 0.0
+
+
 def test_parse_state_requires_numeric_for_other_domains() -> None:
     assert ha_import._parse_state("21.5", "sensor") == 21.5
     assert ha_import._parse_state("not-a-number", "sensor") is None
