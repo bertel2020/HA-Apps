@@ -2726,16 +2726,16 @@ def _entity_config_context(entity) -> dict:
 
     now = datetime.now(TZ)
     window_start = (now - timedelta(days=60)).timestamp()
-    raw_rows = cleanup.list_raw_rows(
-        DATA_DIR, index, entity_id, window_start, now.timestamp(), TZ,
-        now=now, max_rows=MAX_UI_ANALYSIS_ROWS
-    )
+    # deque statt list_raw_rows(max_rows=...): sonst ResultLimitExceeded bei dichten Entitäten (Issue #4)
+    last_rows: deque[tuple[float, float]] = deque(maxlen=10)
+    for ts, value in cleanup.iter_raw_rows(DATA_DIR, index, entity_id, window_start, now.timestamp(), TZ, now=now):
+        last_rows.append((ts, value))
     preview_rows = [
         {
             "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
             "formatted_value": format_value(value, decimals_int),
         }
-        for ts, value in reversed(raw_rows[-10:])
+        for ts, value in reversed(last_rows)
     ]
 
     return {
