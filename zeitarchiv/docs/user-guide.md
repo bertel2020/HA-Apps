@@ -39,7 +39,17 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Ansicht sichern](#ansicht-sichern)
   - [Gespeicherte Optionen](#gespeicherte-optionen)
 - [Charts](#charts)
+  - [Entitäten und Darstellung](#entitäten-und-darstellung)
+  - [Zeitraum und Vergleich](#zeitraum-und-vergleich)
+  - [Unterschiede zur Verlaufsansicht einer einzelnen Entität](#unterschiede-zur-verlaufsansicht-einer-einzelnen-entität)
+  - [Reihenfolge, Namen und Sichtbarkeit](#reihenfolge-namen-und-sichtbarkeit)
+  - [Was wird gespeichert — und was nicht](#was-wird-gespeichert--und-was-nicht)
 - [Tabellen](#tabellen)
+  - [Zeilen](#zeilen)
+  - [Spalten](#spalten)
+  - [Aggregation und Formatierung](#aggregation-und-formatierung)
+  - [Formeln](#formeln)
+  - [Darstellung](#darstellung-1)
 - [Statistik](#statistik)
 
 **Entitäten konfigurieren &amp; pflegen**
@@ -731,27 +741,22 @@ Enthält ein Chart Linien- und Balkenreihen zugleich — etwa eine Temperatur
 neben einem Zähler —, werden beide Typen genannt.
 
 Eigener Editor, erreichbar über **Charts** → neues Chart oder Bearbeiten
-eines bestehenden (Kachelmenü ⋮):
+eines bestehenden (Kachelmenü ⋮).
+
+### Entitäten und Darstellung
 
 - Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
   automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
   in einem Chart sinnvoll lesbar bleiben.
-- **Auflösung** wählbar, inklusive "Automatisch" — dabei zeigt ein kleiner
-  Hinweis direkt an, welche Auflösung das für den aktuell gewählten
-  Zeitraum tatsächlich bedeutet (z. B. "≈ 1 Stunde"). Bei Zeitraum "Tag"
-  steht zusätzlich die Auflösung "Tag" zur Verfügung: sie fasst den ganzen
-  Tag zu einem einzigen Balken je Entität zusammen — praktisch, um z. B.
-  Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt
-  zu vergleichen. Vergleichen, Rollierend und Dynamische Y-Achse sind
-  bei dieser Auflösung deaktiviert, da sie für einen einzelnen
-  Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
+- Ob eine Entität als Linie oder als Balken gezeichnet wird, lässt sich
+  nicht manuell wählen — das entscheidet die App automatisch nach
+  Entitätstyp (Zähler und Schalter als Balken, alles andere als Linie).
+  Nur der **Zeitstrahl** (siehe unten) ist eine bewusste Wahl.
 - Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,
   Durchschnittslinie, Nachkommastellen, Legenden-Statistik — dieselben
   Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
   Chart konfiguriert statt je Entität; Nachkommastellen gilt dabei
-  einheitlich für alle Entitäten des Charts. Alle Einstellungen werden mit
-  dem Chart gespeichert und gelten dann auch für dessen Vorschau auf
-  Dashboards.
+  einheitlich für alle Entitäten des Charts.
 - **Fläche** (nur hier, nicht in der Verlaufsansicht einer einzelnen
   Entität) füllt die Fläche unter Linien-Serien dezent ein — Standard an,
   entspricht damit dem bisherigen Aussehen der Dashboard-Kachel.
@@ -768,18 +773,64 @@ eines bestehenden (Kachelmenü ⋮):
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
   AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
-- Mehrere Entitäten lassen sich per Ziehen oder über Pfeil-Buttons neu
-  anordnen — das bestimmt die Reihenfolge in Legende, Statistik-Anzeige und
-  Farbzuordnung. Dort lässt sich außerdem je Entität ein abweichender
-  Anzeigename nur für dieses Chart vergeben (wirkt in Legende, Statistik und
-  Tooltip) und die Reihe per Augen-Symbol dauerhaft ausblenden — anders als
-  das Ein-/Ausblenden per Klick auf die Legende (siehe
-  [Kennzahlen und Legende](#kennzahlen-und-legende)) wird das mit dem Chart
-  gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
-- Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
-  Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
-- Die geöffnete Ansicht zeigt unter **Verwendet in** die Dashboards, auf denen
-  das gespeicherte Chart als Kachel liegt, und verlinkt direkt dorthin.
+
+### Zeitraum und Vergleich
+
+Dieselbe Zeitraum-Leiste wie in der Verlaufsansicht (Stunde bis Dekade), mit
+einem **Kontinuierlich**-Schalter für ein rollierendes statt kalendarisches
+Fenster (z. B. „letzte 24 Stunden" statt „heute") — dieselbe Funktion wie
+„Rollierend" andernorts in der App, im Chart-Editor nur noch unter dem
+älteren Namen zu finden. Bei Auflösung „Tag" fasst die App den ganzen Tag zu
+einem einzigen Balken je Entität zusammen — praktisch, um z. B.
+Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt zu
+vergleichen. **Vergleichen**, **Kontinuierlich** und **Dynamische Y-Achse**
+sind bei dieser Auflösung deaktiviert, da sie für einen einzelnen
+Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
+
+**Vergleichen** stellt der aktuellen Periode die Vorperiode oder denselben
+Zeitraum des Vorjahres gegenüber — wie in der Verlaufsansicht einer
+einzelnen Entität. Nicht verfügbar bei aktiven Rohwerten, bei Auflösung
+„Tag" oder bei aktiver Stapelung (siehe oben).
+
+### Unterschiede zur Verlaufsansicht einer einzelnen Entität
+
+Ein Chart zeigt beim Ansehen immer die **aktuelle Periode** — anders als die
+Verlaufsansicht einer einzelnen Entität gibt es hier keine Vor-/Zurück-
+Navigation zu vergangenen Perioden. Ebenso fehlt das Hineinzoomen in einen
+Ausschnitt (siehe
+[In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)) — ein
+Chart lässt sich nur über Zeitraum und Auflösung, nicht per Maus/Touch
+eingrenzen. Wer beides braucht, findet auf der Seite der einzelnen Entität
+selbst denselben Chart-Typ mit beiden Funktionen.
+
+### Reihenfolge, Namen und Sichtbarkeit
+
+Mehrere Entitäten lassen sich per Ziehen oder über Pfeil-Buttons neu
+anordnen — das bestimmt die Reihenfolge in Legende, Statistik-Anzeige und
+Farbzuordnung. Dort lässt sich außerdem je Entität ein abweichender
+Anzeigename nur für dieses Chart vergeben (wirkt in Legende, Statistik und
+Tooltip) und die Reihe per Augen-Symbol dauerhaft ausblenden — anders als
+das Ein-/Ausblenden per Klick auf die Legende (siehe
+[Kennzahlen und Legende](#kennzahlen-und-legende)) wird das mit dem Chart
+gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
+
+### Was wird gespeichert — und was nicht
+
+Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Zeitraum samt
+Kontinuierlich-Schalter, Auflösung, dynamische Y-Achse, Werte anzeigen,
+Durchschnittslinie, Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/
+Anteile (%) sowie Zeitstrahl werden alle mit dem Chart gespeichert und
+gelten dann auch für dessen Vorschau auf Dashboards. **Punkte an/aus,
+Rohwerte und Vergleichen dagegen nicht** — diese drei sind reine
+Ansichtseinstellungen für den aktuellen Besuch und stehen beim nächsten
+Öffnen wieder auf ihrem Ausgangswert.
+
+Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
+Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt. Die geöffnete
+Ansicht zeigt unter **Verwendet in** die Dashboards, auf denen das
+gespeicherte Chart als Kachel liegt, und verlinkt direkt dorthin. Nirgends
+mehr angepinnte Charts listet
+[Housekeeping → Ungenutzte Elemente](#housekeeping).
 
 ## Tabellen
 
@@ -789,32 +840,58 @@ Suche, Sortierung und Favoriten-Schalter (siehe
 jede Kachel nennt die Anzahl ihrer Zeilen und Spalten.
 
 Eigener Editor, erreichbar über **Tabellen** → neue Tabelle oder Bearbeiten
-einer bestehenden (Kachelmenü ⋮):
+einer bestehenden (Kachelmenü ⋮).
 
-- **Zeilen** sind Größen: eine einzelne Entität, eine Gruppe mehrerer
-  Entitäten (wird zu einem Summenwert zusammengefasst), eine Formel, oder
-  eine rein optische Trennlinie ohne eigene Daten.
-- **Spalten** sind Zeiträume: frei benannt (z. B. "Heute", "Aug Vorjahr",
-  "2026"), jeweils mit einem Zeitraum-Typ (Tag, Woche, Monat, Jahr …) und
-  einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger, usw.). So
-  lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende Jahre in
-  zwölf Spalten nebeneinanderstellen. Die Beschriftung kann Platzhalter
-  wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten, die sich
-  automatisch auf den jeweiligen Zeitraum der Spalte auflösen (Einfüge-
-  Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des aufgelösten
-  Werts). **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch
-  auf denselben Zeitraum ein Jahr zuvor (schaltjahrsicher). Steht neben einer
-  vergangenen Spalte (Vortag, Vormonat, Vorjahr …) eine Spalte mit Versatz 0
-  desselben Zeitraum-Typs, vergleicht die vergangene Spalte automatisch nur
-  den bislang vergangenen Teil ihres Zeitraums ("Gleicher Zeitpunkt"-
-  Vergleich) — ein noch laufender Tag wird so fair gegen "Vortag bis zur
-  aktuellen Uhrzeit" statt gegen den kompletten Vortag verglichen.
-- **Mehrstufige Kopfzeile:** Spalten mit derselben, nicht leeren
-  Gruppen-Beschriftung (z. B. "2025" über mehreren Monatsspalten) bekommen
-  automatisch eine gemeinsame, übergreifende Kopfzeile darüber.
-- Spalten und Zeilen lassen sich über das jeweilige Kärtchen duplizieren
-  (⧉) — Zeilen-Duplikate inklusive aller Optionen, Formel-Zeilen mit
-  automatisch mitkorrigierten Buchstaben-Referenzen.
+### Zeilen
+
+Eine Zeile ist eine Größe: eine einzelne Entität, eine Gruppe mehrerer
+Entitäten (wird zu einem Summenwert zusammengefasst), eine Formel (siehe
+[Formeln](#formeln)), oder eine rein optische Trennlinie ohne eigene Daten.
+Eine Trennlinie kann optional einen Abschnittsnamen als eigene Überschrift
+zeigen — unabhängig je Trennlinie einstellbar, nicht global für alle.
+
+Jede Zeile lässt sich über ihr Menü **ausblenden**: sie verschwindet aus
+Vorschau und Kachel, wird aber weiter mitberechnet — praktisch für eine
+Hilfszeile, auf die nur eine Formel zugreifen soll, ohne selbst in der
+Tabelle zu erscheinen. Ebenfalls im Zeilenmenü: **Fett** hebt einzelne
+Zeilen hervor, unabhängig von der globalen Einstellung „Beschriftung fett"
+unter [Darstellung](#darstellung-1) (die betrifft die gesamte
+Beschriftungsspalte). Zeilenbeschriftungen sind auf 30 Zeichen begrenzt.
+
+Zeilen lassen sich per Ziehen oder über Pfeil-Buttons neu anordnen sowie
+über ihr Kärtchen duplizieren (⧉), inklusive aller Optionen; Formel-Zeilen
+dabei mit automatisch mitkorrigierten Buchstaben-Referenzen.
+
+### Spalten
+
+Eine Spalte ist ein Zeitraum: frei benannt (z. B. „Heute", „Aug Vorjahr",
+„2026"), mit einem Zeitraum-Typ (Stunde, Tag, Woche, Monat, Jahr oder
+Dekade) und einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger,
+usw.). So lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende
+Jahre in zwölf Spalten nebeneinanderstellen. Die Beschriftung kann
+Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten,
+die sich automatisch auf den jeweiligen Zeitraum der Spalte auflösen
+(Einfüge-Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des
+aufgelösten Werts).
+
+**Vorjahresvergleich** setzt den Versatz einer Spalte automatisch auf
+denselben Zeitraum ein Jahr zuvor (schaltjahrsicher) — verschiebt dabei
+immer exakt ein Jahr, bei Zeitraum-Typ „Dekade" also nicht sinnvoll
+einsetzbar. Steht neben einer vergangenen Spalte (Vortag, Vormonat, Vorjahr
+…) eine Spalte mit Versatz 0 desselben Zeitraum-Typs, vergleicht die
+vergangene Spalte automatisch nur den bislang vergangenen Teil ihres
+Zeitraums („Gleicher Zeitpunkt"-Vergleich) — ein noch laufender Tag wird so
+fair gegen „Vortag bis zur aktuellen Uhrzeit" statt gegen den kompletten
+Vortag verglichen.
+
+Wie Zeilen lässt sich auch eine Spalte über ihr Menü **ausblenden** — sie
+bleibt weiterhin berechnet, etwa damit eine ausgeblendete Vorjahres-Spalte
+ihre prozentuale Abweichung trotzdem an einer sichtbaren Spalte anzeigen
+kann (siehe „Vergleich" unter [Darstellung](#darstellung-1)).
+**Mehrstufige Kopfzeile:** Spalten mit derselben, nicht leeren
+Gruppen-Beschriftung (z. B. „2025" über mehreren Monatsspalten) bekommen
+automatisch eine gemeinsame, übergreifende Kopfzeile darüber. Spalten
+lassen sich wie Zeilen duplizieren (⧉).
 
 ### Aggregation und Formatierung
 
@@ -823,10 +900,10 @@ einer bestehenden (Kachelmenü ⋮):
   die echten Extremwerte der zugrunde liegenden Rohdaten, nicht den
   Durchschnitt der kleinsten verfügbaren Zeitscheibe.
 - **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
-- **% Anteil** (Zeilen-Menü "Optionen"): zeigt statt des absoluten Werts den
+- **% Anteil** (Zeilen-Menü „Optionen"): zeigt statt des absoluten Werts den
   prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen derselben
   Spalte seit der letzten Trennlinie.
-- **Bei 0 ausblenden** (Zeilen-Menü "Optionen"): blendet eine Entität-/
+- **Bei 0 ausblenden** (Zeilen-Menü „Optionen"): blendet eine Entität-/
   Gruppen-Zeile automatisch aus, sobald sie in allen sichtbaren Spalten
   entweder keinen Wert oder 0 hat — etwa ein stillgelegtes Gerät, ohne sie
   manuell aus- und wieder einblenden zu müssen.
@@ -846,9 +923,15 @@ C …), z. B. `A / B * 100`. Referenzierbar sind dabei nur Zeilen *oberhalb*
 der Formel-Zeile. Beim Umsortieren von Zeilen (Ziehen oder Pfeil-Buttons)
 werden die Buchstaben-Referenzen in bestehenden Formeln automatisch
 mitkorrigiert, sodass eine Formel weiterhin dieselbe fachliche Zeile
-referenziert wie vor dem Verschieben — nicht einfach dieselbe Position. Eine
-Formel-Zeile übernimmt, sofern nicht eigens angegeben, automatisch die
-Einheit der ersten referenzierten Zeile.
+referenziert wie vor dem Verschieben — nicht einfach dieselbe Position.
+
+Unterstützt werden `+ − * /`, Klammern, Zeilen-Buchstaben und Zahlen-
+Literale (Komma oder Punkt als Dezimaltrennzeichen, z. B. `A * 3,5`) — keine
+Funktionen wie Runden oder Beträge. Eine Formel-Zeile übernimmt, sofern
+nicht eigens im dafür vorgesehenen Feld angegeben, automatisch die Einheit
+der ersten referenzierten Zeile. Über ihr Zeilenmenü lässt sich eine
+Formel-Zeile zusätzlich optisch **hervorheben** — unabhängig vom generellen
+„Fett" (siehe [Zeilen](#zeilen)).
 
 ### Darstellung
 
@@ -880,7 +963,8 @@ Der Button **CSV** exportiert die aktuell sichtbaren Zeilen/Spalten (inkl.
 Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
 Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
 Unter **Verwendet in** sind die Dashboards, auf denen die Tabelle als Kachel
-liegt, direkt erreichbar.
+liegt, direkt erreichbar. Nirgends mehr angepinnte Tabellen listet
+[Housekeeping → Ungenutzte Elemente](#housekeeping).
 
 ## Statistik
 
