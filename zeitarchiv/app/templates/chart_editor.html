@@ -99,7 +99,7 @@
                Entitäts-Chart (.toolbar-right in app.css). -->
           <div class="toolbar-right">
             <div class="menu-wrap" @click.outside="compareMenuOpen = false">
-              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full'" @click="compareMenuOpen = !compareMenuOpen">
+              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || (stacked && canStack)" @click="compareMenuOpen = !compareMenuOpen">
                 <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
               </button>
               <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
@@ -196,6 +196,40 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
+                <!-- Nur ab zwei Balken-Serien im Chart sinnvoll/anwählbar — mit
+                     nur einer sähe die Fläche identisch zur normalen Balken-
+                     Darstellung aus, nur ohne den Vergleichswert, den eine
+                     Stapelung eigentlich bringen soll (canStack-Getter, siehe
+                     chart_editor.js). Dieselbe x-show-Konvention wie Punkte/
+                     Fläche oben (hasLineSeries) statt :disabled — die Option
+                     existiert unterhalb von zwei Balken-Serien konzeptionell
+                     gar nicht, es gibt also nichts zu erklären, was ein
+                     deaktivierter Schalter noch anzeigen müsste. -->
+                <label class="menu-row" x-show="canStack">
+                  <span class="menu-row-label">Gestapelt</span>
+                  <span class="menu-toggle">
+                    <input type="checkbox" :checked="stacked" @change="toggleStacked()">
+                    <span class="track"><span class="thumb"></span></span>
+                  </span>
+                </label>
+                <!-- Verschachtelt direkt unter "Gestapelt", genau wie
+                     "Legenden-Stil" unter "Statistik in Legende" weiter unten
+                     — existiert als Einstellung nur, solange die
+                     übergeordnete Option an ist. Absichtlich ein Segment
+                     ("Absolut"/"Anteile (%)") statt eines zweiten Schalters:
+                     ein Toggle "Anteile (%) statt kWh" bräuchte eine dritte
+                     Erklärung, wogegen er wirkt, zwei sich gegenseitig
+                     ausschließende Knöpfe sagen das von selbst. Einheiten-
+                     neutrale Labels ("Absolut", nicht "... statt kWh") — ein
+                     Chart kann auch °C- oder Dauer-Serien stapeln, nicht nur
+                     kWh. -->
+                <div class="menu-row menu-row-stack" x-show="canStack && stacked">
+                  <span class="menu-row-label">Anteile (%)</span>
+                  <div class="seg">
+                    <button :class="{active: !normalize}" @click="normalize = false; render()">Absolut</button>
+                    <button :class="{active: normalize}" @click="normalize = true; render()">Anteile (%)</button>
+                  </div>
+                </div>
                 <label class="menu-row" x-show="hasBarSeries">
                   <span class="menu-row-label">Werte anzeigen</span>
                   <span class="menu-toggle">
@@ -231,10 +265,20 @@
                    im Bild liegt. Das eine will man oft ohne das andere — und
                    eine Zeile, die nur zusammen mit einer anderen Option
                    erscheint, wäre ohne sie unauffindbar. #}
+                <!-- Bei gestapelten Balken deaktiviert statt versteckt (anders
+                     als "Gestapelt" oben) — außerhalb des gestapelten Modus
+                     bleibt diese Zeile weiterhin sinnvoll, hier wird sie nur
+                     MOMENTAN wirkungslos: gestapelt beginnt eine Serie nicht
+                     mehr bei 0, ihr Durchschnitt läge dann mitten in einem
+                     fremden Segment und würde als Segmentgrenze
+                     missverstanden. Dieselbe Konvention wie "Kontinuierlich"
+                     bei Auflösung "Tag" weiter oben. -->
                 <label class="menu-row">
-                  <span class="menu-row-label">Durchschnittslinie</span>
+                  <span class="menu-row-label">Durchschnittslinie
+                    <span class="menu-note" x-show="stacked && canStack">nicht im gestapelten Modus</span>
+                  </span>
                   <span class="menu-toggle">
-                    <input type="checkbox" :checked="averageLine" @change="averageLine = !averageLine; render()">
+                    <input type="checkbox" :checked="averageLine" :disabled="stacked && canStack" @change="averageLine = !averageLine; render()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
@@ -379,6 +423,8 @@
     const SHOW_VALUES = {{ show_values | tojson }};
     const AVERAGE_LINE = {{ average_line | tojson }};
     const AREA_FILL = {{ area_fill | tojson }};
+    const STACKED = {{ stacked | tojson }};
+    const NORMALIZE = {{ normalize | tojson }};
     // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
     // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
     // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart

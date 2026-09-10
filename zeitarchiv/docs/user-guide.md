@@ -755,6 +755,15 @@ eines bestehenden (Kachelmenü ⋮):
 - **Fläche** (nur hier, nicht in der Verlaufsansicht einer einzelnen
   Entität) füllt die Fläche unter Linien-Serien dezent ein — Standard an,
   entspricht damit dem bisherigen Aussehen der Dashboard-Kachel.
+- **Gestapelt** (nur hier, ab zwei Balken-Serien im Chart): zeigt Balken-
+  Serien derselben Einheit übereinandergestapelt statt nebeneinander —
+  Zusammensetzung und Gesamtsumme in einem Blick, etwa der Tagesverbrauch
+  mehrerer Verbraucher. Direkt darunter lässt sich zusätzlich auf **Anteile
+  (%)** statt Absolutwerte umschalten; der Tooltip zeigt dabei weiterhin
+  auch den ursprünglichen Wert in Klammern. Bei aktiver Stapelung stehen
+  Vergleichen und Durchschnittslinie nicht zur Verfügung — eine gestapelte
+  Serie beginnt nicht mehr bei 0, beides ließe sich dann nicht mehr sinnvoll
+  einzeichnen.
 - Bei ausschließlich Schalter-Entitäten (`switch`, `binary_sensor` u. Ä.)
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich

@@ -121,6 +121,8 @@
            data-show-values="{{ 'true' if tile.show_values else 'false' }}"
            data-average-line="{{ 'true' if tile.average_line else 'false' }}"
            data-area-fill="{{ 'true' if tile.area_fill else 'false' }}"
+           data-stacked="{{ 'true' if tile.stacked else 'false' }}"
+           data-normalize="{{ 'true' if tile.normalize else 'false' }}"
            data-decimals="{{ tile.decimals }}"
            data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
           <div class="dtile-title">{{ tile.name }}</div>

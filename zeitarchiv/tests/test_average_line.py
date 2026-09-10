@@ -147,7 +147,7 @@ def test_the_tile_averages_the_drawn_points_without_the_hold_point() -> None:
     assert "const averageOf = values =>" in tiles
     assert not _nutzt_echarts_average(tiles)
     assert "el.dataset.averageLine === 'true'" in tiles
-    assert "averageOf(averageValues)" in tiles
+    assert "averageOf(prepared[i].averageValues)" in tiles
     assert "averageValues = displayPoints.map(p => p.value);" in tiles
-    assert "averageValues = [aggregate];" in tiles
+    assert "averageValues: [aggregate]," in tiles
     assert "averageOf(lineData" not in tiles

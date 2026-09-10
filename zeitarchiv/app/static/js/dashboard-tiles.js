@@ -319,6 +319,11 @@
     // dezente Füllfläche wie auf der eigenen Chart-Seite, damit ein
     // angeheftetes Chart nicht anders aussieht als dasselbe Chart dort.
     const areaFill = el.dataset.areaFill !== 'false';
+    // "Gestapelt"/"Anteile (%)" (Optionen-Menü der Chart-Seite) — dieselbe
+    // stacked-Kachel-Vorschau wie auf der eigenen Chart-Seite, siehe
+    // stackedActive/normalizeActive weiter unten (chart_editor.js-Parität).
+    const stacked = el.dataset.stacked === 'true';
+    const normalize = el.dataset.normalize === 'true';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -441,6 +446,17 @@
     const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
     const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
     const units = [...new Set(series.map(axisKey))];
+    // Wie chart_editor.js: "Gestapelt" nur ab zwei Balken-Serien, je Achse
+    // ein eigener Stapel-Schlüssel statt eines globalen "total" (eine Kachel
+    // kann mehrere Einheiten kombinieren, z. B. kWh und Dauer), und 100%-
+    // Normierung nur auf Achsen, auf denen AUSSCHLIESSLICH Balken liegen —
+    // eine mitgezeichnete Linie derselben Einheit stünde sonst auf einer
+    // 0–100%-Skala, die für die gestapelten Balken gemeint ist.
+    const stackedActive = stacked && series.filter(s => s.chart_type === 'bar').length >= 2;
+    const normalizeActive = stackedActive && normalize;
+    const barOnlyAxis = new Set(
+      units.filter(u => series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
+    );
     // Strengste (kleinste) Nachkommastellen-Einstellung aller Entitäten einer
     // gemeinsamen Achse — dieselbe Regel wie in chart_editor.html.
     const unitDecimals = new Map();
@@ -461,20 +477,23 @@
       // je Achse geprüft, da eine Kachel mehrere Einheiten/Achsen mischen kann.
       const axisHasBar = series.some(s => axisKey(s) === u && s.chart_type === 'bar');
       const axisDynamic = dynamicYAxis && !axisHasBar;
+      // Prozent-Achse (100%-Normierung) — immer fest 0–100, unabhängig von
+      // "Dynamische Y-Achse", siehe chart_editor.js (gleiche Begründung).
+      const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
       return {
         type: 'value',
         position: i % 2 === 0 ? 'left' : 'right',
         offset: Math.floor(i / 2) * 46,
-        min: axisDynamic ? undefined : value => Math.min(0, value.min),
-        max: axisDynamic ? undefined : value => Math.max(0, value.max),
+        min: isPercentAxis ? 0 : (axisDynamic ? undefined : value => Math.min(0, value.min)),
+        max: isPercentAxis ? 100 : (axisDynamic ? undefined : value => Math.max(0, value.max)),
         // Siehe chart_editor.html: ohne scale:true erzwingt ECharts bei einer
         // value-Achse per Default immer die Einbindung der Null, auch bei
         // undefined min/max — "Dynamische Y-Achse" hätte sonst keine
         // sichtbare Wirkung.
-        scale: axisDynamic,
+        scale: isPercentAxis ? false : axisDynamic,
         axisLabel: {
           fontSize: scaledFont(10), color: inkFaint,
-          formatter: v => isDuration ? NumberFormat.fmtDuration(v) : fmtCompactNumber(v, decimals),
+          formatter: v => isPercentAxis ? `${fmtCompactNumber(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : fmtCompactNumber(v, decimals)),
         },
         axisLine: {show: false},
         axisTick: {show: false},
@@ -504,15 +523,15 @@
       ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'})
       : '';
 
-    const echartsSeries = series.map((s, i) => {
-      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
-      const displayName = entityNames[s.entity_id] || s.friendly_name;
-      let lineData;
+    // Erster Durchgang: je Serie die anzuzeigenden Punkte berechnen (wie
+    // bisher) — VOR dem eigentlichen Kachel-Aufbau, damit die 100%-
+    // Normierung unten die Werte ALLER Serien einer Achse zum selben Bucket
+    // kennt, bevor die erste Serie fertig gebaut wird.
+    const prepared = series.map(s => {
       // Die Punkte, über die der Durchschnitt geht: das GEZEICHNETE, aber
       // ohne den Halte-Punkt, den der Linien-Zweig unten bis window_end
       // anhängt — der ist eine Wiederholung des letzten Werts und würde
       // ihn doppelt zählen.
-      let averageValues = [];
       if (singleBucket) {
         // resamplePoints() kennt nur "medium"/"coarse" (RESOLUTION_SECONDS),
         // für "full" gibt sie unverändert alle Rohpunkte zurück — ohne diesen
@@ -522,30 +541,70 @@
         // zu werden (sichtbar als lange Dopplung im Tooltip). Dieselbe Summe-
         // vs.-Durchschnitt-Regel wie in den Legenden-Kennzahlen oben.
         const rawValues = (s.points || []).map(p => p.value).filter(Number.isFinite);
-        if (!rawValues.length) {
-          lineData = [];
-        } else {
-          const isSumType = s.aggregation_type === 'counter' || s.aggregation_type === 'switch';
-          const aggregate = isSumType
-            ? rawValues.reduce((sum, v) => sum + v, 0)
-            : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
-          lineData = [[0, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]];
-          averageValues = [aggregate];
-        }
-      } else {
-        const displayPoints = resamplePoints(
-          s.points, range, resolutionPreset, s.aggregation_type, data.window_start
-        );
-        if (tooltipBucketSeconds == null) {
-          tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
-        }
-        lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)]);
-        averageValues = displayPoints.map(p => p.value);
-        if (s.chart_type === 'line' && lineData.length && data.window_end != null
-            && lineData[lineData.length - 1][0] < data.window_end * 1000) {
-          const last = lineData[lineData.length - 1];
-          lineData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
-        }
+        if (!rawValues.length) return {lineData: [], averageValues: []};
+        const isSumType = s.aggregation_type === 'counter' || s.aggregation_type === 'switch';
+        const aggregate = isSumType
+          ? rawValues.reduce((sum, v) => sum + v, 0)
+          : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
+        return {
+          lineData: [[0, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]],
+          averageValues: [aggregate],
+        };
+      }
+      const displayPoints = resamplePoints(
+        s.points, range, resolutionPreset, s.aggregation_type, data.window_start
+      );
+      if (tooltipBucketSeconds == null) {
+        tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
+      }
+      const lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)]);
+      const averageValues = displayPoints.map(p => p.value);
+      if (s.chart_type === 'line' && lineData.length && data.window_end != null
+          && lineData[lineData.length - 1][0] < data.window_end * 1000) {
+        const last = lineData[lineData.length - 1];
+        lineData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
+      }
+      return {lineData, averageValues};
+    });
+    // x (ms-Zeitstempel bzw. 0 bei singleBucket) -> Summe je Achse, nur für
+    // tatsächlich normierte reine Balken-Achsen (barOnlyAxis, s. o.).
+    const axisTotals = new Map();
+    if (normalizeActive) {
+      series.forEach((s, i) => {
+        const u = axisKey(s);
+        if (!barOnlyAxis.has(u)) return;
+        if (!axisTotals.has(u)) axisTotals.set(u, new Map());
+        const totals = axisTotals.get(u);
+        prepared[i].lineData.forEach(p => totals.set(p[0], (totals.get(p[0]) || 0) + p[1]));
+      });
+    }
+    // Letzter Balken-Index je Achse — nur der bekommt beim Stapeln abgerundete
+    // obere Ecken (das oberste, sichtbare Ende des Stapels), statt wie im
+    // gruppierten Fall JEDES Segment einzeln abzurunden.
+    const lastBarIndexForAxis = new Map();
+    series.forEach((s, i) => { if (s.chart_type === 'bar') lastBarIndexForAxis.set(axisKey(s), i); });
+
+    const echartsSeries = series.map((s, i) => {
+      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+      const displayName = entityNames[s.entity_id] || s.friendly_name;
+      const isStackedBar = s.chart_type === 'bar' && stackedActive;
+      // 100%-Normierung nur auf reinen Balken-Achsen und nur für Balken-
+      // Serien — eine überlagerte Linie derselben Einheit bleibt unverändert
+      // in Absolutwerten (barOnlyAxis enthält ihre Achse dann nicht).
+      const axisNormalized = normalizeActive && s.chart_type === 'bar' && barOnlyAxis.has(axisKey(s));
+      let lineData = prepared[i].lineData;
+      if (axisNormalized) {
+        const totals = axisTotals.get(axisKey(s));
+        // Felder 6/7 (Originaleinheit/-Nachkommastellen) stehen schon an
+        // Position 2/3 des Ausgangs-Tupels — direkt übernommen statt erneut
+        // nachgeschlagen. Feld 5: der Original-Absolutwert, nur für den
+        // Tooltip (siehe formatter unten) — sonst verliert der Tooltip genau
+        // die Zahl, die die Normierung aus dem Balken selbst entfernt.
+        lineData = lineData.map(p => {
+          const total = totals.get(p[0]) || 0;
+          const pct = total ? (p[1] / total) * 100 : 0;
+          return [p[0], pct, '%', 0, false, p[1], p[2], p[3]];
+        });
       }
       const cfg = {
         // Angepasster Anzeigename (chart_editor.html, "Angezeigte Namen") hat
@@ -555,16 +614,18 @@
         type: s.chart_type,
         yAxisIndex: units.indexOf(axisKey(s)),
         data: lineData,
+        stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
         lineStyle: {width: 2, color},
         itemStyle: {color},
         // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
         // Punkt, dieselbe Konvention wie entity_detail.html (ohne Einheit,
-        // die steht schon an der Y-Achse).
+        // die steht schon an der Y-Achse). Gestapelt liegt das Label
+        // INNERHALB des Segments (weiß) statt darüber — siehe chart_editor.js.
         label: {
           show: showValues,
-          position: 'top',
+          position: isStackedBar ? 'inside' : 'top',
           fontSize: scaledFont(10),
-          color: inkMuted,
+          color: isStackedBar ? '#fff' : inkMuted,
           formatter: params => params.value[4]
             ? NumberFormat.fmtDuration(params.value[1])
             : fmtCompactNumber(params.value[1], params.value[3]),
@@ -586,14 +647,21 @@
         // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
         // "Fläche"), Default an — siehe chart_editor.js.
         if (areaFill) cfg.areaStyle = {color, opacity: 0.08};
-      } else {
+      } else if (!stackedActive) {
+        cfg.itemStyle.borderRadius = [3, 3, 0, 0];
+      } else if (lastBarIndexForAxis.get(axisKey(s)) === i) {
+        // Nur das oberste Segment jedes Stapels abrunden — jedes einzelne
+        // Segment abzurunden sähe wie mehrere getrennte Balken aus, nicht
+        // wie ein durchgehender Stapel.
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
       }
       // Durchschnittslinie je Serie, in deren Farbe und auf deren y-Achse.
       // Ohne Einheit im Text: die Kachel beschriftet auch ihre Werte
       // (showValues) nur mit der Zahl, und der Platz ist hier knapper als auf
-      // der Chart-Seite.
-      const durchschnitt = averageLine ? averageOf(averageValues) : null;
+      // der Chart-Seite. Entschieden: im gestapelten Modus weggelassen —
+      // dieselbe Begründung wie in chart_editor.js (eine Serie beginnt darin
+      // nicht mehr bei 0).
+      const durchschnitt = averageLine && !isStackedBar ? averageOf(prepared[i].averageValues) : null;
       if (durchschnitt !== null) {
         cfg.markLine = {
           silent: true,
@@ -691,9 +759,17 @@
             const value = p.data[4]
               ? NumberFormat.fmtDuration(p.data[1])
               : `${fmtCompactNumber(p.data[1], decimals)}${unit ? ' ' + unit : ''}`;
+            // 100%-Normierung: zeigt IMMER beides — Anteil und Original-
+            // Absolutwert in Klammern (Felder 5–7, siehe axisNormalized oben)
+            // — sonst verliert der Tooltip genau die Zahl, die die
+            // Normierung aus dem Balken selbst entfernt.
+            const absValue = p.data[5];
+            const extra = absValue != null
+              ? ` <span style="color:${inkFaint};">(${fmtCompactNumber(absValue, p.data[7])}${p.data[6] ? ' ' + p.data[6] : ''})</span>`
+              : '';
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
                  + `<span>${p.marker}${p.seriesName}</span>`
-                 + `<strong style="margin-left:8px;">${value}</strong></div>`;
+                 + `<strong style="margin-left:8px;">${value}${extra}</strong></div>`;
           }).join('');
           return `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}`;
         },

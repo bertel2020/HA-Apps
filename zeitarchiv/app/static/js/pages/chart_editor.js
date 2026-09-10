@@ -351,6 +351,8 @@
         showValues: SHOW_VALUES,
         averageLine: AVERAGE_LINE,
         areaFill: AREA_FILL,
+        stacked: STACKED,
+        normalize: NORMALIZE,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -428,6 +430,12 @@
         // der Server ausschließlich chart_type 'line', die Zeile verschwindet
         // dort also automatisch (früher: :disabled="timeline").
         get hasBarSeries() { return this.series.some(s => s.chart_type === 'bar'); },
+        // "Gestapelt" (Optionen-Menü) nur ab zwei Balken-Serien im Chart
+        // sinnvoll/anwählbar — mit nur einer wäre die Fläche identisch zur
+        // normalen Balken-Darstellung, nur ohne den Vergleichswert, den eine
+        // Stapelung eigentlich bringen soll. Dieselbe Konvention wie
+        // hasBarSeries oben.
+        get canStack() { return this.series.filter(s => s.chart_type === 'bar').length >= 2; },
         // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
         // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
         // timeline-Kommentar oben.
@@ -613,6 +621,19 @@
           if (this.raw) this.compare = false;
           this.load();
         },
+        // Gestapelt + Periodenvergleich zusammen wären eine ungeklärte
+        // Kombination (die Vorperiode-Nebenserie müsste dann entweder
+        // mitgestapelt — acht statt vier Segmente in einem Balken — oder
+        // gesondert behandelt werden) und wurde nie entworfen; deshalb hier
+        // dieselbe Ausschluss-Konvention wie raw+compare (toggleRaw() oben)
+        // statt eine unklare Darstellung zuzulassen. Reines render() statt
+        // load(): Stapelung ändert nur, WIE die bereits geladenen Daten
+        // gezeichnet werden, keinen Server-Query-Parameter.
+        toggleStacked() {
+          this.stacked = !this.stacked;
+          if (this.stacked) this.compare = false;
+          this.render();
+        },
         // Zeitstrahl erzwingt Rohwerte (er zeichnet AN/AUS-Übergänge, keine
         // Bucket-Summen) und schließt Vergleich aus — dieselbe Logik wie
         // setChartType('timeline') auf der Entität-eigenen Chart-Seite. Beim
@@ -689,6 +710,9 @@
           // Dauer-Anzeige) — dieselben Indizes wie beim Aufbau von mainData/
           // compareData unten. noUnit für die Labels über den Balken/Punkten —
           // dort reicht die reine Zahl, die Einheit steht schon an der Y-Achse.
+          // data[6] (nur bei 100%-Normierung gesetzt, s. mainData unten) wird
+          // hier NICHT gelesen — der Original-Absolutwert erscheint nur im
+          // Tooltip, dort eigens angehängt (siehe row() weiter unten).
           const formatPointValue = (data, noUnit) => {
             const [, value, , unit, decimals, isDuration] = data;
             return isDuration ? NumberFormat.fmtDuration(value) : (unit && !noUnit ? `${fmtNum(value, decimals)} ${unit}` : fmtNum(value, decimals));
@@ -736,8 +760,43 @@
           // eine Achse mit unitlosen Standard-Entitäten teilen und in Rohsekunden
           // statt als Dauer beschriftet.
           const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
-          const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
+          const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
           const units = [...new Set(this.series.map(axisKey))];
+          // Balken-Serien stapeln je Einheit statt in einem globalen "total"-
+          // Topf — sonst würden z. B. kWh- und Dauer-Serien auf derselben
+          // Achse zusammenaddiert, sobald ein Chart mehrere Einheiten
+          // kombiniert (siehe yAxis unten, eine Achse je axisKey).
+          // stackedActive/normalizeActive gelten deshalb nicht global,
+          // sondern je Achse.
+          const stackedActive = this.stacked && this.canStack;
+          const normalizeActive = stackedActive && this.normalize;
+          // Nur Achsen, auf denen AUSSCHLIESSLICH Balken-Serien liegen, dürfen
+          // auf Prozent umgestellt werden — eine mitgezeichnete Linien-Serie
+          // derselben Einheit stünde sonst auf derselben 0–100%-Skala, die für
+          // die gestapelten Balken gemeint ist, und zeigte ihre eigenen (nicht
+          // normierten) Werte dadurch verzerrt.
+          const barOnlyAxis = new Set(
+            units.filter(u => this.series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
+          );
+          // Resampelte Punkte je Serie einmal vorab berechnen (statt weiter
+          // unten im Haupt-Loop) — die Prozent-Normierung braucht die Werte
+          // ALLER Serien einer Achse zum selben Bucket-Zeitpunkt, bevor die
+          // erste Serie fertig gebaut werden kann.
+          const preparedPoints = this.series.map(s => resamplePoints(
+            s.points, this.range, this.resolutionPreset, s.aggregation_type, this.windowStart
+          ));
+          // ts -> Summe je Achse, nur für tatsächlich normierte reine
+          // Balken-Achsen.
+          const axisTotals = new Map();
+          if (normalizeActive) {
+            this.series.forEach((s, i) => {
+              const u = axisKey(s);
+              if (!barOnlyAxis.has(u)) return;
+              if (!axisTotals.has(u)) axisTotals.set(u, new Map());
+              const totals = axisTotals.get(u);
+              preparedPoints[i].forEach(p => totals.set(p.ts, (totals.get(p.ts) || 0) + p.value));
+            });
+          }
           // Eine Achse kann mehrere Entitäten mit gleicher Einheit aber
           // unterschiedlicher Nachkommastellen-Einstellung bündeln — dann gilt
           // die "strengste" (kleinste) Rundung aller beteiligten Entitäten, damit
@@ -758,21 +817,26 @@
           const dynamicYAxis = this.dynamicYAxis && !singleBucket;
           const yAxis = units.map((u, i) => {
             const decimals = unitDecimals.get(u);
-            const isDuration = u === ' duration';
+            const isDuration = u === ' duration';
+            // Prozent-Achse (100%-Normierung, Optionen-Menü "Anteile (%)") —
+            // immer fest 0–100, unabhängig von "Dynamische Y-Achse": eine
+            // Anteils-Achse, die nicht bei 0 beginnt oder über 100 hinausgeht,
+            // würde die Prozentwerte selbst verzerrt darstellen.
+            const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
             return {
               type: 'value',
-              name: isDuration ? 'Dauer' : (u || undefined),
+              name: isPercentAxis ? 'Anteil' : (isDuration ? 'Dauer' : (u || undefined)),
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
-              min: dynamicYAxis ? undefined : value => Math.min(0, value.min),
-              max: dynamicYAxis ? undefined : value => Math.max(0, value.max),
+              min: isPercentAxis ? 0 : (dynamicYAxis ? undefined : value => Math.min(0, value.min)),
+              max: isPercentAxis ? 100 : (dynamicYAxis ? undefined : value => Math.max(0, value.max)),
               // ECharts erzwingt bei einer value-Achse standardmäßig (scale:
               // false) IMMER die Einbindung der Null, auch wenn min/max
               // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
               // also keine sichtbare Wirkung gegenüber der festen Variante.
-              scale: dynamicYAxis,
-              axisLabel: {formatter: v => isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals))},
+              scale: isPercentAxis ? false : dynamicYAxis,
+              axisLabel: {formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)))},
             };
           });
           // Feste Farbe je Entität (statt ECharts' Auto-Zuordnung) — nur so lässt
@@ -801,39 +865,61 @@
             const seriesDecimals = this.effectiveDecimals(s);
             const displayName = this.entityNames[s.entity_id] || s.friendly_name;
             legendSelected[displayName] = !this.legendHiddenIds.includes(s.entity_id);
-            const mainPoints = resamplePoints(
-              s.points, this.range, this.resolutionPreset,
-              s.aggregation_type, this.windowStart
-            );
+            const mainPoints = preparedPoints[i];
             if (tooltipBucketSeconds == null) {
               tooltipBucketSeconds = detectResolutionSeconds(mainPoints);
             }
+            // 100%-Normierung (Optionen-Menü, "Anteile (%)") nur auf reinen
+            // Balken-Achsen (barOnlyAxis, s. o.) und nur für Balken-Serien —
+            // eine überlagerte Linie derselben Einheit bliebe unverändert in
+            // Absolutwerten (axisNormalized bleibt dann false für sie, weil
+            // ihre Achse nicht in barOnlyAxis steht).
+            const axisNormalized = normalizeActive && chartType === 'bar' && barOnlyAxis.has(axisKey(s));
             // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position immer
             // Kategorie 0 statt eines Zeitstempels — der Halte-Punkt bis
             // windowEnd (nächster Block) ergibt auf einer Achse mit nur einer
             // Kategorie ohnehin keinen Sinn und entfällt deshalb hier.
-            const mainData = mainPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)]);
+            const mainData = mainPoints.map(p => {
+              if (!axisNormalized) return [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
+              // Felder 7–9: Originalwert/-einheit/-Nachkommastellen, nur für
+              // den Tooltip (formatPointValue() liest sie nicht, siehe dort)
+              // — sonst verliert der Tooltip genau die Zahl, die die
+              // Normierung aus dem Balken selbst entfernt.
+              const total = axisTotals.get(axisKey(s)).get(p.ts) || 0;
+              const pct = total ? (p.value / total) * 100 : 0;
+              return [singleBucket ? 0 : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
+            });
             if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
               mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
             }
+            // Gestapelt nur für Balken-Serien und je Achse ein eigener Stapel-
+            // Schlüssel (nicht ein globales "total") — sonst würden Serien
+            // unterschiedlicher Einheit (z. B. kWh und Dauer) fälschlich in
+            // denselben Balken aufsummiert, sobald ein Chart mehrere Achsen
+            // kombiniert.
+            const isStackedBar = chartType === 'bar' && stackedActive;
             const main = {
               name: displayName,
               type: chartType,
               yAxisIndex: units.indexOf(axisKey(s)),
               data: mainData,
+              stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
               lineStyle: {width: 1.5, color},
               itemStyle: {color},
               // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
               // Punkt, zusätzlich zum Tooltip. Nur die Hauptserie, nicht die
               // Vergleichs-Nebenserie (siehe cmp weiter unten) — sonst überlagern
               // sich bei aktivem Vergleich zwei Beschriftungen je Zeitpunkt.
+              // Gestapelt liegt das Label INNERHALB des Segments (weiß) statt
+              // darüber — "darüber" wäre bei gestapelten Segmenten meist ein
+              // fremdes Segment oder Whitespace, nicht das eigene.
               label: {
                 show: this.showValues,
-                position: 'top',
+                position: isStackedBar ? 'inside' : 'top',
                 fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
-                color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+                color: isStackedBar ? '#fff' : getComputedStyle(document.body).getPropertyValue('--ink-muted'),
                 formatter: params => formatPointValue(params.data, true),
               },
               // Deckelt die Balkenbreite auf einer Zeit-Achse — ohne diese
@@ -883,7 +969,12 @@
             // sichtbar an der Nulllinie. Legende und Linie können dadurch bei
             // Zählern mit gewählter Auflösung verschiedene Zahlen nennen — sie
             // beantworten dann auch verschiedene Fragen.
-            const durchschnitt = this.averageLine
+            // Entschieden: im gestapelten Modus keine Durchschnittslinie —
+            // eine Serie beginnt darin nicht mehr bei 0, ihr Durchschnitt
+            // läge mitten in einem fremden Segment und würde als
+            // Segmentgrenze missverstanden statt als Mittelwert erkannt
+            // (siehe :disabled an der Menü-Zeile in chart_editor.html).
+            const durchschnitt = this.averageLine && !isStackedBar
               ? averageOf(mainPoints.map(p => p.value))
               : null;
             if (durchschnitt !== null) {
@@ -901,7 +992,13 @@
               };
             }
             echartsSeries.push(main);
-            if (this.compare && s.compare_points && s.compare_points.length) {
+            // stackedActive schließt Vergleich schon am Knopf aus
+            // (toggleStacked()/:disabled in chart_editor.html) — hier
+            // zusätzlich robust dagegen, falls compare aus einem älteren
+            // Zustand (z. B. prefill) noch true wäre: eine Vorperiode-
+            // Nebenserie ließe sich in einem gestapelten Balken nicht sinnvoll
+            // einordnen (mitstapeln würde acht statt vier Segmente ergeben).
+            if (this.compare && !stackedActive && s.compare_points && s.compare_points.length) {
               // Vorperiode um die exakte Fensterdifferenz verschieben, nicht per
               // Array-Index mappen — siehe derselbe Kommentar/Grund in
               // entity_detail.html (unterschiedlich lange Punktreihen).
@@ -1044,9 +1141,19 @@
               formatter: params => {
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
-                const row = p => `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
-                                + `<span>${p.marker}${p.seriesName}</span>`
-                                + `<strong style="margin-left:8px;">${formatPointValue(p.data)}</strong></div>`;
+                // 100%-Normierung: zeigt IMMER beides — Anteil und
+                // Original-Absolutwert in Klammern (data[6]/[7]/[8], siehe
+                // mainData oben) — sonst verliert der Tooltip genau die Zahl,
+                // die die Normierung aus dem Balken selbst entfernt.
+                const row = p => {
+                  const [, , , , , , absValue, absUnit, absDecimals] = p.data;
+                  const extra = absValue != null
+                    ? ` <span style="color:var(--ink-faint);">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + absUnit : ''})</span>`
+                    : '';
+                  return `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
+                       + `<span>${p.marker}${p.seriesName}</span>`
+                       + `<strong style="margin-left:8px;">${formatPointValue(p.data)}${extra}</strong></div>`;
+                };
                 if (sameTime) {
                   return `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:4px;">${times[0]}</div>`
                        + params.map(row).join('');
@@ -1180,6 +1287,8 @@
             show_values: this.showValues,
             average_line: this.averageLine,
             area_fill: this.areaFill,
+            stacked: this.stacked,
+            normalize: this.normalize,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;
