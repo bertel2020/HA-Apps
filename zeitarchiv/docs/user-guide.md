@@ -39,7 +39,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Ansicht sichern](#ansicht-sichern)
   - [Gespeicherte Optionen](#gespeicherte-optionen)
 - [Charts](#charts)
-- [Vergleichstabellen](#vergleichstabellen)
+- [Tabellen](#tabellen)
 - [Statistik](#statistik)
 
 **Entitäten konfigurieren &amp; pflegen**
@@ -302,7 +302,7 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   Suchfeld, Sortierung und der Schalter „Favoriten zuerst“ über den Kacheln
   funktionieren wie bei Charts und Tabellen (siehe
   [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)).
-- Jedes Dashboard zeigt bis zu 30 Kacheln — Charts, Vergleichstabellen und
+- Jedes Dashboard zeigt bis zu 30 Kacheln — Charts, Tabellen und
   **Werte-Kacheln** gemischt — in frei wählbarer Größe (1×1 bis 3×3, im
   Präzisen Modus bis 6×6). Per Drag-and-drop anordnen; über das Kachelmenü
   (⋮) Größe ändern, duplizieren (Charts/Tabellen) oder entfernen. Das
@@ -781,7 +781,7 @@ eines bestehenden (Kachelmenü ⋮):
 - Die geöffnete Ansicht zeigt unter **Verwendet in** die Dashboards, auf denen
   das gespeicherte Chart als Kachel liegt, und verlinkt direkt dorthin.
 
-## Vergleichstabellen
+## Tabellen
 
 Die Tabellen-Übersicht listet alle gespeicherten Tabellen als Kacheln mit
 Suche, Sortierung und Favoriten-Schalter (siehe
@@ -1430,7 +1430,7 @@ wie die Einstellungen:
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Rotation** | Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat. |
-| **Ungenutzte Elemente** | Charts und Vergleichstabellen, die in keinem Dashboard angepinnt sind — direkt öffnen oder löschen. Verschwindet automatisch aus der Liste, sobald irgendwo angepinnt. |
+| **Ungenutzte Elemente** | Charts und Tabellen, die in keinem Dashboard angepinnt sind — direkt öffnen oder löschen. Verschwindet automatisch aus der Liste, sobald irgendwo angepinnt. |
 
 Jeder Bereich verlinkt aus der passenden Systemmeldung (siehe unten), falls
 gerade etwas ansteht — Housekeeping selbst muss dafür nicht regelmäßig
