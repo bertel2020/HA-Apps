@@ -1610,8 +1610,8 @@ echten archivierten Werte liegen unverändert in einem komplett eigenen
 Verzeichnis (`<Datenverzeichnis>/demo` statt des echten
 Datenverzeichnisses) und werden zu keinem Zeitpunkt gelesen, verändert oder
 überschrieben. Ist beim ersten Start in diesem Modus noch keine Demo-Historie
-vorhanden, erzeugt die App sie automatisch (rund 6 Monate, dauert im
-Hintergrund einige Sekunden — die App ist währenddessen normal erreichbar,
+vorhanden, erzeugt die App sie automatisch (rund 3 Jahre, dauert im
+Hintergrund rund eine Minute — die App ist währenddessen normal erreichbar,
 zeigt aber erst danach vollständige Werte).
 
 Eine Änderung der Option braucht **immer** einen Neustart, wie jede
@@ -1635,7 +1635,7 @@ Ergänzung ansteht. Drei Bedienelemente:
   die vorhandene Historie anzutasten. Dasselbe passiert automatisch, wenn
   „Automatisch ergänzen" fällig wird.
 - **Neu erzeugen** — verwirft die komplette Demo-Historie und würfelt sie
-  neu (mit Sicherheitsabfrage). Nützlich, um wieder bei „frischen" 6 Monaten
+  neu (mit Sicherheitsabfrage). Nützlich, um wieder bei „frischen" 3 Jahren
   anzufangen.
 
 Ein „Entfernen" gibt es hier bewusst nicht: Solange die Instanz selbst im

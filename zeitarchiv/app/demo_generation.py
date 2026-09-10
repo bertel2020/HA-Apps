@@ -1146,7 +1146,7 @@ def run_generation(
     tz: ZoneInfo,
     rng: random.Random,
     *,
-    months: int = 6,
+    months: int = 36,
     append: bool = False,
     clean: bool = False,
     on_entity: Callable[[int, str, int], None] | None = None,
