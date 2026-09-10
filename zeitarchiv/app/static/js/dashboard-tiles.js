@@ -666,6 +666,14 @@
         xAxisIndex: horizontalActive ? units.indexOf(axisKey(s)) : undefined,
         yAxisIndex: horizontalActive ? 0 : units.indexOf(axisKey(s)),
         data: lineData,
+        // ECharts liest data-Tupel bei Balken/Linien sonst POSITIONAL als
+        // [x, y] — unabhängig davon, welche Achse gerade Kategorie- bzw.
+        // Werte-Achse ist. lineData[0] ist immer der Kategorie-Index, [1] der
+        // Wert; horizontal tauschen xAxis/yAxis ihre Rollen (s. o.), also muss
+        // ECharts das explizit gesagt werden — sonst interpretiert es den
+        // Kategorie-Index als x-Wert und den Messwert als Kategorie-Index
+        // (Balken verschwinden, Werte-Achse skaliert auf ~Kategorien-Anzahl).
+        encode: horizontalActive ? {x: 1, y: 0} : undefined,
         stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
         // Bei aktiver Trendlinie tritt die rohe Kurve zurück, bleibt aber
         // sichtbar — dieselbe Ergänzung-statt-Ersatz-Logik wie im Editor.
@@ -677,7 +685,7 @@
         // INNERHALB des Segments (weiß) statt darüber — siehe chart_editor.js.
         label: {
           show: showValues,
-          position: isStackedBar ? 'inside' : 'top',
+          position: isStackedBar ? 'inside' : (horizontalActive ? 'right' : 'top'),
           fontSize: scaledFont(10),
           color: isStackedBar ? '#fff' : inkMuted,
           formatter: params => params.value[4]
@@ -731,7 +739,7 @@
             color: inkMuted,
             formatter: () => `Ø ${fmtCompactNumber(durchschnitt, effectiveDecimals(s))}`,
           },
-          data: [{yAxis: durchschnitt}],
+          data: [horizontalActive ? {xAxis: durchschnitt} : {yAxis: durchschnitt}],
         };
       }
       if (showRollingAverage) {

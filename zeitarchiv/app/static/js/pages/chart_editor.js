@@ -1006,6 +1006,18 @@
               xAxisIndex: horizontalActive ? unitIndex : undefined,
               yAxisIndex: horizontalActive ? 0 : unitIndex,
               data: mainData,
+              // mainData bleibt IMMER [Kategorie-Index, Wert, ...] — ohne
+              // encode würde ECharts das Tupel positionell als [x, y]
+              // lesen, was bei getauschten Achsen (horizontalActive) die
+              // Kategorie als Werte-Achsen-Position UND den Wert als
+              // Kategorie-Index missverstehen würde (Balken verschwinden,
+              // Werte-Achse skaliert auf die Kategorie-Indizes 0/1/2 statt
+              // auf die echten Werte — so gefunden). encode sagt ECharts
+              // stattdessen explizit, welche Tupel-Position zu welcher
+              // Achse gehört, unabhängig von deren Reihenfolge im Array —
+              // Tooltip/Label-Formatter lesen ohnehin per festem Index
+              // (data[1]=Wert), bleiben also unverändert korrekt.
+              encode: horizontalActive ? {x: 1, y: 0} : undefined,
               stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
               // Bei aktiver Trendlinie tritt die rohe (verrauschte) Kurve
               // zurück, bleibt aber sichtbar — die Trendlinie ist die
@@ -1021,7 +1033,7 @@
               // fremdes Segment oder Whitespace, nicht das eigene.
               label: {
                 show: this.showValues,
-                position: isStackedBar ? 'inside' : 'top',
+                position: isStackedBar ? 'inside' : (horizontalActive ? 'right' : 'top'),
                 fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
                 color: isStackedBar ? '#fff' : getComputedStyle(document.body).getPropertyValue('--ink-muted'),
                 formatter: params => formatPointValue(params.data, true),
@@ -1093,7 +1105,9 @@
                   color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
                   formatter: () => `Ø ${fmtNum(durchschnitt, seriesDecimals)}${s.unit ? ' ' + s.unit : ''}`,
                 },
-                data: [{yAxis: durchschnitt}],
+                // Horizontal ist die Werte-Achse die x-Achse (s. o.) — der
+                // Durchschnitt liegt dann bei einem x-, nicht y-Wert.
+                data: [horizontalActive ? {xAxis: durchschnitt} : {yAxis: durchschnitt}],
               };
             }
             echartsSeries.push(main);
