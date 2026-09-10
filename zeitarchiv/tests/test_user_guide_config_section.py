@@ -12,8 +12,7 @@ still, wenn jemand eine Stufe ergänzt oder einen Grenzwert ändert.
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from _paths import DOCS, TEMPLATES
 from app.formatting import (
     GAP_THRESHOLD_LABELS,
     OUTLIER_THRESHOLD_LABELS,
@@ -26,9 +25,7 @@ from app.storage.index import (
     VALUE_FILTER_HEARTBEAT_SECONDS,
 )
 
-KAPITEL = (
-    Path(__file__).resolve().parents[1] / "docs" / "user-guide.md"
-).read_text(encoding="utf-8")
+KAPITEL = (DOCS / "user-guide.md").read_text(encoding="utf-8")
 ABSCHNITT = KAPITEL[
     KAPITEL.index("## Entität konfigurieren") : KAPITEL.index("## Bereinigung")
 ]
@@ -40,9 +37,7 @@ FLACH = " ".join(ABSCHNITT.split())
 def test_every_field_of_the_form_has_its_own_section() -> None:
     """Acht Felder, acht Überschriften — ein neu hinzugefügtes Feld soll nicht
     unbeschrieben bleiben."""
-    formular = (
-        Path(__file__).resolve().parents[1] / "app" / "templates" / "_entity_config_form.html"
-    ).read_text(encoding="utf-8")
+    formular = (TEMPLATES / "_entity_config_form.html").read_text(encoding="utf-8")
     felder = {
         zeile.split("<label>")[1].split(" {{")[0].split("</label>")[0].strip()
         for zeile in formular.splitlines()

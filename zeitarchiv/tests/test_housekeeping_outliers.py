@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from _paths import DOCS
 from app import cleanup_stats
 from app.notices import build_notices
 from app.storage.cleanup import OUTLIER_RULE_VERSION
@@ -317,9 +318,7 @@ def test_the_page_shows_how_far_the_measurement_got(client) -> None:
 def test_the_manual_names_the_same_mark_and_interval_as_the_code() -> None:
     """Die Marke und der Auffrisch-Abstand stehen als Zahl im Handbuch. Genau
     solche Zahlen veralten still, wenn jemand die Konstante ändert."""
-    kapitel = (
-        Path(__file__).resolve().parents[1] / "docs" / "user-guide.md"
-    ).read_text(encoding="utf-8")
+    kapitel = (DOCS / "user-guide.md").read_text(encoding="utf-8")
     abschnitt = kapitel[kapitel.index("## Housekeeping"):kapitel.index("### Tipps")]
     flach = " ".join(abschnitt.split())
 
