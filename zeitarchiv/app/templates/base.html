@@ -43,7 +43,14 @@
 {% block page_css %}{% endblock %}
 </head>
 <body>
-{% block topnav %}{% include "_topnav.html" %}{% endblock %}
+<div class="page-sticky-header">
+{% block topnav %}
+{% if demo_mode_active %}
+<div class="demo-banner">🧪 Demo-Modus aktiv — synthetische Vorführdaten, keine echten Werte</div>
+{% endif %}
+{% include "_topnav.html" %}
+{% endblock %}
+</div>
 {% block content %}{% endblock %}
 </body>
 </html>

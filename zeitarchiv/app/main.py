@@ -304,6 +304,12 @@ def _font_scale_context(request: Request) -> dict:
         "color_scheme": color_scheme,
         "color_mode": color_mode,
         "dashboard_animation_enabled": dashboard_animation == "1",
+        # Für den Demo-Banner (base.html) — auf JEDER Seite sichtbar, auch auf
+        # der einen, die den Rest der Topnav abbestellt
+        # (_energiedashboard_report.html), deshalb hier global statt nur an
+        # den zwei Stellen (Housekeeping, Einstellungen), die DEMO_MODE bisher
+        # schon einzeln in ihren Kontext aufnahmen.
+        "demo_mode_active": DEMO_MODE,
     }
 
 
