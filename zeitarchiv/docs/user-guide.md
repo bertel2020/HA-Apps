@@ -40,9 +40,11 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Gespeicherte Optionen](#gespeicherte-optionen)
 - [Charts](#charts)
   - [Entitäten und Darstellung](#entitäten-und-darstellung)
+  - [Donut statt Zeitverlauf](#donut-statt-zeitverlauf)
   - [Zeitraum und Vergleich](#zeitraum-und-vergleich)
   - [Unterschiede zur Verlaufsansicht einer einzelnen Entität](#unterschiede-zur-verlaufsansicht-einer-einzelnen-entität)
   - [Reihenfolge, Namen und Sichtbarkeit](#reihenfolge-namen-und-sichtbarkeit)
+  - [CSV- und Bild-Export](#csv--und-bild-export)
   - [Was wird gespeichert — und was nicht](#was-wird-gespeichert--und-was-nicht)
 - [Tabellen](#tabellen)
   - [Zeilen](#zeilen)
@@ -704,8 +706,8 @@ verschieben und sich damit fast vollständig mit dem gezeigten überschneiden.
 
 ### Kennzahlen und Legende
 
-Aktuell/Min/Max/Durchschnitt/Summe des angezeigten Zeitraums lassen sich
-wahlweise direkt einblenden — als kompakte Chips oder als kleine Tabelle
+Aktuell/Min/Max/Ø/Σ (Durchschnitt/Summe) des angezeigten Zeitraums lassen
+sich wahlweise direkt einblenden — als kompakte Chips oder als kleine Tabelle
 (einstellbar über den Legenden-Stil). Beide Darstellungen sind anklickbar,
 um einzelne Reihen ein- oder auszublenden, ohne den Zeitraum zu verlassen.
 
@@ -782,6 +784,21 @@ eines bestehenden (Kachelmenü ⋮).
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
   AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
 
+### Donut statt Zeitverlauf
+
+Über **Darstellungsart** lässt sich ein Chart statt als Zeitverlauf als
+Donut zeigen — ein Anteil je Entität statt einer Zeitachse, etwa um den
+Verbrauchsanteil mehrerer Geräte an einem Gesamtwert zu vergleichen.
+**Aggregation** bestimmt dabei, welcher Wert je Entität die Größe ihres
+Anteils bildet: Summe, Durchschnitt oder Letzter Wert. Im Donut-Modus
+entfallen Auflösung, Rohwerte, Zeitstrahl, Punkte, Fläche, Gestapelt,
+Ausrichtung, Dynamische Y-Achse und Durchschnittslinie — allesamt
+Zeitachsen-/Balken-Konzepte ohne Entsprechung, sobald es keine Zeitachse
+mehr gibt. **Rollierend** bleibt verfügbar: es bestimmt weiterhin, welches
+Zeitfenster überhaupt abgefragt wird, nicht dessen Feinheit. Legenden-
+Statistik, -Kennzahlen und -Stil sowie Nachkommastellen gelten unverändert
+weiter.
+
 ### Zeitraum und Vergleich
 
 Dieselbe Zeitraum-Leiste wie in der Verlaufsansicht (Stunde bis Dekade), mit
@@ -795,7 +812,12 @@ Tages-/Wochen-/Monats-/Jahresverbrauch mehrerer Verbraucher direkt
 miteinander zu vergleichen. Jede Entität bekommt dabei eine eigene Kategorie
 auf der Achse, mit **Ausrichtung** wahlweise vertikal oder horizontal
 (horizontal liest sich bei vielen oder langen Entitätsnamen besser, da die
-Namen dann ausgeschrieben statt gedreht/abgeschnitten stehen). **Vergleichen**,
+Namen dann ausgeschrieben statt gedreht/abgeschnitten stehen). Die
+Ausrichtung-Wahl steht unabhängig von der gewählten Auflösung immer zur
+Verfügung — **Horizontal** schaltet bei Bedarf selbst in diesen
+Ranking-Vergleich (Auflösung „Voll"), **Vertikal** zurück auf
+„Automatisch"; ein manueller Umweg über die Auflösung ist dafür nicht
+nötig. **Vergleichen**,
 **Rollierend**, **Dynamische Y-Achse** und **Gestapelt** sind bei dieser
 Auflösung deaktiviert bzw. nicht anwählbar, da sie für einen Ranking-
 Vergleich einzelner Gesamtwerte keine sinnvolle zusätzliche Aussage liefern
@@ -829,9 +851,23 @@ das Ein-/Ausblenden per Klick auf die Legende (siehe
 [Kennzahlen und Legende](#kennzahlen-und-legende)) wird das mit dem Chart
 gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
 
+### CSV- und Bild-Export
+
+**CSV** (neben „Anpassen") lädt die aktuell angezeigten Chart-Daten
+herunter — im Zeitverlauf ein Zeitstempel-Raster mit einer Spalte je
+Entität, im Donut eine Zeile je Entität mit dem tatsächlich gezeigten
+Wert. Das kleine Symbol oben rechts im Chart selbst speichert stattdessen
+einen PNG-Schnappschuss der aktuellen Ansicht. Beide Dateien tragen
+denselben Namen aus Chart-Titel und Zeitraum, z. B.
+„Haushaltsgeräte_September_2026_bis_10.09.2026" — ein laufender Zeitraum
+(„heute"/„bis heute") wird dabei auf das tatsächliche Datum aufgelöst.
+Nur hier verfügbar, nicht auf der Dashboard-Kachel oder in der
+Verlaufsansicht einer einzelnen Entität.
+
 ### Was wird gespeichert — und was nicht
 
-Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Zeitraum samt
+Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Darstellungsart (samt
+Aggregation bei Donut), Zeitraum samt
 Rollierend-Schalter, Auflösung (samt Ausrichtung beim Ranking-Vergleich),
 dynamische Y-Achse, Werte anzeigen, Durchschnittslinie (samt Flach/Gleitend),
 Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie

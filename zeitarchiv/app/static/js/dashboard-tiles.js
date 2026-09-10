@@ -165,7 +165,10 @@
     return d.toLocaleDateString(LOCALE, {year: 'numeric'});
   }
 
-  const LEGEND_METRIC_LABELS = {last: 'Aktuell', min: 'Min', max: 'Max', average: 'Ø', sum: 'Summe'};
+  // "Ø"/"Σ" statt Text — dieselben Symbole wie chart_editor.js/entity_detail.js
+  // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; "Summe"
+  // war bis jetzt der einzige verbliebene Text-Ausreißer.
+  const LEGEND_METRIC_LABELS = {last: 'Aktuell', min: 'Min', max: 'Max', average: 'Ø', sum: 'Σ'};
 
   function escLegend(s) {
     return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
