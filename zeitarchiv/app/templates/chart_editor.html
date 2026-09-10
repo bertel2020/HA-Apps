@@ -141,8 +141,12 @@
                     </template>
                   </select>
                 </div>
+                <!-- "Rollierend", nicht "Kontinuierlich": dieselbe Umbenennung
+                     wie auf der Entität-eigenen Chart-Seite (siehe Kommentar
+                     dort, entity_detail.html) — hier bislang übersehen, siehe
+                     test_the_chart_options_menu_uses_the_same_word_as_the_settings_page. -->
                 <label class="menu-row">
-                  <span class="menu-row-label">Kontinuierlich</span>
+                  <span class="menu-row-label">Rollierend</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) ohne
                          Wirkung auf die Balken selbst, macht das Umschalten
@@ -271,7 +275,7 @@
                      MOMENTAN wirkungslos: gestapelt beginnt eine Serie nicht
                      mehr bei 0, ihr Durchschnitt läge dann mitten in einem
                      fremden Segment und würde als Segmentgrenze
-                     missverstanden. Dieselbe Konvention wie "Kontinuierlich"
+                     missverstanden. Dieselbe Konvention wie "Rollierend"
                      bei Auflösung "Tag" weiter oben. -->
                 <label class="menu-row">
                   <span class="menu-row-label">Durchschnittslinie

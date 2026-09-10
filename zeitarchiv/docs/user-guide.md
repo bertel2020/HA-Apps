@@ -777,15 +777,14 @@ eines bestehenden (Kachelmenü ⋮).
 ### Zeitraum und Vergleich
 
 Dieselbe Zeitraum-Leiste wie in der Verlaufsansicht (Stunde bis Dekade), mit
-einem **Kontinuierlich**-Schalter für ein rollierendes statt kalendarisches
-Fenster (z. B. „letzte 24 Stunden" statt „heute") — dieselbe Funktion wie
-„Rollierend" andernorts in der App, im Chart-Editor nur noch unter dem
-älteren Namen zu finden. Bei Auflösung „Tag" fasst die App den ganzen Tag zu
-einem einzigen Balken je Entität zusammen — praktisch, um z. B.
-Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt zu
-vergleichen. **Vergleichen**, **Kontinuierlich** und **Dynamische Y-Achse**
-sind bei dieser Auflösung deaktiviert, da sie für einen einzelnen
-Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
+einem **Rollierend**-Schalter für ein rollierendes statt kalendarisches
+Fenster (z. B. „letzte 24 Stunden" statt „heute"). Bei Auflösung „Tag" fasst
+die App den ganzen Tag zu einem einzigen Balken je Entität zusammen —
+praktisch, um z. B. Tages-Einspeisung und -Bezug als zwei
+nebeneinanderstehende Balken direkt zu vergleichen. **Vergleichen**,
+**Rollierend** und **Dynamische Y-Achse** sind bei dieser Auflösung
+deaktiviert, da sie für einen einzelnen Tages-Balken keine sinnvolle
+zusätzliche Aussage liefern.
 
 **Vergleichen** stellt der aktuellen Periode die Vorperiode oder denselben
 Zeitraum des Vorjahres gegenüber — wie in der Verlaufsansicht einer
@@ -817,7 +816,7 @@ gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
 ### Was wird gespeichert — und was nicht
 
 Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Zeitraum samt
-Kontinuierlich-Schalter, Auflösung, dynamische Y-Achse, Werte anzeigen,
+Rollierend-Schalter, Auflösung, dynamische Y-Achse, Werte anzeigen,
 Durchschnittslinie, Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/
 Anteile (%) sowie Zeitstrahl werden alle mit dem Chart gespeichert und
 gelten dann auch für dessen Vorschau auf Dashboards. **Punkte an/aus,
