@@ -44,9 +44,13 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
    & Dienste → Integration hinzufügen → Zeitarchiv** Host (`localhost`),
    Port (`8127`) und Token eintragen.
 4. **Archivfilter festlegen** — auf der Integrationskachel **Konfigurieren →
-   Archivfilter bearbeiten**: Domains, einzelne Entitäten, Bereiche oder
-   Geräte auswählen. Ohne Filter kommen keine Daten an; die App wartet dann
-   untätig, ohne Fehler anzuzeigen.
+   Archivfilter bearbeiten**: Empfohlen ist die Auswahl per **Label** — ein
+   Label lässt sich direkt einer Entität oder einem ganzen Gerät bzw. Bereich
+   zuweisen, alle damit verknüpften Entitäten landen dann automatisch im
+   Filter, auch neu hinzukommende. Unter „Weitere Auswahlmöglichkeiten"
+   lassen sich zusätzlich oder stattdessen einzelne Entitäten, Bereiche,
+   Geräte oder Entitätsmuster erfassen. Ohne Filter kommen keine Daten an;
+   die App wartet dann untätig, ohne Fehler anzuzeigen.
 5. Nach dem ersten empfangenen Wert erscheint die Entität automatisch in
    **Entitäten** — mit den globalen Standardwerten aus **Einstellungen →
    Archivierung**. Diese Standards lassen sich pro Entität jederzeit
