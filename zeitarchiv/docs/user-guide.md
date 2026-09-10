@@ -43,27 +43,46 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
    über HACS oder manuell. In Home Assistant unter **Einstellungen → Geräte
    & Dienste → Integration hinzufügen → Zeitarchiv** Host (`localhost`),
    Port (`8127`) und Token eintragen.
-4. **Archivfilter festlegen** — auf der Integrationskachel **Konfigurieren →
-   Archivfilter bearbeiten**: Empfohlen ist die Auswahl per **Label** — ein
-   Label lässt sich direkt einer Entität oder einem ganzen Gerät bzw. Bereich
-   zuweisen, alle damit verknüpften Entitäten landen dann automatisch im
-   Filter, auch neu hinzukommende. Unter „Weitere Auswahlmöglichkeiten"
-   lassen sich zusätzlich oder stattdessen einzelne Entitäten, Bereiche,
-   Geräte oder Entitätsmuster erfassen. Ohne Filter kommen keine Daten an;
-   die App wartet dann untätig, ohne Fehler anzuzeigen.
-5. Nach dem ersten empfangenen Wert erscheint die Entität automatisch in
+4. **Label vorbereiten** — Zeitarchiv wählt Entitäten bevorzugt über
+   Home-Assistant-Labels aus. Gibt es dafür schon ein passendes Label (z. B.
+   ein thematisches wie „Energie" oder ein eigens für Zeitarchiv
+   angelegtes), diesen Schritt überspringen und das Label direkt in
+   Schritt 5 auswählen. Sonst zuerst eines anlegen: in Home Assistant unter
+   **Einstellungen → Bereiche, Labels & Zonen → Labels → Label
+   hinzufügen** — ein Name genügt, Farbe und Icon sind optional. Danach das
+   neue Label den gewünschten Entitäten, Geräten oder Bereichen zuweisen:
+   entweder einzeln über deren Einstellungsseite (Zahnrad-Symbol → Feld
+   „Labels"), oder gesammelt über **Einstellungen → Geräte & Dienste →
+   Entitäten** — dort mehrere Entitäten per Checkbox markieren und über die
+   Werkzeugleiste am unteren Rand „Label hinzufügen" wählen. Diese
+   Reihenfolge — erst Label anlegen, dann Entitäten labeln, erst danach in
+   Zeitarchiv konfigurieren — erspart den Umweg über eine leere Auswahl in
+   Schritt 5.
+5. **Archivfilter festlegen** — auf der Integrationskachel **Konfigurieren →
+   Archivfilter bearbeiten**: das vorbereitete Label auswählen — alle damit
+   verknüpften Entitäten landen automatisch im Filter, auch neu
+   hinzukommende, ohne dass hier je nachträglich etwas ergänzt werden muss.
+   Unter „Weitere Auswahlmöglichkeiten" lassen sich zusätzlich oder
+   stattdessen einzelne Entitäten, Bereiche, Geräte oder Entitätsmuster
+   erfassen — sinnvoll für Einzelfälle, die kein eigenes Label rechtfertigen.
+   Ohne Filter kommen keine Daten an; die App wartet dann untätig, ohne
+   Fehler anzuzeigen.
+6. Nach dem ersten empfangenen Wert erscheint die Entität automatisch in
    **Entitäten** — mit den globalen Standardwerten aus **Einstellungen →
    Archivierung**. Diese Standards lassen sich pro Entität jederzeit
    individuell überschreiben (siehe [Entität konfigurieren](#entität-konfigurieren)).
-6. Filter, Token oder Standards lassen sich jederzeit nachträglich ändern —
+7. Filter, Token oder Standards lassen sich jederzeit nachträglich ändern —
    bereits archivierte Werte bleiben davon unberührt, nur künftige Werte
-   folgen den neuen Einstellungen.
+   folgen den neuen Einstellungen. Neue Entitäten mit demselben Label
+   erscheinen automatisch, ohne dass der Filter erneut bearbeitet werden
+   muss.
 
 **Woran erkenne ich, dass Daten ankommen?** Unter **Einstellungen →
 Verbindung** zeigt "Letzter empfangener Wert" den Zeitpunkt des zuletzt
 verarbeiteten Schreibvorgangs. Bleibt dieser Wert dauerhaft leer oder alt,
-liegt es entweder an fehlenden Archivfiltern (Schritt 4) oder an einem
-falschen Token/Host in der Integration (Schritt 3).
+liegt es entweder an fehlenden oder falsch zugewiesenen Archivfiltern
+(Schritt 4/5) oder an einem falschen Token/Host in der Integration
+(Schritt 3).
 
 ## Die Übersichtsseite
 
@@ -1743,7 +1762,7 @@ lohnt sich ein Backup (siehe oben), falls die Löschung ein Versehen war.
 
 **Warum sieht ein Chart trotz aktiver Integration keine neuen Werte?**
 Meist fehlt ein passender Archivfilter in der Integration (siehe
-[Erste Schritte](#erste-schritte), Schritt 4), oder Token/Host in der
+[Erste Schritte](#erste-schritte), Schritt 4/5), oder Token/Host in der
 Integrationskonfiguration stimmen nicht mit **Einstellungen → Verbindung**
 überein.
 
