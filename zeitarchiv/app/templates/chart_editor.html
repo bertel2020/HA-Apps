@@ -304,11 +304,13 @@
                      "Anteile (%)" unter "Gestapelt": existiert als Einstellung
                      nur, solange die übergeordnete Option an ist. "Gleitend"
                      wirkt nur auf Linien-Serien (siehe render()) — bei einer
-                     reinen Balken-Auswahl bleibt "Flach" die einzig sichtbare
-                     Wirkung, die Zeile selbst aber trotzdem anwählbar, damit
-                     ein Chart mit gemischten Linien-/Balken-Serien nicht extra
-                     behandelt werden muss. -->
-                <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack)">
+                     reinen Balken-Auswahl hätte die Wahl also nie eine
+                     sichtbare Wirkung, deshalb zusätzlich an hasLineSeries
+                     gebunden (dieselbe x-show-Konvention wie "Punkte"/
+                     "Fläche" oben). Bei gemischten Linien-/Balken-Charts
+                     bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
+                     Linien-Serien. -->
+                <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries">
                   <span class="menu-row-label">Darstellung</span>
                   <div class="seg">
                     <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">Flach</button>
