@@ -12,9 +12,12 @@
     <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (chartId ? 'Chart bearbeiten' : 'Neuer Chart') : (name || 'Neuer Chart')"></h2>
-          {% if chart_id %}
-          <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
-          {% endif %}
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn" x-show="hasData" data-tooltip="Aktuell angezeigte Chart-Daten als CSV herunterladen" @click="exportCsv()">CSV</button>
+            {% if chart_id %}
+            <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
+            {% endif %}
+          </div>
         </div>
         {% if chart_id %}{% include "_dashboard_usage.html" %}{% endif %}
         <p class="sub" x-show="editing">Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.</p>

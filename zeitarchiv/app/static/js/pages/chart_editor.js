@@ -43,6 +43,13 @@
       });
     }
 
+    // Auf Modulebene statt lokal in formatPeriodLabel() (wie bis hierhin) —
+    // formatPeriodForFilename() weiter unten braucht dieselben Formatierer.
+    const fmtDay = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+    const fmtDayMonth = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
+    const fmtMonthYear = d => d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+    const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+
     // Dieselbe Perioden-Beschriftungslogik wie auf der Entität-eigenen Chart-
     // Seite (entity_detail.html) — hier bewusst ohne Vorperiode/Offset-
     // Navigation, ein abgelegtes Chart zeigt beim Ansehen immer die aktuelle
@@ -51,10 +58,6 @@
       if (windowStart == null || windowEnd == null) return '';
       const start = new Date(windowStart * 1000);
       const end = new Date(windowEnd * 1000 - 1000);
-      const fmtDay = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
-      const fmtDayMonth = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
-      const fmtMonthYear = d => d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
-      const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
       switch (range) {
         case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
         case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? 'Heute' : fmtDay(start));
@@ -64,6 +67,58 @@
         case 'decade': return `${start.getFullYear()}–${end.getFullYear()}`;
         default: return '';
       }
+    }
+
+    // Wie formatPeriodLabel(), aber fürs Dateinamensfeld beim CSV-/Bild-
+    // Export (exportFilename-Getter weiter unten): "Heute"/"(bis heute)" löst
+    // sich auf das tatsächliche Datum auf (windowEnd, exklusiv, daher -1s)
+    // statt das relative Wort stehen zu lassen — ein heute heruntergeladener
+    // Export bliebe sonst beim erneuten Ansehen (z. B. nächste Woche) nicht
+    // mehr erkennbar, ab wann er galt. Trennzeichen ("-"/"_" statt "–"/"·")
+    // bewusst dateinamentauglich statt der Lesetypografie aus
+    // formatPeriodLabel(); die eigentliche Zeichen-Bereinigung (Leerzeichen,
+    // verbotene Zeichen) übernimmt sanitizeFilename().
+    function formatPeriodForFilename(range, continuous, windowStart, windowEnd, isCurrent) {
+      if (windowStart == null || windowEnd == null) return '';
+      const start = new Date(windowStart * 1000);
+      const end = new Date(windowEnd * 1000 - 1000);
+      switch (range) {
+        case 'hour': return `${fmtDay(start)}_${fmtTime(start).replace(':', '-')}-${fmtTime(end).replace(':', '-')}`;
+        case 'day': return continuous ? `${fmtDay(start)}-${fmtDay(end)}` : fmtDay(isCurrent ? end : start);
+        case 'week': return `${fmtDayMonth(start)}-${fmtDayMonth(end)}_${end.getFullYear()}`;
+        case 'month': return continuous ? `${fmtDay(start)}-${fmtDay(end)}` : (isCurrent ? `${fmtMonthYear(start)}_bis_${fmtDay(end)}` : fmtMonthYear(start));
+        case 'year': return continuous ? `${fmtMonthYear(start)}-${fmtMonthYear(end)}` : (isCurrent ? `${start.getFullYear()}_bis_${fmtDay(end)}` : `${start.getFullYear()}`);
+        case 'decade': return `${start.getFullYear()}-${end.getFullYear()}`;
+        default: return '';
+      }
+    }
+
+    // Entfernt Dateisystem-kritische Zeichen und macht Leerzeichen zu "_" —
+    // gemeinsam für Chart-Namen und formatPeriodForFilename()-Ergebnis
+    // genutzt (exportFilename-Getter weiter unten).
+    function sanitizeFilename(s) {
+      return String(s)
+        .replace(/[\\/:*?"<>|]/g, '')
+        .replace(/[(),]/g, '')
+        .trim()
+        .replace(/\s+/g, '_');
+    }
+
+    // "Als Bild speichern" (toolbox.feature.saveAsImage) — reines ECharts-
+    // Bordmittel, dieselbe Konfiguration für alle drei Renderpfade (render()/
+    // renderTimelineMulti()/renderDonut()), deshalb hier zentral statt
+    // dreimal dupliziert. NUR auf dieser Seite (nicht auf der Dashboard-
+    // Kachel, dashboard-tiles.js) — eine Kachel ist ohnehin nur eine
+    // Vorschau, das Icon wäre dort in der kleinen Fläche nur Ballast, und das
+    // Original mit vollem Bedienfeld steht ohnehin einen Klick entfernt.
+    function toolboxOption(exportFilename, surface, inkFaint) {
+      return {
+        show: true, right: 6, top: 0,
+        feature: {
+          saveAsImage: {title: 'Als Bild speichern', backgroundColor: surface, name: exportFilename},
+        },
+        iconStyle: {borderColor: inkFaint},
+      };
     }
 
     function previousPeriodLabel(range) {
@@ -572,6 +627,17 @@
         },
         get periodLabel() {
           return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.isCurrent);
+        },
+        // Gemeinsamer Dateiname für CSV- und Bild-Export (exportCsv()/
+        // toolbox.feature.saveAsImage in render()/renderTimelineMulti()/
+        // renderDonut()) — Chart-Name + aufgelöster Zeitraum, siehe
+        // formatPeriodForFilename()/sanitizeFilename().
+        get exportFilename() {
+          const namePart = sanitizeFilename(this.name || 'chart') || 'chart';
+          const periodPart = sanitizeFilename(
+            formatPeriodForFilename(this.range, this.continuous, this.windowStart, this.windowEnd, this.isCurrent)
+          );
+          return periodPart ? `${namePart}_${periodPart}` : namePart;
         },
         get comparePreviousLabel() { return previousPeriodLabel(this.range); },
         get compareYearLabel() { return previousYearPeriodLabel(this.range); },
@@ -1263,6 +1329,11 @@
             }
           });
           chartInstance.setOption({
+            toolbox: toolboxOption(
+              this.exportFilename,
+              getComputedStyle(document.body).getPropertyValue('--surface'),
+              getComputedStyle(document.body).getPropertyValue('--ink-faint')
+            ),
             textStyle: {
               fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
               color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
@@ -1270,8 +1341,10 @@
             },
             // bottom nur noch für die X-Achsen-Beschriftung reserviert — die
             // Legende lebt jetzt als eigenes HTML-Element unterhalb der Karte
-            // (siehe legend weiter unten), nicht mehr im Chart selbst.
-            grid: {left: 10, right: 10, top: 20, bottom: 40, containLabel: true},
+            // (siehe legend weiter unten), nicht mehr im Chart selbst. top um
+            // 8px erhöht (20→28), damit das toolbox-Icon (oben rechts, s. o.)
+            // nicht mit der obersten Y-Achsen-Beschriftung kollidiert.
+            grid: {left: 10, right: 10, top: 28, bottom: 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -1395,12 +1468,18 @@
             }
           });
           const option = {
+            toolbox: toolboxOption(
+              this.exportFilename,
+              getComputedStyle(document.body).getPropertyValue('--surface'),
+              getComputedStyle(document.body).getPropertyValue('--ink-faint')
+            ),
             textStyle: {
               fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
               color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
               fontSize: Math.round(12 * uiFontScale * 10) / 10,
             },
-            grid: {left: 10, right: 20, top: 16, bottom: 40, containLabel: true},
+            // top um 8px erhöht (16→24), Begründung wie in render().
+            grid: {left: 10, right: 20, top: 24, bottom: 40, containLabel: true},
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
@@ -1472,23 +1551,27 @@
         // der Legende darunter (chart-legend/chart-legend-table, unverändert
         // wiederverwendet), eine zweite Beschriftung im Ring selbst wäre
         // Redundanz.
+        // Ausgelagert aus renderDonut(), damit exportCsv() im Donut-Modus
+        // GENAU denselben Wert exportiert, der im Ring steckt — seriesStats()
+        // (Legende) wäre hier keine verlässliche Quelle: deren sum-Feld ist
+        // bei Nicht-Zähler-/Nicht-Schalter-Entitäten bewusst null (siehe dort),
+        // während der Donut trotzdem einen Summenwert zeichnet.
+        donutValueFor(s) {
+          const values = s.points.map(p => p.value).filter(Number.isFinite);
+          if (!values.length) return 0;
+          if (this.donutAggregation === 'average') return values.reduce((sum, v) => sum + v, 0) / values.length;
+          if (this.donutAggregation === 'last') return values[values.length - 1];
+          return values.reduce((sum, v) => sum + v, 0);
+        },
         renderDonut() {
           if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
           const surface = getComputedStyle(document.body).getPropertyValue('--surface');
-          const data = this.series.map(s => {
-            const values = s.points.map(p => p.value).filter(Number.isFinite);
-            let value = 0;
-            if (values.length) {
-              if (this.donutAggregation === 'average') value = values.reduce((sum, v) => sum + v, 0) / values.length;
-              else if (this.donutAggregation === 'last') value = values[values.length - 1];
-              else value = values.reduce((sum, v) => sum + v, 0);
-            }
-            return {
-              name: this.entityNames[s.entity_id] || s.friendly_name,
-              value: Math.max(0, value),
-              itemStyle: {color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length]},
-            };
-          });
+          const inkFaint = getComputedStyle(document.body).getPropertyValue('--ink-faint');
+          const data = this.series.map(s => ({
+            name: this.entityNames[s.entity_id] || s.friendly_name,
+            value: Math.max(0, this.donutValueFor(s)),
+            itemStyle: {color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length]},
+          }));
           // Serien-Umschalter der Legende (toggleLegendItem()/legendHiddenIds)
           // wirkt bei type:'pie' auf einzelne DATENPUNKTE statt auf ganze
           // Serien — ECharts behandelt jeden data-Eintrag wie einen eigenen
@@ -1502,6 +1585,7 @@
             legendSelected[this.entityNames[s.entity_id] || s.friendly_name] = !this.legendHiddenIds.includes(s.entity_id);
           });
           chartInstance.setOption({
+            toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
             legend: {show: false, data: data.map(d => d.name), selected: legendSelected},
             tooltip: {
               trigger: 'item',
@@ -1525,6 +1609,50 @@
             }],
           }, true);
           chartInstance.resize();
+        },
+
+        // "CSV" (Titelzeile) — dieselbe Blob-Download-Technik wie
+        // exportCsv() in table_editor.js (Semikolon-Trennzeichen, BOM,
+        // Anführungszeichen je Zelle), hier zwei Formen statt eines festen
+        // Zeilen/Spalten-Rasters: im Donut GENAU der Wert, der im Ring
+        // steckt (donutValueFor(), eine Zeile je Entität) — Zeitstempel gäbe
+        // es dort nicht, jede Serie ist ja schon auf einen Wert reduziert.
+        // Sonst (Zeitverlauf UND Zeitstrahl) ein Zeitstempel-Raster über die
+        // Vereinigung aller Serien-Zeitstempel, eine Spalte je Entität.
+        exportCsv() {
+          const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
+          const lines = [];
+          if (this.donut) {
+            lines.push(['Entität', 'Wert'].map(csvEscape).join(';'));
+            this.series.forEach(s => {
+              const name = this.entityNames[s.entity_id] || s.friendly_name;
+              const value = fmtNum(this.donutValueFor(s), this.effectiveDecimals(s)) + (s.unit ? ` ${s.unit}` : '');
+              lines.push([name, value].map(csvEscape).join(';'));
+            });
+          } else {
+            const tsSet = new Set();
+            this.series.forEach(s => s.points.forEach(p => tsSet.add(p.ts)));
+            const timestamps = [...tsSet].sort((a, b) => a - b);
+            const names = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
+            lines.push(['Zeit', ...names].map(csvEscape).join(';'));
+            timestamps.forEach(ts => {
+              const row = [new Date(ts * 1000).toLocaleString(LOCALE)];
+              this.series.forEach(s => {
+                const p = s.points.find(pt => pt.ts === ts);
+                row.push(p && Number.isFinite(p.value) ? fmtNum(p.value, this.effectiveDecimals(s)) : '');
+              });
+              lines.push(row.map(csvEscape).join(';'));
+            });
+          }
+          const blob = new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${this.exportFilename}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
         },
 
         async save() {
