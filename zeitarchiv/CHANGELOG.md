@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.94.0 - 2026-09-10
+
+### Neu
+
+- Charts lassen sich jetzt als **Donut** statt als Zeitverlauf darstellen —
+  ein Anteil je Entität statt einer Zeitachse, mit wählbarer Aggregation
+  (Summe, Durchschnitt oder Letzter Wert).
+- **CSV- und Bild-Export für Charts**: ein CSV-Button neben „Anpassen" lädt
+  die aktuell angezeigten Daten herunter, ein Symbol im Chart selbst
+  speichert einen Bild-Schnappschuss — beide mit demselben Dateinamen aus
+  Chart-Titel und Zeitraum.
+- Charts bieten jetzt einen **Ranking-Vergleich**: bei Auflösung „Voll"
+  fasst sich der komplette Zeitraum zu einem Gesamtwert je Entität
+  zusammen, wahlweise vertikal oder horizontal dargestellt — „Horizontal"
+  schaltet dabei direkt in diese Ansicht, ohne die Auflösung vorher manuell
+  umstellen zu müssen.
+- Die Durchschnittslinie im Chart-Editor lässt sich jetzt zwischen einer
+  flachen Linie und einer gleitenden Trendkurve umschalten.
+
+### Geändert
+
+- Der Donut im Energiedashboard und in der Statistik wird in der mobilen
+  Ansicht jetzt kleiner dargestellt, mit weniger Abstand zur Tabelle
+  darunter.
+- Die Aktions-Buttons im Chart- und Tabellen-Editor stehen auf
+  Mobilgeräten jetzt rechtsbündig statt links hängend.
+- Durchschnitt und Summe in den Legenden-Kennzahlen werden jetzt als
+  Symbole (Ø/Σ) statt als Text angezeigt.
+
+### Behoben
+
+- Horizontale Balken im Ranking-Vergleich zeigten keine Werte an.
+- Der Chart-Editor nannte den Zeitraum-Schalter noch „Kontinuierlich" statt
+  „Rollierend" wie an allen anderen Stellen der App.
+
 ## 0.93.0 - 2026-09-10
 
 ### Neu
