@@ -1009,8 +1009,8 @@ Bereinigung, Charts/Tabellen/Dashboards, Statistikverläufe sowie Einstellungen
 und Wartungshistorien enthalten. Pro Tabelle und Bereich werden Eintragszahl,
 belegte Datenseiten, zugehörige SQLite-Indizes und deren Gesamtgröße angezeigt.
 Interne Strukturen und freie SQLite-Seiten bleiben separat ausgewiesen. Die
-eigentlichen Messreihen liegen weiterhin in Hot Buffer, Archiv und Rollups,
-nicht im Index.
+eigentlichen Messreihen liegen weiterhin in Hot Buffer (laufender Monat,
+unkomprimiert), Archiv und Rollups, nicht im Index.
 
 Die Indexdetailseite zeigt außerdem den vollständig freien, durch eine
 Kompaktierung reclaimbaren Speicher. SQLite verwendet diese Seiten im
