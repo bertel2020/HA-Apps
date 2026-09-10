@@ -286,6 +286,21 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
+                <!-- Verschachtelt direkt darunter, dieselbe Konvention wie
+                     "Anteile (%)" unter "Gestapelt": existiert als Einstellung
+                     nur, solange die übergeordnete Option an ist. "Gleitend"
+                     wirkt nur auf Linien-Serien (siehe render()) — bei einer
+                     reinen Balken-Auswahl bleibt "Flach" die einzig sichtbare
+                     Wirkung, die Zeile selbst aber trotzdem anwählbar, damit
+                     ein Chart mit gemischten Linien-/Balken-Serien nicht extra
+                     behandelt werden muss. -->
+                <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack)">
+                  <span class="menu-row-label">Darstellung</span>
+                  <div class="seg">
+                    <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">Flach</button>
+                    <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">Gleitend</button>
+                  </div>
+                </div>
                 <label class="menu-row">
                   <span class="menu-row-label">Statistik in Legende</span>
                   <span class="menu-toggle">
@@ -429,6 +444,7 @@
     const AREA_FILL = {{ area_fill | tojson }};
     const STACKED = {{ stacked | tojson }};
     const NORMALIZE = {{ normalize | tojson }};
+    const AVERAGE_STYLE = {{ average_style | tojson }};
     // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
     // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
     // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart

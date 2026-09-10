@@ -36,6 +36,16 @@
     const zahlen = values.filter(Number.isFinite);
     return zahlen.length ? zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length : null;
   };
+  // Gleitender Durchschnitt — wortgleich mit movingAverageWindow()/
+  // movingAverage() in chart_editor.js (siehe dortiger Kommentar zur
+  // Fensterbreite als Anteil statt fester Tageszahl).
+  const movingAverageWindow = pointCount => Math.min(60, Math.max(3, Math.round(pointCount / 12)));
+  const movingAverage = (points, windowPoints) => points.map((p, i) => {
+    const start = Math.max(0, i - Math.floor(windowPoints / 2));
+    const end = Math.min(points.length, i + Math.ceil(windowPoints / 2));
+    const slice = points.slice(start, end).map(q => q.value).filter(Number.isFinite);
+    return {ts: p.ts, value: slice.length ? slice.reduce((s, v) => s + v, 0) / slice.length : null};
+  });
   const RESOLUTION_SECONDS = {
     hour: {medium: 5 * 60, coarse: 15 * 60},
     day: {medium: 30 * 60, coarse: 60 * 60},
@@ -315,6 +325,9 @@
     // zeichnet sie mit, damit ein angeheftetes Chart nicht anders aussieht als
     // dasselbe Chart auf seiner eigenen Seite.
     const averageLine = el.dataset.averageLine === 'true';
+    // "Flach"/"Gleitend" (verschachtelt unter "Durchschnittslinie" im
+    // Chart-Editor) — dieselbe Kachel-Parität wie averageLine selbst.
+    const averageStyle = el.dataset.averageStyle || 'flat';
     // "Fläche" (Optionen-Menü der Chart-Seite, chart_editor.js) — dieselbe
     // dezente Füllfläche wie auf der eigenen Chart-Seite, damit ein
     // angeheftetes Chart nicht anders aussieht als dasselbe Chart dort.
@@ -541,7 +554,7 @@
         // zu werden (sichtbar als lange Dopplung im Tooltip). Dieselbe Summe-
         // vs.-Durchschnitt-Regel wie in den Legenden-Kennzahlen oben.
         const rawValues = (s.points || []).map(p => p.value).filter(Number.isFinite);
-        if (!rawValues.length) return {lineData: [], averageValues: []};
+        if (!rawValues.length) return {lineData: [], averageValues: [], rawPoints: []};
         const isSumType = s.aggregation_type === 'counter' || s.aggregation_type === 'switch';
         const aggregate = isSumType
           ? rawValues.reduce((sum, v) => sum + v, 0)
@@ -549,6 +562,7 @@
         return {
           lineData: [[0, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]],
           averageValues: [aggregate],
+          rawPoints: [{ts: data.window_start, value: aggregate}],
         };
       }
       const displayPoints = resamplePoints(
@@ -564,7 +578,10 @@
         const last = lineData[lineData.length - 1];
         lineData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
       }
-      return {lineData, averageValues};
+      // rawPoints (ohne Halte-Punkt) für den gleitenden Durchschnitt — dieselbe
+      // Begründung wie bei averageValues: der Halte-Punkt wiederholt nur den
+      // letzten Wert und würde das Fenster am Rand verfälschen.
+      return {lineData, averageValues, rawPoints: displayPoints};
     });
     // x (ms-Zeitstempel bzw. 0 bei singleBucket) -> Summe je Achse, nur für
     // tatsächlich normierte reine Balken-Achsen (barOnlyAxis, s. o.).
@@ -584,6 +601,10 @@
     const lastBarIndexForAxis = new Map();
     series.forEach((s, i) => { if (s.chart_type === 'bar') lastBarIndexForAxis.set(axisKey(s), i); });
 
+    // Gesammelt statt direkt in echartsSeries gepusht — series.map() liefert
+    // genau ein Element je Durchlauf, die Trendlinie ist aber eine
+    // ZUSÄTZLICHE, eigenständige Serie (siehe showRollingAverage unten).
+    const rollingSeries = [];
     const echartsSeries = series.map((s, i) => {
       const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
       const displayName = entityNames[s.entity_id] || s.friendly_name;
@@ -606,6 +627,11 @@
           return [p[0], pct, '%', 0, false, p[1], p[2], p[3]];
         });
       }
+      // Gleitender Durchschnitt nur für Linien-Serien — dieselbe Begründung
+      // wie chart_editor.js (eine Balken-Bucket-SUMME gleitend zu mitteln
+      // ergäbe keine klar lesbare Aussage).
+      const showRollingAverage = averageLine && !isStackedBar && averageStyle === 'rolling'
+        && s.chart_type === 'line' && prepared[i].rawPoints.length >= 3;
       const cfg = {
         // Angepasster Anzeigename (chart_editor.html, "Angezeigte Namen") hat
         // Vorrang vor dem Entität-eigenen friendly_name — dieselbe Regel wie
@@ -615,7 +641,9 @@
         yAxisIndex: units.indexOf(axisKey(s)),
         data: lineData,
         stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
-        lineStyle: {width: 2, color},
+        // Bei aktiver Trendlinie tritt die rohe Kurve zurück, bleibt aber
+        // sichtbar — dieselbe Ergänzung-statt-Ersatz-Logik wie im Editor.
+        lineStyle: {width: 2, color, opacity: showRollingAverage ? 0.45 : 1},
         itemStyle: {color},
         // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
         // Punkt, dieselbe Konvention wie entity_detail.html (ohne Einheit,
@@ -661,7 +689,8 @@
       // der Chart-Seite. Entschieden: im gestapelten Modus weggelassen —
       // dieselbe Begründung wie in chart_editor.js (eine Serie beginnt darin
       // nicht mehr bei 0).
-      const durchschnitt = averageLine && !isStackedBar ? averageOf(prepared[i].averageValues) : null;
+      const durchschnitt = averageLine && !isStackedBar && averageStyle === 'flat'
+        ? averageOf(prepared[i].averageValues) : null;
       if (durchschnitt !== null) {
         cfg.markLine = {
           silent: true,
@@ -676,8 +705,28 @@
           data: [{yAxis: durchschnitt}],
         };
       }
+      if (showRollingAverage) {
+        const windowPoints = movingAverageWindow(prepared[i].rawPoints.length);
+        const rollingData = movingAverage(prepared[i].rawPoints, windowPoints)
+          .filter(p => p.value !== null)
+          .map(p => [p.ts * 1000, p.value]);
+        // Eigene, zusätzliche Serie statt eines markLine/Umbaus der
+        // Hauptserie — dieselbe Technik wie chart_editor.js. Nicht über die
+        // Legende einzeln umschaltbar, sie gehört sichtbar zur Hauptserie.
+        rollingSeries.push({
+          name: `${displayName} (Ø gleitend)`,
+          type: 'line',
+          yAxisIndex: units.indexOf(axisKey(s)),
+          data: rollingData,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: {width: 2.5, color},
+          z: 3,
+        });
+      }
       return cfg;
     });
+    echartsSeries.push(...rollingSeries);
 
     // ECharts' eigene Legende bleibt unsichtbar (show:false, wie in
     // chart_editor.html) — die sichtbare Legende ist das eigene HTML-Element

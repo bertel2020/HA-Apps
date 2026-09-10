@@ -3015,6 +3015,10 @@ _CHART_LEGEND_STYLES = {"chips", "table"}
 # generell als gültiger Wert zugelassen, dieselbe Konvention wie
 # _ENTITY_CHART_TYPES oben.
 _CHART_EDITOR_CHART_TYPES = {"auto", "timeline"}
+# "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
+# Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
+# siehe chart_editor.js render()/movingAverage().
+_CHART_AVERAGE_STYLES = {"flat", "rolling"}
 
 # Optionen-Menü der Entität-eigenen Chart-Seite (entity_detail.html) — im
 # Gegensatz zum Chart-Editor (saved_charts, ein Feld pro Chart) hier zweistufig:
@@ -3194,6 +3198,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "area_fill": chart["area_fill"] if chart else True,
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
+        "average_style": chart["average_style"] if chart else "flat",
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
@@ -3257,6 +3262,7 @@ class _SaveChartBody(BaseModel):
     area_fill: bool = True
     stacked: bool = False
     normalize: bool = False
+    average_style: str = "flat"
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3287,6 +3293,8 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
     if body.decimals not in _ENTITY_CHART_DECIMALS:
         raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+    if body.average_style not in _CHART_AVERAGE_STYLES:
+        raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
@@ -3296,7 +3304,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill,
-        stacked=body.stacked, normalize=body.normalize,
+        stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
     )
     return {"id": chart_id}
 
@@ -3329,6 +3337,8 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
     if body.decimals not in _ENTITY_CHART_DECIMALS:
         raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+    if body.average_style not in _CHART_AVERAGE_STYLES:
+        raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
@@ -3338,7 +3348,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill,
-        stacked=body.stacked, normalize=body.normalize,
+        stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
     )
     return {"id": chart_id}
 
@@ -3377,7 +3387,7 @@ def charts_duplicate(chart_id: int) -> dict:
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
         average_line=chart["average_line"], area_fill=chart["area_fill"],
-        stacked=chart["stacked"], normalize=chart["normalize"],
+        stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
     )
     return {"id": new_id}
 
@@ -3554,7 +3564,7 @@ def _dashboard_tiles_context(
                 "legend_style": c["legend_style"], "chart_type": c["chart_type"],
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"],
-                "stacked": c["stacked"], "normalize": c["normalize"],
+                "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

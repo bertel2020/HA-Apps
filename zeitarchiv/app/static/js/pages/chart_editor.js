@@ -104,6 +104,30 @@
       return zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length;
     }
 
+    // Gleitender Durchschnitt (Optionen-Menü, "Durchschnittslinie" →
+    // "Gleitend") — zentriertes Fenster über die tatsächlich gezeichneten
+    // Punkte (mainPoints), nicht über s.points, aus demselben Grund wie beim
+    // flachen Durchschnitt: resamplePoints() fasst Zähler/Schalter per SUMME
+    // zusammen, Rohpunkte lägen sonst auf einer anderen Skala.
+    //
+    // Fensterbreite als fester ANTEIL der gezeichneten Punkte (1/12,
+    // zwischen 3 und 60 Punkten gekappt) statt einer festen Anzahl Tage —
+    // dadurch funktioniert dieselbe Formel unverändert bei jeder Auflösung
+    // (Auto/Medium/Coarse) und jedem Zeitraum, ohne RESOLUTION_SECONDS hier
+    // ein zweites Mal auszuwerten. Die Note im Menü zeigt die sich daraus
+    // ergebende ungefähre Zeitspanne an (siehe render()).
+    function movingAverageWindow(pointCount) {
+      return Math.min(60, Math.max(3, Math.round(pointCount / 12)));
+    }
+    function movingAverage(points, windowPoints) {
+      return points.map((p, i) => {
+        const start = Math.max(0, i - Math.floor(windowPoints / 2));
+        const end = Math.min(points.length, i + Math.ceil(windowPoints / 2));
+        const slice = points.slice(start, end).map(q => q.value).filter(Number.isFinite);
+        return {ts: p.ts, value: slice.length ? slice.reduce((s, v) => s + v, 0) / slice.length : null};
+      });
+    }
+
     const RESOLUTION_SECONDS = {
       hour: {medium: 5 * 60, coarse: 15 * 60},
       // full: die komplette Periode als EIN Balken — z. B. "Tag" bei
@@ -353,6 +377,7 @@
         areaFill: AREA_FILL,
         stacked: STACKED,
         normalize: NORMALIZE,
+        averageStyle: AVERAGE_STYLE,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -900,13 +925,23 @@
             // denselben Balken aufsummiert, sobald ein Chart mehrere Achsen
             // kombiniert.
             const isStackedBar = chartType === 'bar' && stackedActive;
+            // Gleitender Durchschnitt (Optionen-Menü, "Durchschnittslinie" →
+            // "Gleitend") nur für Linien-Serien — bei einer Balken-Serie
+            // (Bucket-SUMME) ergäbe ein "gleitender Durchschnitt der Summen"
+            // keine klar lesbare Aussage, deshalb dort schlicht keine
+            // Zusatzlinie statt einer verwirrenden.
+            const showRollingAverage = this.averageLine && !isStackedBar && this.averageStyle === 'rolling'
+              && chartType === 'line' && mainPoints.length >= 3;
             const main = {
               name: displayName,
               type: chartType,
               yAxisIndex: units.indexOf(axisKey(s)),
               data: mainData,
               stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
-              lineStyle: {width: 1.5, color},
+              // Bei aktiver Trendlinie tritt die rohe (verrauschte) Kurve
+              // zurück, bleibt aber sichtbar — die Trendlinie ist die
+              // Ergänzung, nicht der Ersatz.
+              lineStyle: {width: 1.5, color, opacity: showRollingAverage ? 0.45 : 1},
               itemStyle: {color},
               // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
               // Punkt, zusätzlich zum Tooltip. Nur die Hauptserie, nicht die
@@ -974,7 +1009,7 @@
             // läge mitten in einem fremden Segment und würde als
             // Segmentgrenze missverstanden statt als Mittelwert erkannt
             // (siehe :disabled an der Menü-Zeile in chart_editor.html).
-            const durchschnitt = this.averageLine && !isStackedBar
+            const durchschnitt = this.averageLine && !isStackedBar && this.averageStyle === 'flat'
               ? averageOf(mainPoints.map(p => p.value))
               : null;
             if (durchschnitt !== null) {
@@ -992,6 +1027,28 @@
               };
             }
             echartsSeries.push(main);
+            if (showRollingAverage) {
+              const windowPoints = movingAverageWindow(mainPoints.length);
+              const rollingData = movingAverage(mainPoints, windowPoints)
+                .filter(p => p.value !== null)
+                .map(p => [p.ts * 1000, p.value]);
+              // Eigene, zusätzliche Serie statt eines markLine/Umbaus der
+              // Hauptserie — dieselbe Technik wie die Vorperiode-Nebenserie
+              // (cmp weiter unten): eine sichtbar mit der Hauptserie
+              // verbundene, aber eigenständige Linie. Nicht über die Legende
+              // einzeln umschaltbar (wie cmp auch nicht) — sie gehört
+              // sichtbar zur Hauptserie, kein eigener Umschalt-Anspruch.
+              echartsSeries.push({
+                name: `${displayName} (Ø gleitend)`,
+                type: 'line',
+                yAxisIndex: units.indexOf(axisKey(s)),
+                data: rollingData,
+                smooth: true,
+                symbol: 'none',
+                lineStyle: {width: 2.5, color},
+                z: 3,
+              });
+            }
             // stackedActive schließt Vergleich schon am Knopf aus
             // (toggleStacked()/:disabled in chart_editor.html) — hier
             // zusätzlich robust dagegen, falls compare aus einem älteren
@@ -1289,6 +1346,7 @@
             area_fill: this.areaFill,
             stacked: this.stacked,
             normalize: this.normalize,
+            average_style: this.averageStyle,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

@@ -760,6 +760,14 @@ eines bestehenden (Kachelmenü ⋮).
 - **Fläche** (nur hier, nicht in der Verlaufsansicht einer einzelnen
   Entität) füllt die Fläche unter Linien-Serien dezent ein — Standard an,
   entspricht damit dem bisherigen Aussehen der Dashboard-Kachel.
+- **Durchschnittslinie: Flach/Gleitend** (nur hier, in der Verlaufsansicht
+  gibt es nur die flache Linie) — direkt unter "Durchschnittslinie"
+  verschachtelt. „Flach" ist die bisherige waagerechte Linie beim
+  Gesamtdurchschnitt, „Gleitend" zeichnet stattdessen eine Trendkurve über
+  Linien-Serien, die kurzfristiges Rauschen glättet (z. B. Wetterdaten über
+  ein Jahr) — die rohe Kurve bleibt dabei sichtbar, nur dezenter. Nur für
+  Linien-Serien; bei Balken-Serien (Zähler/Schalter) bleibt die Wahl ohne
+  sichtbare Wirkung.
 - **Gestapelt** (nur hier, ab zwei Balken-Serien im Chart): zeigt Balken-
   Serien derselben Einheit übereinandergestapelt statt nebeneinander —
   Zusammensetzung und Gesamtsumme in einem Blick, etwa der Tagesverbrauch
@@ -817,8 +825,9 @@ gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
 
 Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Zeitraum samt
 Rollierend-Schalter, Auflösung, dynamische Y-Achse, Werte anzeigen,
-Durchschnittslinie, Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/
-Anteile (%) sowie Zeitstrahl werden alle mit dem Chart gespeichert und
+Durchschnittslinie (samt Flach/Gleitend), Nachkommastellen,
+Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie Zeitstrahl werden
+alle mit dem Chart gespeichert und
 gelten dann auch für dessen Vorschau auf Dashboards. **Punkte an/aus,
 Rohwerte und Vergleichen dagegen nicht** — diese drei sind reine
 Ansichtseinstellungen für den aktuellen Besuch und stehen beim nächsten

@@ -904,6 +904,16 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN normalize INTEGER NOT NULL DEFAULT 0"
             )
+        if "average_style" not in sc_columns:
+            # "Flach"/"Gleitend" (Optionen-Menü, verschachtelt unter
+            # "Durchschnittslinie") — "flach" ist die bisherige waagerechte
+            # markLine, unveränderter Default; "rolling" zeichnet stattdessen
+            # eine gleitende Trendlinie über Linien-Serien (chart_editor.js
+            # render(), movingAverage()). Wirkt nur, solange average_line an
+            # ist; ohne das bleibt der Wert gespeichert, aber ungenutzt.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN average_style TEXT NOT NULL DEFAULT 'flat'"
+            )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -1866,6 +1876,7 @@ class Index:
         area_fill: bool = True,
         stacked: bool = False,
         normalize: bool = False,
+        average_style: str = "flat",
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1876,8 +1887,8 @@ class Index:
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, area_fill, stacked, normalize, "
-                "created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "average_style, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1885,7 +1896,8 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(stacked), int(normalize), now, now,
+                    int(average_line), int(area_fill), int(stacked), int(normalize),
+                    average_style, now, now,
                 ),
             )
             return cur.lastrowid
@@ -1912,6 +1924,7 @@ class Index:
         area_fill: bool = True,
         stacked: bool = False,
         normalize: bool = False,
+        average_style: str = "flat",
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -1921,7 +1934,7 @@ class Index:
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, stacked = ?, normalize = ?, "
-                "updated_at = ? WHERE id = ?",
+                "average_style = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1930,7 +1943,7 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(stacked), int(normalize),
-                    time.time(), chart_id,
+                    average_style, time.time(), chart_id,
                 ),
             )
 
@@ -1950,6 +1963,7 @@ class Index:
         d["area_fill"] = bool(d.get("area_fill", 1))
         d["stacked"] = bool(d.get("stacked", 0))
         d["normalize"] = bool(d.get("normalize", 0))
+        d["average_style"] = d.get("average_style") or "flat"
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []
