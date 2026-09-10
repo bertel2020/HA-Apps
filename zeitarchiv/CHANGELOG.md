@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.93.0 - 2026-09-10
+
+### Neu
+
+- Charts können mehrere Balken-Serien jetzt gestapelt darstellen — wahlweise
+  als Absolutwerte oder als Anteile (%) an der Summe.
+- Der Demo-Modus zeigt jetzt ein deutliches Banner, solange er aktiv ist.
+
+### Geändert
+
+- Der Demo-Modus erzeugt jetzt 3 Jahre Historie statt 6 Monate.
+- Das Benutzerhandbuch wurde überarbeitet: klarere Gliederung mit
+  Inhaltsverzeichnis-Gruppen, ein aufgabenorientierter Schnelleinstieg
+  weiter vorne, sowie deutlich ausführlichere Charts- und
+  Tabellen-Abschnitte mit bisher fehlenden Details.
+
+### Behoben
+
+- Die Energiedashboard-Kachel auf der Dashboard-Übersicht wurde im
+  deaktivierten Zustand unnötig größer angezeigt als im aktivierten.
+
 ## 0.92.0 - 2026-09-10
 
 ### Neu
