@@ -9,6 +9,15 @@
   <sub>PARQUET + ZSTD · INGRESS · ENERGIEDASHBOARD · CHARTS · TABELLEN · IMPORT · BACKUP · DEMO-MODUS</sub>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/aarch64-yes-green.svg" alt="Supports aarch64 Architecture">
+  <img src="https://img.shields.io/badge/amd64-yes-green.svg" alt="Supports amd64 Architecture">
+  <img src="https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fbertel2020%2FHA-Apps%2Fmain%2Fzeitarchiv%2Fconfig.yaml&query=%24.version&label=version&color=007ec6" alt="Version">
+  <a href="https://github.com/bertel2020/HA-Apps/actions/workflows/zeitarchiv-tests.yml"><img src="https://github.com/bertel2020/HA-Apps/actions/workflows/zeitarchiv-tests.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/bertel2020/HA-Apps/actions/workflows/zeitarchiv-image.yml"><img src="https://github.com/bertel2020/HA-Apps/actions/workflows/zeitarchiv-image.yml/badge.svg" alt="Image"></a>
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/LICENSE"><img src="https://img.shields.io/github/license/bertel2020/HA-Apps" alt="License"></a>
+</p>
+
 Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
 Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 [Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv) sammelt
