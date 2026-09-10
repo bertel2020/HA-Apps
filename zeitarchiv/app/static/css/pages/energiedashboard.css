@@ -565,11 +565,14 @@
   }
   /* Mobil: flex-basis (220px) ausschalten, sonst gewinnt sie gegen
      width:100% und der Donut hängt 220px breit links in der Kachel. Als
-     zentrierter Block mit 260px (dieselbe Größe wie #storage-pie in
+     zentrierter Block mit 220px (dieselbe Größe wie #storage-pie in
      statistik.html) oberhalb der Tabelle. */
   @media(max-width:560px){
-    .edash-share-wrap{flex-direction:column;align-items:stretch;}
-    .edash-share-donut{flex:0 0 auto;width:100%;max-width:260px;height:260px;margin:0 auto;}
+    /* gap:18px (Desktop-Wert, zwei nebeneinanderstehende Spalten) wirkt
+       gestapelt wie eine leere Lücke zwischen Donut und Tabelle — 14px,
+       derselbe Wert wie bei #storage-pie in statistik.css. */
+    .edash-share-wrap{flex-direction:column;align-items:stretch;gap:14px;}
+    .edash-share-donut{flex:0 0 auto;width:100%;max-width:220px;height:220px;margin:0 auto;}
     .edash-share-wrap .tbl-wrap{min-width:0;width:100%;}
   }
 

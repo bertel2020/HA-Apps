@@ -53,10 +53,13 @@
   @media (max-width:480px){
     #growth-chart{height:220px;}
     /* flex-basis 260px gewann bisher gegen width:100% — der Donut blieb
-       linksbündig. Als zentrierter Block oberhalb der Tabelle, Größe
-       unverändert 260px. */
-    .storage-card{flex-direction:column;align-items:stretch;}
-    #storage-pie{flex:0 0 auto;width:100%;max-width:260px;margin:0 auto;}
+       linksbündig. Als zentrierter Block oberhalb der Tabelle, Größe 220px
+       (dieselbe Größe wie .edash-share-donut in energiedashboard.css). */
+    /* gap:32px (Desktop-Wert, zwei nebeneinanderstehende Spalten) wirkt
+       gestapelt zwischen Donut und Tabelle wie eine leere Lücke — 14px
+       entspricht der ebenfalls auf 14px reduzierten Kachel-Innenabstand. */
+    .storage-card{flex-direction:column;align-items:stretch;gap:14px;}
+    #storage-pie{flex:0 0 auto;width:100%;max-width:220px;height:220px;margin:0 auto;}
     .storage-card .tbl-wrap{min-width:0;width:100%;}
     .card{padding:14px;}
   }
