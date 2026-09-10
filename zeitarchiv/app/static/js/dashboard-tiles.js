@@ -432,25 +432,34 @@
     // kWh-Werte dieselbe Achse, wodurch die kWh-Balken bei einer viel
     // größeren Watt-Spanne rechnerisch bei ~0 verschwinden, statt sichtbar zu
     // sein. Kompakt gehalten: kein Achsenname, nur die Zahl.
-    const units = [...new Set(series.map(s => s.unit))];
+    // Schalter-Entitäten im Anzeigemodus "Zeit" (Dauer statt Rohsekunden)
+    // bekommen wie in chart_editor.html einen eigenen synthetischen Achsen-
+    // Schlüssel statt ihrer echten (meist leeren) unit — sonst teilten sie
+    // sich fälschlich eine Achse mit unitlosen Standard-Entitäten und
+    // erschienen dort in rohen Sekunden statt als Dauer (Achse UND Tooltip
+    // kannten den Anzeigemodus bisher gar nicht, nur die HTML-Legende oben).
+    const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+    const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
+    const units = [...new Set(series.map(axisKey))];
     // Strengste (kleinste) Nachkommastellen-Einstellung aller Entitäten einer
     // gemeinsamen Achse — dieselbe Regel wie in chart_editor.html.
     const unitDecimals = new Map();
     series.forEach(s => {
       const d = effectiveDecimals(s);
       if (d == null) return;
-      const current = unitDecimals.get(s.unit);
-      if (current == null || d < current) unitDecimals.set(s.unit, d);
+      const current = unitDecimals.get(axisKey(s));
+      if (current == null || d < current) unitDecimals.set(axisKey(s), d);
     });
     const yAxis = units.map((u, i) => {
       const decimals = unitDecimals.get(u);
+      const isDuration = u === ' duration';
       // Balken zeichnen immer von der Null-Basislinie zum Wert — liegt eine
       // auto-skalierte Achse (scale:true, min/max undefined) nicht bei 0,
       // ragt der Balken optisch über den unteren Achsenrand hinaus statt
       // sauber auf der x-Achse zu stehen. "Dynamische Y-Achse" gilt deshalb
       // nur für Achsen, auf denen ausschließlich Linien-Serien liegen —
       // je Achse geprüft, da eine Kachel mehrere Einheiten/Achsen mischen kann.
-      const axisHasBar = series.some(s => s.unit === u && s.chart_type === 'bar');
+      const axisHasBar = series.some(s => axisKey(s) === u && s.chart_type === 'bar');
       const axisDynamic = dynamicYAxis && !axisHasBar;
       return {
         type: 'value',
@@ -463,7 +472,10 @@
         // undefined min/max — "Dynamische Y-Achse" hätte sonst keine
         // sichtbare Wirkung.
         scale: axisDynamic,
-        axisLabel: {fontSize: scaledFont(10), color: inkFaint, formatter: v => fmtCompactNumber(v, decimals)},
+        axisLabel: {
+          fontSize: scaledFont(10), color: inkFaint,
+          formatter: v => isDuration ? NumberFormat.fmtDuration(v) : fmtCompactNumber(v, decimals),
+        },
         axisLine: {show: false},
         axisTick: {show: false},
         splitLine: {lineStyle: {color: borderColor, type: 'dashed'}},
@@ -517,7 +529,7 @@
           const aggregate = isSumType
             ? rawValues.reduce((sum, v) => sum + v, 0)
             : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
-          lineData = [[0, aggregate, s.unit, effectiveDecimals(s)]];
+          lineData = [[0, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]];
           averageValues = [aggregate];
         }
       } else {
@@ -527,12 +539,12 @@
         if (tooltipBucketSeconds == null) {
           tooltipBucketSeconds = detectResolutionSeconds(displayPoints);
         }
-        lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s)]);
+        lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)]);
         averageValues = displayPoints.map(p => p.value);
         if (s.chart_type === 'line' && lineData.length && data.window_end != null
             && lineData[lineData.length - 1][0] < data.window_end * 1000) {
           const last = lineData[lineData.length - 1];
-          lineData.push([data.window_end * 1000, last[1], last[2], last[3]]);
+          lineData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
         }
       }
       const cfg = {
@@ -541,7 +553,7 @@
         // beim Rendern der vollen Chart-Seite (dort this.entityNames[entity_id]).
         name: displayName,
         type: s.chart_type,
-        yAxisIndex: units.indexOf(s.unit),
+        yAxisIndex: units.indexOf(axisKey(s)),
         data: lineData,
         lineStyle: {width: 2, color},
         itemStyle: {color},
@@ -553,7 +565,9 @@
           position: 'top',
           fontSize: scaledFont(10),
           color: inkMuted,
-          formatter: params => fmtCompactNumber(params.value[1], params.value[3]),
+          formatter: params => params.value[4]
+            ? NumberFormat.fmtDuration(params.value[1])
+            : fmtCompactNumber(params.value[1], params.value[3]),
         },
         barMaxWidth: singleBucket ? undefined : 28,
         // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. u.) sitzt mit
@@ -674,9 +688,12 @@
           const rows = params.map(p => {
             const unit = p.data[2] || '';
             const decimals = p.data[3];
+            const value = p.data[4]
+              ? NumberFormat.fmtDuration(p.data[1])
+              : `${fmtCompactNumber(p.data[1], decimals)}${unit ? ' ' + unit : ''}`;
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
                  + `<span>${p.marker}${p.seriesName}</span>`
-                 + `<strong style="margin-left:8px;">${fmtCompactNumber(p.data[1], decimals)}${unit ? ' ' + unit : ''}</strong></div>`;
+                 + `<strong style="margin-left:8px;">${value}</strong></div>`;
           }).join('');
           return `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}`;
         },

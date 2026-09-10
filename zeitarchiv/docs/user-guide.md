@@ -177,12 +177,19 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   Suchfeld, Sortierung und der Schalter „Favoriten zuerst“ über den Kacheln
   funktionieren wie bei Charts und Tabellen (siehe
   [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)).
-- Jedes Dashboard zeigt bis zu 18 Kacheln — Charts, Vergleichstabellen und
+- Jedes Dashboard zeigt bis zu 30 Kacheln — Charts, Vergleichstabellen und
   **Werte-Kacheln** gemischt — in frei wählbarer Größe (1×1 bis 3×3, im
   Präzisen Modus bis 6×6). Per Drag-and-drop anordnen; über das Kachelmenü
   (⋮) Größe ändern, duplizieren (Charts/Tabellen) oder entfernen. Das
   Entfernen einer Kachel löscht nur die Platzierung, nicht das zugrunde
   liegende Chart oder die Tabelle.
+- **Sektionen** gliedern viele Kacheln in benannte Abschnitte: über die
+  "+"-Kachel, Reiter "Sektion", einen Namen vergeben. Ein Sektionskopf lässt
+  sich per Chevron ein-/ausklappen (nur lokal im Browser gemerkt) und über
+  sein eigenes Menü (⋮) wieder entfernen — die enthaltenen Kacheln bleiben
+  dabei erhalten und rutschen in die vorherige Sektion (oder werden "ohne
+  Sektion", falls es die erste war). Sektionen zählen nicht gegen das
+  30-Kacheln-Limit.
 - **Werte-Kachel:** pinnt den aktuellen Wert einer einzelnen Entität direkt
   aufs Dashboard, ohne dafür ein Chart anzulegen. Nach dem Anheften öffnet
   sich sofort die Konfiguration. Bei einer Entität vom Typ **Zähler** ist der
@@ -200,7 +207,8 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   größeren Einstellungs-Popup (⋮), da hier deutlich mehr Optionen als bei
   Chart-/Tabellen-Kacheln zusammenkommen.
 - **Kachel hinzufügen:** die "+"-Kachel öffnet ein Popup mit Registerkarten
-  für Charts, Tabellen und Werte-Kacheln, jeweils mit Suchfeld. Charts und
+  für Charts, Tabellen, Werte-Kacheln und Sektionen, jeweils mit Suchfeld
+  (Sektionen stattdessen mit Namensfeld). Charts und
   Tabellen lassen sich direkt aus der Liste anheften oder über "+ Neuer
   Chart"/"+ Neue Tabelle" neu anlegen (landet nach dem Speichern
   automatisch auf diesem Dashboard); Werte-Kacheln werden über die
@@ -899,11 +907,15 @@ eines bestehenden (Kachelmenü ⋮):
   bei dieser Auflösung deaktiviert, da sie für einen einzelnen
   Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
 - Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,
-  Nachkommastellen, Legenden-Statistik — dieselben Optionen wie in der
-  Verlaufsansicht einer einzelnen Entität, hier aber je Chart konfiguriert
-  statt je Entität; Nachkommastellen gilt dabei einheitlich für alle
-  Entitäten des Charts. Alle Einstellungen werden mit dem Chart gespeichert
-  und gelten dann auch für dessen Vorschau auf Dashboards.
+  Durchschnittslinie, Nachkommastellen, Legenden-Statistik — dieselben
+  Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
+  Chart konfiguriert statt je Entität; Nachkommastellen gilt dabei
+  einheitlich für alle Entitäten des Charts. Alle Einstellungen werden mit
+  dem Chart gespeichert und gelten dann auch für dessen Vorschau auf
+  Dashboards.
+- **Fläche** (nur hier, nicht in der Verlaufsansicht einer einzelnen
+  Entität) füllt die Fläche unter Linien-Serien dezent ein — Standard an,
+  entspricht damit dem bisherigen Aussehen der Dashboard-Kachel.
 - Bei ausschließlich Schalter-Entitäten (`switch`, `binary_sensor` u. Ä.)
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
