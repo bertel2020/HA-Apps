@@ -786,18 +786,26 @@ eines bestehenden (Kachelmenü ⋮).
 
 Dieselbe Zeitraum-Leiste wie in der Verlaufsansicht (Stunde bis Dekade), mit
 einem **Rollierend**-Schalter für ein rollierendes statt kalendarisches
-Fenster (z. B. „letzte 24 Stunden" statt „heute"). Bei Auflösung „Tag" fasst
-die App den ganzen Tag zu einem einzigen Balken je Entität zusammen —
-praktisch, um z. B. Tages-Einspeisung und -Bezug als zwei
-nebeneinanderstehende Balken direkt zu vergleichen. **Vergleichen**,
-**Rollierend** und **Dynamische Y-Achse** sind bei dieser Auflösung
-deaktiviert, da sie für einen einzelnen Tages-Balken keine sinnvolle
-zusätzliche Aussage liefern.
+Fenster (z. B. „letzte 24 Stunden" statt „heute").
+
+**Ranking-Vergleich:** Bei Tag, Woche, Monat oder Jahr steht zusätzlich eine
+Auflösung zur Verfügung, die den kompletten Zeitraum zu einem einzigen
+Gesamtwert je Entität zusammenfasst — praktisch, um z. B. den
+Tages-/Wochen-/Monats-/Jahresverbrauch mehrerer Verbraucher direkt
+miteinander zu vergleichen. Jede Entität bekommt dabei eine eigene Kategorie
+auf der Achse, mit **Ausrichtung** wahlweise vertikal oder horizontal
+(horizontal liest sich bei vielen oder langen Entitätsnamen besser, da die
+Namen dann ausgeschrieben statt gedreht/abgeschnitten stehen). **Vergleichen**,
+**Rollierend**, **Dynamische Y-Achse** und **Gestapelt** sind bei dieser
+Auflösung deaktiviert bzw. nicht anwählbar, da sie für einen Ranking-
+Vergleich einzelner Gesamtwerte keine sinnvolle zusätzliche Aussage liefern
+bzw. dem widersprechen würden (Gestapelt will alle Entitäten in EINER
+Kategorie zusammenfassen, der Ranking-Vergleich gibt jeder ihre eigene).
 
 **Vergleichen** stellt der aktuellen Periode die Vorperiode oder denselben
 Zeitraum des Vorjahres gegenüber — wie in der Verlaufsansicht einer
-einzelnen Entität. Nicht verfügbar bei aktiven Rohwerten, bei Auflösung
-„Tag" oder bei aktiver Stapelung (siehe oben).
+einzelnen Entität. Nicht verfügbar bei aktiven Rohwerten, beim
+Ranking-Vergleich oder bei aktiver Stapelung (siehe oben).
 
 ### Unterschiede zur Verlaufsansicht einer einzelnen Entität
 
@@ -824,10 +832,10 @@ gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
 ### Was wird gespeichert — und was nicht
 
 Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Zeitraum samt
-Rollierend-Schalter, Auflösung, dynamische Y-Achse, Werte anzeigen,
-Durchschnittslinie (samt Flach/Gleitend), Nachkommastellen,
-Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie Zeitstrahl werden
-alle mit dem Chart gespeichert und
+Rollierend-Schalter, Auflösung (samt Ausrichtung beim Ranking-Vergleich),
+dynamische Y-Achse, Werte anzeigen, Durchschnittslinie (samt Flach/Gleitend),
+Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie
+Zeitstrahl werden alle mit dem Chart gespeichert und
 gelten dann auch für dessen Vorschau auf Dashboards. **Punkte an/aus,
 Rohwerte und Vergleichen dagegen nicht** — diese drei sind reine
 Ansichtseinstellungen für den aktuellen Besuch und stehen beim nächsten

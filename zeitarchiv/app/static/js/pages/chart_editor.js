@@ -131,21 +131,25 @@
     const RESOLUTION_SECONDS = {
       hour: {medium: 5 * 60, coarse: 15 * 60},
       // full: die komplette Periode als EIN Balken — z. B. "Tag" bei
-      // Zeitraum "Tag", um zwei Entitäten (etwa Bezug/Einspeisung) als
-      // jeweils einen einzigen Tagesgesamtwert nebeneinander zu vergleichen,
-      // statt als 24-/48-teilige Reihe.
+      // Zeitraum "Tag", um mehrere Entitäten als jeweils einen einzigen
+      // Gesamtwert der Periode miteinander zu vergleichen (Ranking, siehe
+      // render()), statt als vielteilige Zeitreihe. Bei Woche/Monat/Jahr
+      // bewusst großzügig gerundete, aber sichere Obergrenzen (nie kürzer
+      // als die tatsächliche Fensterlänge) statt exakter Kalenderlängen —
+      // resamplePoints() braucht nur "groß genug, dass alle Punkte in
+      // Bucket 0 fallen", keine exakte Sekundenzahl.
       day: {medium: 30 * 60, coarse: 60 * 60, full: 24 * 60 * 60},
-      week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60},
-      month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60},
-      year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60},
+      week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60, full: 7 * 24 * 60 * 60},
+      month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60, full: 31 * 24 * 60 * 60},
+      year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60, full: 366 * 24 * 60 * 60},
       decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
     };
     const RESOLUTION_LABELS = {
       hour: {medium: '5 Minuten', coarse: '15 Minuten'},
       day: {medium: '30 Minuten', coarse: '1 Stunde', full: 'Tag'},
-      week: {medium: '6 Stunden', coarse: '1 Tag'},
-      month: {medium: '1 Tag', coarse: '1 Woche'},
-      year: {medium: '1 Monat', coarse: '3 Monate'},
+      week: {medium: '6 Stunden', coarse: '1 Tag', full: 'Woche'},
+      month: {medium: '1 Tag', coarse: '1 Woche', full: 'Monat'},
+      year: {medium: '1 Monat', coarse: '3 Monate', full: 'Jahr'},
       decade: {medium: '1 Jahr', coarse: '2 Jahre'},
     };
 
@@ -378,6 +382,7 @@
         stacked: STACKED,
         normalize: NORMALIZE,
         averageStyle: AVERAGE_STYLE,
+        horizontal: HORIZONTAL,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -455,12 +460,27 @@
         // der Server ausschließlich chart_type 'line', die Zeile verschwindet
         // dort also automatisch (früher: :disabled="timeline").
         get hasBarSeries() { return this.series.some(s => s.chart_type === 'bar'); },
-        // "Gestapelt" (Optionen-Menü) nur ab zwei Balken-Serien im Chart
-        // sinnvoll/anwählbar — mit nur einer wäre die Fläche identisch zur
-        // normalen Balken-Darstellung, nur ohne den Vergleichswert, den eine
-        // Stapelung eigentlich bringen soll. Dieselbe Konvention wie
-        // hasBarSeries oben.
-        get canStack() { return this.series.filter(s => s.chart_type === 'bar').length >= 2; },
+        // Auflösung "Voll" (Tag/Woche/Monat/Jahr, je nach Zeitraum — siehe
+        // RESOLUTION_LABELS[range].full) fasst den kompletten Zeitraum zu
+        // GENAU EINEM Wert je Entität zusammen, jede Entität bekommt dabei
+        // eine eigene Kategorie auf der Achse (Ranking-Vergleich, s.
+        // render()). Eigener Getter statt der lokalen Konstante in render():
+        // wird auch im Template gebraucht (Ausrichtung/Gestapelt-Sichtbarkeit).
+        get singleBucket() { return this.resolutionPreset === 'full'; },
+        // "Gestapelt" (Optionen-Menü) nur ab zwei Balken-Serien UND außerhalb
+        // von Auflösung "Voll" sinnvoll/anwählbar — mit nur einer Balken-
+        // Serie wäre die Fläche identisch zur normalen Balken-Darstellung,
+        // und bei "Voll" hat jede Entität bereits ihre eigene Kategorie
+        // (Ranking-Vergleich); eine Kombination aus "alle Entitäten in eine
+        // Kategorie stapeln" UND "jede Entität ihre eigene Kategorie" wäre
+        // ein Widerspruch, deshalb schließen sich beide aus — dieselbe
+        // Konvention wie "Gestapelt" + "Vergleichen".
+        get canStack() { return !this.singleBucket && this.series.filter(s => s.chart_type === 'bar').length >= 2; },
+        // "Ausrichtung" (Vertikal/Horizontal) nur im Ranking-Vergleich
+        // sinnvoll — dort stehen Entitätsnamen auf der Kategorie-Achse, bei
+        // jeder anderen Auflösung ist die Kategorie-/Zeit-Achse eine
+        // Zeitachse ohne lange, unterschiedlich lange Beschriftungen.
+        get canGoHorizontal() { return this.singleBucket; },
         // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
         // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
         // timeline-Kommentar oben.
@@ -761,20 +781,26 @@
             return;
           }
 
-          // "Tag"-Auflösung bucketet den kompletten Zeitraum zu genau EINEM
-          // Wert je Entität (siehe RESOLUTION_SECONDS.day.full) — auf der
-          // sonst üblichen Zeit-Achse säße dieser eine Balken exakt auf
-          // windowStart (also am linken Rand) und bliebe trotz barMaxWidth-
-          // Deckelung winzig, während der Rest der auf den ganzen Tag
-          // gespreizten Achse leer bliebe. Eine Kategorie-Achse mit genau
-          // einer Kategorie lässt ECharts die Balken mehrerer Entitäten
-          // stattdessen automatisch nebeneinander und gut sichtbar anordnen
-          // — exakt der Vergleichs-Anwendungsfall, für den diese Auflösung
-          // gedacht ist (z. B. Tages-Einspeisung vs. -Bezug).
-          const singleBucket = this.resolutionPreset === 'full';
-          const singleBucketLabel = this.windowStart != null
-            ? new Date(this.windowStart * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'})
-            : '';
+          // Auflösung "Voll" (Tag/Woche/Monat/Jahr — RESOLUTION_LABELS[range].
+          // full) bucketet den kompletten Zeitraum zu genau EINEM Wert je
+          // Entität — ein Ranking-Vergleich, kein Zeitverlauf. Jede Entität
+          // bekommt dafür eine EIGENE Kategorie auf der Achse (ihr
+          // Anzeigename), statt auf der sonst üblichen Zeit-Achse einen
+          // einzelnen, trotz barMaxWidth-Deckelung winzigen Balken exakt auf
+          // windowStart zu zeigen. Eine Kategorie-Achse mit einer Kategorie
+          // je Entität liest sich außerdem als Ranking natürlicher als
+          // mehrere in eine Kategorie gruppierte Balken.
+          //
+          // "Gestapelt" schließt diese Auflösung aus (canStack-Getter) —
+          // sonst gäbe es zwei widersprüchliche Antworten auf "wie viele
+          // Kategorien": eine gestapelte Kombination will ALLE Entitäten in
+          // EINER Kategorie, der Ranking-Vergleich hier will das Gegenteil.
+          const singleBucket = this.singleBucket;
+          const horizontalActive = singleBucket && this.horizontal;
+          // Anzeigename je Entität, in Auswahlreihenfolge — dieselbe Quelle
+          // wie die Legende (this.entityNames[entity_id] || friendly_name),
+          // damit Kategorie-Beschriftung und Legende nie auseinanderlaufen.
+          const entityCategories = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
 
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
@@ -864,6 +890,41 @@
               axisLabel: {formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)))},
             };
           });
+          // "Ausrichtung: Horizontal" tauscht Kategorie- und Werte-Achse —
+          // dieselben Werte-Achsen-Konfigurationen wie yAxis oben (inklusive
+          // Prozent-Achse, Dauer, Dynamische Y-Achse), nur mit xAxis-
+          // typischen Positionen (oben/unten statt links/rechts). Bewusst
+          // ein reines position-Remapping statt einer zweiten, eigenen
+          // Achsen-Berechnung — sonst müssten Prozent-/Dauer-/Dynamische-
+          // Y-Achse-Logik an zwei Stellen synchron gehalten werden.
+          const xAxisForHorizontal = horizontalActive
+            ? yAxis.map((axis, i) => ({...axis, position: i % 2 === 0 ? 'bottom' : 'top'}))
+            : null;
+          // Kategorie-Achse für singleBucket — Entitätsnamen statt Zeit-
+          // Ticks. rotate/width nur relevant, wenn sie tatsächlich als
+          // x-Achse dient (vertikale Balken): horizontal liest sich die
+          // volle Beschriftung ohnehin unrotiert von links nach rechts
+          // (s. yAxis unten), rotate:0 dort ist deshalb kein Sonderfall,
+          // sondern derselbe Ausdruck wie für die x-Achsen-Rolle.
+          const categoryAxisObj = singleBucket ? {
+            type: 'category',
+            data: entityCategories,
+            axisTick: {show: false},
+            // Ohne dies versucht ECharts (Default: onZero:true), die Achsen-
+            // Linie an der Y-Position von y=0 auszurichten — bei aktiver
+            // "Dynamischer Y-Achse" (Y-Achse startet dann NICHT bei 0,
+            // sondern knapp unter dem kleinsten Wert) landet diese
+            // Ausrichtung mitten in den Balken statt am unteren Rand, sie
+            // wirken dadurch "versenkt". false verankert die Achse immer
+            // am unteren/linken Diagrammrand, unabhängig vom Werte-Minimum.
+            axisLine: {onZero: false},
+            axisLabel: {
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              width: horizontalActive ? 190 : 90,
+              overflow: 'truncate',
+              rotate: horizontalActive ? 0 : 28,
+            },
+          } : null;
           // Feste Farbe je Entität (statt ECharts' Auto-Zuordnung) — nur so lässt
           // sich bei aktivem Vergleich die Vorperiode-Serie einer Entität optisch
           // eindeutig ihrer Hauptserie zuordnen (dieselbe Farbe, nur blasser +
@@ -900,19 +961,21 @@
             // Absolutwerten (axisNormalized bleibt dann false für sie, weil
             // ihre Achse nicht in barOnlyAxis steht).
             const axisNormalized = normalizeActive && chartType === 'bar' && barOnlyAxis.has(axisKey(s));
-            // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position immer
-            // Kategorie 0 statt eines Zeitstempels — der Halte-Punkt bis
-            // windowEnd (nächster Block) ergibt auf einer Achse mit nur einer
-            // Kategorie ohnehin keinen Sinn und entfällt deshalb hier.
+            // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position die
+            // EIGENE Kategorie dieser Entität (ihre Position in this.series,
+            // s. entityCategories) statt eines Zeitstempels — der Halte-Punkt
+            // bis windowEnd (nächster Block) ergibt bei einer einzelnen
+            // Kategorie je Entität ohnehin keinen Sinn und entfällt deshalb
+            // hier.
             const mainData = mainPoints.map(p => {
-              if (!axisNormalized) return [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
+              if (!axisNormalized) return [singleBucket ? i : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
               // Felder 7–9: Originalwert/-einheit/-Nachkommastellen, nur für
               // den Tooltip (formatPointValue() liest sie nicht, siehe dort)
               // — sonst verliert der Tooltip genau die Zahl, die die
               // Normierung aus dem Balken selbst entfernt.
               const total = axisTotals.get(axisKey(s)).get(p.ts) || 0;
               const pct = total ? (p.value / total) * 100 : 0;
-              return [singleBucket ? 0 : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
+              return [singleBucket ? i : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
             });
             if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
@@ -925,6 +988,7 @@
             // denselben Balken aufsummiert, sobald ein Chart mehrere Achsen
             // kombiniert.
             const isStackedBar = chartType === 'bar' && stackedActive;
+            const unitIndex = units.indexOf(axisKey(s));
             // Gleitender Durchschnitt (Optionen-Menü, "Durchschnittslinie" →
             // "Gleitend") nur für Linien-Serien — bei einer Balken-Serie
             // (Bucket-SUMME) ergäbe ein "gleitender Durchschnitt der Summen"
@@ -935,7 +999,12 @@
             const main = {
               name: displayName,
               type: chartType,
-              yAxisIndex: units.indexOf(axisKey(s)),
+              // Horizontal tauschen Kategorie- und Werte-Achse die Plätze
+              // (s. xAxisForHorizontal oben) — die Serie muss dann ihre
+              // Werte-Achse über xAxisIndex ansprechen und die (einzige)
+              // Kategorie-Achse über yAxisIndex:0, statt umgekehrt.
+              xAxisIndex: horizontalActive ? unitIndex : undefined,
+              yAxisIndex: horizontalActive ? 0 : unitIndex,
               data: mainData,
               stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
               // Bei aktiver Trendlinie tritt die rohe (verrauschte) Kurve
@@ -963,19 +1032,20 @@
               // Bezugspunkt für eine sinnvolle Auto-Breite, wodurch der Balken
               // einen Großteil der (bewusst bis zum Fensterende reichenden)
               // Achse einnehmen kann. Bei vielen Balken liegt die Auto-Breite
-              // ohnehin längst unter dem Limit. Bei singleBucket (Kategorie-
-              // Achse mit genau einer Kategorie) ist genau dieses großzügige
-              // Auto-Breite-Verhalten dagegen erwünscht — ECharts verteilt die
-              // Balken mehrerer Entitäten dort von selbst sinnvoll, deshalb
-              // keine Deckelung.
-              barMaxWidth: singleBucket ? undefined : 48,
+              // ohnehin längst unter dem Limit. Gilt jetzt auch für
+              // singleBucket: seit jede Entität ihre eigene Kategorie hat
+              // (statt mehrerer Balken in einer gemeinsamen Kategorie), ist
+              // das genau der Normalfall eines Kategorie-Achsen-Balkens, kein
+              // Sonderfall mehr.
+              barMaxWidth: 48,
               // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. o.)
               // sitzt mit seiner Mitte GENAU auf dem Bucket-Zeitstempel —
               // beim ersten/letzten Bucket liegt die Hälfte der Balkenbreite
               // dadurch zwangsläufig knapp jenseits von min/max und würde
               // ohne dies hart am Diagrammrand abgeschnitten wirken. Bei
-              // singleBucket (Kategorie-Achse mit eigener Bandbreite je
-              // Kategorie) besteht dieses Problem nicht.
+              // singleBucket (echte Kategorie-Achse mit eigener Bandbreite je
+              // Kategorie, kein boundaryGap-Sonderfall) besteht dieses
+              // Problem nicht.
               clip: singleBucket ? undefined : chartType !== 'bar',
             };
             if (chartType === 'line') {
@@ -1115,23 +1185,7 @@
             // letzten tatsächlichen Wert auf, z. B. bei einer Entität, die seit
             // Stunden nichts mehr gemeldet hat, statt konsistent bis zum
             // Fensterende (bei "Heute" also bis zur aktuellen Uhrzeit) zu reichen.
-            xAxis: singleBucket ? {
-              // Genau eine Kategorie statt einer auf den ganzen Tag
-              // gespreizten Zeit-Achse — "Tag"-Auflösung liefert je Entität
-              // nur einen einzigen Wert, ein Achsen-"Zeitpunkt" ist hier
-              // also tatsächlich korrekt (siehe singleBucket oben).
-              type: 'category',
-              data: [singleBucketLabel],
-              axisTick: {show: false},
-              // Ohne dies versucht ECharts (Default: onZero:true), die Achsen-
-              // Linie an der Y-Position von y=0 auszurichten — bei aktiver
-              // "Dynamischer Y-Achse" (Y-Achse startet dann NICHT bei 0,
-              // sondern knapp unter dem kleinsten Wert) landet diese
-              // Ausrichtung mitten in den Balken statt am unteren Rand, sie
-              // wirken dadurch "versenkt". false verankert die Achse immer
-              // am unteren Diagrammrand, unabhängig vom Y-Achsen-Minimum.
-              axisLine: {onZero: false},
-            } : {
+            xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
               // periodEnd statt windowEnd: eine laufende Periode (z. B. Woche)
@@ -1172,7 +1226,7 @@
                 hideOverlap: true,
               },
             },
-            yAxis,
+            yAxis: horizontalActive ? {...categoryAxisObj, inverse: true} : yAxis,
             // ECharts' eigene Legende ist unsichtbar (show:false) — die
             // sichtbare Legende ist das eigene HTML-Element unterhalb der
             // Karte (siehe Template, .chart-legend), das gleichzeitig Serien-
@@ -1347,6 +1401,7 @@
             stacked: this.stacked,
             normalize: this.normalize,
             average_style: this.averageStyle,
+            horizontal: this.horizontal,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

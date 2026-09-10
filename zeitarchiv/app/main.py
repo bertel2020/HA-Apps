@@ -3199,6 +3199,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
         "average_style": chart["average_style"] if chart else "flat",
+        "horizontal": chart["horizontal"] if chart else False,
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
@@ -3263,6 +3264,7 @@ class _SaveChartBody(BaseModel):
     stacked: bool = False
     normalize: bool = False
     average_style: str = "flat"
+    horizontal: bool = False
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3305,6 +3307,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
+        horizontal=body.horizontal,
     )
     return {"id": chart_id}
 
@@ -3349,6 +3352,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
+        horizontal=body.horizontal,
     )
     return {"id": chart_id}
 
@@ -3388,6 +3392,7 @@ def charts_duplicate(chart_id: int) -> dict:
         decimals=chart["decimals"], show_values=chart["show_values"],
         average_line=chart["average_line"], area_fill=chart["area_fill"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
+        horizontal=chart["horizontal"],
     )
     return {"id": new_id}
 
@@ -3565,6 +3570,7 @@ def _dashboard_tiles_context(
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
+                "horizontal": c["horizontal"],
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

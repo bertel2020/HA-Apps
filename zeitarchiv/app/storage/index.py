@@ -914,6 +914,14 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN average_style TEXT NOT NULL DEFAULT 'flat'"
             )
+        if "horizontal" not in sc_columns:
+            # "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll" sichtbar)
+            # — horizontale statt vertikale Balken im Ranking-Vergleich
+            # (chart_editor.js render(), canGoHorizontal-Getter). Default
+            # aus (vertikal), das bisherige Aussehen bleibt unverändert.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN horizontal INTEGER NOT NULL DEFAULT 0"
+            )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -1877,6 +1885,7 @@ class Index:
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
+        horizontal: bool = False,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1887,8 +1896,8 @@ class Index:
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, area_fill, stacked, normalize, "
-                "average_style, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "average_style, horizontal, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1897,7 +1906,7 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(stacked), int(normalize),
-                    average_style, now, now,
+                    average_style, int(horizontal), now, now,
                 ),
             )
             return cur.lastrowid
@@ -1925,6 +1934,7 @@ class Index:
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
+        horizontal: bool = False,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -1934,7 +1944,7 @@ class Index:
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, stacked = ?, normalize = ?, "
-                "average_style = ?, updated_at = ? WHERE id = ?",
+                "average_style = ?, horizontal = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1943,7 +1953,7 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(stacked), int(normalize),
-                    average_style, time.time(), chart_id,
+                    average_style, int(horizontal), time.time(), chart_id,
                 ),
             )
 
@@ -1964,6 +1974,7 @@ class Index:
         d["stacked"] = bool(d.get("stacked", 0))
         d["normalize"] = bool(d.get("normalize", 0))
         d["average_style"] = d.get("average_style") or "flat"
+        d["horizontal"] = bool(d.get("horizontal", 0))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []

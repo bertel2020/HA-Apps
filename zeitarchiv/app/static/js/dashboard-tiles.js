@@ -337,6 +337,9 @@
     // stackedActive/normalizeActive weiter unten (chart_editor.js-Parität).
     const stacked = el.dataset.stacked === 'true';
     const normalize = el.dataset.normalize === 'true';
+    // "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll") — siehe
+    // horizontalActive weiter unten (chart_editor.js-Parität).
+    const horizontal = el.dataset.horizontal === 'true';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -459,13 +462,24 @@
     const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
     const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
     const units = [...new Set(series.map(axisKey))];
-    // Wie chart_editor.js: "Gestapelt" nur ab zwei Balken-Serien, je Achse
-    // ein eigener Stapel-Schlüssel statt eines globalen "total" (eine Kachel
-    // kann mehrere Einheiten kombinieren, z. B. kWh und Dauer), und 100%-
+    // Auflösung "Voll" (Tag/Woche/Monat/Jahr) fasst den kompletten Zeitraum
+    // zu genau EINEM Wert je Entität zusammen — ein Ranking-Vergleich, kein
+    // Zeitverlauf. Jede Entität bekommt dafür eine eigene Kategorie auf der
+    // Achse (ihr Anzeigename), siehe chart_editor.js (gleicher Name/
+    // Kommentar dort für die ausführliche Begründung).
+    const singleBucket = resolutionPreset === 'full';
+    const horizontalActive = singleBucket && horizontal;
+    const entityCategories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
+    // Wie chart_editor.js: "Gestapelt" nur ab zwei Balken-Serien UND
+    // außerhalb von Auflösung "Voll" (dort hat jede Entität schon ihre
+    // eigene Kategorie — eine gestapelte Kombination aller Entitäten in
+    // EINER Kategorie wäre ein Widerspruch dazu), je Achse ein eigener
+    // Stapel-Schlüssel statt eines globalen "total" (eine Kachel kann
+    // mehrere Einheiten kombinieren, z. B. kWh und Dauer), und 100%-
     // Normierung nur auf Achsen, auf denen AUSSCHLIESSLICH Balken liegen —
     // eine mitgezeichnete Linie derselben Einheit stünde sonst auf einer
     // 0–100%-Skala, die für die gestapelten Balken gemeint ist.
-    const stackedActive = stacked && series.filter(s => s.chart_type === 'bar').length >= 2;
+    const stackedActive = stacked && !singleBucket && series.filter(s => s.chart_type === 'bar').length >= 2;
     const normalizeActive = stackedActive && normalize;
     const barOnlyAxis = new Set(
       units.filter(u => series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
@@ -513,6 +527,24 @@
         splitLine: {lineStyle: {color: borderColor, type: 'dashed'}},
       };
     });
+    // "Ausrichtung: Horizontal" tauscht Kategorie- und Werte-Achse — dasselbe
+    // Position-Remapping wie chart_editor.js (siehe dortiger Kommentar).
+    const xAxisForHorizontal = horizontalActive
+      ? yAxis.map((axis, i) => ({...axis, position: i % 2 === 0 ? 'bottom' : 'top'}))
+      : null;
+    // Kategorie-Achse für singleBucket — Entitätsnamen statt Zeit-Ticks.
+    const categoryAxisObj = singleBucket ? {
+      type: 'category',
+      data: entityCategories,
+      axisTick: {show: false},
+      axisLine: {show: false, onZero: false},
+      axisLabel: {
+        fontSize: scaledFont(10), color: inkFaint,
+        width: horizontalActive ? 120 : 60,
+        overflow: 'truncate',
+        rotate: horizontalActive ? 0 : 28,
+      },
+    } : null;
 
     // Erste Serie mit genug angezeigten (resamplePoints()-) Punkten bestimmt
     // die Tooltip-Zeitstempel-Form (fmtTooltipTimestamp) — dieselbe Logik wie
@@ -524,23 +556,11 @@
     // vor), hier nur deklariert.
     let tooltipBucketSeconds = null;
 
-    // Siehe chart_editor.html (render(), gleicher Name/Kommentar): "Tag"-
-    // Auflösung bucketet auf genau EINEN Wert je Entität — auf der sonst
-    // üblichen Zeit-Achse säße dieser eine Balken winzig am linken Rand
-    // (windowStart), der Rest der auf den ganzen Tag gespreizten Achse
-    // bliebe leer. Eine Kategorie-Achse mit einer Kategorie lässt ECharts
-    // die Balken mehrerer Entitäten stattdessen automatisch und gut
-    // sichtbar nebeneinander anordnen.
-    const singleBucket = resolutionPreset === 'full';
-    const singleBucketLabel = data.window_start != null
-      ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'})
-      : '';
-
     // Erster Durchgang: je Serie die anzuzeigenden Punkte berechnen (wie
     // bisher) — VOR dem eigentlichen Kachel-Aufbau, damit die 100%-
     // Normierung unten die Werte ALLER Serien einer Achse zum selben Bucket
     // kennt, bevor die erste Serie fertig gebaut wird.
-    const prepared = series.map(s => {
+    const prepared = series.map((s, i) => {
       // Die Punkte, über die der Durchschnitt geht: das GEZEICHNETE, aber
       // ohne den Halte-Punkt, den der Linien-Zweig unten bis window_end
       // anhängt — der ist eine Wiederholung des letzten Werts und würde
@@ -549,7 +569,7 @@
         // resamplePoints() kennt nur "medium"/"coarse" (RESOLUTION_SECONDS),
         // für "full" gibt sie unverändert alle Rohpunkte zurück — ohne diesen
         // eigenen Zweig würde jeder einzelne Bucket-Punkt als eigener
-        // Tooltip-Eintrag auf derselben Kategorie (x=0) landen, statt zu
+        // Tooltip-Eintrag auf der eigenen Kategorie (x=i) landen, statt zu
         // einem einzigen Balkenwert für den ganzen Zeitraum zusammengefasst
         // zu werden (sichtbar als lange Dopplung im Tooltip). Dieselbe Summe-
         // vs.-Durchschnitt-Regel wie in den Legenden-Kennzahlen oben.
@@ -560,7 +580,10 @@
           ? rawValues.reduce((sum, v) => sum + v, 0)
           : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
         return {
-          lineData: [[0, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]],
+          // x-Position ist die EIGENE Kategorie dieser Entität (ihre Position
+          // in series, s. entityCategories), nicht mehr 0 für alle — seit
+          // jede Entität ihre eigene Kategorie bekommt (s. o.).
+          lineData: [[i, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]],
           averageValues: [aggregate],
           rawPoints: [{ts: data.window_start, value: aggregate}],
         };
@@ -638,7 +661,10 @@
         // beim Rendern der vollen Chart-Seite (dort this.entityNames[entity_id]).
         name: displayName,
         type: s.chart_type,
-        yAxisIndex: units.indexOf(axisKey(s)),
+        // Horizontal tauschen Kategorie- und Werte-Achse die Plätze (s.
+        // xAxisForHorizontal oben) — dieselbe Umkehr wie chart_editor.js.
+        xAxisIndex: horizontalActive ? units.indexOf(axisKey(s)) : undefined,
+        yAxisIndex: horizontalActive ? 0 : units.indexOf(axisKey(s)),
         data: lineData,
         stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
         // Bei aktiver Trendlinie tritt die rohe Kurve zurück, bleibt aber
@@ -658,13 +684,16 @@
             ? NumberFormat.fmtDuration(params.value[1])
             : fmtCompactNumber(params.value[1], params.value[3]),
         },
-        barMaxWidth: singleBucket ? undefined : 28,
+        // Gilt jetzt auch für singleBucket: seit jede Entität ihre eigene
+        // Kategorie hat, ist das der Normalfall eines Kategorie-Achsen-
+        // Balkens, kein Sonderfall mehr (siehe chart_editor.js).
+        barMaxWidth: 28,
         // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. u.) sitzt mit
         // seiner Mitte GENAU auf dem Bucket-Zeitstempel — beim ersten/letzten
         // Bucket liegt die Hälfte der Balkenbreite dadurch zwangsläufig knapp
         // jenseits von min/max und würde ohne dies hart am Kachelrand
-        // abgeschnitten wirken. Bei singleBucket (Kategorie-Achse) entfällt
-        // dieses Problem.
+        // abgeschnitten wirken. Bei singleBucket (echte Kategorie-Achse mit
+        // eigener Bandbreite je Kategorie) entfällt dieses Problem.
         clip: singleBucket ? undefined : s.chart_type !== 'bar',
       };
       if (s.chart_type === 'line') {
@@ -742,16 +771,7 @@
       textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
       color: PALETTE,
       grid: {left: 6, right: 6, top: 10, bottom: 20, containLabel: true},
-      xAxis: singleBucket ? {
-        // Genau eine Kategorie statt einer auf den ganzen Tag gespreizten
-        // Zeit-Achse — siehe singleBucket oben.
-        type: 'category',
-        data: [singleBucketLabel],
-        axisLabel: {fontSize: scaledFont(10), color: inkFaint},
-        axisLine: {lineStyle: {color: borderColor}},
-        axisTick: {show: false},
-        splitLine: {show: false},
-      } : {
+      xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
         type: 'time',
         min: data.window_start != null ? data.window_start * 1000 : undefined,
         // period_end statt window_end: eine laufende Periode (z. B. Woche)
@@ -790,7 +810,7 @@
         axisTick: {show: false},
         splitLine: {show: false},
       },
-      yAxis,
+      yAxis: horizontalActive ? {...categoryAxisObj, inverse: true} : yAxis,
       tooltip: {
         trigger: 'axis',
         backgroundColor: surface,
@@ -798,10 +818,13 @@
         textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: (params) => {
           if (!params.length) return '';
-          // Bei singleBucket ist axisValue die Kategorie-Beschriftung (bereits
-          // ein fertiges Datum), kein Millisekunden-Zeitstempel — fmtTooltip-
-          // Timestamp() erwartet Millisekunden, deshalb hier direkt verwendet.
-          const header = singleBucket ? singleBucketLabel : fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
+          // Bei singleBucket ist axisValue jetzt der Entitätsname (eigene
+          // Kategorie je Entität, s. o.), keine Zeitangabe mehr — die
+          // Kopfzeile zeigt stattdessen weiterhin den Periodenbeginn direkt
+          // aus window_start, wie vor der Kategorie-je-Entität-Umstellung.
+          const header = singleBucket
+            ? (data.window_start != null ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'}) : '')
+            : fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
           const rows = params.map(p => {
             const unit = p.data[2] || '';
             const decimals = p.data[3];
@@ -820,7 +843,7 @@
                  + `<span>${p.marker}${p.seriesName}</span>`
                  + `<strong style="margin-left:8px;">${value}${extra}</strong></div>`;
           }).join('');
-          return `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}`;
+          return header ? `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}` : rows;
         },
         // Kachel hat overflow:hidden (verhindert, dass z. B. die Legende das
         // Kachel-Layout sprengt) — ohne appendToBody würde der Tooltip am
