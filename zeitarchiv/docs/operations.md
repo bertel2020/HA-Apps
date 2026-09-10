@@ -91,7 +91,7 @@ doppelte aktuelle Indexgröße plus 16 MB Sicherheitsreserve frei sein; danach
 läuft `PRAGMA quick_check`. Es gibt bewusst weder einen periodischen Lauf
 noch eine automatische Ausführung beim Löschen von Messwerten.
 
-## Versionierung und Release
+## Versionierung
 
 **Kanonische Version:** `addon/VERSION` (SemVer, eine Zeile). Alles andere
 wird daraus abgeleitet:
@@ -104,41 +104,7 @@ python3 scripts/sync_versions.py --check  # Drift prüfen, Exit-Code 1 bei Abwei
 Die Integration (`custom_components/zeitarchiv`) versioniert sich unabhängig
 über ihre eigene `manifest.json` — `sync_versions.py` prüft dort nur auf
 gültiges SemVer, gleicht sie aber nicht an die App-Version an (zwei getrennte
-Produkte, siehe unten).
-
-**Wichtig — zwei Zielrepositories, drei Arbeitskopien:**
-
-| Verzeichnis | Rolle |
-| --- | --- |
-| `addon/` | Aktive Entwicklungskopie der App (kein eigenes Git) |
-| `custom_components/zeitarchiv/` | Aktive Entwicklungskopie der Integration (kein eigenes Git) |
-| `HA-Apps/zeitarchiv/` | Git-Arbeitskopie von `github.com/bertel2020/HA-Apps` (öffentliches Add-on-Repo) |
-| `HA-Zeitarchiv/` | Git-Arbeitskopie von `github.com/bertel2020/HA-Zeitarchiv` (öffentliches HACS-Integrations-Repo) |
-
-Änderungen entstehen in `addon/` bzw. `custom_components/zeitarchiv/` und
-müssen **manuell** (`rsync`, siehe unten) in die jeweilige Git-Arbeitskopie
-übertragen werden, bevor sie committet/gepusht werden können — es gibt
-keinen automatischen Sync. `addon/CODE_REVIEW.md`, `addon/PERFORMANCE.md`
-und `addon/LOGGING_KONZEPT.md` sind bewusst rein lokal und werden **nie**
-mit übertragen (Setup für lokale Entwicklung ist dagegen bewusst öffentlich,
-siehe [development.md](development.md)). Ebenso lokal bleiben `*.local.md`
-(z. B. Konzeptentwürfe unter `docs/`) und `demo-data/` (per
-`scripts/generate_demo_data.py` erzeugt, nicht Teil der Auslieferung).
-
-```bash
-rsync -av \
-  --exclude='.venv' --exclude='data' --exclude='demo-data' \
-  --exclude='__pycache__' --exclude='.pytest_cache' \
-  --exclude='.DS_Store' --exclude='.claude' --exclude='.git' \
-  --exclude='CODE_REVIEW.md' --exclude='PERFORMANCE.md' \
-  --exclude='LOGGING_KONZEPT.md' --exclude='*.local.md' \
-  --exclude='*.pyc' \
-  addon/ HA-Apps/zeitarchiv/
-```
-
-Anschließend in `HA-Apps/` (bzw. `HA-Zeitarchiv/`) committen. Nach dem
-Pushen `git status -sb` prüfen (`ahead N`) — Pushes erfolgen nie automatisch
-ohne expliziten Auftrag.
+Produkte).
 
 `CHANGELOG.md` folgt "Keep a Changelog"-Konvention (Neu/Geändert/Behoben je
 Version, neuestes oben).
