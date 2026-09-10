@@ -8,26 +8,78 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 
 ## Inhalt
 
+**Einrichtung**
 - [Erste Schritte](#erste-schritte)
+
+**Schnelleinstieg**
+- [Typische Aufgaben](#typische-aufgaben) — "ich will X tun" → direkt zur Lösung
+
+**Die Seiten im Überblick**
 - [Die Übersichtsseite](#die-übersichtsseite)
 - [Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)
 - [Erklärungen zu einem Feld](#erklärungen-zu-einem-feld)
 - [Auf dem Telefon](#auf-dem-telefon)
 - [Dashboards](#dashboards)
+- [Energiedashboard](#energiedashboard)
+  - [Einrichtung](#einrichtung)
+  - [Benötigte und sinnvolle Entitäten](#benötigte-und-sinnvolle-entitäten)
+  - [Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
+  - [Kennzahlen, Ringe und Badges](#kennzahlen-ringe-und-badges)
+  - [Status, Datenqualität und Auffälligkeiten](#status-datenqualität-und-auffälligkeiten)
+  - [Tageslastprofil](#tageslastprofil)
+  - [Energiebericht](#energiebericht)
+  - [Aufbewahrung richtig einstellen](#aufbewahrung-richtig-einstellen)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
-- [Entität konfigurieren](#entität-konfigurieren)
-- [Bereinigung](#bereinigung)
-- [Datenhandling](#datenhandling)
+  - [Zeitraum-Navigation](#zeitraum-navigation)
+  - [Darstellung](#darstellung)
+  - [In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)
+  - [Markierte Werte sehen](#markierte-werte-sehen)
+  - [Vergleich](#vergleich)
+  - [Kennzahlen und Legende](#kennzahlen-und-legende)
+  - [Ansicht sichern](#ansicht-sichern)
+  - [Gespeicherte Optionen](#gespeicherte-optionen)
 - [Charts](#charts)
 - [Vergleichstabellen](#vergleichstabellen)
-- [Energiedashboard](#energiedashboard)
 - [Statistik](#statistik)
+
+**Entitäten konfigurieren &amp; pflegen**
+- [Entität konfigurieren](#entität-konfigurieren)
+  - [Womit fange ich an?](#womit-fange-ich-an)
+  - [App-Anzeigename](#app-anzeigename)
+  - [Auflösung](#auflösung)
+  - [Aufbewahrung](#aufbewahrung)
+  - [Nachkommastellen](#nachkommastellen)
+  - [Wertänderungsfilter](#wertänderungsfilter)
+  - [Lücken-Erkennung](#lücken-erkennung)
+  - [Ausreißer-Erkennung](#ausreißer-erkennung)
+  - [Anzeigemodus](#anzeigemodus)
+  - [Was rückwirkend wirkt — und was nicht](#was-rückwirkend-wirkt--und-was-nicht)
+  - [Datenverwaltung](#datenverwaltung)
+- [Bereinigung](#bereinigung)
+- [Datenhandling](#datenhandling)
+  - [Der Weg eines Werts](#der-weg-eines-werts)
+  - [Aufbewahrung (Retention)](#aufbewahrung-retention)
+  - [Werte löschen: drei Stufen](#werte-löschen-drei-stufen)
+  - [Werte ändern und hinzufügen](#werte-ändern-und-hinzufügen)
+  - [Lücken, Duplikate, Wiederholungen und Zählerrückgänge im Detail](#lücken-duplikate-wiederholungen-und-zählerrückgänge-im-detail)
 - [Housekeeping](#housekeeping)
+
+**Import, Export &amp; Sicherung**
 - [Import und Export](#import-und-export)
+  - [Symcon](#symcon)
+  - [CSV](#csv)
+  - [Home Assistant](#home-assistant)
+  - [Reports](#reports)
+  - [Duplikatschutz](#duplikatschutz)
+  - [CSV-Export](#csv-export)
 - [Backup / Restore](#backup--restore)
-- [Einstellungen im Detail](#einstellungen-im-detail)
 - [Demo-Modus](#demo-modus)
-- [Typische Aufgaben](#typische-aufgaben)
+
+**Referenz**
+- [Protokoll](#protokoll)
+- [Einstellungen im Detail](#einstellungen-im-detail)
+
+**Hilfe**
 - [Häufige Fragen](#häufige-fragen)
 
 ## Erste Schritte
@@ -83,6 +135,56 @@ verarbeiteten Schreibvorgangs. Bleibt dieser Wert dauerhaft leer oder alt,
 liegt es entweder an fehlenden oder falsch zugewiesenen Archivfiltern
 (Schritt 4/5) oder an einem falschen Token/Host in der Integration
 (Schritt 3).
+
+## Typische Aufgaben
+
+**"Ein Sensor sendet unplausible Ausreißer."**
+→ Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf ein passendes
+Vielfaches einstellen und an der Quote darunter ablesen, was das bewirkt
+(bei Schaltern gibt es die Einstellung nicht, siehe
+[Ausreißer-Erkennung](#ausreißer-erkennung)) → zurück zur
+Verlaufsansicht →
+**Bereinigen** → erkannte Ausreißer prüfen und löschen (Soft-Delete,
+rückgängig machbar) → **Housekeeping → Speicherplatz**, wenn der Platz
+tatsächlich freigegeben werden soll.
+
+**"Ich will Innen- und Außentemperatur über die letzten 12 Monate
+vergleichen."**
+→ **Tabellen** → neue Tabelle → 12 Spalten (Zeitraum-Typ "Monat", Versatz 0
+bis −11) → zwei Zeilen (je eine Entität) → optional eine Formel-Zeile für
+die Differenz.
+
+**"Ein Dashboard auf einem Wandtablet soll sich nicht versehentlich
+verändern."**
+→ Dashboard öffnen → Editor → "Fixiert" aktivieren.
+
+**"Ich möchte alte Symcon-Daten übernehmen, ohne HA-Live-Daten zu
+verdoppeln."**
+→ **Import → Symcon** → ZIP hochladen → Zuordnung prüfen → Import starten.
+Bereits vorhandene Zeitstempel werden automatisch übersprungen, unabhängig
+von der Quelle.
+
+**"Ich nutze kein Symcon und möchte trotzdem die bisherige HA-Historie
+übernehmen."**
+→ **Import → Home Assistant** → Entitäten auswählen, optional
+"Verfügbarkeit prüfen" → Vorschau (Dry Run) → Import starten.
+
+**"Eine Entität sendet nicht mehr, ich will sie aber behalten."**
+→ Entität einfach unverändert lassen — bereits archivierte Werte bleiben
+erhalten, Charts und Tabellen zeigen weiterhin die vorhandene Historie.
+Erst bei Bedarf über das Zahnrad-Symbol **Alle Werte löschen** oder
+**Entität entfernen** verwenden.
+
+**"Ich will vor einem größeren Eingriff (Import, Bereinigung, Update) auf
+Nummer sicher gehen."**
+→ **System → Backup / Restore** → Backup erstellen → herunterladen oder im
+konfigurierten Zeitplan belassen.
+
+**"Ich möchte die App vorführen oder ausprobieren, ohne echte Daten zu
+riskieren."**
+→ Add-on-Konfiguration → Option `demo_mode` aktivieren → Add-on neu starten
+→ siehe [Demo-Modus](#demo-modus). Die echten Daten bleiben dabei
+unangetastet in einem komplett eigenen Verzeichnis.
 
 ## Die Übersichtsseite
 
@@ -219,7 +321,16 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   große Wert nicht der Zählerstand, sondern der **Zuwachs** im gewählten
   Zeitraum (Kürzel „+") — der Stand seit Inbetriebnahme lässt sich über
   „Aktuell" weiterhin einstellen. Das gilt für neu angeheftete Kacheln;
-  bestehende bleiben, wie sie eingestellt sind. Die Sparkline ist standardmäßig aktiv und
+  bestehende bleiben, wie sie eingestellt sind. Zeitraum (Std./Tag/Woche/
+  Monat/Jahr) und ob dieser **Laufend** (angefangene Kalenderperiode, „Tag"
+  ab Mitternacht) oder **Rollierend** (festes Fenster relativ zu jetzt,
+  „Tag" = letzte 24 Stunden) gilt, bestimmen zusammen, worüber sich
+  Kennzahlen und Sparkline berechnen. Als **Hauptwert** (die große Zahl)
+  lässt sich neben „Aktuell" auch Min/Durchschnitt/Max/Summe wählen;
+  zusätzlich zeigt eine optionale **Kennzahlen-Zeile** bis zu drei der
+  übrigen Kennzahlen kleiner darunter an. Nicht sinnvolle Kombinationen
+  (z. B. Summe bei einer nicht-summierbaren Entität, oder eine bereits als
+  Hauptwert gewählte Kennzahl) sind ausgegraut. Die Sparkline ist standardmäßig aktiv und
   zeigt die im Zeitarchiv gespeicherten Rohpunkte der letzten 24 Stunden;
   alternativ lässt sie sich auf einen Punkt je 5, 15 oder 30 Minuten oder je
   Stunde verdichten. Entität, Anzeige der letzten Aktualisierung,
@@ -268,11 +379,188 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   Sofort-Erscheinen) gilt zentral für alle Kacheln auf allen Dashboards und
   lässt sich unter **Einstellungen → Darstellung** abschalten.
 
+## Energiedashboard
+
+Eigenständige Ansicht (kein Eintrag im normalen Dashboard-System), die den
+Energiefluss eines Haushalts als Sankey-Diagramm zeigt: von Netzbezug und
+Erzeugern über einen zentralen Knoten zu Verbrauchern, Speichern und
+Einspeisung. Sie wird über eine feste Kachel oben auf der
+Dashboard-Übersicht ein- und ausgeschaltet und ist danach auch im Menü
+**Dashboards** erreichbar.
+
+### Einrichtung
+
+Beim ersten Aktivieren (und später jederzeit über den Stift neben dem Titel,
+**„Rollen bearbeiten"**) zeigt die Rollenzuordnung jede mögliche Rolle als
+eigene Kachel: Netzbezug, Einspeisung, beliebig viele Erzeuger, beliebig
+viele Speicher, beliebig viele Verbraucher, Kosten, PV-Ertragsprognose und
+CO₂. Ein Klick auf eine Kachel öffnet ein Popup mit den zugehörigen Feldern;
+bei Erzeuger/Speicher/Verbraucher legt die **„+"**-Kachel eine neue Zeile an,
+der Ziehgriff (⠿) sortiert bestehende Zeilen um. Eingaben in einem Popup
+gelten erst nach Klick auf **„Übernehmen"** — ein versehentlich geöffnetes
+Popup lässt sich also gefahrlos wieder schließen, ohne etwas zu verändern.
+Endgültig gespeichert wird die gesamte Zuordnung erst mit **„Speichern"** am
+Seitenende.
+
+Der Bereich **„Allgemein"** legt zusätzlich den Namen des zentralen Knotens
+fest (Standard „Haus"), die Schwelle für die Auffälligkeiten-Markierung
+(siehe [unten](#status-datenqualität-und-auffälligkeiten)) sowie **„Sichtbare
+Kacheln"** — welche der optionalen Karten (Autarkie & Speicher,
+Verbraucheranteile, Kostenanalyse, CO₂-Bilanz, Tageslastprofil, Bilanz &
+Datenqualität) überhaupt angezeigt werden. Der Energiefluss selbst lässt
+sich nicht abschalten.
+
+### Benötigte und sinnvolle Entitäten
+
+Die Rollenzuordnung wählt ausschließlich aus bereits archivierten Entitäten
+aus — für das Energiedashboard muss also vorher nichts zusätzlich
+eingerichtet werden, was nicht ohnehin schon in Zeitarchiv ankommt.
+
+| Rolle | Pflicht? | Erwarteter Wert |
+| --- | --- | --- |
+| Netzbezug | **ja** | Zählerstand Strombezug aus dem Netz (kWh, aufsteigend) |
+| Einspeisung | nein | Zählerstand Netzeinspeisung (kWh, aufsteigend) |
+| Erzeuger (beliebig viele) | nein | je ein Ertragszähler (kWh, aufsteigend) mit eigenem Namen — z. B. Dachanlage und Balkonkraftwerk getrennt geführt |
+| Speicher: Laden / Entladen (beliebig viele Speicher) | nein | je zwei Zählerstände (kWh, aufsteigend) — Werte über mehrere Speicher hinweg werden addiert |
+| Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler — bei mehreren Speichern kapazitätsgewichtet gemittelt |
+| Speicher: Kapazität | nein | Gesamtkapazität in kWh (Entität oder fester Wert; Wh-Entitäten werden automatisch umgerechnet) — nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt und bei mehreren Speichern richtig gewichtet wird |
+| Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
+| Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
+| CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
+| PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |
+
+Einzig Netzbezug ist Pflicht — alle anderen Rollen schalten lediglich
+zusätzliche Kacheln, Ringe oder Badges frei; ohne Speicher-Rolle bleiben
+z. B. einfach die Speicher-Kacheln und der Wirkungsgrad-Ring ausgeblendet.
+Die Auswahlfelder zeigen dabei von vornherein nur Entitäten mit passender
+Einheit bzw. Zähler-Typ für die jeweilige Rolle.
+
+Für Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen) und
+Verbraucher wird ein **kWh-Gesamtzähler** erwartet (Home-Assistant-Gerätetyp
+`total_increasing`), keine Momentanleistung in Watt — viele Geräte-
+Integrationen bieten beides parallel an, hier zählt jeweils die
+kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität,
+Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst
+Momentan-/Messwerte (`measurement`), keine Zähler.
+
+### Energiefluss und Verbraucher-Gruppen
+
+Der Sankey zeigt Quellen (Netzbezug, Erzeuger, Speicherentladung) links,
+Senken (Verbraucher, Speicherladung, Einspeisung) rechts, dazwischen den
+zentralen Knoten. Der Rest — Netzbezug plus Erzeugung minus Verbraucher
+minus Einspeisung minus Speicherladung — erscheint automatisch als
+**„Grundlast“**, ohne eigenen Sensor. Navigation läuft wie bei Charts über
+Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
+
+Ein Verbraucher mit zugewiesener Gruppe hängt im Sankey zweistufig am
+zentralen Knoten (Knoten → Gruppe → Gerät), ein ungruppierter direkt daran
+wie ein Erzeuger — hält den Fluss bei vielen einzelnen Verbrauchern
+übersichtlich. Gruppen entstehen direkt beim Zuordnen eines Verbrauchers
+(bestehende auswählen oder per Freitext eine neue anlegen) oder lassen sich
+über den eigenen **„Gruppen"**-Button neben der Verbraucher-Überschrift
+zentral verwalten (umbenennen, löschen — betroffene Verbraucher werden dabei
+nur wieder gruppenlos, ihre Werte bleiben unverändert).
+
+### Kennzahlen, Ringe und Badges
+
+Direkt unter dem Sankey stehen fünf KPI-Kacheln (Erzeugung, Verbrauch,
+Netzbezug, Speicher, Einspeisung) für den gewählten Zeitraum; bei mehreren
+Speichern oder Erzeugern zeigt ihr Tooltip zusätzlich die Aufschlüsselung je
+Gerät. Ein Klick auf eine Kachel führt zum Chart der zugrundeliegenden
+Entität, mit demselben Zeitraum, der gerade im Energiedashboard eingestellt
+ist; steckt mehr als eine Entität dahinter (mehrere Erzeuger/Verbraucher,
+oder ein Speicher mit getrennter Lade-/Entlade-Entität), öffnet sich
+stattdessen ein kurzes Auswahlfenster. Der Link „← zurück zum
+Energiedashboard“ auf der Entitätsseite (ebenso der aus dem Energiebericht,
+siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur
+Standardansicht. Die Karte **„Autarkie & Speicher"** darunter zeigt vier
+Ringe — Autarkie, Eigenverbrauch, Speicher-Ladezustand und
+Speicher-Wirkungsgrad (bei mehreren Speichern jeweils kapazitätsgewichtet
+zusammengefasst, damit ein leerer und ein voller Speicher nicht fälschlich
+als „50 %“ erscheinen). Ein Klick auf einen Ring öffnet dessen Monatstrend
+der letzten drei Kalenderjahre.
+
+Optionale Badges im Kopfbereich fassen die CO₂-Bilanz (🌱) und den
+Kosten-Saldo (💰) zusammen — je ein Klick öffnet die Details, darin jeweils
+zusätzlich eine dritte Kachel „Bilanz“ (CO₂-Ausstoß minus vermieden) bzw.
+der bereits bekannte Saldo, beide farblich hervorgehoben: steht die Bilanz
+im Plus (mehr vermieden bzw. erlöst als verursacht bzw. bezahlt), wird das
+eigens mit Stern und kurzem Hinweistext gefeiert statt nur als Zahl gezeigt.
+Eine Kennzahlen-Leiste über dem Sankey bündelt zusätzlich Autarkie,
+vermiedenes CO₂, Kosten-Saldo und die PV-Ertragsprognose für „heute“ und
+„morgen“ auf einen Blick.
+
+### Status, Datenqualität und Auffälligkeiten
+
+Der **„Status"**-Chip (✓ bzw. ! bei Problemen) öffnet ein Popup mit der
+Bilanzprüfung sowie den übrigen Datenqualitäts-Checks: veraltete
+Sensorwerte, Zählerrücksetzungen, falsche Einheit, falscher Zähler-Typ und
+doppelt zugeordnete Entitäten. Dasselbe Popup listet Auffälligkeiten —
+Verbraucher oder Gruppen, die deutlich über ihrem Schnitt der letzten
+Perioden liegen. Die Schwelle dafür (Standard +50 %) lässt sich in der
+Rollenzuordnung unter **„Allgemein"** anpassen oder ganz abschalten.
+
+### Tageslastprofil
+
+Zeigt bei Tag/Stunde den stündlichen Verbrauch der letzten 7 Kalendertage;
+bei Monat/Jahr stattdessen den nach Wochentag gemittelten Verbrauch (Mo–So)
+über den gewählten Zeitraum, sodass erkennbar wird, an welchen Wochentagen
+typischerweise mehr verbraucht wird.
+
+### Energiebericht
+
+Ein Symbol neben der Zeitraum-Navigation (nur bei Monat/Jahr aktiv) öffnet
+einen druckoptimierten Bericht für den gerade gewählten Zeitraum —
+Kennzahlen samt Vorjahres-/Vormonatsvergleich, Kosten- und CO₂-Bilanz (inkl.
+CO₂-Vergleich als Autofahrt-Strecke), Verbraucheranteile inklusive
+Kosten je Verbraucher, bei Jahresberichten zusätzlich ein Monatsverlauf und
+alle Auffälligkeiten des Jahres. Ein Link oben führt jederzeit zurück zur
+normalen Ansicht. Die Seite selbst erzeugt
+kein neues Dateiformat und keine Bibliothek läuft im Hintergrund — der
+Button **„Drucken / Als PDF speichern"** ruft lediglich den Druckdialog des
+Browsers auf, dort lässt sich wie gewohnt „Als PDF speichern“ statt eines
+echten Druckers wählen. Es gibt keinen automatischen Versand per E-Mail —
+der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
+
+### Aufbewahrung richtig einstellen
+
+Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
+wirkt sich unterschiedlich stark auf das Energiedashboard aus — nicht jede
+Rolle braucht dieselbe Frist:
+
+- **Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen/SOC) und
+  Verbraucher** sollten großzügig aufbewahrt werden — mindestens
+  **2 Jahre**, im Zweifel **Unbegrenzt**. Die Autarkie-, Eigenverbrauchs-,
+  SOC- und Wirkungsgrad-Trends im Ring-Popup werten jeweils die letzten drei
+  Kalenderjahre aus (ebenso der Monatsverlauf im Energiebericht); eine
+  kürzere Frist lässt diese Trends mit der Zeit lückenhaft werden.
+- **Strompreis- und CO₂-Entitäten** (falls über eine Entität statt eines
+  festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
+  eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
+  inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
+  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
+  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
+  alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
+  aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
+  aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
+- **Speicher-Kapazitäts- und PV-Ertragsprognose-Entitäten** werden
+  ausschließlich als aktueller Wert gelesen — unabhängig vom gerade
+  angezeigten Zeitraum wird nie ein archivierter, alter Wert benötigt. Hier
+  genügt die kürzeste verfügbare Frist (**30 Tage**); mehr Aufbewahrung
+  bringt für diese Rollen keinen Vorteil, kostet bei häufig aktualisierenden
+  Quellen aber unnötig Speicherplatz.
+
 ## Entitäten und Verläufe
 
 **Entitäten** listet alle bekannten Entitäten, durchsuchbar über den Namen
-oder die Entity-ID und filterbar (z. B. nach Domain). Ein Klick auf eine
-Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
+oder die Entity-ID. Über **Spalten ▾** lassen sich elf zusätzliche Spalten
+ein-/ausblenden (Typ, Erster/Letzter Wert, Auflösung, Aufbewahrung, Einheit,
+Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle) — die Auswahl
+gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Sind die
+Spalten **Typ** oder **Einheit** eingeblendet, erscheint daneben ein
+passender Filter (Typ: Standard/Zähler/Schalter, mehrfach wählbar; Einheit:
+eine der tatsächlich vorkommenden Einheiten). Ein Klick auf eine Zeile öffnet
+die **Verlaufsansicht** dieser einen Entität.
 
 Jede Entität hat drei gleichrangige Ansichten, erreichbar über die Reiterzeile
 unter dem Namen: **Verlauf** (das Diagramm), **Werte bearbeiten** (siehe
@@ -432,6 +720,219 @@ wieder auf diese Startwerte zurück. Nicht dazu gehört der gezoomte
 Ausschnitt: er beschreibt keine Eigenschaft der Entität, sondern nur den
 gerade betrachteten Bildausschnitt, und gilt deshalb nur bis zur nächsten
 Änderung.
+
+## Charts
+
+Die Chart-Übersicht listet alle gespeicherten Charts als Kacheln mit Suche,
+Sortierung und Favoriten-Schalter (siehe
+[Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)).
+Jede Kachel nennt den Diagrammtyp, die Anzahl der Entitäten und den Zeitraum.
+Enthält ein Chart Linien- und Balkenreihen zugleich — etwa eine Temperatur
+neben einem Zähler —, werden beide Typen genannt.
+
+Eigener Editor, erreichbar über **Charts** → neues Chart oder Bearbeiten
+eines bestehenden (Kachelmenü ⋮):
+
+- Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
+  automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
+  in einem Chart sinnvoll lesbar bleiben.
+- **Auflösung** wählbar, inklusive "Automatisch" — dabei zeigt ein kleiner
+  Hinweis direkt an, welche Auflösung das für den aktuell gewählten
+  Zeitraum tatsächlich bedeutet (z. B. "≈ 1 Stunde"). Bei Zeitraum "Tag"
+  steht zusätzlich die Auflösung "Tag" zur Verfügung: sie fasst den ganzen
+  Tag zu einem einzigen Balken je Entität zusammen — praktisch, um z. B.
+  Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt
+  zu vergleichen. Vergleichen, Rollierend und Dynamische Y-Achse sind
+  bei dieser Auflösung deaktiviert, da sie für einen einzelnen
+  Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
+- Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,
+  Durchschnittslinie, Nachkommastellen, Legenden-Statistik — dieselben
+  Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
+  Chart konfiguriert statt je Entität; Nachkommastellen gilt dabei
+  einheitlich für alle Entitäten des Charts. Alle Einstellungen werden mit
+  dem Chart gespeichert und gelten dann auch für dessen Vorschau auf
+  Dashboards.
+- **Fläche** (nur hier, nicht in der Verlaufsansicht einer einzelnen
+  Entität) füllt die Fläche unter Linien-Serien dezent ein — Standard an,
+  entspricht damit dem bisherigen Aussehen der Dashboard-Kachel.
+- Bei ausschließlich Schalter-Entitäten (`switch`, `binary_sensor` u. Ä.)
+  steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
+  als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
+  AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
+- Mehrere Entitäten lassen sich per Ziehen oder über Pfeil-Buttons neu
+  anordnen — das bestimmt die Reihenfolge in Legende, Statistik-Anzeige und
+  Farbzuordnung. Dort lässt sich außerdem je Entität ein abweichender
+  Anzeigename nur für dieses Chart vergeben (wirkt in Legende, Statistik und
+  Tooltip) und die Reihe per Augen-Symbol dauerhaft ausblenden — anders als
+  das Ein-/Ausblenden per Klick auf die Legende (siehe
+  [Kennzahlen und Legende](#kennzahlen-und-legende)) wird das mit dem Chart
+  gespeichert, nicht nur für die aktuelle Ansicht gemerkt.
+- Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
+  Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
+- Die geöffnete Ansicht zeigt unter **Verwendet in** die Dashboards, auf denen
+  das gespeicherte Chart als Kachel liegt, und verlinkt direkt dorthin.
+
+## Vergleichstabellen
+
+Die Tabellen-Übersicht listet alle gespeicherten Tabellen als Kacheln mit
+Suche, Sortierung und Favoriten-Schalter (siehe
+[Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren));
+jede Kachel nennt die Anzahl ihrer Zeilen und Spalten.
+
+Eigener Editor, erreichbar über **Tabellen** → neue Tabelle oder Bearbeiten
+einer bestehenden (Kachelmenü ⋮):
+
+- **Zeilen** sind Größen: eine einzelne Entität, eine Gruppe mehrerer
+  Entitäten (wird zu einem Summenwert zusammengefasst), eine Formel, oder
+  eine rein optische Trennlinie ohne eigene Daten.
+- **Spalten** sind Zeiträume: frei benannt (z. B. "Heute", "Aug Vorjahr",
+  "2026"), jeweils mit einem Zeitraum-Typ (Tag, Woche, Monat, Jahr …) und
+  einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger, usw.). So
+  lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende Jahre in
+  zwölf Spalten nebeneinanderstellen. Die Beschriftung kann Platzhalter
+  wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten, die sich
+  automatisch auf den jeweiligen Zeitraum der Spalte auflösen (Einfüge-
+  Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des aufgelösten
+  Werts). **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch
+  auf denselben Zeitraum ein Jahr zuvor (schaltjahrsicher). Steht neben einer
+  vergangenen Spalte (Vortag, Vormonat, Vorjahr …) eine Spalte mit Versatz 0
+  desselben Zeitraum-Typs, vergleicht die vergangene Spalte automatisch nur
+  den bislang vergangenen Teil ihres Zeitraums ("Gleicher Zeitpunkt"-
+  Vergleich) — ein noch laufender Tag wird so fair gegen "Vortag bis zur
+  aktuellen Uhrzeit" statt gegen den kompletten Vortag verglichen.
+- **Mehrstufige Kopfzeile:** Spalten mit derselben, nicht leeren
+  Gruppen-Beschriftung (z. B. "2025" über mehreren Monatsspalten) bekommen
+  automatisch eine gemeinsame, übergreifende Kopfzeile darüber.
+- Spalten und Zeilen lassen sich über das jeweilige Kärtchen duplizieren
+  (⧉) — Zeilen-Duplikate inklusive aller Optionen, Formel-Zeilen mit
+  automatisch mitkorrigierten Buchstaben-Referenzen.
+
+### Aggregation und Formatierung
+
+- **Aggregation je Zeile:** Automatisch (bei Zählern die Summe, sonst der
+  Durchschnitt), Ø Durchschnitt, Min, Max oder Σ Summe. Min/Max nutzen dabei
+  die echten Extremwerte der zugrunde liegenden Rohdaten, nicht den
+  Durchschnitt der kleinsten verfügbaren Zeitscheibe.
+- **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
+- **% Anteil** (Zeilen-Menü "Optionen"): zeigt statt des absoluten Werts den
+  prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen derselben
+  Spalte seit der letzten Trennlinie.
+- **Bei 0 ausblenden** (Zeilen-Menü "Optionen"): blendet eine Entität-/
+  Gruppen-Zeile automatisch aus, sobald sie in allen sichtbaren Spalten
+  entweder keinen Wert oder 0 hat — etwa ein stillgelegtes Gerät, ohne sie
+  manuell aus- und wieder einblenden zu müssen.
+- **Summenzeile** (eigener Zeilentyp): Summe oder Durchschnitt aller
+  Entität-/Gruppen-Zeilen seit der letzten Trennlinie, aktualisiert sich
+  automatisch, wenn darüber Zeilen hinzukommen oder wegfallen.
+- **Farbskala** (Spalten-Option): färbt die Zellen einer Spalte nach ihrem
+  Wert relativ zu den anderen Entität-/Gruppen-Zeilen im selben Abschnitt
+  derselben Spalte ein — heller bei niedrigen, kräftiger bei hohen Werten.
+  Formel-, Summen- und Trennzeilen werden dabei weder eingefärbt noch für
+  die Skala berücksichtigt.
+
+### Formeln
+
+Formel-Zeilen referenzieren andere Zeilen über ihr Buchstaben-Kürzel (A, B,
+C …), z. B. `A / B * 100`. Referenzierbar sind dabei nur Zeilen *oberhalb*
+der Formel-Zeile. Beim Umsortieren von Zeilen (Ziehen oder Pfeil-Buttons)
+werden die Buchstaben-Referenzen in bestehenden Formeln automatisch
+mitkorrigiert, sodass eine Formel weiterhin dieselbe fachliche Zeile
+referenziert wie vor dem Verschieben — nicht einfach dieselbe Position. Eine
+Formel-Zeile übernimmt, sofern nicht eigens angegeben, automatisch die
+Einheit der ersten referenzierten Zeile.
+
+### Darstellung
+
+Rein optische Einstellungen, wirken sich nie auf die berechneten Werte aus:
+
+- **Hervorhebung:** Zebra-Streifen, erste Spalte hervorheben, Header
+  hervorheben, Beschriftung fett.
+- **Vergleich:** Vergleichsspalten (Vortag, Vormonat, Vorjahr …) optisch
+  absetzen, prozentuale Abweichung zur zugehörigen Vergleichsspalte
+  anzeigen.
+- **Zahlen / Einheiten:** Einheiten ein-/ausblenden, in einer festen Spalte
+  ausrichten oder kleiner darstellen, Dezimaltrennzeichen spaltenweise
+  ausrichten, fehlende Werte als „Keine Daten“ statt als Gedankenstrich
+  ausschreiben.
+- **Layout:** Rahmen (horizontal/Gitter/ohne), Dichte (komfortabel/
+  kompakt), Header-/Werte-Ausrichtung (linksbündig/zentriert/rechtsbündig,
+  Vorgabe jeweils rechtsbündig), alle Werte-Spalten gleich breit
+  ("Spalten gleichmäßig", die Beschriftungsspalte bleibt davon unberührt).
+  **Erste Spalte fixieren** und **Header fixieren** halten Beschriftungsspalte
+  bzw. Kopfzeile beim Scrollen sichtbar — Header fixieren begrenzt die
+  Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken.
+  Spaltenbreiten lassen sich per Ziehgriff am rechten Rand jeder Kopfzelle
+  anpassen (Doppelklick setzt eine Spalte auf automatische Breite zurück);
+  ohne manuelle Breite richtet sich jede Spalte nach ihrem Inhalt.
+
+Der Button **CSV** exportiert die aktuell sichtbaren Zeilen/Spalten (inkl.
+% Anteil-/Einheiten-Einstellungen) als Semikolon-getrennte Datei.
+
+Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
+Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
+Unter **Verwendet in** sind die Dashboards, auf denen die Tabelle als Kachel
+liegt, direkt erreichbar.
+
+## Statistik
+
+Zeigt Entitätenzahl, Datensätze, Speicherbedarf und Wachstum über die Zeit,
+sowie Aufschlüsselungen nach Typ, Auflösung und Aufbewahrung. Ein interner
+Planer erfasst unabhängig von Seitenaufrufen höchstens stündlich einen
+realen Bestandsschnappschuss, sodass die Wachstumsansicht auch ohne
+regelmäßigen Besuch der Seite aussagekräftig bleibt.
+
+Die Kachelreihe oben nennt neben dem Bestand auch den **Zuwachs**: „Neue
+Datensätze" zählt die letzten 24 Stunden, „Ø/Stunde" und „Ø/Tag" geben
+dieselbe Messung als Durchschnitt über 24 Stunden bzw. sieben Tage. „Neue
+Datensätze" und „Ø/Tag" tragen dieselbe Einheit — liegt der eine deutlich
+unter dem anderen, war der letzte Tag ruhiger als die Woche davor (oder
+umgekehrt). Alle drei stammen aus denselben Bestandsschnappschüssen, es gibt
+also kein eigenes Ereignisprotokoll dafür; solange weniger als 24 Stunden
+Verlauf vorliegen, steht dort ein Strich.
+
+Alle Tabellen lassen sich durch Anklicken ihrer Spaltenüberschriften wie die
+Entitätenliste sortieren. Das Wachstumsdiagramm passt seine beiden Y-Achsen
+dynamisch an den jeweils sichtbaren Wertebereich an.
+
+In der Speichernutzung führt **Index** zu einer Detailseite. Sie schlüsselt
+auf, welche SQLite-Tabellen Entitätsmetadaten, Schreibsicherheit und
+Bereinigung, Charts/Tabellen/Dashboards, Statistikverläufe sowie Einstellungen
+und Wartungshistorien enthalten. Pro Tabelle und Bereich werden Eintragszahl,
+belegte Datenseiten, zugehörige SQLite-Indizes und deren Gesamtgröße angezeigt.
+Interne Strukturen und freie SQLite-Seiten bleiben separat ausgewiesen. Die
+eigentlichen Messreihen liegen weiterhin in Hot Buffer, Archiv und Rollups,
+nicht im Index.
+
+Die Indexdetailseite zeigt außerdem den vollständig freien, durch eine
+Kompaktierung reclaimbaren Speicher. SQLite verwendet diese Seiten im
+laufenden Betrieb automatisch wieder. Eine manuelle **Index optimieren**-
+Aktion schreibt die Datenbankdatei kompakt neu; währenddessen pausieren
+Schreibzugriffe kurzzeitig. Eine Empfehlung erscheint erst bei einer
+Indexgröße ab 50 MB, mindestens 10 MB reclaimbarem Speicher und mindestens
+25 % freien Seiten. In diesem Fall wird auch der Index in der
+Speichernutzung mit **Optimierung empfohlen** markiert. Vor der Ausführung
+prüft Zeitarchiv den freien Plattenplatz und danach die SQLite-Integrität;
+eine automatische Optimierung findet nicht statt.
+
+Während der Optimierung wartet Zeitarchiv zunächst, bis bereits laufende
+Schreibvorgänge abgeschlossen sind. Neue Übertragungen der Home-Assistant-
+Integration pausieren an der Wartungssperre. Dauert die Optimierung länger als
+der HTTP-Timeout, behält die Integration den betroffenen Batch und versucht ihn
+ohne festes Retry-Limit erneut. Stabile Ereignis-IDs sorgen dafür, dass ein
+erneut gesendeter oder teilweise bereits verarbeiteter Batch keine doppelten
+Messwerte erzeugt. Im normalen Betrieb gehen durch die Optimierung daher keine
+Werte verloren.
+
+Die Integrationswarteschlange liegt allerdings nur im Arbeitsspeicher und ist
+auf 5.000 neue Ereignisse begrenzt. Wird sie während eines außergewöhnlich
+langen Rückstaus voll, werden weitere neue Ereignisse verworfen; ein Neustart
+von Home Assistant oder der Integration verwirft ebenfalls noch nicht
+übertragene Werte. Queue-Größe und verworfene Ereignisse sind auf der
+Geräteseite der Integration unter **Diagnose** sichtbar.
+
+Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
+Backups, da auch diese Speicherplatz belegen, aber in der reinen
+Entitäten-Statistik nicht enthalten sind.
 
 ## Entität konfigurieren
 
@@ -905,385 +1406,6 @@ teilt die Liste nicht in getrennte, überschneidungsfreie Gruppen auf. Jeder
 Eintrag der Auswahl nennt seine Trefferzahl im gewählten Zeitraum; Kategorien
 ohne Treffer sind nicht wählbar.
 
-## Charts
-
-Die Chart-Übersicht listet alle gespeicherten Charts als Kacheln mit Suche,
-Sortierung und Favoriten-Schalter (siehe
-[Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren)).
-Jede Kachel nennt den Diagrammtyp, die Anzahl der Entitäten und den Zeitraum.
-Enthält ein Chart Linien- und Balkenreihen zugleich — etwa eine Temperatur
-neben einem Zähler —, werden beide Typen genannt.
-
-Eigener Editor, erreichbar über **Charts** → neues Chart oder Bearbeiten
-eines bestehenden (Kachelmenü ⋮):
-
-- Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
-  automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
-  in einem Chart sinnvoll lesbar bleiben.
-- **Auflösung** wählbar, inklusive "Automatisch" — dabei zeigt ein kleiner
-  Hinweis direkt an, welche Auflösung das für den aktuell gewählten
-  Zeitraum tatsächlich bedeutet (z. B. "≈ 1 Stunde"). Bei Zeitraum "Tag"
-  steht zusätzlich die Auflösung "Tag" zur Verfügung: sie fasst den ganzen
-  Tag zu einem einzigen Balken je Entität zusammen — praktisch, um z. B.
-  Tages-Einspeisung und -Bezug als zwei nebeneinanderstehende Balken direkt
-  zu vergleichen. Vergleichen, Rollierend und Dynamische Y-Achse sind
-  bei dieser Auflösung deaktiviert, da sie für einen einzelnen
-  Tages-Balken keine sinnvolle zusätzliche Aussage liefern.
-- Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,
-  Durchschnittslinie, Nachkommastellen, Legenden-Statistik — dieselben
-  Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je
-  Chart konfiguriert statt je Entität; Nachkommastellen gilt dabei
-  einheitlich für alle Entitäten des Charts. Alle Einstellungen werden mit
-  dem Chart gespeichert und gelten dann auch für dessen Vorschau auf
-  Dashboards.
-- **Fläche** (nur hier, nicht in der Verlaufsansicht einer einzelnen
-  Entität) füllt die Fläche unter Linien-Serien dezent ein — Standard an,
-  entspricht damit dem bisherigen Aussehen der Dashboard-Kachel.
-- Bei ausschließlich Schalter-Entitäten (`switch`, `binary_sensor` u. Ä.)
-  steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
-  als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
-  AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
-- Mehrere Entitäten lassen sich per Ziehen oder über Pfeil-Buttons neu
-  anordnen — das bestimmt die Reihenfolge in Legende, Statistik-Anzeige und
-  Farbzuordnung.
-- Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
-  Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
-- Die geöffnete Ansicht zeigt unter **Verwendet in** die Dashboards, auf denen
-  das gespeicherte Chart als Kachel liegt, und verlinkt direkt dorthin.
-
-## Vergleichstabellen
-
-Die Tabellen-Übersicht listet alle gespeicherten Tabellen als Kacheln mit
-Suche, Sortierung und Favoriten-Schalter (siehe
-[Übersichten durchsuchen und sortieren](#übersichten-durchsuchen-und-sortieren));
-jede Kachel nennt die Anzahl ihrer Zeilen und Spalten.
-
-Eigener Editor, erreichbar über **Tabellen** → neue Tabelle oder Bearbeiten
-einer bestehenden (Kachelmenü ⋮):
-
-- **Zeilen** sind Größen: eine einzelne Entität, eine Gruppe mehrerer
-  Entitäten (wird zu einem Summenwert zusammengefasst), eine Formel, oder
-  eine rein optische Trennlinie ohne eigene Daten.
-- **Spalten** sind Zeiträume: frei benannt (z. B. "Heute", "Aug Vorjahr",
-  "2026"), jeweils mit einem Zeitraum-Typ (Tag, Woche, Monat, Jahr …) und
-  einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger, usw.). So
-  lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende Jahre in
-  zwölf Spalten nebeneinanderstellen. Die Beschriftung kann Platzhalter
-  wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten, die sich
-  automatisch auf den jeweiligen Zeitraum der Spalte auflösen (Einfüge-
-  Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des aufgelösten
-  Werts). **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch
-  auf denselben Zeitraum ein Jahr zuvor (schaltjahrsicher). Steht neben einer
-  vergangenen Spalte (Vortag, Vormonat, Vorjahr …) eine Spalte mit Versatz 0
-  desselben Zeitraum-Typs, vergleicht die vergangene Spalte automatisch nur
-  den bislang vergangenen Teil ihres Zeitraums ("Gleicher Zeitpunkt"-
-  Vergleich) — ein noch laufender Tag wird so fair gegen "Vortag bis zur
-  aktuellen Uhrzeit" statt gegen den kompletten Vortag verglichen.
-- **Mehrstufige Kopfzeile:** Spalten mit derselben, nicht leeren
-  Gruppen-Beschriftung (z. B. "2025" über mehreren Monatsspalten) bekommen
-  automatisch eine gemeinsame, übergreifende Kopfzeile darüber.
-- Spalten und Zeilen lassen sich über das jeweilige Kärtchen duplizieren
-  (⧉) — Zeilen-Duplikate inklusive aller Optionen, Formel-Zeilen mit
-  automatisch mitkorrigierten Buchstaben-Referenzen.
-
-### Aggregation und Formatierung
-
-- **Aggregation je Zeile:** Automatisch (bei Zählern die Summe, sonst der
-  Durchschnitt), Ø Durchschnitt, Min, Max oder Σ Summe. Min/Max nutzen dabei
-  die echten Extremwerte der zugrunde liegenden Rohdaten, nicht den
-  Durchschnitt der kleinsten verfügbaren Zeitscheibe.
-- **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
-- **% Anteil** (Zeilen-Menü "Optionen"): zeigt statt des absoluten Werts den
-  prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen derselben
-  Spalte seit der letzten Trennlinie.
-- **Bei 0 ausblenden** (Zeilen-Menü "Optionen"): blendet eine Entität-/
-  Gruppen-Zeile automatisch aus, sobald sie in allen sichtbaren Spalten
-  entweder keinen Wert oder 0 hat — etwa ein stillgelegtes Gerät, ohne sie
-  manuell aus- und wieder einblenden zu müssen.
-- **Summenzeile** (eigener Zeilentyp): Summe oder Durchschnitt aller
-  Entität-/Gruppen-Zeilen seit der letzten Trennlinie, aktualisiert sich
-  automatisch, wenn darüber Zeilen hinzukommen oder wegfallen.
-- **Farbskala** (Spalten-Option): färbt die Zellen einer Spalte nach ihrem
-  Wert relativ zu den anderen Entität-/Gruppen-Zeilen im selben Abschnitt
-  derselben Spalte ein — heller bei niedrigen, kräftiger bei hohen Werten.
-  Formel-, Summen- und Trennzeilen werden dabei weder eingefärbt noch für
-  die Skala berücksichtigt.
-
-### Formeln
-
-Formel-Zeilen referenzieren andere Zeilen über ihr Buchstaben-Kürzel (A, B,
-C …), z. B. `A / B * 100`. Referenzierbar sind dabei nur Zeilen *oberhalb*
-der Formel-Zeile. Beim Umsortieren von Zeilen (Ziehen oder Pfeil-Buttons)
-werden die Buchstaben-Referenzen in bestehenden Formeln automatisch
-mitkorrigiert, sodass eine Formel weiterhin dieselbe fachliche Zeile
-referenziert wie vor dem Verschieben — nicht einfach dieselbe Position. Eine
-Formel-Zeile übernimmt, sofern nicht eigens angegeben, automatisch die
-Einheit der ersten referenzierten Zeile.
-
-### Darstellung
-
-Rein optische Einstellungen, wirken sich nie auf die berechneten Werte aus:
-
-- **Hervorhebung:** Zebra-Streifen, erste Spalte hervorheben, Header
-  hervorheben, Beschriftung fett.
-- **Vergleich:** Vergleichsspalten (Vortag, Vormonat, Vorjahr …) optisch
-  absetzen, prozentuale Abweichung zur zugehörigen Vergleichsspalte
-  anzeigen.
-- **Zahlen / Einheiten:** Einheiten ein-/ausblenden, in einer festen Spalte
-  ausrichten oder kleiner darstellen, Dezimaltrennzeichen spaltenweise
-  ausrichten, fehlende Werte als „Keine Daten“ statt als Gedankenstrich
-  ausschreiben.
-- **Layout:** Rahmen (horizontal/Gitter/ohne), Dichte (komfortabel/
-  kompakt), Header-/Werte-Ausrichtung (linksbündig/zentriert/rechtsbündig,
-  Vorgabe jeweils rechtsbündig), alle Werte-Spalten gleich breit
-  ("Spalten gleichmäßig", die Beschriftungsspalte bleibt davon unberührt).
-  **Erste Spalte fixieren** und **Header fixieren** halten Beschriftungsspalte
-  bzw. Kopfzeile beim Scrollen sichtbar — Header fixieren begrenzt die
-  Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken.
-  Spaltenbreiten lassen sich per Ziehgriff am rechten Rand jeder Kopfzelle
-  anpassen (Doppelklick setzt eine Spalte auf automatische Breite zurück);
-  ohne manuelle Breite richtet sich jede Spalte nach ihrem Inhalt.
-
-Der Button **CSV** exportiert die aktuell sichtbaren Zeilen/Spalten (inkl.
-% Anteil-/Einheiten-Einstellungen) als Semikolon-getrennte Datei.
-
-Gespeicherte Tabellen zeigen beim Ansehen immer aktuelle Werte — wie
-Charts, kein eingefrorener Schnappschuss zum Speicherzeitpunkt.
-Unter **Verwendet in** sind die Dashboards, auf denen die Tabelle als Kachel
-liegt, direkt erreichbar.
-
-## Energiedashboard
-
-Eigenständige Ansicht (kein Eintrag im normalen Dashboard-System), die den
-Energiefluss eines Haushalts als Sankey-Diagramm zeigt: von Netzbezug und
-Erzeugern über einen zentralen Knoten zu Verbrauchern, Speichern und
-Einspeisung. Sie wird über eine feste Kachel oben auf der
-Dashboard-Übersicht ein- und ausgeschaltet und ist danach auch im Menü
-**Dashboards** erreichbar.
-
-### Einrichtung
-
-Beim ersten Aktivieren (und später jederzeit über den Stift neben dem Titel,
-**„Rollen bearbeiten"**) zeigt die Rollenzuordnung jede mögliche Rolle als
-eigene Kachel: Netzbezug, Einspeisung, beliebig viele Erzeuger, beliebig
-viele Speicher, beliebig viele Verbraucher, Kosten, PV-Ertragsprognose und
-CO₂. Ein Klick auf eine Kachel öffnet ein Popup mit den zugehörigen Feldern;
-bei Erzeuger/Speicher/Verbraucher legt die **„+"**-Kachel eine neue Zeile an,
-der Ziehgriff (⠿) sortiert bestehende Zeilen um. Eingaben in einem Popup
-gelten erst nach Klick auf **„Übernehmen"** — ein versehentlich geöffnetes
-Popup lässt sich also gefahrlos wieder schließen, ohne etwas zu verändern.
-Endgültig gespeichert wird die gesamte Zuordnung erst mit **„Speichern"** am
-Seitenende.
-
-Der Bereich **„Allgemein"** legt zusätzlich den Namen des zentralen Knotens
-fest (Standard „Haus"), die Schwelle für die Auffälligkeiten-Markierung
-(siehe [unten](#status-datenqualität-und-auffälligkeiten)) sowie **„Sichtbare
-Kacheln"** — welche der optionalen Karten (Autarkie & Speicher,
-Verbraucheranteile, Kostenanalyse, CO₂-Bilanz, Tageslastprofil, Bilanz &
-Datenqualität) überhaupt angezeigt werden. Der Energiefluss selbst lässt
-sich nicht abschalten.
-
-### Benötigte und sinnvolle Entitäten
-
-Die Rollenzuordnung wählt ausschließlich aus bereits archivierten Entitäten
-aus — für das Energiedashboard muss also vorher nichts zusätzlich
-eingerichtet werden, was nicht ohnehin schon in Zeitarchiv ankommt.
-
-| Rolle | Pflicht? | Erwarteter Wert |
-| --- | --- | --- |
-| Netzbezug | **ja** | Zählerstand Strombezug aus dem Netz (kWh, aufsteigend) |
-| Einspeisung | nein | Zählerstand Netzeinspeisung (kWh, aufsteigend) |
-| Erzeuger (beliebig viele) | nein | je ein Ertragszähler (kWh, aufsteigend) mit eigenem Namen — z. B. Dachanlage und Balkonkraftwerk getrennt geführt |
-| Speicher: Laden / Entladen (beliebig viele Speicher) | nein | je zwei Zählerstände (kWh, aufsteigend) — Werte über mehrere Speicher hinweg werden addiert |
-| Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler — bei mehreren Speichern kapazitätsgewichtet gemittelt |
-| Speicher: Kapazität | nein | Gesamtkapazität in kWh (Entität oder fester Wert; Wh-Entitäten werden automatisch umgerechnet) — nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt und bei mehreren Speichern richtig gewichtet wird |
-| Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
-| Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
-| CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
-| PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |
-
-Einzig Netzbezug ist Pflicht — alle anderen Rollen schalten lediglich
-zusätzliche Kacheln, Ringe oder Badges frei; ohne Speicher-Rolle bleiben
-z. B. einfach die Speicher-Kacheln und der Wirkungsgrad-Ring ausgeblendet.
-Die Auswahlfelder zeigen dabei von vornherein nur Entitäten mit passender
-Einheit bzw. Zähler-Typ für die jeweilige Rolle.
-
-Für Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen) und
-Verbraucher wird ein **kWh-Gesamtzähler** erwartet (Home-Assistant-Gerätetyp
-`total_increasing`), keine Momentanleistung in Watt — viele Geräte-
-Integrationen bieten beides parallel an, hier zählt jeweils die
-kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität,
-Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst
-Momentan-/Messwerte (`measurement`), keine Zähler.
-
-### Energiefluss und Verbraucher-Gruppen
-
-Der Sankey zeigt Quellen (Netzbezug, Erzeuger, Speicherentladung) links,
-Senken (Verbraucher, Speicherladung, Einspeisung) rechts, dazwischen den
-zentralen Knoten. Der Rest — Netzbezug plus Erzeugung minus Verbraucher
-minus Einspeisung minus Speicherladung — erscheint automatisch als
-**„Grundlast“**, ohne eigenen Sensor. Navigation läuft wie bei Charts über
-Stunde/Tag/Monat/Jahr mit Vor-/Zurück.
-
-Ein Verbraucher mit zugewiesener Gruppe hängt im Sankey zweistufig am
-zentralen Knoten (Knoten → Gruppe → Gerät), ein ungruppierter direkt daran
-wie ein Erzeuger — hält den Fluss bei vielen einzelnen Verbrauchern
-übersichtlich. Gruppen entstehen direkt beim Zuordnen eines Verbrauchers
-(bestehende auswählen oder per Freitext eine neue anlegen) oder lassen sich
-über den eigenen **„Gruppen"**-Button neben der Verbraucher-Überschrift
-zentral verwalten (umbenennen, löschen — betroffene Verbraucher werden dabei
-nur wieder gruppenlos, ihre Werte bleiben unverändert).
-
-### Kennzahlen, Ringe und Badges
-
-Direkt unter dem Sankey stehen fünf KPI-Kacheln (Erzeugung, Verbrauch,
-Netzbezug, Speicher, Einspeisung) für den gewählten Zeitraum; bei mehreren
-Speichern oder Erzeugern zeigt ihr Tooltip zusätzlich die Aufschlüsselung je
-Gerät. Ein Klick auf eine Kachel führt zum Chart der zugrundeliegenden
-Entität, mit demselben Zeitraum, der gerade im Energiedashboard eingestellt
-ist; steckt mehr als eine Entität dahinter (mehrere Erzeuger/Verbraucher,
-oder ein Speicher mit getrennter Lade-/Entlade-Entität), öffnet sich
-stattdessen ein kurzes Auswahlfenster. Der Link „← zurück zum
-Energiedashboard“ auf der Entitätsseite (ebenso der aus dem Energiebericht,
-siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur
-Standardansicht. Die Karte **„Autarkie & Speicher"** darunter zeigt vier
-Ringe — Autarkie, Eigenverbrauch, Speicher-Ladezustand und
-Speicher-Wirkungsgrad (bei mehreren Speichern jeweils kapazitätsgewichtet
-zusammengefasst, damit ein leerer und ein voller Speicher nicht fälschlich
-als „50 %“ erscheinen). Ein Klick auf einen Ring öffnet dessen Monatstrend
-der letzten drei Kalenderjahre.
-
-Optionale Badges im Kopfbereich fassen die CO₂-Bilanz (🌱) und den
-Kosten-Saldo (💰) zusammen — je ein Klick öffnet die Details, darin jeweils
-zusätzlich eine dritte Kachel „Bilanz“ (CO₂-Ausstoß minus vermieden) bzw.
-der bereits bekannte Saldo, beide farblich hervorgehoben: steht die Bilanz
-im Plus (mehr vermieden bzw. erlöst als verursacht bzw. bezahlt), wird das
-eigens mit Stern und kurzem Hinweistext gefeiert statt nur als Zahl gezeigt.
-Eine Kennzahlen-Leiste über dem Sankey bündelt zusätzlich Autarkie,
-vermiedenes CO₂, Kosten-Saldo und die PV-Ertragsprognose für „heute“ und
-„morgen“ auf einen Blick.
-
-### Status, Datenqualität und Auffälligkeiten
-
-Der **„Status"**-Chip (✓ bzw. ! bei Problemen) öffnet ein Popup mit der
-Bilanzprüfung sowie den übrigen Datenqualitäts-Checks: veraltete
-Sensorwerte, Zählerrücksetzungen, falsche Einheit, falscher Zähler-Typ und
-doppelt zugeordnete Entitäten. Dasselbe Popup listet Auffälligkeiten —
-Verbraucher oder Gruppen, die deutlich über ihrem Schnitt der letzten
-Perioden liegen. Die Schwelle dafür (Standard +50 %) lässt sich in der
-Rollenzuordnung unter **„Allgemein"** anpassen oder ganz abschalten.
-
-### Tageslastprofil
-
-Zeigt bei Tag/Stunde den stündlichen Verbrauch der letzten 7 Kalendertage;
-bei Monat/Jahr stattdessen den nach Wochentag gemittelten Verbrauch (Mo–So)
-über den gewählten Zeitraum, sodass erkennbar wird, an welchen Wochentagen
-typischerweise mehr verbraucht wird.
-
-### Energiebericht
-
-Ein Symbol neben der Zeitraum-Navigation (nur bei Monat/Jahr aktiv) öffnet
-einen druckoptimierten Bericht für den gerade gewählten Zeitraum —
-Kennzahlen samt Vorjahres-/Vormonatsvergleich, Kosten- und CO₂-Bilanz (inkl.
-CO₂-Vergleich als Autofahrt-Strecke), Verbraucheranteile inklusive
-Kosten je Verbraucher, bei Jahresberichten zusätzlich ein Monatsverlauf und
-alle Auffälligkeiten des Jahres. Ein Link oben führt jederzeit zurück zur
-normalen Ansicht. Die Seite selbst erzeugt
-kein neues Dateiformat und keine Bibliothek läuft im Hintergrund — der
-Button **„Drucken / Als PDF speichern"** ruft lediglich den Druckdialog des
-Browsers auf, dort lässt sich wie gewohnt „Als PDF speichern“ statt eines
-echten Druckers wählen. Es gibt keinen automatischen Versand per E-Mail —
-der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
-
-### Aufbewahrung richtig einstellen
-
-Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
-wirkt sich unterschiedlich stark auf das Energiedashboard aus — nicht jede
-Rolle braucht dieselbe Frist:
-
-- **Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen/SOC) und
-  Verbraucher** sollten großzügig aufbewahrt werden — mindestens
-  **2 Jahre**, im Zweifel **Unbegrenzt**. Die Autarkie-, Eigenverbrauchs-,
-  SOC- und Wirkungsgrad-Trends im Ring-Popup werten jeweils die letzten drei
-  Kalenderjahre aus (ebenso der Monatsverlauf im Energiebericht); eine
-  kürzere Frist lässt diese Trends mit der Zeit lückenhaft werden.
-- **Strompreis- und CO₂-Entitäten** (falls über eine Entität statt eines
-  festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
-  eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
-  inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
-  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
-  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
-  alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
-  aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
-  aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
-- **Speicher-Kapazitäts- und PV-Ertragsprognose-Entitäten** werden
-  ausschließlich als aktueller Wert gelesen — unabhängig vom gerade
-  angezeigten Zeitraum wird nie ein archivierter, alter Wert benötigt. Hier
-  genügt die kürzeste verfügbare Frist (**30 Tage**); mehr Aufbewahrung
-  bringt für diese Rollen keinen Vorteil, kostet bei häufig aktualisierenden
-  Quellen aber unnötig Speicherplatz.
-
-## Statistik
-
-Zeigt Entitätenzahl, Datensätze, Speicherbedarf und Wachstum über die Zeit,
-sowie Aufschlüsselungen nach Typ, Auflösung und Aufbewahrung. Ein interner
-Planer erfasst unabhängig von Seitenaufrufen höchstens stündlich einen
-realen Bestandsschnappschuss, sodass die Wachstumsansicht auch ohne
-regelmäßigen Besuch der Seite aussagekräftig bleibt.
-
-Die Kachelreihe oben nennt neben dem Bestand auch den **Zuwachs**: „Neue
-Datensätze" zählt die letzten 24 Stunden, „Ø/Stunde" und „Ø/Tag" geben
-dieselbe Messung als Durchschnitt über 24 Stunden bzw. sieben Tage. „Neue
-Datensätze" und „Ø/Tag" tragen dieselbe Einheit — liegt der eine deutlich
-unter dem anderen, war der letzte Tag ruhiger als die Woche davor (oder
-umgekehrt). Alle drei stammen aus denselben Bestandsschnappschüssen, es gibt
-also kein eigenes Ereignisprotokoll dafür; solange weniger als 24 Stunden
-Verlauf vorliegen, steht dort ein Strich.
-
-Alle Tabellen lassen sich durch Anklicken ihrer Spaltenüberschriften wie die
-Entitätenliste sortieren. Das Wachstumsdiagramm passt seine beiden Y-Achsen
-dynamisch an den jeweils sichtbaren Wertebereich an.
-
-In der Speichernutzung führt **Index** zu einer Detailseite. Sie schlüsselt
-auf, welche SQLite-Tabellen Entitätsmetadaten, Schreibsicherheit und
-Bereinigung, Charts/Tabellen/Dashboards, Statistikverläufe sowie Einstellungen
-und Wartungshistorien enthalten. Pro Tabelle und Bereich werden Eintragszahl,
-belegte Datenseiten, zugehörige SQLite-Indizes und deren Gesamtgröße angezeigt.
-Interne Strukturen und freie SQLite-Seiten bleiben separat ausgewiesen. Die
-eigentlichen Messreihen liegen weiterhin in Hot Buffer, Archiv und Rollups,
-nicht im Index.
-
-Die Indexdetailseite zeigt außerdem den vollständig freien, durch eine
-Kompaktierung reclaimbaren Speicher. SQLite verwendet diese Seiten im
-laufenden Betrieb automatisch wieder. Eine manuelle **Index optimieren**-
-Aktion schreibt die Datenbankdatei kompakt neu; währenddessen pausieren
-Schreibzugriffe kurzzeitig. Eine Empfehlung erscheint erst bei einer
-Indexgröße ab 50 MB, mindestens 10 MB reclaimbarem Speicher und mindestens
-25 % freien Seiten. In diesem Fall wird auch der Index in der
-Speichernutzung mit **Optimierung empfohlen** markiert. Vor der Ausführung
-prüft Zeitarchiv den freien Plattenplatz und danach die SQLite-Integrität;
-eine automatische Optimierung findet nicht statt.
-
-Während der Optimierung wartet Zeitarchiv zunächst, bis bereits laufende
-Schreibvorgänge abgeschlossen sind. Neue Übertragungen der Home-Assistant-
-Integration pausieren an der Wartungssperre. Dauert die Optimierung länger als
-der HTTP-Timeout, behält die Integration den betroffenen Batch und versucht ihn
-ohne festes Retry-Limit erneut. Stabile Ereignis-IDs sorgen dafür, dass ein
-erneut gesendeter oder teilweise bereits verarbeiteter Batch keine doppelten
-Messwerte erzeugt. Im normalen Betrieb gehen durch die Optimierung daher keine
-Werte verloren.
-
-Die Integrationswarteschlange liegt allerdings nur im Arbeitsspeicher und ist
-auf 5.000 neue Ereignisse begrenzt. Wird sie während eines außergewöhnlich
-langen Rückstaus voll, werden weitere neue Ereignisse verworfen; ein Neustart
-von Home Assistant oder der Integration verwirft ebenfalls noch nicht
-übertragene Werte. Queue-Größe und verworfene Ereignisse sind auf der
-Geräteseite der Integration unter **Diagnose** sichtbar.
-
-Die Speicherplatz-Aufschlüsselung verlinkt direkt zu Import-Reports und
-Backups, da auch diese Speicherplatz belegen, aber in der reinen
-Entitäten-Statistik nicht enthalten sind.
-
 ## Housekeeping
 
 Eigener Menüpunkt unter **System**, unterhalb Statistik — sammelt an einer
@@ -1571,43 +1693,25 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   anzuwenden — sinnvoll, um die Integrität eines Backups vor einem
   tatsächlichen Wiederherstellungsbedarf zu bestätigen. Gilt gleichermaßen
   für selbst erstellte wie für importierte Backups.
-- **Wiederherstellen:** ersetzt den aktuellen Datenbestand vollständig
-  durch den Inhalt des gewählten Backups (selbst erstellt oder importiert).
-  Der bisherige Stand wird vor dem Überschreiben in ein
-  Rollback-Verzeichnis verschoben, nicht gelöscht — bei Bedarf lässt sich
-  der Zustand vor der Wiederherstellung also zurückholen. Nach einer
-  Wiederherstellung empfiehlt sich ein kurzer Blick auf **Statistik**, um
-  zu prüfen, ob die erwarteten Entitäten und Datensatzmengen wieder
-  vorhanden sind.
-
-## Einstellungen im Detail
-
-| Bereich | Enthält |
-| --- | --- |
-| **Darstellung** | Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
-| **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
-| **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
-| **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
-| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
-| **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |
-| **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
-
-Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
-sofort — die Zeitarchiv-Integration muss danach mit dem neuen Token
-aktualisiert werden, sonst schlagen weitere Schreibversuche fehl.
-
-Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung und die Logansicht selbst
-sind keine Einstellungen-Sektion mehr, sondern liegen direkt auf der Seite
-**Protokoll** (Home-Assistant-Seitenleiste bzw. Menü).
-
-Für den Normalbetrieb sind `warning` und HTTP **Nur fehlgeschlagene Anfragen**
-die empfohlenen Einstellungen. `debug` und der Entity-Trace sind zeitlich
-begrenzt zur Fehlersuche gedacht. Die lokale Logquelle reagiert schnell und
-enthält nur den begrenzten Puffer des laufenden Prozesses; die
-Supervisor-Historie reicht weiter zurück und kann beim Laden etwas länger
-dauern. Zugangsdaten werden vor der Ausgabe maskiert. Write-Captures und
-Entity-Traces können trotzdem Entity-IDs und Messwerte enthalten und sollten
-nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
+- **Wiederherstellen:** bereitet den Austausch nur vor — angewendet wird er
+  erst beim **nächsten Neustart des Zeitarchiv-Add-ons**, bevor die
+  Datenbank wieder geöffnet wird. Nach dem Klick erscheint dazu ein
+  entsprechender Hinweis; ohne Neustart bleibt der aktuelle Datenbestand
+  bis dahin unverändert nutzbar. Der bisherige Stand wird beim Neustart vor
+  dem Überschreiben in ein Rollback-Verzeichnis verschoben, nicht gelöscht
+  — bei Bedarf lässt sich der Zustand vor der Wiederherstellung also
+  zurückholen. Nach einer Wiederherstellung empfiehlt sich ein kurzer Blick
+  auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
+  Datensatzmengen wieder vorhanden sind.
+- **Ausführungsverlauf:** listet jeden Backup-Lauf mit Zeitpunkt, Auslöser
+  (manuell/Zeitplan), Status, Dauer und Größe. Ein fehlgeschlagener oder
+  unterbrochener Lauf ist rot markiert; ein Klick auf die Zeile zeigt den
+  Fehlergrund.
+- **Restore-Rollbacks:** die beim Wiederherstellen automatisch angelegten
+  Sicherungen des jeweils vorherigen Standes, einzeln über „Rollback
+  löschen" entfernbar, sobald sie nicht mehr gebraucht werden — sie zählen
+  nicht zu den regulären Backups und räumen sich nicht über den Zeitplan
+  automatisch mit auf.
 
 ## Demo-Modus
 
@@ -1693,54 +1797,54 @@ solange die Daten liegen bleiben.
   Demo-Modus) einer Instanz über eine eigene Sensor-Entität anzeigen — siehe
   deren [Dokumentation](https://github.com/bertel2020/HA-Zeitarchiv).
 
-## Typische Aufgaben
+## Protokoll
 
-**"Ein Sensor sendet unplausible Ausreißer."**
-→ Entität öffnen → Zahnrad-Symbol → Ausreißer-Erkennung auf ein passendes
-Vielfaches einstellen und an der Quote darunter ablesen, was das bewirkt
-(bei Schaltern gibt es die Einstellung nicht, siehe oben) → zurück zur
-Verlaufsansicht →
-**Bereinigen** → erkannte Ausreißer prüfen und löschen (Soft-Delete,
-rückgängig machbar) → **Housekeeping → Speicherplatz**, wenn der Platz
-tatsächlich freigegeben werden soll.
+Eigener Menüpunkt unter **System**, direkt neben den Einstellungen — zeigt
+die aktuellen App-Meldungen in der Oberfläche, ohne Umweg über die
+Home-Assistant-Seitenleiste.
 
-**"Ich will Innen- und Außentemperatur über die letzten 12 Monate
-vergleichen."**
-→ **Tabellen** → neue Tabelle → 12 Spalten (Zeitraum-Typ "Monat", Versatz 0
-bis −11) → zwei Zeilen (je eine Entität) → optional eine Formel-Zeile für
-die Differenz.
+| Element | Wirkung |
+| --- | --- |
+| **Quelle**: Live / Supervisor-Historie | „Live" liest den begrenzten Puffer des laufenden Prozesses — reagiert am schnellsten. „Supervisor-Historie" reicht weiter zurück, lädt aber beim Öffnen etwas länger. |
+| **Level** | Filtert die Anzeige auf einen Mindest-Schweregrad (Alle, Fehler, Warnungen, Informationen, Debug). Wirkt nur auf die Darstellung — nicht auf das Anwendungs-Loglevel selbst (siehe unten), das bestimmt, was überhaupt geschrieben wird. |
+| **Protokoll durchsuchen** | Freitextsuche innerhalb der aktuell geladenen Zeilen. |
+| **Jetzt aktualisieren** / **Automatisch (15 s)** | Manuelles oder automatisches Nachladen. |
+| **Herunterladen** | Lädt die aktuelle Ansicht als Textdatei herunter. |
 
-**"Ein Dashboard auf einem Wandtablet soll sich nicht versehentlich
-verändern."**
-→ Dashboard öffnen → Editor → "Fixiert" aktivieren.
+Darüber liegt die eigentliche Einstellung, **Protokollierung**:
 
-**"Ich möchte alte Symcon-Daten übernehmen, ohne HA-Live-Daten zu
-verdoppeln."**
-→ **Import → Symcon** → ZIP hochladen → Zuordnung prüfen → Import starten.
-Bereits vorhandene Zeitstempel werden automatisch übersprungen, unabhängig
-von der Quelle.
+| Einstellung | Optionen |
+| --- | --- |
+| **Anwendungs-Loglevel** | Fehler, Warnungen (Standard), Informationen, Debug. |
+| **HTTP-Anfragen protokollieren** | Aus, Nur fehlgeschlagene Anfragen (empfohlen), Alle Anfragen. |
 
-**"Ich nutze kein Symcon und möchte trotzdem die bisherige HA-Historie
-übernehmen."**
-→ **Import → Home Assistant** → Entitäten auswählen, optional
-"Verfügbarkeit prüfen" → Vorschau (Dry Run) → Import starten.
+Für den Normalbetrieb sind `Warnungen` und **Nur fehlgeschlagene Anfragen** die
+empfohlenen Einstellungen — beide wirken sofort, ohne Neustart. `Debug` und
+der Entity-Trace (siehe [Einstellungen im Detail → Diagnose](#einstellungen-im-detail))
+sind zeitlich begrenzt zur Fehlersuche gedacht und erzeugen spürbar mehr
+Daten. Zugangsdaten werden vor der Ausgabe immer maskiert; Write-Captures und
+Entity-Traces können trotzdem Entity-IDs und Messwerte enthalten und sollten
+nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
-**"Eine Entität sendet nicht mehr, ich will sie aber behalten."**
-→ Entität einfach unverändert lassen — bereits archivierte Werte bleiben
-erhalten, Charts und Tabellen zeigen weiterhin die vorhandene Historie.
-Erst bei Bedarf über das Zahnrad-Symbol **Alle Werte löschen** oder
-**Entität entfernen** verwenden.
+## Einstellungen im Detail
 
-**"Ich will vor einem größeren Eingriff (Import, Bereinigung, Update) auf
-Nummer sicher gehen."**
-→ **System → Backup / Restore** → Backup erstellen → herunterladen oder im
-konfigurierten Zeitplan belassen.
+| Bereich | Enthält |
+| --- | --- |
+| **Darstellung** | Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
+| **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
+| **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
+| **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
+| **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |
+| **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
 
-**"Ich möchte die App vorführen oder ausprobieren, ohne echte Daten zu
-riskieren."**
-→ Add-on-Konfiguration → Option `demo_mode` aktivieren → Add-on neu starten
-→ siehe [Demo-Modus](#demo-modus). Die echten Daten bleiben dabei
-unangetastet in einem komplett eigenen Verzeichnis.
+Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
+sofort — die Zeitarchiv-Integration muss danach mit dem neuen Token
+aktualisiert werden, sonst schlagen weitere Schreibversuche fehl.
+
+Anwendungs-Loglevel, HTTP-Zugriffsprotokollierung und die Logansicht selbst
+sind keine Einstellungen-Sektion, sondern liegen auf der eigenen Seite
+[Protokoll](#protokoll).
 
 ## Häufige Fragen
 
