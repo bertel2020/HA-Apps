@@ -72,12 +72,9 @@
                       title="{{ 'Deaktivieren' if nav_energiedashboard_enabled else 'Aktivieren' }}"
                       onclick="toggleEnergieDashboard(this)"></button>
             </div>
-            {% if not nav_energiedashboard_enabled %}
-            <p class="edash-pin-desc">Sankey-Energiefluss aus PV, Netz, Speicher &amp; Verbrauchern. Einmal Entitäten zuordnen, Rest läuft automatisch.</p>
-            {% endif %}
             <div class="edash-pin-meta">
               {% if not nav_energiedashboard_enabled %}
-              Deaktiviert
+              Deaktiviert — Sankey-Energiefluss aus PV, Netz &amp; Speicher, einmal einrichten
               {% elif energiedashboard_configured %}
               {{ energiedashboard_role_count }} Roll{{ 'e' if energiedashboard_role_count == 1 else 'en' }} zugeordnet
               {% else %}
