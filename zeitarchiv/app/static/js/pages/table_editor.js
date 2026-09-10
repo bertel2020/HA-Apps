@@ -831,6 +831,15 @@
           window.location.href = `${BASE}/tables`;
         },
 
+        // Verwirft unsaved Änderungen — dieselbe Begründung wie cancelEdit()
+        // in chart_editor.js: ohne TABLE_ID gibt es keinen gespeicherten
+        // Stand, sonst neu laden statt jedes reaktive Feld einzeln
+        // zurückzusetzen.
+        cancelEdit() {
+          if (!TABLE_ID) { window.location.href = `${BASE}/tables`; return; }
+          window.location.reload();
+        },
+
         // Position/Höhe EINES Buchstaben-Badges in .tbl-letters-gutter — aus
         // letterPositions (von syncLetterPositions() gemessen), nicht
         // errechnet. Ohne Eintrag (z. B. bevor die erste Messung lief) bleibt

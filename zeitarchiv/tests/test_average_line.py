@@ -41,7 +41,11 @@ def test_the_average_is_computed_here_not_by_echarts() -> None:
     for name, js in (("entity_detail", DETAIL_JS), ("chart_editor", EDITOR_JS)):
         assert "function averageOf(values)" in js, name
         assert not _nutzt_echarts_average(js), name
-        assert "data: [{yAxis: durchschnitt}]" in js, name
+        # chart_editor.js kennt seit der Ranking-Vergleich/horizontale-Balken-
+        # Erweiterung zusätzlich {xAxis: durchschnitt} (Achsen vertauscht,
+        # wenn horizontal aktiv ist) — {yAxis: durchschnitt} bleibt in beiden
+        # Dateien der vertikale/Normalfall.
+        assert "{yAxis: durchschnitt}" in js, name
 
 
 def test_each_page_averages_exactly_what_it_draws() -> None:

@@ -418,10 +418,11 @@
 
         <div class="save-row" x-show="editing">
           <input type="text" placeholder="Name des Charts …" maxlength="{{ max_name_length }}" x-model="name">
-          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if chart_id else "Chart erstellen" }}</button>
           {% if chart_id %}
           <button type="button" class="btn btn-danger" @click="deleteChart()">Löschen</button>
           {% endif %}
+          <button type="button" class="btn" @click="cancelEdit()">Abbrechen</button>
+          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if chart_id else "Chart erstellen" }}</button>
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
     </div>

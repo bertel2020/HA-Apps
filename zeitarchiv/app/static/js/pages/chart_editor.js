@@ -1446,6 +1446,17 @@
           window.location.href = `${BASE}/charts`;
         },
 
+        // Verwirft unsaved Änderungen. Ohne CHART_ID gibt es keinen
+        // gespeicherten Stand, zu dem zurückgekehrt werden könnte — dann
+        // direkt zur Chart-Liste. Mit CHART_ID: neu laden statt jedes
+        // reaktive Feld (Entitäten, Reihenfolge, Auflösung, Darstellung,
+        // Vergleich, Legende, …) einzeln zurückzusetzen, garantiert exakt
+        // den zuletzt gespeicherten Stand.
+        cancelEdit() {
+          if (!CHART_ID) { window.location.href = `${BASE}/charts`; return; }
+          window.location.reload();
+        },
+
         init() {
           // Ein vor diesem Fix gespeichertes Chart könnte noch
           // resolution_preset:"full" UND continuous:true gemeinsam tragen
