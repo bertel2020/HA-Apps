@@ -586,42 +586,66 @@
         effectiveDecimals(s) {
           return this.decimals === 'auto' ? s.decimals : parseInt(this.decimals, 10);
         },
+        // Gemeinsame Kennzahlen-Berechnung für seriesStats — als eigene
+        // Funktion statt inline, damit dieselbe Rechnung sowohl auf die
+        // Hauptperiode (s.points) als auch auf die Vergleichsperiode
+        // (s.compare_points) angewendet werden kann, siehe seriesStats.compare
+        // unten. windowEnd ist Parameter statt fest this.windowEnd, weil die
+        // Vergleichsperiode ihr eigenes Fensterende hat (s.compare_window_end)
+        // — relevant für switchOnDuration() im Rohwerte-Modus.
+        seriesStatsFor(s, points, windowEnd) {
+          const values = points.map(p => p.value).filter(Number.isFinite);
+          const minima = points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
+          const maxima = points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
+          const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
+          const unit = s.unit ? ` ${s.unit}` : '';
+          const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, this.effectiveDecimals(s))}${unit}`;
+          // Summe bei Zählern sinnvoll — Bucket-Werte sind dort bereits
+          // Deltas je Zeitfenster (siehe query.py), deren Summe den
+          // Gesamtverbrauch im Zeitraum ergibt — UND bei Schaltern, deren
+          // Bucket-Werte bereits Einschaltsekunden sind (z. B. Summe =
+          // gesamte Anwesenheitsdauer im Zeitraum). Bei Zählern nicht im
+          // Rohwerte-Modus (Einzelmesswerte statt Deltas); bei Schaltern
+          // dagegen AUCH im Rohwerte-/Zeitstrahl-Modus möglich — dort kommt
+          // die Summe nicht aus den (nur 0/1-wertigen) Punktwerten, sondern
+          // aus switchOnDuration() oben.
+          const isSwitch = s.aggregation_type === 'switch';
+          const hasSum = (s.aggregation_type === 'counter' && !this.raw) || isSwitch;
+          const sumValue = this.raw && isSwitch ? switchOnDuration(points, windowEnd) : values.reduce((sum, v) => sum + v, 0);
+          // Summe bei Schaltern ist immer eine Dauer in Sekunden — anders
+          // als "last"/"min"/"max"/"average" (die bei Rohwert-Anzeigemodus
+          // echte 0/1-Zustände sind) unabhängig vom Anzeigemodus
+          // (display_mode) immer als h/m/s formatiert statt über
+          // fmtNum()s generische 4-signifikante-Stellen-Rundung, die bei
+          // größeren Sekundenwerten sichtbar ungenau wird.
+          const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
+          return {
+            last: values.length ? formatted(values[values.length - 1]) : '—',
+            min: minima.length ? formatted(Math.min(...minima)) : '—',
+            max: maxima.length ? formatted(Math.max(...maxima)) : '—',
+            average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+            sum: hasSum ? (values.length ? sumFormatted : '—') : null,
+          };
+        },
         get seriesStats() {
           return this.series.map((s, i) => {
-            const values = s.points.map(p => p.value).filter(Number.isFinite);
-            const minima = s.points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
-            const maxima = s.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
-            const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
-            const unit = s.unit ? ` ${s.unit}` : '';
-            const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, this.effectiveDecimals(s))}${unit}`;
-            // Summe bei Zählern sinnvoll — Bucket-Werte sind dort bereits
-            // Deltas je Zeitfenster (siehe query.py), deren Summe den
-            // Gesamtverbrauch im Zeitraum ergibt — UND bei Schaltern, deren
-            // Bucket-Werte bereits Einschaltsekunden sind (z. B. Summe =
-            // gesamte Anwesenheitsdauer im Zeitraum). Bei Zählern nicht im
-            // Rohwerte-Modus (Einzelmesswerte statt Deltas); bei Schaltern
-            // dagegen AUCH im Rohwerte-/Zeitstrahl-Modus möglich — dort kommt
-            // die Summe nicht aus den (nur 0/1-wertigen) Punktwerten, sondern
-            // aus switchOnDuration() oben.
-            const isSwitch = s.aggregation_type === 'switch';
-            const hasSum = (s.aggregation_type === 'counter' && !this.raw) || isSwitch;
-            const sumValue = this.raw && isSwitch ? switchOnDuration(s.points, this.windowEnd) : values.reduce((sum, v) => sum + v, 0);
-            // Summe bei Schaltern ist immer eine Dauer in Sekunden — anders
-            // als "last"/"min"/"max"/"average" (die bei Rohwert-Anzeigemodus
-            // echte 0/1-Zustände sind) unabhängig vom Anzeigemodus
-            // (display_mode) immer als h/m/s formatiert statt über
-            // fmtNum()s generische 4-signifikante-Stellen-Rundung, die bei
-            // größeren Sekundenwerten sichtbar ungenau wird.
-            const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
+            // Vergleichs-Nebenserie (Vorjahr/Vorperiode, siehe render()) taucht
+            // sonst in keiner Legende auf — dieselbe Rechnung wie die Hauptserie,
+            // nur auf s.compare_points angewendet, damit Chip- und Tabellen-
+            // Legende sie als gedämpfte Unterzeile je Entität zeigen können.
+            const compare = (this.compare && s.compare_points && s.compare_points.length)
+              ? {
+                  seriesLabel: this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode',
+                  period: formatPeriodLabel(this.range, this.continuous, s.compare_window_start, s.compare_window_end, false),
+                  ...this.seriesStatsFor(s, s.compare_points, s.compare_window_end),
+                }
+              : null;
             return {
               entityId: s.entity_id,
               name: this.entityNames[s.entity_id] || s.friendly_name,
               color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length],
-              last: values.length ? formatted(values[values.length - 1]) : '—',
-              min: minima.length ? formatted(Math.min(...minima)) : '—',
-              max: maxima.length ? formatted(Math.max(...maxima)) : '—',
-              average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
-              sum: hasSum ? (values.length ? sumFormatted : '—') : null,
+              ...this.seriesStatsFor(s, s.points, this.windowEnd),
+              compare,
             };
           });
         },

@@ -437,6 +437,21 @@
                 <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
                 <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
               </span>
+              <!-- Gedämpfte Unterzeile für die Vergleichsperiode (Vorjahr/
+                   Vorperiode) — ohne sie war nicht erkennbar, welche der zwei
+                   Balkenreihen je Entität "aktuell" und welche "Vorjahr" ist
+                   (ECharts' eigene Legende ist oben stummgeschaltet). -->
+              <div class="compare-row" x-show="chartStats && stat.compare">
+                <span class="dot" :style="{background: stat.color}"></span>
+                <span class="compare-label" x-text="stat.compare ? stat.compare.seriesLabel + (stat.compare.period ? ' ' + stat.compare.period : '') : ''"></span>
+                <span class="values">
+                  <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="stat.compare?.last"></strong></span>
+                  <span x-show="legendMetrics.includes('min')">Min <strong x-text="stat.compare?.min"></strong></span>
+                  <span x-show="legendMetrics.includes('max')">Max <strong x-text="stat.compare?.max"></strong></span>
+                  <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.compare?.average"></strong></span>
+                  <span x-show="legendMetrics.includes('sum') && stat.compare?.sum !== null">Σ <strong x-text="stat.compare?.sum"></strong></span>
+                </span>
+              </div>
             </button>
           </template>
         </div>
@@ -470,12 +485,33 @@
                       <span class="dot" :style="{background: stat.color}"></span>
                       <span x-text="stat.name"></span>
                     </span>
+                    <!-- Gedämpfte Unterzeile statt einer zweiten Tabellenzeile —
+                         x-for erzeugt pro Iteration genau ein Wurzelelement
+                         (die <tr>), eine zusätzliche Vergleichs-<tr> ließe sich
+                         darin nicht sauber unterbringen. Analog zur Chip-Legende
+                         daneben. -->
+                    <span class="legend-compare-label" x-show="stat.compare" x-text="stat.compare ? '↳ ' + stat.compare.seriesLabel + (stat.compare.period ? ' ' + stat.compare.period : '') : ''"></span>
                   </td>
-                  <td x-show="legendMetrics.includes('last')" x-text="stat.last"></td>
-                  <td x-show="legendMetrics.includes('min')" x-text="stat.min"></td>
-                  <td x-show="legendMetrics.includes('max')" x-text="stat.max"></td>
-                  <td x-show="legendMetrics.includes('average')" x-text="stat.average"></td>
-                  <td x-show="legendMetrics.includes('sum')" x-text="stat.sum ?? '—'"></td>
+                  <td x-show="legendMetrics.includes('last')">
+                    <span x-text="stat.last"></span>
+                    <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.last"></span>
+                  </td>
+                  <td x-show="legendMetrics.includes('min')">
+                    <span x-text="stat.min"></span>
+                    <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.min"></span>
+                  </td>
+                  <td x-show="legendMetrics.includes('max')">
+                    <span x-text="stat.max"></span>
+                    <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.max"></span>
+                  </td>
+                  <td x-show="legendMetrics.includes('average')">
+                    <span x-text="stat.average"></span>
+                    <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.average"></span>
+                  </td>
+                  <td x-show="legendMetrics.includes('sum')">
+                    <span x-text="stat.sum ?? '—'"></span>
+                    <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare ? (stat.compare.sum ?? '—') : ''"></span>
+                  </td>
                 </tr>
               </template>
             </tbody>
