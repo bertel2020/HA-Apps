@@ -32,8 +32,11 @@
       {value: 'last', label: 'Aktuell'},
       {value: 'min', label: 'Min'},
       {value: 'max', label: 'Max'},
-      {value: 'average', label: 'Durchschnitt'},
-      {value: 'sum', label: 'Summe'},
+      // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
+      // Zeichen wie in der Legende selbst (Ø) und in chart_editor.js
+      // (LEGEND_METRIC_OPTIONS, identische Begründung dort).
+      {value: 'average', label: 'Ø'},
+      {value: 'sum', label: 'Σ'},
     ];
     // Rohwerte kommen als JS-Floats mit Rauschen im letzten Bit (z. B. 0.0003999999998995918
     // statt 0.0004) — bei DECIMALS=null (Automatisch) auf 4 signifikante Stellen runden statt

@@ -267,6 +267,34 @@
     };
   }
 
+  // Hover auf eine Legendenzeile hebt bei einer Donut-Kachel den zugehörigen
+  // Slice hervor — dieselbe highlight/showTip- bzw. downplay/hideTip-Aktion
+  // wie in chart_editor.js (highlightDonutSlice()/unhighlightDonutSlice(),
+  // dort mit derselben Begründung: #storage-pie/.edash-share-donut machen es
+  // genauso). Nur bei chartType 'donut' aktiv — bei Linie/Balken hätte
+  // seriesIndex:0 kombiniert mit einem Datenpunkt-Namen keine sinnvolle
+  // Entsprechung (dort ist jede Serie, nicht jeder Datenpunkt, ein
+  // Legendeneintrag).
+  function hoverTileLegendItem(legendEl, entering) {
+    return (e) => {
+      const item = e.target.closest('.chart-legend-item, .chart-legend-table-row');
+      if (!item || !legendEl.contains(item)) return;
+      const tile = legendEl.closest('.dtile');
+      if (tile?.querySelector('.dtile-body')?.dataset.chartType !== 'donut') return;
+      const chartId = tile?.dataset.itemId;
+      const seriesName = item.dataset.series;
+      const chart = instances.get(chartId);
+      if (!chartId || !seriesName || !chart) return;
+      if (entering) {
+        chart.dispatchAction({type: 'highlight', seriesIndex: 0, name: seriesName});
+        chart.dispatchAction({type: 'showTip', seriesIndex: 0, name: seriesName});
+      } else {
+        chart.dispatchAction({type: 'downplay', seriesIndex: 0, name: seriesName});
+        chart.dispatchAction({type: 'hideTip'});
+      }
+    };
+  }
+
   function setupLegendToggles() {
     document.querySelectorAll('.dtile-legend').forEach(legendEl => {
       if (legendEl.dataset.toggleBound) return;
@@ -276,6 +304,8 @@
       legendEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') handler(e);
       });
+      legendEl.addEventListener('mouseover', hoverTileLegendItem(legendEl, true));
+      legendEl.addEventListener('mouseout', hoverTileLegendItem(legendEl, false));
     });
   }
 
@@ -312,6 +342,11 @@
     // echter Übergänge gezeichnet).
     const chartType = el.dataset.chartType || 'auto';
     const timeline = chartType === 'timeline';
+    // "Darstellungsart" Donut (Optionen-Menü der Chart-Seite) — Kachel-
+    // Parität zu chart_editor.js renderDonut(), siehe donut-Zweig weiter
+    // unten und renderTileDonut().
+    const donut = chartType === 'donut';
+    const donutAggregation = el.dataset.donutAggregation || 'sum';
     // Nachkommastellen-Override (Optionen-Menü, "Darstellung") — bei "Auto"
     // behält jede Serie ihre eigene entities.decimals-Einstellung (s.decimals,
     // vom Server je Entität geliefert), sonst gilt dieser Wert für ALLE Serien
@@ -445,6 +480,10 @@
     // ohnehin keinen Sinn ergäbe.
     if (timeline) {
       renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
+      return;
+    }
+    if (donut) {
+      renderTileDonut(chart, series, entityNames, colorIndexFor, donutAggregation, effectiveDecimals, style, surface, chartId);
       return;
     }
 
@@ -952,6 +991,65 @@
   // Zentral in static/js/number-format.js (window.NumberFormat) — dieselbe
   // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
   const fmtCompactNumber = NumberFormat.fmt;
+
+  // Donut statt Zeitverlauf ("Darstellungsart", Optionen-Menü der Chart-
+  // Seite) — Kachel-Parität zu chart_editor.js renderDonut(): ein Anteil je
+  // Serie aus GENAU EINEM aggregierten Wert (aggregation: Summe/Durchschnitt/
+  // Letzter Wert der bereits geladenen Punkte), keine Zeitachse. Dieselbe
+  // Radius-/Emphasis-Konfiguration wie #storage-pie (statistik.js) und
+  // .edash-share-donut (energiedashboard.js) — label:show:false, weil die
+  // Namen schon in der .dtile-legend-Zeile stehen (renderTile() baut sie VOR
+  // diesem Zweig, siehe renderLegend()-Aufruf dort, unverändert wiederverwendet).
+  function renderTileDonut(chart, series, entityNames, colorIndexFor, aggregation, effectiveDecimals, style, surface, chartId) {
+    const data = series.map(s => {
+      const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
+      let value = 0;
+      if (values.length) {
+        if (aggregation === 'average') value = values.reduce((sum, v) => sum + v, 0) / values.length;
+        else if (aggregation === 'last') value = values[values.length - 1];
+        else value = values.reduce((sum, v) => sum + v, 0);
+      }
+      return {
+        name: entityNames[s.entity_id] || s.friendly_name,
+        value: Math.max(0, value),
+        itemStyle: {color: PALETTE[colorIndexFor(s.entity_id) % PALETTE.length]},
+      };
+    });
+    // Serien-Umschalter der Legende (toggleTileLegendItem()) wirkt bei
+    // type:'pie' auf einzelne DATENPUNKTE statt auf ganze Serien — ECharts
+    // behandelt jeden data-Eintrag wie einen eigenen Legendeneintrag (per
+    // name), legendToggleSelect trifft darüber trotzdem genau den richtigen
+    // Slice. Ohne dieses (unsichtbare, show:false — wie im Zeitverlauf-Zweig
+    // oben) legend-Objekt hätte die Aktion nichts zum Umschalten.
+    const hiddenSet = legendHidden.get(chartId);
+    const legendSelected = {};
+    data.forEach(d => { legendSelected[d.name] = !hiddenSet || !hiddenSet.has(d.name); });
+    chart.setOption({
+      legend: {show: false, data: data.map(d => d.name), selected: legendSelected},
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: surface,
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
+        formatter: p => {
+          const s = series[p.dataIndex];
+          const unit = s.unit ? ` ${s.unit}` : '';
+          return `${p.marker} ${p.name}: <strong>${fmtCompactNumber(p.value, effectiveDecimals(s))}${unit}</strong> (${fmtCompactNumber(p.percent, 1)} %)`;
+        },
+        appendToBody: true,
+      },
+      series: [{
+        type: 'pie',
+        radius: ['52%', '85%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: true,
+        label: {show: false},
+        labelLine: {show: false},
+        itemStyle: {borderColor: surface, borderWidth: 2},
+        emphasis: {scaleSize: 6, itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'}},
+        data,
+      }],
+    }, true);
+  }
 
   // Kompakte Vorschau einer Vergleichstabelle-Kachel — dieselbe Rechenlogik
   // wie der volle Editor (static/js/table-compute.js). Zeigt IMMER alle

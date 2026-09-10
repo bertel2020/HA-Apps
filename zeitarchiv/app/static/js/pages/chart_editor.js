@@ -12,8 +12,14 @@
       {value: 'last', label: 'Aktuell'},
       {value: 'min', label: 'Min'},
       {value: 'max', label: 'Max'},
-      {value: 'average', label: 'Durchschnitt'},
-      {value: 'sum', label: 'Summe'},
+      // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
+      // Zeichen, mit denen Durchschnitt/Summe schon überall sonst in der App
+      // beschriftet sind (Ø in der Legende selbst, s. u.; Ø auch in der
+      // Durchschnittslinie, siehe averageOf()-Verwendung). "Aktuell"/"Min"/
+      // "Max" bleiben Text — dafür gibt es kein vergleichbar etabliertes,
+      // eindeutiges Zeichen in dieser App.
+      {value: 'average', label: 'Ø'},
+      {value: 'sum', label: 'Σ'},
     ];
 
     // Feste Farbfolge statt ECharts' Auto-Zuordnung — nur so lässt sich bei
@@ -393,6 +399,14 @@
         // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
         // Chart gespeicherte Wahl verwerfen.
         timeline: CHART_TYPE === 'timeline',
+        // Donut statt Zeitverlauf — ein Anteil je Serie (Summe/Durchschnitt/
+        // Letzter Wert, siehe donutAggregation) statt einer Zeitachse.
+        // Eigenes Feld statt eines dritten timeline-artigen Strings, weil
+        // beide Darstellungsarten im Menü als ZWEI verschiedene Zeilen
+        // auftreten (Darstellungsart oben, Zeitstrahl darunter, nur bei
+        // Zeitverlauf sichtbar) — siehe setDisplayMode()/render() unten.
+        donut: CHART_TYPE === 'donut',
+        donutAggregation: DONUT_AGGREGATION,
         resolutionPreset: RESOLUTION_PRESET,
         dynamicYAxis: DYNAMIC_Y_AXIS,
         // Min/Max/Ø in der Legende statt einer separaten Kachel-Reihe (siehe
@@ -476,11 +490,10 @@
         // ein Widerspruch, deshalb schließen sich beide aus — dieselbe
         // Konvention wie "Gestapelt" + "Vergleichen".
         get canStack() { return !this.singleBucket && this.series.filter(s => s.chart_type === 'bar').length >= 2; },
-        // "Ausrichtung" (Vertikal/Horizontal) nur im Ranking-Vergleich
-        // sinnvoll — dort stehen Entitätsnamen auf der Kategorie-Achse, bei
-        // jeder anderen Auflösung ist die Kategorie-/Zeit-Achse eine
-        // Zeitachse ohne lange, unterschiedlich lange Beschriftungen.
-        get canGoHorizontal() { return this.singleBucket; },
+        // "Ausrichtung" (Vertikal/Horizontal, Optionen-Menü) — setHorizontal()
+        // weiter unten, statt eines eigenen canGoHorizontal-Getters: die Zeile
+        // ist jetzt immer sichtbar, "Horizontal" schaltet den dafür nötigen
+        // Ranking-Vergleich (Auflösung "Voll") selbst mit ein.
         // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
         // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
         // timeline-Kommentar oben.
@@ -634,6 +647,22 @@
           }
           this.render();
         },
+        // "Ausrichtung" (Vertikal/Horizontal, Optionen-Menü) — kehrt die
+        // frühere Abhängigkeit um: nicht mehr "Auflösung: Voll" schaltet
+        // diese Zeile erst frei, sondern "Horizontal" schaltet selbst in den
+        // dafür nötigen Ranking-Vergleich (Auflösung "Voll", s. singleBucket).
+        // Zurück auf "Vertikal" setzt die Auflösung auf "Automatisch" —
+        // bewusst nicht auf den vorherigen Wert: der müsste sonst extra
+        // gemerkt werden, nur um ihn beim nächsten Wechsel wieder zu
+        // verwerfen. onResolutionChange() übernimmt dieselben Folgeschritte
+        // wie bei manueller Auswahl im Auflösung-Dropdown (Vergleich/
+        // Dynamische Y-Achse abschalten, rollierendes Fenster ggf. neu laden).
+        setHorizontal(value) {
+          if (value === this.horizontal) return;
+          this.horizontal = value;
+          this.resolutionPreset = value ? 'full' : 'auto';
+          this.onResolutionChange();
+        },
         setCompareMode(mode) {
           this.compare = true;
           this.compareMode = mode;
@@ -657,6 +686,24 @@
           if (idx === -1) this.legendHiddenIds.push(entityId);
           else this.legendHiddenIds.splice(idx, 1);
           if (chartInstance) chartInstance.dispatchAction({type: 'legendToggleSelect', name: seriesName});
+        },
+        // Hover auf eine Legendenzeile hebt bei aktivem Donut den zugehörigen
+        // Slice hervor — dasselbe highlight/showTip- bzw. downplay/hideTip-
+        // Aktionspaar wie #storage-pie (statistik.js) und .edash-share-donut
+        // (energiedashboard.js), dort mit derselben Begründung: Tabelle/
+        // Legende übernimmt die Funktion einer echten Legende, Hover soll sie
+        // spürbar mit dem Ring verbinden. Nur bei Donut aktiv (sonst kein
+        // "seriesIndex: 0"-Kreisdiagramm zum Hervorheben) und nur wenn schon
+        // gerendert wurde (chartInstance existiert erst nach dem ersten load()).
+        highlightDonutSlice(name) {
+          if (!this.donut || !chartInstance) return;
+          chartInstance.dispatchAction({type: 'highlight', seriesIndex: 0, name});
+          chartInstance.dispatchAction({type: 'showTip', seriesIndex: 0, name});
+        },
+        unhighlightDonutSlice(name) {
+          if (!this.donut || !chartInstance) return;
+          chartInstance.dispatchAction({type: 'downplay', seriesIndex: 0, name});
+          chartInstance.dispatchAction({type: 'hideTip'});
         },
         // Raw-Modus (Rohwerte) und Periodenvergleich schließen sich gegenseitig
         // aus — dieselbe Begründung wie auf der Entität-eigenen Chart-Seite:
@@ -693,6 +740,34 @@
           if (this.timeline) { this.raw = true; this.compare = false; }
           else { this.raw = false; }
           this.load();
+        },
+        // "Darstellungsart" (Optionen-Menü, oberste Zeile unter
+        // "Darstellung") — Zeitverlauf (bisheriges Linie/Balken/Zeitstrahl,
+        // s. u.) oder Donut (renderDonut()). Reines render() statt load():
+        // der Donut aggregiert dieselben bereits geladenen Punkte nur anders
+        // (wie toggleStacked()), braucht also keine neue Serverabfrage.
+        // compare wird abgeschaltet wie bei toggleStacked()/toggleTimeline()
+        // — eine Vorperiode-Nebenserie ergibt für einen Anteil am Ganzen
+        // keinen sinnvoll darstellbaren zweiten Wert.
+        setDisplayMode(mode) {
+          const wantDonut = mode === 'donut';
+          if (wantDonut === this.donut) return;
+          this.donut = wantDonut;
+          if (wantDonut) {
+            this.compare = false;
+            // render() prüft this.timeline VOR this.donut (s. o.) — ein noch
+            // aktives Zeitstrahl bliebe sonst trotz gewähltem Donut weiter
+            // sichtbar, obwohl die Darstellungsart-Zeile schon "Donut" zeigt.
+            this.timeline = false;
+            // renderDonut() summiert/mittelt/liest den letzten Wert der
+            // bereits geladenen Punkte direkt — bei Rohwerten (raw=true)
+            // wären das bei Zählern kumulierte Zählerstände statt Bucket-
+            // Deltas, ihre Summe damit bedeutungslos. load() statt render(),
+            // falls raw noch aktiv war: this.series enthält dann noch die
+            // alten Rohpunkte, nicht die passenden Bucket-Werte.
+            if (this.raw) { this.raw = false; this.load(); return; }
+          }
+          this.render();
         },
 
         async load() {
@@ -778,6 +853,10 @@
 
           if (this.timeline) {
             this.renderTimelineMulti(fmt);
+            return;
+          }
+          if (this.donut) {
+            this.renderDonut();
             return;
           }
 
@@ -1380,6 +1459,74 @@
           chartInstance.resize();
         },
 
+        // Donut statt Zeitverlauf ("Darstellungsart") — ein Anteil je Serie
+        // aus GENAU EINEM aggregierten Wert (donutAggregation: Summe/
+        // Durchschnitt/Letzter Wert), keine Zeitachse. Nutzt this.series
+        // direkt (dieselben rohen, ungebuckelten Punkte wie seriesStats()
+        // für die Legende) statt der resampelten preparedPoints aus render()
+        // — eine Bucket-Verfeinerung ergibt für einen einzigen Werte je
+        // Serie keinen Sinn. Dieselbe Radius-/Emphasis-/Tooltip-Konfiguration
+        // wie #storage-pie (statistik.js) und .edash-share-donut
+        // (energiedashboard.js), damit ein Donut in der ganzen App gleich
+        // aussieht — inklusive label:show:false: die Namen stehen bereits in
+        // der Legende darunter (chart-legend/chart-legend-table, unverändert
+        // wiederverwendet), eine zweite Beschriftung im Ring selbst wäre
+        // Redundanz.
+        renderDonut() {
+          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          const surface = getComputedStyle(document.body).getPropertyValue('--surface');
+          const data = this.series.map(s => {
+            const values = s.points.map(p => p.value).filter(Number.isFinite);
+            let value = 0;
+            if (values.length) {
+              if (this.donutAggregation === 'average') value = values.reduce((sum, v) => sum + v, 0) / values.length;
+              else if (this.donutAggregation === 'last') value = values[values.length - 1];
+              else value = values.reduce((sum, v) => sum + v, 0);
+            }
+            return {
+              name: this.entityNames[s.entity_id] || s.friendly_name,
+              value: Math.max(0, value),
+              itemStyle: {color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length]},
+            };
+          });
+          // Serien-Umschalter der Legende (toggleLegendItem()/legendHiddenIds)
+          // wirkt bei type:'pie' auf einzelne DATENPUNKTE statt auf ganze
+          // Serien — ECharts behandelt jeden data-Eintrag wie einen eigenen
+          // Legendeneintrag (per name), legendToggleSelect trifft darüber
+          // trotzdem genau den richtigen Slice. Ohne dieses (unsichtbare,
+          // show:false — wie im Zeitverlauf-Zweig oben) legend-Objekt hätte
+          // die Aktion nichts zum Umschalten: die Legendenzeile blendete sich
+          // dann selbst ab, ohne den Ring zu ändern.
+          const legendSelected = {};
+          this.series.forEach(s => {
+            legendSelected[this.entityNames[s.entity_id] || s.friendly_name] = !this.legendHiddenIds.includes(s.entity_id);
+          });
+          chartInstance.setOption({
+            legend: {show: false, data: data.map(d => d.name), selected: legendSelected},
+            tooltip: {
+              trigger: 'item',
+              formatter: p => {
+                const s = this.series[p.dataIndex];
+                const unit = s.unit ? ` ${s.unit}` : '';
+                return `${p.marker} ${p.name}: <strong>${fmtNum(p.value, this.effectiveDecimals(s))}${unit}</strong> (${fmtNum(p.percent, 1)} %)`;
+              },
+              appendToBody: true,
+            },
+            series: [{
+              type: 'pie',
+              radius: ['52%', '85%'],
+              center: ['50%', '50%'],
+              avoidLabelOverlap: true,
+              label: {show: false},
+              labelLine: {show: false},
+              itemStyle: {borderColor: surface, borderWidth: 2},
+              emphasis: {scaleSize: 6, itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'}},
+              data,
+            }],
+          }, true);
+          chartInstance.resize();
+        },
+
         async save() {
           if (!this.name.trim()) { appAlert('Bitte einen Namen für das Chart angeben.'); return; }
           if (this.selectedEntityIds.length === 0) { appAlert('Bitte mindestens eine Entität auswählen.'); return; }
@@ -1407,7 +1554,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.timeline ? 'timeline' : 'auto',
+            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : 'auto'),
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
@@ -1416,6 +1563,7 @@
             normalize: this.normalize,
             average_style: this.averageStyle,
             horizontal: this.horizontal,
+            donut_aggregation: this.donutAggregation,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;

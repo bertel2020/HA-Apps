@@ -3013,12 +3013,18 @@ _CHART_LEGEND_STYLES = {"chips", "table"}
 # "timeline" nur clientseitig erzwingbar, wenn tatsächlich alle Serien
 # Schalter sind (siehe allSwitch-Getter in chart_editor.html) — hier nur
 # generell als gültiger Wert zugelassen, dieselbe Konvention wie
-# _ENTITY_CHART_TYPES oben.
-_CHART_EDITOR_CHART_TYPES = {"auto", "timeline"}
+# _ENTITY_CHART_TYPES oben. "donut" ist die dritte, chart-weite
+# Darstellungsart (Optionen-Menü, "Darstellungsart") — ein Anteil je Serie
+# statt eines Zeitverlaufs, siehe chart_editor.js renderDonut().
+_CHART_EDITOR_CHART_TYPES = {"auto", "timeline", "donut"}
 # "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
 # Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
 # siehe chart_editor.js render()/movingAverage().
 _CHART_AVERAGE_STYLES = {"flat", "rolling"}
+# "Aggregation" (Optionen-Menü, nur bei Darstellungsart "Donut" sichtbar) —
+# welcher Einzelwert je Serie deren Anteil am Donut bildet, siehe
+# chart_editor.js renderDonut().
+_CHART_DONUT_AGGREGATIONS = {"sum", "average", "last"}
 
 # Optionen-Menü der Entität-eigenen Chart-Seite (entity_detail.html) — im
 # Gegensatz zum Chart-Editor (saved_charts, ein Feld pro Chart) hier zweistufig:
@@ -3116,19 +3122,22 @@ _CHART_TYPE_LABELS = {
     "linie": "Linie",
     "balken": "Balken",
     "gemischt": "Linie + Balken",
+    "donut": "Donut",
 }
 
 
 def _chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
     """Wie das Chart tatsächlich gezeichnet wird, für die Übersichtskachel.
 
-    Gespeichert ist nur "auto" oder "timeline" — bei "auto" entscheidet der
-    Aggregationstyp JEDER Entität einzeln (Zähler/Schalter → Balken, sonst
+    Gespeichert ist "auto", "timeline" oder "donut" — bei "auto" entscheidet
+    der Aggregationstyp JEDER Entität einzeln (Zähler/Schalter → Balken, sonst
     Linie, dieselbe Regel wie _resolved_chart_type() in storage/query.py).
     Ein Chart kann deshalb beides zugleich enthalten. Ein Chart ohne
     Entitäten hat keinen Typ — leere Kennung, Kachel ohne Streifen."""
     if chart["chart_type"] == "timeline":
         return "zeitstrahl"
+    if chart["chart_type"] == "donut":
+        return "donut"
     vorhanden = {
         "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
         for entity_id in chart["entity_ids"]
@@ -3200,6 +3209,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "normalize": chart["normalize"] if chart else False,
         "average_style": chart["average_style"] if chart else "flat",
         "horizontal": chart["horizontal"] if chart else False,
+        "donut_aggregation": chart["donut_aggregation"] if chart else "sum",
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
@@ -3265,6 +3275,7 @@ class _SaveChartBody(BaseModel):
     normalize: bool = False
     average_style: str = "flat"
     horizontal: bool = False
+    donut_aggregation: str = "sum"
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3297,6 +3308,8 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
     if body.average_style not in _CHART_AVERAGE_STYLES:
         raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
+    if body.donut_aggregation not in _CHART_DONUT_AGGREGATIONS:
+        raise HTTPException(status_code=400, detail="Ungültige Donut-Aggregation")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
@@ -3307,7 +3320,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
-        horizontal=body.horizontal,
+        horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
     )
     return {"id": chart_id}
 
@@ -3342,6 +3355,8 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
     if body.average_style not in _CHART_AVERAGE_STYLES:
         raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
+    if body.donut_aggregation not in _CHART_DONUT_AGGREGATIONS:
+        raise HTTPException(status_code=400, detail="Ungültige Donut-Aggregation")
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
@@ -3352,7 +3367,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
-        horizontal=body.horizontal,
+        horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
     )
     return {"id": chart_id}
 
@@ -3392,7 +3407,7 @@ def charts_duplicate(chart_id: int) -> dict:
         decimals=chart["decimals"], show_values=chart["show_values"],
         average_line=chart["average_line"], area_fill=chart["area_fill"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
-        horizontal=chart["horizontal"],
+        horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
     )
     return {"id": new_id}
 
@@ -3570,7 +3585,7 @@ def _dashboard_tiles_context(
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
-                "horizontal": c["horizontal"],
+                "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"],
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

@@ -99,7 +99,7 @@
                Entitäts-Chart (.toolbar-right in app.css). -->
           <div class="toolbar-right">
             <div class="menu-wrap" @click.outside="compareMenuOpen = false">
-              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || (stacked && canStack)" @click="compareMenuOpen = !compareMenuOpen">
+              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || (stacked && canStack) || donut" @click="compareMenuOpen = !compareMenuOpen">
                 <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
               </button>
               <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
@@ -113,10 +113,19 @@
               <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
                 Optionen <span class="chevron">▾</span>
               </button>
-              <div class="menu-popover" x-show="optionsMenuOpen" x-cloak
+              <div class="menu-popover menu-popover-wide" x-show="optionsMenuOpen" x-cloak
                    x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
                 <div class="menu-section-label">Daten</div>
-                <div class="menu-row">
+                <!-- Auflösung/Rohwerte betreffen die Feinheit INNERHALB des
+                     Abfragefensters (Bucket-Verfeinerung, roh statt gebuckelt)
+                     — der Donut hat keine Zeitachse mehr, sondern genau einen
+                     aggregierten Wert je Serie (siehe "Aggregation" unten),
+                     beide Zeilen wären dort wirkungslos. "Rollierend" bleibt
+                     dagegen sichtbar (Zeile weiter unten): das betrifft, WELCHES
+                     Fenster überhaupt abgefragt wird (rollierend vs.
+                     kalendarisch), nicht seine Feinheit — bleibt für den Donut
+                     genauso eine echte Wahl wie im Zeitverlauf. -->
+                <div class="menu-row" x-show="!donut">
                   <span class="menu-row-label">Auflösung
                     <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
                   </span>
@@ -166,7 +175,7 @@
                      — beides war bisher nur ein toter bzw. deaktivierter
                      Schalter. Das :disabled bleibt für die Zeitraum-Grenze:
                      Rohwerte gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
-                <label class="menu-row" x-show="!timeline && hasLineSeries">
+                <label class="menu-row" x-show="!timeline && !donut && hasLineSeries">
                   <span class="menu-row-label">Rohwerte</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
@@ -175,14 +184,45 @@
                 </label>
                 <div class="menu-divider"></div>
                 <div class="menu-section-label">Darstellung</div>
-                <label class="menu-row" x-show="allSwitch">
+                <!-- Chart-weite Darstellungsart, oberste Zeile dieses
+                     Abschnitts: "Zeitverlauf" ist alles bisherige (Linie/
+                     Balken/Zeitstrahl, siehe die Zeile darunter), "Donut"
+                     ersetzt die Zeitachse durch einen Anteil je Serie
+                     (renderDonut() in chart_editor.js). Eigene seg-Zeile statt
+                     eines Schalters, dieselbe Begründung wie "Anteile (%)"
+                     unter "Gestapelt" weiter unten: zwei sich ausschließende
+                     Knöpfe erklären sich selbst, ein Toggle bräuchte einen
+                     dritten Satz dafür, wogegen er wirkt. -->
+                <div class="menu-row menu-row-stack">
+                  <span class="menu-row-label">Darstellungsart</span>
+                  <div class="seg">
+                    <button :class="{active: !donut}" @click="setDisplayMode('timeseries')">Zeitverlauf</button>
+                    <button :class="{active: donut}" @click="setDisplayMode('donut')">Donut (Anteile)</button>
+                  </div>
+                </div>
+                <!-- Nur bei aktivem Donut sichtbar — bestimmt, welcher
+                     Einzelwert je Serie (Summe/Durchschnitt/Letzter Wert der
+                     bereits geladenen Punkte) deren Slice-Größe ergibt.
+                     Unabhängig von "Statistik in Legende" weiter unten: die
+                     Legende nennt weiterhin alle gewählten Kennzahlen, diese
+                     Zeile bestimmt nur, welche davon den Donut selbst
+                     zeichnet. -->
+                <div class="menu-row menu-row-stack" x-show="donut">
+                  <span class="menu-row-label">Aggregation</span>
+                  <div class="seg">
+                    <button :class="{active: donutAggregation === 'sum'}" @click="donutAggregation = 'sum'; render()">Summe</button>
+                    <button :class="{active: donutAggregation === 'average'}" @click="donutAggregation = 'average'; render()">Durchschnitt</button>
+                    <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">Letzter Wert</button>
+                  </div>
+                </div>
+                <label class="menu-row" x-show="allSwitch && !donut">
                   <span class="menu-row-label">Zeitstrahl</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="timeline" @change="toggleTimeline()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <label class="menu-row" x-show="hasLineSeries">
+                <label class="menu-row" x-show="hasLineSeries && !donut">
                   <span class="menu-row-label">Punkte</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render()">
@@ -193,7 +233,7 @@
                      dezente Füllfläche unter Linien-Serien. Dort fest an, hier
                      erstmals abschaltbar — Default an, damit ein Chart hier
                      nicht anders aussieht als angeheftet auf einem Dashboard. -->
-                <label class="menu-row" x-show="hasLineSeries">
+                <label class="menu-row" x-show="hasLineSeries && !donut">
                   <span class="menu-row-label">Fläche</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="areaFill" @change="areaFill = !areaFill; render()">
@@ -209,7 +249,7 @@
                      existiert unterhalb von zwei Balken-Serien konzeptionell
                      gar nicht, es gibt also nichts zu erklären, was ein
                      deaktivierter Schalter noch anzeigen müsste. -->
-                <label class="menu-row" x-show="canStack">
+                <label class="menu-row" x-show="canStack && !donut">
                   <span class="menu-row-label">Gestapelt</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="stacked" @change="toggleStacked()">
@@ -227,35 +267,56 @@
                      neutrale Labels ("Absolut", nicht "... statt kWh") — ein
                      Chart kann auch °C- oder Dauer-Serien stapeln, nicht nur
                      kWh. -->
-                <div class="menu-row menu-row-stack" x-show="canStack && stacked">
+                <div class="menu-row menu-row-stack" x-show="canStack && stacked && !donut">
                   <span class="menu-row-label">Anteile (%)</span>
                   <div class="seg">
                     <button :class="{active: !normalize}" @click="normalize = false; render()">Absolut</button>
                     <button :class="{active: normalize}" @click="normalize = true; render()">Anteile (%)</button>
                   </div>
                 </div>
-                <!-- Nur bei Auflösung "Voll" (canGoHorizontal-Getter) — dort
-                     bekommt jede Entität ihre eigene Kategorie (Ranking-
-                     Vergleich, siehe render()/singleBucket), erst dann können
-                     lange Entitätsnamen auf der Achse überhaupt eng werden.
-                     Bei jeder anderen Auflösung ist die Kategorie-/Zeit-Achse
-                     eine Zeitachse mit kurzen, gleichförmigen Beschriftungen
-                     — dort gibt es nichts, was "Ausrichtung" ändern könnte. -->
-                <div class="menu-row menu-row-stack" x-show="canGoHorizontal">
+                <!-- "Horizontal" ergibt nur im Ranking-Vergleich Sinn (Auflösung
+                     "Voll" — jede Entität bekommt dort ihre eigene Kategorie,
+                     siehe render()/singleBucket, erst dann können lange
+                     Entitätsnamen auf der Achse eng werden). Statt die Zeile
+                     dafür zu VERSTECKEN, bis "Auflösung: Voll" schon manuell
+                     gewählt ist (zwei nötige Schritte, wovon der zweite bis
+                     zum ersten unsichtbar war), dreht setHorizontal() die
+                     Abhängigkeit um: die Zeile ist immer da (außer im Donut),
+                     "Horizontal" setzt beim Aktivieren selbst Auflösung "Voll"
+                     (das dafür Notwendige), beim Zurückwechseln auf "Vertikal"
+                     wieder "Automatisch" — ein Klick statt zwei.
+
+                     Bei aktivem "Gestapelt" ausgeblendet statt nur inert: ein
+                     Klick auf "Horizontal" würde über setHorizontal()
+                     Auflösung "Voll" erzwingen — canStack (s. o.) schließt
+                     "Voll" (singleBucket) aber explizit aus, "Gestapelt"
+                     bräche dadurch kommentarlos weg. Sichtbar zu lassen,
+                     obwohl der Klick die eigene Grundlage entzieht, wäre
+                     dieselbe Falle wie ein Schalter ohne erkennbare Wirkung.
+
+                     Geprüft wird "stacked && canStack" (wie beim Durch-
+                     schnittslinie-:disabled weiter unten), nicht das rohe
+                     stacked allein: wird "Voll" stattdessen direkt über die
+                     Auflösung-Auswahl gesetzt, bleibt stacked wie bisher
+                     unverändert (kein Reset dort) — ohne canStack in der
+                     Bedingung bliebe "Ausrichtung" dann fälschlich
+                     ausgeblendet, obwohl der Chart längst im Ranking-
+                     Vergleich steht, für den sie gedacht ist. -->
+                <div class="menu-row menu-row-stack" x-show="!donut && !(stacked && canStack)">
                   <span class="menu-row-label">Ausrichtung</span>
                   <div class="seg">
-                    <button :class="{active: !horizontal}" @click="horizontal = false; render()">Vertikal</button>
-                    <button :class="{active: horizontal}" @click="horizontal = true; render()">Horizontal</button>
+                    <button :class="{active: !horizontal}" @click="setHorizontal(false)">Vertikal</button>
+                    <button :class="{active: horizontal}" @click="setHorizontal(true)">Horizontal</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="hasBarSeries">
+                <label class="menu-row" x-show="hasBarSeries && !donut">
                   <span class="menu-row-label">Werte anzeigen</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <label class="menu-row">
+                <label class="menu-row" x-show="!donut">
                   <span class="menu-row-label">Dynamische Y-Achse</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
@@ -291,7 +352,7 @@
                      fremden Segment und würde als Segmentgrenze
                      missverstanden. Dieselbe Konvention wie "Rollierend"
                      bei Auflösung "Tag" weiter oben. -->
-                <label class="menu-row">
+                <label class="menu-row" x-show="!donut">
                   <span class="menu-row-label">Durchschnittslinie
                     <span class="menu-note" x-show="stacked && canStack">nicht im gestapelten Modus</span>
                   </span>
@@ -310,7 +371,7 @@
                      "Fläche" oben). Bei gemischten Linien-/Balken-Charts
                      bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
                      Linien-Serien. -->
-                <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries">
+                <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries && !donut">
                   <span class="menu-row-label">Darstellung</span>
                   <div class="seg">
                     <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">Flach</button>
@@ -362,7 +423,8 @@
         <div class="chart-legend" x-show="hasData && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
-                    @click="toggleLegendItem(stat.entityId, stat.name)">
+                    @click="toggleLegendItem(stat.entityId, stat.name)"
+                    @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
               <span class="dot" :style="{background: stat.color}"></span>
               <span class="name" x-text="stat.name"></span>
               <span class="values" x-show="chartStats">
@@ -370,7 +432,7 @@
                 <span x-show="legendMetrics.includes('min')">Min <strong x-text="stat.min"></strong></span>
                 <span x-show="legendMetrics.includes('max')">Max <strong x-text="stat.max"></strong></span>
                 <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
-                <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Summe <strong x-text="stat.sum"></strong></span>
+                <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
               </span>
             </button>
           </template>
@@ -392,13 +454,14 @@
                 <th x-show="legendMetrics.includes('min')">Min</th>
                 <th x-show="legendMetrics.includes('max')">Max</th>
                 <th x-show="legendMetrics.includes('average')">Ø</th>
-                <th x-show="legendMetrics.includes('sum')">Summe</th>
+                <th x-show="legendMetrics.includes('sum')">Σ</th>
               </tr>
             </thead>
             <tbody>
               <template x-for="stat in seriesStats" :key="stat.entityId">
                 <tr class="chart-legend-table-row" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
-                    @click="toggleLegendItem(stat.entityId, stat.name)">
+                    @click="toggleLegendItem(stat.entityId, stat.name)"
+                    @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
                   <td class="legend-name-col">
                     <span class="legend-name-cell">
                       <span class="dot" :style="{background: stat.color}"></span>
@@ -463,6 +526,7 @@
     const NORMALIZE = {{ normalize | tojson }};
     const AVERAGE_STYLE = {{ average_style | tojson }};
     const HORIZONTAL = {{ horizontal | tojson }};
+    const DONUT_AGGREGATION = {{ donut_aggregation | tojson }};
     // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
     // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
     // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart

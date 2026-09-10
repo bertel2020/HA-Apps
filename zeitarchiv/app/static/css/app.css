@@ -819,6 +819,11 @@ button.dd-picker-clear{
    (dort durch "Legenden-Stil" + Chips/Tabelle nötig) wären hier unnötig
    breit. */
 .menu-popover-narrow{width:190px;}
+/* Breitere Variante für Menüs, deren seg-Zeilen an der Standardbreite
+   umbrechen bzw. abgeschnitten wirken (Chart-Editor, "Aggregation":
+   Summe/Durchschnitt/Letzter Wert — drei Wörter in einer Zeile brauchen mehr
+   als die 290px, die "Legenden-Stil" bislang als breiteste Zeile brauchte). */
+.menu-popover-wide{width:340px;}
 
 /* Rechtsbündige Knopfgruppe am Ende einer .toolbar (Entitäts-Chart und
    Chart-Editor: "Vergleichen" + "Optionen"). Schiebt sich und alles danach an
