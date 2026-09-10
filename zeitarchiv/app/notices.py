@@ -193,6 +193,7 @@ def build_notices(
     host_disk_usage: dict | None = None,
     backup_worker_last_tick: float | None = None,
     backup_worker_in_progress: bool = False,
+    demo_dir_info: dict | None = None,
 ) -> list[dict]:
     """Ungefilterte, aktuell aktive Meldungen — auch stummgeschaltete sind
     hier noch enthalten (main.py braucht das z. B. beim Stummschalten selbst,
@@ -715,6 +716,25 @@ def build_notices(
             "link": "/housekeeping#entitaeten",
         })
 
+    # Demo-Modus (DEMO_MODUS_PLAN.md) — nur wenn main.py überhaupt einen
+    # demo_dir_info übergibt: das passiert ausschließlich, wenn DIESE
+    # Instanz NICHT selbst im Demo-Modus läuft (siehe demo_mode.py-Moduldoc)
+    # UND der Wartungsplaner ein <DATA_DIR>/demo mit Inhalt gefunden hat
+    # (BackgroundService._refresh_demo_dir_info_if_stale). severity "info",
+    # nicht "warn" — eine liegengebliebene Demo-Instanz ist kein Problem.
+    if demo_dir_info is not None:
+        notices.append({
+            "id": "system.demo_data_orphaned",
+            "severity": "info",
+            "title": "Demo-Daten vorhanden",
+            "detail": (
+                f"{format_size(demo_dir_info['size_bytes'])} unter <DATA_DIR>/demo — "
+                "Demo-Modus ist deaktiviert, die Daten liegen ungenutzt."
+            ),
+            "meta": "Demo-Daten",
+            "link": "/settings#demo-daten",
+        })
+
     # Ganz am Ende (niedrigste Priorität) — ein Tipp soll nie vor einer
     # echten Warnung/einem Fehler stehen. tips_enabled() global abschaltbar,
     # siehe Einstellungen → Meldungen.
@@ -936,6 +956,7 @@ def collect_notices(
     host_disk_usage: dict | None = None,
     backup_worker_last_tick: float | None = None,
     backup_worker_in_progress: bool = False,
+    demo_dir_info: dict | None = None,
 ) -> list[dict]:
     """Für die Anzeige in der Topnav — build_notices() abzüglich aktuell
     gültiger Stummschaltungen (beim Tipp bereits durch _current_tip_notice
@@ -946,7 +967,7 @@ def collect_notices(
         notice for notice in build_notices(
             index, index_path, tz, purge_totals, storage_reconcile, stale_entity_count,
             scheduler_last_tick, reconcile_last_tick, reconcile_in_progress, host_disk_usage,
-            backup_worker_last_tick, backup_worker_in_progress,
+            backup_worker_last_tick, backup_worker_in_progress, demo_dir_info,
         )
         if not _is_muted(notice, mutes.get(notice["id"]), now)
     ]

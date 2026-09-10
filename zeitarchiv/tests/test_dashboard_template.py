@@ -44,7 +44,7 @@ def _render_empty_dashboard() -> str:
         total_size="0 B",
         rows_sparkline=None,
         size_sparkline=None,
-        tiles=[],
+        groups=[{"title": None, "section_id": None, "tiles": []}],
         can_add_tile=True,
         unpinned_charts=[],
         unpinned_tables=[],
@@ -81,7 +81,7 @@ def test_dashboard_tile_has_three_by_three_size_picker_and_grid_spans() -> None:
     # wenn sich ihre Signatur ändert.
     environment.globals["asset"] = asset_helper
     html = environment.get_template("_dashboard_tiles.html").render(
-        tiles=[{
+        groups=[{"title": None, "section_id": None, "tiles": [{
             "kind": "chart",
             "id": 7,
             "name": "Großer Chart",
@@ -100,7 +100,7 @@ def test_dashboard_tile_has_three_by_three_size_picker_and_grid_spans() -> None:
             "decimals": "auto",
             "grid_cols": 2,
             "grid_rows": 3,
-        }],
+        }]}],
         can_add_tile=False,
         unpinned_charts=[],
         unpinned_tables=[],

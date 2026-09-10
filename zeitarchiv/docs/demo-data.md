@@ -5,6 +5,19 @@ realistisch aussehenden, synthetischen Beispieldaten — für Screenshots,
 Doku, eine vorzeigbare Demo-Instanz oder einfach zum lokalen Entwickeln ohne
 echte Home-Assistant-Anbindung.
 
+**Verhältnis zum Demo-Modus der App (ab 0.91.0):** Seit dem in-App
+„Demo-Modus" ([Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus),
+Add-on-Option, eigenes `<DATA_DIR>/demo`) teilen sich beide denselben
+Simulationskern (`app/demo_generation.py::run_generation()`, hierher
+ausgelagert — dieses Skript ist seither ein dünner CLI-Wrapper darum, siehe
+[Voraussetzungen](#voraussetzungen)). Der Unterschied ist der Anlass: Der
+Demo-Modus ist der Weg für Endnutzer und braucht dafür keinen Terminal-
+Zugriff, nur einen Add-on-Neustart — dieses Skript bleibt für alles, was der
+Demo-Modus nicht abdeckt: gezieltes Erzeugen in ein beliebiges
+Host-Verzeichnis außerhalb des Add-ons (Screenshots, lokale Entwicklung ohne
+laufenden Server, siehe [development.md](development.md)) sowie die
+Aktionen `--clear`/`--seed`, die es in der App-Oberfläche nicht gibt.
+
 Das Skript schreibt dabei **kein eigenes Format**, sondern nutzt denselben
 generischen Schreibkern, den auch der CSV- und Symcon-Import der App selbst
 verwenden (`app/storage/symcon_import.py::import_rows()`, siehe

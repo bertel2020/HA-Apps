@@ -1,5 +1,5 @@
 name: "Zeitarchiv"
-version: "0.90.2"
+version: "0.92.0"
 slug: "zeitarchiv"
 description: "Kompaktes Zeitreihen-Archiv für Home Assistant"
 url: "https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv"
@@ -28,8 +28,10 @@ backup_exclude:
 panel_icon: "mdi:database-clock"
 options:
   timezone: "Europe/Berlin"
+  demo_mode: false
 schema:
   timezone: "match(^[A-Za-z][A-Za-z0-9._+-]*(/[A-Za-z0-9][A-Za-z0-9._+-]*)*$)"
+  demo_mode: "bool"
 ports:
   8127/tcp: 8127
 ports_description:

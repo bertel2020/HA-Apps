@@ -315,6 +315,10 @@
     // zeichnet sie mit, damit ein angeheftetes Chart nicht anders aussieht als
     // dasselbe Chart auf seiner eigenen Seite.
     const averageLine = el.dataset.averageLine === 'true';
+    // "Fläche" (Optionen-Menü der Chart-Seite, chart_editor.js) — dieselbe
+    // dezente Füllfläche wie auf der eigenen Chart-Seite, damit ein
+    // angeheftetes Chart nicht anders aussieht als dasselbe Chart dort.
+    const areaFill = el.dataset.areaFill !== 'false';
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -565,8 +569,9 @@
         cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
-        // dank der niedrigen Deckkraft nicht.
-        cfg.areaStyle = {color, opacity: 0.08};
+        // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
+        // "Fläche"), Default an — siehe chart_editor.js.
+        if (areaFill) cfg.areaStyle = {color, opacity: 0.08};
       } else {
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
       }
@@ -1800,14 +1805,24 @@
   // gerenderter ECharts-Instanz) bleibt dabei erhalten, es wird nichts neu
   // angelegt. Persistiert wird erst bei dragend, ein einzelner Request mit
   // der kompletten neuen Reihenfolge statt eines Requests je Zwischenschritt.
+  //
+  // Zwei getrennte Drag-Arten seit den Sektionen (_dashboard_tiles.html):
+  // eine einzelne Kachel wandert zwischen den Mini-Rastern der Sektionen
+  // ([data-section-grid]), ein ganzer Sektionskopf (.dsection) nimmt beim
+  // Ziehen seine ganze Gruppe (.dgroup, Kopf + eigenes Mini-Raster) auf
+  // einmal mit — sie stecken schon im selben Container, es muss dafür
+  // nichts extra "eingesammelt" werden. Beide Drag-Arten laufen unabhängig
+  // nebeneinander (draggedTile/draggedGroup), die jeweils andere Ebene
+  // ignoriert dragover-Events, die nicht zu ihrer eigenen Art gehören.
   function setupDragAndDrop() {
-    const grid = document.getElementById('dashboard-grid');
-    if (!grid) return;
-    let draggedEl = null;
+    const shell = document.getElementById('dashboard-grid');
+    if (!shell) return;
+    let draggedTile = null;
+    let draggedGroup = null;
 
-    grid.querySelectorAll('.dtile[data-item-id]').forEach(tile => {
+    shell.querySelectorAll('.dtile[data-item-id]').forEach(tile => {
       tile.addEventListener('dragstart', (e) => {
-        draggedEl = tile;
+        draggedTile = tile;
         tile.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         // setData ist in Firefox Voraussetzung dafür, dass dragover/drop
@@ -1817,32 +1832,108 @@
       });
       tile.addEventListener('dragend', () => {
         tile.classList.remove('dragging');
-        if (draggedEl) persistOrder(grid);
-        draggedEl = null;
-      });
-      tile.addEventListener('dragover', (e) => {
-        if (!draggedEl || draggedEl === tile) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const rect = tile.getBoundingClientRect();
-        const before = (e.clientX - rect.left) < rect.width / 2;
-        tile.parentNode.insertBefore(draggedEl, before ? tile : tile.nextSibling);
+        if (draggedTile) persistOrder(shell);
+        draggedTile = null;
       });
     });
-    // Auf dem Raster selbst (statt nur je Kachel) abfangen, sonst bleibt ein
-    // Drop auf die Lücke zwischen zwei Kacheln oder auf die "+"-Kachel ohne
-    // Wirkung, weil dort kein "dragover"-preventDefault registriert ist —
-    // ohne das bricht der Browser den Drop grundsätzlich ab.
-    grid.addEventListener('dragover', (e) => e.preventDefault());
+    // Je Sektions-Raster statt einmal fürs ganze Dashboard, damit eine Kachel
+    // gezielt in EIN bestimmtes Mini-Raster fällt statt (wie vor den
+    // Sektionen) irgendwo auf der Seite. Am Raster selbst (statt nur je
+    // Kachel) abgefangen, sonst bleibt ein Drop auf die Lücke zwischen zwei
+    // Kacheln oder auf die "+"-Kachel ohne Wirkung.
+    shell.querySelectorAll('[data-section-grid]').forEach(grid => {
+      grid.addEventListener('dragover', (e) => {
+        if (!draggedTile) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const addTile = grid.querySelector('.dtile-add');
+        const after = Array.from(grid.querySelectorAll('.dtile[data-item-id]:not(.dragging)')).find(el => {
+          const r = el.getBoundingClientRect();
+          return e.clientY < r.top + r.height / 2
+            || (e.clientY < r.bottom && (e.clientX - r.left) < r.width / 2);
+        });
+        if (after) grid.insertBefore(draggedTile, after);
+        else if (addTile) grid.insertBefore(draggedTile, addTile);
+        else grid.appendChild(draggedTile);
+      });
+    });
+
+    shell.querySelectorAll('.dsection[data-item-id]').forEach(header => {
+      header.addEventListener('dragstart', (e) => {
+        draggedGroup = header.closest('.dgroup');
+        draggedGroup.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', `section:${header.dataset.itemId}`);
+      });
+      header.addEventListener('dragend', () => {
+        if (draggedGroup) {
+          draggedGroup.classList.remove('dragging');
+          // Verschiebt man ausgerechnet die Gruppe, die gerade die "+"-Kachel
+          // trägt, muss diese der neuen letzten Gruppe folgen — sonst bliebe
+          // sie mitten auf der Seite hängen, weil dieser Reorder-Request
+          // (anders als Pin/Unpin) kein frisches Fragment vom Server
+          // zurückbekommt, das sie neu platzieren würde.
+          ensureAddTileAnchored(shell);
+          persistOrder(shell);
+        }
+        draggedGroup = null;
+      });
+    });
+    // Reihenfolge der GRUPPEN selbst — auf der Hülle statt je Sektionskopf,
+    // damit auch ein Drop zwischen zwei Gruppen (nicht exakt auf einen
+    // anderen Kopf) greift. Bricht während einer einzelnen Kachel nichts:
+    // ohne aktiven Gruppen-Drag ist der Handler ein No-op, das darunter
+    // liegende [data-section-grid]-dragover bleibt dafür zuständig.
+    shell.addEventListener('dragover', (e) => {
+      if (!draggedGroup) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const after = Array.from(shell.querySelectorAll('.dgroup:not(.dragging)')).find(g => {
+        const r = g.getBoundingClientRect();
+        return e.clientY < r.top + r.height / 2;
+      });
+      if (after) shell.insertBefore(draggedGroup, after);
+      else shell.appendChild(draggedGroup);
+    });
   }
 
-  async function persistOrder(grid) {
-    const base = grid.dataset.appRoot || '';
-    const dashboardId = parseInt(grid.dataset.dashboardId || '1', 10);
-    const pins = Array.from(grid.querySelectorAll('.dtile[data-item-id]')).map(el => ({
-      item_type: el.dataset.itemType, item_id: parseInt(el.dataset.itemId, 10),
-      item_entity_id: el.dataset.itemEntityId || null,
-    }));
+  // Die "+"-Kachel hängt serverseitig immer an der zuletzt stehenden Gruppe
+  // (main.py _dashboard_tiles_context()). Ein Gruppen-Reorder ändert das
+  // clientseitig, ohne dass ein frisches Fragment vom Server kommt (siehe
+  // persistOrder() unten) — diese Funktion zieht die "+"-Kachel deshalb nach
+  // jedem Gruppen-Drag selbst in die jetzt tatsächlich letzte Gruppe um.
+  function ensureAddTileAnchored(shell) {
+    const addTile = shell.querySelector('.dtile-add');
+    if (!addTile) return;
+    const grids = shell.querySelectorAll('[data-section-grid]');
+    const lastGrid = grids[grids.length - 1];
+    if (lastGrid && addTile.parentElement !== lastGrid) lastGrid.appendChild(addTile);
+  }
+
+  async function persistOrder(shell) {
+    // Eine Kachel kann in oder aus einer eingeklappten Sektion gezogen worden
+    // sein — deren "N Kacheln ausgeblendet"-Zähler muss das mitbekommen.
+    updateSectionHiddenCounts(shell);
+    const base = shell.dataset.appRoot || '';
+    const dashboardId = parseInt(shell.dataset.dashboardId || '1', 10);
+    // Flach über alle Gruppen hinweg in ihrer aktuellen DOM-Reihenfolge —
+    // ein Sektionskopf (falls vorhanden) kommt vor den Kacheln seiner
+    // eigenen Gruppe, exakt wie /dashboard/reorder es für dashboard_pins
+    // erwartet (reorder_dashboard_pins() kennt item_type='section' bereits
+    // generisch mit, keine Sonderbehandlung nötig).
+    const pins = [];
+    shell.querySelectorAll('.dgroup').forEach(group => {
+      const header = group.querySelector('.dsection[data-item-id]');
+      if (header) {
+        pins.push({item_type: 'section', item_id: parseInt(header.dataset.itemId, 10), item_entity_id: null});
+      }
+      group.querySelectorAll('.dtile[data-item-id]').forEach(el => {
+        pins.push({
+          item_type: el.dataset.itemType, item_id: parseInt(el.dataset.itemId, 10),
+          item_entity_id: el.dataset.itemEntityId || null,
+        });
+      });
+    });
     try {
       await fetch(`${base}/dashboard/reorder`, {
         method: 'POST',
@@ -1858,10 +1949,60 @@
     }
   }
 
+  // Sektionen ein-/ausklappen — rein clientseitig, nur lokal im Browser
+  // gemerkt (kein Server-Feld, kein Sync über Geräte), dieselbe Konvention
+  // wie Sortierung/Favoriten auf der Dashboard-Liste (card-browser.js). Per
+  // Event-Delegation auf document statt in setup() gebunden: setup() bricht
+  // auf einem Dashboard ganz ohne Chart-/Tabellen-/Werte-Kacheln früh ab
+  // (nichts zu beobachten), Sektionen mit nur der "+"-Kachel müssten sich
+  // aber trotzdem ein-/ausklappen lassen.
+  function sectionCollapseKey(sectionId) {
+    return `zeitarchiv.dashboard.section.${sectionId}.collapsed`;
+  }
+
+  function updateSectionHiddenCounts(root) {
+    root.querySelectorAll('.dgroup[data-section-id]').forEach(group => {
+      const countEl = group.querySelector('.dsection-hidden-count');
+      if (!countEl) return;
+      const n = group.querySelectorAll('[data-section-grid] .dtile:not(.dtile-add)').length;
+      if (group.classList.contains('collapsed') && n > 0) {
+        countEl.hidden = false;
+        countEl.textContent = `(${n} Kachel${n === 1 ? '' : 'n'} ausgeblendet)`;
+      } else {
+        countEl.hidden = true;
+      }
+    });
+  }
+
+  function applySectionCollapseState(root) {
+    root.querySelectorAll('.dgroup[data-section-id]').forEach(group => {
+      let collapsed = false;
+      try {
+        collapsed = localStorage.getItem(sectionCollapseKey(group.dataset.sectionId)) === '1';
+      } catch (e) { /* ohne gemerkten Zustand bleibt die Sektion ausgeklappt */ }
+      group.classList.toggle('collapsed', collapsed);
+    });
+    updateSectionHiddenCounts(root);
+  }
+
+  document.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.dsection-toggle');
+    if (!toggle) return;
+    const group = toggle.closest('.dgroup');
+    if (!group) return;
+    const collapsed = !group.classList.contains('collapsed');
+    group.classList.toggle('collapsed', collapsed);
+    try {
+      localStorage.setItem(sectionCollapseKey(group.dataset.sectionId), collapsed ? '1' : '0');
+    } catch (err) { /* Zustand gilt dann nur für diesen Seitenaufruf */ }
+    updateSectionHiddenCounts(document);
+  });
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setup);
+    document.addEventListener('DOMContentLoaded', () => { setup(); applySectionCollapseState(document); });
   } else {
     setup();
+    applySectionCollapseState(document);
   }
   // Nach Pin/Unpin ersetzt htmx #dashboard-grid komplett (outerHTML) — alte
   // ECharts-Instanzen zeigen dann auf längst entfernte DOM-Knoten, deshalb
@@ -1872,6 +2013,7 @@
       instances.forEach(c => c.dispose());
       instances.clear();
       setup();
+      applySectionCollapseState(document);
     }
   });
 })();

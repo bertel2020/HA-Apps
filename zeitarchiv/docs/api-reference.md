@@ -55,10 +55,20 @@ Kategorien und ihre Bedeutung: [ingestion.md](ingestion.md).
 
 ## `GET /api/health`
 
-Authentifiziert wie `/api/write`. Antwort: `{"status": "ok", "version": "<aktuelle App-Version>"}`
-(z. B. `"0.60.0"`) — `version` wird zur Laufzeit aus der installierten App
-gelesen, nicht fest kodiert.
-Von der Integration für den Reauth-Fluss genutzt (falscher Token → 401).
+Authentifiziert wie `/api/write`. Antwort: `{"status": "ok", "version":
+"<aktuelle App-Version>", "demo_mode": bool}` (z. B. `"0.60.0"`) —
+`version` wird zur Laufzeit aus der installierten App gelesen, nicht fest
+kodiert. Von der Integration für den Reauth-Fluss genutzt (falscher Token
+→ 401).
+
+`demo_mode` steht hier — anders als bei den übrigen Feldern — bewusst
+**auch im 401-Fall** im Body (`detail` wird dafür zu
+`{"message": "...", "demo_mode": bool}` statt eines bloßen Strings): der
+einzige Endpunkt, den eine Integration mit einem gerade abgelehnten Token
+noch erreichen kann, und damit die einzige Stelle, an der sie vor einem
+Reauth unterscheiden kann, ob die Ablehnung an einem echten Tokenproblem
+liegt oder daran, dass die Instanz gerade im Demo-Modus läuft (siehe
+`custom_components/zeitarchiv/queue_writer.py::_probe_demo_mode()` dort).
 
 Alle drei öffentlichen Endpunkte akzeptieren zusätzlich den optionalen
 Header `X-Zeitarchiv-Integration-Version` — die Integration schickt darüber
@@ -67,10 +77,25 @@ zeigt sie in Einstellungen → Verbindung an und meldet per Notice, wenn die
 Integration veraltet ist oder eine neuere Version verfügbar wäre. Kein
 Einfluss auf Auth oder Schreibpfad, fehlt er, ändert sich nichts.
 
+**Keine erzwungene Versionsabhängigkeit zwischen App und Integration, in
+keine Richtung.** `MIN_SUPPORTED_INTEGRATION_VERSION`
+(`app/ha_integration.py`) ist ein rein informativer Mindestwert für die
+oben genannte Notice, kein Gate — Auth entscheidet ausschließlich über den
+Bearer-Token. Umgekehrt liest die Integration das `version`-Feld aus
+`/api/health` nirgends aus. `scripts/sync_versions.py` prüft die
+Integrationsversion (`manifest.json`) nur auf gültiges SemVer, gleicht sie
+aber nicht an die App-Version an (siehe [operations.md](operations.md)).
+Jedes neue Feld auf dieser Seite (`demo_mode` hier und in `/api/notices`
+unten, `latest_backup`) ist deshalb bewusst so codiert, dass eine ältere
+Integration gegen eine neuere App (fehlendes Feld → definierter
+Default/`None`) und eine neuere Integration gegen eine ältere App
+(fehlendes Feld → Rückfall auf bisheriges Verhalten) gleichermaßen
+funktionieren, ohne dass eine Seite die Version der anderen kennen muss.
+
 ## `GET /api/notices`
 
 Authentifiziert wie `/api/write`. Antwort: `{"notices": [...], "latest_backup":
-{...} | null}`.
+{...} | null, "demo_mode": bool}`.
 
 `notices` ist dieselbe gefilterte (stummschaltungsbereinigte) Meldungsliste
 wie im Glocken-Icon der Zeitarchiv-UI (siehe `notices.py`,
@@ -84,13 +109,19 @@ wenn noch keines gelungen ist (siehe `notices.latest_backup_info()`,
 erfolgreiche Lauf, nicht der letzte Lauf überhaupt: ein fehlgeschlagener
 oder noch laufender Job hat keine reale, kopierbare Datei.
 
+`demo_mode` spiegelt die Add-on-Option gleichen Namens (siehe
+[Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) — `true`, solange
+diese App-Instanz mit synthetischen Vorführ-/Testdaten statt der echten
+Archivdaten läuft. Fehlt das Feld (ältere App-Version vor 0.91.0), gilt für
+Konsumenten `false`.
+
 Grundlage für die HA-Integration: sie pollt diesen Endpunkt (60s) und macht
 aus `notices` Home-Assistant-Repairs (kritische Fälle) sowie
 `binary_sensor`-Entities (automatisierbare Dauerzustände) am
-Zeitarchiv-Gerät, und aus `latest_backup` die Sensor-Entity „Letztes
+Zeitarchiv-Gerät, aus `latest_backup` die Sensor-Entity „Letztes
 Backup" — Grundlage für ein Automations-Blueprint, das ein Offsite-Ziel
 für die Backup-Datei anstößt (Zeitarchiv selbst spricht kein
-S3/WebDAV/SMB).
+S3/WebDAV/SMB) — und aus `demo_mode` die Sensor-Entity „Betriebsmodus".
 
 ## `GET /api/query` (Ingress-intern)
 

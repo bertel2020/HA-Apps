@@ -132,6 +132,12 @@ class ApiDependencies:
     app_version: str
     collect_notices: Callable[[], list[dict]]
     latest_backup: Callable[[], dict | None]
+    # Grundlage für sensor.zeitarchiv_betriebsmodus (Integration) — siehe
+    # DEMO_MODUS_PLAN.md Punkt 11. Default False, damit die zahlreichen
+    # Test-Konstruktionsstellen dieser Dataclass (Schreib-/Lese-Endpunkte,
+    # die mit Demo-Modus nichts zu tun haben) nicht alle angefasst werden
+    # müssen — main.py setzt ihn explizit auf DEMO_MODE.
+    demo_mode_active: bool = False
 
 
 def expire_write_capture(capture: dict, now: float | None = None) -> bool:
@@ -357,12 +363,23 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
-        check_auth(
-            authorization,
-            getattr(request.state, "request_id", "-"),
-            x_zeitarchiv_integration_version,
-        )
-        return {"status": "ok", "version": deps.app_version}
+        """`demo_mode` steht seit DEMO_MODUS_REAUTH_PLAN.md im Body — bewusst
+        auch bei abgelehntem Token (401): das ist der einzige Endpunkt, den
+        eine Integration mit einem gerade abgelehnten Token noch erreichen
+        kann, und damit die einzige Stelle, an der sie "Ziel ist im
+        Demo-Modus" von "Token wirklich ungültig" unterscheiden kann, bevor
+        sie einen Reauth auslöst (siehe queue_writer.py dort). Kein
+        Datenleck: keine echten Werte, keine Entity-IDs, kein Token."""
+        try:
+            check_auth(
+                authorization,
+                getattr(request.state, "request_id", "-"),
+                x_zeitarchiv_integration_version,
+            )
+        except HTTPException as exc:
+            exc.detail = {"message": exc.detail, "demo_mode": deps.demo_mode_active}
+            raise
+        return {"status": "ok", "version": deps.app_version, "demo_mode": deps.demo_mode_active}
 
     @router.get("/api/notices")
     def notices(
@@ -379,7 +396,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             getattr(request.state, "request_id", "-"),
             x_zeitarchiv_integration_version,
         )
-        return {"notices": deps.collect_notices(), "latest_backup": deps.latest_backup()}
+        return {
+            "notices": deps.collect_notices(),
+            "latest_backup": deps.latest_backup(),
+            "demo_mode": deps.demo_mode_active,
+        }
 
     @router.post("/api/write")
     def write(

@@ -957,18 +957,63 @@ def test_dashboard_precise_mode_only_doubles_pin_sizes_once() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def test_dashboard_tile_limit_is_eighteen() -> None:
+def test_dashboard_tile_limit_is_thirty() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
         index = Index(tmp / "index.sqlite")
-        assert index.DASHBOARD_TILE_LIMIT == 18
+        assert index.DASHBOARD_TILE_LIMIT == 30
         chart_ids = [
             index.create_saved_chart(f"Chart {number}", ["sensor.a"], "day", continuous=False)
-            for number in range(19)
+            for number in range(31)
         ]
-        assert all(index.pin_item_to_dashboard(1, "chart", chart_id) for chart_id in chart_ids[:18])
-        assert index.pin_item_to_dashboard(1, "chart", chart_ids[18]) is False
-        assert len(index.list_dashboard_pins(1)) == 18
+        assert all(index.pin_item_to_dashboard(1, "chart", chart_id) for chart_id in chart_ids[:30])
+        assert index.pin_item_to_dashboard(1, "chart", chart_ids[30]) is False
+        assert len(index.list_dashboard_pins(1)) == 30
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_dashboard_section_pins_do_not_count_against_tile_limit() -> None:
+    """Sektions-Trenner (item_type='section') rendern weder Chart noch
+    Tabelle noch Live-Fetch — sie dürfen das Kachel-Limit deshalb nie
+    verbrauchen, siehe count_dashboard_pins()/pin_item_to_dashboard()."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        for number in range(index.DASHBOARD_TILE_LIMIT):
+            index.add_dashboard_section(1, f"Sektion {number}")
+        assert index.count_dashboard_pins(1) == 0
+        chart_id = index.create_saved_chart("Chart", ["sensor.a"], "day", continuous=False)
+        assert index.pin_item_to_dashboard(1, "chart", chart_id) is True
+        assert index.count_dashboard_pins(1) == 1
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_dashboard_section_crud() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        section_id = index.add_dashboard_section(1, "Erzeugung")
+        assert section_id is not None
+        assert index.add_dashboard_section(1, "   ") is None
+        pins = index.list_dashboard_pins(1)
+        assert len(pins) == 1
+        assert pins[0]["item_type"] == "section"
+        assert pins[0]["title"] == "Erzeugung"
+        # item_id muss je Sektion eindeutig sein (UNIQUE mit item_entity_id
+        # NULL) — eine zweite Sektion darf nicht an derselben Beschränkung
+        # scheitern wie eine erste mit demselben Platzhalter-item_id.
+        second_id = index.add_dashboard_section(1, "Verbrauch")
+        assert second_id is not None and second_id != section_id
+        assert index.rename_dashboard_section(1, section_id, "Klima") is True
+        assert index.list_dashboard_pins(1)[0]["title"] == "Klima"
+        assert index.rename_dashboard_section(1, 999999, "Nichts") is False
+        assert index.remove_dashboard_section(1, section_id) is True
+        assert len(index.list_dashboard_pins(1)) == 1
+        assert index.remove_dashboard_section(1, section_id) is False
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

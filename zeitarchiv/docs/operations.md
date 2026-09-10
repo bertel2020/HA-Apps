@@ -48,8 +48,13 @@ mehrere rückwirkend.
 `background.py:BackgroundService._maintenance_scheduler_loop()`, ein einzelner
 Daemon-Thread, alle 30 Sekunden geprüft. Bündelt: Statistik-/RAM-Schnappschüsse, Cache-Auffrischung
 (Retention-Übersicht, Duplikat-Übersicht, Bereinigungsvorschau — siehe
-[data-model.md](data-model.md)), geplante Backups, geplante Retention. Ein
-Fehler in einem Durchlauf wird geloggt und bricht die Schleife nicht ab.
+[data-model.md](data-model.md)), geplante Backups, geplante Retention sowie
+— nur im Demo-Modus bzw. bei einer liegengebliebenen Demo-Instanz relevant
+(siehe [Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) —
+`_refresh_demo_dir_info_if_stale()` (Belegter-Platz-Cache für den Zustand
+„ungenutzt") und `_run_demo_append_if_due()` (fälligkeitsbasiertes
+automatisches Ergänzen der Demo-Daten). Ein Fehler in einem Durchlauf wird
+geloggt und bricht die Schleife nicht ab.
 
 Backup, Import, Rotation und Retention greifen wegen
 `StorageCoordinator.exclusive()` nie gleichzeitig auf den Datenbestand zu —

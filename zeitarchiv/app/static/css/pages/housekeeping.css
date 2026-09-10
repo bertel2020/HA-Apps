@@ -5,6 +5,11 @@
   .hk-badge{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border);}
   .hk-badge.chart{color:var(--accent-bar);border-color:var(--accent-bar);}
   .hk-badge.table{color:var(--accent-line);border-color:var(--accent-line);}
+  /* Demo-Daten (DEMO_MODUS_PLAN.md) — beide Zustände in Warnton, nicht
+     Gefahrton: weder "läuft im Demo-Modus" noch "liegt ungenutzt herum"
+     sind Fehler, nur Hinweise (severity "info" bei der zugehörigen Meldung
+     im Glocken-Menü, siehe notices.py). */
+  .hk-badge.demo{color:var(--warning);border-color:var(--warning);margin-left:auto;}
   /* Höhere Spezifität als das app.css-Standardpaar table.dt th/table.dt td
      nötig (0-1-2 bzw. 0-1-1) — eine einzelne .hk-col-typ-Klasse (0-1-0) würde
      sonst von deren text-align:left überstimmt, exakt dasselbe

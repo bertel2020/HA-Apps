@@ -33,6 +33,53 @@ keine routenseitige Netzwerk-Prüfung. Wer nginx umgeht und direkt
 [security.md](security.md) für die Verteidigungslinien, die dann noch
 greifen: Bearer-Token auf `/api/*`, sonst keine).
 
+## Demo-Modus: BASE_DIR/DATA_DIR-Auflösung
+
+`main.py` löst das tatsächliche Datenverzeichnis beim Modulimport einmalig
+in drei Schritten auf (`main.py:169-172`):
+
+```python
+BASE_DIR = Path(os.environ.get("ZEITARCHIV_DATA_DIR", "/data"))
+_OPTIONS = demo_mode.load_options(BASE_DIR)
+DEMO_MODE = demo_mode.resolve_demo_mode(_OPTIONS)
+DATA_DIR = demo_mode.demo_dir(BASE_DIR) if DEMO_MODE else BASE_DIR
+```
+
+`BASE_DIR` bleibt der vom Supervisor gemountete, feste Pfad — unabhängig
+davon, ob diese Instanz gerade im Demo-Modus läuft. `demo_mode.load_options()`
+liest `options.json` deshalb **immer** aus `BASE_DIR`, nie aus `DATA_DIR`:
+`DATA_DIR` hängt selbst erst von einer in `options.json` stehenden Option
+(`demo_mode`) ab, ein Zugriff über `DATA_DIR` wäre also zirkulär bzw. läse im
+Demo-Modus aus dem falschen, leeren Unterordner. `resolve_demo_mode()` prüft
+zusätzlich `ZEITARCHIV_DEMO_MODE=1` als Fallback für Docker-Compose-/
+venv-Betrieb ohne Supervisor, analog zu `ZEITARCHIV_TIMEZONE`.
+
+Alles, was danach im Modul gebaut wird — `Index`, `StorageCoordinator`,
+`IngestionService`, jede Route — verwendet ausschließlich `DATA_DIR`. Der
+restliche Code kennt den Demo-Modus dadurch strukturell nicht: er sieht
+einfach ein Datenverzeichnis, in dem entweder echte oder synthetische Werte
+liegen, ohne eigene Fallunterscheidung.
+
+**Kein Laufzeit-Umschalter.** `DATA_DIR` & Co. sind Prozess-Globale, die kein
+Dependency-Injection-Layer zur Laufzeit neu binden könnte — ein Wechsel
+zwischen Demo- und Normalbetrieb bedeutet deshalb immer einen vollständigen
+Prozessneustart (Supervisor: automatisch nach einer Konfigurationsänderung),
+nie einen In-App-Klick.
+
+`app/demo_mode.py` kennt bewusst **nur das Dateisystem**, nie den laufenden
+`Index` einer Demo-Instanz: `demo_dir_info()`/`remove_demo_dir()` müssen auch
+dann sicher aufrufbar sein, wenn der aktuell laufende Prozess NICHT im
+Demo-Modus läuft (Housekeeping-Zustand „ungenutzt") und deshalb keine offene
+Verbindung zur Demo-`index.sqlite` hat — `Index.__init__()` öffnet seine
+Datei immer lese-schreibend und legt sie bei Bedarf sogar neu an, ein bloßer
+Blick von außen wäre also ein echter, ungewollter Schreibzugriff auf ein
+Verzeichnis, das gerade niemand aktiv verwendet. Die Erzeugung selbst
+(`run_generation()`) liegt in `app/demo_generation.py`, nicht im CLI-Skript
+`scripts/generate_demo_data.py` — dieses importiert seither umgekehrt aus
+`app/`, damit die Housekeeping-Routen denselben Simulationskern ohne eine
+rückwärts gerichtete Abhängigkeit `app/` → `scripts/` aufrufen können (siehe
+[demo-data.md](demo-data.md)).
+
 ## Request-Fluss (Schreibpfad)
 
 ```text
@@ -200,7 +247,7 @@ zum sechsten Mal von Hand entsteht:
   Der Kontextprozessor ruft es bei jeder Antwort auf, eine defekte Quelle
   darf nicht jede Seite mitreißen.
 
-Angemeldet sind alle zwölf langen Aktionen:
+Angemeldet sind alle dreizehn langen Aktionen:
 
 | Auftrag | Läuft | Ausgelöst durch |
 | --- | --- | --- |
@@ -212,6 +259,7 @@ Angemeldet sind alle zwölf langen Aktionen:
 | Speicherabgleich | Daemon-Thread beim Start | nichts |
 | Stunden-Rollup-Backfill | Wartungsplaner | Konfigurationsänderung, Minuten vorher |
 | Rollup-Neuaufbau | Schreibpfad (`/api/write`) | Home Assistant |
+| Demo-Daten-Erzeugung | Hintergrund-Thread (`demo_mode.demo_progress`, siehe oben) | Klick, Zeitplan oder Erststart im Demo-Modus |
 
 Die unteren drei Zeilen sind der eigentliche Grund für die Registratur: Wer nichts
 gedrückt hat, sucht für einen zähen Server auch keine Erklärung. Mehrere der

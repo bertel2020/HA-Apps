@@ -35,11 +35,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import cleanup_stats
+from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
 from .formatting import (
     BACKUP_SCHEDULE_LABELS,
     DECIMALS_LABELS,
+    DEMO_APPEND_INTERVAL_LABELS,
     GAP_THRESHOLD_LABELS,
     OUTLIER_THRESHOLD_LABELS,
     RESOLUTION_LABELS,
@@ -51,6 +53,7 @@ from .formatting import (
     format_size,
     format_time,
     format_timestamp,
+    format_uptime,
     format_value,
 )
 from .progress import JobBusy, JobProgress
@@ -101,6 +104,14 @@ class HousekeepingDependencies:
     tz: ZoneInfo
     index: Index
     coordinator: StorageCoordinator
+    # Demo-Modus (DEMO_MODUS_PLAN.md): base_dir ist IMMER die rohe
+    # ZEITARCHIV_DATA_DIR, unabhängig vom aktuellen Modus — anders als
+    # data_dir oben, das im Demo-Modus auf base_dir/demo zeigt. Housekeeping
+    # braucht beide: data_dir für Zustand "aktiv" (läuft der Index gerade
+    # gegen die Demo-Instanz), base_dir für Zustand "ungenutzt" (wo LÄGE
+    # demo/, auch wenn gerade niemand hingegen läuft).
+    base_dir: Path
+    demo_mode_active: bool
     templates: Jinja2Templates
     retention_default_time: str
     retention_default_weekday: int
@@ -127,6 +138,79 @@ class HousekeepingDependencies:
     # None vom Programmstart eingefroren.
     host_disk_usage_cached: Callable[[], dict | None]
     storage_reconcile_last: Callable[[], dict | None]
+
+
+def demo_progress_context() -> dict:
+    """Flach, NUR für _job_progress.html — wie _purge_progress_context().
+    Bewusst getrennt von demo_data_context() unten: würden done/total/
+    error/result usw. direkt in dessen (mit den übrigen Einstellungen-
+    Abschnitten geteilten) Kontext gemischt, kollidierten sie mit
+    gleichnamigen Schlüsseln aus _settings_purge_context() & Co., sobald
+    beide gleichzeitig in einem TemplateResponse-Kontext zusammengeführt
+    werden. Modulweit statt in create_housekeeping_router() verschachtelt,
+    damit settings_view() (main.py, Demo-Daten sitzt auf der Einstellungen-
+    Seite, siehe DEMO_MODUS_PLAN.md) sie ohne HousekeepingDependencies
+    aufrufen kann — braucht ohnehin keine deps."""
+    return {
+        **demo_mode.demo_progress.snapshot(),
+        "progress_id": "demo-progress",
+        "poll_url": "housekeeping/demo-data/progress",
+    }
+
+
+def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> dict:
+    """Einstellungen → Demo-Daten (DEMO_MODUS_PLAN.md) — drei mögliche
+    Zustände, siehe demo_mode.current_demo_state(). "aktiv" und "ungenutzt"
+    lesen ihre Zahlen aus komplett unterschiedlichen Quellen: der laufende
+    Index (aktiv) bzw. ein reiner Dateisystem-Blick (ungenutzt) — dort wird
+    NIE Index() gegen ein Verzeichnis geöffnet, das die laufende Instanz
+    gerade nicht selbst verwendet (siehe demo_mode.py-Moduldoc).
+    demo_progress bleibt absichtlich NAMESPACED (nicht wie
+    demo_progress_context() oben flach) — dieser Kontext hier landet
+    gemeinsam mit allen anderen Einstellungen-Abschnitten in EINEM Dict,
+    flache done/total/error/result-Schlüssel wären dort ein Kollisionsrisiko.
+    Modulweit statt verschachtelt (siehe demo_progress_context() oben) —
+    braucht nur index/base_dir/demo_mode_active, keine restlichen deps."""
+    dir_info = None if demo_mode_active else demo_mode.demo_dir_info(base_dir)
+    state = demo_mode.current_demo_state(demo_mode_active, dir_info)
+    if state is None:
+        return {"demo_state": None}
+
+    progress = demo_mode.demo_progress.snapshot()
+    context: dict = {
+        "demo_state": state,
+        "demo_generating": progress["running"],
+        "demo_progress": demo_progress_context(),
+    }
+    now = time.time()
+    if state == "active":
+        overview = index.get_overview()
+        last_run_raw = index.get_setting("demo_append_last_run", "")
+        last_run = float(last_run_raw) if last_run_raw else None
+        interval = index.get_setting("demo_append_interval", "off")
+        if interval not in DEMO_APPEND_INTERVAL_LABELS:
+            interval = "off"
+        interval_seconds = demo_mode.DEMO_APPEND_INTERVAL_SECONDS.get(interval)
+        next_run_label = (
+            f"in {format_uptime((last_run if last_run is not None else now) + interval_seconds - now)}"
+            if interval_seconds is not None else "—"
+        )
+        context.update({
+            "demo_entity_count_label": format_int(overview["entity_count"]),
+            "demo_row_count_label": format_int(overview["total_rows"]),
+            "demo_size_label": format_size(overview["total_size_bytes"]),
+            "demo_last_run_label": f"vor {format_uptime(now - last_run)}" if last_run else "Noch nie",
+            "demo_next_run_label": next_run_label,
+            "demo_append_interval": interval,
+            "demo_append_interval_options": list(DEMO_APPEND_INTERVAL_LABELS.items()),
+        })
+    else:  # "orphan"
+        context.update({
+            "demo_entity_count_label": format_int(dir_info["entity_count_approx"]),
+            "demo_size_label": format_size(dir_info["size_bytes"]),
+            "demo_newest_label": f"vor {format_uptime(now - dir_info['newest_mtime'])}",
+        })
+    return context
 
 
 def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
@@ -719,6 +803,88 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 result = f"Retention fehlgeschlagen: {outcome['error']}"
         return deps.templates.TemplateResponse(
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
+        )
+
+    @router.post("/housekeeping/demo-data/append-now", response_class=HTMLResponse)
+    def housekeeping_demo_data_append_now(request: Request) -> HTMLResponse:
+        """"Jetzt ergänzen" (DEMO_MODUS_PLAN.md Abschnitt 6) — nur im
+        Demo-Modus erreichbar, der Button rendert sonst gar nicht erst
+        (_housekeeping_demo_data_body.html). Läuft wie die Bereinigung im
+        Hintergrund; ein zweiter Klick bekommt die Anzeige des schon
+        laufenden Auftrags zurück (JobProgress.claim)."""
+        if not deps.demo_mode_active:
+            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+        try:
+            demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "append"), logger)
+        except JobBusy:
+            logger.info("Demo-Daten-Generierung bereits aktiv · event=demo_generate_already_running")
+        return deps.templates.TemplateResponse(request, "_job_progress.html", demo_progress_context())
+
+    @router.post("/housekeeping/demo-data/regenerate", response_class=HTMLResponse)
+    def housekeeping_demo_data_regenerate(request: Request) -> HTMLResponse:
+        """"Neu erzeugen" — leert vorhandene Demo-Werte und würfelt die
+        komplette Historie neu (Rückfrage per hx-confirm im Template, wie
+        beim manuellen Löschen im Bereinigen-Tab)."""
+        if not deps.demo_mode_active:
+            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+        try:
+            demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "regenerate"), logger)
+        except JobBusy:
+            logger.info("Demo-Daten-Generierung bereits aktiv · event=demo_generate_already_running")
+        return deps.templates.TemplateResponse(request, "_job_progress.html", demo_progress_context())
+
+    @router.get("/housekeeping/demo-data/progress", response_class=HTMLResponse)
+    def housekeeping_demo_data_progress(request: Request) -> HTMLResponse:
+        """Poll-Ziel, wie settings_purge_progress(): liefert entweder wieder
+        die Anzeige (nächstes Polling) oder den fertigen Abschnitt zurück,
+        was das Polling von selbst beendet."""
+        stand = demo_mode.demo_progress.snapshot()
+        if not stand["started"]:
+            return HTMLResponse("")
+        if stand["running"]:
+            return deps.templates.TemplateResponse(request, "_job_progress.html", demo_progress_context())
+        return deps.templates.TemplateResponse(
+            request, "_housekeeping_demo_data_body.html",
+            demo_data_context(deps.index, deps.base_dir, deps.demo_mode_active),
+        )
+
+    @router.post("/housekeeping/demo-data/interval", response_class=HTMLResponse)
+    async def housekeeping_demo_data_interval(request: Request) -> HTMLResponse:
+        """Speichert den Zeitplan für die automatische Ergänzung (Scheduler-
+        Hook siehe background.py). Nur im Demo-Modus sinnvoll — der Dropdown
+        rendert sonst nicht."""
+        if not deps.demo_mode_active:
+            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+        form = await request.form()
+        interval = form.get("demo_append_interval")
+        if interval not in DEMO_APPEND_INTERVAL_LABELS:
+            raise HTTPException(status_code=400, detail="Ungültiges Intervall")
+        deps.index.set_setting("demo_append_interval", str(interval))
+        return deps.templates.TemplateResponse(
+            request, "_housekeeping_demo_data_body.html",
+            demo_data_context(deps.index, deps.base_dir, deps.demo_mode_active),
+        )
+
+    @router.post("/housekeeping/demo-data/remove", response_class=HTMLResponse)
+    def housekeeping_demo_data_remove(request: Request) -> HTMLResponse:
+        """Entfernt <BASE_DIR>/demo vollständig (DEMO_MODUS_PLAN.md
+        Abschnitt 8) — nur außerhalb des Demo-Modus erreichbar: Index()
+        dürfte sonst nie gegen ein Verzeichnis geöffnet werden, das die
+        laufende Instanz selbst gerade verwendet (siehe demo_mode.py-
+        Moduldoc). Der Button rendert im Demo-Modus gar nicht erst, diese
+        Prüfung ist reine Verteidigung gegen einen veralteten Tab.
+
+        hx-swap="delete" auf dem Button entfernt #demo-daten unabhängig vom
+        Response-Body — die Antwort trägt trotzdem etwas: ein Out-of-Band-
+        Swap für den Nav-Eintrag (liegt außerhalb von #demo-daten) und ein
+        <script>, das refreshNoticePanel() (_topnav.html) aufruft, damit die
+        Glocke sofort verschwindet statt erst beim nächsten Seitenaufruf."""
+        if deps.demo_mode_active:
+            raise HTTPException(status_code=409, detail="Nicht möglich, während die Instanz im Demo-Modus läuft")
+        demo_mode.remove_demo_dir(deps.base_dir)
+        return HTMLResponse(
+            '<div id="demo-nav-entry" hx-swap-oob="delete"></div>'
+            "<script>refreshNoticePanel();</script>"
         )
 
     return router

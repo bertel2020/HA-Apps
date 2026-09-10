@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import (
     FileResponse,
@@ -78,6 +78,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
+from . import demo_mode
 from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
@@ -131,6 +132,7 @@ from .index_optimization import (
 from .housekeeping_routes import (
     HousekeepingDependencies,
     create_housekeeping_router,
+    demo_data_context,
 )
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -165,7 +167,10 @@ EntityId = Annotated[
 ]
 
 APP_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.environ.get("ZEITARCHIV_DATA_DIR", "/data"))
+BASE_DIR = Path(os.environ.get("ZEITARCHIV_DATA_DIR", "/data"))
+_OPTIONS = demo_mode.load_options(BASE_DIR)  # Auflösung siehe demo_mode.py (DEMO_MODUS_PLAN.md)
+DEMO_MODE = demo_mode.resolve_demo_mode(_OPTIONS)
+DATA_DIR = demo_mode.demo_dir(BASE_DIR) if DEMO_MODE else BASE_DIR
 # Entpackter Symcon-db-Ordner aus einem ZIP-Upload (Konzept Abschnitt 03) — kein
 # Bind-Mount mehr nötig, bleibt bis zum expliziten /import/delete erhalten.
 SYMCON_IMPORT_DIR = DATA_DIR / "symcon_import"
@@ -210,14 +215,6 @@ BACKUP_WEEKDAY_OPTIONS = [
 ]
 
 
-def _load_options() -> dict:
-    options_path = DATA_DIR / "options.json"
-    if options_path.exists():
-        return json.loads(options_path.read_text(encoding="utf-8"))
-    return {}
-
-
-_OPTIONS = _load_options()
 TZ = load_timezone(_OPTIONS, on_invalid=logger.error)
 
 # Je eine Stufe unter/über "Normal" (Einstellungen, Bereich "Darstellung").
@@ -343,6 +340,18 @@ def _app_root_context(request: Request) -> dict:
     return {"app_root": app_root}
 
 
+def _collect_all_notices() -> list[dict]:
+    """Ein Aufhänger für drei gleichlautende collect_notices()-Aufrufstellen
+    statt derselben elf Argumente je einmal (_background existiert erst
+    später im Modul — unproblematisch, gebunden wird erst beim Aufruf)."""
+    return collect_notices(
+        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+        _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+        _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+        _background.last_backup_worker_tick, _background.backup_progress.running, _background.demo_dir_info_cached,
+    )
+
+
 def _notices_context(request: Request) -> dict:
     """Für das Hinweis-Center (Glocken-Icon) in _topnav.html — läuft wie
     _app_root_context automatisch für JEDE TemplateResponse mit, statt dass
@@ -350,12 +359,7 @@ def _notices_context(request: Request) -> dict:
     in ihren Kontext aufnehmen müsste. collect_notices() fragt bewusst nur
     günstige Werte ab (PRAGMA-Stats, LIMIT-1-Queries), siehe notices.py."""
     return {
-        "notices": collect_notices(
-            index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
-            _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-            _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-            _background.last_backup_worker_tick, _background.backup_progress.running,
-        ),
+        "notices": _collect_all_notices(),
         "snooze_labels": notices_mod.SNOOZE_LABELS,
         # Rein im Arbeitsspeicher (siehe activity_snapshot()) — kein Datei-
         # oder Datenbankzugriff, deshalb tragbar in einem Kontextprozessor,
@@ -636,6 +640,7 @@ _background = BackgroundService(BackgroundDependencies(
     tz=TZ,
     index=index,
     coordinator=storage_coordinator,
+    base_dir=BASE_DIR, demo_mode_active=DEMO_MODE,
     backups_dir=BACKUPS_DIR,
     symcon_import_dir=SYMCON_IMPORT_DIR,
     csv_import_dir=CSV_IMPORT_DIR,
@@ -693,20 +698,13 @@ _ENTITY_TRACE_DURATION_SECONDS = 15 * 60
 app.include_router(
     api_routes.create_api_router(
         api_routes.ApiDependencies(
-            data_dir=DATA_DIR,
-            index=index,
-            tz=TZ,
-            coordinator=storage_coordinator,
-            ingestion=ingestion_service,
+            data_dir=DATA_DIR, index=index, tz=TZ,
+            coordinator=storage_coordinator, ingestion=ingestion_service,
             api_token=_current_api_token,
             app_version=APP_VERSION,
-            collect_notices=lambda: collect_notices(
-                index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
-                _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-                _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-                _background.last_backup_worker_tick, _background.backup_progress.running,
-            ),
+            collect_notices=_collect_all_notices,
             latest_backup=lambda: notices_mod.latest_backup_info(index),
+            demo_mode_active=DEMO_MODE,
         ),
         _api_state,
     )
@@ -1239,6 +1237,7 @@ def settings_view(request: Request) -> HTMLResponse:
             **_debug_tools_context(),
             **_settings_notices_context(),
             **_settings_background_processes_context(),
+            **demo_data_context(index, BASE_DIR, DEMO_MODE),
         },
     )
 
@@ -1264,6 +1263,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
                 index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
                 _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
                 _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+                demo_dir_info=_background.demo_dir_info_cached,
             )
             if n["id"] == notice_id
         ),
@@ -1280,12 +1280,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     seconds = notices_mod.SNOOZE_PRESETS[duration]
     until = time.time() + seconds if seconds is not None else None
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
-    remaining = collect_notices(
-        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
-        _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-        _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-        _background.last_backup_worker_tick, _background.backup_progress.running,
-    )
+    remaining = _collect_all_notices()
     return {"success": True, "remaining_count": len(remaining)}
 
 
@@ -2731,16 +2726,16 @@ def _entity_config_context(entity) -> dict:
 
     now = datetime.now(TZ)
     window_start = (now - timedelta(days=60)).timestamp()
-    raw_rows = cleanup.list_raw_rows(
-        DATA_DIR, index, entity_id, window_start, now.timestamp(), TZ,
-        now=now, max_rows=MAX_UI_ANALYSIS_ROWS
-    )
+    # deque statt list_raw_rows(max_rows=...): sonst ResultLimitExceeded bei dichten Entitäten (Issue #4)
+    last_rows: deque[tuple[float, float]] = deque(maxlen=10)
+    for ts, value in cleanup.iter_raw_rows(DATA_DIR, index, entity_id, window_start, now.timestamp(), TZ, now=now):
+        last_rows.append((ts, value))
     preview_rows = [
         {
             "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
             "formatted_value": format_value(value, decimals_int),
         }
-        for ts, value in reversed(raw_rows[-10:])
+        for ts, value in reversed(last_rows)
     ]
 
     return {
@@ -3190,6 +3185,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "decimals": chart["decimals"] if chart else "auto",
         "show_values": chart["show_values"] if chart else False,
         "average_line": chart["average_line"] if chart else False,
+        "area_fill": chart["area_fill"] if chart else True,
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
@@ -3250,6 +3246,7 @@ class _SaveChartBody(BaseModel):
     decimals: str = "auto"
     show_values: bool = False
     average_line: bool = False
+    area_fill: bool = True
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3288,7 +3285,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line,
+        average_line=body.average_line, area_fill=body.area_fill,
     )
     return {"id": chart_id}
 
@@ -3329,7 +3326,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line,
+        average_line=body.average_line, area_fill=body.area_fill,
     )
     return {"id": chart_id}
 
@@ -3367,7 +3364,7 @@ def charts_duplicate(chart_id: int) -> dict:
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
-        average_line=chart["average_line"],
+        average_line=chart["average_line"], area_fill=chart["area_fill"],
     )
     return {"id": new_id}
 
@@ -3503,7 +3500,19 @@ def _dashboard_tiles_context(
     entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
     tiles = []
+    # Sektionen (item_type='section') gruppieren die Kacheln rein über ihre
+    # Position in derselben Liste — keine Kachel trägt eine section_id. Die
+    # erste, kopflose Gruppe sammelt alles vor dem ersten Trenner ("ohne
+    # Sektion"); jeder weitere Trenner eröffnet eine neue Gruppe mit eigenem
+    # Mini-Raster (siehe _dashboard_tiles.html) statt eines gemeinsamen, vollen
+    # Rasters — das hält Sektionsköpfe im präzisen Modus kompakt (kein
+    # Rasterelement mit fester grid-auto-rows-Höhe) und "Lücken auffüllen" pro
+    # Sektion begrenzt.
+    groups: list[dict] = [{"title": None, "section_id": None, "tiles": []}]
     for p in pins:
+        if p["item_type"] == "section":
+            groups.append({"title": p["title"] or "", "section_id": p["id"], "tiles": []})
+            continue
         if p["item_type"] == "chart":
             c = index.get_saved_chart(p["item_id"])
             if c is None:
@@ -3531,8 +3540,9 @@ def _dashboard_tiles_context(
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
                 "legend_style": c["legend_style"], "chart_type": c["chart_type"],
                 "show_values": c["show_values"], "decimals": c["decimals"],
-                "average_line": c["average_line"],
+                "average_line": c["average_line"], "area_fill": c["area_fill"],
             })
+            groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":
             t = index.get_saved_table(p["item_id"])
             if t is None:
@@ -3542,6 +3552,7 @@ def _dashboard_tiles_context(
                 "columns": t["columns"], "rows": t["rows"], "style": t["style"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
+            groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "entity":
             e = index.get_entity(p["item_entity_id"])
             if e is None:
@@ -3601,6 +3612,14 @@ def _dashboard_tiles_context(
                 "sparkline_resolution": p["sparkline_resolution"],
                 **metric_context,
             })
+            groups[-1]["tiles"].append(tiles[-1])
+    # Eine leere kopflose Erstgruppe (alle Kacheln liegen bereits hinter einem
+    # Trenner) wird nicht mitgerendert — sonst stünde ein leeres, unbenanntes
+    # Mini-Raster über der ersten echten Sektion. Bleibt sie die einzige
+    # Gruppe (frisches Dashboard ganz ohne Sektionen/Kacheln), muss sie
+    # stehen bleiben, sie trägt dann die "+"-Kachel.
+    if not groups[0]["tiles"] and len(groups) > 1:
+        groups.pop(0)
     pinned_chart_ids = {p["item_id"] for p in pins if p["item_type"] == "chart"}
     pinned_table_ids = {p["item_id"] for p in pins if p["item_type"] == "table"}
     pinned_entity_ids = {p["item_entity_id"] for p in pins if p["item_type"] == "entity"}
@@ -3627,7 +3646,7 @@ def _dashboard_tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
-        "tiles": tiles,
+        "groups": groups,
         "auto_open_entity_id": auto_open_entity_id,
         "entity_pin_options": [
             {**row, "pinned": row["entity_id"] in pinned_entity_ids}
@@ -3664,6 +3683,44 @@ def _get_dashboard_or_404(dashboard_id: int) -> dict:
     if dashboard is None:
         raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
     return dashboard
+
+
+# -- Sektionen: Formular-POSTs statt JSON-Body, damit der "+ Sektion"-Reiter
+# in _dashboard_tiles.html ein normales <form hx-post=…> bleiben kann wie die
+# übrigen Picker-Einträge dort — kein zusätzlicher JS-Mechanismus nötig.
+@app.post("/dashboard/section/add", response_class=HTMLResponse)
+def dashboard_section_add(request: Request, dashboard_id: int = Form(1), name: str = Form(...)) -> HTMLResponse:
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+    index.add_dashboard_section(dashboard_id, name)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
+
+
+@app.post("/dashboard/section/{section_id}/rename", response_class=HTMLResponse)
+def dashboard_section_rename(
+    request: Request, section_id: int, dashboard_id: int = Form(1), name: str = Form(...)
+) -> HTMLResponse:
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    name = name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+    if not index.rename_dashboard_section(dashboard_id, section_id, name):
+        raise HTTPException(status_code=404, detail="Sektion nicht gefunden")
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
+
+
+@app.post("/dashboard/section/{section_id}/remove", response_class=HTMLResponse)
+def dashboard_section_remove(request: Request, section_id: int, dashboard_id: int = 1) -> HTMLResponse:
+    """Löst die Sektion auf — die Kacheln bleiben erhalten, siehe
+    index.remove_dashboard_section()."""
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    index.remove_dashboard_section(dashboard_id, section_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.post("/charts/{chart_id}/pin", response_class=HTMLResponse)
@@ -5126,6 +5183,7 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     tz=TZ,
     index=index,
     coordinator=storage_coordinator,
+    base_dir=BASE_DIR, demo_mode_active=DEMO_MODE,
     templates=templates,
     retention_default_time=RETENTION_DEFAULT_TIME,
     retention_default_weekday=RETENTION_DEFAULT_WEEKDAY,

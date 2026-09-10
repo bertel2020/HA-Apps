@@ -234,6 +234,17 @@ BACKUP_SCHEDULE_LABELS = {
     "daily": "Täglich",
     "weekly": "Wöchentlich",
 }
+# Demo-Modus (DEMO_MODUS_PLAN.md) — bewusst ein Intervall statt eines
+# Kalendertermins wie bei BACKUP_SCHEDULE_LABELS: "alle 15 Minuten" statt
+# "einmal nachts", siehe app.demo_mode.DEMO_APPEND_INTERVAL_SECONDS für die
+# zugehörigen Sekundenwerte.
+DEMO_APPEND_INTERVAL_LABELS = {
+    "off": "Aus",
+    "5m": "Alle 5 Minuten",
+    "15m": "Alle 15 Minuten",
+    "30m": "Alle 30 Minuten",
+    "60m": "Stündlich",
+}
 BACKUP_KEEP_COUNT_LABELS = {
     "unlimited": "Unbegrenzt",
     "3": "3",

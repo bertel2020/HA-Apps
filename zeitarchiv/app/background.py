@@ -44,6 +44,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import cleanup_stats
+from . import demo_mode
 from . import ha_integration
 from . import notices as notices_mod
 from . import supervisor_stats
@@ -55,7 +56,7 @@ from .energiedashboard_routes import (
     sync_hourly_rollup_flags_for_current_config,
 )
 from .limits import MAX_UI_ANALYSIS_ROWS
-from .progress import JobProgress
+from .progress import JobBusy, JobProgress
 from .storage import backup, cleanup, reconcile
 from .storage import retention as retention_mod
 from .storage.coordinator import StorageCoordinator
@@ -103,6 +104,12 @@ class BackgroundDependencies:
     tz: ZoneInfo
     index: Index
     coordinator: StorageCoordinator
+    # Demo-Modus (DEMO_MODUS_PLAN.md): base_dir ist IMMER die rohe
+    # ZEITARCHIV_DATA_DIR, unabhängig vom aktuellen Modus (siehe
+    # housekeeping_routes.HousekeepingDependencies für dieselbe
+    # Unterscheidung und ihre Begründung).
+    base_dir: Path
+    demo_mode_active: bool
     backups_dir: Path
     symcon_import_dir: Path
     csv_import_dir: Path
@@ -128,6 +135,8 @@ class BackgroundService:
         self.tz = deps.tz
         self.index = deps.index
         self.coordinator = deps.coordinator
+        self.base_dir = deps.base_dir
+        self.demo_mode_active = deps.demo_mode_active
         self.backups_dir = deps.backups_dir
         self.symcon_import_dir = deps.symcon_import_dir
         self.csv_import_dir = deps.csv_import_dir
@@ -185,6 +194,16 @@ class BackgroundService:
         # Docstring) — ein Syscall weniger pro Seitenaufruf ist der einfachere Weg,
         # konsistent mit dem Rest dieser Cache-Gruppe zu bleiben.
         self.host_disk_usage_cached: dict | None = None
+
+        # Demo-Modus (DEMO_MODUS_PLAN.md, Abschnitt "Notify-Meldung"/"Belegter
+        # Platz"): nur relevant, wenn DIESE Instanz NICHT im Demo-Modus läuft
+        # (siehe demo_mode.py-Moduldoc, warum dafür nie Index() geöffnet
+        # wird) — anders als host_disk_usage_cached (shutil.disk_usage, jeden
+        # Tick) deshalb mit eigenem, selteneren Auffrisch-Takt (siehe
+        # _refresh_demo_dir_info_if_stale): ein Verzeichnis-Walk ist teurer
+        # als ein einzelner Syscall.
+        self.demo_dir_info_cached: dict | None = None
+        self._demo_dir_info_last_refresh = 0.0
 
         # Zeitpunkt des letzten (versuchten) Wartungsplaner-Durchlaufs — unabhängig
         # davon, ob er erfolgreich war (siehe try/except in
@@ -363,6 +382,38 @@ class BackgroundService:
         self._run_retention_background(scheduled_for=next_ts)
         self.set_next_retention_run(now)
 
+    def _run_demo_append_if_due(self, now: datetime) -> None:
+        """Automatisches "Jetzt ergänzen" für den Demo-Modus
+        (DEMO_MODUS_PLAN.md, Abschnitt "Scheduler-Intervall") — anders als
+        _run_retention_enforcement_if_due() oben KEIN Kalendertermin
+        (next_scheduled_run(), "einmal nachts"), sondern ein reines
+        Intervall ("alle 15 Minuten"): demo_append_interval/
+        demo_append_last_run leben in der Demo-Instanz-eigenen index.sqlite,
+        genau wie retention_enforcement_* in der jeweils echten."""
+        if not self.demo_mode_active:
+            return
+        interval = demo_mode.DEMO_APPEND_INTERVAL_SECONDS.get(
+            self.index.get_setting("demo_append_interval", "off")
+        )
+        if interval is None:
+            return
+        last_run_raw = self.index.get_setting("demo_append_last_run", "")
+        try:
+            last_run = float(last_run_raw) if last_run_raw else 0.0
+        except (TypeError, ValueError):
+            last_run = 0.0
+        if now.timestamp() - last_run < interval:
+            return
+        try:
+            demo_mode.demo_progress.start(
+                demo_mode.build_demo_worker(self.data_dir, self.index, self.tz, self.coordinator, "append"),
+                logger,
+            )
+        except JobBusy:
+            # Ein manuelles "Jetzt ergänzen"/"Neu erzeugen" läuft gerade —
+            # der nächste Tick (30s) versucht es erneut, kein verlorener Lauf.
+            pass
+
     def _empty_retention_overview(self) -> dict:
         return {
             "generated_at": None,
@@ -425,6 +476,27 @@ class BackgroundService:
     def _refresh_host_disk_usage(self) -> None:
         usage = shutil.disk_usage(self.data_dir)
         self.host_disk_usage_cached = {"free": usage.free, "total": usage.total}
+
+    #: Anders als host_disk_usage_cached (ein einzelner Syscall, jeden Tick):
+    #: demo_mode.demo_dir_info() geht rekursiv über <BASE_DIR>/demo — bei
+    #: vielen Dateien spürbar teurer, deshalb höchstens alle 5 Minuten statt
+    #: jede 30s.
+    _DEMO_DIR_INFO_MAX_AGE_SECONDS = 300
+
+    def _refresh_demo_dir_info_if_stale(self, *, force: bool = False) -> None:
+        """Nur relevant, wenn DIESE Instanz NICHT im Demo-Modus läuft (siehe
+        demo_mode.py-Moduldoc) — sonst bleibt demo_dir_info_cached auf dem
+        Stand von vor dem Umschalten stehen, was aber niemand liest: die
+        Einstellungen-Seite fragt im Demo-Modus stattdessen live
+        index.get_overview() ab (Zustand "aktiv", siehe
+        housekeeping_routes.demo_data_context())."""
+        if self.demo_mode_active:
+            return
+        now = time.time()
+        if not force and now - self._demo_dir_info_last_refresh < self._DEMO_DIR_INFO_MAX_AGE_SECONDS:
+            return
+        self.demo_dir_info_cached = demo_mode.demo_dir_info(self.base_dir)
+        self._demo_dir_info_last_refresh = now
 
     def _empty_purge_preview(self) -> dict:
         return {
@@ -747,6 +819,8 @@ class BackgroundService:
                 refresh_heatmap_weekday_cache_if_stale(self.energiedashboard_service)
                 self._run_backup_schedule_if_due(datetime.now(self.tz))
                 self._run_retention_enforcement_if_due(datetime.now(self.tz))
+                self._refresh_demo_dir_info_if_stale()
+                self._run_demo_append_if_due(datetime.now(self.tz))
             except Exception:
                 logger.exception(
                     "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "
@@ -772,6 +846,26 @@ class BackgroundService:
             self._refresh_host_disk_usage()
         except Exception:
             logger.exception("Host-Speicherplatz beim Start nicht ermittelbar · event=host_disk_usage_failed")
+        # Erststart-Generierung (DEMO_MODUS_PLAN.md, Abschnitt "Erststart-
+        # Generierung"): NICHT synchron vor dem ersten Request — eine volle
+        # Historie dauert deutlich länger als ein Healthcheck-Timeout
+        # verträgt. Läuft stattdessen über denselben Hintergrund-Thread wie
+        # "Jetzt ergänzen"/"Neu erzeugen" (demo_mode.demo_progress), die
+        # Einstellungen-Seite zeigt währenddessen den Fortschrittsbalken.
+        # entity_count == 0 statt
+        # eines Dateisystem-Checks — der Index ist an dieser Stelle ohnehin
+        # schon offen; nur EXAKT leer löst aus, eine bereits (auch nur
+        # teilweise) gefüllte Demo-Instanz aus einem vorigen Lauf wird beim
+        # Neustart nie automatisch überschrieben.
+        if self.demo_mode_active:
+            try:
+                if self.index.get_overview()["entity_count"] == 0:
+                    demo_mode.demo_progress.start(
+                        demo_mode.build_demo_worker(self.data_dir, self.index, self.tz, self.coordinator, "fresh"),
+                        logger,
+                    )
+            except Exception:
+                logger.exception("Erststart-Generierung der Demo-Daten fehlgeschlagen · event=demo_fresh_start_failed")
         if not self.requires_synchronous_reconciliation and (
             self._storage_reconcile_thread is None or not self._storage_reconcile_thread.is_alive()
         ):

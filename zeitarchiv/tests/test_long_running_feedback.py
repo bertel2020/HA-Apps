@@ -594,6 +594,7 @@ ERWARTETE_QUELLEN = {
     "hourly-backfill": "Stunden-Rollup",
     "rollup-rebuild": "Rollup-Neuaufbau",
     "index-optimize": "Index-Optimierung",
+    "demo-generate": "Demo-Daten",
 }
 
 
@@ -828,6 +829,7 @@ def test_the_startup_reconciliation_announces_the_entity_it_is_on(monkeypatch, t
     monkeypatch.setattr(reconcile, "audit_storage_metadata", fake_audit)
     dienst = BackgroundService(BackgroundDependencies(
         data_dir=tmp_path, tz=ZoneInfo("UTC"), index=index, coordinator=StorageCoordinator(),
+        base_dir=tmp_path, demo_mode_active=False,
         backups_dir=tmp_path / "backups", symcon_import_dir=tmp_path / "symcon",
         csv_import_dir=tmp_path / "csv", backup_default_time="03:00", backup_default_weekday=6,
         retention_default_time="04:00", retention_default_weekday=6,

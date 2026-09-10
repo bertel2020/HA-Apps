@@ -55,6 +55,7 @@ def test_every_warning_is_marked_as_one() -> None:
         "_settings_backup_schedule_form.html": "Backups liegen nur lokal",
         "_settings_purge_form.html": "Entfernt markierte Datensätze endgültig",
         "_settings_retention_form.html": "Löscht Werte nach Ablauf ihrer Aufbewahrungsfrist",
+        "_housekeeping_demo_data_body.html": "Entfernt <code>&lt;DATA_DIR&gt;/demo</code> vollständig",
     }
     quellen = _templates()
     for name, satz in warnungen.items():
@@ -126,7 +127,7 @@ def test_the_roles_themselves_stay_a_pure_annotation() -> None:
 
 
 def test_only_the_irreversible_warnings_are_marked() -> None:
-    """Drei der fünf Warnungen kündigen einen nicht umkehrbaren Verlust an und
+    """Vier der sechs Warnungen kündigen einen nicht umkehrbaren Verlust an und
     standen dafür in --ink-faint, der Farbe für Nebensächliches.
 
     Die beiden Diagnose-Werkzeuge bleiben unmarkiert: sie warnen vor dem, was
@@ -143,6 +144,7 @@ def test_only_the_irreversible_warnings_are_marked() -> None:
         "_settings_backup_schedule_form.html": 1,  # Backups liegen nur lokal
         "_settings_purge_form.html": 1,  # entfernt endgültig
         "_settings_retention_form.html": 1,  # löscht nach Ablauf, endgültig
+        "_housekeeping_demo_data_body.html": 1,  # Demo-Daten entfernen, unwiderruflich
     }
     assert "hint-warn-strong" not in quellen["_settings_debug_tools.html"]
 

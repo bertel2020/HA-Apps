@@ -6,7 +6,7 @@
 
 <p align="center">
   Langfristige, kompakte Zeitreihen für Home Assistant.<br>
-  <sub>PARQUET + ZSTD · INGRESS · ENERGIEDASHBOARD · CHARTS · TABELLEN · IMPORT · BACKUP</sub>
+  <sub>PARQUET + ZSTD · INGRESS · ENERGIEDASHBOARD · CHARTS · TABELLEN · IMPORT · BACKUP · DEMO-MODUS</sub>
 </p>
 
 Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
@@ -48,6 +48,7 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Datenpflege** | Ausreißer, Lücken und Duplikate erkennen, korrigieren oder bereinigen |
 | **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Wiederherstellung und Zeitplan |
+| **Demo-Modus** | Eigene Instanz mit synthetischen Vorführdaten, komplett getrennt von den echten Daten — per Add-on-Option umschaltbar |
 | **Abgesichert** | Läuft hinter Home Assistants eigenem Login, Schreibzugriff strikt vom Rest der Oberfläche getrennt |
 
 ## Zusammenspiel
@@ -210,6 +211,15 @@ endgültigen Schritt.
 **Statistik.** Zeigt Bestand, Speicherbedarf, Zuwachs und Wachstum über die
 Zeit; der SQLite-Index kann bei Bedarf kontrolliert optimiert werden.
 
+**Demo-Modus.** Eine Add-on-Option lässt die App komplett getrennt von den
+echten Daten mit synthetischen Vorführ-/Testdaten laufen — ein simulierter
+Haushalt mit PV-Anlage, Wallbox, Balkonkraftwerk und Heimspeicher. Erzeugt
+sich beim ersten Start automatisch, lässt sich per Zeitplan aktuell halten
+oder jederzeit manuell ergänzen bzw. neu erzeugen, und rückstandslos wieder
+entfernen — praktisch für einen ersten Eindruck oder eine dauerhafte
+Schaufenster-Instanz. Details: [Benutzerhandbuch →
+Demo-Modus](docs/user-guide.md#demo-modus).
+
 **Import und Export.** Bestehende Historie lässt sich aus Symcon-Exporten,
 frei zuordenbaren CSV-Dateien oder direkt aus der laufenden
 Home-Assistant-Instanz übernehmen. Der empfohlene Vollimport verbindet ältere
@@ -300,8 +310,11 @@ vollständig in der App verwaltet und im Zeitarchiv-Index gespeichert — siehe
 [Benutzerhandbuch → Einstellungen im
 Detail](docs/user-guide.md#einstellungen-im-detail). Speicherplatz,
 Aufbewahrung und Rotation liegen im eigenen [Housekeeping-Bereich](docs/user-guide.md#housekeeping).
-Die einzige
-Supervisor-Option ist `timezone` (IANA-Zeitzone, Standard `Europe/Berlin`).
+Die Supervisor-Optionen sind `timezone` (IANA-Zeitzone, Standard
+`Europe/Berlin`) und `demo_mode` (schaltet die App auf eine synthetische
+Vorführ-/Testinstanz um, siehe [Benutzerhandbuch →
+Demo-Modus](docs/user-guide.md#demo-modus)) — beide brauchen nach einer
+Änderung einen Add-on-Neustart.
 
 Beim Start sowie nach Datenimporten gleicht Zeitarchiv die abgeleiteten
 Indexkennzahlen automatisch mit Parquet-Archiv und Hot Buffer ab, um

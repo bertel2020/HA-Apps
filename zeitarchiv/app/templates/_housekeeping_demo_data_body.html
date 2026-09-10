@@ -1,0 +1,102 @@
+{# Einstellungen → Demo-Daten (DEMO_MODUS_PLAN.md). Inhalt von
+   <section id="demo-daten"> in settings.html — append-now/regenerate/
+   progress/interval tauschen dieses ganze Partial per hx-target="#demo-daten"
+   hx-swap="innerHTML" aus, die umschließende <section> bleibt dabei stabil
+   stehen. Nur "Entfernen" (Zustand "orphan") ersetzt die Section
+   selbst (hx-swap="delete"), weil danach kein Zustand mehr zutrifft — siehe
+   housekeeping_demo_data_remove() in housekeeping_routes.py. #}
+{% if demo_generating %}
+<h2 class="settings-section-title">
+  Demo-Daten
+  <span class="hk-badge demo">Wird erzeugt &hellip;</span>
+</h2>
+{% with progress_id=demo_progress.progress_id, poll_url=demo_progress.poll_url,
+        phase_label=demo_progress.phase_label, done=demo_progress.done, total=demo_progress.total,
+        unit=demo_progress.unit, detail=demo_progress.detail, percent=demo_progress.percent %}
+{% include "_job_progress.html" %}
+{% endwith %}
+<p class="hint" style="margin-top:10px;">Läuft im Hintergrund, blockiert die App nicht &mdash; andere Seiten sind währenddessen normal erreichbar, zeigen aber noch keine (bzw. noch alte) Demo-Werte.</p>
+
+{% elif demo_state == 'active' %}
+<h2 class="settings-section-title">
+  Demo-Daten
+  <span class="hk-badge demo">Nur im Demo-Modus</span>
+</h2>
+<p class="settings-section-description">Synthetischer Haushalt unter <code>&lt;DATA_DIR&gt;/demo</code> &mdash; komplett getrennt von echten Daten.</p>
+
+<div class="status-grid">
+  <div class="status-card">
+    <span class="status-card-label">Umfang</span>
+    <strong>{{ demo_entity_count_label }} Entitäten</strong>
+    <span class="status-card-detail">{{ demo_row_count_label }} Werte</span>
+  </div>
+  <div class="status-card">
+    <span class="status-card-label">Belegter Platz</span>
+    <strong>{{ demo_size_label }}</strong>
+  </div>
+  <div class="status-card">
+    <span class="status-card-label">Zuletzt ergänzt</span>
+    <strong>{{ demo_last_run_label }}</strong>
+  </div>
+  <div class="status-card">
+    <span class="status-card-label">Nächste Ergänzung</span>
+    <strong>{{ demo_next_run_label }}</strong>
+  </div>
+</div>
+
+<form id="demo-interval-form" hx-post="housekeeping/demo-data/interval" hx-trigger="change"
+      hx-target="#demo-daten" hx-swap="innerHTML" hx-include="#demo-interval-form"
+      style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;margin:18px 0 4px;">
+  <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
+    Automatisch ergänzen
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="demo-interval-btn" onclick="toggleDDPicker('demo-interval')">
+        {% for v, l in demo_append_interval_options %}{% if v == demo_append_interval %}{{ l }}{% endif %}{% endfor %} &#9662;
+      </button>
+      <input type="hidden" name="demo_append_interval" id="demo-interval-input" value="{{ demo_append_interval }}">
+      <div class="dd-picker-popover" id="demo-interval-popover">
+        {% for value, label in demo_append_interval_options %}
+        <div class="dd-picker-row{{ ' active' if value == demo_append_interval else '' }}"
+             onclick="selectDDOption('demo-interval', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </label>
+</form>
+
+<div class="actionbar" style="margin-top:14px;">
+  <button class="btn" hx-post="housekeeping/demo-data/append-now"
+          hx-target="#demo-daten" hx-swap="innerHTML" hx-disabled-elt="this">
+    Jetzt ergänzen
+  </button>
+  <button class="btn btn-danger-outline" hx-post="housekeeping/demo-data/regenerate"
+          hx-target="#demo-daten" hx-swap="innerHTML" hx-disabled-elt="this"
+          hx-confirm="Demo-Daten komplett neu würfeln? Vorhandene Demo-Werte werden dabei gelöscht.">
+    Neu erzeugen
+  </button>
+</div>
+
+<p class="hint">Demo-Daten liegen unter <code>&lt;DATA_DIR&gt;/demo</code>, vollständig getrennt vom eigentlichen Datenverzeichnis. „Entfernen" gibt es hier nicht: solange die Instanz selbst gegen dieses Verzeichnis läuft, würde ein Löschen die eigene laufende Datenbank unter sich wegziehen &mdash; dafür zuerst die Add-on-Option „Demo-Modus" deaktivieren und neu starten.</p>
+
+{% else %}
+{# demo_state == 'orphan' #}
+<h2 class="settings-section-title">
+  Demo-Daten
+  <span class="hk-badge demo">Ungenutzt</span>
+</h2>
+<p class="settings-section-description">Demo-Modus ist aus, aber unter <code>&lt;DATA_DIR&gt;/demo</code> liegt noch eine frühere Demo-Instanz.</p>
+
+<div class="tbl-wrap" style="padding:13px 14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  <div style="flex:1;min-width:220px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);">
+    <strong>{{ demo_size_label }}</strong> &middot; {{ demo_entity_count_label }} Entitäten (Näherung), zuletzt geändert {{ demo_newest_label }}
+    <span style="display:block;margin-top:2px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">Läuft nicht mehr automatisch weiter, weil die Instanz gerade nicht im Demo-Modus läuft.</span>
+  </div>
+  <button class="btn btn-danger" hx-post="housekeeping/demo-data/remove"
+          hx-target="#demo-daten" hx-swap="delete"
+          hx-confirm="Demo-Daten vollständig entfernen? Das kann nicht rückgängig gemacht werden.">
+    Demo-Daten entfernen
+  </button>
+</div>
+
+<p class="hint hint-warn hint-warn-strong">Entfernt <code>&lt;DATA_DIR&gt;/demo</code> vollständig (Werte, Konfiguration, Index) &mdash; nicht rückgängig zu machen. Ungefährlich, weil die laufende Instanz dieses Verzeichnis gerade nicht verwendet.</p>
+{% endif %}

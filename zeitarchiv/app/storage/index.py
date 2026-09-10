@@ -864,6 +864,18 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN average_line INTEGER NOT NULL DEFAULT 0"
             )
+        if "area_fill" not in sc_columns:
+            # "Fläche" (Optionen-Menü, "Darstellung") — dezente Füllfläche unter
+            # Linien-Serien. War auf der Dashboard-Kachel (dashboard-tiles.js)
+            # schon immer fest an, auf der Chart-Seite selbst (chart_editor.js)
+            # dagegen bislang gar nicht vorhanden — dieselbe Inkonsistenz wie
+            # seinerzeit bei show_values. Default AN (nicht 0 wie show_values/
+            # average_line): das entspricht dem bisherigen, unveränderten
+            # Verhalten der Dashboard-Kachel, bestehende Charts sehen dort mit
+            # der neuen Spalte also unverändert aus.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN area_fill INTEGER NOT NULL DEFAULT 1"
+            )
         if "decimals" not in sc_columns:
             # Nachkommastellen-Übersteuerung (Optionen-Menü, "Darstellung") —
             # "auto" übernimmt weiterhin je Serie deren eigene entities.decimals-
@@ -1832,6 +1844,7 @@ class Index:
         decimals: str = "auto",
         show_values: bool = False,
         average_line: bool = False,
+        area_fill: bool = True,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1841,8 +1854,8 @@ class Index:
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, decimals, show_values, average_line, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, decimals, show_values, average_line, area_fill, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1850,7 +1863,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), now, now,
+                    int(average_line), int(area_fill), now, now,
                 ),
             )
             return cur.lastrowid
@@ -1874,6 +1887,7 @@ class Index:
         decimals: str = "auto",
         show_values: bool = False,
         average_line: bool = False,
+        area_fill: bool = True,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -1882,7 +1896,7 @@ class Index:
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, average_line = ?, updated_at = ? WHERE id = ?",
+                "show_values = ?, average_line = ?, area_fill = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1890,7 +1904,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), time.time(), chart_id,
+                    int(average_line), int(area_fill), time.time(), chart_id,
                 ),
             )
 
@@ -1907,6 +1921,7 @@ class Index:
         d["decimals"] = d.get("decimals") or "auto"
         d["show_values"] = bool(d.get("show_values", 0))
         d["average_line"] = bool(d.get("average_line", 0))
+        d["area_fill"] = bool(d.get("area_fill", 1))
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []
@@ -2138,7 +2153,7 @@ class Index:
     # damit denselben Kachel-Grenzwert, siehe DASHBOARD_TILE_LIMIT — jeweils
     # pro Dashboard gezählt). ---------------------------------------------
 
-    DASHBOARD_TILE_LIMIT = 18
+    DASHBOARD_TILE_LIMIT = 30
 
     def list_dashboard_pins(self, dashboard_id: int) -> list[dict]:
         """Angeheftete Kacheln eines Dashboards in Reihenfolge — item_type ist
@@ -2156,12 +2171,18 @@ class Index:
 
     def count_dashboard_pins(self, dashboard_id: int | None = None) -> int:
         """Ohne dashboard_id: Gesamtzahl über alle Dashboards (Statistik-Seite).
-        Mit dashboard_id: Belegung des Kachel-Limits eines einzelnen Dashboards."""
+        Mit dashboard_id: Belegung des Kachel-Limits eines einzelnen Dashboards.
+        Sektions-Trenner (item_type='section') zählen bewusst nicht mit — sie
+        rendern weder Chart noch Tabelle noch Live-Fetch, tragen also nichts zu
+        der Rendering-Last bei, die DASHBOARD_TILE_LIMIT eigentlich begrenzt."""
         with self._lock, self._conn:
             if dashboard_id is None:
-                return self._conn.execute("SELECT COUNT(*) FROM dashboard_pins").fetchone()[0]
+                return self._conn.execute(
+                    "SELECT COUNT(*) FROM dashboard_pins WHERE item_type != 'section'"
+                ).fetchone()[0]
             return self._conn.execute(
-                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'",
+                (dashboard_id,),
             ).fetchone()[0]
 
     def is_pinned(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
@@ -2193,15 +2214,18 @@ class Index:
 
     def pin_item_to_dashboard(self, dashboard_id: int, item_type: str, item_id: int) -> bool:
         """Heftet ein Chart oder eine Vergleichstabelle als neue letzte Kachel
-        eines Dashboards an — False, wenn das Limit von 18 gleichzeitigen
-        Kacheln (Konzept "Offene Punkte": Performance, viele ECharts-Instanzen/
-        Tabellen auf einer Seite) für DIESES Dashboard schon erreicht ist, dann
-        bleibt alles unverändert. UNIQUE(dashboard_id, item_type, item_id)
-        verhindert nebenbei ein doppeltes Anheften auf demselben Dashboard —
-        dasselbe Objekt auf einem ANDEREN Dashboard ist dagegen erlaubt."""
+        eines Dashboards an — False, wenn das Limit von DASHBOARD_TILE_LIMIT
+        gleichzeitigen Kacheln (Konzept "Offene Punkte": Performance, viele
+        ECharts-Instanzen/Tabellen auf einer Seite) für DIESES Dashboard schon
+        erreicht ist, dann bleibt alles unverändert. Sektions-Trenner zählen
+        nicht mit, siehe count_dashboard_pins(). UNIQUE(dashboard_id, item_type,
+        item_id) verhindert nebenbei ein doppeltes Anheften auf demselben
+        Dashboard — dasselbe Objekt auf einem ANDEREN Dashboard ist dagegen
+        erlaubt."""
         with self._lock, self._conn:
             count = self._conn.execute(
-                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'",
+                (dashboard_id,),
             ).fetchone()[0]
             if count >= self.DASHBOARD_TILE_LIMIT:
                 return False
@@ -2275,6 +2299,66 @@ class Index:
                 (dashboard_id, item_type, item_id),
             )
 
+    # -- Sektionen (item_type='section') — benannte Trenner zur Gliederung
+    # gepinnter Kacheln, selbst ein weiterer Eintrag in derselben Reihenfolge
+    # wie Charts/Tabellen/Werte-Kacheln, kein eigenes Datenmodell. Eine Kachel
+    # "gehört" zu dem Trenner, der ihr in list_dashboard_pins() (sortiert nach
+    # position) zuletzt vorausgeht — main.py leitet die Gruppierung beim
+    # Rendern rein aus dieser Reihenfolge ab, hier wird nichts dergleichen
+    # gespeichert. item_id trägt hier die eigene Zeilen-id (zweistufig
+    # eingesetzt, siehe add_dashboard_section()) statt wie bei Charts/Tabellen
+    # auf ein anderes Objekt zu verweisen — nötig, damit
+    # UNIQUE(dashboard_id, item_type, item_id, item_entity_id) mehrere
+    # Sektionen desselben Dashboards zulässt (item_entity_id bleibt NULL,
+    # gleichnamige Sektionen sind erlaubt). -------------------------------
+
+    def add_dashboard_section(self, dashboard_id: int, name: str) -> int | None:
+        """Fügt einen Sektions-Trenner als neue letzte Zeile an. None bei
+        leerem Namen (Aufrufer validiert zusätzlich, das hier ist die letzte
+        Absicherung)."""
+        name = name.strip()[:MAX_CUSTOM_NAME_LENGTH]
+        if not name:
+            return None
+        with self._lock, self._conn:
+            max_pos = self._conn.execute(
+                "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
+            cursor = self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, title) "
+                "VALUES (?, 'section', 0, ?, ?)",
+                (dashboard_id, (max_pos or 0) + 1, name),
+            )
+            new_id = cursor.lastrowid
+            # item_id=0 war nur ein Platzhalter für den INSERT (item_id steht
+            # erst danach fest) — auf die eigene id nachgezogen, siehe
+            # Erklärung oben. Eine zweite Sektion böte sonst mit demselben
+            # item_id=0/item_entity_id=NULL ein Duplikat der UNIQUE-Tupel.
+            self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (new_id, new_id))
+            return new_id
+
+    def rename_dashboard_section(self, dashboard_id: int, section_id: int, name: str) -> bool:
+        name = name.strip()[:MAX_CUSTOM_NAME_LENGTH]
+        if not name:
+            return False
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET title = ? WHERE id = ? AND dashboard_id = ? AND item_type = 'section'",
+                (name, section_id, dashboard_id),
+            )
+            return cursor.rowcount > 0
+
+    def remove_dashboard_section(self, dashboard_id: int, section_id: int) -> bool:
+        """Löst die Sektion auf: nur der Trenner verschwindet, die Kacheln
+        bleiben unangetastet an ihrer position stehen und rutschen dadurch von
+        selbst in die vorausgehende Sektion (oder werden "ohne Sektion", falls
+        es die erste war) — siehe Kommentar oben, keine Nachbearbeitung nötig."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "DELETE FROM dashboard_pins WHERE id = ? AND dashboard_id = ? AND item_type = 'section'",
+                (section_id, dashboard_id),
+            )
+            return cursor.rowcount > 0
+
     # -- Werte-Kacheln (item_type='entity') — eine Entität direkt angeheftet,
     # ohne zuerst ein Chart/eine Tabelle anzulegen (Konzept-Erweiterung).
     # Eigene Methoden statt die obigen chart/table-Funktionen um item_entity_id
@@ -2288,7 +2372,8 @@ class Index:
         Beschränkung der Tabelle)."""
         with self._lock, self._conn:
             count = self._conn.execute(
-                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'",
+                (dashboard_id,),
             ).fetchone()[0]
             if count >= self.DASHBOARD_TILE_LIMIT:
                 return False
