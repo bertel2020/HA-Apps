@@ -23,12 +23,12 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Energiedashboard](#energiedashboard)
   - [Einrichtung](#einrichtung)
   - [Benötigte und sinnvolle Entitäten](#benötigte-und-sinnvolle-entitäten)
+  - [Aufbewahrung richtig einstellen](#aufbewahrung-richtig-einstellen)
   - [Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
   - [Kennzahlen, Ringe und Badges](#kennzahlen-ringe-und-badges)
   - [Status, Datenqualität und Auffälligkeiten](#status-datenqualität-und-auffälligkeiten)
   - [Tageslastprofil](#tageslastprofil)
   - [Energiebericht](#energiebericht)
-  - [Aufbewahrung richtig einstellen](#aufbewahrung-richtig-einstellen)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
   - [Zeitraum-Navigation](#zeitraum-navigation)
   - [Darstellung](#darstellung)
@@ -443,6 +443,34 @@ kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität
 Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst
 Momentan-/Messwerte (`measurement`), keine Zähler.
 
+### Aufbewahrung richtig einstellen
+
+Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
+wirkt sich unterschiedlich stark auf das Energiedashboard aus — nicht jede
+Rolle braucht dieselbe Frist:
+
+- **Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen/SOC) und
+  Verbraucher** sollten großzügig aufbewahrt werden — mindestens
+  **2 Jahre**, im Zweifel **Unbegrenzt**. Die Autarkie-, Eigenverbrauchs-,
+  SOC- und Wirkungsgrad-Trends im Ring-Popup werten jeweils die letzten drei
+  Kalenderjahre aus (ebenso der Monatsverlauf im Energiebericht); eine
+  kürzere Frist lässt diese Trends mit der Zeit lückenhaft werden.
+- **Strompreis- und CO₂-Entitäten** (falls über eine Entität statt eines
+  festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
+  eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
+  inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
+  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
+  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
+  alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
+  aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
+  aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
+- **Speicher-Kapazitäts- und PV-Ertragsprognose-Entitäten** werden
+  ausschließlich als aktueller Wert gelesen — unabhängig vom gerade
+  angezeigten Zeitraum wird nie ein archivierter, alter Wert benötigt. Hier
+  genügt die kürzeste verfügbare Frist (**30 Tage**); mehr Aufbewahrung
+  bringt für diese Rollen keinen Vorteil, kostet bei häufig aktualisierenden
+  Quellen aber unnötig Speicherplatz.
+
 ### Energiefluss und Verbraucher-Gruppen
 
 Der Sankey zeigt Quellen (Netzbezug, Erzeuger, Speicherentladung) links,
@@ -521,34 +549,6 @@ Button **„Drucken / Als PDF speichern"** ruft lediglich den Druckdialog des
 Browsers auf, dort lässt sich wie gewohnt „Als PDF speichern“ statt eines
 echten Druckers wählen. Es gibt keinen automatischen Versand per E-Mail —
 der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
-
-### Aufbewahrung richtig einstellen
-
-Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
-wirkt sich unterschiedlich stark auf das Energiedashboard aus — nicht jede
-Rolle braucht dieselbe Frist:
-
-- **Netzbezug, Einspeisung, Erzeuger, Speicher (Laden/Entladen/SOC) und
-  Verbraucher** sollten großzügig aufbewahrt werden — mindestens
-  **2 Jahre**, im Zweifel **Unbegrenzt**. Die Autarkie-, Eigenverbrauchs-,
-  SOC- und Wirkungsgrad-Trends im Ring-Popup werten jeweils die letzten drei
-  Kalenderjahre aus (ebenso der Monatsverlauf im Energiebericht); eine
-  kürzere Frist lässt diese Trends mit der Zeit lückenhaft werden.
-- **Strompreis- und CO₂-Entitäten** (falls über eine Entität statt eines
-  festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
-  eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
-  inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
-  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
-  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
-  alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
-  aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
-  aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
-- **Speicher-Kapazitäts- und PV-Ertragsprognose-Entitäten** werden
-  ausschließlich als aktueller Wert gelesen — unabhängig vom gerade
-  angezeigten Zeitraum wird nie ein archivierter, alter Wert benötigt. Hier
-  genügt die kürzeste verfügbare Frist (**30 Tage**); mehr Aufbewahrung
-  bringt für diese Rollen keinen Vorteil, kostet bei häufig aktualisierenden
-  Quellen aber unnötig Speicherplatz.
 
 ## Entitäten und Verläufe
 
