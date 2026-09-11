@@ -885,6 +885,54 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'"
             )
+        if "stacked" not in sc_columns:
+            # "Gestapelt" (Optionen-Menü, "Darstellung") — Balken-Serien
+            # derselben Einheit als gestapelte statt nebeneinander gruppierte
+            # Balken (chart_editor.js render(): stack = 'bar-' + axisKey(s),
+            # nur für Serien mit chart_type 'bar'). Nur anwählbar ab zwei
+            # Balken-Serien im Chart (canStack-Getter), Default aus.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN stacked INTEGER NOT NULL DEFAULT 0"
+            )
+        if "normalize" not in sc_columns:
+            # "Anteile (%)" statt Absolutwerte, nur innerhalb gestapelter
+            # Balken sichtbar/wirksam (chart_editor.html: verschachtelt unter
+            # "Gestapelt", wie "Legenden-Stil" unter "Statistik in Legende").
+            # Default aus (Absolutwerte), damit ein gerade erst gestapeltes
+            # Chart nicht überraschend auf Prozent statt der bisher gewohnten
+            # Einheit steht.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN normalize INTEGER NOT NULL DEFAULT 0"
+            )
+        if "average_style" not in sc_columns:
+            # "Flach"/"Gleitend" (Optionen-Menü, verschachtelt unter
+            # "Durchschnittslinie") — "flach" ist die bisherige waagerechte
+            # markLine, unveränderter Default; "rolling" zeichnet stattdessen
+            # eine gleitende Trendlinie über Linien-Serien (chart_editor.js
+            # render(), movingAverage()). Wirkt nur, solange average_line an
+            # ist; ohne das bleibt der Wert gespeichert, aber ungenutzt.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN average_style TEXT NOT NULL DEFAULT 'flat'"
+            )
+        if "horizontal" not in sc_columns:
+            # "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll" sichtbar)
+            # — horizontale statt vertikale Balken im Ranking-Vergleich
+            # (chart_editor.js render(), canGoHorizontal-Getter). Default
+            # aus (vertikal), das bisherige Aussehen bleibt unverändert.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN horizontal INTEGER NOT NULL DEFAULT 0"
+            )
+        if "donut_aggregation" not in sc_columns:
+            # "Aggregation" (Optionen-Menü, nur bei Darstellungsart "Donut"
+            # sichtbar) — bestimmt, welcher Einzelwert je Serie deren Anteil
+            # am Donut bildet (chart_editor.js renderDonut(): sum/average/
+            # last derselben Punkte, die seriesStats() für die Legende schon
+            # berechnet). Default "sum": bei den naheliegendsten Donut-
+            # Kandidaten (Verbrauch/Kosten über einen Zeitraum) beantwortet
+            # die Summe die Frage "wie groß ist der Anteil dieser Serie".
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN donut_aggregation TEXT NOT NULL DEFAULT 'sum'"
+            )
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -1845,6 +1893,11 @@ class Index:
         show_values: bool = False,
         average_line: bool = False,
         area_fill: bool = True,
+        stacked: bool = False,
+        normalize: bool = False,
+        average_style: str = "flat",
+        horizontal: bool = False,
+        donut_aggregation: str = "sum",
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -1854,8 +1907,9 @@ class Index:
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, decimals, show_values, average_line, area_fill, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, decimals, show_values, average_line, area_fill, stacked, normalize, "
+                "average_style, horizontal, donut_aggregation, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1863,7 +1917,8 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), now, now,
+                    int(average_line), int(area_fill), int(stacked), int(normalize),
+                    average_style, int(horizontal), donut_aggregation, now, now,
                 ),
             )
             return cur.lastrowid
@@ -1888,6 +1943,11 @@ class Index:
         show_values: bool = False,
         average_line: bool = False,
         area_fill: bool = True,
+        stacked: bool = False,
+        normalize: bool = False,
+        average_style: str = "flat",
+        horizontal: bool = False,
+        donut_aggregation: str = "sum",
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -1896,7 +1956,8 @@ class Index:
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, average_line = ?, area_fill = ?, updated_at = ? WHERE id = ?",
+                "show_values = ?, average_line = ?, area_fill = ?, stacked = ?, normalize = ?, "
+                "average_style = ?, horizontal = ?, donut_aggregation = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -1904,7 +1965,8 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), time.time(), chart_id,
+                    int(average_line), int(area_fill), int(stacked), int(normalize),
+                    average_style, int(horizontal), donut_aggregation, time.time(), chart_id,
                 ),
             )
 
@@ -1922,6 +1984,11 @@ class Index:
         d["show_values"] = bool(d.get("show_values", 0))
         d["average_line"] = bool(d.get("average_line", 0))
         d["area_fill"] = bool(d.get("area_fill", 1))
+        d["stacked"] = bool(d.get("stacked", 0))
+        d["normalize"] = bool(d.get("normalize", 0))
+        d["average_style"] = d.get("average_style") or "flat"
+        d["horizontal"] = bool(d.get("horizontal", 0))
+        d["donut_aggregation"] = d.get("donut_aggregation") or "sum"
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []

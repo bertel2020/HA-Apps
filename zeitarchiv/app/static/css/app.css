@@ -366,13 +366,39 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 
 [x-cloak]{display:none!important;}
 
+/* Sticky-Rahmen um Demo-Banner + Topnav (base.html: ".page-sticky-header"
+   umschließt beide zusammen mit dem "topnav"-Block) — EIN gemeinsamer
+   Sticky-Kontext statt je einer eigenen Regel pro Element: die Höhe des
+   Banners (Text kann je nach --font-scale/Bildschirmbreite ein- oder
+   zweizeilig umbrechen) müsste sonst als fester top-Offset für die
+   Topnav-eigene Sticky-Position bekannt sein. So bleiben beide zusammen
+   oben kleben, egal wie hoch der Banner gerade ist. Ohne Banner enthält der
+   Wrapper nur die Topnav — sichtbar unverändert wie vorher, als die Topnav
+   noch selbst sticky war. */
+.page-sticky-header{position:sticky;top:0;z-index:15;}
+
+/* Demo-Modus-Banner (base.html, nur wenn demo_mode_active) — sitzt VOR der
+   Topnav und übernimmt deren Full-Bleed-Trick (negative Margins heben das
+   body-Padding auf, siehe Kommentar dort), damit er dieselbe volle
+   Seitenbreite bricht. Die Topnav braucht ihre eigene -32px-Top-Margin dann
+   nicht mehr — sie soll direkt unter dem Banner sitzen, nicht sich darüber
+   hinaus ziehen — deshalb die Geschwister-Regel direkt darunter. Der
+   allgemeine Geschwister-Kombinator (~) statt des direkten (+): zwischen
+   Banner und <nav class="topnav"> liegen noch die <script>-Tags aus
+   _topnav.html (Alpine u. a.) als eigene Geschwisterelemente, + träfe damit
+   gar nicht. */
+.demo-banner{margin:-32px -24px 0;padding:8px 24px;background:var(--warning-soft);border-bottom:1px solid var(--warning);color:var(--warning);font-weight:600;font-size:calc(13px * var(--font-scale, 1));text-align:center;}
+.demo-banner ~ .topnav{margin-top:0;}
+
 /* Globale Menüleiste (_topnav.html) — liegt außerhalb von .page und bricht
    bewusst aus dessen 1120px-Breite aus, um als volle Kopfzeile über die ganze
    Seitenbreite zu laufen. Die negativen Margins heben exakt das body-Padding
    (32px 24px, siehe oben) auf; .topnav-bar zentriert den Inhalt wieder auf
    dieselbe 1120px-Breite wie .page, damit Logo/Menü optisch mit dem
-   Seiteninhalt darunter fluchten. */
-.topnav{position:sticky;top:0;z-index:15;margin:-32px -24px 28px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+   Seiteninhalt darunter fluchten. Sticky sitzt seit dem Demo-Banner nicht
+   mehr hier, sondern eine Ebene höher auf .page-sticky-header (s. o.) —
+   beide zusammen sollen oben kleben bleiben, nicht nur die Topnav allein. */
+.topnav{margin:-32px -24px 28px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);}
 .topnav-bar{max-width:1120px;margin:0 auto;height:56px;display:flex;align-items:center;gap:28px;}
 .topnav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;flex-shrink:0;}
 /* 30px statt 26px — das Logo wirkte neben der 15px-Wortmarke zu zurückhaltend.
@@ -793,6 +819,11 @@ button.dd-picker-clear{
    (dort durch "Legenden-Stil" + Chips/Tabelle nötig) wären hier unnötig
    breit. */
 .menu-popover-narrow{width:190px;}
+/* Breitere Variante für Menüs, deren seg-Zeilen an der Standardbreite
+   umbrechen bzw. abgeschnitten wirken (Chart-Editor, "Aggregation":
+   Summe/Durchschnitt/Letzter Wert — drei Wörter in einer Zeile brauchen mehr
+   als die 290px, die "Legenden-Stil" bislang als breiteste Zeile brauchte). */
+.menu-popover-wide{width:340px;}
 
 /* Rechtsbündige Knopfgruppe am Ende einer .toolbar (Entitäts-Chart und
    Chart-Editor: "Vergleichen" + "Optionen"). Schiebt sich und alles danach an
@@ -2019,6 +2050,7 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
      der Rand mitziehen; sonst ragt die Leiste je Seite um 24-16=8px hinaus und
      erzeugt auf JEDER Seite der App genau diese 8px Seitwärts-Scrollweg. */
   .topnav{margin:-20px -16px 28px;padding:0 16px;}
+  .demo-banner{margin:-20px -16px 0;padding:8px 16px;}
   .stat-row{gap:8px;}
 }
 

@@ -23,12 +23,20 @@ def _nutzt_echarts_average(js: str) -> bool:
 def test_both_pages_offer_the_row_independently_of_the_legend() -> None:
     """Die Kennzahlen-Chips hängen an chartStats und verschwinden mit ihm. Die
     Durchschnittslinie darf das nicht: wer die Legende ausgeschaltet hat, käme
-    sonst gar nicht mehr an die Linie heran."""
+    sonst gar nicht mehr an die Linie heran.
+
+    Der Chart-Editor blendet die Zeile seit der Donut-Darstellungsart
+    zusätzlich per x-show="!donut" aus (chart_editor.html) — eine Linie über
+    der Zeit ergibt ohne Zeitachse keinen Sinn. Das ist keine Kopplung an die
+    Legende, deshalb prüft der Test gezielt auf chartStats/legend statt auf
+    x-show generell."""
     for name, vorlage in (("entity_detail", DETAIL_TEMPLATE), ("chart_editor", EDITOR_TEMPLATE)):
         zeilen = [z for z in vorlage.splitlines() if "Durchschnittslinie" in z]
         assert len(zeilen) == 1, name
         block = vorlage.split("Durchschnittslinie")[0].rsplit("<label", 1)[1]
-        assert "x-show" not in block, f"{name}: Zeile hängt an einer Bedingung"
+        assert "chartStats" not in block and "legend" not in block.lower(), (
+            f"{name}: Zeile hängt an der Legende"
+        )
         assert 'averageLine = !averageLine' in vorlage, name
 
 
@@ -41,7 +49,11 @@ def test_the_average_is_computed_here_not_by_echarts() -> None:
     for name, js in (("entity_detail", DETAIL_JS), ("chart_editor", EDITOR_JS)):
         assert "function averageOf(values)" in js, name
         assert not _nutzt_echarts_average(js), name
-        assert "data: [{yAxis: durchschnitt}]" in js, name
+        # chart_editor.js kennt seit der Ranking-Vergleich/horizontale-Balken-
+        # Erweiterung zusätzlich {xAxis: durchschnitt} (Achsen vertauscht,
+        # wenn horizontal aktiv ist) — {yAxis: durchschnitt} bleibt in beiden
+        # Dateien der vertikale/Normalfall.
+        assert "{yAxis: durchschnitt}" in js, name
 
 
 def test_each_page_averages_exactly_what_it_draws() -> None:
@@ -147,7 +159,7 @@ def test_the_tile_averages_the_drawn_points_without_the_hold_point() -> None:
     assert "const averageOf = values =>" in tiles
     assert not _nutzt_echarts_average(tiles)
     assert "el.dataset.averageLine === 'true'" in tiles
-    assert "averageOf(averageValues)" in tiles
+    assert "averageOf(prepared[i].averageValues)" in tiles
     assert "averageValues = displayPoints.map(p => p.value);" in tiles
-    assert "averageValues = [aggregate];" in tiles
+    assert "averageValues: [aggregate]," in tiles
     assert "averageOf(lineData" not in tiles

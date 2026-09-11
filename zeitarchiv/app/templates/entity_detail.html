@@ -118,7 +118,7 @@
           <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
             Optionen <span class="chevron">▾</span>
           </button>
-          <div class="menu-popover" x-show="optionsMenuOpen" x-cloak
+          <div class="menu-popover menu-popover-wide" x-show="optionsMenuOpen" x-cloak
                x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
             <div class="menu-section-label">Daten</div>
             <label class="menu-row">
@@ -309,7 +309,7 @@
             <span x-show="legendMetrics.includes('min')">Min <strong x-text="entityStat.min"></strong></span>
             <span x-show="legendMetrics.includes('max')">Max <strong x-text="entityStat.max"></strong></span>
             <span x-show="legendMetrics.includes('average')">Ø <strong x-text="entityStat.average"></strong></span>
-            <span x-show="legendMetrics.includes('sum') && entityStat.sum !== null">Summe <strong x-text="entityStat.sum"></strong></span>
+            <span x-show="legendMetrics.includes('sum') && entityStat.sum !== null">Σ <strong x-text="entityStat.sum"></strong></span>
           </span>
         </span>
       </div>
@@ -322,7 +322,7 @@
               <th x-show="legendMetrics.includes('min')">Min</th>
               <th x-show="legendMetrics.includes('max')">Max</th>
               <th x-show="legendMetrics.includes('average')">Ø</th>
-              <th x-show="legendMetrics.includes('sum')">Summe</th>
+              <th x-show="legendMetrics.includes('sum')">Σ</th>
             </tr>
           </thead>
           <tbody>

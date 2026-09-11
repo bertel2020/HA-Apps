@@ -534,6 +534,53 @@ Die Kachel mittelt dabei nicht über `lineData`: der Linien-Zweig hängt bis
 damit doppelt zählen würde. Deshalb sammelt jeder der beiden Zweige seine
 Werte in `averageValues` selbst.
 
+### Fläche unter Linien-Charts
+
+Eine dezente `areaStyle` (Opacity 0,08) unter jeder Linien-Serie, eigene Zeile
+„Fläche" im Optionen-Menü, nur für Charts (nicht für die Entität-eigene
+Verlaufsseite — dort gibt es die Option nicht).
+
+Bis 0.92.0 kannten Dashboard-Kachel und Chart-Editor zwei komplett getrennte
+ECharts-Optionsaufbauten: `dashboard-tiles.js` setzte `areaStyle`
+unconditional für jede Linien-Serie, `chart_editor.js` kannte den Schlüssel an
+keiner einzigen Stelle — dasselbe Chart sah angeheftet anders aus als auf
+seiner eigenen Seite, ohne dass das je bewusst entschieden worden wäre.
+
+Gespeichert wird sie wie `show_values`/`average_line`: pro Chart in
+`saved_charts.area_fill`, Default **an** (`ALTER TABLE ... DEFAULT 1`) — anders
+als bei jenen beiden (die mit 0/Aus starten), weil an das dem bisherigen,
+unveränderten Kachel-Verhalten entspricht. Kein globaler Schalter nötig: die
+Dashboard-Kachel liest ihre gesamte Chart-Konfiguration ohnehin aus derselben
+`saved_charts`-Zeile (`data-area-fill`, analog `data-average-line`), ein
+angeheftetes Chart übernimmt die Einstellung deshalb automatisch.
+
+Die Vergleichs-Nebenserie (bei aktivem „Vergleichen") bekommt eine niedrigere
+Opacity (0,05 statt 0,08) als die Hauptserie — sie ist ohnehin schon
+gestrichelt/blasser, zwei gleich kräftige überlagerte Flächen hätten sich
+sonst optisch zugematscht.
+
+### Dauer-Anzeige (Schalter, Anzeigemodus „Zeit")
+
+Ein Schalter mit `display_mode: "time"` bekommt in `chart_editor.js` und
+`dashboard-tiles.js` gleichermaßen einen eigenen, synthetischen Achsen-
+Schlüssel (`axisKey(s) = isDurationSeries(s) ? ' duration' : s.unit`) statt
+seiner echten, meist leeren `unit` — sonst teilte er sich fälschlich eine
+Achse mit unitlosen Standard-Entitäten und erschiene dort in Rohsekunden
+statt als „1h 30m" (`NumberFormat.fmtDuration`).
+
+Bis 0.92.0 galt das nur im Chart-Editor. Die Dashboard-Kachel kannte den
+Anzeigemodus ausschließlich in ihrer selbstgebauten HTML-Legende (dort schon
+immer korrekt über `NumberFormat.fmtDuration`) — die eigentliche ECharts-
+Achse, der native Tooltip und das Werte-Label rechneten weiterhin nur mit
+`fmtCompactNumber`. Das Dauer-Flag reist deshalb jetzt als fünftes Element im
+`lineData`-Tupel mit (`[ts, value, unit, decimals, isDuration]`) — inklusive
+des Halte-Punkts, den der Linien-Zweig bis `window_end` anhängt, sonst
+verlöre genau der letzte, oft sichtbarste Punkt seine Formatierung.
+
+Die Durchschnittslinie (siehe oben) rechnet weiterhin ohne Dauer-Sonderfall in
+beiden Dateien — dasselbe, vorbestehende Verhalten wie vor diesem Fix, keine
+neue Inkonsistenz.
+
 ### Markierungsquote der Ausreißer-Erkennung
 
 Unter dem Schwellwert-Feld (Entität konfigurieren) steht, welchen Anteil der

@@ -85,6 +85,9 @@
   .chart-card.is-typ-gemischt::before{
     background:linear-gradient(90deg, var(--chart-1), var(--chart-2));
   }
+  .chart-card.is-typ-donut::before{
+    background:linear-gradient(90deg, var(--chart-5), color-mix(in srgb, var(--chart-5) 35%, transparent));
+  }
   .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:96px;border-style:dashed;text-decoration:none;}
   .chart-grid-add-btn{
     display:flex;align-items:center;justify-content:center;

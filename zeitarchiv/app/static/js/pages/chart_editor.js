@@ -12,8 +12,14 @@
       {value: 'last', label: 'Aktuell'},
       {value: 'min', label: 'Min'},
       {value: 'max', label: 'Max'},
-      {value: 'average', label: 'Durchschnitt'},
-      {value: 'sum', label: 'Summe'},
+      // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
+      // Zeichen, mit denen Durchschnitt/Summe schon überall sonst in der App
+      // beschriftet sind (Ø in der Legende selbst, s. u.; Ø auch in der
+      // Durchschnittslinie, siehe averageOf()-Verwendung). "Aktuell"/"Min"/
+      // "Max" bleiben Text — dafür gibt es kein vergleichbar etabliertes,
+      // eindeutiges Zeichen in dieser App.
+      {value: 'average', label: 'Ø'},
+      {value: 'sum', label: 'Σ'},
     ];
 
     // Feste Farbfolge statt ECharts' Auto-Zuordnung — nur so lässt sich bei
@@ -37,6 +43,13 @@
       });
     }
 
+    // Auf Modulebene statt lokal in formatPeriodLabel() (wie bis hierhin) —
+    // formatPeriodForFilename() weiter unten braucht dieselben Formatierer.
+    const fmtDay = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+    const fmtDayMonth = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
+    const fmtMonthYear = d => d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+    const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+
     // Dieselbe Perioden-Beschriftungslogik wie auf der Entität-eigenen Chart-
     // Seite (entity_detail.html) — hier bewusst ohne Vorperiode/Offset-
     // Navigation, ein abgelegtes Chart zeigt beim Ansehen immer die aktuelle
@@ -45,10 +58,6 @@
       if (windowStart == null || windowEnd == null) return '';
       const start = new Date(windowStart * 1000);
       const end = new Date(windowEnd * 1000 - 1000);
-      const fmtDay = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
-      const fmtDayMonth = d => d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
-      const fmtMonthYear = d => d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
-      const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
       switch (range) {
         case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
         case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? 'Heute' : fmtDay(start));
@@ -58,6 +67,58 @@
         case 'decade': return `${start.getFullYear()}–${end.getFullYear()}`;
         default: return '';
       }
+    }
+
+    // Wie formatPeriodLabel(), aber fürs Dateinamensfeld beim CSV-/Bild-
+    // Export (exportFilename-Getter weiter unten): "Heute"/"(bis heute)" löst
+    // sich auf das tatsächliche Datum auf (windowEnd, exklusiv, daher -1s)
+    // statt das relative Wort stehen zu lassen — ein heute heruntergeladener
+    // Export bliebe sonst beim erneuten Ansehen (z. B. nächste Woche) nicht
+    // mehr erkennbar, ab wann er galt. Trennzeichen ("-"/"_" statt "–"/"·")
+    // bewusst dateinamentauglich statt der Lesetypografie aus
+    // formatPeriodLabel(); die eigentliche Zeichen-Bereinigung (Leerzeichen,
+    // verbotene Zeichen) übernimmt sanitizeFilename().
+    function formatPeriodForFilename(range, continuous, windowStart, windowEnd, isCurrent) {
+      if (windowStart == null || windowEnd == null) return '';
+      const start = new Date(windowStart * 1000);
+      const end = new Date(windowEnd * 1000 - 1000);
+      switch (range) {
+        case 'hour': return `${fmtDay(start)}_${fmtTime(start).replace(':', '-')}-${fmtTime(end).replace(':', '-')}`;
+        case 'day': return continuous ? `${fmtDay(start)}-${fmtDay(end)}` : fmtDay(isCurrent ? end : start);
+        case 'week': return `${fmtDayMonth(start)}-${fmtDayMonth(end)}_${end.getFullYear()}`;
+        case 'month': return continuous ? `${fmtDay(start)}-${fmtDay(end)}` : (isCurrent ? `${fmtMonthYear(start)}_bis_${fmtDay(end)}` : fmtMonthYear(start));
+        case 'year': return continuous ? `${fmtMonthYear(start)}-${fmtMonthYear(end)}` : (isCurrent ? `${start.getFullYear()}_bis_${fmtDay(end)}` : `${start.getFullYear()}`);
+        case 'decade': return `${start.getFullYear()}-${end.getFullYear()}`;
+        default: return '';
+      }
+    }
+
+    // Entfernt Dateisystem-kritische Zeichen und macht Leerzeichen zu "_" —
+    // gemeinsam für Chart-Namen und formatPeriodForFilename()-Ergebnis
+    // genutzt (exportFilename-Getter weiter unten).
+    function sanitizeFilename(s) {
+      return String(s)
+        .replace(/[\\/:*?"<>|]/g, '')
+        .replace(/[(),]/g, '')
+        .trim()
+        .replace(/\s+/g, '_');
+    }
+
+    // "Als Bild speichern" (toolbox.feature.saveAsImage) — reines ECharts-
+    // Bordmittel, dieselbe Konfiguration für alle drei Renderpfade (render()/
+    // renderTimelineMulti()/renderDonut()), deshalb hier zentral statt
+    // dreimal dupliziert. NUR auf dieser Seite (nicht auf der Dashboard-
+    // Kachel, dashboard-tiles.js) — eine Kachel ist ohnehin nur eine
+    // Vorschau, das Icon wäre dort in der kleinen Fläche nur Ballast, und das
+    // Original mit vollem Bedienfeld steht ohnehin einen Klick entfernt.
+    function toolboxOption(exportFilename, surface, inkFaint) {
+      return {
+        show: true, right: 6, top: 0,
+        feature: {
+          saveAsImage: {title: 'Als Bild speichern', backgroundColor: surface, name: exportFilename},
+        },
+        iconStyle: {borderColor: inkFaint},
+      };
     }
 
     function previousPeriodLabel(range) {
@@ -104,24 +165,52 @@
       return zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length;
     }
 
+    // Gleitender Durchschnitt (Optionen-Menü, "Durchschnittslinie" →
+    // "Gleitend") — zentriertes Fenster über die tatsächlich gezeichneten
+    // Punkte (mainPoints), nicht über s.points, aus demselben Grund wie beim
+    // flachen Durchschnitt: resamplePoints() fasst Zähler/Schalter per SUMME
+    // zusammen, Rohpunkte lägen sonst auf einer anderen Skala.
+    //
+    // Fensterbreite als fester ANTEIL der gezeichneten Punkte (1/12,
+    // zwischen 3 und 60 Punkten gekappt) statt einer festen Anzahl Tage —
+    // dadurch funktioniert dieselbe Formel unverändert bei jeder Auflösung
+    // (Auto/Medium/Coarse) und jedem Zeitraum, ohne RESOLUTION_SECONDS hier
+    // ein zweites Mal auszuwerten. Die Note im Menü zeigt die sich daraus
+    // ergebende ungefähre Zeitspanne an (siehe render()).
+    function movingAverageWindow(pointCount) {
+      return Math.min(60, Math.max(3, Math.round(pointCount / 12)));
+    }
+    function movingAverage(points, windowPoints) {
+      return points.map((p, i) => {
+        const start = Math.max(0, i - Math.floor(windowPoints / 2));
+        const end = Math.min(points.length, i + Math.ceil(windowPoints / 2));
+        const slice = points.slice(start, end).map(q => q.value).filter(Number.isFinite);
+        return {ts: p.ts, value: slice.length ? slice.reduce((s, v) => s + v, 0) / slice.length : null};
+      });
+    }
+
     const RESOLUTION_SECONDS = {
       hour: {medium: 5 * 60, coarse: 15 * 60},
       // full: die komplette Periode als EIN Balken — z. B. "Tag" bei
-      // Zeitraum "Tag", um zwei Entitäten (etwa Bezug/Einspeisung) als
-      // jeweils einen einzigen Tagesgesamtwert nebeneinander zu vergleichen,
-      // statt als 24-/48-teilige Reihe.
+      // Zeitraum "Tag", um mehrere Entitäten als jeweils einen einzigen
+      // Gesamtwert der Periode miteinander zu vergleichen (Ranking, siehe
+      // render()), statt als vielteilige Zeitreihe. Bei Woche/Monat/Jahr
+      // bewusst großzügig gerundete, aber sichere Obergrenzen (nie kürzer
+      // als die tatsächliche Fensterlänge) statt exakter Kalenderlängen —
+      // resamplePoints() braucht nur "groß genug, dass alle Punkte in
+      // Bucket 0 fallen", keine exakte Sekundenzahl.
       day: {medium: 30 * 60, coarse: 60 * 60, full: 24 * 60 * 60},
-      week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60},
-      month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60},
-      year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60},
+      week: {medium: 6 * 60 * 60, coarse: 24 * 60 * 60, full: 7 * 24 * 60 * 60},
+      month: {medium: 24 * 60 * 60, coarse: 7 * 24 * 60 * 60, full: 31 * 24 * 60 * 60},
+      year: {medium: 30 * 24 * 60 * 60, coarse: 90 * 24 * 60 * 60, full: 366 * 24 * 60 * 60},
       decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
     };
     const RESOLUTION_LABELS = {
       hour: {medium: '5 Minuten', coarse: '15 Minuten'},
       day: {medium: '30 Minuten', coarse: '1 Stunde', full: 'Tag'},
-      week: {medium: '6 Stunden', coarse: '1 Tag'},
-      month: {medium: '1 Tag', coarse: '1 Woche'},
-      year: {medium: '1 Monat', coarse: '3 Monate'},
+      week: {medium: '6 Stunden', coarse: '1 Tag', full: 'Woche'},
+      month: {medium: '1 Tag', coarse: '1 Woche', full: 'Monat'},
+      year: {medium: '1 Monat', coarse: '3 Monate', full: 'Jahr'},
       decade: {medium: '1 Jahr', coarse: '2 Jahre'},
     };
 
@@ -351,6 +440,10 @@
         showValues: SHOW_VALUES,
         averageLine: AVERAGE_LINE,
         areaFill: AREA_FILL,
+        stacked: STACKED,
+        normalize: NORMALIZE,
+        averageStyle: AVERAGE_STYLE,
+        horizontal: HORIZONTAL,
         raw: false,
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
@@ -361,6 +454,14 @@
         // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
         // Chart gespeicherte Wahl verwerfen.
         timeline: CHART_TYPE === 'timeline',
+        // Donut statt Zeitverlauf — ein Anteil je Serie (Summe/Durchschnitt/
+        // Letzter Wert, siehe donutAggregation) statt einer Zeitachse.
+        // Eigenes Feld statt eines dritten timeline-artigen Strings, weil
+        // beide Darstellungsarten im Menü als ZWEI verschiedene Zeilen
+        // auftreten (Darstellungsart oben, Zeitstrahl darunter, nur bei
+        // Zeitverlauf sichtbar) — siehe setDisplayMode()/render() unten.
+        donut: CHART_TYPE === 'donut',
+        donutAggregation: DONUT_AGGREGATION,
         resolutionPreset: RESOLUTION_PRESET,
         dynamicYAxis: DYNAMIC_Y_AXIS,
         // Min/Max/Ø in der Legende statt einer separaten Kachel-Reihe (siehe
@@ -428,6 +529,26 @@
         // der Server ausschließlich chart_type 'line', die Zeile verschwindet
         // dort also automatisch (früher: :disabled="timeline").
         get hasBarSeries() { return this.series.some(s => s.chart_type === 'bar'); },
+        // Auflösung "Voll" (Tag/Woche/Monat/Jahr, je nach Zeitraum — siehe
+        // RESOLUTION_LABELS[range].full) fasst den kompletten Zeitraum zu
+        // GENAU EINEM Wert je Entität zusammen, jede Entität bekommt dabei
+        // eine eigene Kategorie auf der Achse (Ranking-Vergleich, s.
+        // render()). Eigener Getter statt der lokalen Konstante in render():
+        // wird auch im Template gebraucht (Ausrichtung/Gestapelt-Sichtbarkeit).
+        get singleBucket() { return this.resolutionPreset === 'full'; },
+        // "Gestapelt" (Optionen-Menü) nur ab zwei Balken-Serien UND außerhalb
+        // von Auflösung "Voll" sinnvoll/anwählbar — mit nur einer Balken-
+        // Serie wäre die Fläche identisch zur normalen Balken-Darstellung,
+        // und bei "Voll" hat jede Entität bereits ihre eigene Kategorie
+        // (Ranking-Vergleich); eine Kombination aus "alle Entitäten in eine
+        // Kategorie stapeln" UND "jede Entität ihre eigene Kategorie" wäre
+        // ein Widerspruch, deshalb schließen sich beide aus — dieselbe
+        // Konvention wie "Gestapelt" + "Vergleichen".
+        get canStack() { return !this.singleBucket && this.series.filter(s => s.chart_type === 'bar').length >= 2; },
+        // "Ausrichtung" (Vertikal/Horizontal, Optionen-Menü) — setHorizontal()
+        // weiter unten, statt eines eigenen canGoHorizontal-Getters: die Zeile
+        // ist jetzt immer sichtbar, "Horizontal" schaltet den dafür nötigen
+        // Ranking-Vergleich (Auflösung "Voll") selbst mit ein.
         // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
         // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
         // timeline-Kommentar oben.
@@ -507,6 +628,17 @@
         get periodLabel() {
           return formatPeriodLabel(this.range, this.continuous, this.windowStart, this.windowEnd, this.isCurrent);
         },
+        // Gemeinsamer Dateiname für CSV- und Bild-Export (exportCsv()/
+        // toolbox.feature.saveAsImage in render()/renderTimelineMulti()/
+        // renderDonut()) — Chart-Name + aufgelöster Zeitraum, siehe
+        // formatPeriodForFilename()/sanitizeFilename().
+        get exportFilename() {
+          const namePart = sanitizeFilename(this.name || 'chart') || 'chart';
+          const periodPart = sanitizeFilename(
+            formatPeriodForFilename(this.range, this.continuous, this.windowStart, this.windowEnd, this.isCurrent)
+          );
+          return periodPart ? `${namePart}_${periodPart}` : namePart;
+        },
         get comparePreviousLabel() { return previousPeriodLabel(this.range); },
         get compareYearLabel() { return previousYearPeriodLabel(this.range); },
         // Blendet die zweite Menüzeile aus, wo sie nichts Eigenes aussagt
@@ -581,6 +713,22 @@
           }
           this.render();
         },
+        // "Ausrichtung" (Vertikal/Horizontal, Optionen-Menü) — kehrt die
+        // frühere Abhängigkeit um: nicht mehr "Auflösung: Voll" schaltet
+        // diese Zeile erst frei, sondern "Horizontal" schaltet selbst in den
+        // dafür nötigen Ranking-Vergleich (Auflösung "Voll", s. singleBucket).
+        // Zurück auf "Vertikal" setzt die Auflösung auf "Automatisch" —
+        // bewusst nicht auf den vorherigen Wert: der müsste sonst extra
+        // gemerkt werden, nur um ihn beim nächsten Wechsel wieder zu
+        // verwerfen. onResolutionChange() übernimmt dieselben Folgeschritte
+        // wie bei manueller Auswahl im Auflösung-Dropdown (Vergleich/
+        // Dynamische Y-Achse abschalten, rollierendes Fenster ggf. neu laden).
+        setHorizontal(value) {
+          if (value === this.horizontal) return;
+          this.horizontal = value;
+          this.resolutionPreset = value ? 'full' : 'auto';
+          this.onResolutionChange();
+        },
         setCompareMode(mode) {
           this.compare = true;
           this.compareMode = mode;
@@ -605,6 +753,24 @@
           else this.legendHiddenIds.splice(idx, 1);
           if (chartInstance) chartInstance.dispatchAction({type: 'legendToggleSelect', name: seriesName});
         },
+        // Hover auf eine Legendenzeile hebt bei aktivem Donut den zugehörigen
+        // Slice hervor — dasselbe highlight/showTip- bzw. downplay/hideTip-
+        // Aktionspaar wie #storage-pie (statistik.js) und .edash-share-donut
+        // (energiedashboard.js), dort mit derselben Begründung: Tabelle/
+        // Legende übernimmt die Funktion einer echten Legende, Hover soll sie
+        // spürbar mit dem Ring verbinden. Nur bei Donut aktiv (sonst kein
+        // "seriesIndex: 0"-Kreisdiagramm zum Hervorheben) und nur wenn schon
+        // gerendert wurde (chartInstance existiert erst nach dem ersten load()).
+        highlightDonutSlice(name) {
+          if (!this.donut || !chartInstance) return;
+          chartInstance.dispatchAction({type: 'highlight', seriesIndex: 0, name});
+          chartInstance.dispatchAction({type: 'showTip', seriesIndex: 0, name});
+        },
+        unhighlightDonutSlice(name) {
+          if (!this.donut || !chartInstance) return;
+          chartInstance.dispatchAction({type: 'downplay', seriesIndex: 0, name});
+          chartInstance.dispatchAction({type: 'hideTip'});
+        },
         // Raw-Modus (Rohwerte) und Periodenvergleich schließen sich gegenseitig
         // aus — dieselbe Begründung wie auf der Entität-eigenen Chart-Seite:
         // ein Vergleich zweier Rohwert-Serien ergibt kaum lesbaren Sinn.
@@ -612,6 +778,19 @@
           this.raw = !this.raw;
           if (this.raw) this.compare = false;
           this.load();
+        },
+        // Gestapelt + Periodenvergleich zusammen wären eine ungeklärte
+        // Kombination (die Vorperiode-Nebenserie müsste dann entweder
+        // mitgestapelt — acht statt vier Segmente in einem Balken — oder
+        // gesondert behandelt werden) und wurde nie entworfen; deshalb hier
+        // dieselbe Ausschluss-Konvention wie raw+compare (toggleRaw() oben)
+        // statt eine unklare Darstellung zuzulassen. Reines render() statt
+        // load(): Stapelung ändert nur, WIE die bereits geladenen Daten
+        // gezeichnet werden, keinen Server-Query-Parameter.
+        toggleStacked() {
+          this.stacked = !this.stacked;
+          if (this.stacked) this.compare = false;
+          this.render();
         },
         // Zeitstrahl erzwingt Rohwerte (er zeichnet AN/AUS-Übergänge, keine
         // Bucket-Summen) und schließt Vergleich aus — dieselbe Logik wie
@@ -627,6 +806,34 @@
           if (this.timeline) { this.raw = true; this.compare = false; }
           else { this.raw = false; }
           this.load();
+        },
+        // "Darstellungsart" (Optionen-Menü, oberste Zeile unter
+        // "Darstellung") — Zeitverlauf (bisheriges Linie/Balken/Zeitstrahl,
+        // s. u.) oder Donut (renderDonut()). Reines render() statt load():
+        // der Donut aggregiert dieselben bereits geladenen Punkte nur anders
+        // (wie toggleStacked()), braucht also keine neue Serverabfrage.
+        // compare wird abgeschaltet wie bei toggleStacked()/toggleTimeline()
+        // — eine Vorperiode-Nebenserie ergibt für einen Anteil am Ganzen
+        // keinen sinnvoll darstellbaren zweiten Wert.
+        setDisplayMode(mode) {
+          const wantDonut = mode === 'donut';
+          if (wantDonut === this.donut) return;
+          this.donut = wantDonut;
+          if (wantDonut) {
+            this.compare = false;
+            // render() prüft this.timeline VOR this.donut (s. o.) — ein noch
+            // aktives Zeitstrahl bliebe sonst trotz gewähltem Donut weiter
+            // sichtbar, obwohl die Darstellungsart-Zeile schon "Donut" zeigt.
+            this.timeline = false;
+            // renderDonut() summiert/mittelt/liest den letzten Wert der
+            // bereits geladenen Punkte direkt — bei Rohwerten (raw=true)
+            // wären das bei Zählern kumulierte Zählerstände statt Bucket-
+            // Deltas, ihre Summe damit bedeutungslos. load() statt render(),
+            // falls raw noch aktiv war: this.series enthält dann noch die
+            // alten Rohpunkte, nicht die passenden Bucket-Werte.
+            if (this.raw) { this.raw = false; this.load(); return; }
+          }
+          this.render();
         },
 
         async load() {
@@ -689,6 +896,9 @@
           // Dauer-Anzeige) — dieselben Indizes wie beim Aufbau von mainData/
           // compareData unten. noUnit für die Labels über den Balken/Punkten —
           // dort reicht die reine Zahl, die Einheit steht schon an der Y-Achse.
+          // data[6] (nur bei 100%-Normierung gesetzt, s. mainData unten) wird
+          // hier NICHT gelesen — der Original-Absolutwert erscheint nur im
+          // Tooltip, dort eigens angehängt (siehe row() weiter unten).
           const formatPointValue = (data, noUnit) => {
             const [, value, , unit, decimals, isDuration] = data;
             return isDuration ? NumberFormat.fmtDuration(value) : (unit && !noUnit ? `${fmtNum(value, decimals)} ${unit}` : fmtNum(value, decimals));
@@ -711,21 +921,31 @@
             this.renderTimelineMulti(fmt);
             return;
           }
+          if (this.donut) {
+            this.renderDonut();
+            return;
+          }
 
-          // "Tag"-Auflösung bucketet den kompletten Zeitraum zu genau EINEM
-          // Wert je Entität (siehe RESOLUTION_SECONDS.day.full) — auf der
-          // sonst üblichen Zeit-Achse säße dieser eine Balken exakt auf
-          // windowStart (also am linken Rand) und bliebe trotz barMaxWidth-
-          // Deckelung winzig, während der Rest der auf den ganzen Tag
-          // gespreizten Achse leer bliebe. Eine Kategorie-Achse mit genau
-          // einer Kategorie lässt ECharts die Balken mehrerer Entitäten
-          // stattdessen automatisch nebeneinander und gut sichtbar anordnen
-          // — exakt der Vergleichs-Anwendungsfall, für den diese Auflösung
-          // gedacht ist (z. B. Tages-Einspeisung vs. -Bezug).
-          const singleBucket = this.resolutionPreset === 'full';
-          const singleBucketLabel = this.windowStart != null
-            ? new Date(this.windowStart * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'})
-            : '';
+          // Auflösung "Voll" (Tag/Woche/Monat/Jahr — RESOLUTION_LABELS[range].
+          // full) bucketet den kompletten Zeitraum zu genau EINEM Wert je
+          // Entität — ein Ranking-Vergleich, kein Zeitverlauf. Jede Entität
+          // bekommt dafür eine EIGENE Kategorie auf der Achse (ihr
+          // Anzeigename), statt auf der sonst üblichen Zeit-Achse einen
+          // einzelnen, trotz barMaxWidth-Deckelung winzigen Balken exakt auf
+          // windowStart zu zeigen. Eine Kategorie-Achse mit einer Kategorie
+          // je Entität liest sich außerdem als Ranking natürlicher als
+          // mehrere in eine Kategorie gruppierte Balken.
+          //
+          // "Gestapelt" schließt diese Auflösung aus (canStack-Getter) —
+          // sonst gäbe es zwei widersprüchliche Antworten auf "wie viele
+          // Kategorien": eine gestapelte Kombination will ALLE Entitäten in
+          // EINER Kategorie, der Ranking-Vergleich hier will das Gegenteil.
+          const singleBucket = this.singleBucket;
+          const horizontalActive = singleBucket && this.horizontal;
+          // Anzeigename je Entität, in Auswahlreihenfolge — dieselbe Quelle
+          // wie die Legende (this.entityNames[entity_id] || friendly_name),
+          // damit Kategorie-Beschriftung und Legende nie auseinanderlaufen.
+          const entityCategories = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
 
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
@@ -736,8 +956,43 @@
           // eine Achse mit unitlosen Standard-Entitäten teilen und in Rohsekunden
           // statt als Dauer beschriftet.
           const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
-          const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
+          const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
           const units = [...new Set(this.series.map(axisKey))];
+          // Balken-Serien stapeln je Einheit statt in einem globalen "total"-
+          // Topf — sonst würden z. B. kWh- und Dauer-Serien auf derselben
+          // Achse zusammenaddiert, sobald ein Chart mehrere Einheiten
+          // kombiniert (siehe yAxis unten, eine Achse je axisKey).
+          // stackedActive/normalizeActive gelten deshalb nicht global,
+          // sondern je Achse.
+          const stackedActive = this.stacked && this.canStack;
+          const normalizeActive = stackedActive && this.normalize;
+          // Nur Achsen, auf denen AUSSCHLIESSLICH Balken-Serien liegen, dürfen
+          // auf Prozent umgestellt werden — eine mitgezeichnete Linien-Serie
+          // derselben Einheit stünde sonst auf derselben 0–100%-Skala, die für
+          // die gestapelten Balken gemeint ist, und zeigte ihre eigenen (nicht
+          // normierten) Werte dadurch verzerrt.
+          const barOnlyAxis = new Set(
+            units.filter(u => this.series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
+          );
+          // Resampelte Punkte je Serie einmal vorab berechnen (statt weiter
+          // unten im Haupt-Loop) — die Prozent-Normierung braucht die Werte
+          // ALLER Serien einer Achse zum selben Bucket-Zeitpunkt, bevor die
+          // erste Serie fertig gebaut werden kann.
+          const preparedPoints = this.series.map(s => resamplePoints(
+            s.points, this.range, this.resolutionPreset, s.aggregation_type, this.windowStart
+          ));
+          // ts -> Summe je Achse, nur für tatsächlich normierte reine
+          // Balken-Achsen.
+          const axisTotals = new Map();
+          if (normalizeActive) {
+            this.series.forEach((s, i) => {
+              const u = axisKey(s);
+              if (!barOnlyAxis.has(u)) return;
+              if (!axisTotals.has(u)) axisTotals.set(u, new Map());
+              const totals = axisTotals.get(u);
+              preparedPoints[i].forEach(p => totals.set(p.ts, (totals.get(p.ts) || 0) + p.value));
+            });
+          }
           // Eine Achse kann mehrere Entitäten mit gleicher Einheit aber
           // unterschiedlicher Nachkommastellen-Einstellung bündeln — dann gilt
           // die "strengste" (kleinste) Rundung aller beteiligten Entitäten, damit
@@ -758,23 +1013,63 @@
           const dynamicYAxis = this.dynamicYAxis && !singleBucket;
           const yAxis = units.map((u, i) => {
             const decimals = unitDecimals.get(u);
-            const isDuration = u === ' duration';
+            const isDuration = u === ' duration';
+            // Prozent-Achse (100%-Normierung, Optionen-Menü "Anteile (%)") —
+            // immer fest 0–100, unabhängig von "Dynamische Y-Achse": eine
+            // Anteils-Achse, die nicht bei 0 beginnt oder über 100 hinausgeht,
+            // würde die Prozentwerte selbst verzerrt darstellen.
+            const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
             return {
               type: 'value',
-              name: isDuration ? 'Dauer' : (u || undefined),
+              name: isPercentAxis ? 'Anteil' : (isDuration ? 'Dauer' : (u || undefined)),
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
-              min: dynamicYAxis ? undefined : value => Math.min(0, value.min),
-              max: dynamicYAxis ? undefined : value => Math.max(0, value.max),
+              min: isPercentAxis ? 0 : (dynamicYAxis ? undefined : value => Math.min(0, value.min)),
+              max: isPercentAxis ? 100 : (dynamicYAxis ? undefined : value => Math.max(0, value.max)),
               // ECharts erzwingt bei einer value-Achse standardmäßig (scale:
               // false) IMMER die Einbindung der Null, auch wenn min/max
               // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
               // also keine sichtbare Wirkung gegenüber der festen Variante.
-              scale: dynamicYAxis,
-              axisLabel: {formatter: v => isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals))},
+              scale: isPercentAxis ? false : dynamicYAxis,
+              axisLabel: {formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)))},
             };
           });
+          // "Ausrichtung: Horizontal" tauscht Kategorie- und Werte-Achse —
+          // dieselben Werte-Achsen-Konfigurationen wie yAxis oben (inklusive
+          // Prozent-Achse, Dauer, Dynamische Y-Achse), nur mit xAxis-
+          // typischen Positionen (oben/unten statt links/rechts). Bewusst
+          // ein reines position-Remapping statt einer zweiten, eigenen
+          // Achsen-Berechnung — sonst müssten Prozent-/Dauer-/Dynamische-
+          // Y-Achse-Logik an zwei Stellen synchron gehalten werden.
+          const xAxisForHorizontal = horizontalActive
+            ? yAxis.map((axis, i) => ({...axis, position: i % 2 === 0 ? 'bottom' : 'top'}))
+            : null;
+          // Kategorie-Achse für singleBucket — Entitätsnamen statt Zeit-
+          // Ticks. rotate/width nur relevant, wenn sie tatsächlich als
+          // x-Achse dient (vertikale Balken): horizontal liest sich die
+          // volle Beschriftung ohnehin unrotiert von links nach rechts
+          // (s. yAxis unten), rotate:0 dort ist deshalb kein Sonderfall,
+          // sondern derselbe Ausdruck wie für die x-Achsen-Rolle.
+          const categoryAxisObj = singleBucket ? {
+            type: 'category',
+            data: entityCategories,
+            axisTick: {show: false},
+            // Ohne dies versucht ECharts (Default: onZero:true), die Achsen-
+            // Linie an der Y-Position von y=0 auszurichten — bei aktiver
+            // "Dynamischer Y-Achse" (Y-Achse startet dann NICHT bei 0,
+            // sondern knapp unter dem kleinsten Wert) landet diese
+            // Ausrichtung mitten in den Balken statt am unteren Rand, sie
+            // wirken dadurch "versenkt". false verankert die Achse immer
+            // am unteren/linken Diagrammrand, unabhängig vom Werte-Minimum.
+            axisLine: {onZero: false},
+            axisLabel: {
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+              width: horizontalActive ? 190 : 90,
+              overflow: 'truncate',
+              rotate: horizontalActive ? 0 : 28,
+            },
+          } : null;
           // Feste Farbe je Entität (statt ECharts' Auto-Zuordnung) — nur so lässt
           // sich bei aktivem Vergleich die Vorperiode-Serie einer Entität optisch
           // eindeutig ihrer Hauptserie zuordnen (dieselbe Farbe, nur blasser +
@@ -801,39 +1096,91 @@
             const seriesDecimals = this.effectiveDecimals(s);
             const displayName = this.entityNames[s.entity_id] || s.friendly_name;
             legendSelected[displayName] = !this.legendHiddenIds.includes(s.entity_id);
-            const mainPoints = resamplePoints(
-              s.points, this.range, this.resolutionPreset,
-              s.aggregation_type, this.windowStart
-            );
+            const mainPoints = preparedPoints[i];
             if (tooltipBucketSeconds == null) {
               tooltipBucketSeconds = detectResolutionSeconds(mainPoints);
             }
-            // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position immer
-            // Kategorie 0 statt eines Zeitstempels — der Halte-Punkt bis
-            // windowEnd (nächster Block) ergibt auf einer Achse mit nur einer
-            // Kategorie ohnehin keinen Sinn und entfällt deshalb hier.
-            const mainData = mainPoints.map(p => [singleBucket ? 0 : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)]);
+            // 100%-Normierung (Optionen-Menü, "Anteile (%)") nur auf reinen
+            // Balken-Achsen (barOnlyAxis, s. o.) und nur für Balken-Serien —
+            // eine überlagerte Linie derselben Einheit bliebe unverändert in
+            // Absolutwerten (axisNormalized bleibt dann false für sie, weil
+            // ihre Achse nicht in barOnlyAxis steht).
+            const axisNormalized = normalizeActive && chartType === 'bar' && barOnlyAxis.has(axisKey(s));
+            // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position die
+            // EIGENE Kategorie dieser Entität (ihre Position in this.series,
+            // s. entityCategories) statt eines Zeitstempels — der Halte-Punkt
+            // bis windowEnd (nächster Block) ergibt bei einer einzelnen
+            // Kategorie je Entität ohnehin keinen Sinn und entfällt deshalb
+            // hier.
+            const mainData = mainPoints.map(p => {
+              if (!axisNormalized) return [singleBucket ? i : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
+              // Felder 7–9: Originalwert/-einheit/-Nachkommastellen, nur für
+              // den Tooltip (formatPointValue() liest sie nicht, siehe dort)
+              // — sonst verliert der Tooltip genau die Zahl, die die
+              // Normierung aus dem Balken selbst entfernt.
+              const total = axisTotals.get(axisKey(s)).get(p.ts) || 0;
+              const pct = total ? (p.value / total) * 100 : 0;
+              return [singleBucket ? i : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
+            });
             if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
               mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
             }
+            // Gestapelt nur für Balken-Serien und je Achse ein eigener Stapel-
+            // Schlüssel (nicht ein globales "total") — sonst würden Serien
+            // unterschiedlicher Einheit (z. B. kWh und Dauer) fälschlich in
+            // denselben Balken aufsummiert, sobald ein Chart mehrere Achsen
+            // kombiniert.
+            const isStackedBar = chartType === 'bar' && stackedActive;
+            const unitIndex = units.indexOf(axisKey(s));
+            // Gleitender Durchschnitt (Optionen-Menü, "Durchschnittslinie" →
+            // "Gleitend") nur für Linien-Serien — bei einer Balken-Serie
+            // (Bucket-SUMME) ergäbe ein "gleitender Durchschnitt der Summen"
+            // keine klar lesbare Aussage, deshalb dort schlicht keine
+            // Zusatzlinie statt einer verwirrenden.
+            const showRollingAverage = this.averageLine && !isStackedBar && this.averageStyle === 'rolling'
+              && chartType === 'line' && mainPoints.length >= 3;
             const main = {
               name: displayName,
               type: chartType,
-              yAxisIndex: units.indexOf(axisKey(s)),
+              // Horizontal tauschen Kategorie- und Werte-Achse die Plätze
+              // (s. xAxisForHorizontal oben) — die Serie muss dann ihre
+              // Werte-Achse über xAxisIndex ansprechen und die (einzige)
+              // Kategorie-Achse über yAxisIndex:0, statt umgekehrt.
+              xAxisIndex: horizontalActive ? unitIndex : undefined,
+              yAxisIndex: horizontalActive ? 0 : unitIndex,
               data: mainData,
-              lineStyle: {width: 1.5, color},
+              // mainData bleibt IMMER [Kategorie-Index, Wert, ...] — ohne
+              // encode würde ECharts das Tupel positionell als [x, y]
+              // lesen, was bei getauschten Achsen (horizontalActive) die
+              // Kategorie als Werte-Achsen-Position UND den Wert als
+              // Kategorie-Index missverstehen würde (Balken verschwinden,
+              // Werte-Achse skaliert auf die Kategorie-Indizes 0/1/2 statt
+              // auf die echten Werte — so gefunden). encode sagt ECharts
+              // stattdessen explizit, welche Tupel-Position zu welcher
+              // Achse gehört, unabhängig von deren Reihenfolge im Array —
+              // Tooltip/Label-Formatter lesen ohnehin per festem Index
+              // (data[1]=Wert), bleiben also unverändert korrekt.
+              encode: horizontalActive ? {x: 1, y: 0} : undefined,
+              stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
+              // Bei aktiver Trendlinie tritt die rohe (verrauschte) Kurve
+              // zurück, bleibt aber sichtbar — die Trendlinie ist die
+              // Ergänzung, nicht der Ersatz.
+              lineStyle: {width: 1.5, color, opacity: showRollingAverage ? 0.45 : 1},
               itemStyle: {color},
               // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
               // Punkt, zusätzlich zum Tooltip. Nur die Hauptserie, nicht die
               // Vergleichs-Nebenserie (siehe cmp weiter unten) — sonst überlagern
               // sich bei aktivem Vergleich zwei Beschriftungen je Zeitpunkt.
+              // Gestapelt liegt das Label INNERHALB des Segments (weiß) statt
+              // darüber — "darüber" wäre bei gestapelten Segmenten meist ein
+              // fremdes Segment oder Whitespace, nicht das eigene.
               label: {
                 show: this.showValues,
-                position: 'top',
+                position: isStackedBar ? 'inside' : (horizontalActive ? 'right' : 'top'),
                 fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
-                color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+                color: isStackedBar ? '#fff' : getComputedStyle(document.body).getPropertyValue('--ink-muted'),
                 formatter: params => formatPointValue(params.data, true),
               },
               // Deckelt die Balkenbreite auf einer Zeit-Achse — ohne diese
@@ -842,19 +1189,20 @@
               // Bezugspunkt für eine sinnvolle Auto-Breite, wodurch der Balken
               // einen Großteil der (bewusst bis zum Fensterende reichenden)
               // Achse einnehmen kann. Bei vielen Balken liegt die Auto-Breite
-              // ohnehin längst unter dem Limit. Bei singleBucket (Kategorie-
-              // Achse mit genau einer Kategorie) ist genau dieses großzügige
-              // Auto-Breite-Verhalten dagegen erwünscht — ECharts verteilt die
-              // Balken mehrerer Entitäten dort von selbst sinnvoll, deshalb
-              // keine Deckelung.
-              barMaxWidth: singleBucket ? undefined : 48,
+              // ohnehin längst unter dem Limit. Gilt jetzt auch für
+              // singleBucket: seit jede Entität ihre eigene Kategorie hat
+              // (statt mehrerer Balken in einer gemeinsamen Kategorie), ist
+              // das genau der Normalfall eines Kategorie-Achsen-Balkens, kein
+              // Sonderfall mehr.
+              barMaxWidth: 48,
               // Ein Balken auf einer Zeit-Achse (kein boundaryGap, s. o.)
               // sitzt mit seiner Mitte GENAU auf dem Bucket-Zeitstempel —
               // beim ersten/letzten Bucket liegt die Hälfte der Balkenbreite
               // dadurch zwangsläufig knapp jenseits von min/max und würde
               // ohne dies hart am Diagrammrand abgeschnitten wirken. Bei
-              // singleBucket (Kategorie-Achse mit eigener Bandbreite je
-              // Kategorie) besteht dieses Problem nicht.
+              // singleBucket (echte Kategorie-Achse mit eigener Bandbreite je
+              // Kategorie, kein boundaryGap-Sonderfall) besteht dieses
+              // Problem nicht.
               clip: singleBucket ? undefined : chartType !== 'bar',
             };
             if (chartType === 'line') {
@@ -883,7 +1231,12 @@
             // sichtbar an der Nulllinie. Legende und Linie können dadurch bei
             // Zählern mit gewählter Auflösung verschiedene Zahlen nennen — sie
             // beantworten dann auch verschiedene Fragen.
-            const durchschnitt = this.averageLine
+            // Entschieden: im gestapelten Modus keine Durchschnittslinie —
+            // eine Serie beginnt darin nicht mehr bei 0, ihr Durchschnitt
+            // läge mitten in einem fremden Segment und würde als
+            // Segmentgrenze missverstanden statt als Mittelwert erkannt
+            // (siehe :disabled an der Menü-Zeile in chart_editor.html).
+            const durchschnitt = this.averageLine && !isStackedBar && this.averageStyle === 'flat'
               ? averageOf(mainPoints.map(p => p.value))
               : null;
             if (durchschnitt !== null) {
@@ -897,11 +1250,41 @@
                   color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
                   formatter: () => `Ø ${fmtNum(durchschnitt, seriesDecimals)}${s.unit ? ' ' + s.unit : ''}`,
                 },
-                data: [{yAxis: durchschnitt}],
+                // Horizontal ist die Werte-Achse die x-Achse (s. o.) — der
+                // Durchschnitt liegt dann bei einem x-, nicht y-Wert.
+                data: [horizontalActive ? {xAxis: durchschnitt} : {yAxis: durchschnitt}],
               };
             }
             echartsSeries.push(main);
-            if (this.compare && s.compare_points && s.compare_points.length) {
+            if (showRollingAverage) {
+              const windowPoints = movingAverageWindow(mainPoints.length);
+              const rollingData = movingAverage(mainPoints, windowPoints)
+                .filter(p => p.value !== null)
+                .map(p => [p.ts * 1000, p.value]);
+              // Eigene, zusätzliche Serie statt eines markLine/Umbaus der
+              // Hauptserie — dieselbe Technik wie die Vorperiode-Nebenserie
+              // (cmp weiter unten): eine sichtbar mit der Hauptserie
+              // verbundene, aber eigenständige Linie. Nicht über die Legende
+              // einzeln umschaltbar (wie cmp auch nicht) — sie gehört
+              // sichtbar zur Hauptserie, kein eigener Umschalt-Anspruch.
+              echartsSeries.push({
+                name: `${displayName} (Ø gleitend)`,
+                type: 'line',
+                yAxisIndex: units.indexOf(axisKey(s)),
+                data: rollingData,
+                smooth: true,
+                symbol: 'none',
+                lineStyle: {width: 2.5, color},
+                z: 3,
+              });
+            }
+            // stackedActive schließt Vergleich schon am Knopf aus
+            // (toggleStacked()/:disabled in chart_editor.html) — hier
+            // zusätzlich robust dagegen, falls compare aus einem älteren
+            // Zustand (z. B. prefill) noch true wäre: eine Vorperiode-
+            // Nebenserie ließe sich in einem gestapelten Balken nicht sinnvoll
+            // einordnen (mitstapeln würde acht statt vier Segmente ergeben).
+            if (this.compare && !stackedActive && s.compare_points && s.compare_points.length) {
               // Vorperiode um die exakte Fensterdifferenz verschieben, nicht per
               // Array-Index mappen — siehe derselbe Kommentar/Grund in
               // entity_detail.html (unterschiedlich lange Punktreihen).
@@ -946,6 +1329,11 @@
             }
           });
           chartInstance.setOption({
+            toolbox: toolboxOption(
+              this.exportFilename,
+              getComputedStyle(document.body).getPropertyValue('--surface'),
+              getComputedStyle(document.body).getPropertyValue('--ink-faint')
+            ),
             textStyle: {
               fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
               color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
@@ -953,31 +1341,17 @@
             },
             // bottom nur noch für die X-Achsen-Beschriftung reserviert — die
             // Legende lebt jetzt als eigenes HTML-Element unterhalb der Karte
-            // (siehe legend weiter unten), nicht mehr im Chart selbst.
-            grid: {left: 10, right: 10, top: 20, bottom: 40, containLabel: true},
+            // (siehe legend weiter unten), nicht mehr im Chart selbst. top um
+            // 8px erhöht (20→28), damit das toolbox-Icon (oben rechts, s. o.)
+            // nicht mit der obersten Y-Achsen-Beschriftung kollidiert.
+            grid: {left: 10, right: 10, top: 28, bottom: 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
             // letzten tatsächlichen Wert auf, z. B. bei einer Entität, die seit
             // Stunden nichts mehr gemeldet hat, statt konsistent bis zum
             // Fensterende (bei "Heute" also bis zur aktuellen Uhrzeit) zu reichen.
-            xAxis: singleBucket ? {
-              // Genau eine Kategorie statt einer auf den ganzen Tag
-              // gespreizten Zeit-Achse — "Tag"-Auflösung liefert je Entität
-              // nur einen einzigen Wert, ein Achsen-"Zeitpunkt" ist hier
-              // also tatsächlich korrekt (siehe singleBucket oben).
-              type: 'category',
-              data: [singleBucketLabel],
-              axisTick: {show: false},
-              // Ohne dies versucht ECharts (Default: onZero:true), die Achsen-
-              // Linie an der Y-Position von y=0 auszurichten — bei aktiver
-              // "Dynamischer Y-Achse" (Y-Achse startet dann NICHT bei 0,
-              // sondern knapp unter dem kleinsten Wert) landet diese
-              // Ausrichtung mitten in den Balken statt am unteren Rand, sie
-              // wirken dadurch "versenkt". false verankert die Achse immer
-              // am unteren Diagrammrand, unabhängig vom Y-Achsen-Minimum.
-              axisLine: {onZero: false},
-            } : {
+            xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
               // periodEnd statt windowEnd: eine laufende Periode (z. B. Woche)
@@ -1018,7 +1392,7 @@
                 hideOverlap: true,
               },
             },
-            yAxis,
+            yAxis: horizontalActive ? {...categoryAxisObj, inverse: true} : yAxis,
             // ECharts' eigene Legende ist unsichtbar (show:false) — die
             // sichtbare Legende ist das eigene HTML-Element unterhalb der
             // Karte (siehe Template, .chart-legend), das gleichzeitig Serien-
@@ -1044,9 +1418,19 @@
               formatter: params => {
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
-                const row = p => `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
-                                + `<span>${p.marker}${p.seriesName}</span>`
-                                + `<strong style="margin-left:8px;">${formatPointValue(p.data)}</strong></div>`;
+                // 100%-Normierung: zeigt IMMER beides — Anteil und
+                // Original-Absolutwert in Klammern (data[6]/[7]/[8], siehe
+                // mainData oben) — sonst verliert der Tooltip genau die Zahl,
+                // die die Normierung aus dem Balken selbst entfernt.
+                const row = p => {
+                  const [, , , , , , absValue, absUnit, absDecimals] = p.data;
+                  const extra = absValue != null
+                    ? ` <span style="color:var(--ink-faint);">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + absUnit : ''})</span>`
+                    : '';
+                  return `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
+                       + `<span>${p.marker}${p.seriesName}</span>`
+                       + `<strong style="margin-left:8px;">${formatPointValue(p.data)}${extra}</strong></div>`;
+                };
                 if (sameTime) {
                   return `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:4px;">${times[0]}</div>`
                        + params.map(row).join('');
@@ -1084,12 +1468,18 @@
             }
           });
           const option = {
+            toolbox: toolboxOption(
+              this.exportFilename,
+              getComputedStyle(document.body).getPropertyValue('--surface'),
+              getComputedStyle(document.body).getPropertyValue('--ink-faint')
+            ),
             textStyle: {
               fontFamily: getComputedStyle(document.body).getPropertyValue('--font-mono'),
               color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
               fontSize: Math.round(12 * uiFontScale * 10) / 10,
             },
-            grid: {left: 10, right: 20, top: 16, bottom: 40, containLabel: true},
+            // top um 8px erhöht (16→24), Begründung wie in render().
+            grid: {left: 10, right: 20, top: 24, bottom: 40, containLabel: true},
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
@@ -1148,6 +1538,123 @@
           chartInstance.resize();
         },
 
+        // Donut statt Zeitverlauf ("Darstellungsart") — ein Anteil je Serie
+        // aus GENAU EINEM aggregierten Wert (donutAggregation: Summe/
+        // Durchschnitt/Letzter Wert), keine Zeitachse. Nutzt this.series
+        // direkt (dieselben rohen, ungebuckelten Punkte wie seriesStats()
+        // für die Legende) statt der resampelten preparedPoints aus render()
+        // — eine Bucket-Verfeinerung ergibt für einen einzigen Werte je
+        // Serie keinen Sinn. Dieselbe Radius-/Emphasis-/Tooltip-Konfiguration
+        // wie #storage-pie (statistik.js) und .edash-share-donut
+        // (energiedashboard.js), damit ein Donut in der ganzen App gleich
+        // aussieht — inklusive label:show:false: die Namen stehen bereits in
+        // der Legende darunter (chart-legend/chart-legend-table, unverändert
+        // wiederverwendet), eine zweite Beschriftung im Ring selbst wäre
+        // Redundanz.
+        // Ausgelagert aus renderDonut(), damit exportCsv() im Donut-Modus
+        // GENAU denselben Wert exportiert, der im Ring steckt — seriesStats()
+        // (Legende) wäre hier keine verlässliche Quelle: deren sum-Feld ist
+        // bei Nicht-Zähler-/Nicht-Schalter-Entitäten bewusst null (siehe dort),
+        // während der Donut trotzdem einen Summenwert zeichnet.
+        donutValueFor(s) {
+          const values = s.points.map(p => p.value).filter(Number.isFinite);
+          if (!values.length) return 0;
+          if (this.donutAggregation === 'average') return values.reduce((sum, v) => sum + v, 0) / values.length;
+          if (this.donutAggregation === 'last') return values[values.length - 1];
+          return values.reduce((sum, v) => sum + v, 0);
+        },
+        renderDonut() {
+          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          const surface = getComputedStyle(document.body).getPropertyValue('--surface');
+          const inkFaint = getComputedStyle(document.body).getPropertyValue('--ink-faint');
+          const data = this.series.map(s => ({
+            name: this.entityNames[s.entity_id] || s.friendly_name,
+            value: Math.max(0, this.donutValueFor(s)),
+            itemStyle: {color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length]},
+          }));
+          // Serien-Umschalter der Legende (toggleLegendItem()/legendHiddenIds)
+          // wirkt bei type:'pie' auf einzelne DATENPUNKTE statt auf ganze
+          // Serien — ECharts behandelt jeden data-Eintrag wie einen eigenen
+          // Legendeneintrag (per name), legendToggleSelect trifft darüber
+          // trotzdem genau den richtigen Slice. Ohne dieses (unsichtbare,
+          // show:false — wie im Zeitverlauf-Zweig oben) legend-Objekt hätte
+          // die Aktion nichts zum Umschalten: die Legendenzeile blendete sich
+          // dann selbst ab, ohne den Ring zu ändern.
+          const legendSelected = {};
+          this.series.forEach(s => {
+            legendSelected[this.entityNames[s.entity_id] || s.friendly_name] = !this.legendHiddenIds.includes(s.entity_id);
+          });
+          chartInstance.setOption({
+            toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
+            legend: {show: false, data: data.map(d => d.name), selected: legendSelected},
+            tooltip: {
+              trigger: 'item',
+              formatter: p => {
+                const s = this.series[p.dataIndex];
+                const unit = s.unit ? ` ${s.unit}` : '';
+                return `${p.marker} ${p.name}: <strong>${fmtNum(p.value, this.effectiveDecimals(s))}${unit}</strong> (${fmtNum(p.percent, 1)} %)`;
+              },
+              appendToBody: true,
+            },
+            series: [{
+              type: 'pie',
+              radius: ['52%', '85%'],
+              center: ['50%', '50%'],
+              avoidLabelOverlap: true,
+              label: {show: false},
+              labelLine: {show: false},
+              itemStyle: {borderColor: surface, borderWidth: 2},
+              emphasis: {scaleSize: 6, itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'}},
+              data,
+            }],
+          }, true);
+          chartInstance.resize();
+        },
+
+        // "CSV" (Titelzeile) — dieselbe Blob-Download-Technik wie
+        // exportCsv() in table_editor.js (Semikolon-Trennzeichen, BOM,
+        // Anführungszeichen je Zelle), hier zwei Formen statt eines festen
+        // Zeilen/Spalten-Rasters: im Donut GENAU der Wert, der im Ring
+        // steckt (donutValueFor(), eine Zeile je Entität) — Zeitstempel gäbe
+        // es dort nicht, jede Serie ist ja schon auf einen Wert reduziert.
+        // Sonst (Zeitverlauf UND Zeitstrahl) ein Zeitstempel-Raster über die
+        // Vereinigung aller Serien-Zeitstempel, eine Spalte je Entität.
+        exportCsv() {
+          const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
+          const lines = [];
+          if (this.donut) {
+            lines.push(['Entität', 'Wert'].map(csvEscape).join(';'));
+            this.series.forEach(s => {
+              const name = this.entityNames[s.entity_id] || s.friendly_name;
+              const value = fmtNum(this.donutValueFor(s), this.effectiveDecimals(s)) + (s.unit ? ` ${s.unit}` : '');
+              lines.push([name, value].map(csvEscape).join(';'));
+            });
+          } else {
+            const tsSet = new Set();
+            this.series.forEach(s => s.points.forEach(p => tsSet.add(p.ts)));
+            const timestamps = [...tsSet].sort((a, b) => a - b);
+            const names = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
+            lines.push(['Zeit', ...names].map(csvEscape).join(';'));
+            timestamps.forEach(ts => {
+              const row = [new Date(ts * 1000).toLocaleString(LOCALE)];
+              this.series.forEach(s => {
+                const p = s.points.find(pt => pt.ts === ts);
+                row.push(p && Number.isFinite(p.value) ? fmtNum(p.value, this.effectiveDecimals(s)) : '');
+              });
+              lines.push(row.map(csvEscape).join(';'));
+            });
+          }
+          const blob = new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${this.exportFilename}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        },
+
         async save() {
           if (!this.name.trim()) { appAlert('Bitte einen Namen für das Chart angeben.'); return; }
           if (this.selectedEntityIds.length === 0) { appAlert('Bitte mindestens eine Entität auswählen.'); return; }
@@ -1175,11 +1682,16 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.timeline ? 'timeline' : 'auto',
+            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : 'auto'),
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
             area_fill: this.areaFill,
+            stacked: this.stacked,
+            normalize: this.normalize,
+            average_style: this.averageStyle,
+            horizontal: this.horizontal,
+            donut_aggregation: this.donutAggregation,
           };
           try {
             const url = CHART_ID ? `${BASE}/charts/${CHART_ID}` : `${BASE}/charts`;
@@ -1208,6 +1720,17 @@
           if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
           await fetch(`${BASE}/charts/${CHART_ID}/delete`, {method: 'POST'});
           window.location.href = `${BASE}/charts`;
+        },
+
+        // Verwirft unsaved Änderungen. Ohne CHART_ID gibt es keinen
+        // gespeicherten Stand, zu dem zurückgekehrt werden könnte — dann
+        // direkt zur Chart-Liste. Mit CHART_ID: neu laden statt jedes
+        // reaktive Feld (Entitäten, Reihenfolge, Auflösung, Darstellung,
+        // Vergleich, Legende, …) einzeln zurückzusetzen, garantiert exakt
+        // den zuletzt gespeicherten Stand.
+        cancelEdit() {
+          if (!CHART_ID) { window.location.href = `${BASE}/charts`; return; }
+          window.location.reload();
         },
 
         init() {
