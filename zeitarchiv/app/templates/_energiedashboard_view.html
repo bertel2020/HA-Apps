@@ -469,7 +469,8 @@
         <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
         <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
       </a>
-      <a class="edash-kpi{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
+      <a class="edash-kpi has-tooltip{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
+         data-tooltip="Gesamtverbrauch im gewählten Zeitraum: erfasste Verbraucher zusammen mit der Grundlast (nicht einzeln gemessene Geräte, rechnerisch aus der Bilanz ermittelt)."
          {% if single_verbraucher_id %}:href="`{{ app_root }}/entities/{{ single_verbraucher_id }}?range=${range}&offset=${offset}`"
          {% elif verbraucher_list|length > 1 %}@click="$refs.verbraucherPickerDialog.showModal()"
          {% endif %}>
@@ -494,7 +495,7 @@
         <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
       </a>
       <a class="edash-kpi has-tooltip tooltip-lines{{ ' is-pickable' if speicher_link_entities|length > 1 else '' }}"
-         x-show="kpi.speicher_netto != null" :data-tooltip="speicherBreakdownText()"
+         x-show="kpi.speicher_netto != null" :data-tooltip="speicherTooltipText()"
          {% if single_speicher_id %}:href="`{{ app_root }}/entities/{{ single_speicher_id }}?range=${range}&offset=${offset}`"
          {% elif speicher_link_entities|length > 1 %}@click="$refs.speicherPickerDialog.showModal()"
          {% endif %}>

@@ -521,6 +521,16 @@
         return this.speicherBreakdown.map((s) => `${s.name}: ${this.fmt(s.value, 1)} kWh`).join('\n');
       },
 
+      // Statischer Erklärtext der Speicher-KPI-Kachel plus, bei mehr als
+      // einem Speicher, die Aufschlüsselung je Speicher darunter — analog zu
+      // socNowTooltipText() unten. Ohne diesen Satz liest sich "1,0 kWh" wie
+      // ein aktueller Füllstand statt eines Perioden-Saldos.
+      speicherTooltipText() {
+        const base = 'Ladung minus Entladung im gewählten Zeitraum — nicht der aktuelle Ladezustand (siehe Ring „Speicher SOC" unten).';
+        const breakdown = this.speicherBreakdownText();
+        return breakdown ? base + '\n\n' + breakdown : base;
+      },
+
       // Analog für den "Jetzt"-Ladezustand im Autarkie&Speicher-Ring — anders
       // als speicherBreakdownText() ein Momentanwert (%, plus kWh wenn die
       // Kapazität dieses Speichers bekannt ist), kein Perioden-Wert.
