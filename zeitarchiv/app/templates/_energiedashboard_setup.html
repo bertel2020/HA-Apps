@@ -744,7 +744,7 @@
           <template x-if="!kostenEigenverbrauchEntity && kostenEigenverbrauchFixed === null">
             <div class="edash-item-body edash-item-body-activator">
               <span class="edash-item-add-btn">+</span>
-              <span class="edash-item-name">EV-Vergütung</span>
+              <span class="edash-item-name">Eigenverbrauchsvergütung</span>
               <span class="edash-item-chip edash-item-chip-empty">Aktivieren</span>
             </div>
           </template>
@@ -752,9 +752,9 @@
             <div class="edash-item-body-wrap">
               <div class="edash-item-accent edash-item-accent-neutral"></div>
               <div class="edash-item-body">
-                <div class="edash-item-head">
+                <div class="edash-item-head edash-item-head-wrap">
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
-                  <span class="edash-item-name">EV-Vergütung</span>
+                  <span class="edash-item-name">Eigenverbrauchsvergütung</span>
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-meta" x-text="priceLabel(kostenEigenverbrauchEntity, kostenEigenverbrauchFixed, 'Ct/kWh')"></span>
@@ -828,7 +828,7 @@
       </dialog>
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-eigenverbrauch" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>EV-Vergütung</h2>
+          <h2>Eigenverbrauchsvergütung</h2>
           <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-eigenverbrauch').close()" aria-label="Schließen">✕</button>
         </div>
         {% set kev_fixed = config.kosten.get('preis_eigenverbrauch_fixed') if config.kosten else none %}

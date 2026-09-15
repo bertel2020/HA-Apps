@@ -818,6 +818,23 @@
     font-weight:600;font-size:calc(13px * var(--font-scale, 1));flex:1;min-width:0;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;
   }
+  /* Modifikator für Kachel-Köpfe mit einem längeren Namen als üblich
+     (z. B. "Eigenverbrauchsvergütung", deutlich länger als "Netzbezug-
+     Preis"/"Einspeisevergütung") — bei fester Spaltenbreite (.edash-item-
+     grid teilt IMMER in 4 gleiche Spalten, unabhängig von der Kachel-
+     anzahl) reicht eine Zeile sonst nicht, .edash-item-name schneidet dann
+     unbemerkt mitten im Wort ab statt umzubrechen. align-items bleibt
+     bewusst center (nicht flex-start) — bei mehreren Zeilen sitzt das
+     Icon dann mittig zwischen ihnen statt an der ersten Zeile allein
+     auszurichten, was bei diesem schmalen 18px-Icon unauffälliger wirkt.
+     overflow-wrap/hyphens wie bei .edash-item-body-activator .edash-item-
+     name weiter unten — der Name ist EIN zusammengesetztes Wort ohne
+     Leerzeichen, ohne Bruchstelle würde er vom overflow:hidden der Kachel
+     mitten im Wort statt an einer Silbengrenze abgeschnitten. */
+  .edash-item-head-wrap .edash-item-name{
+    white-space:normal;overflow:visible;text-overflow:unset;overflow-wrap:break-word;
+    hyphens:auto;line-height:1.2;
+  }
   .edash-item-req{
     flex:none;font-size:calc(9px * var(--font-scale, 1));font-weight:700;letter-spacing:.03em;
     color:var(--accent-bar);background:var(--accent-bar-soft);padding:2px 5px;border-radius:4px;
