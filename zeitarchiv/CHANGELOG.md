@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.96.0 - 2026-09-15
+
+### Neu
+
+- Neues, optionales Preisfeld **Eigenverbrauchsvergütung** in den
+  Kosteneinstellungen des Energiedashboards, für Anlagen mit einer echten
+  Vergütung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — anders als
+  die bestehende „Vermiedene Kosten"-Kachel (rein rechnerischer
+  Vergleichswert) fließt dieser Betrag als echter Geldfluss in den Saldo
+  ein. Standardmäßig deaktiviert, da nur wenige Anlagen betroffen sind.
+- Das Energiedashboard aktualisiert sich jetzt automatisch alle 60 Sekunden,
+  wie schon die Dashboard-Kacheln — nur während die aktuelle Periode
+  angezeigt wird und kein Detail-Dialog offen ist.
+
+### Behoben
+
+- Nach dem 0.95.0-Update konnten in seltenen Fällen wiederkehrende
+  Auth-Fehler trotz gültiger Verbindung auftreten (Zähler „Auth-Fehler seit
+  Start" stieg stetig, ohne dass die Verbindung insgesamt ausfiel). Ursache
+  war ein neuer, schnellerer Lesepfad für Einstellungswerte, der auch für
+  die Token-Prüfung selbst verwendet wurde; dieser Lesepfad wird für die
+  Token-Prüfung nicht mehr verwendet.
+
 ## 0.95.0 - 2026-09-15
 
 ### Neu
