@@ -1725,7 +1725,14 @@ class Index:
         return [row["unit"] for row in rows]
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:
-        row = self._read_conn().execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        """Bewusst über self._conn statt _read_conn(): dieser Wert entscheidet
+        u. a. über ensure_api_token() bei jeder einzelnen API-Anfrage
+        (api_routes.py::check_auth) — ein verpasster, momentan leerer Read
+        würde dort sofort einen neuen Token erzeugen und den echten
+        überschreiben. Das rechtfertigt hier die Lock-Wartezeit, die
+        _read_conn() für die anderen, unkritischen Reads gerade vermeidet."""
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
         return row["value"] if row else default
 
     def set_setting(self, key: str, value: str) -> None:
