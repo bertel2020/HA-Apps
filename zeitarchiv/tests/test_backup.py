@@ -427,6 +427,43 @@ def test_prepared_restore_keeps_previous_state_as_rollback() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_restore_moves_away_stale_wal_sidecars() -> None:
+    """Phase 1 von ROADMAP.md 1.14: Index läuft jetzt mit journal_mode=WAL,
+    das legt index.sqlite-wal/-shm neben index.sqlite an. Blieben die beim
+    Restore stehen, würde SQLite sie beim nächsten Öffnen der frisch
+    eingespielten index.sqlite fälschlich hineinspielen wollen — sie müssen
+    also genauso wie index.sqlite selbst ins Rollback-Verzeichnis wandern,
+    nicht nur gelöscht werden (dieselbe "nie destruktiv"-Linie wie der Rest
+    von apply_pending_restore())."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-restore-wal-test-"))
+    try:
+        backups_dir = tmp / "backups"
+        conn = sqlite3.connect(tmp / "index.sqlite")
+        conn.execute("CREATE TABLE sample (value TEXT)")
+        conn.execute("INSERT INTO sample VALUES ('backup')")
+        conn.commit()
+        conn.close()
+        dest = backups_dir / "zeitarchiv-backup-2026-08-24-143000.zip"
+        backup.create_backup(tmp, dest, consistent_sqlite=True)
+
+        # Stale WAL-Sidecars simulieren, wie sie ein echter Index._conn im
+        # laufenden Betrieb neben index.sqlite anlegt.
+        (tmp / "index.sqlite-wal").write_bytes(b"stale-wal")
+        (tmp / "index.sqlite-shm").write_bytes(b"stale-shm")
+
+        backup.prepare_restore(tmp, backups_dir, dest.name)
+        result = backup.apply_pending_restore(tmp, backups_dir)
+
+        assert result and result["success"] is True
+        assert not (tmp / "index.sqlite-wal").exists()
+        assert not (tmp / "index.sqlite-shm").exists()
+        rollback_dir = tmp / result["rollback"]
+        assert (rollback_dir / "index.sqlite-wal").read_bytes() == b"stale-wal"
+        assert (rollback_dir / "index.sqlite-shm").read_bytes() == b"stale-shm"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_install_validated_backup_never_overwrites_existing_file() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-backup-import-test-"))
     try:

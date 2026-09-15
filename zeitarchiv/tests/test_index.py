@@ -5,6 +5,8 @@ from __future__ import annotations
 import shutil
 import sqlite3
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 
@@ -63,6 +65,59 @@ def test_timeout_lock_records_busy_events_for_notices() -> None:
         except IndexBusy:
             pass
     assert lock.recent_busy_events() == 1
+
+
+def test_index_runs_in_wal_mode() -> None:
+    """Phase 1 von ROADMAP.md 1.14: WAL statt Rollback-Journal, damit Leser
+    Schreiber nicht mehr blockieren (und umgekehrt) — Grundlage für spätere
+    Phasen (eigene Lese-Connections). Reine Regressionssicherung, dass die
+    beiden PRAGMAs in Index.__init__ tatsächlich greifen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-wal-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        assert index._conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert index._conn.execute("PRAGMA synchronous").fetchone()[0] == 1  # NORMAL
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_read_methods_bypass_the_lock_held_by_a_writer() -> None:
+    """Phase 2 von ROADMAP.md 1.14: get_entity()/get_setting()/
+    list_entities() laufen über eine eigene Lese-Connection (_read_conn()),
+    nicht mehr über self._lock — sie dürfen deshalb nicht warten, nur weil
+    irgendwo ein anderer Zugriff gerade den Lock hält (hier direkt simuliert,
+    ohne einen echten, ggf. langsamen Schreibvorgang zu brauchen)."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-readconn-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.set_setting("foo", "bar")
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "kWh")
+
+        lock_held = threading.Event()
+        release_lock = threading.Event()
+
+        def hold_lock() -> None:
+            with index._lock:
+                lock_held.set()
+                release_lock.wait(2)
+
+        t = threading.Thread(target=hold_lock)
+        t.start()
+        try:
+            assert lock_held.wait(1)
+            started = time.monotonic()
+            assert index.get_setting("foo") == "bar"
+            assert index.get_entity("sensor.a")["entity_id"] == "sensor.a"
+            assert len(index.list_entities()) == 1
+            elapsed = time.monotonic() - started
+            assert elapsed < 0.5, f"Lesezugriff wartete auf den gehaltenen Lock ({elapsed:.2f}s)"
+        finally:
+            release_lock.set()
+            t.join(2)
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def test_get_or_create_backfills_unit_and_friendly_name_on_existing_entity() -> None:

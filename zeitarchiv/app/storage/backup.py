@@ -41,6 +41,17 @@ from ..limits import (
 # — alles andere (symcon_import/, csv_import/, server.log, .dev-token, ...)
 # bleibt bewusst außen vor (siehe Moduldocstring).
 BACKUP_ENTRIES = ["index.sqlite", "archive", "rollup", "hot", "reports", "symcon_names.json"]
+# Sidecar-Dateien des WAL-Modus (Index._conn läuft seit Phase 1 des
+# Index-Lock-Umbaus, ROADMAP.md 1.14, mit journal_mode=WAL). Nicht Teil von
+# BACKUP_ENTRIES/eines Backups — ein Backup entsteht ausschließlich über
+# _copy_sqlite_database()/create_source_snapshot() (SQLites eigene
+# Backup-API, WAL-bewusst, liefert immer eine einzelne, bereits
+# konsolidierte Datei ohne offene WAL). Bei apply_pending_restore() müssen
+# sie trotzdem behandelt werden: bliebe eine ALTE index.sqlite-wal neben der
+# frisch eingespielten index.sqlite liegen, würde SQLite beim nächsten
+# Öffnen versuchen, darin stehende (zur neuen Datei nicht mehr passende)
+# Seiten hineinzuspielen — mit Beschädigung als mögliche Folge.
+_INDEX_SQLITE_WAL_SIDECARS = ["index.sqlite-wal", "index.sqlite-shm"]
 BACKUP_MANIFEST_NAME = "zeitarchiv-manifest.json"
 BACKUP_FORMAT_VERSION = 1
 RESTORE_REQUEST_NAME = ".zeitarchiv-restore-request.json"
@@ -444,7 +455,7 @@ def apply_pending_restore(data_dir: Path, backups_dir: Path) -> dict | None:
             connection.close()
 
         rollback.mkdir(parents=True)
-        for name in BACKUP_ENTRIES:
+        for name in [*BACKUP_ENTRIES, *_INDEX_SQLITE_WAL_SIDECARS]:
             current = data_dir / name
             if current.exists():
                 old_target = rollback / name

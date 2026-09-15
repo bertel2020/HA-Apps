@@ -651,8 +651,18 @@ class _TimeoutLock:
 
 
 class Index:
-    """Dünner Wrapper um die SQLite-Datenbank. Ein Lock, weil sqlite3 hier
-    aus mehreren FastAPI-Requests parallel angesprochen werden kann."""
+    """Dünner Wrapper um die SQLite-Datenbank. Ein Lock für alle schreibenden
+    und die meisten lesenden Zugriffe, weil sqlite3 hier aus mehreren
+    FastAPI-Requests parallel angesprochen werden kann.
+
+    Ausnahme (Phase 2 von ROADMAP.md 1.14): die häufigsten reinen
+    Lesepfade — get_entity()/get_setting()/list_entities() — laufen über
+    _read_conn() auf einer eigenen, kurzlebigen Connection statt über
+    self._lock/self._conn. Unter WAL (Phase 1) blockieren sie dadurch
+    weder einen laufenden Schreibvorgang noch werden sie von ihm blockiert.
+    Bewusst nur diese drei, nicht alle ~117 Methoden: jede Umstellung
+    braucht die Zusicherung, dass die Methode WIRKLICH nichts schreibt
+    (auch keinen Cache) — siehe _read_conn()."""
 
     def __init__(self, db_path: Path) -> None:
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -660,9 +670,56 @@ class Index:
         self._lock = _TimeoutLock()
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._read_local = threading.local()
+        self._read_conns: list[sqlite3.Connection] = []
+        self._read_conns_registry_lock = threading.Lock()
+        # Phase 1 von ROADMAP.md 1.14 (Index/Storage-Lock-Umbau): WAL statt
+        # des SQLite-Standard-Rollback-Journals — Leser blockieren Schreiber
+        # nicht mehr und umgekehrt. Ändert für sich allein noch NICHTS an der
+        # Nebenläufigkeit (self._lock bleibt bestehen, weiterhin eine
+        # geteilte Connection für alle ~117 Aufrufstellen), legt aber die
+        # Grundlage für spätere Phasen (eigene Lese-Connections). synchronous
+        # NORMAL ist die mit WAL übliche Paarung — FULL wäre unnötig
+        # vorsichtig, sobald WAL selbst schon Konsistenz nach einem Absturz
+        # garantiert. Backups sind davon unberührt: sie laufen ausschließlich
+        # über SQLites eigene Backup-API (_copy_sqlite_database() in
+        # storage/backup.py), die WAL-Inhalte korrekt mit einliest, nie über
+        # eine rohe Kopie der Datei allein — siehe auch
+        # apply_pending_restore() dort für den Restore-seitigen Teil
+        # (Aufräumen alter index.sqlite-wal/-shm-Reste).
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         with self._lock, self._conn:
             self._conn.executescript(_SCHEMA)
             self._migrate()
+
+    def _read_conn(self) -> sqlite3.Connection:
+        """Eigene, langlebige Lese-Connection je Thread (uvicorn bedient
+        synchrone Routen über einen Thread-Pool — kein Verbindungsaufbau pro
+        Request nötig). mode=ro statt einer normalen Connection: eine rein
+        lesende Absicht, die SQLite selbst durchsetzt, nicht nur Konvention.
+        Unter WAL (Phase 1) braucht auch eine mode=ro-Connection Schreib-
+        zugriff auf die -shm-Datei (SQLite-Eigenheit, keine echte
+        Schreibabsicht auf die Hauptdatei) — im Datenverzeichnis der App
+        gegeben.
+
+        KEIN self._lock: genau das ist der Zweck dieser Methode. Nur für
+        Methoden geeignet, die nachweislich ausschließlich lesen — siehe
+        Klassen-Docstring.
+
+        check_same_thread=False trotz strikter Ein-Thread-Nutzung über
+        threading.local(): close() muss alle je Thread geöffneten
+        Lese-Connections einsammeln können, meist vom AUFRUFER-Thread aus,
+        nicht von dem, der sie ursprünglich geöffnet hat — ohne das Flag
+        wirft schon dieser abschließende close() einen ProgrammingError."""
+        conn = getattr(self._read_local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            self._read_local.conn = conn
+            with self._read_conns_registry_lock:
+                self._read_conns.append(conn)
+        return conn
 
     def _migrate(self) -> None:
         """Fügt Spalten nach, die es in einer schon laufenden Datenbank noch nicht gibt
@@ -1601,8 +1658,7 @@ class Index:
             query += " LIMIT ? OFFSET ?"
             params = [*params, limit, offset]
 
-        with self._lock, self._conn:
-            return self._conn.execute(query, params).fetchall()
+        return self._read_conn().execute(query, params).fetchall()
 
     def count_entities(
         self,
@@ -1669,9 +1725,8 @@ class Index:
         return [row["unit"] for row in rows]
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:
-        with self._lock, self._conn:
-            row = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-            return row["value"] if row else default
+        row = self._read_conn().execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
 
     def set_setting(self, key: str, value: str) -> None:
         with self._lock, self._conn:
@@ -3319,11 +3374,10 @@ class Index:
             return [dict(row) for row in rows]
 
     def get_entity(self, entity_id: str) -> sqlite3.Row | None:
-        with self._lock, self._conn:
-            return self._conn.execute(
-                "SELECT * FROM entities WHERE entity_id = ?",
-                (entity_id,),
-            ).fetchone()
+        return self._read_conn().execute(
+            "SELECT * FROM entities WHERE entity_id = ?",
+            (entity_id,),
+        ).fetchone()
 
     def clear_entity_data(self, entity_id: str) -> None:
         """Setzt eine Entität auf leer zurück, behält aber ihre Konfiguration."""
@@ -3558,3 +3612,10 @@ class Index:
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+        # Alle je Thread über _read_conn() geöffneten Lese-Connections
+        # mitschließen — sonst blieben sie als offene Dateihandles auf
+        # index.sqlite zurück, unsichtbar für den Aufrufer dieser Methode.
+        with self._read_conns_registry_lock:
+            for conn in self._read_conns:
+                conn.close()
+            self._read_conns.clear()
