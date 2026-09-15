@@ -2920,12 +2920,95 @@ class Index:
         }
 
     def vacuum_database(self) -> dict:
-        """Verdichtet den Index synchron und prüft ihn anschließend.
+        """Verdichtet den Index, ohne den globalen Lock für die eigentliche
+        Kompaktierung zu halten.
 
         Der Aufrufer muss parallel laufende Dateioperationen über den
-        StorageCoordinator ausschließen. Der Index-Lock blockiert zusätzlich
-        reine SQLite-Schreibpfade, die keine Archivdateien anfassen.
+        StorageCoordinator ausschließen — das betrifft aber nur Archiv-/
+        Rollup-/Hot-Dateien, nicht reine Index-Schreibzugriffe (z. B.
+        Dashboard/Chart/Settings speichern), die keine Entitäts-Datei
+        anfassen und deshalb am StorageCoordinator vorbeilaufen.
+
+        Frühere Version führte VACUUM direkt auf self._conn unter self._lock
+        aus — bei einer größeren Indexdatei blockierte das für die GESAMTE
+        Dauer jeden anderen Index-Zugriff (u. a. das Energiedashboard,
+        IndexBusy nach INDEX_LOCK_TIMEOUT_SECONDS). Stattdessen läuft die
+        eigentliche Kompaktierung jetzt auf einer isolierten Kopie (über
+        SQLite's Backup-API gebaut, derselbe Ansatz wie
+        storage/backup.py._copy_sqlite_database) — self._lock wird nur für
+        die kurzen Momente davor (Stand feststellen) und danach (Datei
+        tauschen) gehalten, nicht für die potenziell lange Kompaktierung
+        selbst.
+
+        self._conn.total_changes (statt PRAGMA data_version, das auf
+        Schreibzugriffe über dieselbe Connection nicht anschlägt — hier ist
+        aber ausschließlich diese eine geteilte Connection im Spiel) markiert,
+        ob währenddessen doch etwas geschrieben wurde: dann wäre die Kopie
+        veraltet, sie wird verworfen und der Versuch wiederholt. Bleibt es
+        nach mehreren Versuchen dabei (in der Praxis nicht erwartet — dafür
+        müsste jemand exakt während der Kompaktierung einen
+        Index-Schreibzugriff auslösen), kompaktiert der Fallback synchron
+        unter Lock wie bisher — langsamer, aber immer korrekt.
+
+        Bewusst nicht mit WAL-Modus gelöst (der Lese-/Schreibzugriffe generell
+        unabhängig voneinander machen würde): das hätte Rückwirkungen auf
+        storage/backup.py, das index.sqlite bisher als einzelne Datei sichert
+        — ein WAL-Sidecar mit noch nicht zurückgeschriebenen Änderungen bliebe
+        dort sonst unbemerkt außen vor. Größerer Umbau, hier bewusst nicht
+        mit erledigt.
         """
+        copy_path = self._db_path.with_name(self._db_path.name + ".vacuum-copy")
+        for _attempt in range(3):
+            copy_path.unlink(missing_ok=True)
+            with self._lock:
+                self._conn.commit()
+                before = self._get_database_maintenance_stats_unlocked()
+                changes_before = self._conn.total_changes
+            try:
+                self._build_vacuumed_copy(copy_path)
+                with self._lock:
+                    if self._conn.total_changes != changes_before:
+                        # Während der Kompaktierung wurde geschrieben — die
+                        # Kopie ist veraltet, verwerfen und erneut versuchen.
+                        continue
+                    self._conn.close()
+                    copy_path.replace(self._db_path)
+                    self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+                    self._conn.row_factory = sqlite3.Row
+                    quick_check = str(
+                        self._conn.execute("PRAGMA quick_check").fetchone()[0]
+                    )
+                    if quick_check != "ok":
+                        raise sqlite3.DatabaseError(
+                            f"SQLite quick_check nach VACUUM: {quick_check}"
+                        )
+                    after = self._get_database_maintenance_stats_unlocked()
+                    return {"before": before, "after": after, "quick_check": quick_check}
+            finally:
+                copy_path.unlink(missing_ok=True)
+        return self._vacuum_database_locked()
+
+    def _build_vacuumed_copy(self, copy_path: Path) -> None:
+        """Kopiert den aktuellen Datenbestand über SQLite's Backup-API (kein
+        self._lock nötig — liest über eine eigene, separate Connection direkt
+        von der Datei) und kompaktiert anschließend diese Kopie. Beides
+        passiert isoliert auf copy_path, ohne self._conn zu berühren — die
+        potenziell lange VACUUM-Laufzeit blockiert dadurch keinen anderen
+        Index-Zugriff."""
+        source = sqlite3.connect(f"file:{self._db_path.resolve()}?mode=ro", uri=True)
+        destination = sqlite3.connect(copy_path)
+        try:
+            source.backup(destination)
+            destination.execute("VACUUM")
+        finally:
+            destination.close()
+            source.close()
+
+    def _vacuum_database_locked(self) -> dict:
+        """Fallback: synchrones VACUUM unter Lock, wie vor dieser Änderung —
+        nur falls vacuum_database() mehrfach hintereinander mit einem
+        parallelen Index-Schreibzugriff kollidiert (in der Praxis nicht
+        erwartet, garantiert aber Korrektheit statt endloser Versuche)."""
         with self._lock:
             self._conn.commit()
             before = self._get_database_maintenance_stats_unlocked()
