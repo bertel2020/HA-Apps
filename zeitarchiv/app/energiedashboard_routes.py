@@ -1736,6 +1736,7 @@ class EnergieDashboardService:
         netzbezug_cost = None
         einspeisung_revenue = None
         vermiedene_kosten = None
+        eigenverbrauch_verguetung = None
         co2_ausstoss = None
         co2_vermieden = None
         if not (continuous or skip_quality):
@@ -1834,6 +1835,25 @@ class EnergieDashboardService:
                 if vermiedene_kosten is not None:
                     vermiedene_kosten = round(vermiedene_kosten, 2)
 
+            # Eigenverbrauchsvergütung: eigenes, bewusst separates Preisfeld —
+            # anders als "Einsparung" oben ist das hier eine ECHTE Zahlung
+            # (z. B. KWK-Zuschlag auf Eigenverbrauch), kein rechnerischer
+            # Vergleichswert zum Netzbezug-Preis. Seltener Fall, deshalb im
+            # Setup als eigens zu aktivierendes Feld geführt (siehe
+            # _energiedashboard_setup.html) — hier im Code aber kein
+            # Sonderfall: derselbe _bucket_factor() wie bei den anderen
+            # Preisfeldern, auf derselben pv_eigenverbrauch_series wie
+            # "Einsparung".
+            if kosten.get("preis_eigenverbrauch") or kosten.get("preis_eigenverbrauch_fixed") is not None:
+                eigenverbrauch_verguetung = _bucket_factor(
+                    pv_eigenverbrauch_series,
+                    kosten.get("preis_eigenverbrauch"),
+                    kosten.get("preis_eigenverbrauch_fixed"),
+                    "Vergütung Eigenverbrauch",
+                )
+                if eigenverbrauch_verguetung is not None:
+                    eigenverbrauch_verguetung = round(eigenverbrauch_verguetung, 2)
+
             # CO2-Bilanz: dieselbe Faktor×Energie-Logik wie Kosten, aber ein
             # einziger Faktor (g CO2/kWh) für den bezogenen Netzstrom — PV und
             # Speicher gelten als emissionsfrei, brauchen also keinen eigenen
@@ -1868,9 +1888,12 @@ class EnergieDashboardService:
                         series, kosten.get("preis_netzbezug"), kosten.get("preis_netzbezug_fixed"), "Preis Netzbezug"
                     )
                     item["kosten"] = round(item_kosten, 2) if item_kosten is not None else None
+        # Eigenverbrauchsvergütung fließt hier mit ein (echter Geldfluss wie
+        # Einspeisung Erlös) — "Einsparung"/vermiedene_kosten bewusst nicht
+        # (rein rechnerischer Vergleichswert, siehe Kommentar dort).
         net_cost = (
-            round((netzbezug_cost or 0.0) - (einspeisung_revenue or 0.0), 2)
-            if netzbezug_cost is not None or einspeisung_revenue is not None
+            round((netzbezug_cost or 0.0) - (einspeisung_revenue or 0.0) - (eigenverbrauch_verguetung or 0.0), 2)
+            if netzbezug_cost is not None or einspeisung_revenue is not None or eigenverbrauch_verguetung is not None
             else None
         )
 
@@ -2077,6 +2100,7 @@ class EnergieDashboardService:
                 "netzbezug_cost": netzbezug_cost,
                 "einspeisung_revenue": einspeisung_revenue,
                 "vermiedene_kosten": vermiedene_kosten,
+                "eigenverbrauch_verguetung": eigenverbrauch_verguetung,
                 "net_cost": net_cost,
                 "co2_ausstoss": co2_ausstoss,
                 "co2_vermieden": co2_vermieden,
@@ -2667,8 +2691,10 @@ class EnergieDashboardService:
             verbraucher_gruppen: list[str] = Form([]),
             preis_netzbezug: str = Form(""),
             preis_einspeisung: str = Form(""),
+            preis_eigenverbrauch: str = Form(""),
             preis_netzbezug_fixed: str = Form(""),
             preis_einspeisung_fixed: str = Form(""),
+            preis_eigenverbrauch_fixed: str = Form(""),
             co2_faktor_netzbezug_entity: str = Form(""),
             co2_faktor_netzbezug_fixed: str = Form(""),
             prognose_rest_heute_entity_id: str = Form(""),
@@ -2762,16 +2788,20 @@ class EnergieDashboardService:
             kosten = None
             preis_netzbezug_fixed_val = _cent_to_euro(preis_netzbezug_fixed)
             preis_einspeisung_fixed_val = _cent_to_euro(preis_einspeisung_fixed)
+            preis_eigenverbrauch_fixed_val = _cent_to_euro(preis_eigenverbrauch_fixed)
             if (
-                preis_netzbezug.strip() or preis_einspeisung.strip()
+                preis_netzbezug.strip() or preis_einspeisung.strip() or preis_eigenverbrauch.strip()
                 or preis_netzbezug_fixed_val is not None
                 or preis_einspeisung_fixed_val is not None
+                or preis_eigenverbrauch_fixed_val is not None
             ):
                 kosten = {
                     "preis_netzbezug": preis_netzbezug.strip() or None,
                     "preis_einspeisung": preis_einspeisung.strip() or None,
+                    "preis_eigenverbrauch": preis_eigenverbrauch.strip() or None,
                     "preis_netzbezug_fixed": preis_netzbezug_fixed_val,
                     "preis_einspeisung_fixed": preis_einspeisung_fixed_val,
+                    "preis_eigenverbrauch_fixed": preis_eigenverbrauch_fixed_val,
                 }
 
             # CO2-Faktor wird — anders als der Preis — direkt in g/kWh

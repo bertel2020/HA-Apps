@@ -224,6 +224,9 @@
         {% if current.kpi.einspeisung_revenue is not none %}
         <div class="stat-line"><span>{{ config.einspeisung_name or "Einspeisung" }}</span><strong>{{ current.kpi.einspeisung_revenue | format_value(2) }} €</strong></div>
         {% endif %}
+        {% if current.kpi.eigenverbrauch_verguetung is not none %}
+        <div class="stat-line"><span>EV-Vergütung</span><strong>{{ current.kpi.eigenverbrauch_verguetung | format_value(2) }} €</strong></div>
+        {% endif %}
         {% if current.kpi.vermiedene_kosten is not none %}
         <div class="stat-line"><span>Vermiedene Kosten (Eigenverbrauch)</span><strong>{{ current.kpi.vermiedene_kosten | format_value(2) }} €</strong></div>
         {% endif %}

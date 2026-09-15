@@ -866,6 +866,39 @@
   }
   .edash-item-add:hover .edash-item-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
 
+  /* Eigenverbrauchsvergütung-Kachel (Kosten-Sektion): teilt sich denselben
+     .edash-item-tile mit den beiden Standard-Preisfeldern, wechselt aber je
+     nach Zustand per x-if zwischen der normalen Kachel-Optik und der
+     gestrichelten "+"-Optik von .edash-item-add oben — bewusst am selben
+     Kachel-Element statt einer separaten Fläche daneben, damit "aktivieren"
+     sich wie ein Zustandswechsel derselben Kachel anfühlt statt wie zwei
+     verschiedene UI-Elemente nebeneinander. */
+  .edash-item-tile.is-activator{
+    border-style:dashed;border-color:var(--border-strong);box-shadow:none;background:transparent;
+    align-items:center;justify-content:center;
+  }
+  .edash-item-tile.is-activator:hover{border-color:var(--accent-line);}
+  .edash-item-tile.is-activator:hover .edash-item-add-btn{color:var(--accent-line);border-color:var(--accent-line);}
+  .edash-item-body-activator{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 12px;text-align:center;}
+  /* .edash-item-name ist sonst auf eine einzeilige Kachel-Kopfzeile
+     ausgelegt (flex:1 im Row-Kontext, nowrap+ellipsis) — hier steht der
+     Name allein und mittig, braucht bei sehr engen Mobile-Spalten also
+     ggf. mehr als eine Zeile statt eines abgeschnittenen Worts.
+     overflow-wrap/hyphens als Sicherheitsnetz für lange, zusammengesetzte
+     Namen ohne Leerzeichen (ohne Bruchstelle überliefe der Name sonst,
+     mittig ausgerichtet nach BEIDEN Seiten, die schmale Spalte — vom
+     overflow:hidden der Kachel links UND rechts abgeschnitten). */
+  .edash-item-body-activator .edash-item-name{
+    flex:none;white-space:normal;overflow:visible;overflow-wrap:break-word;hyphens:auto;text-align:center;
+  }
+  .edash-item-body-activator .edash-item-chip{align-self:center;}
+  /* Wrapper NUR für den aktivierten Zustand: <template x-if> erlaubt genau
+     ein Wurzelelement, Akzentstreifen + Body brauchen aber zwei Geschwister
+     wie bei den übrigen Kacheln. flex:1 lässt den Wrapper die volle
+     Kachelhöhe füllen (sonst nur Inhaltshöhe), damit .edash-item-bottoms
+     margin-top:auto weiterhin wie gewohnt nach unten drückt. */
+  .edash-item-body-wrap{display:flex;flex-direction:column;flex:1;min-height:0;}
+
   /* Einzelrollen-Popup: deutlich schmaler als der App-Standard-Dialog
      (.detail-dialog, bis 860px, für Datenqualität/Kosten-Tabellen) — hier
      stehen nur 1-4 Felder für genau EINEN Eintrag, dieselbe Größenordnung
