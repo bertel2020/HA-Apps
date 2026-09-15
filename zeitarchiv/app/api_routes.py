@@ -330,20 +330,32 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         authorization: str | None,
         request_id: str = "-",
         integration_version: str | None = None,
+        *,
+        missing_token_is_healthcheck: bool = False,
     ) -> None:
+        """missing_token_is_healthcheck (nur von /api/health gesetzt): der
+        Docker-HEALTHCHECK (siehe healthcheck.py/Dockerfile) fragt diesen
+        Endpunkt alle 30s absichtlich OHNE Token ab — dieselbe Ausnahme wie
+        in logging_setup.py::log_http_request() für die Zugriffs-Log-Zeile,
+        hier zusätzlich für den "Auth-Fehler seit Start"-Zähler und dessen
+        Meldung. Ein tatsächlich FALSCHER Token auf /api/health (z. B. aus
+        queue_writer.py::_probe_demo_mode()) zählt weiterhin — nur ein
+        komplett fehlender Token an diesem einen Endpunkt gilt als Healthcheck,
+        kein echtes Auth-Problem."""
         expected = f"Bearer {deps.api_token()}"
         if authorization is None or not secrets.compare_digest(authorization, expected):
-            state.connection_stats["auth_failures"] += 1
-            state.connection_stats["last_auth_failure_ts"] = time.time()
-            log_rate_limited(
-                logger,
-                logging.WARNING,
-                "api_auth_failure",
-                "API-Authentifizierung fehlgeschlagen · event=api_auth_failure request_id=%s gesamt_seit_start=%d",
-                request_id,
-                state.connection_stats["auth_failures"],
-                interval_seconds=300,
-            )
+            if not (missing_token_is_healthcheck and authorization is None):
+                state.connection_stats["auth_failures"] += 1
+                state.connection_stats["last_auth_failure_ts"] = time.time()
+                log_rate_limited(
+                    logger,
+                    logging.WARNING,
+                    "api_auth_failure",
+                    "API-Authentifizierung fehlgeschlagen · event=api_auth_failure request_id=%s gesamt_seit_start=%d",
+                    request_id,
+                    state.connection_stats["auth_failures"],
+                    interval_seconds=300,
+                )
             raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
         if integration_version:
             ha_integration.record_seen(deps.index, integration_version)
@@ -375,6 +387,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 authorization,
                 getattr(request.state, "request_id", "-"),
                 x_zeitarchiv_integration_version,
+                missing_token_is_healthcheck=True,
             )
         except HTTPException as exc:
             exc.detail = {"message": exc.detail, "demo_mode": deps.demo_mode_active}

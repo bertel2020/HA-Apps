@@ -21,6 +21,7 @@ from app.api_routes import (  # noqa: E402
     expire_write_capture,
     schedule_write_capture_expiry,
 )
+from app import logging_setup  # noqa: E402
 from app.logging_setup import (  # noqa: E402
     DEFAULT_LOG_LEVEL,
     configure_logging,
@@ -99,8 +100,35 @@ def _write_endpoint(state: ApiState, result: str = "written"):
     )
 
 
+def _health_endpoint(state: ApiState):
+    router = create_api_router(
+        ApiDependencies(
+            data_dir=Path("/tmp"),
+            index=_FakeIndex(),
+            tz=ZoneInfo("Europe/Berlin"),
+            coordinator=StorageCoordinator(),
+            ingestion=_FakeIngestion(),
+            api_token=lambda: "test-token",
+            app_version="test",
+            collect_notices=lambda: [],
+            latest_backup=lambda: None,
+        ),
+        state,
+    )
+    raw = next(route.endpoint for route in router.routes if route.path == "/api/health")
+    return lambda request, authorization: raw(
+        request, authorization, x_zeitarchiv_integration_version=None,
+    )
+
+
 def _request(request_id: str) -> Request:
     request = Request({"type": "http", "method": "POST", "path": "/api/write", "headers": []})
+    request.state.request_id = request_id
+    return request
+
+
+def _health_request(request_id: str) -> Request:
+    request = Request({"type": "http", "method": "GET", "path": "/api/health", "headers": []})
     request.state.request_id = request_id
     return request
 
@@ -184,3 +212,43 @@ def test_auth_failure_is_correlated_without_logging_token() -> None:
     lines = local_log_lines(search="bad-auth-request", limit=50)
     assert any("event=api_auth_failure" in line for line in lines)
     assert not any("top-secret" in line for line in lines)
+
+
+def test_docker_healthcheck_probe_on_api_health_is_not_counted_as_auth_failure() -> None:
+    """Der Docker-HEALTHCHECK (healthcheck.py, alle 30s) ruft /api/health
+    absichtlich OHNE Token ab — das darf weder den "Auth-Fehler seit
+    Start"-Zähler erhöhen noch eine api_auth_failure-Meldung loggen (an
+    einer echten Installation beobachtet: der Zähler stieg dadurch
+    unaufhaltsam, obwohl die Verbindung nie gestört war)."""
+    configure_logging("debug", "off")
+    state = ApiState()
+    try:
+        _health_endpoint(state)(_health_request("healthcheck-request"), None)
+        raise AssertionError("Fehlender Token wurde akzeptiert")
+    except HTTPException as exc:
+        assert exc.status_code == 401
+    assert state.connection_stats["auth_failures"] == 0
+    lines = local_log_lines(search="healthcheck-request", limit=50)
+    assert not any("event=api_auth_failure" in line for line in lines)
+
+
+def test_wrong_token_on_api_health_still_counts_as_auth_failure() -> None:
+    """Gegenstück: ein tatsächlich FALSCHER (nicht fehlender) Token auf
+    /api/health — z. B. queue_writer.py::_probe_demo_mode() mit einem
+    echten, aber abgelehnten Token — ist kein Healthcheck und muss weiter
+    zählen."""
+    configure_logging("debug", "off")
+    # log_rate_limited() haelt seinen Unterdrueckungs-Zustand modulweit fest
+    # (logging_setup._RATE_LIMIT_STATE) - ohne Reset wuerde ein vorheriger
+    # Test im selben Lauf, der ebenfalls "api_auth_failure" geloggt hat,
+    # die Meldung hier fuer 300s unterdruecken.
+    logging_setup._RATE_LIMIT_STATE.pop("api_auth_failure", None)
+    state = ApiState()
+    try:
+        _health_endpoint(state)(_health_request("wrong-token-request"), "Bearer wrong")
+        raise AssertionError("Ungültiger Token wurde akzeptiert")
+    except HTTPException as exc:
+        assert exc.status_code == 401
+    assert state.connection_stats["auth_failures"] == 1
+    lines = local_log_lines(search="wrong-token-request", limit=50)
+    assert any("event=api_auth_failure" in line for line in lines)
