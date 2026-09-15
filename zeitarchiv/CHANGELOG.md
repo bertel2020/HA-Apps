@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.96.1 - 2026-09-15
+
+### Behoben
+
+- Der Zähler „Auth-Fehler seit Start" (Einstellungen → Verbindung) stieg
+  gleichmäßig alle 30 Sekunden, unabhängig von der tatsächlichen
+  Verbindung: Der interne Docker-Healthcheck fragt die App absichtlich
+  ohne Token ab, um nur ihre Erreichbarkeit zu prüfen — das wurde
+  fälschlich wie ein echter Auth-Fehler gezählt.
+
 ## 0.96.0 - 2026-09-15
 
 ### Neu
