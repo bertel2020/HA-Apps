@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.95.0 - 2026-09-15
+
+### Neu
+
+- Einstellungen → Diagnose zeigt jetzt eine neue Übersicht „Sperren" mit der
+  Häufigkeit kurzzeitiger Datenbank-/Speicherzugriffs-Blockaden der letzten
+  24 Stunden, ergänzt um passende Meldungen im Glocken-Icon bei Häufung.
+- Die Speicher- und Verbrauch-Kachel im Energiedashboard erklären jetzt per
+  Tooltip, was die angezeigte Zahl bedeutet.
+
+### Geändert
+
+- Der Datenbankzugriff läuft jetzt grundlegend nebenläufiger (WAL-Modus) —
+  Lesezugriffe wie das Energiedashboard blockieren dadurch seltener wegen
+  gleichzeitiger Schreibvorgänge.
+
+### Behoben
+
+- „Datenbank kurzzeitig ausgelastet"-Fehler (503) konnten auftreten, wenn im
+  Hintergrund eine Index-Optimierung lief oder ein Schreibbatch viele
+  bereits archivierte Duplikate enthielt — in beiden Fällen scheiterten
+  dabei kurzzeitig auch andere Seitenaufrufe. Beide Ursachen behoben.
+- Die Chart-Editor-Legende zeigte bei aktivem Jahres-/Vorperiodenvergleich
+  keine eigene Zeile für die Vergleichsserie.
+
 ## 0.94.0 - 2026-09-10
 
 ### Neu
