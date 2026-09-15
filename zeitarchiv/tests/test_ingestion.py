@@ -256,6 +256,57 @@ def test_existing_timestamp_in_month_archive_is_not_appended() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_duplicate_storm_only_reads_the_archive_once_per_batch() -> None:
+    """Echter Vorfall in einer anderen Umgebung: 100 Duplikate am Stück, je
+    ~850 ms, weil jedes einzeln dieselbe Monats-Parquet-Datei erneut las —
+    hielt nebenbei den Index-Lock so dicht besetzt, dass parallele Anfragen
+    mit IndexBusy/503 scheiterten. api_routes.py legt seither EINEN
+    archive_cache je Batch an und reicht ihn durch alle ingest()-Aufrufe
+    des Batches — hier direkt gegen IngestionService.ingest() geprüft."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-ingestion-dup-storm-"))
+    index = Index(tmp / "index.sqlite")
+    original_read_table = ingestion_mod.pq.read_table
+    read_calls: list[int] = []
+
+    def counting_read_table(*args, **kwargs):
+        read_calls.append(1)
+        return original_read_table(*args, **kwargs)
+
+    try:
+        service = IngestionService(tmp, index, ZoneInfo("UTC"))
+        first = _event("event-1")
+        next_month = IngestEvent(
+            event_id="event-2",
+            entity_id=first.entity_id,
+            domain=first.domain,
+            ts=first.ts + 32 * 24 * 60 * 60,
+            value=22.0,
+            state_class=first.state_class,
+            unit=first.unit,
+        )
+        assert service.ingest(first) == "written"
+        assert service.ingest(next_month) == "written"
+
+        ingestion_mod.pq.read_table = counting_read_table
+        archive_cache: dict = {}
+        for i in range(5):
+            duplicate = IngestEvent(
+                event_id=f"dup-{i}",
+                entity_id=first.entity_id,
+                domain=first.domain,
+                ts=first.ts,
+                value=99.0,
+                state_class=first.state_class,
+                unit=first.unit,
+            )
+            assert service.ingest(duplicate, archive_cache) == "duplicate"
+        assert len(read_calls) == 1, "Archiv-Datei hätte nur einmal gelesen werden dürfen"
+    finally:
+        ingestion_mod.pq.read_table = original_read_table
+        index.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_same_value_at_different_timestamp_is_appended() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-ingestion-"))
     index = Index(tmp / "index.sqlite")
@@ -422,6 +473,23 @@ def test_startup_reconciles_persisted_open_claim() -> None:
         assert service.recover_pending() == 1
         assert service.ingest(event) == "duplicate"
         assert index.get_entity(event.entity_id)["row_count"] == 1
+    finally:
+        index.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_record_duplicate_ratio_event_counts_within_24h_window() -> None:
+    """Grundlage der Meldung "Hohe Duplikatquote im Ingest" (notices.py,
+    ingest.duplicate_ratio_high) — von api_routes.py aufgerufen, sobald ein
+    Batch die Schwelle überschreitet."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-ingestion-dup-ratio-"))
+    index = Index(tmp / "index.sqlite")
+    try:
+        service = IngestionService(tmp, index, ZoneInfo("UTC"))
+        assert service.recent_duplicate_ratio_events() == 0
+        service.record_duplicate_ratio_event()
+        service.record_duplicate_ratio_event()
+        assert service.recent_duplicate_ratio_events() == 2
     finally:
         index.close()
         shutil.rmtree(tmp, ignore_errors=True)

@@ -8,6 +8,7 @@ import logging
 import math
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -24,6 +25,11 @@ from .paths import entity_dir, validate_entity_id
 
 
 logger = logging.getLogger(__name__)
+
+# Fenster, über das Vorkommen einer hohen Duplikatquote im Ingest für die
+# gleichnamige Meldung gezählt werden (siehe notices.py) — derselbe Wert wie
+# _BUSY_EVENTS_WINDOW_SECONDS in storage/index.py für die IndexBusy-Meldung.
+_DUPLICATE_RATIO_EVENTS_WINDOW_SECONDS = 24 * 60 * 60
 
 
 def _is_storable_measurement(event: IngestEvent) -> bool:
@@ -132,8 +138,23 @@ def _timestamp_exists(
     ts: float,
     last_ts: float | None,
     tz: ZoneInfo,
+    archive_cache: dict[tuple[str, float], bool] | None = None,
 ) -> bool:
-    """Prueft, ob fuer die Entitaet bereits ein Wert zum Zeitstempel liegt."""
+    """Prueft, ob fuer die Entitaet bereits ein Wert zum Zeitstempel liegt.
+
+    archive_cache: optionaler, vom Aufrufer über einen ganzen Ingest-Batch
+    hinweg geteilter Zwischenspeicher für das Ergebnis des Archiv-Lesens
+    unten (Schlüssel (entity_id, ts)) — ohne ihn liest ein Duplikat-Sturm
+    (dieselbe Entität/derselbe Zeitstempel, viele Events hintereinander,
+    jedes mit frischer event_id) dieselbe Monats-Parquet-Datei bei jedem
+    einzelnen Event erneut von der Platte. Gemessen an einem echten Vorfall:
+    100 Duplikate à ~850 ms, weil jedes einzeln dieselbe Datei gelesen hat —
+    das hielt nebenbei den globalen Index-Lock (get_or_create_entity/
+    claim_ingest_event je Event) so oft und dicht besetzt, dass parallele
+    Anfragen mit IndexBusy scheiterten. Der Hot-Buffer-Check darüber bleibt
+    bewusst ungecacht — der ändert sich innerhalb desselben Batches
+    tatsächlich (ein zuvor in diesem Batch geschriebener Wert landet dort),
+    das Archiv dagegen nicht."""
     # Der normale Live-Pfad liefert steigende Zeitstempel. Solange der neue
     # Zeitstempel hinter dem Indexmaximum liegt, kann er noch nicht existieren
     # und wir vermeiden das Lesen einer stetig wachsenden Monatsdatei.
@@ -144,15 +165,23 @@ def _timestamp_exists(
     if hotbuffer.contains_timestamp(hot_path, ts):
         return True
 
+    cache_key = (entity_id, ts)
+    if archive_cache is not None and cache_key in archive_cache:
+        return archive_cache[cache_key]
+
     month = hotbuffer.month_key(ts, tz)
     archive_path = entity_dir(data_dir, "archive", entity_id) / f"{month}.parquet"
     if not archive_path.exists():
-        return False
-    return pq.read_table(
-        archive_path,
-        columns=["ts"],
-        filters=[("ts", "=", ts)],
-    ).num_rows > 0
+        exists = False
+    else:
+        exists = pq.read_table(
+            archive_path,
+            columns=["ts"],
+            filters=[("ts", "=", ts)],
+        ).num_rows > 0
+    if archive_cache is not None:
+        archive_cache[cache_key] = exists
+    return exists
 
 
 class IngestionService:
@@ -171,6 +200,27 @@ class IngestionService:
         self._coordinator = coordinator or StorageCoordinator()
         self._completion_lock = threading.Lock()
         self._completions_since_prune = 0
+        self._duplicate_ratio_events: deque[float] = deque()
+
+    def record_duplicate_ratio_event(self) -> None:
+        """Merkt ein Vorkommen einer hohen Duplikatquote im Ingest-Batch
+        fürs 24h-Fenster — von api_routes.py aufgerufen, sobald
+        INGEST_DUPLICATE_WARNING_RATIO überschritten wird. Grundlage der
+        Meldung "Hohe Duplikatquote im Ingest" (notices.py); Fire-and-forget
+        wie StorageCoordinator._record_busy_event()/Index._TimeoutLock."""
+        now = time.time()
+        self._duplicate_ratio_events.append(now)
+        while (
+            self._duplicate_ratio_events
+            and now - self._duplicate_ratio_events[0] > _DUPLICATE_RATIO_EVENTS_WINDOW_SECONDS
+        ):
+            self._duplicate_ratio_events.popleft()
+
+    def recent_duplicate_ratio_events(
+        self, window_seconds: float = _DUPLICATE_RATIO_EVENTS_WINDOW_SECONDS
+    ) -> int:
+        cutoff = time.time() - window_seconds
+        return sum(1 for ts in self._duplicate_ratio_events if ts >= cutoff)
 
     def _complete(self, event: IngestEvent, *, recorded: bool) -> None:
         self._index.complete_ingest_event(
@@ -260,13 +310,27 @@ class IngestionService:
             )
         return recovered
 
-    def ingest(self, event: IngestEvent) -> str:
+    def ingest(
+        self,
+        event: IngestEvent,
+        archive_cache: dict[tuple[str, float], bool] | None = None,
+    ) -> str:
         """Liefert ``written``, ``filtered``, ``skipped``, ``duplicate`` oder
-        ``recovered``."""
-        with self._coordinator.entity(event.entity_id):
-            return self._ingest_entity_locked(event)
+        ``recovered``.
 
-    def _ingest_entity_locked(self, event: IngestEvent) -> str:
+        archive_cache: siehe _timestamp_exists() — optional, vom Aufrufer
+        EINMAL pro Batch angelegt und für dessen gesamte Events
+        wiederverwendet (api_routes.py). Ohne Angabe (z. B. einzelne
+        ingest()-Aufrufe in Tests) entfällt der Cache einfach, unverändertes
+        Verhalten."""
+        with self._coordinator.entity(event.entity_id):
+            return self._ingest_entity_locked(event, archive_cache)
+
+    def _ingest_entity_locked(
+        self,
+        event: IngestEvent,
+        archive_cache: dict[tuple[str, float], bool] | None = None,
+    ) -> str:
         validate_entity_id(event.entity_id)
         if not _is_storable_measurement(event):
             # Vor get_or_create_entity und vor dem Claim: ein unbrauchbares
@@ -320,6 +384,7 @@ class IngestionService:
             event.ts,
             entity["last_ts"],
             self._tz,
+            archive_cache,
         ):
             self._complete(event, recorded=False)
             return "duplicate"

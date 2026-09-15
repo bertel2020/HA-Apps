@@ -356,6 +356,7 @@ def _collect_all_notices() -> list[dict]:
         _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
         _background.last_backup_worker_tick, _background.backup_progress.running, _background.demo_dir_info_cached,
         coordinator_busy_events=storage_coordinator.recent_busy_events(),
+        duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
     )
 
 
@@ -1044,13 +1045,11 @@ def _integration_update_context(integration_info: dict | None) -> dict:
 
 
 def _settings_background_processes_context() -> dict:
-    """Letzter Lauf + Status je Wartungsplaner-Hintergrundaufgabe (Einstellungen
-    → Diagnose, Abschnitt "Hintergrundprozesse") — bisher nur in den
-    Server-Logs sichtbar (siehe _maintenance_scheduler_loop() in
-    background.py). Rein lesend,
-    löst selbst nichts aus; der Wartungsplaner läuft unabhängig alle 30s
-    weiter, unabhängig davon, ob diese Seite gerade geöffnet ist. Liefert
-    zusätzlich lock_status (Abschnitt "Sperren"), siehe BackgroundService.lock_status_rows()."""
+    """Letzter Lauf + Status je Wartungsplaner-Hintergrundaufgabe (Einstellungen → Diagnose,
+    Abschnitt "Hintergrundprozesse") — bisher nur in den Server-Logs sichtbar (siehe
+    _maintenance_scheduler_loop() in background.py). Rein lesend, löst selbst nichts aus; der
+    Wartungsplaner läuft unabhängig alle 30s weiter, unabhängig davon, ob diese Seite gerade
+    geöffnet ist. Liefert zusätzlich lock_status (Abschnitt "Sperren"), siehe BackgroundService.lock_status_rows()."""
     now = time.time()
 
     def row(name: str, hint: str, ts: float | None, *, error: bool = False) -> dict:
@@ -1273,6 +1272,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
                 _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
                 demo_dir_info=_background.demo_dir_info_cached,
                 coordinator_busy_events=storage_coordinator.recent_busy_events(),
+                duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
             )
             if n["id"] == notice_id
         ),

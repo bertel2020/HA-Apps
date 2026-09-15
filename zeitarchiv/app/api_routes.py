@@ -433,6 +433,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             trace_active = bool(trace_entity) and (state.entity_trace["expires_at"] or 0) > now
 
         counts = {"written": 0, "skipped": 0, "filtered": 0, "duplicate": 0, "recovered": 0}
+        # Über den ganzen Batch geteilt statt je Event neu: verhindert, dass
+        # ein Duplikat-Sturm (viele Events derselben Entität/desselben
+        # Zeitstempels, z. B. eine hängende Integrations-Wiederholung)
+        # dieselbe Archiv-Monatsdatei bei jedem einzelnen Event erneut liest
+        # (siehe _timestamp_exists() in storage/ingestion.py) — gemessen an
+        # einem echten Vorfall: 100 Duplikate à ~850 ms statt weniger ms nach
+        # dem ersten Treffer.
+        archive_cache: dict[tuple[str, float], bool] = {}
         started = time.perf_counter()
         try:
             for event in payload.events:
@@ -442,7 +450,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 )
                 result = deps.ingestion.ingest(IngestEvent(event_id=event_id, **{
                     key: value for key, value in event_data.items() if key != "event_id"
-                }))
+                }), archive_cache)
                 counts[result] += 1
                 if trace_active and event.entity_id == trace_entity:
                     trace_logger.debug(
@@ -497,6 +505,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             duplicate_ratio = counts["duplicate"] / event_count
             discarded_ratio = (counts["filtered"] + counts["skipped"]) / event_count
             if duplicate_ratio >= INGEST_DUPLICATE_WARNING_RATIO:
+                deps.ingestion.record_duplicate_ratio_event()
                 log_rate_limited(
                     logger,
                     logging.WARNING,

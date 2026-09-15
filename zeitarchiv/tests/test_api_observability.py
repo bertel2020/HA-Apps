@@ -54,7 +54,7 @@ class _FakeIngestion:
     def __init__(self, result: str = "written") -> None:
         self.result = result
 
-    def ingest(self, _event) -> str:
+    def ingest(self, _event, _archive_cache=None) -> str:
         return self.result
 
 
