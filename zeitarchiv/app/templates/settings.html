@@ -109,6 +109,22 @@
               {% endfor %}
             </div>
           </div>
+          <div class="settings-subsection">
+            <h3 class="settings-subsection-title">Sperren {{ hint_button('Sperren') }}</h3>
+            {% call hint_body() %}Wie oft ein Zugriff wegen Überlastung nicht rechtzeitig drankam — einzelne Vorkommen sind normal (z. B. während eines Backups oder einer Index-Optimierung), erst Häufung wäre auffällig.{% endcall %}
+            <div>
+              {% for proc in lock_status %}
+              <div class="bgproc-row">
+                <div class="bgproc-name">{{ proc.name }}</div>
+                <div class="bgproc-right">
+                  <span class="bgproc-lastrun">{{ proc.last_run }}</span>
+                  <span class="bgproc-pill {{ proc.pill_class }}">{{ proc.pill_label }}</span>
+                </div>
+                <div class="bgproc-hint">{{ proc.hint }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
         </section>
 
         {# Demo-Modus (DEMO_MODUS_PLAN.md) — Abschnitt existiert nur, wenn

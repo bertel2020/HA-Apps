@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.96.1 - 2026-09-15
+
+### Behoben
+
+- Der Zähler „Auth-Fehler seit Start" (Einstellungen → Verbindung) stieg
+  gleichmäßig alle 30 Sekunden, unabhängig von der tatsächlichen
+  Verbindung: Der interne Docker-Healthcheck fragt die App absichtlich
+  ohne Token ab, um nur ihre Erreichbarkeit zu prüfen — das wurde
+  fälschlich wie ein echter Auth-Fehler gezählt.
+
+## 0.96.0 - 2026-09-15
+
+### Neu
+
+- Neues, optionales Preisfeld **Eigenverbrauchsvergütung** in den
+  Kosteneinstellungen des Energiedashboards, für Anlagen mit einer echten
+  Vergütung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — anders als
+  die bestehende „Vermiedene Kosten"-Kachel (rein rechnerischer
+  Vergleichswert) fließt dieser Betrag als echter Geldfluss in den Saldo
+  ein. Standardmäßig deaktiviert, da nur wenige Anlagen betroffen sind.
+- Das Energiedashboard aktualisiert sich jetzt automatisch alle 60 Sekunden,
+  wie schon die Dashboard-Kacheln — nur während die aktuelle Periode
+  angezeigt wird und kein Detail-Dialog offen ist.
+
+### Behoben
+
+- Nach dem 0.95.0-Update konnten in seltenen Fällen wiederkehrende
+  Auth-Fehler trotz gültiger Verbindung auftreten (Zähler „Auth-Fehler seit
+  Start" stieg stetig, ohne dass die Verbindung insgesamt ausfiel). Ursache
+  war ein neuer, schnellerer Lesepfad für Einstellungswerte, der auch für
+  die Token-Prüfung selbst verwendet wurde; dieser Lesepfad wird für die
+  Token-Prüfung nicht mehr verwendet.
+
+## 0.95.0 - 2026-09-15
+
+### Neu
+
+- Einstellungen → Diagnose zeigt jetzt eine neue Übersicht „Sperren" mit der
+  Häufigkeit kurzzeitiger Datenbank-/Speicherzugriffs-Blockaden der letzten
+  24 Stunden, ergänzt um passende Meldungen im Glocken-Icon bei Häufung.
+- Die Speicher- und Verbrauch-Kachel im Energiedashboard erklären jetzt per
+  Tooltip, was die angezeigte Zahl bedeutet.
+
+### Geändert
+
+- Der Datenbankzugriff läuft jetzt grundlegend nebenläufiger (WAL-Modus) —
+  Lesezugriffe wie das Energiedashboard blockieren dadurch seltener wegen
+  gleichzeitiger Schreibvorgänge.
+
+### Behoben
+
+- „Datenbank kurzzeitig ausgelastet"-Fehler (503) konnten auftreten, wenn im
+  Hintergrund eine Index-Optimierung lief oder ein Schreibbatch viele
+  bereits archivierte Duplikate enthielt — in beiden Fällen scheiterten
+  dabei kurzzeitig auch andere Seitenaufrufe. Beide Ursachen behoben.
+- Die Chart-Editor-Legende zeigte bei aktivem Jahres-/Vorperiodenvergleich
+  keine eigene Zeile für die Vergleichsserie.
+
 ## 0.94.0 - 2026-09-10
 
 ### Neu

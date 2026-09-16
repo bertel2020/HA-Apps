@@ -16,9 +16,15 @@ logger = logging.getLogger(__name__)
 #: Meldet das VACUUM an der Kopfleiste an. Es bleibt synchron im
 #: Request-Thread — wer den Knopf drückt, wartet ohnehin auf die neu
 #: gerenderte Seite. Sichtbar sein muss es trotzdem: Unter
-#: storage_coordinator.exclusive() steht für die Dauer die GESAMTE Anwendung,
-#: einschließlich der Aufnahme aus Home Assistant. Ohne diesen Eintrag sähe
-#: jeder andere Tab nur einen Server, der ohne Grund nicht mehr antwortet.
+#: storage_coordinator.exclusive() pausieren Archiv-/Rollup-/Hot-Datei-
+#: Operationen (einschließlich der Aufnahme aus Home Assistant) für die
+#: Dauer. Reine Index-Zugriffe (Dashboards, Energiedashboard, Einstellungen)
+#: pausieren dagegen NICHT mehr — index.vacuum_database() kompaktiert seit
+#: der VACUUM-INTO-Umstellung auf einer isolierten Kopie, ohne den
+#: Index-Lock für die eigentliche Laufzeit zu halten (siehe dortige
+#: Docstring). Ohne diesen Eintrag sähe trotzdem jeder andere Tab nur einen
+#: Server, der bei der Datei-Aufnahme ohne erkennbaren Grund nicht mehr
+#: antwortet.
 _optimize_progress = JobProgress("index-optimize", label="Index-Optimierung")
 
 INDEX_VACUUM_MIN_FILE_BYTES = 50 * 1024 * 1024

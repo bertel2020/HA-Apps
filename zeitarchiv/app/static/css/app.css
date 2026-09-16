@@ -1029,11 +1029,21 @@ a.menu-row{text-decoration:none;}
    UND der Entität-eigenen Chart-Seite (entity_detail.html) genutzt. */
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
 .chart-legend-item{
-  display:flex;align-items:baseline;gap:9px;max-width:100%;
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:9px;max-width:100%;
   padding:6px 13px;border-radius:20px;border:1px solid var(--border);
   background:var(--surface-alt);cursor:pointer;font:inherit;color:inherit;
   transition:opacity .15s ease,border-color .15s ease;
 }
+/* Vergleichsperiode (Vorjahr/Vorperiode) je Entität — flex-basis:100% erzwingt
+   eine eigene Zeile unterhalb von .dot/.name/.values, ohne deren Zeile zu
+   berühren (dafür braucht .chart-legend-item oben zusätzlich flex-wrap). */
+.chart-legend-item .compare-row{flex-basis:100%;display:flex;align-items:baseline;gap:9px;}
+.chart-legend-item .compare-row .dot{opacity:.55;}
+.chart-legend-item .compare-row .compare-label{
+  color:var(--ink-faint);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:180px;font-size:calc(11px * var(--font-scale, 1));
+}
+.chart-legend-item .compare-row .values{color:var(--ink-faint);}
 .chart-legend-item:hover{border-color:var(--accent-line);}
 .chart-legend-item.inactive{opacity:.4;}
 /* Für die per role="button"/tabindex="0" bedienbaren Chips in den Dashboard-
@@ -1071,6 +1081,14 @@ a.menu-row{text-decoration:none;}
 .chart-legend-table-row{cursor:pointer;}
 .chart-legend-table-row.inactive{opacity:.4;}
 .chart-legend-table-row[tabindex]:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
+/* Vergleichsperiode (Vorjahr/Vorperiode) als gedämpfte Unterzeile je Zelle —
+   dieselbe Idee wie .compare-row bei den Chips, hier als zweite <span> je
+   <td> statt einer zweiten <tr>, weil x-for pro Iteration nur ein
+   Wurzelelement (die <tr>) erzeugt. */
+.chart-legend-table .legend-compare-label,
+.chart-legend-table td .legend-compare-value{
+  display:block;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));
+}
 
 /* Datentabellen */
 .tbl-wrap{

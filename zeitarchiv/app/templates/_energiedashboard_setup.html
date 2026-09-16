@@ -128,6 +128,13 @@
   einspeisungName: {{ (config.einspeisung_name or '') | tojson }},
   kostenBezugEntity: {{ (config.kosten.preis_netzbezug if config.kosten else '') | tojson }},
   kostenEinspeisungEntity: {{ (config.kosten.preis_einspeisung if config.kosten else '') | tojson }},
+  {# .get() statt Punktzugriff (wie bei preis_netzbezug/preis_einspeisung
+     oben) — bestehende, vor diesem Feld gespeicherte kosten-Configs haben
+     den Schlüssel "preis_eigenverbrauch" schlicht nicht, ein Punktzugriff
+     auf einen fehlenden dict-Key liefert in Jinja Undefined, und
+     Undefined|tojson wirft eine TypeError (500 auf der ganzen Setup-Seite,
+     ausgerechnet für Bestandskonfigurationen ohne dieses neue Feld). #}
+  kostenEigenverbrauchEntity: {{ (config.kosten.get('preis_eigenverbrauch') if config.kosten else '') | tojson }},
   prognoseHeute: {{ (config.prognose.rest_heute_entity_id if config.prognose else '') | tojson }},
   prognoseMorgen: {{ (config.prognose.morgen_entity_id if config.prognose else '') | tojson }},
   co2Entity: {{ (config.co2.faktor_netzbezug_entity if config.co2 else '') | tojson }},
@@ -135,6 +142,8 @@
   kostenBezugFixed: {{ ((kb * 100) if kb is not none else none) | tojson }},
   {% set ke = config.kosten.get('preis_einspeisung_fixed') if config.kosten else none %}
   kostenEinspeisungFixed: {{ ((ke * 100) if ke is not none else none) | tojson }},
+  {% set kev = config.kosten.get('preis_eigenverbrauch_fixed') if config.kosten else none %}
+  kostenEigenverbrauchFixed: {{ ((kev * 100) if kev is not none else none) | tojson }},
   co2Fixed: {{ (config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none) | tojson }},
   // Entwurf für die Einzelrollen-Popups (Netz/Kosten/Prognose/CO2): beim
   // Öffnen einer Kachel wird der AKTUELLE Stand hierher kopiert, alle
@@ -722,6 +731,38 @@
             </div>
           </div>
         </button>
+        {# Eigenverbrauchsvergütung: nur für den seltenen Fall einer echten
+           Zahlung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — anders
+           als die beiden Pflicht-/Standardfelder oben deshalb als eigens zu
+           aktivierendes Feld geführt, nicht als dritte gleichrangige Kachel.
+           Unaktiviert (weder Entität noch fester Wert gesetzt) zeigt die
+           Kachel die gestrichelte "+"-Optik von .edash-item-add statt der
+           normalen Kachel-Optik — Klick öffnet in beiden Zuständen dasselbe
+           Popup wie bei den anderen Preisfeldern, kein Sonderpfad. #}
+        <button type="button" class="edash-item-tile" :class="{'is-activator': !kostenEigenverbrauchEntity && kostenEigenverbrauchFixed === null}"
+                @click="draft.kostenEigenverbrauchEntity = kostenEigenverbrauchEntity; activePopup = 'kosten-eigenverbrauch'; openEdashDialog('edash-dlg-kosten-eigenverbrauch')">
+          <template x-if="!kostenEigenverbrauchEntity && kostenEigenverbrauchFixed === null">
+            <div class="edash-item-body edash-item-body-activator">
+              <span class="edash-item-add-btn">+</span>
+              <span class="edash-item-name">Eigenverbrauchsvergütung</span>
+              <span class="edash-item-chip edash-item-chip-empty">Aktivieren</span>
+            </div>
+          </template>
+          <template x-if="kostenEigenverbrauchEntity || kostenEigenverbrauchFixed !== null">
+            <div class="edash-item-body-wrap">
+              <div class="edash-item-accent edash-item-accent-neutral"></div>
+              <div class="edash-item-body">
+                <div class="edash-item-head edash-item-head-wrap">
+                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
+                  <span class="edash-item-name">Eigenverbrauchsvergütung</span>
+                </div>
+                <div class="edash-item-bottom">
+                  <span class="edash-item-meta" x-text="priceLabel(kostenEigenverbrauchEntity, kostenEigenverbrauchFixed, 'Ct/kWh')"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </button>
       </div>
 
       {# Preis-Entitäten liefern €/kWh und werden genau so gespeichert; der
@@ -785,11 +826,40 @@
         <input type="hidden" name="preis_einspeisung" :value="kostenEinspeisungEntity">
         <input type="hidden" id="preis_einspeisung_fixed_real" name="preis_einspeisung_fixed" value="{{ (ke_fixed * 100) if ke_fixed is not none else '' }}">
       </dialog>
-      {# Kein eigenes "PV-Eigenverbrauch-Preis"-Feld mehr — der Wert des
-         selbst verbrauchten PV-Stroms (Kachel "Vermiedene Kosten") wird aus
-         dem Netzbezug-Preis oben abgeleitet (dieselbe kWh × Netzbezug-Preis
-         statt eines zweiten, meist identischen Preisfelds), siehe
-         "vermiedene_kosten" in compute_flow (energiedashboard_routes.py). #}
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-eigenverbrauch" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>Eigenverbrauchsvergütung</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-eigenverbrauch').close()" aria-label="Schließen">✕</button>
+        </div>
+        {% set kev_fixed = config.kosten.get('preis_eigenverbrauch_fixed') if config.kosten else none %}
+        <template x-if="activePopup === 'kosten-eigenverbrauch'">
+          <div>
+            <div class="field">
+              <label>Vergütung {{ hint_button('Vergütung Eigenverbrauch') }}</label>
+              {% call entity_field('preis_eigenverbrauch_draft', 'draft.kostenEigenverbrauchEntity', "(id) => { draft.kostenEigenverbrauchEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
+                {{ number_field('preis_eigenverbrauch_fixed_draft', (kev_fixed * 100) if kev_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_eigenverbrauch_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
+              {% endcall %}
+              {% call hint_body() %}Nur für Anlagen mit einer echten Zahlung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — für die meisten Anlagen bleibt dieses Feld leer. Vergütung in Cent/kWh, wird mit dem Eigenverbrauch (Erzeugung minus Einspeisung) verrechnet und fließt zusätzlich zum Einspeisung-Erlös in den Saldo ein.{% endcall %}
+            </div>
+            <div class="edash-dialog-footer" style="justify-content:space-between;">
+              <button type="button" class="btn btn-danger" x-show="kostenEigenverbrauchEntity || kostenEigenverbrauchFixed !== null"
+                      @click="kostenEigenverbrauchEntity = ''; kostenEigenverbrauchFixed = null; document.getElementById('preis_eigenverbrauch_fixed_real').value = ''; $el.closest('dialog').close();">Feld deaktivieren</button>
+              <button type="button" class="btn primary" @click="kostenEigenverbrauchEntity = draft.kostenEigenverbrauchEntity; kostenEigenverbrauchFixed = readFixedInput('preis_eigenverbrauch_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="preis_eigenverbrauch" :value="kostenEigenverbrauchEntity">
+        <input type="hidden" id="preis_eigenverbrauch_fixed_real" name="preis_eigenverbrauch_fixed" value="{{ (kev_fixed * 100) if kev_fixed is not none else '' }}">
+      </dialog>
+      {# Kein eigenes Preisfeld für "Vermiedene Kosten" (Einsparung) — der
+         Wert des selbst verbrauchten PV-Stroms wird dort weiterhin aus dem
+         Netzbezug-Preis oben abgeleitet (dieselbe kWh × Netzbezug-Preis statt
+         eines zweiten, meist identischen Preisfelds), siehe "vermiedene_kosten"
+         in compute_flow (energiedashboard_routes.py). Die Eigenverbrauchs-
+         vergütung oben ist etwas anderes: eine ECHTE, zusätzliche Zahlung
+         (z. B. KWK-Zuschlag), kein rechnerischer Vergleichswert — deshalb ein
+         eigenes, aber bewusst selten zu aktivierendes Feld statt eines
+         Standardfelds wie Netzbezug-Preis/Einspeisevergütung. #}
     </section>
 
     <section class="settings-section edash-section-neutral">

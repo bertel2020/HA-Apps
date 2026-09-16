@@ -134,6 +134,36 @@ def test_entity_timeout_raises_coordinator_busy_and_recovers() -> None:
         pass
 
 
+def test_records_busy_events_for_notices() -> None:
+    """Analog zu Index._TimeoutLock.recent_busy_events() (siehe test_index.py)
+    — Grundlage für die Meldung "Kurzzeitige Speicherzugriffs-Überlastung"
+    (notices.py, system.storage_lock_contention)."""
+    coordinator = StorageCoordinator()
+    entered = threading.Event()
+    release = threading.Event()
+    assert coordinator.recent_busy_events() == 0
+
+    def holder() -> None:
+        with coordinator.entity("sensor.a"):
+            entered.set()
+            release.wait(2)
+
+    t = threading.Thread(target=holder)
+    t.start()
+    try:
+        assert entered.wait(1)
+        try:
+            with coordinator.entity("sensor.a", timeout=0.15):
+                pass
+            raise AssertionError("Erwerb hätte am Timeout scheitern müssen")
+        except CoordinatorBusy:
+            pass
+    finally:
+        release.set()
+        t.join(1)
+    assert coordinator.recent_busy_events() == 1
+
+
 def test_entity_timeout_while_exclusive_active() -> None:
     """timeout gilt auch für die Zulassungs-Wartezeit vor einer laufenden
     exclusive()-Wartung, nicht nur für den Entitäts-Lock-Erwerb danach."""

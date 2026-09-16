@@ -897,3 +897,35 @@ class BackgroundService:
         # sauberer Shutdown; dann wird beim nächsten Start synchron geprüft.
         if self.requires_synchronous_reconciliation or self._storage_reconcile_completed:
             self.index.set_setting("storage_clean_shutdown", "1")
+
+    def lock_status_rows(self) -> list[dict]:
+        """Für Einstellungen → Diagnose, Abschnitt "Sperren" — dieselben
+        IndexBusy-/CoordinatorBusy-Zähler wie die gleichnamigen Meldungen in
+        notices.py (system.index_lock_contention/system.storage_lock_contention),
+        hier aber dauerhaft als Stand statt nur als vorübergehende Meldung für
+        24h nach dem letzten Vorkommen — praktisch für eine Umgebung, die man
+        nicht laufend im Blick hat. Kein row(): auch hier ein Zähler statt
+        eines Zeitpunkts (analog zu "Ausreißer-Quoten"), aber über ein festes
+        24h-Fenster statt einer Warteschlange — "Letzte 24 Stunden" bleibt
+        deshalb als Kontext stehen, unabhängig vom Zählerstand."""
+        def row(name: str, hint: str, count: int) -> dict:
+            return {
+                "name": name,
+                "hint": hint,
+                "last_run": "Letzte 24 Stunden",
+                "pill_class": "pending" if count else "ok",
+                "pill_label": f"{count}×" if count else "OK",
+            }
+
+        return [
+            row(
+                "Datenbank-Überlastung",
+                "Wie oft ein Datenbank-Zugriff nicht rechtzeitig drankam · 24h",
+                self.index.recent_lock_busy_events(),
+            ),
+            row(
+                "Speicherzugriff-Überlastung",
+                "Wie oft ein Datei-Zugriff (Archiv/Rollup/Hot) nicht rechtzeitig drankam · 24h",
+                self.coordinator.recent_busy_events(),
+            ),
+        ]

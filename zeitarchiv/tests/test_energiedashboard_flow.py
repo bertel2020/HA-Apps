@@ -904,6 +904,40 @@ def test_grid_costs_do_not_depend_on_the_price_sensors_reporting_phase(
         a.close()
 
 
+def test_eigenverbrauch_verguetung_ist_ohne_konfiguration_none(monkeypatch, tmp: Path) -> None:
+    """Seltenes, aktiv zu setzendes Feld (siehe Setup-Oberfläche) — ohne
+    preis_eigenverbrauch/preis_eigenverbrauch_fixed bleibt es None und der
+    Saldo unverändert wie vor der Einführung des Felds."""
+    flow, a, _ = _flow(monkeypatch, tmp)
+    try:
+        kpi = flow["kpi"]
+        assert kpi["eigenverbrauch_verguetung"] is None
+        assert kpi["net_cost"] is None
+    finally:
+        a.close()
+
+
+def test_eigenverbrauch_verguetung_wird_auf_pv_eigenverbrauch_verrechnet(monkeypatch, tmp: Path) -> None:
+    """PV-Eigenverbrauch = Erzeugung (10) - Einspeisung (3) = 7 kWh, bei
+    5 Ct/kWh Vergütung also 0,35 € — und diese Zahlung zieht zusätzlich zum
+    Einspeisung-Erlös vom Saldo ab, anders als die rein rechnerische
+    "Einsparung" (vermiedene_kosten)."""
+    a, config = _beispielanlage(tmp)
+    config["kosten"] = {
+        "preis_netzbezug_fixed": 0.30,
+        "preis_einspeisung_fixed": 0.10,
+        "preis_eigenverbrauch_fixed": 0.05,
+    }
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        assert kpi["eigenverbrauch_verguetung"] == pytest.approx(0.35, abs=0.001)
+        # netzbezug_cost 1,80 - einspeisung_revenue 0,30 - eigenverbrauch_verguetung 0,35 = 1,15
+        assert kpi["net_cost"] == pytest.approx(1.15, abs=0.001)
+    finally:
+        a.close()
+
+
 def _preis_anlage_mit_ende(tmp: Path, letzte_stunde: float, schwelle: str = "15") -> tuple[_Anlage, dict]:
     """Preissensor, der ab ``letzte_stunde`` schweigt — der tote Sensor."""
     a, config = _beispielanlage(tmp)

@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 from .paths import validate_entity_id
+
+# Fenster, über das CoordinatorBusy-Vorkommen für die Meldung "Kurzzeitige
+# Speicherzugriffs-Überlastung" gezählt werden (siehe notices.py) — derselbe
+# Wert wie _BUSY_EVENTS_WINDOW_SECONDS in storage/index.py für die analoge
+# IndexBusy-Meldung.
+_BUSY_EVENTS_WINDOW_SECONDS = 24 * 60 * 60
 
 
 class CoordinatorBusy(Exception):
@@ -52,10 +59,27 @@ class StorageCoordinator:
         self._active_entity_operations = 0
         self._exclusive_active = False
         self._exclusive_waiters = 0
+        self._busy_events: deque[float] = deque()
 
     def _lock_for(self, entity_id: str) -> threading.RLock:
         with self._condition:
             return self._entity_locks.setdefault(entity_id, threading.RLock())
+
+    def _record_busy_event(self) -> None:
+        """Merkt sich ein CoordinatorBusy-Vorkommen fürs 24h-Fenster —
+        dieselbe Fire-and-forget-Herangehensweise wie
+        Index._TimeoutLock.recent_busy_events(), keine eigene Sperre nötig."""
+        now = time.time()
+        self._busy_events.append(now)
+        while self._busy_events and now - self._busy_events[0] > _BUSY_EVENTS_WINDOW_SECONDS:
+            self._busy_events.popleft()
+
+    def recent_busy_events(self, window_seconds: float = _BUSY_EVENTS_WINDOW_SECONDS) -> int:
+        """Anzahl CoordinatorBusy-Vorkommen innerhalb der letzten window_seconds
+        — für die Meldung "Kurzzeitige Speicherzugriffs-Überlastung" (notices.py),
+        analog zu Index.recent_lock_busy_events()."""
+        cutoff = time.time() - window_seconds
+        return sum(1 for ts in self._busy_events if ts >= cutoff)
 
     def _finish_entity_operation(self) -> None:
         with self._condition:
@@ -83,12 +107,14 @@ class StorageCoordinator:
                 timeout=_wait_timeout(deadline),
             )
             if not acquired:
+                self._record_busy_event()
                 raise CoordinatorBusy(
                     f"Speicherzugriff für {entity_id!r} nicht innerhalb von {timeout:g}s erhalten"
                 )
             self._active_entity_operations += 1
         if not entity_lock.acquire(timeout=_acquire_timeout(deadline)):
             self._finish_entity_operation()
+            self._record_busy_event()
             raise CoordinatorBusy(
                 f"Speicherzugriff für {entity_id!r} nicht innerhalb von {timeout:g}s erhalten"
             )
@@ -117,12 +143,14 @@ class StorageCoordinator:
                 timeout=_wait_timeout(deadline),
             )
             if not acquired:
+                self._record_busy_event()
                 raise CoordinatorBusy(f"Speicherzugriff nicht innerhalb von {timeout:g}s erhalten")
             self._active_entity_operations += 1
         held: list[threading.RLock] = []
         try:
             for lock in locks:
                 if not lock.acquire(timeout=_acquire_timeout(deadline)):
+                    self._record_busy_event()
                     raise CoordinatorBusy(f"Speicherzugriff nicht innerhalb von {timeout:g}s erhalten")
                 held.append(lock)
         except CoordinatorBusy:
@@ -156,6 +184,7 @@ class StorageCoordinator:
                     timeout=_wait_timeout(deadline),
                 )
                 if not acquired:
+                    self._record_busy_event()
                     raise CoordinatorBusy(
                         f"Exklusiver Speicherzugriff nicht innerhalb von {timeout:g}s erhalten"
                     )

@@ -212,6 +212,11 @@
   let heatmapResizeObserver = null;
   let shareResizeObserver = null;
   let resizeListenerAdded = false;
+  let refreshTimer = null;
+  // Dasselbe Muster wie dashboard-tiles.js (dort DASHBOARD_REFRESH_INTERVAL_MS,
+  // ebenfalls 60s) — ohne das blieb ein offen gelassenes Energiedashboard
+  // beliebig lange auf dem Stand des letzten manuellen Reloads stehen.
+  const ENERGIEDASHBOARD_REFRESH_INTERVAL_MS = 60000;
   const SHARE_COLORS = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6', '--chart-7', '--chart-8'];
   // Dieselbe Breakpoint-Zahl wie die übrigen @media(max-width:560px)-Regeln
   // auf dieser Seite. Sankey-Orientierung wechselt nur bei tatsächlichem
@@ -379,6 +384,28 @@
             }
           });
         }
+        this.setupAutoRefresh();
+      },
+
+      // Lädt periodisch neu, solange der Tab sichtbar ist — Gegenstück zu
+      // dashboard-tiles.js' setupAutoRefresh(), hier aber auf die ganze
+      // Ansicht statt auf einzelne Kacheln. clearInterval() statt eines
+      // once-Guards (wie beim Resize-Listener oben): nach einem htmx-Swap
+      // mountet Alpine eine neue Komponenteninstanz, ein alter, nicht
+      // gecancelter Timer würde sonst auf verwaistem this weiterlaufen.
+      setupAutoRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(() => {
+          if (document.visibilityState !== 'visible') return;
+          // Nur die laufende Periode ändert sich noch weiter — eine bereits
+          // abgeschlossene Vorperiode (offset != 0) bleibt für immer gleich,
+          // ein erneutes Laden wäre reine Verschwendung.
+          if (this.offset !== 0) return;
+          // Offene Dialoge (Trend-Popups, Mehrfach-Entitäten-Auswahl) nicht
+          // unter der Hand neu rendern, während der Nutzer sie gerade liest.
+          if (document.querySelector('dialog[open]')) return;
+          this.load();
+        }, ENERGIEDASHBOARD_REFRESH_INTERVAL_MS);
       },
 
       // Jeder Klick auf Tag/Monat/Jahr springt zur aktuellen Periode (offset
@@ -519,6 +546,16 @@
       speicherBreakdownText() {
         if (this.speicherBreakdown.length <= 1) return null;
         return this.speicherBreakdown.map((s) => `${s.name}: ${this.fmt(s.value, 1)} kWh`).join('\n');
+      },
+
+      // Statischer Erklärtext der Speicher-KPI-Kachel plus, bei mehr als
+      // einem Speicher, die Aufschlüsselung je Speicher darunter — analog zu
+      // socNowTooltipText() unten. Ohne diesen Satz liest sich "1,0 kWh" wie
+      // ein aktueller Füllstand statt eines Perioden-Saldos.
+      speicherTooltipText() {
+        const base = 'Ladung minus Entladung im gewählten Zeitraum — nicht der aktuelle Ladezustand (siehe Ring „Speicher SOC" unten).';
+        const breakdown = this.speicherBreakdownText();
+        return breakdown ? base + '\n\n' + breakdown : base;
       },
 
       // Analog für den "Jetzt"-Ladezustand im Autarkie&Speicher-Ring — anders

@@ -330,20 +330,32 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         authorization: str | None,
         request_id: str = "-",
         integration_version: str | None = None,
+        *,
+        missing_token_is_healthcheck: bool = False,
     ) -> None:
+        """missing_token_is_healthcheck (nur von /api/health gesetzt): der
+        Docker-HEALTHCHECK (siehe healthcheck.py/Dockerfile) fragt diesen
+        Endpunkt alle 30s absichtlich OHNE Token ab — dieselbe Ausnahme wie
+        in logging_setup.py::log_http_request() für die Zugriffs-Log-Zeile,
+        hier zusätzlich für den "Auth-Fehler seit Start"-Zähler und dessen
+        Meldung. Ein tatsächlich FALSCHER Token auf /api/health (z. B. aus
+        queue_writer.py::_probe_demo_mode()) zählt weiterhin — nur ein
+        komplett fehlender Token an diesem einen Endpunkt gilt als Healthcheck,
+        kein echtes Auth-Problem."""
         expected = f"Bearer {deps.api_token()}"
         if authorization is None or not secrets.compare_digest(authorization, expected):
-            state.connection_stats["auth_failures"] += 1
-            state.connection_stats["last_auth_failure_ts"] = time.time()
-            log_rate_limited(
-                logger,
-                logging.WARNING,
-                "api_auth_failure",
-                "API-Authentifizierung fehlgeschlagen · event=api_auth_failure request_id=%s gesamt_seit_start=%d",
-                request_id,
-                state.connection_stats["auth_failures"],
-                interval_seconds=300,
-            )
+            if not (missing_token_is_healthcheck and authorization is None):
+                state.connection_stats["auth_failures"] += 1
+                state.connection_stats["last_auth_failure_ts"] = time.time()
+                log_rate_limited(
+                    logger,
+                    logging.WARNING,
+                    "api_auth_failure",
+                    "API-Authentifizierung fehlgeschlagen · event=api_auth_failure request_id=%s gesamt_seit_start=%d",
+                    request_id,
+                    state.connection_stats["auth_failures"],
+                    interval_seconds=300,
+                )
             raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
         if integration_version:
             ha_integration.record_seen(deps.index, integration_version)
@@ -375,6 +387,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 authorization,
                 getattr(request.state, "request_id", "-"),
                 x_zeitarchiv_integration_version,
+                missing_token_is_healthcheck=True,
             )
         except HTTPException as exc:
             exc.detail = {"message": exc.detail, "demo_mode": deps.demo_mode_active}
@@ -433,6 +446,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             trace_active = bool(trace_entity) and (state.entity_trace["expires_at"] or 0) > now
 
         counts = {"written": 0, "skipped": 0, "filtered": 0, "duplicate": 0, "recovered": 0}
+        # Über den ganzen Batch geteilt statt je Event neu: verhindert, dass
+        # ein Duplikat-Sturm (viele Events derselben Entität/desselben
+        # Zeitstempels, z. B. eine hängende Integrations-Wiederholung)
+        # dieselbe Archiv-Monatsdatei bei jedem einzelnen Event erneut liest
+        # (siehe _timestamp_exists() in storage/ingestion.py) — gemessen an
+        # einem echten Vorfall: 100 Duplikate à ~850 ms statt weniger ms nach
+        # dem ersten Treffer.
+        archive_cache: dict[tuple[str, float], bool] = {}
         started = time.perf_counter()
         try:
             for event in payload.events:
@@ -442,7 +463,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 )
                 result = deps.ingestion.ingest(IngestEvent(event_id=event_id, **{
                     key: value for key, value in event_data.items() if key != "event_id"
-                }))
+                }), archive_cache)
                 counts[result] += 1
                 if trace_active and event.entity_id == trace_entity:
                     trace_logger.debug(
@@ -497,6 +518,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             duplicate_ratio = counts["duplicate"] / event_count
             discarded_ratio = (counts["filtered"] + counts["skipped"]) / event_count
             if duplicate_ratio >= INGEST_DUPLICATE_WARNING_RATIO:
+                deps.ingestion.record_duplicate_ratio_event()
                 log_rate_limited(
                     logger,
                     logging.WARNING,

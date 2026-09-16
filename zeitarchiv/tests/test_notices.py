@@ -394,6 +394,87 @@ def test_index_lock_contention_notice_reflects_recent_busy_events() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_storage_lock_contention_notice_reflects_coordinator_busy_events() -> None:
+    """Analog zur Index-Lock-Meldung oben, aber für CoordinatorBusy
+    (Datei-Locks) — coordinator_busy_events kommt in main.py aus
+    storage_coordinator.recent_busy_events(), hier direkt durchgereicht."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+
+        notices_before = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            coordinator_busy_events=0,
+        )
+        assert "system.storage_lock_contention" not in [n["id"] for n in notices_before]
+
+        notices_after = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            coordinator_busy_events=2,
+        )
+        ids_after = [n["id"] for n in notices_after]
+        assert "system.storage_lock_contention" in ids_after
+        assert "2×" in next(n for n in notices_after if n["id"] == "system.storage_lock_contention")["detail"]
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_duplicate_ratio_notice_reflects_ingestion_service_events() -> None:
+    """Analog zu den beiden Busy-Meldungen oben, aber warn statt info — eine
+    hohe Duplikatquote ist kein selbstheilender App-interner Zustand,
+    sondern ein Hinweis auf Client-/Integrationsverhalten, das sich lohnt zu
+    prüfen (siehe ingestion.py.record_duplicate_ratio_event())."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+
+        notices_before = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            duplicate_ratio_events=0,
+        )
+        assert "ingest.duplicate_ratio_high" not in [n["id"] for n in notices_before]
+
+        notices_after = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            duplicate_ratio_events=3,
+        )
+        ids_after = [n["id"] for n in notices_after]
+        assert "ingest.duplicate_ratio_high" in ids_after
+        notice = next(n for n in notices_after if n["id"] == "ingest.duplicate_ratio_high")
+        assert notice["severity"] == "warn"
+        assert "3×" in notice["detail"]
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _build_notices_for_entities(index, db_path) -> list[dict]:
     return build_notices(
         index, db_path, TZ,

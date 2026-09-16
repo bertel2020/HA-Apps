@@ -194,6 +194,8 @@ def build_notices(
     backup_worker_last_tick: float | None = None,
     backup_worker_in_progress: bool = False,
     demo_dir_info: dict | None = None,
+    coordinator_busy_events: int = 0,
+    duplicate_ratio_events: int = 0,
 ) -> list[dict]:
     """Ungefilterte, aktuell aktive Meldungen — auch stummgeschaltete sind
     hier noch enthalten (main.py braucht das z. B. beim Stummschalten selbst,
@@ -213,7 +215,13 @@ def build_notices(
     wenn der Scheduler noch nicht gelaufen ist oder shutil.disk_usage
     fehlschlug). backup_worker_last_tick ist None, solange noch nie ein
     Backup gestartet wurde (dann kann auch backup_worker_in_progress nicht
-    True sein)."""
+    True sein). coordinator_busy_events kommt analog aus
+    storage_coordinator.recent_busy_events() (main.py) — dieselbe
+    Fire-and-forget-Zählung wie index.recent_lock_busy_events(), nur für
+    CoordinatorBusy (Datei-Locks) statt IndexBusy (Index-Lock).
+    duplicate_ratio_events kommt aus
+    ingestion_service.recent_duplicate_ratio_events() (main.py), dieselbe
+    Zählung für gehäufte "Hohe Duplikatquote im Ingest"-Vorkommen."""
     notices: list[dict] = []
 
     latest_version = version_check.latest_known_version(index)
@@ -368,6 +376,60 @@ def build_notices(
             ),
             "meta": "Diagnose",
             "link": "/settings#diagnose",
+        })
+
+    # CoordinatorBusy-Vorkommen (siehe StorageCoordinator in
+    # storage/coordinator.py) — Datei-Locks (Archiv/Rollup/Hot), nicht der
+    # Index-Lock oben. Trifft eine synchrone HTTP-Route (storage_locked() in
+    # route_support.py), während Backup/Retention/Rotation/Purge/Import
+    # gerade exklusiven Zugriff halten oder viele Entitäten gleichzeitig
+    # busy sind. Bewusst ebenfalls nur info, aus demselben Grund wie oben:
+    # ein einzelnes Vorkommen ist erwartbar, erst Häufung wäre auffällig.
+    coordinator_busy = coordinator_busy_events
+    if coordinator_busy:
+        notices.append({
+            "id": "system.storage_lock_contention",
+            "severity": "info",
+            "title": "Kurzzeitige Speicherzugriffs-Überlastung erkannt",
+            "detail": (
+                f"{coordinator_busy}× in den letzten 24h musste ein Datei-"
+                "Zugriff (Archiv/Rollup/Hot) abgebrochen werden, weil er "
+                "nicht rechtzeitig an die Reihe kam — trat z. B. während "
+                "eines laufenden Backups, einer Retention oder eines "
+                "Imports auf und hat sich von selbst gelöst."
+            ),
+            "meta": "Diagnose",
+            "link": "/settings#diagnose",
+        })
+
+    # Hohe Duplikatquote im Ingest (siehe api_routes.py, INGEST_DUPLICATE_
+    # WARNING_RATIO) — anders als die beiden Busy-Meldungen oben kein
+    # harmloser, selbstheilender App-interner Zustand, sondern ein Hinweis
+    # auf ein Client-/Integrationsverhalten, das sich lohnt zu prüfen (z. B.
+    # eine Automation oder ein Sensor, der wiederholt denselben Messwert
+    # sendet). Ein echter Vorfall zeigte außerdem eine Nebenwirkung: bei
+    # genug Duplikaten in einem Batch (jedes einzeln mit einem Archiv-
+    # Dateilesen, siehe storage/ingestion.py._timestamp_exists()) hielt das
+    # den Index-Lock so dicht besetzt, dass parallele Anfragen mit
+    # IndexBusy/503 scheiterten — seit dem geteilten archive_cache je Batch
+    # entschärft, aber die zugrunde liegende Duplikatquote bleibt ein
+    # eigenständiges, meldenswertes Signal. Deshalb warn statt info.
+    duplicate_ratio_busy = duplicate_ratio_events
+    if duplicate_ratio_busy:
+        notices.append({
+            "id": "ingest.duplicate_ratio_high",
+            "severity": "warn",
+            "title": "Hohe Duplikatquote im Ingest erkannt",
+            "detail": (
+                f"{duplicate_ratio_busy}× in den letzten 24h bestand ein "
+                "Schreibbatch überwiegend aus bereits vorhandenen Werten — "
+                "möglicherweise sendet eine Automation oder ein Sensor "
+                "wiederholt denselben Messwert. Lohnt einen Blick auf die "
+                "sendende Quelle, sonst kein Handlungsbedarf von dieser "
+                "Seite aus."
+            ),
+            "meta": "Verbindung",
+            "link": "/settings#verbindung",
         })
 
     # errors sind Entitäten, die gar nicht erst geprüft werden konnten — ein
@@ -957,6 +1019,8 @@ def collect_notices(
     backup_worker_last_tick: float | None = None,
     backup_worker_in_progress: bool = False,
     demo_dir_info: dict | None = None,
+    coordinator_busy_events: int = 0,
+    duplicate_ratio_events: int = 0,
 ) -> list[dict]:
     """Für die Anzeige in der Topnav — build_notices() abzüglich aktuell
     gültiger Stummschaltungen (beim Tipp bereits durch _current_tip_notice
@@ -968,6 +1032,8 @@ def collect_notices(
             index, index_path, tz, purge_totals, storage_reconcile, stale_entity_count,
             scheduler_last_tick, reconcile_last_tick, reconcile_in_progress, host_disk_usage,
             backup_worker_last_tick, backup_worker_in_progress, demo_dir_info,
+            coordinator_busy_events=coordinator_busy_events,
+            duplicate_ratio_events=duplicate_ratio_events,
         )
         if not _is_muted(notice, mutes.get(notice["id"]), now)
     ]

@@ -217,6 +217,16 @@
         <div class="edash-kpi-label">Einspeisung Erlös</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.einspeisung_revenue)"></div>
       </div>
+      {# Eigene Kachel statt Einrechnen in "Einspeisung Erlös" — beide sind
+         reale Zahlungen, aber an unterschiedliche Energiemengen gekoppelt
+         (Export vs. Eigenverbrauch); nur für die seltenen Anlagen sichtbar,
+         die das Feld im Setup aktiviert haben (kpi.eigenverbrauch_verguetung
+         bleibt sonst null). Anders als "Einsparung" direkt darunter (rein
+         rechnerischer Vergleichswert, kein Geldfluss) zählt sie zum Saldo. #}
+      <div class="edash-kpi" x-show="kpi.eigenverbrauch_verguetung != null">
+        <div class="edash-kpi-label">EV-Vergütung</div>
+        <div class="edash-kpi-val" x-text="fmtCurrency(kpi.eigenverbrauch_verguetung)"></div>
+      </div>
       <div class="edash-kpi" x-show="kpi.vermiedene_kosten != null">
         <div class="edash-kpi-label">Einsparung</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.vermiedene_kosten)"></div>
@@ -469,7 +479,8 @@
         <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
         <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
       </a>
-      <a class="edash-kpi{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
+      <a class="edash-kpi has-tooltip{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
+         data-tooltip="Gesamtverbrauch im gewählten Zeitraum: erfasste Verbraucher zusammen mit der Grundlast (nicht einzeln gemessene Geräte, rechnerisch aus der Bilanz ermittelt)."
          {% if single_verbraucher_id %}:href="`{{ app_root }}/entities/{{ single_verbraucher_id }}?range=${range}&offset=${offset}`"
          {% elif verbraucher_list|length > 1 %}@click="$refs.verbraucherPickerDialog.showModal()"
          {% endif %}>
@@ -494,7 +505,7 @@
         <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
       </a>
       <a class="edash-kpi has-tooltip tooltip-lines{{ ' is-pickable' if speicher_link_entities|length > 1 else '' }}"
-         x-show="kpi.speicher_netto != null" :data-tooltip="speicherBreakdownText()"
+         x-show="kpi.speicher_netto != null" :data-tooltip="speicherTooltipText()"
          {% if single_speicher_id %}:href="`{{ app_root }}/entities/{{ single_speicher_id }}?range=${range}&offset=${offset}`"
          {% elif speicher_link_entities|length > 1 %}@click="$refs.speicherPickerDialog.showModal()"
          {% endif %}>
