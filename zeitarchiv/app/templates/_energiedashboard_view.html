@@ -570,6 +570,73 @@
   </div>
 
   <div class="edash-grid" style="margin-top:14px;">
+    {% if config.show_verbraucheranteile or config.show_versorgungsanteile %}
+    <div class="edash-share-row">
+      {% if config.show_versorgungsanteile %}
+      <div class="edash-card edash-versorgung-card" x-show="versorgungBreakdown.length">
+        <div class="edash-card-head"><div class="edash-card-title">Versorgungsanteile</div></div>
+        <div class="edash-share-wrap edash-share-wrap-stacked">
+          <div class="edash-share-donut" x-ref="versorgungChartEl"></div>
+          <div class="tbl-wrap">
+            <table class="dt edash-share-table">
+              <thead><tr><th>Quelle</th><th>kWh</th><th>Anteil</th></tr></thead>
+              <tbody>
+                <template x-for="(item, idx) in versorgungBreakdown" :key="item.name">
+                  <tr @mouseenter="highlightVersorgung(item.name)" @mouseleave="unhighlightVersorgung(item.name)">
+                    <td class="label">
+                      <span class="edash-share-dot" :style="{background: shareColor(idx)}"></span>
+                      <a x-show="item.entity_id" class="edash-share-link" :href="'entities/' + encodeURIComponent(item.entity_id || '')" x-text="item.name"></a>
+                      <span x-show="!item.entity_id" x-text="item.name"></span>
+                    </td>
+                    <td x-text="fmt(item.value, 1)"></td>
+                    <td x-text="fmt(item.share, 0) + ' %'"></td>
+                  </tr>
+                </template>
+              </tbody>
+              <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong x-text="fmt(versorgungTotal(), 1)"></strong></td><td><strong>100 %</strong></td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if config.show_verbraucheranteile %}
+      <div class="edash-card edash-verbraucher-card" x-show="verbraucherBreakdown.length">
+        <div class="edash-card-head"><div class="edash-card-title">Verbraucheranteile</div></div>
+        <div class="edash-share-wrap">
+          <div class="edash-share-donut" x-ref="shareChartEl"></div>
+          <div class="tbl-wrap">
+            <table class="dt edash-share-table">
+              <thead><tr><th>Verbraucher</th><th>kWh</th><th>Anteil</th><th x-show="verbraucherHasKosten">Kosten</th></tr></thead>
+              <tbody>
+                <template x-for="(item, idx) in visibleVerbraucherBreakdown()" :key="item.name">
+                  <tr @mouseenter="highlightShare(item.name)" @mouseleave="unhighlightShare(item.name)">
+                    <td class="label">
+                      <span class="edash-share-dot" :style="{background: shareColor(idx)}"></span>
+                      <a x-show="item.entity_id" class="edash-share-link" :href="'entities/' + encodeURIComponent(item.entity_id || '')" x-text="item.name"></a>
+                      <span x-show="!item.entity_id" x-text="item.name"></span>
+                    </td>
+                    <td x-text="fmt(item.value, 1)"></td>
+                    <td x-text="fmt(item.share, 0) + ' %'"></td>
+                    <td x-show="verbraucherHasKosten" x-text="fmtCurrency(item.kosten)"></td>
+                  </tr>
+                </template>
+                <tr class="edash-share-more-row" x-show="verbraucherBreakdown.length > 8">
+                  <td colspan="4">
+                    <button type="button" class="edash-share-more-btn" @click="verbraucherExpanded = !verbraucherExpanded"
+                            x-text="verbraucherExpanded ? 'Weniger anzeigen' : ('+ ' + (verbraucherBreakdown.length - 8) + ' weitere anzeigen')"></button>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong x-text="fmt(kpi.verbrauch, 1)"></strong></td><td><strong>100 %</strong></td><td x-show="verbraucherHasKosten"><strong x-text="fmtCurrency(verbraucherKostenTotal())"></strong></td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {% if config.show_autarkie %}
     <div class="edash-card edash-ring-card">
       <div class="edash-card-head">
@@ -648,35 +715,6 @@
             <text x="50" y="45" text-anchor="middle" class="edash-ring-num" x-text="ratioText(kpi.speicher_efficiency)"></text>
             <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">Wirkungsgrad</text>
           </svg>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if config.show_verbraucheranteile %}
-    <div class="edash-card edash-span2 edash-verbraucher-card" x-show="verbraucherBreakdown.length">
-      <div class="edash-card-head"><div class="edash-card-title">Verbraucheranteile</div></div>
-      <div class="edash-share-wrap">
-        <div class="edash-share-donut" x-ref="shareChartEl"></div>
-        <div class="tbl-wrap">
-          <table class="dt edash-share-table">
-            <thead><tr><th>Verbraucher</th><th>kWh</th><th>Anteil</th><th x-show="verbraucherHasKosten">Kosten</th></tr></thead>
-            <tbody>
-              <template x-for="(item, idx) in verbraucherBreakdown" :key="item.name">
-                <tr @mouseenter="highlightShare(item.name)" @mouseleave="unhighlightShare(item.name)">
-                  <td class="label">
-                    <span class="edash-share-dot" :style="{background: shareColor(idx)}"></span>
-                    <a x-show="item.entity_id" class="edash-share-link" :href="'entities/' + encodeURIComponent(item.entity_id || '')" x-text="item.name"></a>
-                    <span x-show="!item.entity_id" x-text="item.name"></span>
-                  </td>
-                  <td x-text="fmt(item.value, 1)"></td>
-                  <td x-text="fmt(item.share, 0) + ' %'"></td>
-                  <td x-show="verbraucherHasKosten" x-text="fmtCurrency(item.kosten)"></td>
-                </tr>
-              </template>
-            </tbody>
-            <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong x-text="fmt(kpi.verbrauch, 1)"></strong></td><td><strong>100 %</strong></td><td x-show="verbraucherHasKosten"><strong x-text="fmtCurrency(verbraucherKostenTotal())"></strong></td></tr></tfoot>
-          </table>
         </div>
       </div>
     </div>

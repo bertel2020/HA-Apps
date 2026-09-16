@@ -54,6 +54,18 @@ wiederzuerkennen und gezielt löschbar):
 | `binary_sensor.demo_trockner_an` | Schalter | — | An/Aus, deckungsgleich mit den Zyklen von `demo_trockner` |
 | `sensor.demo_wallbox_leistung` | Standard | W | Einzelne Ladevorgänge (~alle 3 Tage abends), Anlaufen/Plateau/Taper |
 | `sensor.demo_wallbox_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_wallbox_leistung` |
+| `sensor.demo_kuehlschrank` | Standard | W | Kompressor-Takt, konstant wiederkehrend unabhängig von Tageszeit/Wetter (kein binary_sensor "_an", siehe `demo_wallbox_leistung`) |
+| `sensor.demo_kuehlschrank_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_kuehlschrank` |
+| `sensor.demo_herd` | Standard | W | Einzelner Abendblock (~85 % Tageschance), dreiphasiges Profil (Ankochen/Kochen/Nachwärme) |
+| `sensor.demo_herd_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_herd` |
+| `sensor.demo_homeoffice` | Standard | W | Wochentagsabhängig (Mo–Fr, 9–17 Uhr) statt Zufallschance — einziger Verbraucher mit diesem Muster |
+| `sensor.demo_homeoffice_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_homeoffice` |
+| `sensor.demo_entertainment` | Standard | W | Abendblock (~19–23 Uhr, ~90 % Tageschance) |
+| `sensor.demo_entertainment_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_entertainment` |
+| `sensor.demo_boiler` | Standard | W | Zwei feste Taktfenster (morgens/abends), Duty-Cycle wie `demo_heizung`, aber uhrzeit- statt temperaturgekoppelt |
+| `sensor.demo_boiler_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_boiler` |
+| `sensor.demo_wallbox2_leistung` | Standard | W | Zweite, kleinere Ladeeinheit (E-Bike/Zweitwagen), seltener als `demo_wallbox_leistung` (~18 % Tageschance) |
+| `sensor.demo_wallbox2_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_wallbox2_leistung` |
 | `sensor.demo_pv_leistung` | Standard | W | Glockenkurve tagsüber, 0 nachts; Tageslichtlänge nach Jahreszeit, gedämpft durch dieselbe Bewölkung wie Außentemperatur/Luftfeuchte |
 | `sensor.demo_pv_ertrag` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration der PV-Leistung über die Zeit |
 | `sensor.demo_pv_prognose_rest_heute` | Standard | kWh | Wie ein Forecast.Solar-Sensor: geschätzter Rest-Ertrag der Dachanlage bis Sonnenuntergang, einmal morgens grob geschätzt (mit Schätzfehler, nicht exaktem Vorauswissen) und sinkt über den Tag mit dem tatsächlich eingefahrenen Ertrag Richtung 0 |
