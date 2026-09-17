@@ -90,6 +90,37 @@ DEMO_ENTITIES = [
                "sensor", "measurement", "W"),
     DemoEntity("sensor.demo_wallbox_energie", "Demo Wallbox Energie",
                "sensor", "total_increasing", "kWh"),
+    # Sechs weitere Verbraucher (Nutzerwunsch: mehr Testdaten für die
+    # Verbraucheranteile-Kachel, insbesondere deren 8er-Anzeigegrenze/
+    # "weitere anzeigen") — bewusst ohne eigenen binary_sensor "_an" wie
+    # Waschmaschine/Spülmaschine/Trockner, sondern wie Wallbox nur
+    # Leistung+Energie: ein An/Aus-Schalter bringt fürs Energiedashboard
+    # (das nur den Energie-Zähler als Verbraucher braucht) keinen
+    # zusätzlichen Nutzen, nur mehr Code je Gerät.
+    DemoEntity("sensor.demo_kuehlschrank", "Demo Kühlschrank",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_kuehlschrank_energie", "Demo Kühlschrank Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_herd", "Demo Herd",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_herd_energie", "Demo Herd Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_homeoffice", "Demo Homeoffice",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_homeoffice_energie", "Demo Homeoffice Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_entertainment", "Demo Entertainment",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_entertainment_energie", "Demo Entertainment Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_boiler", "Demo Boiler",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_boiler_energie", "Demo Boiler Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_wallbox2_leistung", "Demo Wallbox 2 Leistung",
+               "sensor", "measurement", "W"),
+    DemoEntity("sensor.demo_wallbox2_energie", "Demo Wallbox 2 Energie",
+               "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_pv_leistung", "Demo PV-Leistung",
                "sensor", "measurement", "W"),
     DemoEntity("sensor.demo_pv_ertrag", "Demo PV-Ertrag",
@@ -261,6 +292,7 @@ def build_appliance_schedules(
 ) -> dict[str, dict[str, list[ApplianceCycle]]]:
     schedules: dict[str, dict[str, list[ApplianceCycle]]] = {
         "waschmaschine": {}, "spuelmaschine": {}, "trockner": {}, "wallbox": {},
+        "herd": {}, "entertainment": {}, "wallbox2": {},
     }
     day = start.date()
     while day <= end.date():
@@ -289,6 +321,28 @@ def build_appliance_schedules(
             begin = base + timedelta(hours=rng.uniform(17, 23))
             schedules["wallbox"].setdefault(key, []).append(
                 ApplianceCycle(begin, begin + timedelta(minutes=rng.uniform(120, 300)))
+            )
+
+        if rng.random() < 0.85:
+            begin = base + timedelta(hours=rng.uniform(17.5, 20))
+            schedules["herd"].setdefault(key, []).append(
+                ApplianceCycle(begin, begin + timedelta(minutes=rng.uniform(25, 45)))
+            )
+
+        if rng.random() < 0.9:
+            begin = base + timedelta(hours=rng.uniform(19, 21))
+            schedules["entertainment"].setdefault(key, []).append(
+                ApplianceCycle(begin, begin + timedelta(minutes=rng.uniform(150, 240)))
+            )
+
+        # Zweite, kleinere Ladeeinheit (E-Bike/Zweitwagen) — seltener als die
+        # Haupt-Wallbox, eigener (etwas früherer) Zeitraum statt derselben
+        # Verteilung, sonst liefen beide de facto wie ein einziges,
+        # zufällig verdoppeltes Gerät.
+        if rng.random() < 0.18:
+            begin = base + timedelta(hours=rng.uniform(17, 22))
+            schedules["wallbox2"].setdefault(key, []).append(
+                ApplianceCycle(begin, begin + timedelta(minutes=rng.uniform(60, 150)))
             )
 
         day += timedelta(days=1)
@@ -334,6 +388,9 @@ WASCHMASCHINE_PROFILE = [(0.18, 350.0), (0.32, 2000.0), (0.82, 300.0), (0.92, 55
 SPUELMASCHINE_PROFILE = [(0.12, 100.0), (0.28, 1900.0), (0.85, 150.0), (1.0, 90.0)]
 TROCKNER_PROFILE = [(0.78, 2400.0), (1.0, 300.0)]
 WALLBOX_PROFILE = [(0.06, 4000.0), (0.85, 7400.0), (1.0, 2500.0)]  # Anlaufen, Laden, Taper
+HERD_PROFILE = [(0.15, 1200.0), (0.75, 2500.0), (1.0, 800.0)]  # Ankochen, Kochen, Nachwärme
+ENTERTAINMENT_PROFILE = [(0.05, 180.0), (0.95, 150.0), (1.0, 40.0)]  # Einschalten, Betrieb, Standby
+WALLBOX2_PROFILE = [(0.1, 1800.0), (0.9, 2200.0), (1.0, 500.0)]
 
 
 def _rain_active(schedule_for_day: list[ApplianceCycle], dt: datetime) -> bool:
@@ -361,6 +418,49 @@ def _heating_power_at(dt: datetime, weather: WeatherContext, rng: random.Random)
     step_index = (dt.hour * 60 + dt.minute) // CONTINUOUS_STEP_MINUTES % window_steps
     if step_index < round(duty * window_steps):
         return 1800.0 + rng.uniform(-150, 250)
+    return 0.0
+
+
+KUEHLSCHRANK_CYCLE_MINUTES = 35
+KUEHLSCHRANK_DUTY = 0.4
+
+
+def _kuehlschrank_power_at(dt: datetime, rng: random.Random) -> float:
+    """Kompressor-Kühlschrank: kurze, konstant wiederkehrende Ein/Aus-Takte —
+    anders als _heating_power_at() (deren Duty-Anteil von der Außentemperatur
+    abhängt) ist der Takt hier unabhängig von Tageszeit/Wetter immer gleich,
+    dieselbe Fensterlogik (Minute-des-Tages modulo Zykluslänge) wie dort."""
+    window_steps = KUEHLSCHRANK_CYCLE_MINUTES // CONTINUOUS_STEP_MINUTES
+    step_index = (dt.hour * 60 + dt.minute) // CONTINUOUS_STEP_MINUTES % window_steps
+    if step_index < round(KUEHLSCHRANK_DUTY * window_steps):
+        return 118.0 + rng.uniform(-15, 15)
+    return 3.0 + rng.uniform(-1.0, 1.0)  # Steuerung/Innenbeleuchtung im Leerlauf
+
+
+def _homeoffice_power_at(dt: datetime, rng: random.Random) -> float:
+    """Neues Muster gegenüber den übrigen Verbrauchern: wochentagsabhängig
+    (Mo–Fr) statt einer täglichen Zufallschance — PC+Monitor laufen während
+    der Bürozeit durchgehend, nicht in Zyklen."""
+    if dt.weekday() >= 5:  # Sa/So
+        return 0.0
+    hour = dt.hour + dt.minute / 60
+    if not (9.0 <= hour < 17.0):
+        return 0.0
+    return 150.0 + rng.uniform(-30, 30)
+
+
+def _boiler_power_at(dt: datetime, rng: random.Random) -> float:
+    """Warmwasserboiler: zwei feste Taktfenster (morgens/abends, typischer
+    Warmwasserbedarf) statt eines einzelnen Zyklus — innerhalb der Fenster
+    dieselbe Duty-Cycle-Logik wie _heating_power_at(), hier aber an feste
+    Uhrzeiten statt an die Außentemperatur gekoppelt."""
+    hour = dt.hour + dt.minute / 60
+    if not ((6.0 <= hour < 8.0) or (18.0 <= hour < 20.0)):
+        return 0.0
+    window_steps = COUNTER_STEP_MINUTES // CONTINUOUS_STEP_MINUTES
+    step_index = (dt.hour * 60 + dt.minute) // CONTINUOUS_STEP_MINUTES % window_steps
+    if step_index < round(0.5 * window_steps):
+        return 1750.0 + rng.uniform(-200, 250)
     return 0.0
 
 
@@ -532,6 +632,9 @@ def simulate_household(
         "load_power": [], "heizung": [], "waschmaschine": [], "spuelmaschine": [], "trockner": [], "wallbox": [],
         "waschmaschine_energie": [], "spuelmaschine_energie": [], "trockner_energie": [], "wallbox_energie": [],
         "waschmaschine_an": [], "spuelmaschine_an": [], "trockner_an": [], "regensensor": [],
+        "kuehlschrank": [], "kuehlschrank_energie": [], "herd": [], "herd_energie": [],
+        "homeoffice": [], "homeoffice_energie": [], "entertainment": [], "entertainment_energie": [],
+        "boiler": [], "boiler_energie": [], "wallbox2": [], "wallbox2_energie": [],
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
@@ -557,6 +660,12 @@ def simulate_household(
     spuelmaschine_energie_total = counter_seed.get("spuelmaschine_energie", rng.uniform(50, 400))
     trockner_energie_total = counter_seed.get("trockner_energie", rng.uniform(50, 400))
     wallbox_energie_total = counter_seed.get("wallbox_energie", rng.uniform(200, 2500))
+    kuehlschrank_energie_total = counter_seed.get("kuehlschrank_energie", rng.uniform(300, 900))
+    herd_energie_total = counter_seed.get("herd_energie", rng.uniform(80, 400))
+    homeoffice_energie_total = counter_seed.get("homeoffice_energie", rng.uniform(80, 500))
+    entertainment_energie_total = counter_seed.get("entertainment_energie", rng.uniform(80, 400))
+    boiler_energie_total = counter_seed.get("boiler_energie", rng.uniform(200, 700))
+    wallbox2_energie_total = counter_seed.get("wallbox2_energie", rng.uniform(100, 1200))
     on_state = {
         "waschmaschine": appliance_seed.get("waschmaschine", 0.0),
         "spuelmaschine": appliance_seed.get("spuelmaschine", 0.0),
@@ -637,8 +746,17 @@ def simulate_household(
         spuelmaschine_w = _appliance_power_at(schedules["spuelmaschine"], SPUELMASCHINE_PROFILE, dt, rng)
         trockner_w = _appliance_power_at(schedules["trockner"], TROCKNER_PROFILE, dt, rng)
         wallbox_w = _appliance_power_at(schedules["wallbox"], WALLBOX_PROFILE, dt, rng)
+        kuehlschrank_w = _kuehlschrank_power_at(dt, rng)
+        herd_w = _appliance_power_at(schedules["herd"], HERD_PROFILE, dt, rng)
+        homeoffice_w = _homeoffice_power_at(dt, rng)
+        entertainment_w = _appliance_power_at(schedules["entertainment"], ENTERTAINMENT_PROFILE, dt, rng)
+        boiler_w = _boiler_power_at(dt, rng)
+        wallbox2_w = _appliance_power_at(schedules["wallbox2"], WALLBOX2_PROFILE, dt, rng)
         baseline_w = _baseline_load_at(dt, rng)
-        load_w = baseline_w + heizung_w + waschmaschine_w + spuelmaschine_w + trockner_w + wallbox_w
+        load_w = (
+            baseline_w + heizung_w + waschmaschine_w + spuelmaschine_w + trockner_w + wallbox_w
+            + kuehlschrank_w + herd_w + homeoffice_w + entertainment_w + boiler_w + wallbox2_w
+        )
         pv_w = gen_pv_power(dt, weather, rng)
 
         series["heizung"].append((ts, round(heizung_w, 1)))
@@ -646,6 +764,12 @@ def simulate_household(
         series["spuelmaschine"].append((ts, round(spuelmaschine_w, 1)))
         series["trockner"].append((ts, round(trockner_w, 1)))
         series["wallbox"].append((ts, round(wallbox_w, 1)))
+        series["kuehlschrank"].append((ts, round(kuehlschrank_w, 1)))
+        series["herd"].append((ts, round(herd_w, 1)))
+        series["homeoffice"].append((ts, round(homeoffice_w, 1)))
+        series["entertainment"].append((ts, round(entertainment_w, 1)))
+        series["boiler"].append((ts, round(boiler_w, 1)))
+        series["wallbox2"].append((ts, round(wallbox2_w, 1)))
         series["load_power"].append((ts, round(load_w, 1)))
         series["pv_power"].append((ts, pv_w))
 
@@ -806,6 +930,12 @@ def simulate_household(
         spuelmaschine_energie_total += (spuelmaschine_w / 1000) * step_hours
         trockner_energie_total += (trockner_w / 1000) * step_hours
         wallbox_energie_total += (wallbox_w / 1000) * step_hours
+        kuehlschrank_energie_total += (kuehlschrank_w / 1000) * step_hours
+        herd_energie_total += (herd_w / 1000) * step_hours
+        homeoffice_energie_total += (homeoffice_w / 1000) * step_hours
+        entertainment_energie_total += (entertainment_w / 1000) * step_hours
+        boiler_energie_total += (boiler_w / 1000) * step_hours
+        wallbox2_energie_total += (wallbox2_w / 1000) * step_hours
 
         if index % COUNTER_EVERY_N == 0:
             series["pv_ertrag"].append((ts, round(pv_ertrag_total, 3)))
@@ -815,6 +945,12 @@ def simulate_household(
             series["spuelmaschine_energie"].append((ts, round(spuelmaschine_energie_total, 3)))
             series["trockner_energie"].append((ts, round(trockner_energie_total, 3)))
             series["wallbox_energie"].append((ts, round(wallbox_energie_total, 3)))
+            series["kuehlschrank_energie"].append((ts, round(kuehlschrank_energie_total, 3)))
+            series["herd_energie"].append((ts, round(herd_energie_total, 3)))
+            series["homeoffice_energie"].append((ts, round(homeoffice_energie_total, 3)))
+            series["entertainment_energie"].append((ts, round(entertainment_energie_total, 3)))
+            series["boiler_energie"].append((ts, round(boiler_energie_total, 3)))
+            series["wallbox2_energie"].append((ts, round(wallbox2_energie_total, 3)))
             series["balkon_ertrag_gesamt"].append((ts, round(balkon_ertrag_gesamt_total, 3)))
             series["balkon_ertrag_heute"].append((ts, round(balkon_ertrag_heute_total, 3)))
             series["balkon_geladen_gesamt"].append((ts, round(balkon_geladen_gesamt_total, 3)))
@@ -985,6 +1121,12 @@ COUNTER_SEED_ENTITY_KEYS = {
     "sensor.demo_stromzaehler_bezug": "bezug",
     "sensor.demo_stromzaehler_einspeisung": "einspeisung",
     "sensor.demo_waschmaschine_energie": "waschmaschine_energie",
+    "sensor.demo_kuehlschrank_energie": "kuehlschrank_energie",
+    "sensor.demo_herd_energie": "herd_energie",
+    "sensor.demo_homeoffice_energie": "homeoffice_energie",
+    "sensor.demo_entertainment_energie": "entertainment_energie",
+    "sensor.demo_boiler_energie": "boiler_energie",
+    "sensor.demo_wallbox2_energie": "wallbox2_energie",
     "sensor.demo_spuelmaschine_energie": "spuelmaschine_energie",
     "sensor.demo_trockner_energie": "trockner_energie",
     "sensor.demo_wallbox_energie": "wallbox_energie",
@@ -1269,6 +1411,18 @@ def run_generation(
         "binary_sensor.demo_trockner_an": household["trockner_an"],
         "sensor.demo_wallbox_leistung": household["wallbox"],
         "sensor.demo_wallbox_energie": household["wallbox_energie"],
+        "sensor.demo_kuehlschrank": household["kuehlschrank"],
+        "sensor.demo_kuehlschrank_energie": household["kuehlschrank_energie"],
+        "sensor.demo_herd": household["herd"],
+        "sensor.demo_herd_energie": household["herd_energie"],
+        "sensor.demo_homeoffice": household["homeoffice"],
+        "sensor.demo_homeoffice_energie": household["homeoffice_energie"],
+        "sensor.demo_entertainment": household["entertainment"],
+        "sensor.demo_entertainment_energie": household["entertainment_energie"],
+        "sensor.demo_boiler": household["boiler"],
+        "sensor.demo_boiler_energie": household["boiler_energie"],
+        "sensor.demo_wallbox2_leistung": household["wallbox2"],
+        "sensor.demo_wallbox2_energie": household["wallbox2_energie"],
         "sensor.demo_pv_leistung": household["pv_power"],
         "sensor.demo_pv_ertrag": household["pv_ertrag"],
         "sensor.demo_pv_prognose_rest_heute": household["pv_prognose_rest_heute"],

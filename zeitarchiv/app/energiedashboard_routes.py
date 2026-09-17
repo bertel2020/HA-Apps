@@ -206,10 +206,15 @@ def _empty_config() -> dict:
         # kein eigener Schlüssel dafür.
         "show_autarkie": True,
         "show_verbraucheranteile": True,
+        "show_versorgungsanteile": True,
         "show_kostenanalyse": True,
         "show_co2": True,
         "show_tageslastprofil": True,
         "show_bilanz_datenqualitaet": True,
+        # Verbraucheranteile standardmäßig je Einzelgerät — Gruppierung ist
+        # ein Opt-in, weil sie einzelne Geräte hinter Gruppennamen verbirgt
+        # (nur relevant, wer überhaupt Gruppen angelegt hat).
+        "verbraucheranteile_gruppieren": False,
         # Farblegende unter dem Energiefluss — anders als die Kachel-Schalter
         # oben per Default AUS: der Sankey ist auch ohne sie lesbar (Tooltip
         # nennt Name, Wert und Anteil), und eine zusätzliche Zeile unter dem
@@ -1252,7 +1257,7 @@ class EnergieDashboardService:
             bus_in += val
             erzeuger_sum += val
             erzeuger_series_list.append(series)
-            erzeuger_breakdown.append({"name": name, "value": round(max(val, 0.0), 3)})
+            erzeuger_breakdown.append({"name": name, "value": round(max(val, 0.0), 3), "entity_id": entity_id})
             add_stale_issue(name, stale)
 
         # Mehrere Speicher gleichzeitig (z. B. Hausspeicher + separates
@@ -1605,6 +1610,35 @@ class EnergieDashboardService:
             })
             verbraucher_series_by_name[name] = series
             add_stale_issue(name, stale)
+        if config.get("verbraucheranteile_gruppieren"):
+            # Verbraucheranteile-Tabelle/-Donut optional nach Gruppe statt je
+            # Einzelgerät — dieselbe (bereits auf >=2 Mitglieder gefilterte)
+            # gruppe wie im Sankey oben, hier nur zusätzlich zu einer Zeile
+            # aufsummiert. Bucket-Serien werden mitgemerged, damit die
+            # Kosten-Spalte weiter unten (verbraucher_series_by_name) für die
+            # Gruppen-Zeile genauso bucket-genau bewertet wird wie für ein
+            # einzelnes Gerät.
+            grouped_values: dict[str, float] = {}
+            grouped_series: dict[str, list[dict[float, float]]] = {}
+            grouped_order: list[str] = []
+            ungrouped_breakdown: list[dict] = []
+            for item in verbraucher_breakdown:
+                gruppe_name = item.get("gruppe")
+                if not gruppe_name:
+                    ungrouped_breakdown.append(item)
+                    continue
+                if gruppe_name not in grouped_values:
+                    grouped_values[gruppe_name] = 0.0
+                    grouped_series[gruppe_name] = []
+                    grouped_order.append(gruppe_name)
+                grouped_values[gruppe_name] += item["value"]
+                grouped_series[gruppe_name].append(verbraucher_series_by_name.get(item["name"], {}))
+            for gruppe_name in grouped_order:
+                verbraucher_series_by_name[gruppe_name] = self._series_merge(*grouped_series[gruppe_name])
+            verbraucher_breakdown = ungrouped_breakdown + [
+                {"name": gruppe_name, "value": round(grouped_values[gruppe_name], 3)}
+                for gruppe_name in grouped_order
+            ]
         for gruppe_name in sorted(gruppen_totals, key=gruppen_totals.get, reverse=True):  # type: ignore[arg-type]
             total = gruppen_totals[gruppe_name]
             if total <= 0:
@@ -1700,6 +1734,29 @@ class EnergieDashboardService:
         for item in verbraucher_breakdown:
             item["share"] = round(item["value"] / verbrauch_total * 100, 1) if verbrauch_total > 0 else None
         verbraucher_breakdown.sort(key=lambda item: item["value"], reverse=True)
+
+        # Versorgungsanteile: Pendant zu Verbraucheranteile für die
+        # Angebotsseite des Bus — Erzeuger + Netzbezug + Speicherentladung
+        # ergeben zusammen immer genau bus_in. Speicherentladung ist ein
+        # rechnerischer Sammel-Eintrag über alle Speicher (kein eigener
+        # Sensor, kein Gruppen-Konzept auf dieser Seite — anders als bei
+        # Verbrauchern ist hier schon jede Zeile eine eigene Rolle), analog
+        # zu Grundlast auf der Verbraucher-Seite.
+        versorgung_breakdown: list[dict] = [dict(item) for item in erzeuger_breakdown]
+        if netzbezug_id:
+            versorgung_breakdown.append({
+                "name": config.get("netzbezug_name") or "Netzbezug",
+                "value": round(max(netzbezug_val, 0.0), 3),
+                "entity_id": netzbezug_id,
+            })
+        if speicher_entladen_val > 0:
+            versorgung_breakdown.append({
+                "name": "Speicherentladung", "value": round(speicher_entladen_val, 3),
+            })
+        versorgung_total = round(max(bus_in, 0.0), 3)
+        for item in versorgung_breakdown:
+            item["share"] = round(item["value"] / versorgung_total * 100, 1) if versorgung_total > 0 else None
+        versorgung_breakdown.sort(key=lambda item: item["value"], reverse=True)
 
         # Sparklines je KPI-Kachel — Bucket-Verlauf statt nur Periodensumme,
         # aus denselben query_series()-Punkten, die für die Summen ohnehin
@@ -2114,6 +2171,7 @@ class EnergieDashboardService:
             },
             "verbraucher_breakdown": verbraucher_breakdown,
             "erzeuger_breakdown": erzeuger_breakdown,
+            "versorgung_breakdown": versorgung_breakdown,
             "speicher_breakdown": speicher_breakdown,
             "speicher_soc_now_breakdown": soc_now_breakdown,
             "anomalien": anomalien,
@@ -2701,11 +2759,13 @@ class EnergieDashboardService:
             prognose_morgen_entity_id: str = Form(""),
             show_autarkie: str = Form(""),
             show_verbraucheranteile: str = Form(""),
+            show_versorgungsanteile: str = Form(""),
             show_kostenanalyse: str = Form(""),
             show_co2: str = Form(""),
             show_tageslastprofil: str = Form(""),
             show_bilanz_datenqualitaet: str = Form(""),
             show_sankey_legende: str = Form(""),
+            verbraucheranteile_gruppieren: str = Form(""),
             anomalie_schwelle: str = Form("50"),
         ) -> HTMLResponse:
             if not netzbezug.strip():
@@ -2843,11 +2903,13 @@ class EnergieDashboardService:
                 "prognose": prognose,
                 "show_autarkie": show_autarkie == "on",
                 "show_verbraucheranteile": show_verbraucheranteile == "on",
+                "show_versorgungsanteile": show_versorgungsanteile == "on",
                 "show_kostenanalyse": show_kostenanalyse == "on",
                 "show_co2": show_co2 == "on",
                 "show_tageslastprofil": show_tageslastprofil == "on",
                 "show_bilanz_datenqualitaet": show_bilanz_datenqualitaet == "on",
                 "show_sankey_legende": show_sankey_legende == "on",
+                "verbraucheranteile_gruppieren": verbraucheranteile_gruppieren == "on",
                 "anomalie_schwelle": anomalie_schwelle,
             }
             _save_config(deps.index, config)

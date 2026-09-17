@@ -366,6 +366,7 @@
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}><span>Autarkie &amp; Speicher</span></label>
           <label class="filter-chip"><input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}><span>Verbraucheranteile</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_versorgungsanteile" {% if config.show_versorgungsanteile %}checked{% endif %}><span>Versorgungsanteile</span></label>
           <label class="filter-chip"><input type="checkbox" name="show_kostenanalyse" {% if config.show_kostenanalyse %}checked{% endif %}><span>Kostenanalyse</span></label>
           <label class="filter-chip"><input type="checkbox" name="show_co2" {% if config.show_co2 %}checked{% endif %}><span>CO2-Bilanz</span></label>
           <label class="filter-chip"><input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}><span>Tageslastprofil</span></label>
@@ -384,6 +385,17 @@
           <label class="filter-chip"><input type="checkbox" name="show_sankey_legende" {% if config.show_sankey_legende %}checked{% endif %}><span>Farblegende</span></label>
         </div>
         {% call hint_body() %}Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.{% endcall %}
+      </div>
+      {# Eigenes Feld statt eines weiteren Chips in "Sichtbare Kacheln": das
+         ist kein Ein/Aus-Schalter für eine Kachel, sondern ein Darstellungs-
+         Modus INNERHALB der Verbraucheranteile-Kachel — dieselbe Begründung
+         wie beim Energiefluss-Feld oben. #}
+      <div class="field" style="margin-bottom:0;margin-top:14px;">
+        <label>Verbraucheranteile {{ hint_button('Verbraucheranteile-Gruppierung') }}</label>
+        <div class="edash-toggle-list">
+          <label class="filter-chip"><input type="checkbox" name="verbraucheranteile_gruppieren" {% if config.verbraucheranteile_gruppieren %}checked{% endif %}><span>Nach Gruppe anzeigen</span></label>
+        </div>
+        {% call hint_body() %}Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann als eine gemeinsame Zeile statt einzeln — Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.{% endcall %}
       </div>
     </section>
 

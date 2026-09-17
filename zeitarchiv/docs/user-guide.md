@@ -418,9 +418,9 @@ Der Bereich **„Allgemein"** legt zusätzlich den Namen des zentralen Knotens
 fest (Standard „Haus"), die Schwelle für die Auffälligkeiten-Markierung
 (siehe [unten](#status-datenqualität-und-auffälligkeiten)) sowie **„Sichtbare
 Kacheln"** — welche der optionalen Karten (Autarkie & Speicher,
-Verbraucheranteile, Kostenanalyse, CO₂-Bilanz, Tageslastprofil, Bilanz &
-Datenqualität) überhaupt angezeigt werden. Der Energiefluss selbst lässt
-sich nicht abschalten.
+Verbraucheranteile, Versorgungsanteile, Kostenanalyse, CO₂-Bilanz,
+Tageslastprofil, Bilanz & Datenqualität) überhaupt angezeigt werden. Der
+Energiefluss selbst lässt sich nicht abschalten.
 
 ### Benötigte und sinnvolle Entitäten
 
@@ -501,6 +501,14 @@ wie ein Erzeuger — hält den Fluss bei vielen einzelnen Verbrauchern
 zentral verwalten (umbenennen, löschen — betroffene Verbraucher werden dabei
 nur wieder gruppenlos, ihre Werte bleiben unverändert).
 
+Die Verbraucheranteile-Tabelle (siehe unten) zeigt höchstens die acht
+größten Einträge; bei mehr Verbrauchern blendet **„weitere anzeigen"** den
+Rest ein — der Donut daneben zeigt unabhängig davon immer alle. Wer Gruppen
+angelegt hat, kann zusätzlich in der Rollenzuordnung unter
+**„Verbraucheranteile" → „Nach Gruppe anzeigen"** umschalten, ob die Tabelle
+jeden Verbraucher einzeln oder gruppiert (eine Zeile je Gruppe, ungruppierte
+Geräte bleiben einzeln) zeigt.
+
 ### Kennzahlen, Ringe und Badges
 
 Direkt unter dem Sankey stehen fünf KPI-Kacheln (Erzeugung, Verbrauch,
@@ -513,7 +521,18 @@ oder ein Speicher mit getrennter Lade-/Entlade-Entität), öffnet sich
 stattdessen ein kurzes Auswahlfenster. Der Link „← zurück zum
 Energiedashboard“ auf der Entitätsseite (ebenso der aus dem Energiebericht,
 siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur
-Standardansicht. Die Karte **„Autarkie & Speicher"** darunter zeigt vier
+Standardansicht.
+
+Darunter stehen nebeneinander zwei Donut-plus-Tabelle-Karten:
+**„Versorgungsanteile"** (Erzeuger, Netzbezug und Speicherentladung — die
+Angebotsseite) links und **„Verbraucheranteile"** (die einzelnen
+Verbraucher plus Grundlast — die Verbrauchsseite, siehe
+[Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
+oben) rechts. Eine Tabellenzeile mit der Maus zu berühren hebt das
+zugehörige Donut-Segment hervor, Entitäten mit eigener Zuordnung sind
+zusätzlich verlinkt.
+
+Die Karte **„Autarkie & Speicher"** darunter zeigt vier
 Ringe — Autarkie, Eigenverbrauch, Speicher-Ladezustand und
 Speicher-Wirkungsgrad (bei mehreren Speichern jeweils kapazitätsgewichtet
 zusammengefasst, damit ein leerer und ein voller Speicher nicht fälschlich

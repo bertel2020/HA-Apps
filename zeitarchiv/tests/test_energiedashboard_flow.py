@@ -160,6 +160,24 @@ def test_grundlast_ist_der_nicht_gemessene_rest(monkeypatch, tmp: Path) -> None:
         a.close()
 
 
+def test_versorgung_breakdown_spiegelt_erzeuger_und_netzbezug(monkeypatch, tmp: Path) -> None:
+    """Versorgungsanteile ist das Pendant zu Verbraucheranteile für die
+    Angebotsseite: Dach-PV (10) + Netzbezug (6) ergeben zusammen bus_in (16),
+    kein Speicher konfiguriert also keine Speicherentladung-Zeile."""
+    flow, a, _ = _flow(monkeypatch, tmp)
+    try:
+        versorgung = {i["name"]: i for i in flow["versorgung_breakdown"]}
+        assert versorgung.keys() == {"Dach-PV", "Netzbezug"}
+        assert versorgung["Dach-PV"]["value"] == pytest.approx(10.0)
+        assert versorgung["Dach-PV"]["entity_id"] == "sensor.pv"
+        assert versorgung["Netzbezug"]["value"] == pytest.approx(6.0)
+        assert versorgung["Netzbezug"]["entity_id"] == "sensor.netz"
+        assert versorgung["Dach-PV"]["share"] == pytest.approx(62.5)
+        assert versorgung["Netzbezug"]["share"] == pytest.approx(37.5)
+    finally:
+        a.close()
+
+
 def test_energiebilanz_geht_am_bus_auf(monkeypatch, tmp: Path) -> None:
     """Die Erhaltungs-Identität, auf der das ganze Diagramm beruht: was in den
     Sammelknoten hineinfließt, fließt auch wieder heraus."""
@@ -195,6 +213,24 @@ def test_gruppe_mit_einem_mitglied_wird_aufgeloest(monkeypatch, tmp: Path) -> No
         assert any(link["source"] == "Haushalt" and link["target"] == "Trockner" for link in flow["links"])
         # Der aufgelöste Verbraucher zählt trotzdem voll mit.
         assert flow["kpi"]["verbrauch"] == pytest.approx(13.0)
+    finally:
+        a.close()
+
+
+def test_verbraucheranteile_gruppieren_fasst_gruppen_zu_einer_zeile_zusammen(monkeypatch, tmp: Path) -> None:
+    """Mit aktiviertem Schalter erscheint "Haushalt" (Waschmaschine+Trockner)
+    als eine Zeile — die aufgelöste Einzel-"Gruppe" Wallbox bleibt unverändert
+    ein eigener Eintrag, genau wie im Sankey (siehe Test oben)."""
+    a, config = _beispielanlage(tmp)
+    config["verbraucheranteile_gruppieren"] = True
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        anteile = {i["name"]: i["value"] for i in flow["verbraucher_breakdown"]}
+        assert anteile.keys() == {"Haushalt", "Wallbox", "Grundlast"}
+        assert anteile["Haushalt"] == pytest.approx(3.0)
+        assert anteile["Wallbox"] == pytest.approx(4.0)
+        assert sum(anteile.values()) == pytest.approx(flow["kpi"]["verbrauch"])
     finally:
         a.close()
 

@@ -208,9 +208,11 @@
 
   let chartInstance = null;
   let shareChartInstance = null;
+  let versorgungChartInstance = null;
   let heatmapChartInstance = null;
   let heatmapResizeObserver = null;
   let shareResizeObserver = null;
+  let versorgungResizeObserver = null;
   let resizeListenerAdded = false;
   let refreshTimer = null;
   // Dasselbe Muster wie dashboard-tiles.js (dort DASHBOARD_REFRESH_INTERVAL_MS,
@@ -299,6 +301,12 @@
       // Farbschema-Wechsel unbemerkt auseinanderlaufen.
       legendItems: [],
       verbraucherBreakdown: [],
+      // Tabelle (und Donut, siehe visibleVerbraucherBreakdown()) zeigen ab
+      // 9 Verbrauchern nur noch die größten 8 plus eine "weitere anzeigen"-
+      // Zeile — eine lange Geräteliste sprengte sonst die Kartenhöhe neben
+      // der (durch Versorgungsanteile jetzt schmaleren) Nachbarkarte.
+      verbraucherExpanded: false,
+      versorgungBreakdown: [],
       erzeugerBreakdown: [],
       speicherBreakdown: [],
       speicherSocNowBreakdown: [],
@@ -359,6 +367,14 @@
           shareResizeObserver.disconnect();
           shareResizeObserver = null;
         }
+        if (versorgungChartInstance) {
+          versorgungChartInstance.dispose();
+          versorgungChartInstance = null;
+        }
+        if (versorgungResizeObserver) {
+          versorgungResizeObserver.disconnect();
+          versorgungResizeObserver = null;
+        }
         if (heatmapChartInstance) {
           heatmapChartInstance.dispose();
           heatmapChartInstance = null;
@@ -374,6 +390,7 @@
           window.addEventListener('resize', () => {
             if (chartInstance) chartInstance.resize();
             if (shareChartInstance) shareChartInstance.resize();
+            if (versorgungChartInstance) versorgungChartInstance.resize();
             if (heatmapChartInstance) heatmapChartInstance.resize();
             // Sankey-Orientierung (horizontal/vertikal) nur neu rendern, wenn
             // der Breakpoint wirklich über-/unterschritten wurde — sonst bei
@@ -609,6 +626,21 @@
         return this.verbraucherBreakdown.reduce((sum, i) => sum + (i.kosten || 0), 0);
       },
 
+      // Nur die Tabelle deckelt sich (siehe verbraucherExpanded oben) — der
+      // Donut zeigt weiterhin alle Verbraucher, seine Segmente bleiben damit
+      // unabhängig vom Auf-/Zuklappen stabil. Die ersten 8 statt irgendeiner
+      // Auswahl, weil verbraucherBreakdown bereits nach Wert absteigend
+      // sortiert ist (server-seitig) — Index 0..7 hier deckt sich exakt mit
+      // Index 0..7 in renderShareChart()/shareColor(), auch nach dem
+      // Aufklappen.
+      visibleVerbraucherBreakdown() {
+        return this.verbraucherExpanded ? this.verbraucherBreakdown : this.verbraucherBreakdown.slice(0, 8);
+      },
+
+      versorgungTotal() {
+        return this.versorgungBreakdown.reduce((sum, i) => sum + (i.value || 0), 0);
+      },
+
       // Fortschrittsring (Autarkie/Eigenverbrauch, siehe .edash-ring-* im
       // Template): stroke-dashoffset des zweiten (farbigen) Kreises auf dem
       // Umfang 263,894 (= 2·π·42, Radius 42 aus dem SVG) — 0 % Offset = voller
@@ -669,12 +701,14 @@
           this.periodText = periodLabel(data);
           this.hasFlow = data.nodes.some(n => n.role !== 'bus' && n.value > 0);
           this.verbraucherBreakdown = data.verbraucher_breakdown || [];
+          this.versorgungBreakdown = data.versorgung_breakdown || [];
           this.erzeugerBreakdown = data.erzeuger_breakdown || [];
           this.speicherBreakdown = data.speicher_breakdown || [];
           this.speicherSocNowBreakdown = data.speicher_soc_now_breakdown || [];
           this.anomalien = data.anomalien || [];
           this.renderChart(data);
           this.renderShareChart(this.verbraucherBreakdown);
+          this.renderVersorgungChart(this.versorgungBreakdown);
           this.renderSparklines(data.kpi_series || {});
         } catch (e) {
           this.loadError = true;
@@ -1292,6 +1326,58 @@
         if (!shareChartInstance) return;
         shareChartInstance.dispatchAction({type: 'downplay', seriesIndex: 0, name});
         shareChartInstance.dispatchAction({type: 'hideTip'});
+      },
+
+      // Versorgungsanteile: Pendant zu renderShareChart()/highlightShare()/
+      // unhighlightShare() für die Angebotsseite (Erzeuger + Netzbezug +
+      // Speicherentladung, siehe versorgung_breakdown in compute_flow) —
+      // eigene Chart-Instanz/ResizeObserver, sonst identisches Muster.
+      renderVersorgungChart(breakdown) {
+        const el = this.$refs.versorgungChartEl;
+        if (!el || typeof echarts === 'undefined' || !breakdown.length) return;
+        if (!versorgungChartInstance) versorgungChartInstance = echarts.init(el);
+        const surface = cssVar('--surface');
+        const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
+        versorgungChartInstance.setOption({
+          tooltip: {
+            trigger: 'item',
+            formatter: (p) => `${p.marker}${p.name}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
+          },
+          series: [{
+            type: 'pie',
+            radius: ['52%', '85%'],
+            center: ['50%', '50%'],
+            avoidLabelOverlap: true,
+            itemStyle: {borderColor: surface, borderWidth: 2},
+            label: {show: false},
+            labelLine: {show: false},
+            emphasis: {
+              scaleSize: 6,
+              itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'},
+            },
+            data: breakdown.map((item, idx) => ({
+              name: item.name, value: item.value,
+              itemStyle: {color: this.shareColor(idx)},
+            })),
+          }],
+        }, true);
+        if (typeof ResizeObserver !== 'undefined') {
+          if (versorgungResizeObserver) versorgungResizeObserver.disconnect();
+          versorgungResizeObserver = new ResizeObserver(() => {
+            if (versorgungChartInstance) versorgungChartInstance.resize();
+          });
+          versorgungResizeObserver.observe(el);
+        }
+      },
+      highlightVersorgung(name) {
+        if (!versorgungChartInstance) return;
+        versorgungChartInstance.dispatchAction({type: 'highlight', seriesIndex: 0, name});
+        versorgungChartInstance.dispatchAction({type: 'showTip', seriesIndex: 0, name});
+      },
+      unhighlightVersorgung(name) {
+        if (!versorgungChartInstance) return;
+        versorgungChartInstance.dispatchAction({type: 'downplay', seriesIndex: 0, name});
+        versorgungChartInstance.dispatchAction({type: 'hideTip'});
       },
     };
   };

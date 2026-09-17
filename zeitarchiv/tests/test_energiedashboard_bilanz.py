@@ -87,5 +87,9 @@ def test_gradient_extended_to_remaining_three_cards_with_role_colors() -> None:
     assert "var(--chart-4)" in DASHBOARD_HTML.split("\n  .edash-ring-card{")[1][:200]
     assert "var(--chart-7)" in DASHBOARD_HTML.split(".edash-verbraucher-card{")[1][:200]
     assert "var(--chart-7)" in DASHBOARD_HTML.split(".edash-tageslast-card{")[1][:200]
-    assert 'class="edash-card edash-span2 edash-verbraucher-card"' in VIEW
+    # edash-span2 entfiel mit der Versorgungsanteile-Einführung: die Karte
+    # sitzt seither in edash-share-row (eigenes 2-Spalten-Grid neben
+    # Versorgungsanteile) statt direkt im äußeren edash-grid, braucht also
+    # keine eigene Spannweiten-Klasse mehr.
+    assert 'class="edash-card edash-verbraucher-card"' in VIEW
     assert 'class="edash-card edash-span3 edash-tageslast-card"' in VIEW

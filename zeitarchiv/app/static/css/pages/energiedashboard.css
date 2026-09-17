@@ -94,7 +94,15 @@
   .edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px;min-width:0;box-shadow:var(--shadow);}
   .edash-card.edash-span3{grid-column:span 3;}
   .edash-card.edash-span2{grid-column:span 2;}
-  .edash-card.edash-ring-card{grid-column:span 1;}
+  /* Autarkie & Speicher stand früher zusammen mit Verbraucheranteile in
+     einer Zeile (1+2 = 3 Spalten) — steht jetzt in eigener, voller Zeile
+     unter der neuen Versorgungs-/Verbraucheranteile-Zeile (edash-share-row
+     unten), daher span 3 statt span 1. */
+  .edash-card.edash-ring-card{grid-column:span 3;}
+  /* Versorgungsanteile + Verbraucheranteile nebeneinander: eigenes 2-Spalten-
+     Grid als volle Zeile im äußeren 3-Spalten-Grid — ein sauberes 50/50
+     lässt sich nicht als Bruchteil von drei Spalten ausdrücken (1.5+1.5). */
+  .edash-share-row{grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .edash-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
   .edash-card-title{font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
   .edash-card-title .n{color:var(--ink-faint);font-weight:500;font-size:calc(12px * var(--font-scale, 1));margin-left:6px;}
@@ -105,8 +113,12 @@
   .edash-soc-now{display:flex;align-items:center;gap:5px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
   .edash-soc-now strong{color:var(--ink);font-weight:600;}
   .edash-soc-now-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--chart-4);flex:none;}
-  @media(max-width:820px){.edash-grid{grid-template-columns:repeat(2,1fr);}.edash-card.edash-span3,.edash-card.edash-ring-card{grid-column:span 2;}}
-  @media(max-width:560px){.edash-grid{grid-template-columns:1fr;}.edash-card.edash-span3,.edash-card.edash-span2,.edash-card.edash-ring-card{grid-column:span 1;}}
+  @media(max-width:820px){.edash-grid{grid-template-columns:repeat(2,1fr);}.edash-card.edash-span3,.edash-card.edash-ring-card,.edash-share-row{grid-column:span 2;}}
+  @media(max-width:560px){
+    .edash-grid{grid-template-columns:1fr;}
+    .edash-card.edash-span3,.edash-card.edash-span2,.edash-card.edash-ring-card,.edash-share-row{grid-column:span 1;}
+    .edash-share-row{grid-template-columns:1fr;}
+  }
 
   /* Wrapper für Perioden-Pills + Pfeil-Navigation (vorher Inline-Style) —
      als eigene Klasse, damit die mobile Regel unten ihn zentrieren kann. */
@@ -442,6 +454,12 @@
       radial-gradient(140% 100% at 100% 0%, color-mix(in srgb, var(--chart-7) 5%, transparent), transparent 55%),
       var(--surface);
   }
+  /* Versorgungsanteile bekommt BEWUSST keinen Rollenfarbton wie die übrigen
+     drei Karten: es fasst Erzeuger (--chart-1..), Netzbezug und
+     Speicherentladung zusammen und gehört damit keiner einzelnen Rolle an —
+     ein einzelner Farbton wäre hier keine Bedeutungs-Kopplung mehr, sondern
+     eine willkürliche Wahl. Bleibt neutral (nur die Basis-.edash-card-
+     Fläche). */
   .edash-tageslast-card{
     background:
       radial-gradient(140% 100% at 0% 100%, color-mix(in srgb, var(--chart-7) 5%, transparent), transparent 55%),
@@ -521,7 +539,13 @@
   /* 18px = dieselbe horizontale Kachel-Innenabstand wie .edash-card padding
      — Donut-zu-Tabelle-Abstand entsprach vorher nicht dem Abstand zwischen
      Donut und Kachel-Rand (32px vs. 18px), wirkte dadurch unausgewogen. */
-  .edash-share-wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}
+  /* justify-content:center wirkt nur, wenn der Donut allein auf seiner Zeile
+     umbricht (Karte schmaler als Donut+Tabelle nebeneinander, seit
+     Verbraucheranteile durch edash-share-row nur noch die halbe Breite hat)
+     — sonst füllt die Tabelle (flex:1) ohnehin die ganze Zeile, center
+     ändert dort nichts. Ohne die Regel hing der Donut auf seiner eigenen
+     Zeile links, mit sichtbar leerem Raum rechts (siehe Bugreport). */
+  .edash-share-wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:center;}
   .edash-share-donut{flex:0 0 220px;width:220px;height:220px;}
   .edash-share-wrap .tbl-wrap{flex:1;min-width:280px;}
   .edash-share-dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:8px;vertical-align:middle;flex:none;}
@@ -575,6 +599,26 @@
     .edash-share-donut{flex:0 0 auto;width:100%;max-width:220px;height:220px;margin:0 auto;}
     .edash-share-wrap .tbl-wrap{min-width:0;width:100%;}
   }
+  /* Versorgungsanteile: Donut fest oberhalb der Tabelle, unabhängig von der
+     Kartenbreite — dieselbe Umstellung wie die ≤560px-Regel oben, hier per
+     Klasse statt Breakpoint, weil die Karte durch edash-share-row (zwei
+     Karten nebeneinander) bereits auf Desktop schmaler ist als eine volle
+     edash-span2-Karte und die nebeneinander-Anordnung dort zu eng würde. */
+  .edash-share-wrap.edash-share-wrap-stacked{flex-direction:column;align-items:stretch;gap:14px;}
+  .edash-share-wrap.edash-share-wrap-stacked .edash-share-donut{flex:0 0 auto;width:100%;max-width:220px;height:220px;margin:0 auto;}
+  .edash-share-wrap.edash-share-wrap-stacked .tbl-wrap{min-width:0;width:100%;}
+
+  /* "+N weitere anzeigen"/"Weniger anzeigen" — eigene Zeile in der
+     Verbraucheranteile-Tabelle ab 9 Einträgen (siehe visibleVerbraucher-
+     Breakdown() in energiedashboard.js), als schlichter Text-Button statt
+     einer weiteren Tabellenzeile mit Werten. */
+  .edash-share-more-row td{padding-top:8px;text-align:center;}
+  .edash-share-more-btn{
+    background:none;border:none;padding:2px 4px;font:inherit;
+    font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);
+    cursor:pointer;
+  }
+  .edash-share-more-btn:hover{text-decoration:underline;}
 
   /* Setup-Formular orientiert sich bewusst am Bereich "Einstellungen"
      (settings.html): echte .settings-section/.field/.actionbar-Klassen aus

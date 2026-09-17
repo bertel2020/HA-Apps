@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.97.0 - 2026-09-16
+
+### Neu
+
+- Neue Kachel **Versorgungsanteile** im Energiedashboard (Donut + Tabelle
+  für Erzeuger, Netzbezug und Speicherentladung) — nach demselben Prinzip
+  wie die bestehende Verbraucheranteile-Kachel, direkt daneben platziert;
+  **Autarkie & Speicher** rückte dafür in eine eigene Zeile darunter.
+- Verbraucheranteile: die Tabelle zeigt jetzt höchstens die acht größten
+  Verbraucher, mit „weitere anzeigen" für den Rest (der Donut bleibt
+  vollständig). Neuer Schalter **„Nach Gruppe anzeigen"** fasst Verbraucher
+  mit derselben Gruppe optional zu einer gemeinsamen Zeile zusammen.
+- Sechs weitere Demo-Verbraucher (Kühlschrank, Herd, Homeoffice,
+  Entertainment, Boiler, zweite Ladeeinheit) für realistischere Demo-Daten.
+
 ## 0.96.1 - 2026-09-15
 
 ### Behoben
