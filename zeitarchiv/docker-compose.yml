@@ -1,0 +1,23 @@
+services:
+  zeitarchiv:
+    build:
+      context: ./zeitarchiv-build/zeitarchiv
+      args:
+        BUILD_VERSION: "0.90.2"
+        BUILD_ARCH: "amd64"
+
+    image: zeitarchiv:0.90.2-local
+    container_name: zeitarchiv
+    environment:
+      HA_API_BASE: "http://<HA-URLinklPort>/api"
+      HA_WS_URL: "ws://<HA-URLinklPort>/api/websocket"
+      HA_ACCESS_TOKEN: "<TOKEN>"
+
+    restart: unless-stopped
+
+    ports:
+      - "8099:8099"
+      - "8127:8127"
+
+    volumes:
+      - ./data:/data
