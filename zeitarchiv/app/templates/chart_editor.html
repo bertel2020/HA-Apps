@@ -149,7 +149,8 @@
                        stimmt), nur die Anzeige im Dropdown nicht. -->
                   <select x-model="resolutionPreset" :disabled="raw" @change="onResolutionChange()">
                     <template x-for="option in resolutionOptions" :key="option.value">
-                      <option :value="option.value" :selected="option.value === resolutionPreset" x-text="option.label"></option>
+                      <option :value="option.value" :selected="option.value === resolutionPreset"
+                              :disabled="option.value === 'full' && compare" x-text="option.label"></option>
                     </template>
                   </select>
                 </div>
@@ -177,11 +178,17 @@
                      Zeitstrahl-Modus erzwingt toggleTimeline() ohnehin raw = true
                      — beides war bisher nur ein toter bzw. deaktivierter
                      Schalter. Das :disabled bleibt für die Zeitraum-Grenze:
-                     Rohwerte gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
+                     Rohwerte gibt es nur bis Woche (MAX_RAW_QUERY_POINTS).
+                     Zusätzlich deaktiviert bei aktivem Vergleich — Vergleich
+                     hat Vorrang (siehe setCompareMode() in chart_editor.js):
+                     wer Rohwerte will, muss Vergleich erst ausschalten, statt
+                     dass ein Klick hier ihn stillschweigend abschaltet. -->
                 <label class="menu-row" x-show="!timeline && !donut && hasLineSeries">
-                  <span class="menu-row-label">Rohwerte</span>
+                  <span class="menu-row-label">Rohwerte
+                    <span class="menu-note" x-show="compare">nicht bei aktivem Vergleich</span>
+                  </span>
                   <span class="menu-toggle">
-                    <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
+                    <input type="checkbox" :checked="raw" :disabled="compare || !['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
@@ -197,10 +204,12 @@
                      Knöpfe erklären sich selbst, ein Toggle bräuchte einen
                      dritten Satz dafür, wogegen er wirkt. -->
                 <div class="menu-row menu-row-stack">
-                  <span class="menu-row-label">Darstellungsart</span>
+                  <span class="menu-row-label">Darstellungsart
+                    <span class="menu-note" x-show="compare">Donut nicht bei aktivem Vergleich</span>
+                  </span>
                   <div class="seg">
                     <button :class="{active: !donut}" @click="setDisplayMode('timeseries')">Zeitverlauf</button>
-                    <button :class="{active: donut}" @click="setDisplayMode('donut')">Donut (Anteile)</button>
+                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">Donut (Anteile)</button>
                   </div>
                 </div>
                 <!-- Nur bei aktivem Donut sichtbar — bestimmt, welcher
@@ -219,9 +228,11 @@
                   </div>
                 </div>
                 <label class="menu-row" x-show="allSwitch && !donut">
-                  <span class="menu-row-label">Zeitstrahl</span>
+                  <span class="menu-row-label">Zeitstrahl
+                    <span class="menu-note" x-show="compare">nicht bei aktivem Vergleich</span>
+                  </span>
                   <span class="menu-toggle">
-                    <input type="checkbox" :checked="timeline" @change="toggleTimeline()">
+                    <input type="checkbox" :checked="timeline" :disabled="compare" @change="toggleTimeline()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
@@ -253,9 +264,11 @@
                      gar nicht, es gibt also nichts zu erklären, was ein
                      deaktivierter Schalter noch anzeigen müsste. -->
                 <label class="menu-row" x-show="canStack && !donut">
-                  <span class="menu-row-label">Gestapelt</span>
+                  <span class="menu-row-label">Gestapelt
+                    <span class="menu-note" x-show="compare">nicht bei aktivem Vergleich</span>
+                  </span>
                   <span class="menu-toggle">
-                    <input type="checkbox" :checked="stacked" @change="toggleStacked()">
+                    <input type="checkbox" :checked="stacked" :disabled="compare" @change="toggleStacked()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
@@ -306,10 +319,12 @@
                      ausgeblendet, obwohl der Chart längst im Ranking-
                      Vergleich steht, für den sie gedacht ist. -->
                 <div class="menu-row menu-row-stack" x-show="!donut && !(stacked && canStack)">
-                  <span class="menu-row-label">Ausrichtung</span>
+                  <span class="menu-row-label">Ausrichtung
+                    <span class="menu-note" x-show="compare">Horizontal nicht bei aktivem Vergleich</span>
+                  </span>
                   <div class="seg">
                     <button :class="{active: !horizontal}" @click="setHorizontal(false)">Vertikal</button>
-                    <button :class="{active: horizontal}" @click="setHorizontal(true)">Horizontal</button>
+                    <button :class="{active: horizontal}" :disabled="compare" @click="setHorizontal(true)">Horizontal</button>
                   </div>
                 </div>
                 <label class="menu-row" x-show="hasBarSeries && !donut">

@@ -723,10 +723,14 @@
         // und Periodenvergleich (zeitversetzte Zweitserie) schließen sich
         // aus derselben Begründung wie raw+compare aus (siehe toggleRaw()) —
         // ein Vergleich zweier Einzelwerte auf einer Kategorie-Achse ergäbe
-        // keinen sinnvoll darstellbaren zweiten Zeitpunkt.
+        // keinen sinnvoll darstellbaren zweiten Zeitpunkt. Vergleich hat
+        // Vorrang (siehe setCompareMode()): die "Voll"-Option im Auflösung-
+        // Dropdown und der "Horizontal"-Knopf (setHorizontal() setzt
+        // resolutionPreset ebenfalls auf 'full') sind disabled, solange
+        // compare true ist — 'full' ist von dort aus also gar nicht mehr
+        // erreichbar, kein this.compare = false hier mehr nötig.
         onResolutionChange() {
           if (this.resolutionPreset === 'full') {
-            this.compare = false;
             this.dynamicYAxis = false;
             // continuous ist (anders als compare/dynamicYAxis) ein
             // Server-Query-Parameter (verschiebt windowStart/windowEnd) —
@@ -745,18 +749,29 @@
         // bewusst nicht auf den vorherigen Wert: der müsste sonst extra
         // gemerkt werden, nur um ihn beim nächsten Wechsel wieder zu
         // verwerfen. onResolutionChange() übernimmt dieselben Folgeschritte
-        // wie bei manueller Auswahl im Auflösung-Dropdown (Vergleich/
-        // Dynamische Y-Achse abschalten, rollierendes Fenster ggf. neu laden).
+        // wie bei manueller Auswahl im Auflösung-Dropdown (Dynamische Y-Achse
+        // abschalten, rollierendes Fenster ggf. neu laden).
         setHorizontal(value) {
           if (value === this.horizontal) return;
           this.horizontal = value;
           this.resolutionPreset = value ? 'full' : 'auto';
           this.onResolutionChange();
         },
+        // Vergleich hat Vorrang vor den Optionen, mit denen er sich
+        // ausschließt (Rohwerte, Zeitstrahl, Gestapelt, Donut) — umgekehrt zur
+        // früheren Richtung, in der AKTIVIEREN einer dieser Optionen den
+        // Vergleich stillschweigend abschaltete. Ihre Bedienelemente sind
+        // jetzt disabled, solange compare true ist (siehe chart_editor.html);
+        // das Zurücksetzen hier ist zusätzliche Absicherung für einen älteren
+        // gespeicherten Chart, der noch beide Zustände gleichzeitig trägt.
         setCompareMode(mode) {
           this.compare = true;
           this.compareMode = mode;
           this.compareMenuOpen = false;
+          this.raw = false;
+          this.stacked = false;
+          this.timeline = false;
+          this.donut = false;
           this.load();
         },
         disableCompare() {
@@ -798,27 +813,30 @@
         // Raw-Modus (Rohwerte) und Periodenvergleich schließen sich gegenseitig
         // aus — dieselbe Begründung wie auf der Entität-eigenen Chart-Seite:
         // ein Vergleich zweier Rohwert-Serien ergibt kaum lesbaren Sinn.
+        // Vergleich hat dabei Vorrang (siehe setCompareMode()): das Rohwerte-
+        // Kontrollelement ist disabled, solange compare true ist, statt dass
+        // ein Klick hier den Vergleich stillschweigend abschaltet.
         toggleRaw() {
           this.raw = !this.raw;
-          if (this.raw) this.compare = false;
           this.load();
         },
         // Gestapelt + Periodenvergleich zusammen wären eine ungeklärte
         // Kombination (die Vorperiode-Nebenserie müsste dann entweder
         // mitgestapelt — acht statt vier Segmente in einem Balken — oder
-        // gesondert behandelt werden) und wurde nie entworfen; deshalb hier
-        // dieselbe Ausschluss-Konvention wie raw+compare (toggleRaw() oben)
-        // statt eine unklare Darstellung zuzulassen. Reines render() statt
+        // gesondert behandelt werden) und wurde nie entworfen. Vergleich hat
+        // Vorrang (siehe setCompareMode()) — das Gestapelt-Kontrollelement
+        // ist disabled, solange compare true ist. Reines render() statt
         // load(): Stapelung ändert nur, WIE die bereits geladenen Daten
         // gezeichnet werden, keinen Server-Query-Parameter.
         toggleStacked() {
           this.stacked = !this.stacked;
-          if (this.stacked) this.compare = false;
           this.render();
         },
         // Zeitstrahl erzwingt Rohwerte (er zeichnet AN/AUS-Übergänge, keine
         // Bucket-Summen) und schließt Vergleich aus — dieselbe Logik wie
-        // setChartType('timeline') auf der Entität-eigenen Chart-Seite. Beim
+        // setChartType('timeline') auf der Entität-eigenen Chart-Seite.
+        // Vergleich hat Vorrang (siehe setCompareMode()) — das Zeitstrahl-
+        // Kontrollelement ist disabled, solange compare true ist. Beim
         // Ausschalten wird raw wieder zurückgesetzt: anders als ein manuell
         // gesetztes "Rohwerte" darf es hier nicht stehen bleiben, sonst
         // liefert der Server laut query_raw_series() weiterhin chart_type
@@ -827,7 +845,7 @@
         // erwarteten automatischen Balken für Zähler/Schalter.
         toggleTimeline() {
           this.timeline = !this.timeline;
-          if (this.timeline) { this.raw = true; this.compare = false; }
+          if (this.timeline) { this.raw = true; }
           else { this.raw = false; }
           this.load();
         },
@@ -836,15 +854,15 @@
         // s. u.) oder Donut (renderDonut()). Reines render() statt load():
         // der Donut aggregiert dieselben bereits geladenen Punkte nur anders
         // (wie toggleStacked()), braucht also keine neue Serverabfrage.
-        // compare wird abgeschaltet wie bei toggleStacked()/toggleTimeline()
-        // — eine Vorperiode-Nebenserie ergibt für einen Anteil am Ganzen
-        // keinen sinnvoll darstellbaren zweiten Wert.
+        // Der Donut-Knopf ist disabled, solange compare true ist (Vergleich
+        // hat Vorrang, siehe setCompareMode()) — eine Vorperiode-Nebenserie
+        // ergibt für einen Anteil am Ganzen keinen sinnvoll darstellbaren
+        // zweiten Wert.
         setDisplayMode(mode) {
           const wantDonut = mode === 'donut';
           if (wantDonut === this.donut) return;
           this.donut = wantDonut;
           if (wantDonut) {
-            this.compare = false;
             // render() prüft this.timeline VOR this.donut (s. o.) — ein noch
             // aktives Zeitstrahl bliebe sonst trotz gewähltem Donut weiter
             // sichtbar, obwohl die Darstellungsart-Zeile schon "Donut" zeigt.
@@ -998,6 +1016,18 @@
           const barOnlyAxis = new Set(
             units.filter(u => this.series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
           );
+          // Achsen mit MINDESTENS einer Balken-Serie (nicht nur reine
+          // Balken-Achsen wie barOnlyAxis oben) dürfen "Dynamische Y-Achse"
+          // nie übernehmen — sonst startet die Achse nicht bei 0 und
+          // Balkenhöhen wirken optisch verzerrt (ein Balken, der nur "ein
+          // bisschen kürzer" aussieht, kann bei einer bei 60 statt 0
+          // beginnenden Achse tatsächlich nur ein Zehntel des Werts sein).
+          // Dieselbe Regel gilt bereits für Dashboard-Kacheln
+          // (dashboard-tiles.js, axisHasBar) und Einzel-Entitäts-Charts
+          // (entity_detail.js, chartType !== 'bar') — hier bisher gefehlt.
+          const axisHasBar = new Set(
+            units.filter(u => this.series.some(s => axisKey(s) === u && s.chart_type === 'bar'))
+          );
           // Resampelte Punkte je Serie einmal vorab berechnen (statt weiter
           // unten im Haupt-Loop) — die Prozent-Normierung braucht die Werte
           // ALLER Serien einer Achse zum selben Bucket-Zeitpunkt, bevor die
@@ -1043,19 +1073,20 @@
             // Anteils-Achse, die nicht bei 0 beginnt oder über 100 hinausgeht,
             // würde die Prozentwerte selbst verzerrt darstellen.
             const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
+            const axisDynamic = dynamicYAxis && !axisHasBar.has(u);
             return {
               type: 'value',
               name: isPercentAxis ? 'Anteil' : (isDuration ? 'Dauer' : (u || undefined)),
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
-              min: isPercentAxis ? 0 : (dynamicYAxis ? undefined : value => Math.min(0, value.min)),
-              max: isPercentAxis ? 100 : (dynamicYAxis ? undefined : value => Math.max(0, value.max)),
+              min: isPercentAxis ? 0 : (axisDynamic ? undefined : value => Math.min(0, value.min)),
+              max: isPercentAxis ? 100 : (axisDynamic ? undefined : value => Math.max(0, value.max)),
               // ECharts erzwingt bei einer value-Achse standardmäßig (scale:
               // false) IMMER die Einbindung der Null, auch wenn min/max
               // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
               // also keine sichtbare Wirkung gegenüber der festen Variante.
-              scale: isPercentAxis ? false : dynamicYAxis,
+              scale: isPercentAxis ? false : axisDynamic,
               axisLabel: {formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)))},
             };
           });

@@ -20,6 +20,7 @@ EDITOR = page_text("chart_editor.html")
 ENERGIE = page_text("energiedashboard.html")
 STATISTIK = page_text("statistik.html")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+CHART_EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 
 
 def test_the_wheel_alone_still_scrolls_the_page() -> None:
@@ -58,6 +59,17 @@ def test_the_zoom_follows_the_y_axis_setting_instead_of_fighting_it() -> None:
     'none' nähme der Einstellung "dynamisch" ihre Wirkung im Ausschnitt.
     """
     assert "(this.dynamicYAxis && this.chartType !== 'bar') ? 'filter' : 'none'" in ENTITY
+
+
+def test_the_charts_page_bar_axes_never_go_dynamic() -> None:
+    """Dieselbe Regel wie oben (Balken + "Dynamische Y-Achse" vertragen sich
+    nicht — eine Achse, die nicht bei 0 beginnt, verzerrt Balkenhöhen optisch),
+    aber für die Charts-Seite (chart_editor.js), die mehrere Serien
+    unterschiedlichen Typs auf derselben Achse mischen kann. Fehlte hier
+    bisher, obwohl dashboard-tiles.js/entity_detail.js sie längst hatten —
+    sichtbar an einer Balken-Achse, die bei z. B. 60 statt 0 kWh begann."""
+    assert "const axisHasBar = new Set(" in CHART_EDITOR_JS
+    assert "dynamicYAxis && !axisHasBar.has(u)" in CHART_EDITOR_JS
 
 
 def test_zoom_appears_only_where_there_is_more_data_than_pixels() -> None:
