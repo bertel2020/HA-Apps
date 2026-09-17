@@ -178,6 +178,32 @@ def test_versorgung_breakdown_spiegelt_erzeuger_und_netzbezug(monkeypatch, tmp: 
         a.close()
 
 
+def test_versorgung_breakdown_speichernutzung_ist_netto_und_kann_negativ_sein(monkeypatch, tmp: Path) -> None:
+    """Speichernutzung ist Entladen MINUS Laden (netto), nicht nur die
+    Entladung — sonst würde die Kachel den vollen Erzeuger-Ertrag als
+    "Versorgung" ausweisen, obwohl ein Teil noch im Speicher steckt statt
+    beim Verbrauch/der Einspeisung angekommen zu sein (Nutzerwunsch: voller
+    Ertrag pro Erzeuger bleibt sichtbar, der Speicher-Effekt wird stattdessen
+    in einer eigenen, ggf. negativen Netto-Zeile sichtbar). Hier wird mehr
+    geladen (5) als entladen (3) -> Speichernutzung ist negativ, und die
+    Summe aller Zeilen deckt sich exakt mit Verbrauch + Einspeisung."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "Heimspeicher",
+        "laden_entity_id": "sensor.laden", "entladen_entity_id": "sensor.entladen",
+    }])
+    a.zaehler("sensor.laden", (0, 200.0), (23, 205.0))      # +5 geladen
+    a.zaehler("sensor.entladen", (0, 300.0), (23, 303.0))   # +3 entladen
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        versorgung = {i["name"]: i["value"] for i in flow["versorgung_breakdown"]}
+        assert versorgung["Speichernutzung"] == pytest.approx(-2.0)
+        gesamt = sum(versorgung.values())
+        assert gesamt == pytest.approx(flow["kpi"]["verbrauch"] + flow["kpi"]["einspeisung"])
+    finally:
+        a.close()
+
+
 def test_energiebilanz_geht_am_bus_auf(monkeypatch, tmp: Path) -> None:
     """Die Erhaltungs-Identität, auf der das ganze Diagramm beruht: was in den
     Sammelknoten hineinfließt, fließt auch wieder heraus."""

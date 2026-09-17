@@ -1355,7 +1355,16 @@
               scaleSize: 6,
               itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'},
             },
-            data: breakdown.map((item, idx) => ({
+            // Negative/Null-Werte (Speichernutzung in einer überwiegend
+            // ladenden Periode, siehe compute_flow()) ergäben ein
+            // negatives Tortenstück — ECharts kann das nicht sinnvoll
+            // zeichnen. Nur aus dem Donut ausgefiltert, die Tabelle zeigt
+            // die Zeile weiterhin. Da versorgungBreakdown serverseitig
+            // absteigend sortiert ist, kann ein solcher Wert nur am Ende
+            // stehen — herausfiltern verschiebt also nicht den Index der
+            // übrigen Einträge, shareColor(idx) bleibt zur Tabellenzeile
+            // konsistent.
+            data: breakdown.filter((item) => item.value > 0).map((item, idx) => ({
               name: item.name, value: item.value,
               itemStyle: {color: this.shareColor(idx)},
             })),

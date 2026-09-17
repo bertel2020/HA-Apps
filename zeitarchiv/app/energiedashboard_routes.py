@@ -1736,12 +1736,19 @@ class EnergieDashboardService:
         verbraucher_breakdown.sort(key=lambda item: item["value"], reverse=True)
 
         # Versorgungsanteile: Pendant zu Verbraucheranteile für die
-        # Angebotsseite des Bus — Erzeuger + Netzbezug + Speicherentladung
-        # ergeben zusammen immer genau bus_in. Speicherentladung ist ein
-        # rechnerischer Sammel-Eintrag über alle Speicher (kein eigener
-        # Sensor, kein Gruppen-Konzept auf dieser Seite — anders als bei
-        # Verbrauchern ist hier schon jede Zeile eine eigene Rolle), analog
-        # zu Grundlast auf der Verbraucher-Seite.
+        # Angebotsseite — Erzeuger bleiben mit ihrem VOLLEN Ertrag stehen
+        # (Nutzerwunsch: der volle Ertrag eines Erzeugers, z. B. eines
+        # Balkonkraftwerks mit eigenem Speicher, soll sichtbar bleiben, auch
+        # wenn ein Teil davon in dessen Speicher statt direkt ins Haus
+        # fließt). Ein Speicher taucht hier deshalb NICHT als Bruttowert
+        # ("Speicherentladung") auf, sondern als EIN Netto-Posten
+        # "Speichernutzung" (Entladen minus Laden) — kann negativ sein
+        # (Periode überwiegend geladen statt entladen). Ohne das würde die
+        # Summe dieser Kachel den vollen Erzeuger-Ertrag als "Versorgung"
+        # ausweisen, obwohl ein Teil davon noch im Speicher steckt statt
+        # beim Verbrauch/der Einspeisung angekommen zu sein — dieselbe
+        # Netto-Logik, die Grundlast weiter unten schon für speicher_laden_val
+        # anwendet, hier nur explizit als eigene Zeile statt implizit im Bus.
         versorgung_breakdown: list[dict] = [dict(item) for item in erzeuger_breakdown]
         if netzbezug_id:
             versorgung_breakdown.append({
@@ -1749,11 +1756,15 @@ class EnergieDashboardService:
                 "value": round(max(netzbezug_val, 0.0), 3),
                 "entity_id": netzbezug_id,
             })
-        if speicher_entladen_val > 0:
+        if speicher_laden_val or speicher_entladen_val:
             versorgung_breakdown.append({
-                "name": "Speicherentladung", "value": round(speicher_entladen_val, 3),
+                "name": "Speichernutzung", "value": round(speicher_entladen_val - speicher_laden_val, 3),
             })
-        versorgung_total = round(max(bus_in, 0.0), 3)
+        # Summe der Zeilen statt bus_in als Nenner — deckt sich dadurch immer
+        # mit Verbrauch + Einspeisung (der Teil, der wirklich "versorgt"
+        # wurde), auch wenn ein Erzeuger brutto mehr lieferte, als am Bus
+        # netto verfügbar war.
+        versorgung_total = round(sum(item["value"] for item in versorgung_breakdown), 3)
         for item in versorgung_breakdown:
             item["share"] = round(item["value"] / versorgung_total * 100, 1) if versorgung_total > 0 else None
         versorgung_breakdown.sort(key=lambda item: item["value"], reverse=True)
