@@ -12,13 +12,10 @@
   trotzdem irgendwann Archivvolumen reduzieren lässt. Zugehörige
   Löschmarkierungen bleiben dabei automatisch konsistent, statt als
   „Löschmarkierung ohne passende Rohdatenzeile" liegen zu bleiben.
-- **Auflösung** arbeitet jetzt auf einem festen Zeitraster statt relativ zum
-  zuletzt gespeicherten Wert — kein Verschieben des Rasters mehr nach
-  Neustarts oder Verbindungsaussetzern. Bei „Standard"-Entitäten (Temperatur,
-  Feuchte …) wird pro Fenster jetzt zusätzlich Min/Max mitgeführt statt nur
-  eines Einzelwerts. Bei Schalter-Entitäten ist die Auflösung jetzt fest auf
-  „Rohdaten" gesperrt, damit kein Zustandswechsel durch ein Zeitfenster
-  verloren gehen kann.
+- **Auflösung**: bei „Standard"-Entitäten (Temperatur, Feuchte …) wird pro
+  Zeitfenster jetzt zusätzlich Min/Max mitgeführt statt nur eines
+  Einzelwerts — bisher ging z. B. eine kurze Temperaturspitze beim
+  Zusammenfassen auf ein Zeitraster ersatzlos verloren.
 - Neuer Housekeeping-Tab **Aktivität**: listet Korrekturen, hinzugefügte
   Werte, Bereinigungen und Verdichtungen, filterbar nach Entität,
   Aktionstyp, Status und Zeitraum; ein Klick auf Verdichten-/Bereinigen-
@@ -51,6 +48,14 @@
   Solarbank) zählte mit seinem vollen Ertrag statt seiner Netto-Nutzung
   (Entladen minus Laden) — ein Teil davon erschien dadurch doppelt als
   „Versorgung", obwohl er noch im Speicher steckte.
+- Auflösung: Zähler-Entitäten mit eingestelltem Zeitraster (z. B. „5 Min.")
+  verschoben ihr Speicherraster nach jedem Neustart oder
+  Verbindungsaussetzer zufällig weiter (Phasendrift) — arbeiten jetzt auf
+  einem festen Uhrzeit-Raster statt relativ zum zuletzt gespeicherten Wert.
+- Auflösung: bei Schalter-Entitäten mit eingestelltem Zeitraster (statt
+  „Rohdaten") konnte ein echter Zustandswechsel durch das Zeitfenster
+  verloren gehen — die Auflösung ist bei Schalter-Entitäten jetzt fest auf
+  „Rohdaten" gesperrt.
 
 ## 0.97.0 - 2026-09-16
 
