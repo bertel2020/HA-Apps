@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.98.0 - 2026-09-18
+
+### Neu
+
+- **Verdichten**: archivierte Monate lassen sich jetzt nachträglich auf eine
+  gröbere Auflösung reduzieren — manuell mit Vorschau im Bearbeitungsbereich
+  einer Entität, oder automatisch über ein neues Mindestalter in
+  Housekeeping → Verdichten (standardmäßig aus). Bewusst getrennt von der
+  laufenden „Auflösung", damit sich Rohdaten live flexibel halten und
+  trotzdem irgendwann Archivvolumen reduzieren lässt.
+- **Auflösung** arbeitet jetzt auf einem festen Zeitraster statt relativ zum
+  zuletzt gespeicherten Wert — kein Verschieben des Rasters mehr nach
+  Neustarts oder Verbindungsaussetzern. Bei „Standard"-Entitäten (Temperatur,
+  Feuchte …) wird pro Fenster jetzt zusätzlich Min/Max mitgeführt statt nur
+  eines Einzelwerts. Bei Schalter-Entitäten ist die Auflösung jetzt fest auf
+  „Rohdaten" gesperrt, damit kein Zustandswechsel durch ein Zeitfenster
+  verloren gehen kann.
+- Neuer Housekeeping-Tab **Aktivität**: listet Korrekturen, hinzugefügte
+  Werte, Bereinigungen und Verdichtungen, filterbar nach Entität,
+  Aktionstyp, Status und Zeitraum; ein Klick auf Verdichten-/Bereinigen-
+  Zeilen zeigt Details (Zielauflösung, betroffener Zeitraum, Zeilen vorher/
+  nachher).
+- **Automatische Bereinigung** (Housekeeping → Speicherplatz): entfernt
+  markierte (gelöschte) Datensätze automatisch nach einem einstellbaren
+  Mindestalter (1 Woche bis 3 Monate), standardmäßig aus — lässt dabei ein
+  Sicherheitsfenster, damit „Rückgängig" frisch markierte Datensätze noch
+  zurückholen kann.
+- **Markierte Datensätze** (Housekeeping → Speicherplatz) zeigt jetzt erst
+  die betroffenen Entitäten, dann per Klick deren einzelne Markierungen
+  inklusive Wert — bisher eine unübersichtliche, endlos lange Liste aller
+  Einzelmarkierungen.
+- Versorgungsanteile: ein Speicher zählt jetzt mit seiner **Netto-Nutzung**
+  (Entladen minus Laden) statt der vollen Speicherentladung — vermeidet,
+  dass ein Teil des Ertrags doppelt als „Versorgung" auftaucht.
+
+### Geändert
+
+- Charts-Seite: ein aktiver Periodenvergleich hat jetzt Vorrang — Rohwerte/
+  Gestapelt/Zeitstrahl/Donut/„Auflösung: Voll" sind währenddessen
+  deaktiviert, statt den Vergleich stillschweigend abzuschalten.
+- Ausreißer-Hinweistext im Konfigurationsformular gekürzt (ausführliche
+  Erklärung steht im Handbuch).
+- Aktivität-Detailpopup (Verdichten/Bereinigen) zeigt jetzt beschriftete
+  Zeilen statt einer dicht mit „·" verketteten Zeile.
+
+### Behoben
+
+- Balken-Diagramme auf der Charts-Seite begannen bei aktiver „Dynamische
+  Y-Achse" nicht immer bei 0 — anders als auf Dashboard-Kacheln und der
+  Entitätsseite.
+- Verdichten räumt jetzt Löschmarkierungen des verdichteten Monats mit auf;
+  ein einmaliger Nachzieh-Lauf beim nächsten Start bereinigt auch bereits
+  zuvor verdichtete Monate. Vorher blieben solche Markierungen dauerhaft als
+  „ohne passende Rohdatenzeile" liegen.
+- Sortieren einer bereits serverseitig paginierten Tabelle (z. B. Markierte
+  Datensätze) erzeugte fälschlich einen zweiten, ungefragten Pager.
+- Der Standard für „Verdichtungsziel" stand versehentlich auf „1 Min." statt
+  „Aus".
+
 ## 0.97.0 - 2026-09-16
 
 ### Neu
