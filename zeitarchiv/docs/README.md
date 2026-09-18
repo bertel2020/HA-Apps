@@ -14,8 +14,11 @@ eigenes Änderungsprotokoll) — sie sendet an `/api/write`
 behandelt. Beide Repos zusammen zu pflegen (Versionierung, Sync,
 Release-Reihenfolge): [operations.md](operations.md).
 
-Unterstütze das Projekt: [Buy Me a Coffee](https://buymeacoffee.com/bertel2020) ·
-[Ko-fi](https://ko-fi.com/bertel2020) · [PayPal](https://paypal.me/RobertoMartins)
+<p align="center">
+  <a href="https://buymeacoffee.com/bertel2020"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://ko-fi.com/bertel2020"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
+</p>
 
 ## Für Nutzer
 
