@@ -1,0 +1,22 @@
+<p class="hint" style="margin:0 0 14px;">Korrektur, Hinzufügen, Bereinigen, Verdichten und Aufbewahrung, jeweils Datensatz-verändernd — die letzten {{ activity_rows | length }} Einträge. Backup bleibt außen vor, es betrifft die ganze Installation statt einzelner Datensätze.</p>
+{% if activity_rows %}
+<div class="tbl-wrap">
+  <table class="dt" data-sortable data-paginate data-page-size="20">
+    <thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Entität</th><th>Auslöser</th><th>Zeilen</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for row in activity_rows %}
+    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% endif %}>
+      <td data-sort="{{ row.created_at_ts }}">{{ row.created_at }}</td>
+      <td>{{ row.action }}</td>
+      <td>{{ row.entity_label }}</td>
+      <td>{{ row.trigger }}</td>
+      <td>{{ row.rows_affected }}</td>
+      <td{% if row.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ row.status }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="hint hint-status">Noch keine Aktivität aufgezeichnet.</p>
+{% endif %}

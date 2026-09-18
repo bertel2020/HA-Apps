@@ -281,6 +281,61 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "saved": saved,
         }
 
+    # Aktionstyp/Auslöser → Anzeigetext für Housekeeping → Aktivität. Lokal
+    # statt in formatting.py, dasselbe Muster wie status_labels in
+    # _settings_retention_context() — nur für diese eine Seite gebraucht.
+    _ACTIVITY_ACTION_LABELS = {
+        "add": "Hinzufügen", "correct": "Korrektur", "purge": "Bereinigen",
+        "compact": "Verdichten", "retention": "Aufbewahrung",
+    }
+    _ACTIVITY_STATUS_LABELS = {
+        "success": "Erfolgreich", "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen",
+        # "queued"/"running"/"skipped" kommen nur von retention_jobs — entity_actions
+        # protokolliert ausschließlich bereits abgeschlossene ("success") Aktionen.
+        "queued": "Geplant", "running": "Läuft", "skipped": "Übersprungen",
+    }
+
+    def _settings_activity_context(limit: int = 100) -> dict:
+        """Housekeeping → Aktivität: vereint entity_actions (Korrektur/
+        Hinzufügen/Bereinigen/Verdichten — bisher spurlos) mit retention_jobs
+        (hatte schon eine eigene Historie, siehe _settings_retention_context)
+        zu EINER zeitlich sortierten Liste. Backup bleibt bewusst außen vor —
+        betrifft die ganze Installation, keine einzelnen Datensätze."""
+        rows = []
+        for a in deps.index.list_entity_actions(limit):
+            entity = deps.index.get_entity(a["entity_id"]) if a["entity_id"] else None
+            if entity is not None:
+                entity_label = entity_display_name(a["entity_id"], entity["friendly_name"], entity["custom_name"])
+            else:
+                entity_label = a["entity_id"] or "mehrere Entitäten"
+            rows.append({
+                "created_at": f"{format_timestamp(a['created_at'], deps.tz)} {format_time(a['created_at'], deps.tz)}",
+                "created_at_ts": a["created_at"],
+                "action": _ACTIVITY_ACTION_LABELS.get(a["action"], a["action"]),
+                "entity_label": entity_label,
+                "trigger": "Automatisch" if a["trigger"] == "automatic" else "Manuell",
+                "rows_affected": format_int(a["rows_affected"]) if a["rows_affected"] is not None else "—",
+                "status": _ACTIVITY_STATUS_LABELS.get(a["status"], a["status"]),
+                "status_key": a["status"],
+                "error": a["error"],
+            })
+        for job in deps.index.list_retention_jobs(limit):
+            rows.append({
+                "created_at": f"{format_timestamp(job['created_at'], deps.tz)} {format_time(job['created_at'], deps.tz)}",
+                "created_at_ts": job["created_at"],
+                "action": _ACTIVITY_ACTION_LABELS["retention"],
+                "entity_label": (
+                    f"{job['entities_affected']} Entitäten" if job["entities_affected"] else "mehrere Entitäten"
+                ),
+                "trigger": "Automatisch" if job["trigger"] == "scheduled" else "Manuell",
+                "rows_affected": format_int(job["rows_deleted"]) if job["rows_deleted"] is not None else "—",
+                "status": _ACTIVITY_STATUS_LABELS.get(job["status"], job["status"]),
+                "status_key": job["status"],
+                "error": job["error"],
+            })
+        rows.sort(key=lambda r: r["created_at_ts"], reverse=True)
+        return {"activity_rows": rows[:limit]}
+
     def _settings_storage_index_context(report: dict | None = None) -> dict:
         report = report if report is not None else deps.storage_reconcile_last()
         if report is None:
@@ -537,6 +592,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 **_settings_retention_context(),
                 **_settings_rotation_context(),
                 **_settings_compact_context(),
+                **_settings_activity_context(),
             },
         )
 
@@ -675,6 +731,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "Bereinigung läuft…",
             int(vorschau.get("totals", {}).get("archive_months", 0) or 0),
         )
+        started_at = time.time()
         with deps.coordinator.exclusive():
             hot_purged = cleanup.purge_hot_buffer(deps.data_dir, deps.index, deps.tz)
             archive_result = cleanup.purge_archived_months(
@@ -698,6 +755,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             total_rows,
             months,
         )
+        if total_rows:
+            deps.index.log_entity_action(
+                None, "purge", "manual", started_at, time.time(), "success", rows_affected=total_rows
+            )
         deps.refresh_purge_preview_if_stale(force=True)
         return result
 

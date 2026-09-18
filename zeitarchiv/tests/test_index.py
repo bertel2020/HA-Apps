@@ -955,6 +955,41 @@ def test_compacted_month_marker_round_trips_and_can_be_overwritten() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_log_entity_action_round_trips_and_lists_newest_first() -> None:
+    """Grundlage für Housekeeping → Aktivität — Korrektur/Hinzufügen/
+    Bereinigen/Verdichten hatten bisher keine eigene Spur."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.temp", "sensor", "measurement", "°C")
+
+        assert index.list_entity_actions() == []
+
+        index.log_entity_action(
+            "sensor.temp", "correct", "manual", 100.0, 101.0, "success", rows_affected=1
+        )
+        index.log_entity_action(
+            None, "purge", "manual", 200.0, 205.0, "success", rows_affected=42,
+            detail='{"months": 3}',
+        )
+
+        rows = index.list_entity_actions()
+        assert len(rows) == 2
+        # Neuester zuerst — beide Einträge landen praktisch zeitgleich
+        # (created_at ist server-seitig, nicht die übergebenen Zeitstempel),
+        # deshalb über die Aktion statt über die Reihenfolge geprüft.
+        by_action = {row["action"]: row for row in rows}
+        assert by_action["correct"]["entity_id"] == "sensor.temp"
+        assert by_action["correct"]["rows_affected"] == 1
+        assert by_action["purge"]["entity_id"] is None
+        assert by_action["purge"]["detail"] == '{"months": 3}'
+        assert by_action["purge"]["rows_affected"] == 42
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_hidden_series_survive_save_and_default_to_none() -> None:
     """Ausgeblendete Serien eines Charts.
 

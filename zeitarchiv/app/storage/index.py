@@ -410,6 +410,31 @@ CREATE TABLE IF NOT EXISTS retention_jobs (
 CREATE INDEX IF NOT EXISTS idx_retention_jobs_created_at
     ON retention_jobs(created_at DESC);
 
+-- Protokoll datensatz-verändernder Aktionen, die bisher keine Spur
+-- hinterließen: Korrektur, Hinzufügen, Bereinigen, Verdichten (manuell und
+-- automatisch) — Grundlage für Housekeeping → Aktivität. entity_id ist NULL
+-- bei Aktionen über mehrere Entitäten hinweg (z. B. die globale Bereinigung).
+-- detail ist ein freies JSON-Objekt statt einer Spalte je Aktionstyp
+-- (Zeitraum/Ziel bei Verdichten, alter/neuer Wert bei Korrektur, …), damit
+-- neue Aktionstypen kein Schema-Wachstum brauchen. retention_jobs/backup_jobs
+-- bleiben bewusst eigene Tabellen (siehe deren Kommentare) — Housekeeping →
+-- Aktivität vereint beide nur zur Anzeige, nicht im Schema.
+CREATE TABLE IF NOT EXISTS entity_actions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_id TEXT,
+    action TEXT NOT NULL,
+    trigger TEXT NOT NULL,
+    started_at REAL,
+    finished_at REAL,
+    status TEXT NOT NULL,
+    rows_affected INTEGER,
+    detail TEXT,
+    error TEXT,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_entity_actions_created_at
+    ON entity_actions(created_at DESC);
+
 -- Persistente Idempotenz für den Live-Schreibpfad. "processing" wird vor
 -- dem Dateianhang gespeichert; "done" wird gemeinsam mit den Entitäts-
 -- Metadaten committed. Nach einem Crash lässt sich über die Event-ID in Hot-
@@ -1912,6 +1937,41 @@ class Index:
                 (finished_at,),
             )
             return cur.rowcount
+
+    def log_entity_action(
+        self,
+        entity_id: str | None,
+        action: str,
+        trigger: str,
+        started_at: float,
+        finished_at: float,
+        status: str,
+        rows_affected: int | None = None,
+        detail: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        """Ein Eintrag in Housekeeping → Aktivität — Korrektur/Hinzufügen/
+        Bereinigen/Verdichten hatten bisher keine eigene Spur (anders als
+        Backup/Retention mit ihren jeweiligen Job-Tabellen). `detail` ist
+        vom Aufrufer bereits als JSON-String übergeben, nicht hier serialisiert
+        — der Index kennt die Struktur der einzelnen Aktionstypen nicht."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                """INSERT INTO entity_actions
+                    (entity_id, action, trigger, started_at, finished_at, status,
+                     rows_affected, detail, error, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (entity_id, action, trigger, started_at, finished_at, status,
+                 rows_affected, detail, error, time.time()),
+            )
+
+    def list_entity_actions(self, limit: int = 100) -> list[sqlite3.Row]:
+        safe_limit = max(1, min(int(limit), 500))
+        with self._lock, self._conn:
+            return self._conn.execute(
+                "SELECT * FROM entity_actions ORDER BY created_at DESC, id DESC LIMIT ?",
+                (safe_limit,),
+            ).fetchall()
 
     # -- Eindeutige Namen (Dashboards/Charts/Tabellen) -------------------------
     # Die drei folgenden Helfer setzen voraus, dass der Aufrufer self._lock

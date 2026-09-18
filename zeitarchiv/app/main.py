@@ -4871,8 +4871,13 @@ def _rows_fragment(
     # Zeitraum vollständig in EINEM bereits verdichteten Monat liegt — bei
     # Jahr/Gesamt (mehrere Monate, teils verdichtet, teils nicht) wäre ein
     # einzelner Hinweis irreführend, deshalb bewusst kein Hinweis dafür.
+    # window_end ist EXKLUSIV (siehe rows_window()-Docstring) — bei "Monat"
+    # zeigt es exakt auf den 1. des FOLGEMONATS, ein direkter Vergleich mit
+    # window_start würde die Monatsgleichheit also fälschlich verneinen.
+    # Eine Sekunde davor liegt dagegen sicher noch im angezeigten Monat.
+    window_last_moment = datetime.fromtimestamp(window_end.timestamp() - 1, TZ)
     compacted_month_hint = None
-    if mode == "correct" and (window_start.year, window_start.month) == (window_end.year, window_end.month):
+    if mode == "correct" and (window_start.year, window_start.month) == (window_last_moment.year, window_last_moment.month):
         marker = index.get_compacted_month(entity_id, window_start.year, window_start.month)
         if marker is not None:
             compacted_month_hint = (
@@ -4993,7 +4998,11 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     now = datetime.now(TZ)
     if body.ts <= 0 or body.ts > now.timestamp() + 3600:
         raise HTTPException(status_code=400, detail="Ungültiger Zeitstempel")
+    started_at = time.time()
     cleanup.add_raw_value(DATA_DIR, index, entity_id, body.ts, body.value, TZ, now=now)
+    index.log_entity_action(
+        entity_id, "add", "manual", started_at, time.time(), "success", rows_affected=1
+    )
     return {"ok": True}
 
 
@@ -5014,11 +5023,15 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
     der Aufrufer (cleanup.html) triggert nach Erfolg selbst ein Neuladen von
     #controls, damit die Tabelle den neuen Wert zeigt."""
     _require_entity(entity_id)
+    started_at = time.time()
     changed = cleanup.correct_raw_value(
         DATA_DIR, index, entity_id, body.ts, body.old_value, body.new_value, TZ
     )
     if not changed:
         raise HTTPException(status_code=404, detail="Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)")
+    index.log_entity_action(
+        entity_id, "correct", "manual", started_at, time.time(), "success", rows_affected=1
+    )
     return {"ok": True}
 
 
@@ -5064,12 +5077,23 @@ def compact_rows(entity_id: str, body: _CompactValuesBody) -> dict:
     /rows/correct kein async def."""
     _require_entity(entity_id)
     _validate_compact_body(entity_id, body)
+    started_at = time.time()
     try:
         result = cleanup.compact_raw_values(
             DATA_DIR, index, entity_id, body.start_ts, body.end_ts, body.target_resolution, TZ,
         )
     except cleanup.CompactionError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
+    index.log_entity_action(
+        entity_id, "compact", "manual", started_at, time.time(), "success",
+        rows_affected=result["rows_before"] - result["rows_after"],
+        detail=json.dumps({
+            "target_resolution": body.target_resolution,
+            "months_compacted": result["months_compacted"],
+            "rows_before": result["rows_before"],
+            "rows_after": result["rows_after"],
+        }),
+    )
     logger.info(
         "Manuelle Verdichtung abgeschlossen · event=manual_compaction_completed "
         "entity_id=%s target=%s rows_before=%d rows_after=%d months=%d",

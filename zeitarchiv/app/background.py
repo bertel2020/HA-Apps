@@ -863,9 +863,10 @@ class BackgroundService:
             if entity["aggregation_type"] == "switch" or entity["compact_target"] == "off":
                 continue
             entity_id = entity["entity_id"]
+            started_at = time.time()
             with self.coordinator.entity(entity_id):
                 try:
-                    cleanup.compact_raw_values(
+                    result = cleanup.compact_raw_values(
                         self.data_dir, self.index, entity_id, 0.0, cutoff_ts,
                         entity["compact_target"], self.tz, now=now,
                     )
@@ -873,6 +874,17 @@ class BackgroundService:
                     # z. B. Ziel nicht mehr gültig zwischen zwei Läufen —
                     # kein Grund, die übrigen Entitäten zu überspringen.
                     continue
+            if result["months_compacted"]:
+                self.index.log_entity_action(
+                    entity_id, "compact", "automatic", started_at, time.time(), "success",
+                    rows_affected=result["rows_before"] - result["rows_after"],
+                    detail=json.dumps({
+                        "target_resolution": entity["compact_target"],
+                        "months_compacted": result["months_compacted"],
+                        "rows_before": result["rows_before"],
+                        "rows_after": result["rows_after"],
+                    }),
+                )
 
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
