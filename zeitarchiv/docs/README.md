@@ -14,6 +14,9 @@ eigenes Änderungsprotokoll) — sie sendet an `/api/write`
 behandelt. Beide Repos zusammen zu pflegen (Versionierung, Sync,
 Release-Reihenfolge): [operations.md](operations.md).
 
+Unterstütze das Projekt: [Buy Me a Coffee](https://buymeacoffee.com/bertel2020) ·
+[Ko-fi](https://ko-fi.com/bertel2020) · [PayPal](https://paypal.me/RobertoMartins)
+
 ## Für Nutzer
 
 | Dokument | Inhalt |
