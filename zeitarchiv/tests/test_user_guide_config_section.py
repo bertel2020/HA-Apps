@@ -90,14 +90,16 @@ def test_the_switch_domains_are_named() -> None:
         assert f"`{domain}`" in ABSCHNITT, domain
 
 
-def test_the_chapter_does_not_claim_that_dense_values_get_condensed() -> None:
-    """Der konkrete Fehler, der hier stand: `should_accept_write()` VERWIRFT
-    zu dichte Werte, es entsteht kein Mittelwert. Wer das Kapitel wieder auf
-    „verdichtet" umschreibt, ändert eine Zusage über das Verhalten."""
-    assert "verworfen, nicht zusammengefasst" in ABSCHNITT
-    # "verdichtete Werte" darf vorkommen (als Verweis auf die Aggregation in
-    # Charts und Tabellen) — verboten ist die Aussage über die Auflösung selbst.
-    assert "werden entsprechend verdichtet" not in ABSCHNITT
+def test_the_chapter_describes_the_resolution_behavior_per_type() -> None:
+    """Seit 0.98.0 (festes Zeitraster, Ø/Min/Max für Standard) ist das
+    Verhalten typabhängig — der ursprüngliche Fehler hier war eine
+    pauschale Aussage für alle Typen ("verdichtet" statt "verworfen"),
+    heute wäre eine pauschale Aussage in die jeweils andere Richtung
+    genauso falsch: Zähler verwerfen zu dichte Werte weiterhin ersatzlos,
+    Standard-Entitäten fassen sie jetzt tatsächlich zusammen."""
+    auflösung = FLACH[FLACH.index("### Auflösung"):FLACH.index("### Verdichtungsziel")]
+    assert "wird behalten, der Rest verworfen" in auflösung
+    assert "zu einer Zeile zusammengefasst" in auflösung
 
 
 def test_the_outlier_rules_are_described_per_type() -> None:

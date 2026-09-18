@@ -524,13 +524,22 @@ siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur
 Standardansicht.
 
 Darunter stehen nebeneinander zwei Donut-plus-Tabelle-Karten:
-**„Versorgungsanteile"** (Erzeuger, Netzbezug und Speicherentladung — die
+**„Versorgungsanteile"** (Erzeuger, Netzbezug und Speicher — die
 Angebotsseite) links und **„Verbraucheranteile"** (die einzelnen
 Verbraucher plus Grundlast — die Verbrauchsseite, siehe
 [Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
 oben) rechts. Eine Tabellenzeile mit der Maus zu berühren hebt das
 zugehörige Donut-Segment hervor, Entitäten mit eigener Zuordnung sind
 zusätzlich verlinkt.
+
+Ein Speicher zählt in „Versorgungsanteile" mit seiner **Netto-Nutzung**
+(Entladen minus Geladen) statt der reinen Entladeleistung — sonst würde ein
+Erzeuger mit eigenem Speicher (z. B. eine Solarbank) teilweise doppelt
+gezählt: einmal mit seinem vollen Ertrag, einmal über den Speicher, obwohl
+ein Teil davon noch gar nicht beim Verbrauch angekommen ist. Die
+Netto-Nutzung kann negativ sein (Periode überwiegend geladen); der Donut
+zeigt dann nur die positiven Anteile, die Tabelle die Zeile trotzdem
+inklusive Minuszeichen.
 
 Die Karte **„Autarkie & Speicher"** darunter zeigt vier
 Ringe — Autarkie, Eigenverbrauch, Speicher-Ladezustand und
@@ -637,7 +646,9 @@ Darstellungs-Schalter, keine Navigation mehr.
 - **Dynamische Y-Achse** skaliert die Achse auf die tatsächliche
   Wertespanne des angezeigten Zeitraums statt bei 0 zu beginnen — macht
   kleine Schwankungen sichtbarer, kann die visuelle Größe von Änderungen
-  aber auch überzeichnen.
+  aber auch überzeichnen. Bei Balken-Diagrammen bleibt die Achse davon
+  unberührt und beginnt immer bei 0, weil ein Balken sonst eine falsche
+  Größenordnung suggerieren würde.
 - **Werte anzeigen** blendet die Zahlenwerte direkt neben den Datenpunkten
   ein.
 - **Durchschnittslinie** legt eine gestrichelte waagerechte Linie beim
@@ -846,7 +857,11 @@ Kategorie zusammenfassen, der Ranking-Vergleich gibt jeder ihre eigene).
 **Vergleichen** stellt der aktuellen Periode die Vorperiode oder denselben
 Zeitraum des Vorjahres gegenüber — wie in der Verlaufsansicht einer
 einzelnen Entität. Nicht verfügbar bei aktiven Rohwerten, beim
-Ranking-Vergleich oder bei aktiver Stapelung (siehe oben).
+Ranking-Vergleich oder bei aktiver Stapelung (siehe oben). Umgekehrt gilt
+dasselbe: Rohwerte, Zeitstrahl, Donut, Gestapelt, Ausrichtung und
+Auflösung „Voll" sind deaktiviert, solange Vergleichen aktiv ist —
+Vergleichen hat Vorrang, statt beim Umschalten still im Hintergrund
+abgeschaltet zu werden.
 
 ### Unterschiede zur Verlaufsansicht einer einzelnen Entität
 
@@ -1136,22 +1151,33 @@ HA-Namen wieder her.
 ### Auflösung
 
 **Mindestabstand zwischen zwei gespeicherten Werten.** Wählbar: Rohdaten,
-30 Sekunden, 1, 5, 15 Minuten, 1 Stunde.
+30 Sekunden, 1, 5, 15 Minuten, 1 Stunde. „Rohdaten" speichert jede
+eintreffende Zustandsänderung und ist die Voreinstellung für neu erkannte
+Entitäten. Die Einstellung gilt nur für neu eintreffende Werte; bereits
+archivierte bleiben unverändert.
 
-Zwei Dinge, die man leicht falsch erwartet:
+Was aus zu dicht eintreffenden Werten wird, hängt vom Entitätstyp ab:
 
-- **Zu dichte Werte werden verworfen, nicht zusammengefasst.** Bei „5 Min."
-  wird ein Wert, der 30 Sekunden nach dem letzten gespeicherten eintrifft,
-  weggeworfen — es entsteht kein Mittelwert daraus. Wer verdichtete Werte
-  will, lässt die Auflösung fein und nutzt in Charts und Tabellen die dortige
-  Aggregation.
-- **Der Abstand läuft ab dem zuletzt gespeicherten Wert**, nicht ab festen
-  Uhrzeit-Rastern. Nach einer Pause wird der erste wieder eintreffende Wert
-  also sofort gespeichert, nicht erst zur nächsten vollen Fünf-Minuten-Marke.
+- **Zähler** (Verbrauch, Erzeugung, alles mit stetig steigendem Stand): der
+  letzte Wert je Zeitfenster wird behalten, der Rest verworfen — Zählerstände
+  lassen sich daraus weiterhin exakt weiterrechnen. Das Zeitfenster liegt auf
+  einem festen Uhrzeit-Raster (bei „5 Min." also immer zur vollen
+  Fünf-Minuten-Marke), nicht relativ zum zuletzt gespeicherten Wert — nach
+  einer Pause (Neustart, Verbindungsaussetzer) verschiebt sich das Raster
+  dadurch nicht.
+- **Standard-Entitäten** (Temperatur, Feuchte, Leistung …): alle Rohwerte
+  eines Zeitfensters werden zu einer Zeile zusammengefasst — Durchschnitt
+  plus Min/Max, damit ein kurzer Ausreißer (z. B. eine Temperaturspitze)
+  nicht ersatzlos verloren geht. Zeitstempel der Zeile ist das Ende des
+  Zeitfensters.
+- **Schalter-Entitäten**: Auflösung ist fest auf „Rohdaten" gesperrt, damit
+  ein echter Zustandswechsel nie durch ein Zeitfenster verworfen werden
+  kann. Duplikate (unveränderter Zustand) fängt stattdessen weiterhin der
+  unabhängige [Wertänderungsfilter](#wertänderungsfilter) ab.
 
-„Rohdaten" speichert jede eintreffende Zustandsänderung und ist die
-Voreinstellung für neu erkannte Entitäten. Die Einstellung gilt nur für neu
-eintreffende Werte; bereits archivierte bleiben unverändert.
+Wer verdichtete Werte über einen längeren, frei wählbaren Zeitraum sehen
+will, nutzt in Charts und Tabellen die dortige Aggregation — oder, für
+bereits archivierte Monate, das [Verdichtungsziel](#verdichtungsziel) unten.
 
 ### Verdichtungsziel
 
@@ -1174,6 +1200,9 @@ Min/Max je Bucket. Ein bereits verdichteter Monat wird bei Standard-Entitäten
 nie erneut verdichtet; bei Zählern nur auf ein noch gröberes Ziel. Voreingestellt
 für neue Entitäten ist der globale Standard unter **Einstellungen →
 Archivierung**.
+
+Für **Schalter-Entitäten nicht verfügbar** — eine rückwirkende Verdichtung
+könnte einen echten Zustandswechsel (AN/AUS) wegkomprimieren.
 
 ### Aufbewahrung
 
@@ -1614,7 +1643,7 @@ wie die Einstellungen:
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Verdichten** | Schalter für die automatische, rückwirkende Verdichtung archivierter Monate (standardmäßig aus) und das Mindestalter dafür — betrifft nur Entitäten mit gesetztem Verdichtungsziel (siehe [Entität konfigurieren](#entität-konfigurieren)). Die manuelle Verdichten-Aktion liegt dagegen bei der jeweiligen Entität selbst, im Bearbeitungsbereich. |
-| **Aktivität** | Die letzten Korrektur-, Hinzufügen-, Bereinigen-, Verdichten- und Aufbewahrung-Vorgänge in einer Liste, mit Entität, Auslöser (manuell/automatisch), Zeilenzahl und Status. Backup steht dort nicht mit drin — es betrifft die ganze Installation, nicht einzelne Datensätze. |
+| **Aktivität** | Die letzten Korrektur-, Hinzufügen-, Bereinigen-, Verdichten- und Aufbewahrung-Vorgänge in einer Liste, mit Entität, Auslöser (manuell/automatisch), Zeilenzahl und Status — filterbar nach Entität, Aktionstyp, Status und Zeitraum. Ein Klick auf eine Verdichten- oder Bereinigen-Zeile zeigt ihr Detail (Zielauflösung, betroffener Zeitraum, Zeilen vorher/nachher). Backup steht dort nicht mit drin — es betrifft die ganze Installation, nicht einzelne Datensätze. |
 | **Rotation** | Entitäten mit noch nicht archiviertem Vormonat (passiert normalerweise automatisch beim nächsten empfangenen Wert) — bei Bedarf manuell nachziehbar, z. B. wenn eine Entität längere Zeit keine Werte mehr gesendet hat. |
 | **Ungenutzte Elemente** | Charts und Tabellen, die in keinem Dashboard angepinnt sind — direkt öffnen oder löschen. Verschwindet automatisch aus der Liste, sobald irgendwo angepinnt. |
 

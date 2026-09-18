@@ -33,13 +33,42 @@ Nutzereingaben ohne diese Validierung.
 
 ## Hot Buffer (laufender Monat)
 
-- Format: CSV, eine Zeile `ts,value[,event_id]` pro Messpunkt.
+- Format: CSV, eine Zeile `ts,value[,event_id[,min_value,max_value]]` pro
+  Messpunkt. `min_value`/`max_value` stehen nur bei Zeilen, die die
+  Auflösung als Ø mehrerer Rohwerte eines Zeitfensters geschrieben hat
+  (Standard-Entitäten, siehe unten) — bei jeder anderen Zeile leer, und bei
+  älteren Zeilen ohne die beiden Spalten liest `hotbuffer.iter_records()`
+  sie als `None` nach.
 - Bewusst **unkomprimiert**: Parquet lässt sich nicht beliebig fortlaufend
   anhängen; ein Absturz mitten im Schreiben macht ein CSV nicht unlesbar,
   eine Parquet-Datei ohne Footer schon.
 - Ein neuer Wert landet immer hier, nie direkt im Archiv.
 - Live-Abfragen des laufenden Zeitraums lesen und aggregieren diese Datei
   direkt (kein Rollup existiert für unabgeschlossene Perioden).
+
+## Auflösung (Schreib-Drossel)
+
+`Index.should_accept_write()` entscheidet vor jedem Schreiben, ob ein
+eintreffender Wert überhaupt in den Hot Buffer wandert — abhängig von
+`entities.resolution` und, seit 0.98.0, vom Aggregationstyp:
+
+- **Zähler:** festes Uhrzeit-Raster (`ceil(ts/interval)*interval`) statt
+  relativ zum zuletzt gespeicherten Wert — kein Phasendrift mehr nach
+  Neustarts/Verbindungsaussetzern. Werte zwischen zwei Rasterpunkten werden
+  verworfen, nicht gemittelt (Teleskopsumme bleibt exakt).
+- **Standard:** kein Verwerfen mehr, sondern `storage/resolution.py` —
+  jeder Rohwert wird sofort in den Hot Buffer geschrieben (nie im RAM
+  gepuffert, dadurch neustart-sicher); beim Überschreiten der nächsten
+  Fenstergrenze fasst ein Hintergrund-Mechanismus die Rohzeilen des
+  abgeschlossenen Fensters zu einer Ø/Min/Max-Zeile zusammen (Zeitstempel
+  = Fenster-**Ende**, nicht -Anfang). Sicherheitsnetz für verstummte
+  Entitäten: `_flush_stale_resolution_windows()`, alle 5 Minuten im
+  Wartungsplaner geprüft.
+- **Switch:** `resolution` fest auf `raw` gesperrt (Formularfeld
+  deaktiviert, Server validiert zusätzlich) — ein echter Zustandswechsel
+  darf nie durch ein Zeitfenster verworfen werden. Duplikate (unveränderter
+  Zustand) fängt weiterhin der unabhängige, zeitfensterfreie
+  `should_accept_value()` ab.
 
 ## Rotation (Hot → Archiv)
 
@@ -106,12 +135,40 @@ zwei identischen Zeitstempeln lässt sich so gezielt nur einmal entfernen).
   anzufassen.
 - **Rückgängig:** Löschen aus `deleted_points`, Rohdatei bleibt unverändert
   — jederzeit möglich, solange nicht purged wurde.
-- **Purge** (`cleanup.purge_hot_buffer()` / `purge_archived_months()`, nur
-  über **Housekeeping → Speicherplatz**, explizite Bestätigung): entfernt
-  die markierten Zeilen physisch. Für den laufenden Monat ein CSV-Rewrite;
-  für bereits archivierte Monate ein Parquet-Rewrite **plus** Neuberechnung
-  der betroffenen Rollup-Zeilen (`rollup.replace_month()` /
-  `remove_month()`). Danach ist der Vorgang endgültig.
+- **Purge** (`cleanup.purge_hot_buffer()` / `purge_archived_months()`):
+  entfernt die markierten Zeilen physisch. Für den laufenden Monat ein
+  CSV-Rewrite; für bereits archivierte Monate ein Parquet-Rewrite **plus**
+  Neuberechnung der betroffenen Rollup-Zeilen (`rollup.replace_month()` /
+  `remove_month()`). Danach ist der Vorgang endgültig. Manuell über
+  **Housekeeping → Speicherplatz** (explizite Bestätigung), oder
+  automatisch ab einem einstellbaren Mindestalter der Markierung
+  (`older_than`-Parameter, bezogen auf `deleted_points.deleted_at` statt
+  auf den Zeitpunkt des Datenpunkts selbst — ein Sicherheitsfenster, damit
+  „Rückgängig" eine gerade erst markierte Charge noch zurückholen kann).
+- **Verdichten** entfernt Markierungen ebenfalls, als Nebeneffekt einer
+  Auflösungsänderung statt eines expliziten Löschvorgangs — siehe unten.
+
+## Verdichten (rückwirkende Kompaktierung archivierter Monate)
+
+Anders als Auflösung (wirkt nur auf neu eintreffende Werte) und Rollups
+(Lesepfad, ändert das Archiv nicht): `cleanup.compact_raw_values()`
+schreibt einen bereits archivierten Monat tatsächlich neu, mit gröberer
+Auflösung — typabhängig (Zähler: letzter Wert je Bucket plus jeder
+erkannte Zählerrücksprung als eigene Rohzeile; Standard: Ø/Min/Max je
+Bucket; Switch ausgeschlossen). Gesteuert über `entities.compact_target`
+(Default `off`), ausgelöst manuell (Bearbeitungsbereich der Entität) oder
+automatisch (`background._run_automatic_compaction_if_due()`, Housekeeping
+→ Verdichten, höchstens einmal täglich). `compacted_months` verhindert
+eine zweite Verdichtung desselben Monats (Standard-Entitäten: nie erneut;
+Zähler: nur auf ein noch gröberes Ziel).
+
+Da die Archivdatei beim Verdichten komplett neu geschrieben wird, entfernt
+`compact_raw_values()` dabei automatisch auch `deleted_points`-Markierungen
+des betroffenen Monats — sonst blieben sie dauerhaft als „Löschmarkierung
+ohne passende Rohdatenzeile" liegen (die Zeitstempel, auf die sie zeigen,
+existieren nach der Neuberechnung nicht mehr). Ein einmaliger Lauf beim
+App-Start (`remove_deleted_points_for_already_compacted_months()`) räumt
+denselben Bestand auch für bereits vor diesem Fix verdichtete Monate auf.
 
 ## Aufbewahrung (Retention)
 
@@ -134,8 +191,10 @@ Existenz-Check in `Index.__init__()`.
 
 | Tabelle | Zweck |
 | --- | --- |
-| `entities` | Eine Zeile je bekannter Entität: Aggregationstyp, Auflösung, Aufbewahrung, Nachkommastellen, Wertfilter, Ausreißer-/Lücken-Schwellen, `first_ts`/`last_ts`/`last_value` (Zustand für Idempotenz- und Filterprüfungen), `row_count`/`size_bytes`/`deleted_count` (für die Statistik, inkrementell gepflegt statt bei jeder Anzeige neu gezählt bzw. gegen `deleted_points` gejoint) |
+| `entities` | Eine Zeile je bekannter Entität: Aggregationstyp, Auflösung, `compact_target` (Verdichtungsziel, siehe oben), Aufbewahrung, Nachkommastellen, Wertfilter, Ausreißer-/Lücken-Schwellen, `first_ts`/`last_ts`/`last_value` (Zustand für Idempotenz- und Filterprüfungen), `row_count`/`size_bytes`/`deleted_count` (für die Statistik, inkrementell gepflegt statt bei jeder Anzeige neu gezählt bzw. gegen `deleted_points` gejoint) |
 | `deleted_points` | Soft-Delete-Markierungen, siehe oben. Indiziert auf `(entity_id, ts)` und `(entity_id, deleted_at)` |
+| `compacted_months` | Ein Eintrag je bereits verdichtetem Monat (`entity_id, year, month` → `target_resolution`, `compacted_at`) — verhindert eine erneute Verdichtung (siehe oben) und ist Grundlage des Löschmarkierungs-Nachzieh-Laufs beim App-Start |
+| `entity_actions` | Log der Korrektur-/Hinzufügen-/Bereinigen-/Verdichten-Vorgänge (Housekeeping → Aktivität): `entity_id` (nullable — Bereinigung/automatisches Verdichten betreffen oft mehrere), `action`/`trigger`/`status`/`rows_affected`, `detail` als freies JSON statt einer Spalte je Aktionstyp |
 | `ingested_events` | Idempotenz-Ledger des Schreibpfads (siehe [ingestion.md](ingestion.md)); Einträge älter als 7 Tage werden periodisch geprunt |
 | `settings` | Generischer Key-Value-Store: globale Auflösungs-/Aufbewahrungs-Standards, Loglevel, Farbschema, API-Token, sowie **gecachte teure Vorschauen** und **HA-Integrations-Status** (siehe unten) |
 | `stats_snapshots`, `memory_snapshots` | Stündliche Schnappschüsse für Statistik-Verlaufsgrafiken |

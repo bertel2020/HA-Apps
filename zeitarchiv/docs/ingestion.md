@@ -24,8 +24,13 @@ siehe [architecture.md](architecture.md)):
    monoton steigenden Live-Pfad genügt ein Vergleich mit `entities.last_ts`
    (kein Datei-I/O); nur wenn der neue Zeitstempel nicht hinter dem Index-
    Maximum liegt, wird die Datei tatsächlich durchsucht.
-4. **Auflösungsfilter** (`should_accept_write`) — z. B. "nur alle 5 Minuten"
-   bei individuell konfigurierter Auflösung.
+4. **Auflösungsfilter**, typabhängig (siehe [data-model.md](data-model.md#auflösung-schreib-drossel)):
+   bei Zählern und Switches drosselt `should_accept_write` auf ein festes
+   Zeitraster und verwirft dazwischenliegende Werte ersatzlos (Switch-
+   Auflösung ist ohnehin fest auf `raw` gesperrt, drosselt also nie).
+   Standard-Entitäten mit Auflösung ≠ `raw` lassen dagegen jeden Wert durch
+   und fassen ihn erst nachträglich fensterweise zu einer Ø/Min/Max-Zeile
+   zusammen (`resolution.py`) — kein `skipped` hier.
 5. **Wertänderungsfilter** (`should_accept_value`) — überspringt gerundet
    gleiche Folgewerte, behält aber mindestens alle sechs Stunden ein
    Lebenszeichen (verhindert, dass ein Chart bei einem seit Tagen
