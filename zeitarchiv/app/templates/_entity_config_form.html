@@ -169,7 +169,7 @@
   </p>
   {% endif %}
   {% endif %}
-  {% call hint_body() %}Ab welchem Vielfachen des für diese Entität Üblichen die Bereinigungs-Seite einen Wert als Ausreißer markiert — gesucht sind unplausible Werte (Übertragungsfehler, verrutschte Ziffern), nicht bloß hohe. Bei Zählern ist der Bezug der übliche Zuwachs: markiert wird ein Zuwachs, der ein Vielfaches davon beträgt; ein gleichmäßig laufender Zähler löst nie aus. Bei allen anderen Sensoren ist der Bezug die übliche Schwankung der letzten fünfzehn Werte. Ein Vielfaches statt eines Prozentsatzes, damit dieselbe Einstellung auf einem frischen und einem alten Zähler und auf jeder Skala dasselbe bedeutet. Kleinere Zahl = empfindlicher. „Aus“ blendet den Filter dort aus.{% endcall %}
+  {% call hint_body() %}Ab welchem Vielfachen des für diese Entität Üblichen ein Wert als Ausreißer markiert wird — bei Zählern bezogen auf den üblichen Zuwachs, bei allen anderen Sensoren auf die übliche Schwankung der letzten 15 Werte. Kleinere Zahl = empfindlicher, „Aus“ schaltet die Erkennung ab. Mehr dazu im Handbuch.{% endcall %}
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">
