@@ -50,9 +50,6 @@
   Solarbank) zählte mit seinem vollen Ertrag statt seiner Netto-Nutzung
   (Entladen minus Laden) — ein Teil davon erschien dadurch doppelt als
   „Versorgung", obwohl er noch im Speicher steckte.
-- Sortieren einer bereits serverseitig paginierten Tabelle mit mehr als 10
-  Zeilen (z. B. Statistik → Speichernutzung/Index) erzeugte fälschlich
-  einen zweiten, ungefragten Pager.
 
 ## 0.97.0 - 2026-09-16
 
