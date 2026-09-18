@@ -117,7 +117,11 @@ def test_the_compact_detail_is_rendered_readably(client) -> None:
     tabelle = html[html.index("<tbody>"):]
     assert 'class="job-row-detail"' in tabelle
     assert 'onclick="showActivityDetail(this)"' in tabelle
-    assert 'data-detail="Ziel 1 Std. · Oktober 2023, November 2023 · 17.280 → 1.440 Zeilen"' in tabelle
+    assert (
+        'data-detail="Zielauflösung: 1 Std.\n'
+        "Zeitraum: Oktober 2023, November 2023\n"
+        'Zeilen: 17.280 → 1.440"'
+    ) in tabelle
 
 
 def test_the_compact_detail_mentions_cleaned_up_stale_markers(client) -> None:
@@ -145,7 +149,7 @@ def test_the_compact_detail_mentions_cleaned_up_stale_markers(client) -> None:
     )
 
     html = client.get("/housekeeping/activity?entity=sensor.pytest_activity_compact_stale").text
-    assert "3 verwaiste Löschmarkierungen aufgeräumt" in html
+    assert "Aufgeräumt: 3 verwaiste Löschmarkierungen" in html
 
 
 def test_the_automatic_purge_detail_is_rendered_readably(client) -> None:
@@ -165,12 +169,14 @@ def test_the_automatic_purge_detail_is_rendered_readably(client) -> None:
     html = client.get("/housekeeping/activity?action=purge").text
     tabelle = html[html.index("<tbody>"):]
     assert 'class="job-row-detail"' in tabelle
-    assert 'data-detail="Mindestalter der Markierung: 3 Monate · 5 bereits archivierte Monate neu berechnet"' in tabelle
+    assert (
+        'data-detail="Mindestalter der Markierung: 3 Monate\n'
+        'Neu berechnete Monate: 5"'
+    ) in tabelle
     assert "Automatisch" in tabelle
 
 
-def test_the_purge_detail_uses_correct_singular_grammar(client) -> None:
-    """1 statt N Monate: "archivierter Monat", nicht "archivierte Monate"."""
+def test_the_purge_detail_shows_the_month_count_even_when_it_is_one(client) -> None:
     from app.main import index
 
     now = time.time()
@@ -182,7 +188,10 @@ def test_the_purge_detail_uses_correct_singular_grammar(client) -> None:
 
     html = client.get("/housekeeping/activity?action=purge&status=success").text
     tabelle = html[html.index("<tbody>"):]
-    assert 'data-detail="Mindestalter der Markierung: 1 Woche · 1 bereits archivierter Monat neu berechnet"' in tabelle
+    assert (
+        'data-detail="Mindestalter der Markierung: 1 Woche\n'
+        'Neu berechnete Monate: 1"'
+    ) in tabelle
 
 
 def test_other_action_types_are_not_clickable(client) -> None:

@@ -2109,5 +2109,5 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 }
 .confirm-overlay.open{transform:translateY(0) scale(1);}
 .confirm-overlay::backdrop{background:rgba(0,0,0,.4);}
-.confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);}
+.confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);white-space:pre-line;}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}

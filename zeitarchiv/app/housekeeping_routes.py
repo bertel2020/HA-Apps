@@ -341,30 +341,33 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             detail = json.loads(detail_json)
         except (TypeError, ValueError):
             return ""
+        # Beschriftete Zeilen statt einer dicht mit "·" verketteten Zeile —
+        # zeigt jeden Wert mit eigenem Label, dank white-space:pre-line auf
+        # .confirm-message (app.css) auch als eigene Zeile im Popup.
         if action == "compact":
             months_list = sorted(detail.get("months_compacted") or [])
-            parts = [f"Ziel {format_compact_target(detail.get('target_resolution', ''))}"]
+            lines = [f"Zielauflösung: {format_compact_target(detail.get('target_resolution', ''))}"]
             if months_list:
-                parts.append(", ".join(_month_year_label(m) for m in months_list))
+                lines.append(f"Zeitraum: {', '.join(_month_year_label(m) for m in months_list)}")
             rows_before, rows_after = detail.get("rows_before"), detail.get("rows_after")
             if rows_before is not None and rows_after is not None:
-                parts.append(f"{format_int(rows_before)} → {format_int(rows_after)} Zeilen")
+                lines.append(f"Zeilen: {format_int(rows_before)} → {format_int(rows_after)}")
             stale_markers = detail.get("stale_markers_removed")
             if stale_markers:
-                parts.append(
-                    f"{format_int(stale_markers)} verwaiste Löschmarkierung{'en' if stale_markers != 1 else ''} aufgeräumt"
+                lines.append(
+                    f"Aufgeräumt: {format_int(stale_markers)} verwaiste Löschmarkierung{'en' if stale_markers != 1 else ''}"
                 )
-            return " · ".join(parts)
+            return "\n".join(lines)
         # action == "purge" — bisher nur vom automatischen Lauf gefüllt (siehe
         # Docstring), der manuelle Button kennt kein Mindestalter.
         min_age_label = PURGE_MIN_AGE_DAYS_LABELS.get(
             str(detail.get("min_age_days", "")), f"{detail.get('min_age_days')} Tage"
         )
-        parts = [f"Mindestalter der Markierung: {min_age_label}"]
+        lines = [f"Mindestalter der Markierung: {min_age_label}"]
         months_purged = detail.get("months_purged")
         if months_purged:
-            parts.append(f"{months_purged} bereits archivierte{'r' if months_purged == 1 else ''} Monat{'e' if months_purged != 1 else ''} neu berechnet")
-        return " · ".join(parts)
+            lines.append(f"Neu berechnete Monate: {format_int(months_purged)}")
+        return "\n".join(lines)
 
     def _settings_activity_context(
         limit: int = 100,
