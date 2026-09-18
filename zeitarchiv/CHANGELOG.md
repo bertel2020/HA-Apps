@@ -9,7 +9,9 @@
   einer Entität, oder automatisch über ein neues Mindestalter in
   Housekeeping → Verdichten (standardmäßig aus). Bewusst getrennt von der
   laufenden „Auflösung", damit sich Rohdaten live flexibel halten und
-  trotzdem irgendwann Archivvolumen reduzieren lässt.
+  trotzdem irgendwann Archivvolumen reduzieren lässt. Zugehörige
+  Löschmarkierungen bleiben dabei automatisch konsistent, statt als
+  „Löschmarkierung ohne passende Rohdatenzeile" liegen zu bleiben.
 - **Auflösung** arbeitet jetzt auf einem festen Zeitraster statt relativ zum
   zuletzt gespeicherten Wert — kein Verschieben des Rasters mehr nach
   Neustarts oder Verbindungsaussetzern. Bei „Standard"-Entitäten (Temperatur,
@@ -31,33 +33,26 @@
   die betroffenen Entitäten, dann per Klick deren einzelne Markierungen
   inklusive Wert — bisher eine unübersichtliche, endlos lange Liste aller
   Einzelmarkierungen.
-- Versorgungsanteile: ein Speicher zählt jetzt mit seiner **Netto-Nutzung**
-  (Entladen minus Laden) statt der vollen Speicherentladung — vermeidet,
-  dass ein Teil des Ertrags doppelt als „Versorgung" auftaucht.
 
 ### Geändert
 
-- Charts-Seite: ein aktiver Periodenvergleich hat jetzt Vorrang — Rohwerte/
-  Gestapelt/Zeitstrahl/Donut/„Auflösung: Voll" sind währenddessen
-  deaktiviert, statt den Vergleich stillschweigend abzuschalten.
 - Ausreißer-Hinweistext im Konfigurationsformular gekürzt (ausführliche
   Erklärung steht im Handbuch).
-- Aktivität-Detailpopup (Verdichten/Bereinigen) zeigt jetzt beschriftete
-  Zeilen statt einer dicht mit „·" verketteten Zeile.
 
 ### Behoben
 
-- Balken-Diagramme auf der Charts-Seite begannen bei aktiver „Dynamische
-  Y-Achse" nicht immer bei 0 — anders als auf Dashboard-Kacheln und der
-  Entitätsseite.
-- Verdichten räumt jetzt Löschmarkierungen des verdichteten Monats mit auf;
-  ein einmaliger Nachzieh-Lauf beim nächsten Start bereinigt auch bereits
-  zuvor verdichtete Monate. Vorher blieben solche Markierungen dauerhaft als
-  „ohne passende Rohdatenzeile" liegen.
-- Sortieren einer bereits serverseitig paginierten Tabelle (z. B. Markierte
-  Datensätze) erzeugte fälschlich einen zweiten, ungefragten Pager.
-- Der Standard für „Verdichtungsziel" stand versehentlich auf „1 Min." statt
-  „Aus".
+- Charts-Seite: Balken-Diagramme begannen bei aktiver „Dynamische Y-Achse"
+  nicht immer bei 0 — anders als auf Dashboard-Kacheln und der
+  Entitätsseite. Ein aktiver Periodenvergleich wurde außerdem beim
+  Umschalten auf Rohwerte/Gestapelt/Zeitstrahl/Donut/„Auflösung: Voll"
+  stillschweigend abgeschaltet, statt Vorrang zu behalten.
+- Versorgungsanteile: ein Speicher mit eigenem Ertrag (z. B. eine
+  Solarbank) zählte mit seinem vollen Ertrag statt seiner Netto-Nutzung
+  (Entladen minus Laden) — ein Teil davon erschien dadurch doppelt als
+  „Versorgung", obwohl er noch im Speicher steckte.
+- Sortieren einer bereits serverseitig paginierten Tabelle mit mehr als 10
+  Zeilen (z. B. Statistik → Speichernutzung/Index) erzeugte fälschlich
+  einen zweiten, ungefragten Pager.
 
 ## 0.97.0 - 2026-09-16
 
