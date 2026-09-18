@@ -23,9 +23,10 @@ import pyarrow.parquet as pq
 
 from ..formatting import decimals_to_int, format_value
 from . import hotbuffer, rollup
+from . import resolution as resolution_mod
 from .hotbuffer import append as hot_append
 from .hotbuffer import hot_path, month_key, read_rows
-from .index import Index, filter_deleted_occurrences, should_accept_value
+from .index import Index, filter_deleted_occurrences, resolution_seconds, should_accept_value
 from .paths import entity_dir
 
 
@@ -1193,3 +1194,195 @@ def correct_raw_value(
         )
 
     return True
+
+
+# -- Verdichten: rückwirkende Reduktion bereits archivierter Monate --
+#
+# Ergänzt die Live-Auflösung (resolution.py) um die rückwirkende Variante für
+# Monate, die schon in voller Auflösung archiviert wurden, bevor eine
+# Auflösungs-Entscheidung getroffen wurde — oder für Fälle, in denen die
+# Live-Auflösung bewusst auf "raw" bleibt, alte Daten aber trotzdem
+# irgendwann reduziert werden sollen. Nutzt denselben Zeitraster-Begriff wie
+# resolution.py (bucket_end(): Bucket-ENDE statt -Anfang), damit rückwirkend
+# und live verdichtete Zeitstempel gleich interpretierbar sind.
+
+
+class CompactionError(ValueError):
+    """Verdichtung abgelehnt (Schalter, kein Verdichtungsziel, bereits
+    verdichteter Monat) — main.py wandelt das in einen HTTP 400 um."""
+
+
+def _compacted_rows_for_month(
+    rows: list[tuple[float, float, float | None, float | None]],
+    aggregation_type: str,
+    interval: int,
+) -> list[tuple[float, float, float | None, float | None]]:
+    """Bucketet einen sortierten Monat auf `interval` und aggregiert je
+    Bucket typabhängig. Gemeinsam von compact_raw_values() und
+    preview_compact_raw_values() genutzt, damit die Vorschau exakt
+    vorhersagt, was der tatsächliche Lauf schreibt.
+
+    Zähler: letzter Wert je Bucket (Teleskopsumme bleibt exakt korrekt).
+    Zusätzlich bleiben Reset-Zeitpunkte (detect_counter_decreases) als eigene
+    Rohzeilen erhalten, unabhängig vom Raster — sonst würde ein echter
+    Zählerrücksprung im Bucket-Mittendrin verschluckt.
+
+    Standard: Ø der Bucket-Werte, Min/Max über value UND bereits vorhandene
+    min_value/max_value (falls das Fenster teils schon durch die Live-
+    Auflösung vor-aggregierte Zeilen enthält). Bewusst ein einfacher,
+    ungewichteter Durchschnitt über die Bucket-Zeilen — ohne mitgeführte
+    Stichprobenanzahl je Zeile lässt sich kein exakt gewichteter Durchschnitt
+    bilden, dieselbe akzeptierte Vereinfachung wie bei der Live-Auflösung."""
+    buckets: dict[float, list[tuple[float, float, float | None, float | None]]] = {}
+    for row in rows:
+        buckets.setdefault(resolution_mod.bucket_end(interval, row[0]), []).append(row)
+
+    if aggregation_type == "counter":
+        decreases = detect_counter_decreases([(r[0], r[1]) for r in rows])
+        new_rows = [
+            (bucket_ts, bucket_rows[-1][1], None, None)
+            for bucket_ts, bucket_rows in buckets.items()
+        ]
+        new_rows.extend((r[0], r[1], None, None) for r in rows if r[0] in decreases)
+    else:
+        new_rows = []
+        for bucket_ts, bucket_rows in buckets.items():
+            values = [r[1] for r in bucket_rows]
+            mins = [r[2] if r[2] is not None else r[1] for r in bucket_rows]
+            maxs = [r[3] if r[3] is not None else r[1] for r in bucket_rows]
+            new_rows.append((bucket_ts, sum(values) / len(values), min(mins), max(maxs)))
+    new_rows.sort(key=lambda r: (r[0], r[1]))
+    return new_rows
+
+
+def _compactable_months(
+    index: Index,
+    entity_id: str,
+    aggregation_type: str,
+    target_resolution: str,
+    interval: int,
+    archive_dir: Path,
+    start_ts: float,
+    end_ts: float,
+    current_month_start: float,
+    tz: ZoneInfo,
+) -> list[tuple[int, int, Path]]:
+    """Archivierte Monate im Zeitraum, die tatsächlich verdichtet werden
+    dürfen — gemeinsam von compact_raw_values() und
+    preview_compact_raw_values() genutzt, damit beide exakt dieselben Monate
+    berücksichtigen. Siehe compact_raw_values() für die Schutzregeln."""
+    result = []
+    for year, month in _months_between(start_ts, end_ts, tz):
+        month_start = datetime(year, month, 1, tzinfo=tz).timestamp()
+        if month_start >= current_month_start:
+            continue
+        archive_path = archive_dir / f"{year:04d}-{month:02d}.parquet"
+        if not archive_path.exists():
+            continue
+        existing_marker = index.get_compacted_month(entity_id, year, month)
+        if existing_marker is not None:
+            if aggregation_type != "counter":
+                continue
+            existing_interval = resolution_seconds(existing_marker["target_resolution"])
+            if existing_interval is None or interval <= existing_interval:
+                continue
+        result.append((year, month, archive_path))
+    return result
+
+
+def _validate_compaction_target(entity: dict, target_resolution: str) -> int:
+    if entity["aggregation_type"] == "switch":
+        raise CompactionError("Verdichten ist für Schalter nicht verfügbar")
+    interval = resolution_seconds(target_resolution)
+    if interval is None:
+        raise CompactionError(f"Ungültiges Verdichtungsziel: {target_resolution}")
+    return interval
+
+
+def preview_compact_raw_values(
+    data_dir: Path, index: Index, entity_id: str, start_ts: float, end_ts: float, target_resolution: str,
+    tz: ZoneInfo, now: datetime | None = None,
+) -> dict:
+    """Zeilenzahl vorher/geschätzt danach, OHNE etwas zu schreiben — für die
+    Vorschau im Bearbeitungsbereich, Reiter "Verdichten", bevor der Nutzer
+    bestätigt."""
+    now = now or datetime.now(tz)
+    entity = index.get_entity(entity_id)
+    if entity is None:
+        raise ValueError(f"Unbekannte Entität: {entity_id}")
+    interval = _validate_compaction_target(entity, target_resolution)
+    aggregation_type = entity["aggregation_type"]
+    current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+
+    rows_before = 0
+    rows_after = 0
+    months = _compactable_months(
+        index, entity_id, aggregation_type, target_resolution, interval, archive_dir,
+        start_ts, end_ts, current_month_start, tz,
+    )
+    for _year, _month, archive_path in months:
+        rows = sorted(_read_archive_month_full(archive_path), key=lambda r: (r[0], r[1]))
+        if not rows:
+            continue
+        rows_before += len(rows)
+        rows_after += len(_compacted_rows_for_month(rows, aggregation_type, interval))
+    return {"rows_before": rows_before, "rows_after": rows_after, "months": len(months)}
+
+
+def compact_raw_values(
+    data_dir: Path, index: Index, entity_id: str, start_ts: float, end_ts: float, target_resolution: str,
+    tz: ZoneInfo, now: datetime | None = None,
+) -> dict:
+    """Verdichtet bereits archivierte Monate im Zeitraum [start_ts, end_ts]
+    auf target_resolution — rückwirkend, im Gegensatz zur Live-Auflösung
+    (resolution.py). Nur Zähler und Standard (siehe CompactionError bei
+    Schalter); nur Monate, für die schon eine Archivdatei existiert — der
+    laufende, noch nicht rotierte Monat wird stillschweigend übersprungen,
+    nicht abgelehnt, sonst würde ein bis "heute" reichender Zeitraum komplett
+    scheitern statt die bereits archivierten Monate darin zu verdichten.
+
+    Schutz vor doppelter Verdichtung (compacted_months-Tabelle): Zähler
+    dürfen erneut auf ein GRÖBERES Ziel verdichtet werden (mathematisch
+    exakt — der letzte Wert im großen Bucket ist zwangsläufig auch der
+    letzte unter den bereits verdichteten kleineren Buckets), Standard-Monate
+    dagegen nie erneut (Ø aus bereits gemittelten Ø-Werten wäre ohne
+    mitgeführte Stichprobenanzahl verzerrt, siehe _compacted_rows_for_month()).
+
+    Locking ist Sache des Aufrufers (main.py, wie bei correct_raw_value()/
+    add_raw_value()/purge_*): diese Funktion nimmt selbst keine Sperre.
+
+    Gibt rows_before/rows_after/months_compacted zurück."""
+    now = now or datetime.now(tz)
+    entity = index.get_entity(entity_id)
+    if entity is None:
+        raise ValueError(f"Unbekannte Entität: {entity_id}")
+    interval = _validate_compaction_target(entity, target_resolution)
+    aggregation_type = entity["aggregation_type"]
+    hourly_rollup = bool(entity["hourly_rollup"])
+    current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+
+    rows_before = 0
+    rows_after = 0
+    months_compacted: list[str] = []
+    months = _compactable_months(
+        index, entity_id, aggregation_type, target_resolution, interval, archive_dir,
+        start_ts, end_ts, current_month_start, tz,
+    )
+    for year, month, archive_path in months:
+        rows = sorted(_read_archive_month_full(archive_path), key=lambda r: (r[0], r[1]))
+        if not rows:
+            continue
+        new_rows = _compacted_rows_for_month(rows, aggregation_type, interval)
+        rows_before += len(rows)
+        rows_after += len(new_rows)
+        _rewrite_archive_month(
+            data_dir, index, entity_id, aggregation_type, new_rows, year, month, tz,
+            hourly_rollup=hourly_rollup,
+        )
+        index.add_row_count(entity_id, len(new_rows) - len(rows))
+        index.set_compacted_month(entity_id, year, month, target_resolution, now.timestamp())
+        months_compacted.append(f"{year:04d}-{month:02d}")
+
+    return {"rows_before": rows_before, "rows_after": rows_after, "months_compacted": months_compacted}

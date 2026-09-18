@@ -536,6 +536,21 @@ def test_set_config_updates_only_provided_fields() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_set_config_updates_compact_target() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.temp", "sensor", "measurement", "°C")
+        assert index.get_entity("sensor.temp")["compact_target"] == "off"
+
+        index.set_config("sensor.temp", compact_target="5min")
+        assert index.get_entity("sensor.temp")["compact_target"] == "5min"
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_set_config_decimals_defaults_to_auto_and_is_settable() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
@@ -885,6 +900,52 @@ def test_get_or_create_entity_uses_configured_default_resolution_and_retention()
         # Vorher angelegte Entität bleibt unverändert — der Standardwert wirkt
         # nur beim Neuanlegen, nie rückwirkend.
         assert index.get_entity("sensor.before")["resolution"] == "raw"
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_get_or_create_entity_uses_configured_default_compact_target() -> None:
+    """Dasselbe Muster wie bei default_resolution/default_retention oben,
+    für das neue Verdichtungsziel (Roadmap "Verdichten")."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.before", "sensor", "measurement", None)
+        assert index.get_entity("sensor.before")["compact_target"] == "off"
+
+        index.set_setting("default_compact_target", "1min")
+        index.get_or_create_entity("sensor.after", "sensor", "measurement", None)
+
+        assert index.get_entity("sensor.after")["compact_target"] == "1min"
+        assert index.get_entity("sensor.before")["compact_target"] == "off"
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_compacted_month_marker_round_trips_and_can_be_overwritten() -> None:
+    """Grundlage für den Doppel-Verdichtung-Schutz in
+    cleanup.compact_raw_values(): ein UPSERT, weil Zähler-Monate erneut auf
+    ein gröberes Ziel verdichtet werden dürfen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.counter", "sensor", "total_increasing", "kWh")
+
+        assert index.get_compacted_month("sensor.counter", 2024, 7) is None
+
+        index.set_compacted_month("sensor.counter", 2024, 7, "1min", 1000.0)
+        marker = index.get_compacted_month("sensor.counter", 2024, 7)
+        assert marker["target_resolution"] == "1min"
+        assert marker["compacted_at"] == 1000.0
+
+        index.set_compacted_month("sensor.counter", 2024, 7, "5min", 2000.0)
+        marker = index.get_compacted_month("sensor.counter", 2024, 7)
+        assert marker["target_resolution"] == "5min"
+        assert marker["compacted_at"] == 2000.0
 
         index.close()
     finally:

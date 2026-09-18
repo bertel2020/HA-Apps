@@ -183,6 +183,12 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     # der Effekt (Zeitfenster zu Ø/Min/Max zusammengefasst) ist direkt als
     # normale Zeile in der Roh-Werte-Tabelle der Entität sichtbar.
     "_flush_stale_resolution_windows": None,
+    # Standardmäßig aus (Housekeeping → Verdichten), und ihr Effekt (verdichtete
+    # Monate) ist direkt an der betroffenen Entität sichtbar (Korrektur-Hinweis
+    # im Bearbeitungsbereich, Konfiguration) — kein eigener globaler Zustand,
+    # der eine Diagnose-Zeile rechtfertigen würde, dasselbe Argument wie bei
+    # _flush_stale_resolution_windows oben.
+    "_run_automatic_compaction_if_due": None,
 }
 
 #: Läuft NICHT im 30-Sekunden-Takt, sondern einmalig beim Start in einem

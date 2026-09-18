@@ -48,6 +48,8 @@ from starlette.types import Receive, Scope, Send
 from .formatting import (
     BACKUP_KEEP_COUNT_LABELS,
     BACKUP_SCHEDULE_LABELS,
+    COMPACT_TARGET_BLOCKED_REASONS,
+    COMPACT_TARGET_LABELS,
     DECIMALS_LABELS,
     DISPLAY_MODE_LABELS,
     FONT_SCALE_LABELS,
@@ -60,6 +62,7 @@ from .formatting import (
     VALUE_FILTER_LABELS,
     decimals_to_int,
     entity_display_name,
+    format_compact_target,
     format_int,
     format_resolution,
     format_retention,
@@ -101,6 +104,7 @@ from .storage import (
 )
 from .storage import query as query_mod
 from .storage.index import (
+    DEFAULT_COMPACT_TARGET,
     DEFAULT_DECIMALS,
     DEFAULT_GAP_THRESHOLD,
     DEFAULT_OUTLIER_THRESHOLD,
@@ -901,12 +905,14 @@ def _settings_archivierung_context(saved: bool = False) -> dict:
         "default_value_filter": index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER),
         "default_gap_threshold": index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD),
         "default_outlier_threshold": index.get_setting("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD),
+        "default_compact_target": index.get_setting("default_compact_target", DEFAULT_COMPACT_TARGET),
         "resolution_options": list(RESOLUTION_LABELS.items()),
         "retention_options": list(RETENTION_LABELS.items()),
         "decimals_options": list(DECIMALS_LABELS.items()),
         "value_filter_options": list(VALUE_FILTER_LABELS.items()),
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
+        "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
         "saved": saved,
     }
 
@@ -2779,6 +2785,8 @@ def _entity_config_context(entity) -> dict:
         "outlier_blocked_reason": OUTLIER_BLOCKED_REASONS.get(entity["aggregation_type"]),
         "outlier_rate": _outlier_rate_labels(cleanup_stats.outlier_rate(index, entity)),
         "display_mode": entity["display_mode"],
+        "compact_target": entity["compact_target"],
+        "compact_target_blocked_reason": COMPACT_TARGET_BLOCKED_REASONS.get(entity["aggregation_type"]),
         "resolution_options": list(RESOLUTION_LABELS.items()),
         "retention_options": list(RETENTION_LABELS.items()),
         "decimals_options": list(DECIMALS_LABELS.items()),
@@ -2786,6 +2794,7 @@ def _entity_config_context(entity) -> dict:
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
         "display_mode_options": list(DISPLAY_MODE_LABELS.items()),
+        "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
         "preview_rows": preview_rows,
     }
 
@@ -2843,6 +2852,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     gap_threshold = form.get("gap_threshold")
     outlier_threshold = form.get("outlier_threshold")
     display_mode = form.get("display_mode")
+    compact_target = form.get("compact_target")
     custom_name = form.get("custom_name")
     if custom_name is not None:
         custom_name = custom_name.strip()
@@ -2863,6 +2873,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail="Ungültiger Lücken-Schwellwert")
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Ausreißer-Schwellwert")
+    if compact_target is not None and compact_target not in COMPACT_TARGET_LABELS:
+        raise HTTPException(status_code=400, detail="Ungültiges Verdichtungsziel")
     # Für Zähler/Schalter ist das Feld deaktiviert (siehe
     # outlier_detection_applies()). Ein trotzdem mitgeschickter Wert wird
     # verworfen statt abgelehnt: die Einstellung wirkt für diese Typen ohnehin
@@ -2876,6 +2888,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     # abgelehnt, das Feld ist im Formular für Switch deaktiviert.
     if entity["aggregation_type"] == "switch":
         resolution = None
+        compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Anzeigemodus")
     def update_locked() -> HTMLResponse:
@@ -2890,6 +2903,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 outlier_threshold=str(outlier_threshold) if outlier_threshold is not None else None,
                 display_mode=str(display_mode) if display_mode is not None else None,
                 custom_name=custom_name if custom_name is not None else None,
+                compact_target=str(compact_target) if compact_target is not None else None,
             )
             if retention is not None:
                 _background.invalidate_retention_overview()
@@ -4623,6 +4637,8 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             ) != "off",
             "counter_decrease_enabled": entity["state_class"] == "total_increasing",
             "is_favorite": bool(entity["is_favorite"]),
+            "aggregation_type": entity["aggregation_type"],
+            "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
         },
     )
 
@@ -4851,6 +4867,20 @@ def _rows_fragment(
     if mode not in ("cleanup", "correct"):
         mode = "cleanup"
 
+    # Nur relevant im Korrigieren-Reiter, und nur, wenn der angezeigte
+    # Zeitraum vollständig in EINEM bereits verdichteten Monat liegt — bei
+    # Jahr/Gesamt (mehrere Monate, teils verdichtet, teils nicht) wäre ein
+    # einzelner Hinweis irreführend, deshalb bewusst kein Hinweis dafür.
+    compacted_month_hint = None
+    if mode == "correct" and (window_start.year, window_start.month) == (window_end.year, window_end.month):
+        marker = index.get_compacted_month(entity_id, window_start.year, window_start.month)
+        if marker is not None:
+            compacted_month_hint = (
+                f"Dieser Monat wurde am {format_timestamp(marker['compacted_at'], TZ)} auf "
+                f"{format_compact_target(marker['target_resolution'])} verdichtet — angezeigte Zeilen "
+                "sind bereits zusammengefasst, keine Rohwerte mehr."
+            )
+
     period_label = _rows_period_label(range_key, offset, window_start, window_end, now)
     first_date = datetime.fromtimestamp(entity["first_ts"], TZ).strftime("%Y-%m-%d") if entity["first_ts"] else None
     last_date = datetime.fromtimestamp(entity["last_ts"], TZ).strftime("%Y-%m-%d") if entity["last_ts"] else None
@@ -4894,6 +4924,7 @@ def _rows_fragment(
             "first_date": first_date,
             "last_date": last_date,
             "deleted_count": deleted_count,
+            "compacted_month_hint": compacted_month_hint,
         },
     )
 
@@ -4989,6 +5020,63 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
     if not changed:
         raise HTTPException(status_code=404, detail="Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)")
     return {"ok": True}
+
+
+class _CompactValuesBody(BaseModel):
+    start_ts: float
+    end_ts: float
+    target_resolution: str
+
+
+def _validate_compact_body(entity_id: str, body: _CompactValuesBody) -> None:
+    if body.target_resolution not in COMPACT_TARGET_LABELS or body.target_resolution == "off":
+        raise HTTPException(status_code=400, detail="Ungültiges Verdichtungsziel")
+    if body.end_ts <= body.start_ts:
+        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+
+
+@app.post("/entities/{entity_id}/rows/compact/preview")
+def compact_rows_preview(entity_id: str, body: _CompactValuesBody) -> dict:
+    """Bearbeitungsbereich, Reiter "Verdichten" — Zeilenzahl vorher/geschätzt
+    danach, bevor der Nutzer bestätigt (siehe cleanup.preview_compact_raw_values()).
+    Rein lesend, deshalb ohne @_storage_locked: dieselbe Nichtsperre wie bei
+    der Bereinigungs-Vorschau (settings/purge/preview). Synchron statt async
+    wie /rows/add — FastAPI bedient einen "def"-Pfad ohnehin über den
+    Thread-Pool, kein zusätzliches await nötig."""
+    _require_entity(entity_id)
+    _validate_compact_body(entity_id, body)
+    try:
+        return cleanup.preview_compact_raw_values(
+            DATA_DIR, index, entity_id, body.start_ts, body.end_ts, body.target_resolution, TZ,
+        )
+    except cleanup.CompactionError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+
+
+@app.post("/entities/{entity_id}/rows/compact")
+@_storage_locked(lambda args: args["entity_id"])
+def compact_rows(entity_id: str, body: _CompactValuesBody) -> dict:
+    """Bearbeitungsbereich, Reiter "Verdichten" — verdichtet bereits
+    archivierte Monate im angegebenen Zeitraum auf target_resolution
+    (Roadmap 1.16/Verdichten, siehe cleanup.compact_raw_values()). Reines
+    JSON wie /rows/add, nicht umkehrbar. @_storage_locked braucht einen
+    synchronen Handler (siehe dessen Docstring), deshalb wie /rows/add/
+    /rows/correct kein async def."""
+    _require_entity(entity_id)
+    _validate_compact_body(entity_id, body)
+    try:
+        result = cleanup.compact_raw_values(
+            DATA_DIR, index, entity_id, body.start_ts, body.end_ts, body.target_resolution, TZ,
+        )
+    except cleanup.CompactionError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+    logger.info(
+        "Manuelle Verdichtung abgeschlossen · event=manual_compaction_completed "
+        "entity_id=%s target=%s rows_before=%d rows_after=%d months=%d",
+        entity_id, body.target_resolution, result["rows_before"], result["rows_after"],
+        len(result["months_compacted"]),
+    )
+    return {"ok": True, **result}
 
 
 @app.post("/entities/{entity_id}/rows/undo", response_class=HTMLResponse)

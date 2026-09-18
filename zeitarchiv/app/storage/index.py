@@ -37,6 +37,11 @@ DEFAULT_DECIMALS = "auto"
 DEFAULT_VALUE_FILTER = "decimals"
 DEFAULT_GAP_THRESHOLD = "15"
 DEFAULT_OUTLIER_THRESHOLD = "50"
+# "off" statt "raw": Verdichtungsziel ist kein Auflösungswert, sondern ein
+# Ziel-Zeitraster für die (manuelle oder automatische) rückwirkende
+# Verdichtung bereits archivierter Monate — unabhängig von der Live-Auflösung,
+# siehe compact_raw_values() in storage/cleanup.py.
+DEFAULT_COMPACT_TARGET = "off"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 
 # Zeitraum und Kennzahlen einer Werte-Kachel (dashboard_pins, siehe die
@@ -285,6 +290,7 @@ CREATE TABLE IF NOT EXISTS entities (
     friendly_name TEXT,
     custom_name TEXT,
     hourly_rollup INTEGER NOT NULL DEFAULT 0,
+    compact_target TEXT NOT NULL DEFAULT 'off',
     first_ts REAL,
     last_ts REAL,
     last_value REAL,
@@ -313,6 +319,21 @@ CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_ts
     ON deleted_points(entity_id, ts);
 CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_deleted_at
     ON deleted_points(entity_id, deleted_at);
+
+-- Merkt sich, WELCHE archivierten Monate bereits verdichtet wurden und AUF
+-- WELCHES Zeitraster — zwei Zwecke: verhindert eine (je nach Typ unsichere,
+-- siehe compact_raw_values()) doppelte Verdichtung, und verhindert, dass
+-- rebuild_entity_rollups() das Rollup still aus den jetzt gröberen Daten neu
+-- berechnet, statt den bestehenden, aus den vollen Rohdaten stammenden Stand
+-- zu behalten.
+CREATE TABLE IF NOT EXISTS compacted_months (
+    entity_id TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    target_resolution TEXT NOT NULL,
+    compacted_at REAL NOT NULL,
+    PRIMARY KEY (entity_id, year, month)
+);
 
 -- Archiv-weite Schnappschüsse für die Statistik-Übersicht (Konzept Abschnitt 03,
 -- "Verlaufs-Sparkline"/"Allgemeine Statistik-Übersicht"). Der interne
@@ -796,6 +817,12 @@ class Index:
             # Energiedashboard-Konfiguration automatisch gesetzt/entfernt
             # (siehe energiedashboard_routes.py), nicht manuell editierbar.
             self._conn.execute("ALTER TABLE entities ADD COLUMN hourly_rollup INTEGER NOT NULL DEFAULT 0")
+        if "compact_target" not in columns:
+            # Ziel-Zeitraster für die rückwirkende Verdichtung archivierter
+            # Monate (Roadmap "Verdichten") — 'off' erhält das bisherige
+            # Verhalten (keine automatische/manuelle Verdichtung) für alle
+            # bestehenden Entitäten bei.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN compact_target TEXT NOT NULL DEFAULT 'off'")
 
         dp_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(deleted_points)")}
         if "id" not in dp_columns:
@@ -1328,7 +1355,8 @@ class Index:
                 self._conn.execute(
                     "SELECT key, value FROM settings WHERE key IN "
                     "('default_resolution', 'default_retention', 'default_decimals', "
-                    "'default_value_filter', 'default_gap_threshold', 'default_outlier_threshold')"
+                    "'default_value_filter', 'default_gap_threshold', 'default_outlier_threshold', "
+                    "'default_compact_target')"
                 ).fetchall()
             )
             resolution = default_rows.get("default_resolution", DEFAULT_RESOLUTION)
@@ -1337,13 +1365,14 @@ class Index:
             value_filter = default_rows.get("default_value_filter", DEFAULT_VALUE_FILTER)
             gap_threshold = default_rows.get("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
             outlier_threshold = default_rows.get("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD)
+            compact_target = default_rows.get("default_compact_target", DEFAULT_COMPACT_TARGET)
             self._conn.execute(
                 """
                 INSERT INTO entities
                     (entity_id, aggregation_type, resolution, retention, decimals, value_filter,
-                     gap_threshold, outlier_threshold,
+                     gap_threshold, outlier_threshold, compact_target,
                      unit, state_class, friendly_name, row_count, size_bytes, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
                 """,
                 (
                     entity_id,
@@ -1354,6 +1383,7 @@ class Index:
                     value_filter,
                     gap_threshold,
                     outlier_threshold,
+                    compact_target,
                     unit,
                     state_class,
                     friendly_name,
@@ -1482,6 +1512,7 @@ class Index:
         outlier_threshold: str | None = None,
         display_mode: str | None = None,
         custom_name: str | None = None,
+        compact_target: str | None = None,
     ) -> None:
         """Ändert Auflösung, Aufbewahrung, Nachkommastellen und/oder die Lücken-/
         Ausreißer-Schwellwerte einer Entität (Konzept Abschnitt 03/04). Alle
@@ -1508,6 +1539,9 @@ class Index:
         if outlier_threshold is not None:
             updates.append("outlier_threshold = ?")
             params.append(outlier_threshold)
+        if compact_target is not None:
+            updates.append("compact_target = ?")
+            params.append(compact_target)
         if display_mode is not None:
             updates.append("display_mode = ?")
             params.append(display_mode)
@@ -3625,6 +3659,30 @@ class Index:
                     "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
                     (removed, entity_id),
                 )
+
+    def get_compacted_month(self, entity_id: str, year: int, month: int) -> sqlite3.Row | None:
+        """Marker eines bereits verdichteten Monats, oder None. Grundlage für
+        den Schutz vor doppelter Verdichtung (siehe compact_raw_values()) und
+        dafür, dass rebuild_entity_rollups() diesen Monat nicht still aus den
+        jetzt gröberen Rohdaten neu berechnet."""
+        with self._lock, self._conn:
+            return self._conn.execute(
+                "SELECT * FROM compacted_months WHERE entity_id = ? AND year = ? AND month = ?",
+                (entity_id, year, month),
+            ).fetchone()
+
+    def set_compacted_month(self, entity_id: str, year: int, month: int, target_resolution: str, compacted_at: float) -> None:
+        """Setzt/überschreibt den Verdichtet-Marker eines Monats — ein
+        UPSERT, weil Zähler-Monate (anders als Standard) erneut auf ein
+        gröberes Ziel verdichtet werden dürfen (siehe compact_raw_values())."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                """INSERT INTO compacted_months (entity_id, year, month, target_resolution, compacted_at)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (entity_id, year, month)
+                   DO UPDATE SET target_resolution = excluded.target_resolution, compacted_at = excluded.compacted_at""",
+                (entity_id, year, month, target_resolution, compacted_at),
+            )
 
     def recent_lock_busy_events(self, window_seconds: float = _BUSY_EVENTS_WINDOW_SECONDS) -> int:
         """Anzahl IndexBusy-Vorkommen (Lock-Timeout) innerhalb der letzten

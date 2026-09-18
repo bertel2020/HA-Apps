@@ -31,6 +31,21 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Standard-Verdichtungsziel</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-compact-target-btn" onclick="toggleDDPicker('default-compact-target')">{% for k, l in compact_target_options %}{% if k == default_compact_target %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_compact_target" id="default-compact-target-input" value="{{ default_compact_target }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-compact-target-popover">
+        {% for key, label in compact_target_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-compact-target', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">Standard-Nachkommastellen</div>
     </div>
     <span class="dd-picker-wrap">

@@ -41,6 +41,9 @@
       <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">Bereinigen</button>
       <button type="button" :class="{active: tab === 'correct'}" @click="setTab('correct')">Korrigieren</button>
       <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">Hinzufügen</button>
+      {% if aggregation_type != 'switch' %}
+      <button type="button" :class="{active: tab === 'compact'}" @click="setTab('compact')">Verdichten</button>
+      {% endif %}
     </div>
 
     <div x-show="tab === 'add'" x-cloak class="add-value-card">
@@ -56,6 +59,30 @@
       </div>
       <p class="add-value-status" id="add-value-status"></p>
     </div>
+
+    {% if aggregation_type != 'switch' %}
+    <div x-show="tab === 'compact'" x-cloak class="add-value-card">
+      <p class="sub" style="margin-top:12px;">Verdichtet bereits archivierte Monate rückwirkend auf ein gröberes Zeitraster — unabhängig von der laufenden Auflösung. Nicht umkehrbar.</p>
+      <div class="add-value-row">
+        <label>Von
+          <input type="date" id="compact-start">
+        </label>
+        <label>Bis
+          <input type="date" id="compact-end">
+        </label>
+        <label>Ziel-Auflösung
+          <select id="compact-target">
+            {% for key, label in compact_target_options %}
+            {% if key != 'off' %}<option value="{{ key }}">{{ label }}</option>{% endif %}
+            {% endfor %}
+          </select>
+        </label>
+        <button type="button" class="btn" onclick="previewCompact()">Vorschau</button>
+      </div>
+      <div id="compact-preview"></div>
+      <p class="add-value-status" id="compact-value-status"></p>
+    </div>
+    {% endif %}
 
     <div x-show="tab === 'cleanup' || tab === 'correct'" x-cloak>
     <div id="controls" hx-trigger="load, change" hx-get="{{ app_root }}/entities/{{ entity_id }}/rows"

@@ -1,0 +1,36 @@
+<p class="hint" style="margin:0 0 14px;">Verdichtet bereits archivierte Monate automatisch auf das je Entität eingestellte Verdichtungsziel (Konfiguration), sobald sie das Mindestalter erreicht haben. Betrifft nur Entitäten, deren Verdichtungsziel nicht „Aus“ ist.</p>
+<div class="settings-compact-list">
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Automatische Verdichtung</div>
+      <div class="settings-compact-hint">Läuft im Hintergrund, wie die automatische Aufbewahrung</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="compact-auto-enabled-btn" onclick="toggleDDPicker('compact-auto-enabled')">{% for k, l in compact_auto_options %}{% if k == compact_auto_enabled %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="compact_auto_enabled" id="compact-auto-enabled-input" value="{{ compact_auto_enabled }}"
+             hx-post="settings/compact" hx-trigger="change" hx-target="#compact-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="compact-auto-enabled-popover">
+        {% for key, label in compact_auto_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('compact-auto-enabled', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Mindestalter</div>
+      <div class="settings-compact-hint">Wie lange ein archivierter Monat unangetastet bleibt, bevor er verdichtet wird</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="compact-min-age-months-btn" onclick="toggleDDPicker('compact-min-age-months')">{% for k, l in compact_min_age_options %}{% if k == compact_min_age_months %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="compact_min_age_months" id="compact-min-age-months-input" value="{{ compact_min_age_months }}"
+             hx-post="settings/compact" hx-trigger="change" hx-target="#compact-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="compact-min-age-months-popover">
+        {% for key, label in compact_min_age_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('compact-min-age-months', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+</div>
+{% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

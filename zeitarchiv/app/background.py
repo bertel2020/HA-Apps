@@ -50,6 +50,7 @@ from . import notices as notices_mod
 from . import supervisor_stats
 from . import version_check
 from .backup_scheduler import next_scheduled_run
+from .formatting import DEFAULT_COMPACT_AUTO_ENABLED, DEFAULT_COMPACT_MIN_AGE_MONTHS
 from .energiedashboard_routes import (
     process_pending_hourly_backfill,
     refresh_heatmap_weekday_cache_if_stale,
@@ -141,6 +142,7 @@ class BackgroundService:
         # zurück, was höchstens einen zusätzlichen Lauf beim nächsten Tick
         # bedeutet, keinen verlorenen.
         self._resolution_flush_last_run = 0.0
+        self._compact_last_run = 0.0
         self.base_dir = deps.base_dir
         self.demo_mode_active = deps.demo_mode_active
         self.backups_dir = deps.backups_dir
@@ -827,6 +829,51 @@ class BackgroundService:
                 if pending_end is not None and now_ts >= pending_end:
                     resolution_mod.collapse_pending_window(path, interval)
 
+    def _run_automatic_compaction_if_due(self, now: datetime) -> None:
+        """Automatische Verdichtung (Housekeeping → Verdichten) — standardmäßig
+        AUS (siehe DEFAULT_COMPACT_AUTO_ENABLED), muss bewusst aktiviert
+        werden, bevor sie in bereits archivierte Daten eingreift. Läuft
+        höchstens einmal täglich statt bei jedem 30s-Tick: anders als die
+        Live-Auflösung (die aktiv offene Fenster abschließen muss) ist die
+        rückwirkende Verdichtung nicht zeitkritisch — ein archivierter Monat
+        wartet notfalls einen Tag länger.
+
+        Verdichtet je Entität alles bis zum Mindestalter-Stichtag in einem
+        Rutsch (compact_raw_values() selbst überspringt bereits verdichtete/
+        noch nicht archivierte Monate) — kein eigener Fortschritts-Zustand
+        nötig, weil die Funktion selbst idempotent und pro Aufruf begrenzt
+        auf tatsächlich fällige Monate ist."""
+        now_ts = now.timestamp()
+        if now_ts - self._compact_last_run < 86400:
+            return
+        self._compact_last_run = now_ts
+        if self.index.get_setting("compact_auto_enabled", DEFAULT_COMPACT_AUTO_ENABLED) != "on":
+            return
+        min_age_months = int(
+            self.index.get_setting("compact_min_age_months", DEFAULT_COMPACT_MIN_AGE_MONTHS)
+        )
+        # Letzter noch ZULÄSSIGER Monat (Mindestalter erreicht), nicht der
+        # erste unzulässige — als end_ts an compact_raw_values() übergeben,
+        # dessen Monats-Iteration (_months_between) den Endmonat einschließt.
+        total_months = now.year * 12 + (now.month - 1) - min_age_months
+        cutoff_year, cutoff_month = divmod(total_months, 12)
+        cutoff_month += 1
+        cutoff_ts = datetime(cutoff_year, cutoff_month, 1, tzinfo=self.tz).timestamp()
+        for entity in self.index.list_entities():
+            if entity["aggregation_type"] == "switch" or entity["compact_target"] == "off":
+                continue
+            entity_id = entity["entity_id"]
+            with self.coordinator.entity(entity_id):
+                try:
+                    cleanup.compact_raw_values(
+                        self.data_dir, self.index, entity_id, 0.0, cutoff_ts,
+                        entity["compact_target"], self.tz, now=now,
+                    )
+                except cleanup.CompactionError:
+                    # z. B. Ziel nicht mehr gültig zwischen zwei Läufen —
+                    # kein Grund, die übrigen Entitäten zu überspringen.
+                    continue
+
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
         while not self._maintenance_scheduler_stop.is_set():
@@ -853,6 +900,7 @@ class BackgroundService:
                 self._refresh_demo_dir_info_if_stale()
                 self._run_demo_append_if_due(datetime.now(self.tz))
                 self._flush_stale_resolution_windows(datetime.now(self.tz))
+                self._run_automatic_compaction_if_due(datetime.now(self.tz))
             except Exception:
                 logger.exception(
                     "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "

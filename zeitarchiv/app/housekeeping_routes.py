@@ -40,7 +40,12 @@ from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
 from .formatting import (
     BACKUP_SCHEDULE_LABELS,
+    COMPACT_AUTO_LABELS,
+    COMPACT_MIN_AGE_MONTHS_LABELS,
+    COMPACT_TARGET_LABELS,
     DECIMALS_LABELS,
+    DEFAULT_COMPACT_AUTO_ENABLED,
+    DEFAULT_COMPACT_MIN_AGE_MONTHS,
     DEMO_APPEND_INTERVAL_LABELS,
     GAP_THRESHOLD_LABELS,
     OUTLIER_THRESHOLD_LABELS,
@@ -264,6 +269,17 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
     def _settings_rotation_context(result: str | None = None) -> dict:
         return {"stale_count": deps.count_stale_entities(), "result": result}
+
+    def _settings_compact_context(saved: bool = False) -> dict:
+        return {
+            "compact_auto_enabled": deps.index.get_setting("compact_auto_enabled", DEFAULT_COMPACT_AUTO_ENABLED),
+            "compact_min_age_months": deps.index.get_setting(
+                "compact_min_age_months", DEFAULT_COMPACT_MIN_AGE_MONTHS
+            ),
+            "compact_auto_options": list(COMPACT_AUTO_LABELS.items()),
+            "compact_min_age_options": list(COMPACT_MIN_AGE_MONTHS_LABELS.items()),
+            "saved": saved,
+        }
 
     def _settings_storage_index_context(report: dict | None = None) -> dict:
         report = report if report is not None else deps.storage_reconcile_last()
@@ -520,6 +536,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 **_settings_purge_context(),
                 **_settings_retention_context(),
                 **_settings_rotation_context(),
+                **_settings_compact_context(),
             },
         )
 
@@ -539,6 +556,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, "Ungültiger Wertänderungsfilter"),
             "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, "Ungültige Lücken-Erkennung"),
             "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, "Ungültige Ausreißer-Erkennung"),
+            "default_compact_target": (form.get("default_compact_target"), COMPACT_TARGET_LABELS, "Ungültiges Verdichtungsziel"),
         }
         for _key, (value, labels, error) in fields.items():
             if value is not None and value not in labels:
@@ -592,6 +610,28 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
         return deps.templates.TemplateResponse(
             request, "_settings_rotation_form.html", _settings_rotation_context(result=result)
+        )
+
+
+    @router.post("/settings/compact", response_class=HTMLResponse)
+    async def settings_compact(request: Request) -> HTMLResponse:
+        """Speichert die globalen Verdichten-Einstellungen (Schalter +
+        Mindestalter) — die eigentliche Verdichtung läuft anschließend im
+        Wartungsplaner (background.py), nicht hier. Standardmäßig aus (siehe
+        DEFAULT_COMPACT_AUTO_ENABLED)."""
+        form = await request.form()
+        auto_enabled = form.get("compact_auto_enabled")
+        min_age_months = form.get("compact_min_age_months")
+        if auto_enabled is not None and auto_enabled not in COMPACT_AUTO_LABELS:
+            raise HTTPException(status_code=400, detail="Ungültiger Wert für Automatische Verdichtung")
+        if min_age_months is not None and min_age_months not in COMPACT_MIN_AGE_MONTHS_LABELS:
+            raise HTTPException(status_code=400, detail="Ungültiges Mindestalter")
+        if auto_enabled is not None:
+            deps.index.set_setting("compact_auto_enabled", auto_enabled)
+        if min_age_months is not None:
+            deps.index.set_setting("compact_min_age_months", min_age_months)
+        return deps.templates.TemplateResponse(
+            request, "_housekeeping_compact_form.html", _settings_compact_context(saved=True)
         )
 
 

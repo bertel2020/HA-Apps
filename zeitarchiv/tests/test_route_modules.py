@@ -69,7 +69,18 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Routen verzahnt als die Hintergrundarbeit es war — ein Schnitt dort
     # braucht erst eine Antwort darauf, was ein Kontext-Erbauer vom Request
     # wissen darf. Das ist mit dieser Anhebung NICHT erledigt, nur vertagt.
-    assert len(main.splitlines()) < 5_320
+    #
+    # Noch am 18. September, nach der Auflösungs-Zusammenführung, auf 5.420
+    # angehoben — Verdichten (Roadmap-Thema, manuelle + automatische
+    # rückwirkende Reduktion bereits archivierter Monate): neues Feld
+    # "Verdichtungsziel" in Konfiguration und Einstellungen → Archivierung,
+    # zwei neue JSON-Routen (rows/compact, rows/compact/preview) samt
+    # Validierung, plus der Korrektur-Hinweis für bereits verdichtete Monate
+    # in _rows_fragment(). main.py wuchs von 5.272 auf 5.360 — wieder neue
+    # Nutzer-Funktionalität, kein schleichendes Wachstum an schon bekannter
+    # Stelle. Schwelle weiter nach "Ist-Stand plus kleiner Puffer": 5.420
+    # gegen die heutigen 5.360, gut 60 Zeilen.
+    assert len(main.splitlines()) < 5_420
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

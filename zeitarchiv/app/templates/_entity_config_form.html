@@ -35,6 +35,29 @@
   {% endif %}
 </div>
 <div class="field">
+  <label>Verdichtungsziel {{ hint_button('Verdichtungsziel') }}</label>
+  {# Switch: fest gesperrt, dieselbe Begründung wie bei der Auflösung oben
+     (COMPACT_TARGET_BLOCKED_REASONS, formatting.py). #}
+  {% if compact_target_blocked_reason %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" disabled>Aus (immer) ▾</button>
+  </span>
+  <p class="hint hint-status">{{ compact_target_blocked_reason }}</p>
+  {% else %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="compact-target-btn" onclick="toggleDDPicker('compact-target')">{% for k, l in compact_target_options %}{% if k == compact_target %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="compact_target" id="compact-target-input" value="{{ compact_target }}"
+           hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="compact-target-popover">
+      {% for key, label in compact_target_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('compact-target', '{{ key }}', '{{ label }}')">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
+  {% call hint_body() %}Ziel-Zeitraster für die (manuelle oder automatische) Verdichtung bereits archivierter Daten — unabhängig von der Live-Auflösung. Automatische Verdichtung siehe Housekeeping → Verdichten.{% endcall %}
+  {% endif %}
+</div>
+<div class="field">
   <label>Aufbewahrung {{ hint_button('Aufbewahrung') }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="retention-btn" onclick="toggleDDPicker('retention')">{% for k, l in retention_options %}{% if k == retention %}{{ l }}{% endif %}{% endfor %} ▾</button>

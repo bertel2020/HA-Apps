@@ -1153,6 +1153,28 @@ Zwei Dinge, die man leicht falsch erwartet:
 Voreinstellung für neu erkannte Entitäten. Die Einstellung gilt nur für neu
 eintreffende Werte; bereits archivierte bleiben unverändert.
 
+### Verdichtungsziel
+
+**Ziel-Zeitraster für die rückwirkende Verdichtung bereits archivierter
+Monate** — unabhängig von der Auflösung oben, die nur für neu eintreffende
+Werte gilt. Wählbar: Aus, 30 Sekunden, 1, 5, 15 Minuten, 1 Stunde.
+
+Zwei Wege, wie ein Monat tatsächlich verdichtet wird:
+
+- **Manuell** im Bearbeitungsbereich der Entität, Reiter **Verdichten** —
+  Zeitraum und Ziel-Auflösung wählen, Vorschau ansehen, bestätigen. Nicht
+  umkehrbar.
+- **Automatisch**, wenn unter **Housekeeping → Verdichten** aktiviert: läuft
+  im Hintergrund, sobald ein archivierter Monat das dort eingestellte
+  Mindestalter erreicht hat. Standardmäßig **aus**.
+
+Bei Zählern bleibt je Bucket der letzte Wert erhalten (Zählerstände lassen
+sich so exakt weiterrechnen), bei Standard-Entitäten Durchschnitt sowie
+Min/Max je Bucket. Ein bereits verdichteter Monat wird bei Standard-Entitäten
+nie erneut verdichtet; bei Zählern nur auf ein noch gröberes Ziel. Voreingestellt
+für neue Entitäten ist der globale Standard unter **Einstellungen →
+Archivierung**.
+
 ### Aufbewahrung
 
 Wie lange Werte behalten werden: Unbegrenzt, 30 Tage, 90 Tage, 365 Tage,

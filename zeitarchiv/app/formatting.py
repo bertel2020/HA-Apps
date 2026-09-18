@@ -173,6 +173,24 @@ RESOLUTION_LABELS = {
     "15min": "15 Min.",
     "1h": "1 Std.",
 }
+COMPACT_TARGET_LABELS = {
+    "off": "Aus",
+    "30s": "30 Sek.",
+    "1min": "1 Min.",
+    "5min": "5 Min.",
+    "15min": "15 Min.",
+    "1h": "1 Std.",
+}
+# Housekeeping → Verdichten: globaler Schalter für die automatische
+# (Wartungsplaner-)Verdichtung, standardmäßig AUS — anders als die manuelle
+# Aktion (immer verfügbar) greift die Automatik erst nach bewusster Aktivierung
+# in fremde, bereits archivierte Daten ein.
+COMPACT_AUTO_LABELS = {"off": "Aus", "on": "An"}
+DEFAULT_COMPACT_AUTO_ENABLED = "off"
+# Wie lange ein archivierter Monat unangetastet bleibt, bevor die Automatik
+# ihn verdichtet — siehe compact_raw_values()/background.py.
+COMPACT_MIN_AGE_MONTHS_LABELS = {"3": "3 Monate", "6": "6 Monate", "12": "12 Monate"}
+DEFAULT_COMPACT_MIN_AGE_MONTHS = "6"
 RETENTION_LABELS = {
     "unlimited": "Unbegrenzt",
     "30d": "30 Tage",
@@ -240,6 +258,14 @@ RESOLUTION_BLOCKED_REASONS = {
         "echten Zustandswechsel (AN/AUS) verwerfen."
     ),
 }
+# Aus demselben Grund wie RESOLUTION_BLOCKED_REASONS: eine rückwirkende
+# Verdichtung könnte einen echten Zustandswechsel wegkomprimieren.
+COMPACT_TARGET_BLOCKED_REASONS = {
+    "switch": (
+        "Für Schalter nicht verfügbar: Eine rückwirkende Verdichtung könnte "
+        "einen echten Zustandswechsel (AN/AUS) wegkomprimieren."
+    ),
+}
 BACKUP_SCHEDULE_LABELS = {
     "off": "Aus",
     "daily": "Täglich",
@@ -284,3 +310,7 @@ def format_resolution(value: str) -> str:
 
 def format_retention(value: str) -> str:
     return RETENTION_LABELS.get(value, value)
+
+
+def format_compact_target(value: str) -> str:
+    return COMPACT_TARGET_LABELS.get(value, value)

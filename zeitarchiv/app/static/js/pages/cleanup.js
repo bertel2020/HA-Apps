@@ -52,6 +52,98 @@
       }
     }
 
+    // Verdichten: zweistufig wie die "Jetzt anwenden"-Aktionen unter
+    // Housekeeping — erst eine rein lesende Vorschau (Zeilenzahl vorher/
+    // geschätzt danach, siehe cleanup.preview_compact_raw_values()), der
+    // eigentliche, nicht umkehrbare Lauf erscheint erst danach als eigener
+    // Knopf, zusätzlich mit appConfirm() abgesichert.
+    async function previewCompact() {
+      const statusEl = document.getElementById('compact-value-status');
+      const previewEl = document.getElementById('compact-preview');
+      const startStr = document.getElementById('compact-start').value;
+      const endStr = document.getElementById('compact-end').value;
+      const target = document.getElementById('compact-target').value;
+      statusEl.className = 'add-value-status';
+      statusEl.textContent = '';
+      previewEl.innerHTML = '';
+      if (!startStr || !endStr) {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = 'Bitte Zeitraum angeben.';
+        return;
+      }
+      const startTs = new Date(startStr).getTime() / 1000;
+      const endTs = new Date(`${endStr}T23:59:59`).getTime() / 1000;
+      if (endTs <= startTs) {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = '"Bis" muss nach "Von" liegen.';
+        return;
+      }
+      try {
+        const res = await fetch(`${BASE}/entities/${ENTITY_ID}/rows/compact/preview`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({start_ts: startTs, end_ts: endTs, target_resolution: target}),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          statusEl.className = 'add-value-status err';
+          statusEl.textContent = err.detail || 'Vorschau fehlgeschlagen.';
+          return;
+        }
+        const data = await res.json();
+        if (data.months === 0) {
+          previewEl.innerHTML =
+            '<p class="hint" style="margin-top:12px;">Keine bereits archivierten, noch nicht (bzw. bei Zählern: nicht gröber) verdichteten Monate in diesem Zeitraum.</p>';
+          return;
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-danger';
+        btn.textContent = 'Verdichten — nicht umkehrbar';
+        btn.onclick = () => submitCompact(startTs, endTs, target);
+        previewEl.innerHTML =
+          '<div class="stat-row" style="margin:12px 0;">' +
+          `<div class="stat"><div class="label">Zeilen aktuell</div><div class="value">${data.rows_before}</div></div>` +
+          `<div class="stat"><div class="label">Zeilen danach (geschätzt)</div><div class="value">${data.rows_after}</div></div>` +
+          `<div class="stat"><div class="label">Monate</div><div class="value">${data.months}</div></div>` +
+          '</div>';
+        previewEl.appendChild(btn);
+      } catch (e) {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = 'Vorschau fehlgeschlagen.';
+      }
+    }
+
+    async function submitCompact(startTs, endTs, target) {
+      const statusEl = document.getElementById('compact-value-status');
+      const ok = await appConfirm(
+        'Werte im gewählten Zeitraum jetzt verdichten? Das lässt sich nicht rückgängig machen.',
+        {danger: true}
+      );
+      if (!ok) return;
+      statusEl.className = 'add-value-status';
+      statusEl.textContent = '';
+      try {
+        const res = await fetch(`${BASE}/entities/${ENTITY_ID}/rows/compact`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({start_ts: startTs, end_ts: endTs, target_resolution: target}),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          statusEl.className = 'add-value-status err';
+          statusEl.textContent = err.detail || 'Verdichten fehlgeschlagen.';
+          return;
+        }
+        const data = await res.json();
+        statusEl.className = 'add-value-status ok';
+        statusEl.textContent =
+          `✓ ${data.months_compacted.length} Monat(e) verdichtet, ${data.rows_before} → ${data.rows_after} Zeilen.`;
+        document.getElementById('compact-preview').innerHTML = '';
+      } catch (e) {
+        statusEl.className = 'add-value-status err';
+        statusEl.textContent = 'Verdichten fehlgeschlagen.';
+      }
+    }
+
     // Korrigieren: die Wert-Zelle einer Zeile wird per Klick auf den
     // Stift-Button zu einem Inline-Formular (Zahl-Feld + ✓/✗) — dieselbe
     // Zelle, kein separater Dialog, damit Zeitstempel/aktueller Wert der

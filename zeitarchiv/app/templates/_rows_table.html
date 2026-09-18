@@ -113,6 +113,9 @@
    Kreuz erscheint, verschöbe die Tabelle unter dem Finger. Stattdessen wird
    "0 ausgewählt" blass und "Löschen" gesperrt — dieselbe Entscheidung wie bei
    .toolbars in entity_detail.css (fester Platz, nur aktiviert/deaktiviert). #}
+{% if compacted_month_hint %}
+<p class="hint hint-status" style="margin:0 0 10px;">{{ compacted_month_hint }}</p>
+{% endif %}
 <div class="rows-actionbar">
   {% if mode == 'correct' %}
   ✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.
