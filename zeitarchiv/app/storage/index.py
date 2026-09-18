@@ -37,10 +37,14 @@ DEFAULT_DECIMALS = "auto"
 DEFAULT_VALUE_FILTER = "decimals"
 DEFAULT_GAP_THRESHOLD = "15"
 DEFAULT_OUTLIER_THRESHOLD = "50"
-# "off" statt "raw": Verdichtungsziel ist kein Auflösungswert, sondern ein
-# Ziel-Zeitraster für die (manuelle oder automatische) rückwirkende
-# Verdichtung bereits archivierter Monate — unabhängig von der Live-Auflösung,
-# siehe compact_raw_values() in storage/cleanup.py.
+# "off": bewusst wirkungslos für neu erkannte Entitäten, anders als es ein
+# konkretes Zeitraster hier wäre. Automatische Verdichtung ist zwar separat
+# schon auf "aus" gesperrt (Housekeeping → Verdichten,
+# DEFAULT_COMPACT_AUTO_ENABLED in formatting.py) — ein Standard-Ziel ≠ "off"
+# würde aber trotzdem JEDE neue Entität automatisch für die Verdichtung
+# vormerken, sobald die Automatik einmal eingeschaltet wird. Das widerspräche
+# dem eigentlichen Zweck des Felds: gezielt einzelne Entitäten, nicht
+# stillschweigend alle.
 DEFAULT_COMPACT_TARGET = "off"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 

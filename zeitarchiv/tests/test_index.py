@@ -908,17 +908,20 @@ def test_get_or_create_entity_uses_configured_default_resolution_and_retention()
 
 def test_get_or_create_entity_uses_configured_default_compact_target() -> None:
     """Dasselbe Muster wie bei default_resolution/default_retention oben,
-    für das neue Verdichtungsziel (Roadmap "Verdichten")."""
+    für das neue Verdichtungsziel (Roadmap "Verdichten"). DEFAULT_COMPACT_TARGET
+    ist bewusst "off" — ein konkretes Standard-Ziel würde sonst JEDE neue
+    Entität automatisch für die Verdichtung vormerken, sobald die Automatik
+    (separat, standardmäßig aus) einmal eingeschaltet wird."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
         index = Index(tmp / "index.sqlite")
         index.get_or_create_entity("sensor.before", "sensor", "measurement", None)
         assert index.get_entity("sensor.before")["compact_target"] == "off"
 
-        index.set_setting("default_compact_target", "1min")
+        index.set_setting("default_compact_target", "5min")
         index.get_or_create_entity("sensor.after", "sensor", "measurement", None)
 
-        assert index.get_entity("sensor.after")["compact_target"] == "1min"
+        assert index.get_entity("sensor.after")["compact_target"] == "5min"
         assert index.get_entity("sensor.before")["compact_target"] == "off"
 
         index.close()
