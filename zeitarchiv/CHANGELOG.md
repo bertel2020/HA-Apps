@@ -13,14 +13,14 @@
   Löschmarkierungen bleiben dabei automatisch konsistent, statt als
   „Löschmarkierung ohne passende Rohdatenzeile" liegen zu bleiben.
 - **Auflösung** bei „Standard"-Entitäten (Temperatur, Feuchte, Leistung …)
-  arbeitet jetzt grundlegend anders: statt einen einzelnen Rohwert je
-  Zeitfenster zu behalten und den Rest zu verwerfen, werden **alle**
-  Rohwerte eines Fensters zu einer Zeile zusammengefasst — Durchschnitt
-  **plus Min/Max**. Bisher ging z. B. eine kurze Temperaturspitze zwischen
-  zwei Speicherpunkten ersatzlos verloren, sobald die Auflösung gröber als
-  „Rohdaten" eingestellt war; jetzt bleibt sie als Min/Max-Wert der
-  betroffenen Zeile sichtbar, auch wenn der Durchschnitt sie glättet.
-  Zeitstempel der Zeile ist das Ende des Zeitfensters, nicht sein Anfang.
+  arbeitet jetzt grundlegend anders: bisher lief hier dieselbe Drossel wie
+  bei Zählern und Schaltern (siehe „Behoben" unten) — ein beliebiger
+  Rohwert je Zeitfenster blieb erhalten, der Rest wurde ersatzlos
+  verworfen. Jetzt werden **alle** Rohwerte eines Fensters zu einer Zeile
+  zusammengefasst, mit Durchschnitt **plus Min/Max** — eine kurze
+  Temperaturspitze zwischen zwei Speicherpunkten geht dadurch nicht mehr
+  komplett verloren, sondern bleibt als Min/Max-Wert der betroffenen Zeile
+  sichtbar, auch wenn der Durchschnitt sie glättet.
 - Neuer Housekeeping-Tab **Aktivität**: listet Korrekturen, hinzugefügte
   Werte, Bereinigungen und Verdichtungen, filterbar nach Entität,
   Aktionstyp, Status und Zeitraum; ein Klick auf Verdichten-/Bereinigen-
@@ -53,25 +53,26 @@
   Solarbank) zählte mit seinem vollen Ertrag statt seiner Netto-Nutzung
   (Entladen minus Laden) — ein Teil davon erschien dadurch doppelt als
   „Versorgung", obwohl er noch im Speicher steckte.
-- Auflösung: Zähler-Entitäten mit eingestelltem Zeitraster (z. B. „5 Min.")
-  maßen den Mindestabstand bisher relativ zum zuletzt gespeicherten Wert
-  statt zu einem festen Uhrzeit-Punkt — nach jedem Neustart oder
-  Verbindungsaussetzer begann das Raster dadurch neu und verschob sich auf
+- Auflösung: das Zeitfenster, das bei Zählern und Schaltern zu dichte Werte
+  filtert, maß den Mindestabstand bisher relativ zum zuletzt gespeicherten
+  Wert statt zu einem festen Uhrzeit-Punkt — nach jedem Neustart oder
+  Verbindungsaussetzer begann das Fenster dadurch neu und verschob sich auf
   einen zufälligen Phasenwert (z. B. „:02, :07, :12" statt „:00, :05,
-  :10"). Zwei Zähler-Entitäten mit derselben Auflösung landeten dadurch
-  praktisch nie auf denselben Zeitstempeln, und nach jeder Lücke driftete
-  die Phase dauerhaft weiter, ohne sich je wieder einzupendeln. Arbeitet
-  jetzt auf einem festen, an der Uhrzeit ausgerichteten Raster.
-- Auflösung: bei Schalter-Entitäten mit eingestelltem Zeitraster (statt
-  „Rohdaten") konnte das Zeitfenster einen echten Zustandswechsel (AN→AUS
-  oder umgekehrt) verwerfen, wenn er innerhalb desselben Fensters wie der
-  vorherige Wert eintraf — anders als bei einem Messwert ist bei einem
-  Schalter genau dieser Wechsel der eigentlich interessante Datenpunkt,
-  ein verlorener Wechsel also potenziell folgenreich (z. B. für spätere
-  Auswertungen der Einschaltdauer). Die Auflösung ist bei
-  Schalter-Entitäten jetzt fest auf „Rohdaten" gesperrt (Auswahlfeld im
-  Formular deaktiviert); Duplikate (unveränderter Zustand) filtert
-  weiterhin unabhängig davon der Wertänderungsfilter.
+  :10"). Zwei Entitäten mit derselben Auflösung landeten dadurch praktisch
+  nie auf denselben Zeitstempeln, und nach jeder weiteren Unterbrechung
+  driftete die Phase weiter, ohne sich je wieder einzupendeln. Arbeitet
+  jetzt für beide Typen auf einem festen, an der Uhrzeit ausgerichteten
+  Raster statt relativ zum letzten Wert.
+- Auflösung: bei Schalter-Entitäten kam durch dasselbe Zeitfenster ein
+  zweites, schwerwiegenderes Problem hinzu — es konnte einen echten
+  Zustandswechsel (AN→AUS oder umgekehrt) verwerfen, wenn er innerhalb
+  desselben Fensters wie der vorherige Wert eintraf. Anders als bei einem
+  Messwert ist bei einem Schalter genau dieser Wechsel der eigentlich
+  interessante Datenpunkt — ein Fenster reicht hier also nicht als Fix,
+  die Auflösung ist bei Schalter-Entitäten deshalb jetzt fest auf
+  „Rohdaten" gesperrt (Auswahlfeld im Formular deaktiviert). Duplikate
+  (unveränderter Zustand) filtert weiterhin unabhängig davon der
+  Wertänderungsfilter.
 
 ## 0.97.0 - 2026-09-16
 
