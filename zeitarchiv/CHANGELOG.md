@@ -43,9 +43,10 @@
 
 - Charts-Seite: Balken-Diagramme begannen bei aktiver „Dynamische Y-Achse"
   nicht immer bei 0 — anders als auf Dashboard-Kacheln und der
-  Entitätsseite. Ein aktiver Periodenvergleich wurde außerdem beim
-  Umschalten auf Rohwerte/Gestapelt/Zeitstrahl/Donut/„Auflösung: Voll"
-  stillschweigend abgeschaltet, statt Vorrang zu behalten.
+  Entitätsseite.
+- Charts-Seite: ein aktiver Periodenvergleich wurde beim Umschalten auf
+  Rohwerte/Gestapelt/Zeitstrahl/Donut/„Auflösung: Voll" stillschweigend
+  abgeschaltet, statt Vorrang zu behalten.
 - Versorgungsanteile: ein Speicher mit eigenem Ertrag (z. B. eine
   Solarbank) zählte mit seinem vollen Ertrag statt seiner Netto-Nutzung
   (Entladen minus Laden) — ein Teil davon erschien dadurch doppelt als
