@@ -106,6 +106,15 @@
     window.appAlert(tr.dataset.error, {danger: true});
   };
 
+  // Housekeeping → Aktivität: Verdichten-/Bereinigen-Zeilen tragen ihr Detail
+  // (Ziel, betroffene Monate, Zeilen vorher/nachher) NICHT mehr als eigene
+  // Tabellenspalte, sondern wie ein Fehlergrund per Klick — dasselbe Muster
+  // wie showJobError() oben, nur ohne die Rot-Einfärbung, weil es keine
+  // Fehlermeldung ist.
+  window.showActivityDetail = function (tr) {
+    window.appAlert(tr.dataset.detail);
+  };
+
   document.body.addEventListener('htmx:confirm', function (evt) {
     if (!evt.detail.question) return; // kein hx-confirm auf diesem Element
     evt.preventDefault();

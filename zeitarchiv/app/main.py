@@ -5092,6 +5092,7 @@ def compact_rows(entity_id: str, body: _CompactValuesBody) -> dict:
             "months_compacted": result["months_compacted"],
             "rows_before": result["rows_before"],
             "rows_after": result["rows_after"],
+            "stale_markers_removed": result["stale_markers_removed"],
         }),
     )
     logger.info(

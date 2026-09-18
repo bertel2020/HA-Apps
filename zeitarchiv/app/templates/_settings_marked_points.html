@@ -1,57 +1,28 @@
-{% if rows %}
+{# Erste Ebene: betroffene Entitäten statt einzelner Zeilen (siehe
+   settings_purge_marked() in housekeeping_routes.py) — Klick auf eine
+   Entität lädt die zweite Ebene (_settings_marked_points_entity.html) in
+   denselben #marked-points-list-Container. #}
+{% if entities %}
 <div class="tbl-wrap">
-  <table class="dt" style="min-width:680px;">
-    <thead><tr><th>Entität</th><th>Messzeitpunkt</th><th>Markiert am</th></tr></thead>
+  <table class="dt" data-sortable style="min-width:680px;">
+    <thead><tr><th>Entität</th><th>Markierungen</th><th>Zuletzt markiert</th></tr></thead>
     <tbody>
-    {% for row in rows %}
-      <tr>
-        <td>
-          <a href="entities/{{ row.entity_id }}/cleanup"
-             onclick="document.getElementById('marked-points-dialog').close()">
-            <strong>{{ row.friendly_name or row.entity_id }}</strong>
-          </a>
-          {% if row.friendly_name %}<span class="ts-time">{{ row.entity_id }}</span>{% endif %}
+    {% for row in entities %}
+      <tr class="job-row-nav" tabindex="0" role="button"
+          aria-label="Markierungen von {{ row.friendly_name or row.entity_id }} anzeigen"
+          hx-get="settings/purge/marked/{{ row.entity_id }}" hx-target="#marked-points-list" hx-swap="innerHTML"
+          hx-trigger="click, keyup[key=='Enter' || key==' ']">
+        <td data-sort="{{ row.friendly_name or row.entity_id }}">
+          <strong>{{ row.friendly_name or row.entity_id }}</strong>
+          {% if row.friendly_name %}<div class="ts-time">{{ row.entity_id }}</div>{% endif %}
         </td>
-        <td class="nowrap">{{ row.measured_at }}</td>
-        <td class="nowrap">{{ row.marked_at }}</td>
+        <td class="nowrap" data-sort="{{ row.count }}">{{ row.count }}</td>
+        <td class="nowrap">{{ row.last_marked }}</td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
 {% else %}
-<div class="empty">Keine passenden markierten Datensätze gefunden.</div>
+<div class="empty">Keine passenden markierten Entitäten gefunden.</div>
 {% endif %}
-
-<div class="pager" style="justify-content:space-between;">
-  <div style="display:flex;align-items:center;gap:10px;">
-    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
-    <button class="btn navbtn" type="button"
-            hx-get="settings/purge/marked" hx-vals='{"page": 1}'
-            hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
-            {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
-    <button class="btn navbtn" type="button"
-            hx-get="settings/purge/marked" hx-vals='{"page": {{ pagination.page - 1 }}}'
-            hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
-            {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite
-      <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}"
-             hx-get="settings/purge/marked" hx-trigger="change"
-             hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list">
-      / {{ pagination.total_pages }}</span>
-    <button class="btn navbtn" type="button"
-            hx-get="settings/purge/marked" hx-vals='{"page": {{ pagination.page + 1 }}}'
-            hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
-            {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
-    <button class="btn navbtn" type="button"
-            hx-get="settings/purge/marked" hx-vals='{"page": {{ pagination.total_pages }}}'
-            hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
-            {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
-  </div>
-  <select id="marked-points-page-size" name="page_size" title="Zeilen pro Seite"
-          hx-get="settings/purge/marked" hx-include="#marked-points-search" hx-target="#marked-points-list" hx-swap="innerHTML">
-    {% for size in [10, 20, 50, 100, 200] %}
-    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
-    {% endfor %}
-  </select>
-</div>

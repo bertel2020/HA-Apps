@@ -889,6 +889,7 @@ class BackgroundService:
                         "months_compacted": result["months_compacted"],
                         "rows_before": result["rows_before"],
                         "rows_after": result["rows_after"],
+                        "stale_markers_removed": result["stale_markers_removed"],
                     }),
                 )
 
@@ -979,6 +980,24 @@ class BackgroundService:
         # bräuchte jede bestehende Installation ein manuelles erneutes Speichern
         # des Setup-Formulars, damit der rückwirkende Backfill überhaupt anläuft.
         sync_hourly_rollup_flags_for_current_config(self.energiedashboard_service)
+        # Einmalig beim Start: compact_raw_values() räumte deleted_points bisher
+        # nicht auf (Fund vom 18.09.2026) — für jeden VOR diesem Fix bereits
+        # verdichteten Monat holt das die seither verwaisten Markierungen nach.
+        # Idempotent (siehe dort), kostet ab dem zweiten Lauf nur einen
+        # Tabellen-Scan über compacted_months.
+        try:
+            removed = cleanup.remove_deleted_points_for_already_compacted_months(self.index, self.tz)
+            if removed:
+                logger.info(
+                    "Verwaiste Löschmarkierungen bereits verdichteter Monate aufgeräumt · "
+                    "event=stale_deleted_points_backfill_completed removed=%d",
+                    removed,
+                )
+        except Exception:
+            logger.exception(
+                "Verwaiste Löschmarkierungen konnten nicht aufgeräumt werden · "
+                "event=stale_deleted_points_backfill_failed"
+            )
         # Einmal vorab, damit die erste Seite nach dem Start nicht 30s lang
         # fälschlich "0 ausstehende Rotationen" meldet — zu diesem Zeitpunkt hält
         # noch niemand Entitäts-Sperren, der Aufruf ist hier ungefährlich.

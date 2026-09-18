@@ -118,8 +118,17 @@
           th.dataset.dir = dir;
           th.classList.add(dir === 'asc' ? 'dt-sort-asc' : 'dt-sort-desc');
           sortRows(table, idx, dir);
-          if (table.hasAttribute('data-paginate')) { table.dataset.page = '1'; }
-          updatePager(table);
+          // Nur bei data-paginate: updatePager() legt sonst — auch ohne das
+          // Attribut — bei mehr als der Default-Seitengröße (10) Zeilen einen
+          // eigenen, ungefragten Pager an (siehe updatePager() unten, die das
+          // Attribut selbst nie prüft). Betraf zuerst die Detailansicht
+          // markierter Datensätze (Housekeeping → Speicherplatz), die
+          // data-sortable ohne data-paginate nutzt, weil sie bereits
+          // serverseitig paginiert.
+          if (table.hasAttribute('data-paginate')) {
+            table.dataset.page = '1';
+            updatePager(table);
+          }
         });
       });
     }

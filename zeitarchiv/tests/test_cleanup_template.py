@@ -75,14 +75,25 @@ def test_marked_points_are_loaded_on_demand_in_a_dialog() -> None:
     # blieben unverändert, nur eingebunden von einer anderen Seite.
     purge = (TEMPLATES / "_settings_purge_form.html").read_text(encoding="utf-8")
     housekeeping = (TEMPLATES / "housekeeping.html").read_text(encoding="utf-8")
-    partial = (TEMPLATES / "_settings_marked_points.html").read_text(encoding="utf-8")
     assert "Markierte Datensätze anzeigen" in purge
     assert 'hx-get="settings/purge/marked"' in purge
     assert '<dialog id="marked-points-dialog"' in housekeeping
-    assert "Messzeitpunkt" in partial and "Markiert am" in partial
-    assert 'hx-include="#marked-points-search"' in partial
     environment = Environment(loader=FileSystemLoader(TEMPLATES))
     environment.get_template("_settings_marked_points.html")
+    environment.get_template("_settings_marked_points_entity.html")
+
+
+def test_marked_points_are_a_two_level_drill_down() -> None:
+    """Erste Ebene zeigt betroffene Entitäten (nicht jede einzelne Markierung
+    flach untereinander — bei einer Entität mit hunderttausenden Markierungen
+    wäre das eine endlose Liste ohne Orientierung), Klick auf eine Entität
+    lädt die zweite Ebene mit den einzelnen Markierungen samt Wert."""
+    ebene1 = (TEMPLATES / "_settings_marked_points.html").read_text(encoding="utf-8")
+    ebene2 = (TEMPLATES / "_settings_marked_points_entity.html").read_text(encoding="utf-8")
+    assert "Markierungen" in ebene1 and "Zuletzt markiert" in ebene1
+    assert 'hx-get="settings/purge/marked/{{ row.entity_id }}"' in ebene1
+    assert "Messzeitpunkt" in ebene2 and "Wert" in ebene2 and "Markiert am" in ebene2
+    assert 'hx-get="settings/purge/marked"' in ebene2  # der "Zurück"-Knopf
 
 
 def _run_all() -> None:

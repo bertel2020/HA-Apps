@@ -1031,6 +1031,44 @@ def purge_archived_months(
     return {"rows_purged": rows_purged, "months_purged": months_purged}
 
 
+def read_values_for_timestamps(
+    data_dir: Path, entity_id: str, timestamps: list[float], tz: ZoneInfo, now: datetime | None = None
+) -> dict[float, float]:
+    """Liest den Rohwert zu einer Menge bestimmter Zeitstempel einer Entität —
+    rein lesend, für die Detailansicht markierter Datensätze (Housekeeping →
+    Speicherplatz → "Markierte Datensätze anzeigen"): ein weich gelöschter
+    Zeitstempel wird aus allen normalen Ansichten rausgefiltert (siehe
+    Modul-Docstring), sein Wert steht sonst nirgends mehr. Liest NUR die
+    Monate, die unter den übergebenen Zeitstempeln tatsächlich vorkommen —
+    bei einer paginierten Detailseite (20-200 Zeilen) sind das meist nur eine
+    Handvoll Dateien, nie die komplette Historie einer Entität.
+
+    Ein Zeitstempel ohne Treffer (Rohdaten inzwischen anderweitig entfernt,
+    z. B. durch einen bereits erfolgten Purge) fehlt im Ergebnis-dict statt
+    mit None aufzutauchen — der Aufrufer zeigt dafür „—"."""
+    now = now or datetime.now(tz)
+    by_month = _group_by_month({ts: 1 for ts in timestamps}, tz)
+    current_month = month_key(now.timestamp(), tz)
+    values: dict[float, float] = {}
+    for month, wanted in by_month.items():
+        if month == current_month:
+            path = hot_path(data_dir, entity_id, now.timestamp(), tz)
+            if not path.exists():
+                continue
+            for ts, value in read_rows(path):
+                if ts in wanted:
+                    values[ts] = value
+        else:
+            archive_path = entity_dir(data_dir, "archive", entity_id) / f"{month}.parquet"
+            if not archive_path.exists():
+                continue
+            table = pq.read_table(archive_path, columns=["ts", "value"])
+            for ts, value in zip(table.column("ts").to_pylist(), table.column("value").to_pylist()):
+                if ts in wanted:
+                    values[ts] = value
+    return values
+
+
 # -- Bearbeitungsbereich: nachträgliches Hinzufügen/Korrigieren von Rohwerten --
 #
 # Ergänzt die reine Löschung oben um die beiden fehlenden Bausteine eines
@@ -1343,6 +1381,43 @@ def preview_compact_raw_values(
     return {"rows_before": rows_before, "rows_after": rows_after, "months": len(months)}
 
 
+def _remove_deleted_points_for_month(index: Index, entity_id: str, year: int, month: int, tz: ZoneInfo) -> int:
+    """Entfernt alle deleted_points-Markierungen einer Entität, deren
+    Zeitstempel in den angegebenen Kalendermonat fallen — für compact_raw_
+    values() (siehe dort): sobald ein Monat verdichtet ist, existieren seine
+    ursprünglichen Rohzeitstempel nirgends mehr, eine Markierung dafür wäre
+    sonst dauerhaft verwaist ("Löschmarkierungen ohne passende
+    Rohdatenzeile" in der Bereinigungsvorschau). Auch von
+    remove_deleted_points_for_already_compacted_months() genutzt, für Monate,
+    die VOR diesem Fix verdichtet wurden. Gibt die Anzahl entfernter
+    Markierungen zurück."""
+    deleted = index.get_deleted_counts_for_entity(entity_id)
+    if not deleted:
+        return 0
+    target_month_key = f"{year:04d}-{month:02d}"
+    relevant = {ts: count for ts, count in deleted.items() if month_key(ts, tz) == target_month_key}
+    if not relevant:
+        return 0
+    timestamps = [ts for ts, count in relevant.items() for _ in range(count)]
+    index.remove_deleted_points(entity_id, timestamps)
+    return len(timestamps)
+
+
+def remove_deleted_points_for_already_compacted_months(index: Index, tz: ZoneInfo) -> int:
+    """Einmaliger Nachzieh-Lauf beim Start (siehe background.py
+    BackgroundService.start()): compact_raw_values() räumte deleted_points
+    bisher nicht auf (Fund vom 18.09.2026, Housekeeping → Speicherplatz →
+    "Löschmarkierungen ohne passende Rohdatenzeile") — für jeden VOR diesem
+    Fix bereits verdichteten Monat (compacted_months) können deshalb noch
+    verwaiste Markierungen übrig sein. Idempotent: findet bei jedem weiteren
+    Lauf nichts mehr, kostet dann nur einen Tabellen-Scan. Gibt die Anzahl
+    insgesamt entfernter Markierungen zurück."""
+    total = 0
+    for row in index.list_all_compacted_months():
+        total += _remove_deleted_points_for_month(index, row["entity_id"], row["year"], row["month"], tz)
+    return total
+
+
 def compact_raw_values(
     data_dir: Path, index: Index, entity_id: str, start_ts: float, end_ts: float, target_resolution: str,
     tz: ZoneInfo, now: datetime | None = None,
@@ -1365,7 +1440,12 @@ def compact_raw_values(
     Locking ist Sache des Aufrufers (main.py, wie bei correct_raw_value()/
     add_raw_value()/purge_*): diese Funktion nimmt selbst keine Sperre.
 
-    Gibt rows_before/rows_after/months_compacted zurück."""
+    Räumt außerdem deleted_points-Markierungen im verdichteten Monat auf
+    (siehe _remove_deleted_points_for_month()) — deren ursprüngliche
+    Rohzeitstempel existieren danach nicht mehr, sie blieben sonst dauerhaft
+    als "Löschmarkierungen ohne passende Rohdatenzeile" liegen.
+
+    Gibt rows_before/rows_after/months_compacted/stale_markers_removed zurück."""
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
@@ -1378,6 +1458,7 @@ def compact_raw_values(
 
     rows_before = 0
     rows_after = 0
+    stale_markers_removed = 0
     months_compacted: list[str] = []
     months = _compactable_months(
         index, entity_id, aggregation_type, target_resolution, interval, archive_dir,
@@ -1397,5 +1478,11 @@ def compact_raw_values(
         index.add_row_count(entity_id, len(new_rows) - len(rows))
         index.set_compacted_month(entity_id, year, month, target_resolution, now.timestamp())
         months_compacted.append(f"{year:04d}-{month:02d}")
+        stale_markers_removed += _remove_deleted_points_for_month(index, entity_id, year, month, tz)
 
-    return {"rows_before": rows_before, "rows_after": rows_after, "months_compacted": months_compacted}
+    return {
+        "rows_before": rows_before,
+        "rows_after": rows_after,
+        "months_compacted": months_compacted,
+        "stale_markers_removed": stale_markers_removed,
+    }

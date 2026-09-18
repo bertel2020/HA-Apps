@@ -13,9 +13,13 @@ function toggleDDPicker(prefix) {
   popover.classList.toggle('open');
   // Beim Öffnen die aktuell aktive Zeile in den sichtbaren Bereich scrollen
   // (relevant für lange, scrollbare Listen wie den Zeitraum-Typ-Picker im
-  // Tabellen-Editor).
+  // Tabellen-Editor oder den Entität-Filter in Housekeeping → Aktivität).
+  // 'nearest' statt 'center': scrollt nur das Minimum, das nötig ist, um die
+  // Zeile innerhalb des (jetzt selbst scrollbaren, siehe app.css) Popovers
+  // sichtbar zu machen — 'center' zog sonst auch die ganze Seite mit, wenn
+  // die aktive Zeile weit unten in einer langen Liste stand.
   if (opening) {
-    popover.querySelector('.dd-picker-row.active')?.scrollIntoView({block: 'center'});
+    popover.querySelector('.dd-picker-row.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   }
 }
 

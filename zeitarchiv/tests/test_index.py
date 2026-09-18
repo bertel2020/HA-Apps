@@ -804,14 +804,18 @@ def test_get_stats_by_retention_groups_correctly() -> None:
 
 
 def test_get_deleted_points_by_entity_only_lists_affected_entities() -> None:
+    """Erste Ebene der "Markierte Datensätze"-Detailansicht (Housekeeping →
+    Speicherplatz): eine Zeile je betroffener Entität statt jeder einzelnen
+    Markierung — search filtert wie im alten flachen list_deleted_points()."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
         index = Index(tmp / "index.sqlite")
-        index.get_or_create_entity("sensor.a", "sensor", "measurement", None, friendly_name="A")
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", None, friendly_name="Wohnzimmer")
         index.get_or_create_entity("sensor.b", "sensor", "measurement", None, friendly_name="B")
         index.get_or_create_entity("sensor.c", "sensor", "measurement", None, friendly_name="C")
-        index.mark_deleted("sensor.a", [1.0, 2.0, 3.0])
-        index.mark_deleted("sensor.b", [1.0])
+        index.mark_deleted("sensor.a", [1.0, 2.0], deleted_at=1_000.0)
+        index.mark_deleted("sensor.a", [3.0], deleted_at=2_000.0)
+        index.mark_deleted("sensor.b", [1.0], deleted_at=500.0)
         # sensor.c bleibt ohne markierte Vorkommen — darf nicht in der Liste auftauchen.
 
         breakdown = index.get_deleted_points_by_entity()
@@ -819,42 +823,40 @@ def test_get_deleted_points_by_entity_only_lists_affected_entities() -> None:
         assert [row["entity_id"] for row in breakdown] == ["sensor.a", "sensor.b"]  # nach n absteigend sortiert
         by_id = {row["entity_id"]: row for row in breakdown}
         assert by_id["sensor.a"]["n"] == 3
-        assert by_id["sensor.a"]["friendly_name"] == "A"
+        assert by_id["sensor.a"]["friendly_name"] == "Wohnzimmer"
+        assert by_id["sensor.a"]["last_deleted_at"] == 2_000.0  # jüngste der beiden Chargen
         assert by_id["sensor.b"]["n"] == 1
+
+        gefiltert = index.get_deleted_points_by_entity(search="wohnzimmer")
+        assert [row["entity_id"] for row in gefiltert] == ["sensor.a"]
 
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def test_list_deleted_points_searches_and_paginates_individual_markers() -> None:
+def test_list_deleted_points_for_entity_paginates_a_single_entity() -> None:
+    """Zweite Ebene: einzelne Markierungen EINER Entität, neueste Charge
+    zuerst — eine andere Entität mit eigenen Markierungen bleibt außen vor."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:
         index = Index(tmp / "index.sqlite")
-        index.get_or_create_entity(
-            "sensor.alpha", "sensor", "measurement", "°C", friendly_name="Wohnzimmer"
-        )
-        index.get_or_create_entity(
-            "sensor.beta", "sensor", "measurement", "W", friendly_name="Leistung"
-        )
-        index.mark_deleted("sensor.alpha", [float(i) for i in range(12)])
-        index.mark_deleted("sensor.beta", [99.0])
+        index.get_or_create_entity("sensor.alpha", "sensor", "measurement", "°C")
+        index.get_or_create_entity("sensor.beta", "sensor", "measurement", "W")
+        index.mark_deleted("sensor.alpha", [float(i) for i in range(12)], deleted_at=1_000.0)
+        index.mark_deleted("sensor.beta", [99.0], deleted_at=2_000.0)
 
-        first = index.list_deleted_points(page=1, page_size=10)
-        second = index.list_deleted_points(page=2, page_size=10)
+        first = index.list_deleted_points_for_entity("sensor.alpha", page=1, page_size=10)
+        second = index.list_deleted_points_for_entity("sensor.alpha", page=2, page_size=10)
         assert first["pagination"] == {
-            "page": 1, "page_size": 10, "total": 13, "total_pages": 2,
+            "page": 1, "page_size": 10, "total": 12, "total_pages": 2,
             "start": 1, "end": 10,
         }
         assert second["pagination"]["start"] == 11
-        assert second["pagination"]["end"] == 13
+        assert second["pagination"]["end"] == 12
         assert len(first["rows"]) == 10
-        assert len(second["rows"]) == 3
-
-        by_name = index.list_deleted_points(search="wohnzimmer", page_size=50)
-        assert by_name["pagination"]["total"] == 12
-        assert {row["entity_id"] for row in by_name["rows"]} == {"sensor.alpha"}
-        assert all("deleted_at" in row and "ts" in row for row in by_name["rows"])
+        assert len(second["rows"]) == 2
+        assert all(0.0 <= row["ts"] <= 11.0 for row in first["rows"] + second["rows"])
 
         index.close()
     finally:
@@ -949,6 +951,30 @@ def test_compacted_month_marker_round_trips_and_can_be_overwritten() -> None:
         marker = index.get_compacted_month("sensor.counter", 2024, 7)
         assert marker["target_resolution"] == "5min"
         assert marker["compacted_at"] == 2000.0
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_list_all_compacted_months_spans_every_entity() -> None:
+    """Grundlage für den einmaligen Nachzieh-Lauf verwaister Löschmarkierungen
+    (cleanup.remove_deleted_points_for_already_compacted_months()) — der
+    braucht JEDEN verdichteten Monat über ALLE Entitäten hinweg, nicht nur
+    einer bestimmten."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.a", "sensor", "total_increasing", "kWh")
+        index.get_or_create_entity("sensor.b", "sensor", "measurement", "°C")
+
+        assert index.list_all_compacted_months() == []
+
+        index.set_compacted_month("sensor.a", 2024, 7, "1min", 1000.0)
+        index.set_compacted_month("sensor.b", 2024, 8, "1h", 2000.0)
+
+        markers = {(row["entity_id"], row["year"], row["month"]) for row in index.list_all_compacted_months()}
+        assert markers == {("sensor.a", 2024, 7), ("sensor.b", 2024, 8)}
 
         index.close()
     finally:

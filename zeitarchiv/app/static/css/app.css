@@ -754,8 +754,21 @@ button.dd-picker-clear{
   position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;
   background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px;
   display:none;
+  /* Lange Listen (z. B. der Entität-Filter in Housekeeping → Aktivität)
+     wachsen sonst über den sichtbaren Bereich hinaus — scrollIntoView()
+     beim Öffnen (dd-picker.js) müsste dann die ganze Seite verschieben, um
+     die aktive Zeile zu zeigen, statt nur innerhalb des Popovers zu
+     scrollen. Ohne Auswirkung auf kurze Listen, die diese Höhe nie erreichen. */
+  max-height:min(360px, 60vh);overflow-y:auto;
 }
 .dd-picker-popover.open{display:block;}
+/* Housekeeping → Aktivität: die Filter-Optionen tragen teils lange
+   Entitätsnamen ("Demo Balkonkraftwerk Ladeleistung") — die Standardbreite
+   ließ sie umbrechen. Nur diese vier, nicht global: die meisten anderen
+   dd-picker (z. B. "Aus"/"An") brauchen die Breite nicht. */
+#activity-entity-popover,#activity-action-popover,#activity-status-popover,#activity-days-popover{
+  width:280px;max-width:calc(100vw - 32px);
+}
 .dd-picker-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
 .dd-picker-row:hover{background:var(--surface-alt);}
 /* Suchbare Varianten (Alpine-gesteuert statt der globalen .open-Klasse aus
@@ -1166,6 +1179,16 @@ table.dt tr.flag td{background:var(--danger-soft);color:var(--ink);}
 table.dt tr.job-row-error{cursor:pointer;}
 table.dt tr.job-row-error:hover td{background:var(--danger-soft);}
 table.dt tr.job-row-error:focus-visible td{outline:2px solid var(--accent-line);outline-offset:-2px;}
+/* Aktivität (housekeeping.html): Zeile mit Verdichten-/Bereinigen-Detail,
+   klickbar wie job-row-error, nur ohne die Fehler-Einfärbung — der normale
+   Hover (siehe oben) reicht als Rückmeldung, nur der Fokusring fehlt sonst. */
+table.dt tr.job-row-detail{cursor:pointer;}
+table.dt tr.job-row-detail:focus-visible td{outline:2px solid var(--accent-line);outline-offset:-2px;}
+/* Markierte Datensätze (Housekeeping → Speicherplatz), erste Ebene: Zeile
+   klickbar statt eines Buttons um den Entitätsnamen — führt (per hx-get) in
+   die zweite Ebene, kein Popup wie job-row-detail, sonst dieselbe Optik. */
+table.dt tr.job-row-nav{cursor:pointer;}
+table.dt tr.job-row-nav:focus-visible td{outline:2px solid var(--accent-line);outline-offset:-2px;}
 table.dt.compact th{padding:4px 14px;}
 table.dt.compact td{padding:2px 14px;}
 .table-resize-enabled{position:relative;}

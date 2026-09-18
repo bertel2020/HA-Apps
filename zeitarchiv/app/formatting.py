@@ -190,7 +190,7 @@ DEFAULT_COMPACT_AUTO_ENABLED = "off"
 # Wie lange ein archivierter Monat unangetastet bleibt, bevor die Automatik
 # ihn verdichtet — siehe compact_raw_values()/background.py.
 COMPACT_MIN_AGE_MONTHS_LABELS = {"3": "3 Monate", "6": "6 Monate", "12": "12 Monate"}
-DEFAULT_COMPACT_MIN_AGE_MONTHS = "6"
+DEFAULT_COMPACT_MIN_AGE_MONTHS = "3"
 # Housekeeping → Speicherplatz: globaler Schalter für die automatische
 # (Wartungsplaner-)Bereinigung, standardmäßig AUS — dasselbe Muster wie bei
 # der Verdichten-Automatik oben.

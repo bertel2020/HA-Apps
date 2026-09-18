@@ -1,0 +1,62 @@
+{# Zweite Ebene: einzelne Markierungen EINER Entität inklusive Wert (siehe
+   settings_purge_marked_entity() in housekeeping_routes.py) — "Zurück" lädt
+   wieder die erste Ebene (_settings_marked_points.html) in denselben
+   #marked-points-list-Container, ohne die Suche der ersten Ebene zu kennen
+   (bewusst zurückgesetzt, statt sie hier mitzuführen). #}
+<div class="toolbar" style="margin:0 0 14px;">
+  <button type="button" class="btn btn-sm" hx-get="settings/purge/marked" hx-target="#marked-points-list" hx-swap="innerHTML">
+    ← Zurück zur Übersicht
+  </button>
+</div>
+<h3 class="settings-minor-title" style="margin:0 0 10px;">{{ entity_label }}</h3>
+{% if rows %}
+<div class="tbl-wrap">
+  <table class="dt" data-sortable style="min-width:680px;">
+    <thead><tr><th>Messzeitpunkt</th><th>Wert</th><th>Markiert am</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td class="nowrap" data-sort="{{ row.ts }}">{{ row.measured_at }}</td>
+        <td>{{ row.value_label }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
+        <td class="nowrap" data-sort="{{ row.deleted_at }}">{{ row.marked_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">Keine markierten Datensätze für diese Entität gefunden.</div>
+{% endif %}
+
+<div class="pager" style="justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+    <button class="btn navbtn" type="button"
+            hx-get="settings/purge/marked/{{ entity_id }}" hx-vals='{"page": 1}'
+            hx-include="#marked-points-entity-page-size" hx-target="#marked-points-list"
+            {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+    <button class="btn navbtn" type="button"
+            hx-get="settings/purge/marked/{{ entity_id }}" hx-vals='{"page": {{ pagination.page - 1 }}}'
+            hx-include="#marked-points-entity-page-size" hx-target="#marked-points-list"
+            {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
+    <span class="pager-page">Seite
+      <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}"
+             hx-get="settings/purge/marked/{{ entity_id }}" hx-trigger="change"
+             hx-include="#marked-points-entity-page-size" hx-target="#marked-points-list">
+      / {{ pagination.total_pages }}</span>
+    <button class="btn navbtn" type="button"
+            hx-get="settings/purge/marked/{{ entity_id }}" hx-vals='{"page": {{ pagination.page + 1 }}}'
+            hx-include="#marked-points-entity-page-size" hx-target="#marked-points-list"
+            {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
+    <button class="btn navbtn" type="button"
+            hx-get="settings/purge/marked/{{ entity_id }}" hx-vals='{"page": {{ pagination.total_pages }}}'
+            hx-include="#marked-points-entity-page-size" hx-target="#marked-points-list"
+            {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+  </div>
+  <select id="marked-points-entity-page-size" name="page_size" title="Zeilen pro Seite"
+          hx-get="settings/purge/marked/{{ entity_id }}" hx-target="#marked-points-list" hx-swap="innerHTML">
+    {% for size in [10, 20, 50, 100, 200] %}
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+    {% endfor %}
+  </select>
+</div>

@@ -1,18 +1,74 @@
-<p class="hint" style="margin:0 0 14px;">Korrektur, Hinzufügen, Bereinigen, Verdichten und Aufbewahrung, jeweils Datensatz-verändernd — die letzten {{ activity_rows | length }} Einträge. Backup bleibt außen vor, es betrifft die ganze Installation statt einzelner Datensätze.</p>
+{# Vier Einfachauswahl-Filter nach demselben dd-picker-Muster wie "seit" bei
+   Inaktive Entitäten — EIN Formular, EIN hx-trigger="change", das geänderte
+   Feld ist über hx-include="#activity-filter-form" ohnehin mit dabei. Sitzt
+   bewusst HIER, innerhalb des per htmx getauschten Bereichs statt in
+   housekeeping.html: die Route liefert die aktuellen Filterwerte in jeder
+   Antwort ohnehin zurück (siehe _settings_activity_context()), ein Verlust
+   des Dropdown-Zustands beim Tauschen findet also nicht statt — und nur so
+   sitzen die Felder direkt über der Tabelle statt neben der Überschrift. #}
+<div class="toolbar" data-sort-host style="justify-content:flex-end;">
+  <form id="activity-filter-form" hx-get="housekeeping/activity" hx-trigger="change"
+        hx-target="#activity-body" hx-swap="innerHTML" hx-include="#activity-filter-form">
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="activity-entity-btn" onclick="toggleDDPicker('activity-entity')">{% for value, label in activity_entity_options %}{% if value == activity_entity_filter %}{{ label }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="entity" id="activity-entity-input" value="{{ activity_entity_filter }}">
+      <div class="dd-picker-popover" id="activity-entity-popover">
+        {% for value, label in activity_entity_options %}
+        <div class="dd-picker-row{{ ' active' if value == activity_entity_filter else '' }}"
+             onclick="selectDDOption('activity-entity', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="activity-action-btn" onclick="toggleDDPicker('activity-action')">{% for value, label in activity_action_options %}{% if value == activity_action_filter %}{{ label }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="action" id="activity-action-input" value="{{ activity_action_filter }}">
+      <div class="dd-picker-popover" id="activity-action-popover">
+        {% for value, label in activity_action_options %}
+        <div class="dd-picker-row{{ ' active' if value == activity_action_filter else '' }}"
+             onclick="selectDDOption('activity-action', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="activity-status-btn" onclick="toggleDDPicker('activity-status')">{% for value, label in activity_status_options %}{% if value == activity_status_filter %}{{ label }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="status" id="activity-status-input" value="{{ activity_status_filter }}">
+      <div class="dd-picker-popover" id="activity-status-popover">
+        {% for value, label in activity_status_options %}
+        <div class="dd-picker-row{{ ' active' if value == activity_status_filter else '' }}"
+             onclick="selectDDOption('activity-status', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="activity-days-btn" onclick="toggleDDPicker('activity-days')">{% for value, label in activity_days_options %}{% if value == activity_days_filter %}{{ label }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="days" id="activity-days-input" value="{{ activity_days_filter }}">
+      <div class="dd-picker-popover" id="activity-days-popover">
+        {% for value, label in activity_days_options %}
+        <div class="dd-picker-row{{ ' active' if value == activity_days_filter else '' }}"
+             onclick="selectDDOption('activity-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </form>
+</div>
 {% if activity_rows %}
 <div class="tbl-wrap">
   <table class="dt" data-sortable data-paginate data-page-size="10">
-    <thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Entität</th><th>Auslöser</th><th>Zeilen</th><th>Status</th><th data-no-sort>Detail</th></tr></thead>
+    <thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Entität</th><th>Auslöser</th><th>Zeilen</th><th>Status</th></tr></thead>
     <tbody>
     {% for row in activity_rows %}
-    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% endif %}>
+    {# Fehlergrund UND Verdichten-/Bereinigen-Detail teilen sich dasselbe
+       Muster (Zeile klickbar statt eigener Spalte, Popup per appAlert) —
+       siehe showJobError()/showActivityDetail() in confirm-dialog.js. Nie
+       beides gleichzeitig: detail_label füllt nur ein erfolgreicher Lauf,
+       error nur ein fehlgeschlagener. #}
+    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% elif row.detail_label %} class="job-row-detail" data-detail="{{ row.detail_label }}" onclick="showActivityDetail(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showActivityDetail(this);}" tabindex="0" role="button" aria-label="Detail anzeigen"{% endif %}>
       <td data-sort="{{ row.created_at_ts }}">{{ row.created_at }}</td>
       <td>{{ row.action }}</td>
       <td>{{ row.entity_label }}</td>
       <td>{{ row.trigger }}</td>
       <td>{{ row.rows_affected }}</td>
       <td{% if row.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ row.status }}</td>
-      <td>{{ row.detail_label or '—' }}</td>
     </tr>
     {% endfor %}
     </tbody>

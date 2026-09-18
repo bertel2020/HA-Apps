@@ -1,10 +1,12 @@
 """Housekeeping → Aktivität: die vier Filter (Entität/Aktionstyp/Status/
-Zeitraum) und die lesbare Aufbereitung des Verdichten-Detail-Felds.
+Zeitraum) und die lesbare Aufbereitung des Verdichten-/Bereinigen-Detail-
+Felds als klickbares Popup (kein eigenes Tabellenfeld, siehe
+showActivityDetail() in confirm-dialog.js).
 
 Schreiben und Lesen von entity_actions selbst deckt test_index.py bereits ab
 (test_log_entity_action_round_trips_and_lists_newest_first) — hier geht es nur
 um das, was NUR die Route beisteuert: filtern und das JSON-detail-Feld einer
-Verdichten-Zeile in Klartext übersetzen.
+Verdichten-/Bereinigen-Zeile in Klartext übersetzen.
 """
 
 from __future__ import annotations
@@ -27,8 +29,11 @@ def test_the_entity_filter_narrows_the_list_to_that_entity(client) -> None:
     index.log_entity_action("sensor.pytest_activity_entity_b", "correct", "manual", now, now, "success", rows_affected=1)
 
     html = client.get("/housekeeping/activity?entity=sensor.pytest_activity_entity_a").text
-    assert "sensor.pytest_activity_entity_a" in html
-    assert "sensor.pytest_activity_entity_b" not in html
+    # Nur die Tabelle prüfen: der Filter selbst (mit ALLEN bekannten
+    # Entitäten als Dropdown-Optionen) sitzt in derselben Antwort.
+    tabelle = html[html.index("<tbody>"):html.index("</tbody>")]
+    assert "sensor.pytest_activity_entity_a" in tabelle
+    assert "sensor.pytest_activity_entity_b" not in tabelle
 
 
 def test_the_action_filter_narrows_the_list_to_that_type(client) -> None:
@@ -109,9 +114,38 @@ def test_the_compact_detail_is_rendered_readably(client) -> None:
     )
 
     html = client.get("/housekeeping/activity?entity=sensor.pytest_activity_compact").text
-    assert "Ziel 1 Std." in html
-    assert "2 Monate" in html
-    assert "17.280 → 1.440 Zeilen" in html
+    tabelle = html[html.index("<tbody>"):]
+    assert 'class="job-row-detail"' in tabelle
+    assert 'onclick="showActivityDetail(this)"' in tabelle
+    assert 'data-detail="Ziel 1 Std. · Oktober 2023, November 2023 · 17.280 → 1.440 Zeilen"' in tabelle
+
+
+def test_the_compact_detail_mentions_cleaned_up_stale_markers(client) -> None:
+    """compact_raw_values() räumt seit dem Fund vom 18.09.2026 verwaiste
+    Löschmarkierungen des verdichteten Monats mit auf (siehe test_cleanup.py)
+    — die Detailanzeige nennt das, wenn tatsächlich welche betroffen waren.
+    Fehlt das Feld (ältere, vor diesem Fix geloggte Zeilen), erscheint dazu
+    nichts — kein KeyError."""
+    from app.main import index
+
+    _entity(index, "sensor.pytest_activity_compact_stale")
+    now = time.time()
+    index.log_entity_action(
+        "sensor.pytest_activity_compact_stale", "compact", "manual", now, now, "success",
+        rows_affected=100,
+        detail=json.dumps({
+            "target_resolution": "1h", "months_compacted": ["2023-10"],
+            "rows_before": 200, "rows_after": 100, "stale_markers_removed": 3,
+        }),
+    )
+    index.log_entity_action(
+        "sensor.pytest_activity_compact_stale", "compact", "manual", now, now, "success",
+        rows_affected=50,
+        detail=json.dumps({"target_resolution": "1h", "months_compacted": ["2023-11"]}),
+    )
+
+    html = client.get("/housekeeping/activity?entity=sensor.pytest_activity_compact_stale").text
+    assert "3 verwaiste Löschmarkierungen aufgeräumt" in html
 
 
 def test_the_automatic_purge_detail_is_rendered_readably(client) -> None:
@@ -130,14 +164,30 @@ def test_the_automatic_purge_detail_is_rendered_readably(client) -> None:
 
     html = client.get("/housekeeping/activity?action=purge").text
     tabelle = html[html.index("<tbody>"):]
-    assert "Mindestalter 3 Monate" in tabelle
-    assert "5 Monate neu berechnet" in tabelle
+    assert 'class="job-row-detail"' in tabelle
+    assert 'data-detail="Mindestalter der Markierung: 3 Monate · 5 bereits archivierte Monate neu berechnet"' in tabelle
     assert "Automatisch" in tabelle
 
 
-def test_other_action_types_show_no_detail(client) -> None:
-    """Nur Verdichten füllt das detail-Feld — die Zelle bleibt für die anderen
-    Aktionstypen ein einfacher Platzhalter statt eines leeren Strings."""
+def test_the_purge_detail_uses_correct_singular_grammar(client) -> None:
+    """1 statt N Monate: "archivierter Monat", nicht "archivierte Monate"."""
+    from app.main import index
+
+    now = time.time()
+    index.log_entity_action(
+        None, "purge", "automatic", now, now, "success",
+        rows_affected=1,
+        detail=json.dumps({"min_age_days": 7, "months_purged": 1}),
+    )
+
+    html = client.get("/housekeeping/activity?action=purge&status=success").text
+    tabelle = html[html.index("<tbody>"):]
+    assert 'data-detail="Mindestalter der Markierung: 1 Woche · 1 bereits archivierter Monat neu berechnet"' in tabelle
+
+
+def test_other_action_types_are_not_clickable(client) -> None:
+    """Nur Verdichten/Bereinigen füllen das detail-Feld — eine Zeile ohne
+    Detail (und ohne Fehler) bleibt ein normales <tr>, nicht anklickbar."""
     from app.main import index
 
     _entity(index, "sensor.pytest_activity_no_detail")
@@ -147,14 +197,17 @@ def test_other_action_types_show_no_detail(client) -> None:
     )
 
     html = client.get("/housekeeping/activity?entity=sensor.pytest_activity_no_detail").text
-    row = html[html.index("sensor.pytest_activity_no_detail"):]
-    row = row[:row.index("</tr>")]
-    assert "—" in row
+    tabelle = html[html.index("<tbody>"):html.index("</tbody>")]
+    row_start = tabelle.rindex("<tr", 0, tabelle.index("sensor.pytest_activity_no_detail"))
+    row = tabelle[row_start:tabelle.index("</tr>", row_start)]
+    assert row.startswith("<tr>")  # kein zusätzliches Klasse/onclick-Attribut
+    assert "onclick" not in row
 
 
 def test_the_entity_appears_as_a_filter_option_on_the_full_page(client) -> None:
-    """Die Filter-Steuerung selbst lebt in housekeeping.html, außerhalb des per
-    htmx getauschten #activity-body — nur ein Aufruf der ganzen Seite zeigt sie."""
+    """Die Filter-Steuerung lebt zwar innerhalb von #activity-body (direkt über
+    der Tabelle statt neben der Überschrift), wird aber wie der Rest der Seite
+    beim vollen /housekeeping-Aufruf mitgerendert."""
     from app.main import index
 
     _entity(index, "sensor.pytest_activity_option")

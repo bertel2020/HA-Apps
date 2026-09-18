@@ -45,6 +45,7 @@ from .formatting import (
     COMPACT_MIN_AGE_MONTHS_LABELS,
     COMPACT_TARGET_LABELS,
     DECIMALS_LABELS,
+    decimals_to_int,
     DEFAULT_COMPACT_AUTO_ENABLED,
     DEFAULT_COMPACT_MIN_AGE_MONTHS,
     DEFAULT_PURGE_AUTO_ENABLED,
@@ -308,6 +309,25 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     _ACTIVITY_STATUS_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_STATUS_LABELS.items())
     _ACTIVITY_DAYS_FILTER_OPTIONS = [("", "Alle"), ("7", "7 Tage"), ("30", "30 Tage"), ("90", "90 Tage")]
 
+    # Nur für die Monatsliste im Verdichten-Detail (unten) — dieselben Namen
+    # wie main.py:_MONTH_NAMES_DE, hier lokal statt geteilt, weil sonst nirgends
+    # in diesem Modul gebraucht.
+    _MONTH_NAMES_DE = (
+        "Januar", "Februar", "März", "April", "Mai", "Juni",
+        "Juli", "August", "September", "Oktober", "November", "Dezember",
+    )
+
+    def _month_year_label(month_key: str) -> str:
+        """"2023-10" -> "Oktober 2023". Ungültige/unerwartete Werte kommen
+        unverändert zurück, statt die ganze Detail-Zeile mit einem Fehler
+        abzubrechen — das JSON stammt aus einer früheren Verdichten-Zeile,
+        deren genaues Format sich in einer künftigen Version ändern könnte."""
+        try:
+            year_str, month_str = month_key.split("-")
+            return f"{_MONTH_NAMES_DE[int(month_str) - 1]} {year_str}"
+        except (ValueError, IndexError):
+            return month_key
+
     def _activity_detail_label(action: str, detail_json: str | None) -> str:
         """Liest das JSON-detail-Feld einer Verdichten- oder automatischen
         Bereinigen-Zeile (main.py compact_rows/background.py
@@ -322,24 +342,28 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         except (TypeError, ValueError):
             return ""
         if action == "compact":
-            months = len(detail.get("months_compacted") or [])
-            parts = [
-                f"Ziel {format_compact_target(detail.get('target_resolution', ''))}",
-                f"{months} Monat{'e' if months != 1 else ''}",
-            ]
+            months_list = sorted(detail.get("months_compacted") or [])
+            parts = [f"Ziel {format_compact_target(detail.get('target_resolution', ''))}"]
+            if months_list:
+                parts.append(", ".join(_month_year_label(m) for m in months_list))
             rows_before, rows_after = detail.get("rows_before"), detail.get("rows_after")
             if rows_before is not None and rows_after is not None:
                 parts.append(f"{format_int(rows_before)} → {format_int(rows_after)} Zeilen")
+            stale_markers = detail.get("stale_markers_removed")
+            if stale_markers:
+                parts.append(
+                    f"{format_int(stale_markers)} verwaiste Löschmarkierung{'en' if stale_markers != 1 else ''} aufgeräumt"
+                )
             return " · ".join(parts)
         # action == "purge" — bisher nur vom automatischen Lauf gefüllt (siehe
         # Docstring), der manuelle Button kennt kein Mindestalter.
         min_age_label = PURGE_MIN_AGE_DAYS_LABELS.get(
             str(detail.get("min_age_days", "")), f"{detail.get('min_age_days')} Tage"
         )
-        parts = [f"Mindestalter {min_age_label}"]
+        parts = [f"Mindestalter der Markierung: {min_age_label}"]
         months_purged = detail.get("months_purged")
         if months_purged:
-            parts.append(f"{months_purged} Monat{'e' if months_purged != 1 else ''} neu berechnet")
+            parts.append(f"{months_purged} bereits archivierte{'r' if months_purged == 1 else ''} Monat{'e' if months_purged != 1 else ''} neu berechnet")
         return " · ".join(parts)
 
     def _settings_activity_context(
@@ -948,26 +972,71 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
 
     @router.get("/settings/purge/marked", response_class=HTMLResponse)
-    def settings_purge_marked(
+    def settings_purge_marked(request: Request, search: str = Query(default="", max_length=200)) -> HTMLResponse:
+        """Erste Ebene der "Markierte Datensätze"-Detailansicht: betroffene
+        Entitäten mit Anzahl markierter Vorkommen, nicht mehr die einzelnen
+        Zeilen direkt — bei einer einzelnen Entität mit hunderttausenden
+        Markierungen (siehe Endgültige Bereinigung, "Betroffene Entitäten")
+        wäre das eine endlose flache Liste ohne Orientierung. Klick auf eine
+        Entität lädt die zweite Ebene (settings_purge_marked_entity())."""
+        rows = deps.index.get_deleted_points_by_entity(search=search)
+        entities = [
+            {
+                "entity_id": row["entity_id"],
+                "friendly_name": row["friendly_name"],
+                "count": format_int(row["n"]),
+                "last_marked": (
+                    f"{format_timestamp(row['last_deleted_at'], deps.tz)} "
+                    f"{format_time(row['last_deleted_at'], deps.tz)}"
+                ),
+            }
+            for row in rows
+        ]
+        return deps.templates.TemplateResponse(
+            request, "_settings_marked_points.html", {"entities": entities, "search": search}
+        )
+
+    @router.get("/settings/purge/marked/{entity_id}", response_class=HTMLResponse)
+    def settings_purge_marked_entity(
         request: Request,
-        search: str = Query(default="", max_length=200),
+        entity_id: str,
         page: int = Query(default=1, ge=1),
         page_size: int = Query(default=20, ge=10, le=200),
     ) -> HTMLResponse:
-        """On-demand-Detailansicht der einzelnen Soft-Delete-Markierungen."""
-        result = deps.index.list_deleted_points(search=search, page=page, page_size=page_size)
+        """Zweite Ebene: einzelne Markierungen EINER Entität, inklusive ihres
+        Werts. Der Wert steht in deleted_points selbst nicht — ein weich
+        gelöschter Zeitstempel wird aus allen normalen Ansichten
+        rausgefiltert (cleanup.py-Modul-Docstring), deshalb liest
+        read_values_for_timestamps() ihn eigens aus Hot Buffer/Archiv nach,
+        beschränkt auf die aktuelle Seite (20-200 Zeitstempel), nicht die
+        komplette Historie der Entität."""
+        entity = deps.index.get_entity(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=404, detail="Unbekannte Entität")
+        result = deps.index.list_deleted_points_for_entity(entity_id, page=page, page_size=page_size)
+        values = cleanup.read_values_for_timestamps(
+            deps.data_dir, entity_id, [row["ts"] for row in result["rows"]], deps.tz
+        )
+        decimals_int = decimals_to_int(entity["decimals"])
         rows = [
             {
                 **row,
-                "measured_at": datetime.fromtimestamp(row["ts"], deps.tz).strftime("%d.%m.%Y %H:%M:%S"),
-                "marked_at": datetime.fromtimestamp(row["deleted_at"], deps.tz).strftime("%d.%m.%Y %H:%M:%S"),
+                "measured_at": f"{format_timestamp(row['ts'], deps.tz)} {format_time(row['ts'], deps.tz)}",
+                "marked_at": f"{format_timestamp(row['deleted_at'], deps.tz)} {format_time(row['deleted_at'], deps.tz)}",
+                "value_label": format_value(values[row["ts"]], decimals_int) if row["ts"] in values else "—",
             }
             for row in result["rows"]
         ]
         return deps.templates.TemplateResponse(
             request,
-            "_settings_marked_points.html",
-            {"rows": rows, "pagination": result["pagination"]},
+            "_settings_marked_points_entity.html",
+            {
+                "entity_id": entity_id,
+                "entity_label": entity_display_name(entity_id, entity["friendly_name"], entity["custom_name"]),
+                "unit": entity["unit"],
+                "rows": rows,
+                "pagination": result["pagination"],
+            },
         )
 
 

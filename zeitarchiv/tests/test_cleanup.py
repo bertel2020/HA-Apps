@@ -429,6 +429,39 @@ def test_purge_hot_buffer_older_than_leaves_fresh_marks_untouched() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_read_values_for_timestamps_reads_hot_buffer_and_archive() -> None:
+    """Grundlage der zweiten Ebene der "Markierte Datensätze"-Detailansicht
+    (Housekeeping → Speicherplatz): der Wert eines weich gelöschten
+    Zeitstempels steht sonst nirgends mehr, weil er aus allen normalen
+    Ansichten rausgefiltert wird — read_values_for_timestamps() holt ihn
+    gezielt aus Hot Buffer (laufender Monat) oder Archiv (älterer Monat)
+    nach, je nachdem wo der Zeitstempel liegt. Ein Zeitstempel ohne
+    Rohdaten-Treffer (hier: einer, der nie geschrieben wurde) fehlt im
+    Ergebnis statt mit None aufzutauchen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        entity_id = "sensor.temp"
+        now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+        hot_ts = _ts(2024, 8, 10, 8)
+        hotbuffer.append(tmp, entity_id, hot_ts, 21.5, TZ)
+
+        archive_ts = _ts(2024, 7, 5, 8)
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        pq.write_table(pa.table({"ts": [archive_ts], "value": [19.0]}), archive_dir / "2024-07.parquet")
+
+        missing_ts = _ts(2024, 6, 1, 8)  # nie geschrieben
+
+        values = cleanup.read_values_for_timestamps(
+            tmp, entity_id, [hot_ts, archive_ts, missing_ts], TZ, now=now
+        )
+
+        assert values == {hot_ts: 21.5, archive_ts: 19.0}
+        assert missing_ts not in values
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_preview_purge_reports_hot_archive_and_missing_without_changes() -> None:
     """Die Vorschau zählt exakt, bleibt aber vollständig schreibfrei."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
@@ -901,7 +934,9 @@ def test_compact_raw_values_counter_keeps_last_value_per_bucket_and_marks_reset_
             tmp, index, entity_id, t0, t3, "5min", TZ, now=datetime(2024, 8, 15, tzinfo=TZ)
         )
 
-        assert result == {"rows_before": 4, "rows_after": 2, "months_compacted": ["2024-07"]}
+        assert result == {
+            "rows_before": 4, "rows_after": 2, "months_compacted": ["2024-07"], "stale_markers_removed": 0,
+        }
         rows = {r["ts"]: r for r in pq.read_table(archive_path).to_pylist()}
         assert set(rows) == {bucket_ts, t2}
         assert rows[bucket_ts]["value"] == 8.0  # letzter Wert im Fenster
@@ -950,11 +985,85 @@ def test_compact_raw_values_standard_averages_values_and_composes_min_max() -> N
             tmp, index, entity_id, t0, t2, "5min", TZ, now=datetime(2024, 8, 15, tzinfo=TZ)
         )
 
-        assert result == {"rows_before": 3, "rows_after": 1, "months_compacted": ["2024-07"]}
+        assert result == {
+            "rows_before": 3, "rows_after": 1, "months_compacted": ["2024-07"], "stale_markers_removed": 0,
+        }
         rows = {r["ts"]: r for r in pq.read_table(archive_path).to_pylist()}
         assert rows[bucket_ts]["value"] == sum([20.0, 22.0, 24.0]) / 3
         assert rows[bucket_ts]["min_value"] == 18.0
         assert rows[bucket_ts]["max_value"] == 26.0
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_compact_raw_values_removes_stale_markers_in_the_compacted_month_only() -> None:
+    """Fund vom 18.09.2026: eine Löschmarkierung für einen Zeitstempel, der
+    gerade verdichtet wird, existiert danach für keine Rohdatenzeile mehr
+    (weder alt noch neu) — compact_raw_values() muss sie deshalb selbst
+    aufräumen, sonst bliebe sie für immer als "Löschmarkierung ohne passende
+    Rohdatenzeile" liegen. Eine Markierung in einem ANDEREN, nicht
+    verdichteten Monat bleibt dagegen unangetastet."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        base = _ts(2024, 7, 5, 8) + 1
+        t0, t1, t2 = base, base + 10, base + 20
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        archive_path = archive_dir / "2024-07.parquet"
+        pq.write_table(
+            pa.table({"ts": [t0, t1, t2], "value": [20.0, 22.0, 24.0]}),
+            archive_path,
+        )
+        index.add_row_count(entity_id, 3)
+        index.set_first_ts(entity_id, t0)
+        # t1 liegt im zu verdichtenden Juli, außerdem noch nicht bereinigt
+        # markiert — und ein zweiter Marker in einem GANZ ANDEREN Monat
+        # (Juni), der von dieser Verdichtung nicht betroffen sein darf.
+        june_ts = _ts(2024, 6, 1, 8)
+        index.mark_deleted(entity_id, [t1, june_ts])
+        assert index.get_deleted_points_count() == 2
+
+        result = cleanup.compact_raw_values(
+            tmp, index, entity_id, t0, t2, "5min", TZ, now=datetime(2024, 8, 15, tzinfo=TZ)
+        )
+
+        assert result["stale_markers_removed"] == 1
+        assert index.get_deleted_points_count() == 1
+        assert index.get_deleted_counts_for_entity(entity_id) == {june_ts: 1}
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_remove_deleted_points_for_already_compacted_months_is_a_retroactive_backfill() -> None:
+    """Für Installationen, die schon VOR dem obigen Fix verdichtet haben:
+    der einmalige Nachzieh-Lauf (background.py BackgroundService.start())
+    räumt verwaiste Markierungen anhand der compacted_months-Tabelle auf,
+    ohne erneut zu verdichten — und ist beim zweiten Lauf ein No-op."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        already_compacted_ts = _ts(2024, 5, 10, 8)  # Mai bereits früher verdichtet
+        untouched_ts = _ts(2024, 6, 10, 8)  # Juni nie verdichtet
+        index.mark_deleted(entity_id, [already_compacted_ts, untouched_ts])
+        index.set_compacted_month(entity_id, 2024, 5, "1h", already_compacted_ts)
+
+        removed_first = cleanup.remove_deleted_points_for_already_compacted_months(index, TZ)
+        assert removed_first == 1
+        assert index.get_deleted_counts_for_entity(entity_id) == {untouched_ts: 1}
+
+        removed_second = cleanup.remove_deleted_points_for_already_compacted_months(index, TZ)
+        assert removed_second == 0  # idempotent, nichts mehr zu tun
 
         index.close()
     finally:
@@ -989,7 +1098,9 @@ def test_compact_raw_values_standard_month_is_never_compacted_twice() -> None:
         rows_after_first = pq.read_table(archive_path).to_pylist()
 
         second = cleanup.compact_raw_values(tmp, index, entity_id, t0, t1, "1h", TZ, now=now)
-        assert second == {"rows_before": 0, "rows_after": 0, "months_compacted": []}
+        assert second == {
+            "rows_before": 0, "rows_after": 0, "months_compacted": [], "stale_markers_removed": 0,
+        }
         assert pq.read_table(archive_path).to_pylist() == rows_after_first
 
         index.close()
@@ -1033,7 +1144,9 @@ def test_compact_raw_values_counter_month_allows_coarser_recompaction_but_not_fi
         same_target = cleanup.compact_raw_values(
             tmp, index, entity_id, timestamps[0], timestamps[-1], "1min", TZ, now=now
         )
-        assert same_target == {"rows_before": 0, "rows_after": 0, "months_compacted": []}
+        assert same_target == {
+            "rows_before": 0, "rows_after": 0, "months_compacted": [], "stale_markers_removed": 0,
+        }
 
         coarser = cleanup.compact_raw_values(
             tmp, index, entity_id, timestamps[0], timestamps[-1], "5min", TZ, now=now
@@ -1091,7 +1204,9 @@ def test_compact_raw_values_never_touches_the_current_month_even_if_archived() -
             now=datetime(2024, 8, 15, tzinfo=TZ),
         )
 
-        assert result == {"rows_before": 0, "rows_after": 0, "months_compacted": []}
+        assert result == {
+            "rows_before": 0, "rows_after": 0, "months_compacted": [], "stale_markers_removed": 0,
+        }
         assert index.get_compacted_month(entity_id, 2024, 8) is None
 
         index.close()

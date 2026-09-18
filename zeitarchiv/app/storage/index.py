@@ -3618,34 +3618,15 @@ class Index:
             row = self._conn.execute("SELECT COUNT(*) AS n FROM deleted_points").fetchone()
             return row["n"]
 
-    def get_deleted_points_by_entity(self) -> list[dict]:
+    def get_deleted_points_by_entity(self, search: str = "") -> list[dict]:
         """Aufschlüsselung der zur Löschung markierten Vorkommen je Entität
         (nur Entitäten mit mindestens einem markierten Vorkommen) — für die
         Statistik-Übersicht, damit sichtbar wird WELCHE Entitäten betroffen
-        sind, nicht nur die archiv-weite Summe (siehe get_deleted_points_count)."""
-        with self._lock, self._conn:
-            rows = self._conn.execute(
-                """
-                SELECT d.entity_id AS entity_id,
-                       COALESCE(e.custom_name, e.friendly_name) AS friendly_name,
-                       COUNT(*) AS n
-                FROM deleted_points d
-                LEFT JOIN entities e ON e.entity_id = d.entity_id
-                GROUP BY d.entity_id
-                ORDER BY n DESC, d.entity_id ASC
-                """
-            ).fetchall()
-            return [dict(row) for row in rows]
-
-    def list_deleted_points(
-        self, *, search: str = "", page: int = 1, page_size: int = 50
-    ) -> dict:
-        """Listet einzelne Soft-Delete-Markierungen serverseitig paginiert.
-
-        Die UI lädt diese Detailansicht bewusst erst auf Anforderung. Dadurch
-        bleibt die Einstellungsseite auch bei sehr vielen Markierungen klein
-        und es werden nie sämtliche Zeilen in den Arbeitsspeicher geladen.
-        """
+        sind, nicht nur die archiv-weite Summe (siehe get_deleted_points_count),
+        UND für die erste Ebene der "Markierte Datensätze"-Detailansicht
+        (Housekeeping → Speicherplatz), deren Suchfeld hier landet. Die zweite
+        Ebene (einzelne Markierungen EINER Entität) liefert
+        list_deleted_points_for_entity()."""
         search = search.strip().lower()
         pattern = f"%{search}%"
         where = """
@@ -3653,31 +3634,46 @@ class Index:
                    OR lower(COALESCE(e.friendly_name, '')) LIKE ?
                    OR lower(COALESCE(e.custom_name, '')) LIKE ?)
         """
-        page_size = max(10, min(int(page_size), 200))
         with self._lock, self._conn:
-            total = self._conn.execute(
+            rows = self._conn.execute(
                 f"""
-                SELECT COUNT(*) AS n
+                SELECT d.entity_id AS entity_id,
+                       COALESCE(e.custom_name, e.friendly_name) AS friendly_name,
+                       COUNT(*) AS n,
+                       MAX(d.deleted_at) AS last_deleted_at
                 FROM deleted_points d
                 LEFT JOIN entities e ON e.entity_id = d.entity_id
                 {where}
+                GROUP BY d.entity_id
+                ORDER BY n DESC, d.entity_id ASC
                 """,
                 (search, pattern, pattern, pattern),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def list_deleted_points_for_entity(
+        self, entity_id: str, *, page: int = 1, page_size: int = 50
+    ) -> dict:
+        """Wie list_deleted_points(), aber auf eine einzelne Entität
+        eingeschränkt (kein Suchfeld nötig) — die zweite Ebene der "Markierte
+        Datensätze"-Detailansicht, aufgerufen nach einem Klick auf eine
+        Entität aus get_deleted_points_by_entity()."""
+        page_size = max(10, min(int(page_size), 200))
+        with self._lock, self._conn:
+            total = self._conn.execute(
+                "SELECT COUNT(*) AS n FROM deleted_points WHERE entity_id = ?", (entity_id,)
             ).fetchone()["n"]
             total_pages = max(1, -(-total // page_size))
             page = max(1, min(int(page), total_pages))
             offset = (page - 1) * page_size
             rows = self._conn.execute(
-                f"""
-                SELECT d.id, d.entity_id, d.ts, d.deleted_at,
-                       COALESCE(e.custom_name, e.friendly_name) AS friendly_name, e.unit
-                FROM deleted_points d
-                LEFT JOIN entities e ON e.entity_id = d.entity_id
-                {where}
-                ORDER BY d.deleted_at DESC, d.id DESC
+                """
+                SELECT id, ts, deleted_at FROM deleted_points
+                WHERE entity_id = ?
+                ORDER BY deleted_at DESC, id DESC
                 LIMIT ? OFFSET ?
                 """,
-                (search, pattern, pattern, pattern, page_size, offset),
+                (entity_id, page_size, offset),
             ).fetchall()
         return {
             "rows": [dict(row) for row in rows],
@@ -3774,6 +3770,14 @@ class Index:
                    DO UPDATE SET target_resolution = excluded.target_resolution, compacted_at = excluded.compacted_at""",
                 (entity_id, year, month, target_resolution, compacted_at),
             )
+
+    def list_all_compacted_months(self) -> list[sqlite3.Row]:
+        """Alle Verdichtet-Marker über alle Entitäten — für den einmaligen
+        Nachzieh-Lauf, der bei bereits verdichteten Monaten verwaiste
+        deleted_points-Markierungen aufräumt (siehe cleanup.
+        remove_deleted_points_for_already_compacted_months())."""
+        with self._lock, self._conn:
+            return self._conn.execute("SELECT * FROM compacted_months").fetchall()
 
     def recent_lock_busy_events(self, window_seconds: float = _BUSY_EVENTS_WINDOW_SECONDS) -> int:
         """Anzahl IndexBusy-Vorkommen (Lock-Timeout) innerhalb der letzten

@@ -244,77 +244,16 @@
       </section>
 
       <section id="verdichten" class="settings-section">
-        <h2 class="settings-section-title">Verdichten</h2>
+        <h2 class="settings-section-title">Verdichten {{ hint_button('Verdichten') }}</h2>
+        {% call hint_body('settings-section-description') %}Verdichtet bereits archivierte Monate automatisch auf das je Entität eingestellte Verdichtungsziel (Konfiguration), sobald sie das Mindestalter erreicht haben. Betrifft nur Entitäten, deren Verdichtungsziel nicht „Aus“ ist.{% endcall %}
         <div id="compact-form">
           {% include "_housekeeping_compact_form.html" %}
         </div>
       </section>
 
       <section id="aktivitaet" class="settings-section">
-        <div class="hk-section-head">
-          <h2 class="settings-section-title">Aktivität</h2>
-          {# Vier Einfachauswahl-Filter nach demselben dd-picker-Muster wie
-             "seit" bei Inaktive Entitäten oben — EIN Formular, EIN
-             hx-trigger="change", das Feld, das sich ändert, ist über
-             hx-include="#activity-filter-form" ohnehin mit dabei. Die Filter
-             selbst bleiben (wie das Formular hier) außerhalb von
-             #activity-body: nur die Tabelle wird bei jeder Änderung
-             ausgetauscht, sonst verlöre man bei jedem Filterwechsel den
-             Zustand der anderen drei Dropdowns. #}
-          <div class="hk-section-tools" data-sort-host>
-          <form id="activity-filter-form" hx-get="housekeeping/activity" hx-trigger="change"
-                hx-target="#activity-body" hx-swap="innerHTML" hx-include="#activity-filter-form">
-            <span class="dd-picker-wrap">
-              <button type="button" class="btn btn-sm" id="activity-entity-btn" onclick="toggleDDPicker('activity-entity')">
-                {% for value, label in activity_entity_options %}{% if value == activity_entity_filter %}{{ label }}{% endif %}{% endfor %} ▾
-              </button>
-              <input type="hidden" name="entity" id="activity-entity-input" value="{{ activity_entity_filter }}">
-              <div class="dd-picker-popover" id="activity-entity-popover">
-                {% for value, label in activity_entity_options %}
-                <div class="dd-picker-row{{ ' active' if value == activity_entity_filter else '' }}"
-                     onclick="selectDDOption('activity-entity', '{{ value }}', '{{ label }}')">{{ label }}</div>
-                {% endfor %}
-              </div>
-            </span>
-            <span class="dd-picker-wrap">
-              <button type="button" class="btn btn-sm" id="activity-action-btn" onclick="toggleDDPicker('activity-action')">
-                {% for value, label in activity_action_options %}{% if value == activity_action_filter %}{{ label }}{% endif %}{% endfor %} ▾
-              </button>
-              <input type="hidden" name="action" id="activity-action-input" value="{{ activity_action_filter }}">
-              <div class="dd-picker-popover" id="activity-action-popover">
-                {% for value, label in activity_action_options %}
-                <div class="dd-picker-row{{ ' active' if value == activity_action_filter else '' }}"
-                     onclick="selectDDOption('activity-action', '{{ value }}', '{{ label }}')">{{ label }}</div>
-                {% endfor %}
-              </div>
-            </span>
-            <span class="dd-picker-wrap">
-              <button type="button" class="btn btn-sm" id="activity-status-btn" onclick="toggleDDPicker('activity-status')">
-                {% for value, label in activity_status_options %}{% if value == activity_status_filter %}{{ label }}{% endif %}{% endfor %} ▾
-              </button>
-              <input type="hidden" name="status" id="activity-status-input" value="{{ activity_status_filter }}">
-              <div class="dd-picker-popover" id="activity-status-popover">
-                {% for value, label in activity_status_options %}
-                <div class="dd-picker-row{{ ' active' if value == activity_status_filter else '' }}"
-                     onclick="selectDDOption('activity-status', '{{ value }}', '{{ label }}')">{{ label }}</div>
-                {% endfor %}
-              </div>
-            </span>
-            <span class="dd-picker-wrap">
-              <button type="button" class="btn btn-sm" id="activity-days-btn" onclick="toggleDDPicker('activity-days')">
-                {% for value, label in activity_days_options %}{% if value == activity_days_filter %}{{ label }}{% endif %}{% endfor %} ▾
-              </button>
-              <input type="hidden" name="days" id="activity-days-input" value="{{ activity_days_filter }}">
-              <div class="dd-picker-popover" id="activity-days-popover">
-                {% for value, label in activity_days_options %}
-                <div class="dd-picker-row{{ ' active' if value == activity_days_filter else '' }}"
-                     onclick="selectDDOption('activity-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
-                {% endfor %}
-              </div>
-            </span>
-          </form>
-          </div>
-        </div>
+        <h2 class="settings-section-title">Aktivität {{ hint_button('Aktivität') }}</h2>
+        {% call hint_body('settings-section-description') %}Korrektur, Hinzufügen, Bereinigen, Verdichten und Aufbewahrung, jeweils Datensatz-verändernd. Backup bleibt außen vor, es betrifft die ganze Installation statt einzelner Datensätze.{% endcall %}
         <div id="activity-body">
           {% include "_housekeeping_activity_form.html" %}
         </div>
