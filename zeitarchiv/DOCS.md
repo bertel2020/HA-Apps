@@ -9,6 +9,9 @@ Backup / Restore in der Home-Assistant-Oberfläche bereit.
 **[Benutzerhandbuch](docs/user-guide.md)** — Einrichtung, jede Seite im
 Detail, Einstellungen-Referenz, typische Aufgaben.
 
+Unterstütze das Projekt: [Buy Me a Coffee](https://buymeacoffee.com/bertel2020) ·
+[Ko-fi](https://ko-fi.com/bertel2020) · [PayPal](https://paypal.me/RobertoMartins)
+
 ## Einrichtung
 
 1. App installieren und starten.
