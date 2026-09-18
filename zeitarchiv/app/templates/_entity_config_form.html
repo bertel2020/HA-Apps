@@ -8,6 +8,15 @@
 </div>
 <div class="field">
   <label>Auflösung {{ hint_button('Auflösung') }}</label>
+  {# Switch: fest gesperrt, siehe RESOLUTION_BLOCKED_REASONS-Kommentar
+     (formatting.py) — dasselbe Muster wie outlier_blocked_reason oben im
+     Formular. #}
+  {% if resolution_blocked_reason %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" disabled>Rohdaten (immer) ▾</button>
+  </span>
+  <p class="hint hint-status">{{ resolution_blocked_reason }}</p>
+  {% else %}
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="resolution-btn" onclick="toggleDDPicker('resolution')">{% for k, l in resolution_options %}{% if k == resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="resolution" id="resolution-input" value="{{ resolution }}"
@@ -18,7 +27,12 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}Mindestabstand zum zuletzt gespeicherten Wert; „Rohdaten“ speichert jede Zustandsänderung. Gilt nur für neue Werte, vorhandene bleiben.{% endcall %}
+  {% if resolution_averages_standard %}
+  <p class="hint hint-status">Es wird der Durchschnitt je Zeitfenster gespeichert (inkl. Min/Max), einzelne Messwerte innerhalb des Fensters gehen verloren.</p>
+  {% else %}
+  {% call hint_body() %}Zähler: höchstens ein Wert je Zeitfenster. Standard: Durchschnitt inkl. Min/Max je Zeitfenster. „Rohdaten“ speichert jeden Wert. Gilt nur für neue Werte, vorhandene bleiben.{% endcall %}
+  {% endif %}
+  {% endif %}
 </div>
 <div class="field">
   <label>Aufbewahrung {{ hint_button('Aufbewahrung') }}</label>

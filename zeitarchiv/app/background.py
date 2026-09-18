@@ -57,10 +57,11 @@ from .energiedashboard_routes import (
 )
 from .limits import MAX_UI_ANALYSIS_ROWS
 from .progress import JobBusy, JobProgress
-from .storage import backup, cleanup, reconcile
+from .storage import backup, cleanup, hotbuffer, reconcile
+from .storage import resolution as resolution_mod
 from .storage import retention as retention_mod
 from .storage.coordinator import StorageCoordinator
-from .storage.index import Index
+from .storage.index import Index, resolution_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,11 @@ class BackgroundService:
         self.tz = deps.tz
         self.index = deps.index
         self.coordinator = deps.coordinator
+        # Sicherheitsnetz für die Standard-Live-Auflösung (resolution.py) —
+        # rein in-memory, kein Settings-Wert: geht beim Neustart auf 0
+        # zurück, was höchstens einen zusätzlichen Lauf beim nächsten Tick
+        # bedeutet, keinen verlorenen.
+        self._resolution_flush_last_run = 0.0
         self.base_dir = deps.base_dir
         self.demo_mode_active = deps.demo_mode_active
         self.backups_dir = deps.backups_dir
@@ -796,6 +802,31 @@ class BackgroundService:
             self.data_dir, self.index, self.tz, entity, datetime.now(self.tz), force=True
         )
 
+    def _flush_stale_resolution_windows(self, now: datetime) -> None:
+        """Sicherheitsnetz für die Standard-Live-Auflösung (resolution.py):
+        schließt Zeitfenster ab, die nie durch das nächste Live-Event
+        abgeschlossen wurden, weil die Entity währenddessen verstummt ist
+        (WLAN-Ausfall, abgeschaltet). Alle 5 Minuten statt bei jedem
+        30s-Tick, weil dafür jede betroffene Hotbuffer-Datei gelesen werden
+        muss — Datenverlust entsteht dadurch nicht, die Rohwerte liegen ja
+        längst sicher im Hotbuffer, nur das Zusammenfassen verzögert sich."""
+        now_ts = now.timestamp()
+        if now_ts - self._resolution_flush_last_run < 300:
+            return
+        self._resolution_flush_last_run = now_ts
+        for entity in self.index.list_entities():
+            if entity["aggregation_type"] != "standard":
+                continue
+            interval = resolution_seconds(entity["resolution"])
+            if interval is None:
+                continue
+            entity_id = entity["entity_id"]
+            with self.coordinator.entity(entity_id):
+                path = hotbuffer.hot_path(self.data_dir, entity_id, now_ts, self.tz)
+                pending_end = resolution_mod.pending_bucket_end(path, interval)
+                if pending_end is not None and now_ts >= pending_end:
+                    resolution_mod.collapse_pending_window(path, interval)
+
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
         while not self._maintenance_scheduler_stop.is_set():
@@ -821,6 +852,7 @@ class BackgroundService:
                 self._run_retention_enforcement_if_due(datetime.now(self.tz))
                 self._refresh_demo_dir_info_if_stale()
                 self._run_demo_append_if_due(datetime.now(self.tz))
+                self._flush_stale_resolution_windows(datetime.now(self.tz))
             except Exception:
                 logger.exception(
                     "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "

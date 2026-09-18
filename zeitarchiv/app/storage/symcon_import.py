@@ -538,10 +538,22 @@ def _current_archive_records_to_recover(
         if "event_id" in table.column_names
         else [None] * table.num_rows
     )
+    min_values = (
+        table.column("min_value").to_pylist()
+        if "min_value" in table.column_names
+        else [None] * table.num_rows
+    )
+    max_values = (
+        table.column("max_value").to_pylist()
+        if "max_value" in table.column_names
+        else [None] * table.num_rows
+    )
     archive_rows = list(zip(
         table.column("ts").to_pylist(),
         table.column("value").to_pylist(),
         event_ids,
+        min_values,
+        max_values,
     ))
     hot_path = hotbuffer.hot_path(data_dir, entity_id, month_rows[0][0], tz)
     existing_hot_ts = {ts for ts, _ in hotbuffer.read_rows(hot_path)}

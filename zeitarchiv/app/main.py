@@ -54,6 +54,7 @@ from .formatting import (
     GAP_THRESHOLD_LABELS,
     OUTLIER_BLOCKED_REASONS,
     OUTLIER_THRESHOLD_LABELS,
+    RESOLUTION_BLOCKED_REASONS,
     RESOLUTION_LABELS,
     RETENTION_LABELS,
     VALUE_FILTER_LABELS,
@@ -2765,6 +2766,11 @@ def _entity_config_context(entity) -> dict:
         "last_ts_time": format_time(entity["last_ts"], TZ),
         "size": format_size(entity["size_bytes"]),
         "resolution": entity["resolution"],
+        "resolution_blocked_reason": RESOLUTION_BLOCKED_REASONS.get(entity["aggregation_type"]),
+        # Nur bei Standard und Auflösung != raw relevant — siehe resolution.py.
+        "resolution_averages_standard": (
+            entity["aggregation_type"] == "standard" and entity["resolution"] != DEFAULT_RESOLUTION
+        ),
         "retention": entity["retention"],
         "decimals": decimals,
         "value_filter": entity["value_filter"],
@@ -2863,6 +2869,13 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     # nicht, ein HTTP 400 würde ein Problem behaupten, wo keines ist.
     if not outlier_detection_applies(entity["aggregation_type"]):
         outlier_threshold = None
+    # Switch-Entities: Auflösung bleibt fest auf "raw" — ein Zeitfenster
+    # könnte sonst einen echten Zustandswechsel verwerfen (siehe
+    # should_accept_write()-Docstring). Wie beim outlier_threshold oben:
+    # ein trotzdem mitgeschickter Wert wird verworfen statt mit HTTP 400
+    # abgelehnt, das Feld ist im Formular für Switch deaktiviert.
+    if entity["aggregation_type"] == "switch":
+        resolution = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
         raise HTTPException(status_code=400, detail="Ungültiger Anzeigemodus")
     def update_locked() -> HTMLResponse:

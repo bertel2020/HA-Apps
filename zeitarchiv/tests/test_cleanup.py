@@ -588,6 +588,132 @@ def test_purge_archived_months_is_noop_when_nothing_soft_deleted() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_purge_archived_months_preserves_min_max_of_untouched_resolution_rows() -> None:
+    """Ein archivierter Monat kann Zeilen enthalten, die die Standard-
+    Live-Auflösung (resolution.py) als Ø mehrerer Rohwerte geschrieben hat
+    (min_value/max_value gesetzt). Ein Purge, der eine ANDERE Zeile dieses
+    Monats entfernt, darf diese Spalten bei den unberührten Zeilen nicht
+    stillschweigend verwerfen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        dup_ts = _ts(2024, 7, 5, 8)
+        resolved_ts = _ts(2024, 7, 5, 9)
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        archive_path = archive_dir / "2024-07.parquet"
+        pq.write_table(
+            pa.table({
+                "ts": [dup_ts, dup_ts, resolved_ts],
+                "value": [20.0, 20.0, 21.85],
+                "min_value": [None, None, 21.0],
+                "max_value": [None, None, 24.8],
+            }),
+            archive_path,
+        )
+        index.add_row_count(entity_id, 3)
+        index.set_first_ts(entity_id, dup_ts)
+        cleanup.soft_delete(index, entity_id, [dup_ts])  # nur EIN Vorkommen
+
+        result = cleanup.purge_archived_months(tmp, index, TZ, now=datetime(2024, 8, 15, tzinfo=TZ))
+
+        assert result == {"rows_purged": 1, "months_purged": 1}
+        remaining = {r["ts"]: r for r in pq.read_table(archive_path).to_pylist()}
+        assert remaining[resolved_ts]["min_value"] == 21.0
+        assert remaining[resolved_ts]["max_value"] == 24.8
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_correct_raw_value_clears_min_max_only_on_the_corrected_row() -> None:
+    """correct_raw_value() darf die Ø/Min/Max-Spalte einer per Auflösung
+    zusammengefassten Zeile nur bei der WIRKLICH korrigierten Zeile löschen
+    (der neue Wert ist kein Ø mehr) — alle anderen Zeilen desselben Archiv-
+    Monats müssen ihre Min/Max-Werte behalten."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        wrong_ts = _ts(2024, 7, 5, 8)
+        untouched_ts = _ts(2024, 7, 5, 9)
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        archive_path = archive_dir / "2024-07.parquet"
+        pq.write_table(
+            pa.table({
+                "ts": [wrong_ts, untouched_ts],
+                "value": [999.0, 21.85],
+                "min_value": [20.5, 21.0],
+                "max_value": [21.5, 24.8],
+            }),
+            archive_path,
+        )
+        index.add_row_count(entity_id, 2)
+        index.set_first_ts(entity_id, wrong_ts)
+
+        changed = cleanup.correct_raw_value(
+            tmp, index, entity_id, wrong_ts, 999.0, 21.2, TZ, now=datetime(2024, 8, 15, tzinfo=TZ)
+        )
+
+        assert changed is True
+        remaining = {r["ts"]: r for r in pq.read_table(archive_path).to_pylist()}
+        assert remaining[wrong_ts]["value"] == 21.2
+        assert remaining[wrong_ts]["min_value"] is None
+        assert remaining[wrong_ts]["max_value"] is None
+        assert remaining[untouched_ts]["min_value"] == 21.0
+        assert remaining[untouched_ts]["max_value"] == 24.8
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_add_raw_value_preserves_min_max_of_existing_archive_rows() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        existing_ts = _ts(2024, 7, 5, 8)
+        new_ts = _ts(2024, 7, 5, 9)
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        archive_path = archive_dir / "2024-07.parquet"
+        pq.write_table(
+            pa.table({
+                "ts": [existing_ts],
+                "value": [21.85],
+                "min_value": [21.0],
+                "max_value": [24.8],
+            }),
+            archive_path,
+        )
+        index.add_row_count(entity_id, 1)
+        index.set_first_ts(entity_id, existing_ts)
+
+        cleanup.add_raw_value(
+            tmp, index, entity_id, new_ts, 19.5, TZ, now=datetime(2024, 8, 15, tzinfo=TZ)
+        )
+
+        remaining = {r["ts"]: r for r in pq.read_table(archive_path).to_pylist()}
+        assert remaining[existing_ts]["min_value"] == 21.0
+        assert remaining[existing_ts]["max_value"] == 24.8
+        assert remaining[new_ts]["value"] == 19.5
+        assert remaining[new_ts]["min_value"] is None
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_count_duplicate_rows_by_entity_only_lists_affected_entities_within_window() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
     try:

@@ -1155,7 +1155,7 @@ def _last_actual_point(data_dir: Path, entity_id: str) -> Row | None:
     best: Row | None = None
     hot_dir = storage_area_dir(data_dir, "hot")
     for path in sorted(hot_dir.glob(f"{entity_id}-*.csv")) if hot_dir.exists() else []:
-        for ts, value, _event_id in hotbuffer.iter_records(path):
+        for ts, value, _event_id, _min_value, _max_value in hotbuffer.iter_records(path):
             if best is None or ts > best[0]:
                 best = (ts, value)
     if best is not None:

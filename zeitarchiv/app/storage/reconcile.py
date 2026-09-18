@@ -61,7 +61,7 @@ def _entity_storage_stats(data_dir: Path, entity_id: str) -> dict:
         hot_count = 0
         hot_first: float | None = None
         hot_last: float | None = None
-        for ts, _value, _event_id in hotbuffer.iter_records(path):
+        for ts, _value, _event_id, _min_value, _max_value in hotbuffer.iter_records(path):
             hot_count += 1
             hot_first = ts if hot_first is None else min(hot_first, ts)
             hot_last = ts if hot_last is None else max(hot_last, ts)

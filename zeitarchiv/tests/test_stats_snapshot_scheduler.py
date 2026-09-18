@@ -179,6 +179,10 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     "_run_retention_enforcement_if_due": None,  # → eigene Aufbewahrung-Seite mit Verlauf
     "_refresh_demo_dir_info_if_stale": None,   # → Einstellungen → Demo-Daten (Belegter Platz/Meldung)
     "_run_demo_append_if_due": None,           # → Einstellungen → Demo-Daten (Zuletzt/Nächste Ergänzung)
+    # Kein eigener Fortschritt/Zustand, der eine Diagnose-Zeile bräuchte —
+    # der Effekt (Zeitfenster zu Ø/Min/Max zusammengefasst) ist direkt als
+    # normale Zeile in der Roh-Werte-Tabelle der Entität sichtbar.
+    "_flush_stale_resolution_windows": None,
 }
 
 #: Läuft NICHT im 30-Sekunden-Takt, sondern einmalig beim Start in einem

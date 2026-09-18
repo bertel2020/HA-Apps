@@ -416,9 +416,9 @@ def test_current_month_archive_is_recovered_into_hot_buffer() -> None:
             hotbuffer.read_records(hotbuffer.hot_path(tmp, entity_id, duplicate_ts, TZ))
         )
         assert records == [
-            (duplicate_ts, 20.0, "hot-event"),
-            (archive_only_ts, 30.0, "archive-event"),
-            (source_only_ts, 40.0, None),
+            (duplicate_ts, 20.0, "hot-event", None, None),
+            (archive_only_ts, 30.0, "archive-event", None, None),
+            (source_only_ts, 40.0, None, None, None),
         ]
 
         index.close()

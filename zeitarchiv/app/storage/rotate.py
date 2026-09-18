@@ -35,19 +35,33 @@ def rotate_month_file(
     ts_col: list[float] = []
     value_col: list[float] = []
     event_id_col: list[str | None] = []
-    for ts, value, event_id in iter_records(hot_csv_path):
+    min_value_col: list[float | None] = []
+    max_value_col: list[float | None] = []
+    for ts, value, event_id, min_value, max_value in iter_records(hot_csv_path):
         ts_col.append(ts)
         value_col.append(value)
         event_id_col.append(event_id)
+        min_value_col.append(min_value)
+        max_value_col.append(max_value)
     table = pa.table(
         {
             "ts": ts_col,
             "value": value_col,
             # Nullable: historische/importierte Hot-Zeilen besitzen keine ID.
             "event_id": event_id_col,
+            # Nullable: nur bei Zeilen gesetzt, die die Standard-Auflösung
+            # (resolution.py) als Ø mehrerer Rohwerte geschrieben hat.
+            "min_value": min_value_col,
+            "max_value": max_value_col,
         },
         schema=pa.schema(
-            [("ts", pa.float64()), ("value", pa.float64()), ("event_id", pa.string())]
+            [
+                ("ts", pa.float64()),
+                ("value", pa.float64()),
+                ("event_id", pa.string()),
+                ("min_value", pa.float64()),
+                ("max_value", pa.float64()),
+            ]
         ),
     )
 

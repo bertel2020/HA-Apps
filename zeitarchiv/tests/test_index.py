@@ -570,6 +570,10 @@ def test_should_accept_write_throttles_by_configured_interval() -> None:
 
 
 def test_should_accept_write_supports_every_configured_interval() -> None:
+    """Festes Zeitraster (ceil(ts/interval)*interval), nicht mehr relativ zum
+    letzten Wert — last_ts liegt bewusst in der Mitte seines Fensters, damit
+    die Grenzen des Fensters eindeutig sind: bis einschließlich Fensterende
+    (last_ts' eigenes Bucket) wird verworfen, danach angenommen."""
     intervals = {
         "30s": 30,
         "1min": 60,
@@ -578,8 +582,10 @@ def test_should_accept_write_supports_every_configured_interval() -> None:
         "1h": 3600,
     }
     for resolution, seconds in intervals.items():
-        assert should_accept_write(resolution, last_ts=1000.0, new_ts=1000.0 + seconds - 0.001) is False
-        assert should_accept_write(resolution, last_ts=1000.0, new_ts=1000.0 + seconds) is True
+        last_ts = seconds / 2
+        assert should_accept_write(resolution, last_ts=last_ts, new_ts=seconds - 0.001) is False
+        assert should_accept_write(resolution, last_ts=last_ts, new_ts=seconds) is False
+        assert should_accept_write(resolution, last_ts=last_ts, new_ts=seconds + 0.001) is True
 
 
 def test_should_accept_write_unknown_resolution_fails_open() -> None:

@@ -8,6 +8,7 @@ Tabelle (state_class → Standard/Zähler, Domain → Schalter).
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import subprocess
 import threading
@@ -110,22 +111,34 @@ def _normalized_name(name: str) -> str:
     return name.strip().casefold()
 
 
+def resolution_seconds(resolution: str) -> int | None:
+    """Intervallgröße einer Auflösungsstufe in Sekunden, oder None bei
+    ``raw``/unbekannten Werten. Öffentlicher Zugriff auf _RESOLUTION_SECONDS
+    für ingestion.py/resolution.py, statt das private Dict direkt zu lesen."""
+    return _RESOLUTION_SECONDS.get(resolution)
+
+
 def should_accept_write(
     resolution: str,
     last_ts: float | None,
     new_ts: float,
 ) -> bool:
-    """Prüft den Mindestabstand zum letzten tatsächlich gespeicherten Wert.
+    """Prüft, ob new_ts in einem neuen Zeitraster-Fenster liegt als last_ts.
 
     ``raw`` speichert jedes Event. Unbekannte Werte werden ebenfalls wie
     ``raw`` behandelt, damit eine beschädigte oder zukünftige Einstellung
-    nicht unbemerkt Messwerte verwirft. Die Intervalle laufen relativ zum
-    letzten akzeptierten Zeitstempel und sind nicht an Uhrzeit-Buckets gebunden.
+    nicht unbemerkt Messwerte verwirft. Feste Uhrzeit-Buckets
+    (ceil(ts/interval)*interval) statt eines Abstands zum letzten
+    akzeptierten Wert — sonst verschiebt sich das Raster nach jeder
+    Unterbrechung (Neustart, Funkloch) auf einen neuen, zufälligen Phasenwert.
+    Nur für Zähler/Switch relevant; Standard-Entitäten mit Auflösung ≠ raw
+    laufen stattdessen über resolution.py (Ø/Min/Max je Fenster statt
+    Verwerfen).
     """
-    interval = _RESOLUTION_SECONDS.get(resolution)
+    interval = resolution_seconds(resolution)
     if interval is None or last_ts is None:
         return True
-    return new_ts - last_ts >= interval
+    return math.ceil(new_ts / interval) != math.ceil(last_ts / interval)
 
 def should_accept_value(
     value_filter: str,
@@ -567,24 +580,28 @@ CREATE TABLE IF NOT EXISTS table_rows (
 """
 
 
-def filter_deleted_occurrences(
-    rows: list[tuple[float, float]], deleted_counts: dict[float, int]
-) -> list[tuple[float, float]]:
+def filter_deleted_occurrences(rows: list[tuple], deleted_counts: dict[float, int]) -> list[tuple]:
     """Entfernt aus rows genau so viele Vorkommen je Zeitstempel wie in
     deleted_counts hinterlegt — NICHT pauschal alle Zeilen mit diesem
     Zeitstempel. rows muss in einer stabilen, deterministischen Reihenfolge
     vorliegen (z. B. sortiert), sonst würde bei einem Duplikat mal die eine,
     mal die andere Zeile verschwinden. Gemeinsam von cleanup.py und query.py
     genutzt, damit Bereinigungs-Tabelle und Chart-Anzeige nach dem Löschen
-    einer einzelnen Duplikat-Zeile konsistent bleiben."""
+    einer einzelnen Duplikat-Zeile konsistent bleiben.
+
+    Tupel-Form-neutral (liest nur row[0] als Zeitstempel, gibt die Zeile
+    unverändert zurück) — cleanup.py reicht beim Archiv-Purge auch
+    (ts, value, min_value, max_value)-Zeilen durch, query.py weiterhin
+    (ts, value)."""
     remaining = dict(deleted_counts)
-    kept: list[tuple[float, float]] = []
-    for ts, value in rows:
+    kept: list[tuple] = []
+    for row in rows:
+        ts = row[0]
         skip = remaining.get(ts, 0)
         if skip > 0:
             remaining[ts] = skip - 1
             continue
-        kept.append((ts, value))
+        kept.append(row)
     return kept
 
 

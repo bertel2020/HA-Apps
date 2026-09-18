@@ -229,6 +229,17 @@ OUTLIER_BLOCKED_REASONS = {
         "die Erkennung würde nie etwas markieren."
     ),
 }
+# Warum die Auflösung für diesen Typ fest auf "Rohdaten" steht — die Bedingung
+# selbst steht in main.py (update_entity_config). Anders als bei
+# OUTLIER_BLOCKED_REASONS kein reines "würde nichts bringen": ein Zeitfenster
+# könnte hier einen echten Zustandswechsel verwerfen, deshalb ist das Feld
+# nicht nur wirkungslos, sondern potenziell irreführend.
+RESOLUTION_BLOCKED_REASONS = {
+    "switch": (
+        "Für Schalter fest auf „Rohdaten“: Ein Zeitfenster könnte sonst einen "
+        "echten Zustandswechsel (AN/AUS) verwerfen."
+    ),
+}
 BACKUP_SCHEDULE_LABELS = {
     "off": "Aus",
     "daily": "Täglich",

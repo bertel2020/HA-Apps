@@ -22,7 +22,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ..formatting import decimals_to_int, format_value
-from . import rollup
+from . import hotbuffer, rollup
 from .hotbuffer import append as hot_append
 from .hotbuffer import hot_path, month_key, read_rows
 from .index import Index, filter_deleted_occurrences, should_accept_value
@@ -875,25 +875,22 @@ def purge_hot_buffer(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime |
         if not relevant:
             continue
         path = hot_path(data_dir, entity_id, now.timestamp(), tz)
-        rows = read_rows(path)
-        if not rows:
+        records = hotbuffer.read_full_rows(path)
+        if not records:
             continue
         remaining = dict(relevant)
-        kept_rows: list[tuple[float, float]] = []
+        kept_records: list[hotbuffer.HotRecord] = []
         removed_timestamps: list[float] = []
-        for ts, value in rows:
+        for record in records:
+            ts = record[0]
             if remaining.get(ts, 0) > 0:
                 remaining[ts] -= 1
                 removed_timestamps.append(ts)
             else:
-                kept_rows.append((ts, value))
+                kept_records.append(record)
         if not removed_timestamps:
             continue
-        tmp_path = path.with_suffix(".tmp")
-        with tmp_path.open("w", encoding="utf-8") as f:
-            for ts, value in kept_rows:
-                f.write(f"{ts},{value}\n")
-        tmp_path.replace(path)
+        hotbuffer.write_records(path, kept_records)
         index.remove_deleted_points(entity_id, removed_timestamps)
         index.add_row_count(entity_id, -len(removed_timestamps))
         purged_total += len(removed_timestamps)
@@ -971,8 +968,7 @@ def purge_archived_months(
             year_str, month_str = path.stem.split("-")
             year, month = int(year_str), int(month_str)
 
-            table = pq.read_table(path)
-            rows = sorted(zip(table.column("ts").to_pylist(), table.column("value").to_pylist()))
+            rows = sorted(_read_archive_month_full(path), key=lambda r: (r[0], r[1]))
             kept = filter_deleted_occurrences(rows, relevant)
             removed = len(rows) - len(kept)
             if removed == 0:
@@ -980,7 +976,12 @@ def purge_archived_months(
 
             old_size = path.stat().st_size
             if kept:
-                kept_table = pa.table({"ts": [r[0] for r in kept], "value": [r[1] for r in kept]})
+                kept_table = pa.table({
+                    "ts": [r[0] for r in kept],
+                    "value": [r[1] for r in kept],
+                    "min_value": [r[2] for r in kept],
+                    "max_value": [r[3] for r in kept],
+                })
                 tmp_path = path.with_suffix(".tmp")
                 pq.write_table(kept_table, tmp_path, compression="zstd")
                 tmp_path.replace(path)
@@ -1031,19 +1032,29 @@ def purge_archived_months(
 
 
 def _rewrite_archive_month(
-    data_dir: Path, index: Index, entity_id: str, aggregation_type: str, rows: list[tuple[float, float]],
+    data_dir: Path, index: Index, entity_id: str, aggregation_type: str,
+    rows: list[tuple[float, float, float | None, float | None]],
     year: int, month: int, tz: ZoneInfo, hourly_rollup: bool = False,
 ) -> None:
-    """Schreibt einen archivierten Monat komplett neu aus `rows` (bereits
-    sortiert, inkl. der Änderung) und berechnet die Rollup-Zeilen dieses
-    Monats neu — gemeinsam von add_raw_value()/correct_raw_value() genutzt,
-    dieselbe atomare tmp-Datei-plus-rename-Technik wie überall sonst in
-    diesem Modul, damit ein Absturz mittendrin nie eine halb geschriebene
-    Archivdatei hinterlässt."""
+    """Schreibt einen archivierten Monat komplett neu aus `rows` (ts, value,
+    min_value, max_value — bereits sortiert, inkl. der Änderung) und
+    berechnet die Rollup-Zeilen dieses Monats neu — gemeinsam von
+    add_raw_value()/correct_raw_value() genutzt, dieselbe atomare
+    tmp-Datei-plus-rename-Technik wie überall sonst in diesem Modul, damit
+    ein Absturz mittendrin nie eine halb geschriebene Archivdatei
+    hinterlässt. min_value/max_value müssen mitgeführt werden, sonst würde
+    jede Korrektur/jedes Hinzufügen in einem Monat, der Standard-
+    Auflösungs-Zeilen (Ø je Zeitfenster) enthält, deren Min/Max-Spalten für
+    alle unberührten Zeilen des Monats stillschweigend löschen."""
     archive_path = entity_dir(data_dir, "archive", entity_id) / f"{year:04d}-{month:02d}.parquet"
     old_size = archive_path.stat().st_size if archive_path.exists() else 0
     archive_path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.table({"ts": [r[0] for r in rows], "value": [r[1] for r in rows]})
+    table = pa.table({
+        "ts": [r[0] for r in rows],
+        "value": [r[1] for r in rows],
+        "min_value": [r[2] for r in rows],
+        "max_value": [r[3] for r in rows],
+    })
     tmp_path = archive_path.with_suffix(".tmp")
     pq.write_table(table, tmp_path, compression="zstd")
     tmp_path.replace(archive_path)
@@ -1052,6 +1063,29 @@ def _rewrite_archive_month(
     )
     new_size = archive_path.stat().st_size
     index.add_size_bytes(entity_id, new_size - old_size)
+
+
+def _read_archive_month_full(
+    archive_path: Path,
+) -> list[tuple[float, float, float | None, float | None]]:
+    """Liest einen archivierten Monat als (ts, value, min_value, max_value).
+    Ältere Archivdateien (vor der Standard-Auflösung) kennen die beiden
+    letzten Spalten noch nicht — dann werden sie als None aufgefüllt, statt
+    dass das Lesen mit KeyError abbricht."""
+    table = pq.read_table(archive_path)
+    ts_col = table.column("ts").to_pylist()
+    value_col = table.column("value").to_pylist()
+    min_col = (
+        table.column("min_value").to_pylist()
+        if "min_value" in table.column_names
+        else [None] * len(ts_col)
+    )
+    max_col = (
+        table.column("max_value").to_pylist()
+        if "max_value" in table.column_names
+        else [None] * len(ts_col)
+    )
+    return list(zip(ts_col, value_col, min_col, max_col))
 
 
 def add_raw_value(
@@ -1077,13 +1111,14 @@ def add_raw_value(
         hot_append(data_dir, entity_id, ts, value, tz)
     else:
         archive_path = entity_dir(data_dir, "archive", entity_id) / f"{ts_month_key}.parquet"
-        if archive_path.exists():
-            table = pq.read_table(archive_path)
-            rows = list(zip(table.column("ts").to_pylist(), table.column("value").to_pylist()))
-        else:
-            rows = []
-        rows.append((ts, value))
-        rows.sort()
+        rows = _read_archive_month_full(archive_path) if archive_path.exists() else []
+        # Manuell nachgetragener Wert ist kein Ø aus mehreren Rohwerten.
+        rows.append((ts, value, None, None))
+        # Nur nach (ts, value) sortieren, nicht per Tupel-Vergleich über alle
+        # vier Felder — bei exakten (ts, value)-Duplikaten würde das sonst
+        # None mit einem float vergleichen (TypeError) statt einfach die
+        # bestehende Reihenfolge der Duplikate beizubehalten.
+        rows.sort(key=lambda r: (r[0], r[1]))
         _rewrite_archive_month(
             data_dir, index, entity_id, entity["aggregation_type"], rows, ts_dt.year, ts_dt.month, tz,
             hourly_rollup=bool(entity["hourly_rollup"]),
@@ -1113,35 +1148,43 @@ def correct_raw_value(
     ts_dt = datetime.fromtimestamp(ts, tz)
     ts_month_key = ts_dt.strftime("%Y-%m")
 
-    def _replace_first_match(rows: list[tuple[float, float]]) -> tuple[list[tuple[float, float]], bool]:
+    # Trifft der Vergleich die Zeile, die gerade korrigiert wird, werden
+    # min_value/max_value mitgelöscht: sie gehörten zum alten (Ø-)Wert, der
+    # jetzt durch eine bewusste manuelle Korrektur ersetzt wird — der neue
+    # Wert ist kein Ø aus mehreren Rohwerten mehr.
+    def _replace_first_match_full(
+        rows: list[tuple[float, float, float | None, float | None]],
+    ) -> tuple[list[tuple[float, float, float | None, float | None]], bool]:
         changed = False
         result = []
-        for row_ts, row_value in rows:
+        for row_ts, row_value, min_value, max_value in rows:
             if not changed and row_ts == ts and row_value == old_value:
-                result.append((row_ts, new_value))
+                result.append((row_ts, new_value, None, None))
                 changed = True
             else:
-                result.append((row_ts, row_value))
+                result.append((row_ts, row_value, min_value, max_value))
         return result, changed
 
     if ts_month_key == now_month_key:
         path = hot_path(data_dir, entity_id, ts, tz)
-        rows = read_rows(path)
-        new_rows, changed = _replace_first_match(rows)
+        records = hotbuffer.read_full_rows(path)
+        changed = False
+        new_records: list[hotbuffer.HotRecord] = []
+        for row_ts, row_value, event_id, min_value, max_value in records:
+            if not changed and row_ts == ts and row_value == old_value:
+                new_records.append((row_ts, new_value, event_id, None, None))
+                changed = True
+            else:
+                new_records.append((row_ts, row_value, event_id, min_value, max_value))
         if not changed:
             return False
-        tmp_path = path.with_suffix(".tmp")
-        with tmp_path.open("w", encoding="utf-8") as handle:
-            for row_ts, row_value in new_rows:
-                handle.write(f"{row_ts},{row_value}\n")
-        tmp_path.replace(path)
+        hotbuffer.write_records(path, new_records)
     else:
         archive_path = entity_dir(data_dir, "archive", entity_id) / f"{ts_month_key}.parquet"
         if not archive_path.exists():
             return False
-        table = pq.read_table(archive_path)
-        rows = sorted(zip(table.column("ts").to_pylist(), table.column("value").to_pylist()))
-        new_rows, changed = _replace_first_match(rows)
+        rows = sorted(_read_archive_month_full(archive_path), key=lambda r: (r[0], r[1]))
+        new_rows, changed = _replace_first_match_full(rows)
         if not changed:
             return False
         _rewrite_archive_month(

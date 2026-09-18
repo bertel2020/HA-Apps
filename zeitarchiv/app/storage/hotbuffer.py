@@ -14,7 +14,12 @@ from zoneinfo import ZoneInfo
 
 from .paths import hot_file_path, storage_area_dir, validate_entity_id
 
-HotRecord = tuple[float, float, str | None]
+# (ts, value, event_id, min_value, max_value). min_value/max_value sind nur
+# bei Zeilen gesetzt, die die Standard-Auflösung als Ø mehrerer Rohwerte
+# eines Zeitfensters geschrieben hat (siehe resolution.py) — bei jeder
+# anderen Zeile None. Alte Zeilen ohne die beiden Spalten werden beim Lesen
+# genauso mit None aufgefüllt.
+HotRecord = tuple[float, float, str | None, float | None, float | None]
 
 
 def month_key(ts: float, tz: ZoneInfo) -> str:
@@ -31,6 +36,24 @@ def hot_path(data_dir: Path, entity_id: str, ts: float, tz: ZoneInfo) -> Path:
     return hot_file_path(data_dir, entity_id, month_key(ts, tz))
 
 
+def _format_row(
+    ts: float,
+    value: float,
+    event_id: str | None,
+    min_value: float | None,
+    max_value: float | None,
+) -> str:
+    # min_value/max_value nur anhängen, wenn mindestens eines gesetzt ist —
+    # hält die weit überwiegende Mehrheit der Zeilen (Rohwerte ohne
+    # Auflösung) im bisherigen, kürzeren 2/3-Spalten-Format.
+    if min_value is None and max_value is None:
+        suffix = f",{event_id}" if event_id else ""
+        return f"{ts},{value}{suffix}"
+    min_part = "" if min_value is None else min_value
+    max_part = "" if max_value is None else max_value
+    return f"{ts},{value},{event_id or ''},{min_part},{max_part}"
+
+
 def append(
     data_dir: Path,
     entity_id: str,
@@ -38,12 +61,13 @@ def append(
     value: float,
     tz: ZoneInfo,
     event_id: str | None = None,
+    min_value: float | None = None,
+    max_value: float | None = None,
 ) -> None:
     path = hot_path(data_dir, entity_id, ts, tz)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
-        suffix = f",{event_id}" if event_id else ""
-        handle.write(f"{ts},{value}{suffix}\n")
+        handle.write(_format_row(ts, value, event_id, min_value, max_value) + "\n")
 
 
 def append_many(data_dir: Path, entity_id: str, rows: list[tuple[float, float]], tz: ZoneInfo) -> None:
@@ -76,21 +100,30 @@ def append_records(
     path = hot_path(data_dir, entity_id, records[0][0], tz)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
-        for ts, value, event_id in records:
-            suffix = f",{event_id}" if event_id else ""
-            handle.write(f"{ts},{value}{suffix}\n")
+        for ts, value, event_id, min_value, max_value in records:
+            handle.write(_format_row(ts, value, event_id, min_value, max_value) + "\n")
 
 
 def read_rows(path: Path) -> list[tuple[float, float]]:
-    """Liest eine Hot-CSV-Datei als (ts, value)-Paare — leer, falls die Datei fehlt."""
-    return [(ts, value) for ts, value, _event_id in iter_records(path)]
+    """Liest eine Hot-CSV-Datei als (ts, value)-Paare — leer, falls die Datei fehlt.
+    Ignoriert min_value/max_value bewusst — für Aufrufer, die nur den
+    gespeicherten Wert brauchen (Korrektur-Matching, Bereinigungs-Anzeige)."""
+    return [(ts, value) for ts, value, _event_id, _min_value, _max_value in iter_records(path)]
+
+
+def read_full_rows(path: Path) -> list[HotRecord]:
+    """Wie read_records(), als expliziter Name für Aufrufer, die min_value/
+    max_value beim Neuschreiben einer Datei erhalten müssen (Archivierung,
+    Korrektur/Hinzufügen bereits archivierter Monate) — sonst würden dort
+    unbemerkt die Ø/Min/Max-Spalten der Standard-Auflösung verloren gehen."""
+    return read_records(path)
 
 
 def iter_records(path: Path) -> Iterator[HotRecord]:
-    """Streamt alte Zwei-Spalten- und neue Drei-Spalten-Hot-Dateien.
-
-    Die optionale dritte Spalte trägt die stabile Event-ID des Live-
-    Schreibpfads. Importierte/ältere Zeilen haben bewusst keine ID.
+    """Streamt Hot-Dateien in allen bisherigen Formaten: zwei Spalten (alt),
+    drei Spalten (ts,value,event_id) oder fünf Spalten
+    (ts,value,event_id,min_value,max_value — Standard-Auflösung). Fehlende
+    Spalten werden als None aufgefüllt.
     """
     if not path.exists():
         return
@@ -99,11 +132,13 @@ def iter_records(path: Path) -> Iterator[HotRecord]:
             line = line.strip()
             if not line:
                 continue
-            parts = line.split(",", 2)
+            parts = line.split(",", 4)
             if len(parts) < 2:
                 continue
-            event_id = (parts[2] or None) if len(parts) == 3 else None
-            yield (float(parts[0]), float(parts[1]), event_id)
+            event_id = (parts[2] or None) if len(parts) >= 3 else None
+            min_value = float(parts[3]) if len(parts) >= 5 and parts[3] != "" else None
+            max_value = float(parts[4]) if len(parts) >= 5 and parts[4] != "" else None
+            yield (float(parts[0]), float(parts[1]), event_id, min_value, max_value)
 
 
 def read_records(path: Path) -> list[HotRecord]:
@@ -111,14 +146,29 @@ def read_records(path: Path) -> list[HotRecord]:
     return list(iter_records(path))
 
 
+def write_records(path: Path, records: list[HotRecord]) -> None:
+    """Schreibt eine Hot-Datei komplett neu aus `records` — für die
+    Live-Auflösung (resolution.py), die die trailing Rohzeilen eines
+    abgeschlossenen Fensters durch eine Ø/Min/Max-Zeile ersetzt."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for ts, value, event_id, min_value, max_value in records:
+            handle.write(_format_row(ts, value, event_id, min_value, max_value) + "\n")
+
+
 def contains_event_id(path: Path, event_id: str) -> bool:
     """Bricht die Suche ab, sobald die Event-ID gefunden wurde."""
-    return any(row_event_id == event_id for _ts, _value, row_event_id in iter_records(path))
+    return any(
+        row_event_id == event_id
+        for _ts, _value, row_event_id, _min_value, _max_value in iter_records(path)
+    )
 
 
 def contains_timestamp(path: Path, ts: float) -> bool:
     """Bricht die Suche ab, sobald der Zeitstempel gefunden wurde."""
-    return any(row_ts == ts for row_ts, _value, _event_id in iter_records(path))
+    return any(
+        row_ts == ts for row_ts, _value, _event_id, _min_value, _max_value in iter_records(path)
+    )
 
 
 def find_stale_hot_files(data_dir: Path, entity_id: str, current_ts: float, tz: ZoneInfo) -> list[Path]:

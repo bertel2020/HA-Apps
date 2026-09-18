@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import shutil
 import tempfile
 import threading
@@ -47,7 +48,7 @@ def test_retry_does_not_append_duplicate() -> None:
         records = hotbuffer.read_records(
             hotbuffer.hot_path(tmp, "sensor.temp", _event().ts, ZoneInfo("UTC"))
         )
-        assert records == [(_event().ts, 21.4, "event-1")]
+        assert records == [(_event().ts, 21.4, "event-1", None, None)]
         assert index.get_entity("sensor.temp")["row_count"] == 1
     finally:
         index.close()
@@ -192,7 +193,7 @@ def test_same_measurement_with_new_event_id_is_not_appended() -> None:
         records = hotbuffer.read_records(
             hotbuffer.hot_path(tmp, "sensor.temp", _event().ts, ZoneInfo("UTC"))
         )
-        assert records == [(_event().ts, 21.4, "event-1")]
+        assert records == [(_event().ts, 21.4, "event-1", None, None)]
         assert index.get_entity("sensor.temp")["row_count"] == 1
     finally:
         index.close()
@@ -335,33 +336,93 @@ def test_same_value_at_different_timestamp_is_appended() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_standard_entity_never_skips_but_collapses_closed_windows() -> None:
+    """Standard-Entitäten mit Auflösung != raw laufen über resolution.py
+    statt should_accept_write: jeder Wert wird angenommen ("written"), erst
+    beim Überschreiten der nächsten Fenstergrenze wird das abgeschlossene
+    Fenster zu einer Ø/Min/Max-Zeile mit ts=Bucket-Ende zusammengefasst."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-ingestion-"))
+    index = Index(tmp / "index.sqlite")
+    try:
+        service = IngestionService(tmp, index, ZoneInfo("UTC"))
+        # 30s NACH einer 300s-Rastergrenze statt exakt darauf (_event().ts
+        # liegt zufällig exakt auf Mitternacht/Monatsgrenze) — sonst würde
+        # ein zweiter Wert "kurz davor" versehentlich in den Vormonat fallen.
+        base = _event().ts + 30
+        first = IngestEvent(
+            event_id="event-1", entity_id="sensor.temp", domain="sensor",
+            ts=base, value=21.4, state_class="measurement", unit="°C",
+        )
+        assert service.ingest(first) == "written"
+        index.set_config(first.entity_id, resolution="5min")
+
+        bucket_end = math.ceil(first.ts / 300) * 300
+        second = IngestEvent(
+            event_id="event-2", entity_id=first.entity_id, domain=first.domain,
+            ts=base + 30, value=24.8, state_class=first.state_class, unit=first.unit,
+        )
+        # Landet in einem neuen Fenster -> soll das vorherige (first, second)
+        # abschließen, nicht verwerfen.
+        third = IngestEvent(
+            event_id="event-3", entity_id=first.entity_id, domain=first.domain,
+            ts=bucket_end + 10, value=22.0, state_class=first.state_class, unit=first.unit,
+        )
+
+        assert service.ingest(second) == "written"
+        assert service.ingest(third) == "written"
+
+        records = hotbuffer.read_full_rows(
+            hotbuffer.hot_path(tmp, first.entity_id, first.ts, ZoneInfo("UTC"))
+        )
+        assert len(records) == 2
+        resolved_ts, resolved_value, resolved_event_id, min_value, max_value = records[0]
+        assert resolved_ts == bucket_end
+        # sum()/len() wie in resolution.collapse_pending_window(), siehe
+        # Kommentar in test_resolution.py zur Fließkomma-Reihenfolge.
+        assert resolved_value == sum([first.value, second.value]) / 2
+        assert min_value == min(first.value, second.value)
+        assert max_value == max(first.value, second.value)
+        assert resolved_event_id is None
+        # Der neue Wert selbst ist noch unaufgelöst (eigenes offenes Fenster).
+        assert records[1] == (third.ts, third.value, "event-3", None, None)
+    finally:
+        index.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _counter_event(event_id: str, ts: float, value: float) -> IngestEvent:
+    # total_increasing -> aggregation_type "counter". Nur Zähler (und
+    # Schalter, für die die Auflösung ohnehin gesperrt ist) drosseln noch
+    # über should_accept_write/"skipped" — Standard-Entitäten (_event() oben)
+    # laufen seit der Live-Auflösung stattdessen über resolution.py und
+    # verwerfen nie, siehe test_resolution.py.
+    return IngestEvent(
+        event_id=event_id,
+        entity_id="sensor.energy_counter",
+        domain="sensor",
+        ts=ts,
+        value=value,
+        state_class="total_increasing",
+        unit="kWh",
+    )
+
+
+def _bucket_end(ts: float, interval: int) -> float:
+    return math.ceil(ts / interval) * interval
+
+
 def test_configured_resolution_skips_events_inside_interval() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-ingestion-"))
     index = Index(tmp / "index.sqlite")
     try:
         service = IngestionService(tmp, index, ZoneInfo("UTC"))
-        first = _event("event-1")
+        first = _counter_event("event-1", 1722470400.0, 100.0)
         assert service.ingest(first) == "written"
         index.set_config(first.entity_id, resolution="15min")
 
-        inside = IngestEvent(
-            event_id="event-2",
-            entity_id=first.entity_id,
-            domain=first.domain,
-            ts=first.ts + 899,
-            value=22.0,
-            state_class=first.state_class,
-            unit=first.unit,
-        )
-        boundary = IngestEvent(
-            event_id="event-3",
-            entity_id=first.entity_id,
-            domain=first.domain,
-            ts=first.ts + 900,
-            value=23.0,
-            state_class=first.state_class,
-            unit=first.unit,
-        )
+        bucket_end = _bucket_end(first.ts, 900)
+        inside = _counter_event("event-2", bucket_end - 0.001, 101.0)
+        boundary = _counter_event("event-3", bucket_end + 0.001, 102.0)
 
         assert service.ingest(inside) == "skipped"
         assert service.ingest(boundary) == "written"
@@ -378,40 +439,19 @@ def test_resolution_change_keeps_existing_rows_and_uses_last_stored_timestamp() 
     index = Index(tmp / "index.sqlite")
     try:
         service = IngestionService(tmp, index, ZoneInfo("UTC"))
-        first = _event("event-1")
+        first = _counter_event("event-1", 1722470400.0, 100.0)
         assert service.ingest(first) == "written"
         index.set_config(first.entity_id, resolution="15min")
 
-        after_15_minutes = IngestEvent(
-            event_id="event-2",
-            entity_id=first.entity_id,
-            domain=first.domain,
-            ts=first.ts + 900,
-            value=22.0,
-            state_class=first.state_class,
-            unit=first.unit,
+        after_15_minutes = _counter_event(
+            "event-2", _bucket_end(first.ts, 900) + 0.001, 101.0
         )
         assert service.ingest(after_15_minutes) == "written"
 
         index.set_config(first.entity_id, resolution="1h")
-        too_early = IngestEvent(
-            event_id="event-3",
-            entity_id=first.entity_id,
-            domain=first.domain,
-            ts=after_15_minutes.ts + 3599,
-            value=23.0,
-            state_class=first.state_class,
-            unit=first.unit,
-        )
-        after_one_hour = IngestEvent(
-            event_id="event-4",
-            entity_id=first.entity_id,
-            domain=first.domain,
-            ts=after_15_minutes.ts + 3600,
-            value=24.0,
-            state_class=first.state_class,
-            unit=first.unit,
-        )
+        hour_end = _bucket_end(after_15_minutes.ts, 3600)
+        too_early = _counter_event("event-3", hour_end - 0.001, 102.0)
+        after_one_hour = _counter_event("event-4", hour_end + 0.001, 103.0)
 
         assert service.ingest(too_early) == "skipped"
         assert index.get_entity(first.entity_id)["row_count"] == 2

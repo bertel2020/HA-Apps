@@ -15,9 +15,9 @@ from zoneinfo import ZoneInfo
 
 import pyarrow.parquet as pq
 
-from . import hotbuffer, rollup, rotate
+from . import hotbuffer, resolution, rollup, rotate
 from .coordinator import StorageCoordinator
-from .index import Index, should_accept_value, should_accept_write
+from .index import Index, resolution_seconds, should_accept_value, should_accept_write
 from ..limits import MAX_EVENT_TS, MIN_EVENT_TS
 from ..logging_setup import log_rate_limited
 from ..progress import JobProgress
@@ -389,7 +389,17 @@ class IngestionService:
             self._complete(event, recorded=False)
             return "duplicate"
 
-        if not should_accept_write(
+        # Standard-Entitäten mit Auflösung != raw drosseln nicht über
+        # should_accept_write (verwirft Werte ersatzlos), sondern lassen
+        # jeden Wert durch und fassen ihn nachträglich fensterweise zu
+        # Ø/Min/Max zusammen (siehe resolution.py-Docstring) — Zähler und
+        # Switch (für Switch ist die Auflösung ohnehin auf "raw" gesperrt,
+        # siehe main.py) bleiben bei der reinen Zeitraster-Drossel.
+        live_resolution_interval = None
+        if entity["aggregation_type"] == "standard":
+            live_resolution_interval = resolution_seconds(entity["resolution"])
+
+        if live_resolution_interval is None and not should_accept_write(
             entity["resolution"],
             entity["last_ts"],
             event.ts,
@@ -419,6 +429,14 @@ class IngestionService:
         rotate.rotate_if_needed(
             self._data_dir, event.entity_id, event.ts, self._index, self._tz
         )
+        if live_resolution_interval is not None:
+            path = hotbuffer.hot_path(self._data_dir, event.entity_id, event.ts, self._tz)
+            pending_end = resolution.pending_bucket_end(path, live_resolution_interval)
+            new_bucket_end = resolution.bucket_end(live_resolution_interval, event.ts)
+            # Nur vorwärts schließen — ein leicht verspätet eintreffender Wert
+            # für das noch offene Fenster darf es nicht fälschlich abschließen.
+            if pending_end is not None and new_bucket_end > pending_end:
+                resolution.collapse_pending_window(path, live_resolution_interval)
         hotbuffer.append(
             self._data_dir,
             event.entity_id,

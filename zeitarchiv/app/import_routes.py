@@ -1694,7 +1694,7 @@ class ImportService:
                     **self._ha_debug_row(ts, value),
                     "event_id": event_id,
                 }
-                for ts, value, event_id in hotbuffer.read_records(hot_path)
+                for ts, value, event_id, _min_value, _max_value in hotbuffer.read_records(hot_path)
             ]
             month_start = datetime(year, month, 1, tzinfo=self.deps.tz)
             next_month = (

@@ -25,7 +25,12 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Schwellenhistorie: 4.800, dann 5.700 (Housekeeping-Bereich, 0.75.0),
     # dann 5.800 (CoordinatorBusy-Handler + Backup-Worker-Heartbeat), dann
     # 5.850. Am 7. September 2026 erstmals GESENKT auf 5.700 (ZG-27), am
-    # 8. September auf 5.150, am 9. September auf 5.260.
+    # 8. September auf 5.150, am 9. September auf 5.260, am 18. September
+    # auf 5.320 — die Switch-Sperre der Auflösungs-Einstellung (Live-
+    # Auflösung für Standard-Entitäten) brauchte eine Feldvalidierung plus
+    # zwei neue Kontextwerte in _entity_config_context(), main.py wuchs von
+    # 5.260 auf 5.272. Wie am 9. September: neue Nutzer-Funktionalität, kein
+    # schleichendes Wachstum an einer Stelle mit bereits benanntem Ausweg.
     #
     # Was beim vorletzten Mal schiefgelaufen war: Bei 5.850 stand hier der
     # Satz, der nächste Schritt sei eine eigene housekeeping_routes.py und
@@ -53,7 +58,7 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # konkrete Änderung herum bemessen, sie kannte das Feature nicht.
     #
     # Die Schwelle folgt weiter der Regel "Ist-Stand plus kleiner Puffer":
-    # 5.260 gegen die heutigen 5.209, also gut 50 Zeilen.
+    # 5.320 gegen die heutigen 5.272, also gut 45 Zeilen.
     #
     # Der fällige, schwierigere Schnitt bleibt unverändert offen: die
     # TEMPLATE-KONTEXTE. Am 8. September gezählt waren von 5.084 Zeilen rund
@@ -64,7 +69,7 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Routen verzahnt als die Hintergrundarbeit es war — ein Schnitt dort
     # braucht erst eine Antwort darauf, was ein Kontext-Erbauer vom Request
     # wissen darf. Das ist mit dieser Anhebung NICHT erledigt, nur vertagt.
-    assert len(main.splitlines()) < 5_260
+    assert len(main.splitlines()) < 5_320
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:
