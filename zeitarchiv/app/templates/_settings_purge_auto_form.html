@@ -1,0 +1,36 @@
+<p class="hint" style="margin:0 0 14px;">Entfernt zur Löschung markierte Datensätze automatisch physisch, sobald ihre Markierung das Mindestalter erreicht hat — frischere Markierungen bleiben unangetastet und über „Rückgängig“ rückholbar.</p>
+<div class="settings-compact-list">
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Automatische Bereinigung</div>
+      <div class="settings-compact-hint">Läuft im Hintergrund, wie die automatische Verdichtung</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="purge-auto-enabled-btn" onclick="toggleDDPicker('purge-auto-enabled')">{% for k, l in purge_auto_options %}{% if k == purge_auto_enabled %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="purge_auto_enabled" id="purge-auto-enabled-input" value="{{ purge_auto_enabled }}"
+             hx-post="settings/purge-auto" hx-trigger="change" hx-target="#purge-auto-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="purge-auto-enabled-popover">
+        {% for key, label in purge_auto_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('purge-auto-enabled', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">Mindestalter der Markierung</div>
+      <div class="settings-compact-hint">Wie lange eine Löschmarkierung unangetastet bleibt, bevor sie physisch entfernt wird</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="purge-min-age-days-btn" onclick="toggleDDPicker('purge-min-age-days')">{% for k, l in purge_min_age_options %}{% if k == purge_min_age_days %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="purge_min_age_days" id="purge-min-age-days-input" value="{{ purge_min_age_days }}"
+             hx-post="settings/purge-auto" hx-trigger="change" hx-target="#purge-auto-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="purge-min-age-days-popover">
+        {% for key, label in purge_min_age_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('purge-min-age-days', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+</div>
+{% if purge_auto_saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}

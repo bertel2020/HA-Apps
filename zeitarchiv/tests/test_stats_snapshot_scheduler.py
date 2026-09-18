@@ -189,6 +189,12 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     # der eine Diagnose-Zeile rechtfertigen würde, dasselbe Argument wie bei
     # _flush_stale_resolution_windows oben.
     "_run_automatic_compaction_if_due": None,
+    # Ebenfalls standardmäßig aus (Housekeeping → Speicherplatz), und ihr
+    # Effekt (frei gewordener Speicherplatz) zeigt sich direkt in der bereits
+    # eigenen Zeile "Löschvorschau" oben sowie in Housekeeping → Aktivität —
+    # kein zusätzlicher globaler Zustand, der eine eigene Diagnose-Zeile
+    # rechtfertigen würde.
+    "_run_automatic_purge_if_due": None,
 }
 
 #: Läuft NICHT im 30-Sekunden-Takt, sondern einmalig beim Start in einem

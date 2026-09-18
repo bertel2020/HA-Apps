@@ -191,6 +191,19 @@ DEFAULT_COMPACT_AUTO_ENABLED = "off"
 # ihn verdichtet — siehe compact_raw_values()/background.py.
 COMPACT_MIN_AGE_MONTHS_LABELS = {"3": "3 Monate", "6": "6 Monate", "12": "12 Monate"}
 DEFAULT_COMPACT_MIN_AGE_MONTHS = "6"
+# Housekeeping → Speicherplatz: globaler Schalter für die automatische
+# (Wartungsplaner-)Bereinigung, standardmäßig AUS — dasselbe Muster wie bei
+# der Verdichten-Automatik oben.
+PURGE_AUTO_LABELS = {"off": "Aus", "on": "An"}
+DEFAULT_PURGE_AUTO_ENABLED = "off"
+# Wie lange eine Löschmarkierung (deleted_points.deleted_at) unangetastet
+# bleibt, bevor die Automatik sie physisch entfernt — in Tagen statt Monaten
+# wie beim Verdichten-Pendant, weil "Rückgängig" (undo_last_deleted_batch())
+# nur die zuletzt markierte Charge zurückholen kann und dafür ein kurzes statt
+# ein monatelanges Zeitfenster braucht. Siehe purge_hot_buffer()/
+# purge_archived_months() (cleanup.py) und background.py.
+PURGE_MIN_AGE_DAYS_LABELS = {"7": "1 Woche", "14": "2 Wochen", "30": "1 Monat", "90": "3 Monate"}
+DEFAULT_PURGE_MIN_AGE_DAYS = "30"
 RETENTION_LABELS = {
     "unlimited": "Unbegrenzt",
     "30d": "30 Tage",

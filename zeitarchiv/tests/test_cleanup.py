@@ -394,6 +394,41 @@ def test_purge_hot_buffer_removes_soft_deleted_rows_from_current_month_only() ->
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_purge_hot_buffer_older_than_leaves_fresh_marks_untouched() -> None:
+    """Grundlage der automatischen Bereinigung (background.py): older_than
+    lässt eine gerade erst markierte Zeile stehen, obwohl sie physisch
+    entfernbar wäre — sonst liefe "Rückgängig" für sie ins Leere, bevor
+    jemand sie zurückholen konnte."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.leistung"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+
+        now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+        old_ts, fresh_ts = _ts(2024, 8, 10, 8), _ts(2024, 8, 11, 9)
+        for ts, value in [(old_ts, 100.0), (fresh_ts, 110.0)]:
+            hotbuffer.append(tmp, entity_id, ts, value, TZ)
+            index.record_write(entity_id, ts)
+        # old_ts vor 40 Tagen markiert, fresh_ts gerade eben — nur old_ts hat
+        # ein übliches 30-Tage-Mindestalter schon erreicht.
+        index.mark_deleted(entity_id, [old_ts], deleted_at=now.timestamp() - 40 * 86400)
+        index.mark_deleted(entity_id, [fresh_ts], deleted_at=now.timestamp())
+
+        cutoff = now.timestamp() - 30 * 86400
+        purged = cleanup.purge_hot_buffer(tmp, index, TZ, now=now, older_than=cutoff)
+        assert purged == 1
+
+        hot_file = hotbuffer.hot_path(tmp, entity_id, now.timestamp(), TZ)
+        remaining = hotbuffer.read_rows(hot_file)
+        assert sorted(remaining) == [(fresh_ts, 110.0)]
+        assert index.get_deleted_points_count() == 1  # fresh_ts bleibt markiert
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_preview_purge_reports_hot_archive_and_missing_without_changes() -> None:
     """Die Vorschau zählt exakt, bleibt aber vollständig schreibfrei."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
@@ -528,6 +563,42 @@ def test_purge_archived_months_rewrites_file_and_recomputes_rollup() -> None:
         assert monat_table[0]["value"] == 22.5  # Mittelwert aus 20.0 und 25.0
         assert monat_table[0]["min_value"] == 20.0
         assert monat_table[0]["max_value"] == 25.0
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_purge_archived_months_older_than_leaves_fresh_marks_untouched() -> None:
+    """Wie test_purge_hot_buffer_older_than_leaves_fresh_marks_untouched, nur
+    für einen bereits archivierten Monat: die frisch markierte Zeile bleibt in
+    der Parquet-Datei stehen, nur die alte wird tatsächlich entfernt."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        old_ts, fresh_ts = _ts(2024, 7, 5, 8), _ts(2024, 7, 20, 8)
+        rows = [(old_ts, 20.0), (fresh_ts, 25.0)]
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        archive_path = archive_dir / "2024-07.parquet"
+        pq.write_table(pa.table({"ts": [r[0] for r in rows], "value": [r[1] for r in rows]}), archive_path)
+        index.add_row_count(entity_id, len(rows))
+        index.set_first_ts(entity_id, old_ts)
+
+        now = datetime(2024, 8, 15, tzinfo=TZ)
+        index.mark_deleted(entity_id, [old_ts], deleted_at=now.timestamp() - 40 * 86400)
+        index.mark_deleted(entity_id, [fresh_ts], deleted_at=now.timestamp())
+
+        cutoff = now.timestamp() - 30 * 86400
+        result = cleanup.purge_archived_months(tmp, index, TZ, now=now, older_than=cutoff)
+
+        assert result == {"rows_purged": 1, "months_purged": 1}
+        remaining = pq.read_table(archive_path).to_pylist()
+        assert [(r["ts"], r["value"]) for r in remaining] == [(fresh_ts, 25.0)]
+        assert index.get_deleted_points_count() == 1  # fresh_ts bleibt markiert
 
         index.close()
     finally:

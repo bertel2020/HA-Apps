@@ -990,6 +990,44 @@ def test_log_entity_action_round_trips_and_lists_newest_first() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_deleted_counts_and_removal_respect_older_than() -> None:
+    """Grundlage für die automatische Bereinigung (background.py): older_than
+    filtert auf deleted_at (wann eine Zeile zur Löschung markiert wurde), nicht
+    auf ihren eigenen Zeitstempel — und trifft bei mehreren Vorkommen
+    DESSELBEN Zeitstempels gezielt nur die älteste noch offene Markierung,
+    damit eine frischere Markierung desselben ts erhalten bleibt."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.temp", "sensor", "measurement", "°C")
+
+        old_ts, fresh_ts, shared_ts = 100.0, 200.0, 300.0
+        index.mark_deleted("sensor.temp", [old_ts], deleted_at=1_000.0)
+        index.mark_deleted("sensor.temp", [fresh_ts], deleted_at=9_000.0)
+        # Derselbe Zeitstempel zweimal markiert, an zwei verschiedenen Tagen.
+        index.mark_deleted("sensor.temp", [shared_ts], deleted_at=1_000.0)
+        index.mark_deleted("sensor.temp", [shared_ts], deleted_at=9_000.0)
+
+        cutoff = 5_000.0
+        counts = index.get_deleted_counts_for_entity("sensor.temp", older_than=cutoff)
+        assert counts == {old_ts: 1, shared_ts: 1}  # fresh_ts fehlt, shared_ts nur EINMAL
+
+        # Ohne older_than weiterhin alles, wie vor dieser Erweiterung.
+        assert index.get_deleted_counts_for_entity("sensor.temp") == {
+            old_ts: 1, fresh_ts: 1, shared_ts: 2,
+        }
+
+        index.remove_deleted_points("sensor.temp", [old_ts, shared_ts], older_than=cutoff)
+        remaining = index.get_deleted_counts_for_entity("sensor.temp")
+        assert old_ts not in remaining
+        assert remaining[fresh_ts] == 1
+        assert remaining[shared_ts] == 1  # nur die alte Markierung ist weg
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_hidden_series_survive_save_and_default_to_none() -> None:
     """Ausgeblendete Serien eines Charts.
 

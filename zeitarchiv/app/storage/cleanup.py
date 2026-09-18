@@ -3,10 +3,11 @@ Zählerrückgänge markieren,
 nie destruktiv löschen (Konzept Abschnitt 04).
 
 Löschen ist ein Soft-Delete über index.deleted_points — Zeitstempel werden aus
-allen Ansichten rausgefiltert. Ein manueller Purge (purge_hot_buffer() für den
-laufenden Monat, purge_archived_months() für bereits archivierte Monate,
-beide nur bei explizitem Klick in den Einstellungen) entfernt sie danach auch
-physisch.
+allen Ansichten rausgefiltert. Ein Purge (purge_hot_buffer() für den
+laufenden Monat, purge_archived_months() für bereits archivierte Monate)
+entfernt sie danach auch physisch — per Klick in den Einstellungen, oder
+automatisch im Hintergrund ab einem eingestellten Mindestalter der Markierung
+(``older_than``, standardmäßig aus, siehe background.py).
 """
 
 from __future__ import annotations
@@ -857,7 +858,9 @@ def preview_purge(
     return {"totals": totals, "rows": rows}
 
 
-def purge_hot_buffer(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None) -> int:
+def purge_hot_buffer(
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None, older_than: float | None = None
+) -> int:
     """Entfernt weich gelöschte Vorkommen physisch aus dem Hot Buffer (laufender
     Monat, unkomprimiertes CSV) — der laufende Monat hat keine Rollup-Datei,
     seine Aggregation wird bei jeder Abfrage ohnehin live aus dem Hot Buffer
@@ -865,13 +868,17 @@ def purge_hot_buffer(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime |
     CSV-Rewrite ohne Rollup-Folgeaufwand. Für bereits archivierte Monate siehe
     purge_archived_months() (Parquet-Rewrite + Rollup-Neuberechnung).
 
+    ``older_than`` (siehe Index.get_deleted_counts_for_entity()) beschränkt auf
+    Markierungen, die mindestens so alt sind — für die automatische
+    Bereinigung (background.py). Der manuelle Purge lässt es weg.
+
     Gibt die Anzahl tatsächlich physisch entfernter Zeilen zurück."""
     now = now or datetime.now(tz)
     current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
     purged_total = 0
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
-        deleted = index.get_deleted_counts_for_entity(entity_id)
+        deleted = index.get_deleted_counts_for_entity(entity_id, older_than=older_than)
         relevant = {ts: count for ts, count in deleted.items() if ts >= current_month_start}
         if not relevant:
             continue
@@ -892,7 +899,7 @@ def purge_hot_buffer(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime |
         if not removed_timestamps:
             continue
         hotbuffer.write_records(path, kept_records)
-        index.remove_deleted_points(entity_id, removed_timestamps)
+        index.remove_deleted_points(entity_id, removed_timestamps, older_than=older_than)
         index.add_row_count(entity_id, -len(removed_timestamps))
         purged_total += len(removed_timestamps)
     return purged_total
@@ -923,6 +930,7 @@ def purge_archived_months(
     tz: ZoneInfo,
     now: datetime | None = None,
     on_month: Callable[[int, str], None] | None = None,
+    older_than: float | None = None,
 ) -> dict:
     """Entfernt weich gelöschte Vorkommen physisch aus bereits archivierten
     Monaten — schreibt die betroffene Parquet-Datei ohne die gelöschten
@@ -930,9 +938,14 @@ def purge_archived_months(
     Rollup-Zeilen (fein/Monat, bei Zähler-Entitäten ggf. ein bereits
     berechnetes Jahr) über rollup.replace_month() passend neu. Ergänzt
     purge_hot_buffer() um den bisher fehlenden Teil (Konzept, "Offene
-    Punkte") — bewusst weiterhin nur bei explizitem Klick in den
-    Einstellungen, nie automatisch/lazy: anders als beim Hot Buffer wird hier
-    eine echte Archivdatei angefasst.
+    Punkte") — eine echte Archivdatei wird angefasst, deshalb läuft das immer
+    unter der globalen Sperre (coordinator.exclusive()), egal ob der Aufrufer
+    der manuelle Button oder die automatische Bereinigung (background.py) ist.
+
+    ``older_than`` (siehe Index.get_deleted_counts_for_entity()) beschränkt auf
+    Markierungen, die mindestens so alt sind — nur von der Automatik gesetzt,
+    damit "Rückgängig" für eine gerade erst markierte Charge nicht ins Leere
+    läuft. Der manuelle Purge lässt es weg und sieht wie bisher alles.
 
     ``on_month`` wird nach jedem tatsächlich neu geschriebenen Monat mit
     (Anzahl bisher, "entity_id 2024-03") gerufen — die Fortschrittsanzeige der
@@ -951,7 +964,7 @@ def purge_archived_months(
         entity_id = entity["entity_id"]
         aggregation_type = entity["aggregation_type"]
         hourly_rollup = bool(entity["hourly_rollup"])
-        deleted = index.get_deleted_counts_for_entity(entity_id)
+        deleted = index.get_deleted_counts_for_entity(entity_id, older_than=older_than)
         if not deleted:
             continue
         archive_dir = entity_dir(data_dir, "archive", entity_id)
@@ -1005,7 +1018,7 @@ def purge_archived_months(
             index.add_row_count(entity_id, -removed)
             index.add_size_bytes(entity_id, new_size - old_size)
             removed_timestamps = [ts for ts, count in relevant.items() for _ in range(count)]
-            index.remove_deleted_points(entity_id, removed_timestamps)
+            index.remove_deleted_points(entity_id, removed_timestamps, older_than=older_than)
 
             rows_purged += removed
             months_purged += 1

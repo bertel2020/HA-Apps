@@ -1410,6 +1410,13 @@ eine Vorschau vorab, wie viele Zeilen tatsächlich entfernbar sind
 Schritt tatsächlich ausgeführt wird. Dieser Schritt ist endgültig — danach
 ist "Rückgängig" nicht mehr möglich.
 
+Alternativ läuft das automatisch: derselbe Bereich hat einen Schalter für
+die automatische Bereinigung (standardmäßig aus) mit einstellbarem
+Mindestalter der Löschmarkierung (1 Woche bis 3 Monate). Erst wenn eine
+Markierung mindestens so lange her ist, entfernt die Automatik sie physisch
+— frischere Markierungen bleiben unangetastet, damit "Rückgängig" auch bei
+aktivierter Automatik ein echtes Zeitfenster hat.
+
 ## Datenhandling
 
 Dieser Abschnitt erklärt genauer, was hinter den Kulissen passiert, wenn
@@ -1604,7 +1611,7 @@ wie die Einstellungen:
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
 | **Ausreißer** | Entitäten, bei denen die eingestellte Ausreißer-Schwelle mehr als 1 % ihrer Werte markiert — mit Schwelle, absoluter Zahl und Quote. Dann ist die Schwelle für dieses Signal zu eng: markiert wird nicht mehr das Unplausible, sondern normales Verhalten. Es sind dieselben Zahlen, die unter dem Schwellenfeld der jeweiligen Entität stehen (siehe [Entität konfigurieren](#entität-konfigurieren)); die Liste rechnet nichts eigenes. Keine Sammel-Korrektur — die passende Schwelle hängt am Signal. |
 | **Konfiguration** | Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann, weil die gewählte Auflösung oder der aktive Wertänderungsfilter selbst schon einen größeren Mindestabstand zwischen Werten erzwingt (siehe [Entität konfigurieren](#entität-konfigurieren)) — mit Auflösung, aktueller und empfohlener Lücken-Erkennung je Entität. Rein informativ, keine Sammel-Korrektur: der passende Zielwert unterscheidet sich je Entität. |
-| **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). |
+| **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch); Indexkonsistenz prüfen/reparieren; markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Verdichten** | Schalter für die automatische, rückwirkende Verdichtung archivierter Monate (standardmäßig aus) und das Mindestalter dafür — betrifft nur Entitäten mit gesetztem Verdichtungsziel (siehe [Entität konfigurieren](#entität-konfigurieren)). Die manuelle Verdichten-Aktion liegt dagegen bei der jeweiligen Entität selbst, im Bearbeitungsbereich. |
 | **Aktivität** | Die letzten Korrektur-, Hinzufügen-, Bereinigen-, Verdichten- und Aufbewahrung-Vorgänge in einer Liste, mit Entität, Auslöser (manuell/automatisch), Zeilenzahl und Status. Backup steht dort nicht mit drin — es betrifft die ganze Installation, nicht einzelne Datensätze. |

@@ -3691,30 +3691,57 @@ class Index:
             },
         }
 
-    def get_deleted_counts_for_entity(self, entity_id: str) -> dict[float, int]:
+    def get_deleted_counts_for_entity(self, entity_id: str, older_than: float | None = None) -> dict[float, int]:
         """Wie get_deleted_counts(), aber ohne Zeitfenster — für den Purge, der
         alle gelöschten Vorkommen einer Entität sehen muss, nicht nur die in
-        einem bestimmten Anzeige-Zeitraum."""
+        einem bestimmten Anzeige-Zeitraum.
+
+        ``older_than`` filtert zusätzlich auf deleted_at (wann eine Zeile zur
+        Löschung markiert wurde, nicht ihr eigener Zeitstempel) — für die
+        automatische Bereinigung (background.py), die nur Markierungen
+        anfasst, die das eingestellte Mindestalter schon erreicht haben. Der
+        manuelle Purge lässt older_than weg und sieht wie bisher alles."""
         with self._lock, self._conn:
-            rows = self._conn.execute(
-                "SELECT ts, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? GROUP BY ts",
-                (entity_id,),
-            ).fetchall()
+            if older_than is None:
+                rows = self._conn.execute(
+                    "SELECT ts, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? GROUP BY ts",
+                    (entity_id,),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT ts, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? AND deleted_at <= ? GROUP BY ts",
+                    (entity_id, older_than),
+                ).fetchall()
             return {row["ts"]: row["n"] for row in rows}
 
-    def remove_deleted_points(self, entity_id: str, timestamps: list[float]) -> None:
+    def remove_deleted_points(
+        self, entity_id: str, timestamps: list[float], *, older_than: float | None = None
+    ) -> None:
         """Entfernt je einen deleted_points-Eintrag pro Zeitstempel in timestamps
         (mehrfaches Vorkommen in der Liste entfernt entsprechend mehrere Einträge)
         — aufgerufen NACHDEM diese Vorkommen tatsächlich physisch aus dem Hot
         Buffer entfernt wurden (purge_hot_buffer() in cleanup.py), sie brauchen
-        dann keine Soft-Delete-Filterung mehr."""
+        dann keine Soft-Delete-Filterung mehr.
+
+        ``older_than`` (siehe get_deleted_counts_for_entity()) trifft mit
+        ORDER BY deleted_at ASC gezielt die ÄLTESTE noch offene Markierung
+        dieses Zeitstempels — kommt derselbe ts mehrfach vor (Duplikate,
+        unterschiedlich alt markiert), bleiben die jüngeren bis zum nächsten
+        Lauf unangetastet, statt dass eine willkürliche von ihnen mitgeht."""
         with self._lock, self._conn:
             removed = 0
             for ts in timestamps:
-                row = self._conn.execute(
-                    "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? LIMIT 1",
-                    (entity_id, ts),
-                ).fetchone()
+                if older_than is None:
+                    row = self._conn.execute(
+                        "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? LIMIT 1",
+                        (entity_id, ts),
+                    ).fetchone()
+                else:
+                    row = self._conn.execute(
+                        "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? AND deleted_at <= ? "
+                        "ORDER BY deleted_at ASC LIMIT 1",
+                        (entity_id, ts, older_than),
+                    ).fetchone()
                 if row:
                     self._conn.execute("DELETE FROM deleted_points WHERE id = ?", (row["id"],))
                     removed += 1

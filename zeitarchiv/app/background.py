@@ -50,7 +50,12 @@ from . import notices as notices_mod
 from . import supervisor_stats
 from . import version_check
 from .backup_scheduler import next_scheduled_run
-from .formatting import DEFAULT_COMPACT_AUTO_ENABLED, DEFAULT_COMPACT_MIN_AGE_MONTHS
+from .formatting import (
+    DEFAULT_COMPACT_AUTO_ENABLED,
+    DEFAULT_COMPACT_MIN_AGE_MONTHS,
+    DEFAULT_PURGE_AUTO_ENABLED,
+    DEFAULT_PURGE_MIN_AGE_DAYS,
+)
 from .energiedashboard_routes import (
     process_pending_hourly_backfill,
     refresh_heatmap_weekday_cache_if_stale,
@@ -143,6 +148,7 @@ class BackgroundService:
         # bedeutet, keinen verlorenen.
         self._resolution_flush_last_run = 0.0
         self._compact_last_run = 0.0
+        self._purge_last_run = 0.0
         self.base_dir = deps.base_dir
         self.demo_mode_active = deps.demo_mode_active
         self.backups_dir = deps.backups_dir
@@ -886,6 +892,51 @@ class BackgroundService:
                     }),
                 )
 
+    def _run_automatic_purge_if_due(self, now: datetime) -> None:
+        """Automatische Bereinigung (Housekeeping → Speicherplatz) — standardmäßig
+        AUS (siehe DEFAULT_PURGE_AUTO_ENABLED), läuft höchstens einmal täglich wie
+        die automatische Verdichtung: physisches Entfernen ist nicht zeitkritisch.
+
+        Das Mindestalter bezieht sich auf deleted_points.deleted_at (wann eine
+        Zeile zur Löschung markiert wurde), NICHT auf ihren eigenen Zeitstempel —
+        sonst liefe "Rückgängig" (undo_last_deleted_batch(), macht nur die
+        zuletzt markierte Charge rückgängig) regelmäßig ins Leere, weil die
+        Automatik genau diese Charge schon wieder physisch entfernt hätte, bevor
+        jemand sie zurückholen konnte.
+
+        Anders als die Verdichten-Automatik (Sperre je Entität) braucht das hier
+        dieselbe globale Sperre wie der manuelle Button (purge_archived_months()
+        schreibt echte Archivdateien um) — läuft deshalb synchron im
+        Wartungsplaner-Tick statt in einem eigenen Thread wie die geplante
+        Aufbewahrung, die zusätzlich eine Live-Fortschrittsanzeige für einen
+        manuell ausgelösten Lauf bedienen muss. Hier schaut niemand zu; das
+        Ergebnis erscheint danach nur in Housekeeping → Aktivität."""
+        now_ts = now.timestamp()
+        if now_ts - self._purge_last_run < 86400:
+            return
+        self._purge_last_run = now_ts
+        if self.index.get_setting("purge_auto_enabled", DEFAULT_PURGE_AUTO_ENABLED) != "on":
+            return
+        min_age_days = int(self.index.get_setting("purge_min_age_days", DEFAULT_PURGE_MIN_AGE_DAYS))
+        cutoff_ts = now_ts - min_age_days * 86400
+        started_at = time.time()
+        with self.coordinator.exclusive():
+            hot_purged = cleanup.purge_hot_buffer(self.data_dir, self.index, self.tz, now=now, older_than=cutoff_ts)
+            archive_result = cleanup.purge_archived_months(
+                self.data_dir, self.index, self.tz, now=now, older_than=cutoff_ts
+            )
+        total_rows = hot_purged + archive_result["rows_purged"]
+        if total_rows:
+            self.index.log_entity_action(
+                None, "purge", "automatic", started_at, time.time(), "success",
+                rows_affected=total_rows,
+                detail=json.dumps({
+                    "min_age_days": min_age_days,
+                    "months_purged": archive_result["months_purged"],
+                }),
+            )
+            self.refresh_purge_preview_if_stale(force=True)
+
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
         while not self._maintenance_scheduler_stop.is_set():
@@ -913,6 +964,7 @@ class BackgroundService:
                 self._run_demo_append_if_due(datetime.now(self.tz))
                 self._flush_stale_resolution_windows(datetime.now(self.tz))
                 self._run_automatic_compaction_if_due(datetime.now(self.tz))
+                self._run_automatic_purge_if_due(datetime.now(self.tz))
             except Exception:
                 logger.exception(
                     "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "
