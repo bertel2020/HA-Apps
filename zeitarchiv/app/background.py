@@ -998,6 +998,27 @@ class BackgroundService:
                 "Verwaiste Löschmarkierungen konnten nicht aufgeräumt werden · "
                 "event=stale_deleted_points_backfill_failed"
             )
+        # Einmalig beim Start: retention.enforce_retention_for_entity() räumte
+        # deleted_points ebenfalls nicht auf, wenn die Aufbewahrung einen
+        # kompletten Archiv-Monat löschte (derselbe Fund, 18.09.2026) — anders
+        # als beim Verdichten gibt es dafür keine Tabelle mit den betroffenen
+        # Monaten, deshalb prüft dieser Lauf direkt gegen die Realität statt
+        # gegen eine Monatsliste (siehe cleanup.remove_deleted_points_with_no_
+        # matching_row()). Idempotent, deckt nebenbei jede andere, noch
+        # unbekannte Ursache für verwaiste Markierungen mit ab.
+        try:
+            removed = cleanup.remove_deleted_points_with_no_matching_row(self.data_dir, self.index, self.tz)
+            if removed:
+                logger.info(
+                    "Löschmarkierungen ohne passende Rohdatenzeile aufgeräumt · "
+                    "event=orphaned_deleted_points_backfill_completed removed=%d",
+                    removed,
+                )
+        except Exception:
+            logger.exception(
+                "Löschmarkierungen ohne passende Rohdatenzeile konnten nicht aufgeräumt werden · "
+                "event=orphaned_deleted_points_backfill_failed"
+            )
         # Einmal vorab, damit die erste Seite nach dem Start nicht 30s lang
         # fälschlich "0 ausstehende Rotationen" meldet — zu diesem Zeitpunkt hält
         # noch niemand Entitäts-Sperren, der Aufruf ist hier ungefährlich.

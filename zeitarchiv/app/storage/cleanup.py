@@ -1381,11 +1381,13 @@ def preview_compact_raw_values(
     return {"rows_before": rows_before, "rows_after": rows_after, "months": len(months)}
 
 
-def _remove_deleted_points_for_month(index: Index, entity_id: str, year: int, month: int, tz: ZoneInfo) -> int:
+def remove_deleted_points_for_month(index: Index, entity_id: str, year: int, month: int, tz: ZoneInfo) -> int:
     """Entfernt alle deleted_points-Markierungen einer Entität, deren
-    Zeitstempel in den angegebenen Kalendermonat fallen — für compact_raw_
-    values() (siehe dort): sobald ein Monat verdichtet ist, existieren seine
-    ursprünglichen Rohzeitstempel nirgends mehr, eine Markierung dafür wäre
+    Zeitstempel in den angegebenen Kalendermonat fallen — für Vorgänge, die
+    einen kompletten Monat ersetzen oder entfernen (compact_raw_values(),
+    siehe dort, sowie retention.enforce_retention_for_entity() für per
+    Aufbewahrung gelöschte Monate): danach existieren die ursprünglichen
+    Rohzeitstempel des Monats nirgends mehr, eine Markierung dafür wäre
     sonst dauerhaft verwaist ("Löschmarkierungen ohne passende
     Rohdatenzeile" in der Bereinigungsvorschau). Auch von
     remove_deleted_points_for_already_compacted_months() genutzt, für Monate,
@@ -1414,8 +1416,59 @@ def remove_deleted_points_for_already_compacted_months(index: Index, tz: ZoneInf
     insgesamt entfernter Markierungen zurück."""
     total = 0
     for row in index.list_all_compacted_months():
-        total += _remove_deleted_points_for_month(index, row["entity_id"], row["year"], row["month"], tz)
+        total += remove_deleted_points_for_month(index, row["entity_id"], row["year"], row["month"], tz)
     return total
+
+
+def remove_deleted_points_with_no_matching_row(
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None
+) -> int:
+    """Einmaliger Nachzieh-Lauf beim Start (siehe background.py
+    BackgroundService.start()): retention.enforce_retention_for_entity()
+    räumte deleted_points bisher nicht auf, wenn die Aufbewahrungsfrist einen
+    kompletten Archiv-Monat löschte (Fund vom 18.09.2026, derselbe Befund wie
+    bei compact_raw_values() oben) — anders als dort gibt es für bereits VOR
+    diesem Fix per Aufbewahrung gelöschte Monate aber keine Tabelle, die
+    festhält, welche Monate das waren. Prüft deshalb stattdessen direkt gegen
+    die Realität, mit derselben Abgleichslogik wie preview_purge() (siehe
+    dort) — nur, dass hier tatsächlich entfernt statt nur gezählt wird, was
+    nirgends mehr eine passende Rohdatenzeile hat. Fängt dadurch nebenbei
+    jede andere, noch unbekannte Ursache für verwaiste Markierungen mit auf.
+    Idempotent: findet bei jedem weiteren Lauf nichts mehr. Gibt die Anzahl
+    insgesamt entfernter Markierungen zurück."""
+    now = now or datetime.now(tz)
+    total_removed = 0
+
+    def consume(timestamps: Iterable[float], remaining: dict[float, int]) -> None:
+        for ts in timestamps:
+            if remaining.get(ts, 0) > 0:
+                remaining[ts] -= 1
+
+    for entity in index.list_entities():
+        entity_id = entity["entity_id"]
+        deleted = index.get_deleted_counts_for_entity(entity_id)
+        if not deleted:
+            continue
+        remaining = dict(deleted)
+
+        hot_file = hot_path(data_dir, entity_id, now.timestamp(), tz)
+        if hot_file.exists():
+            consume((ts for ts, _ in read_rows(hot_file)), remaining)
+
+        archive_dir = entity_dir(data_dir, "archive", entity_id)
+        if archive_dir.exists():
+            remaining_by_month = _group_by_month(remaining, tz)
+            for path in sorted(archive_dir.glob("*.parquet")):
+                if path.stem not in remaining_by_month:
+                    continue
+                table = pq.read_table(path, columns=["ts"])
+                consume(table.column("ts").to_pylist(), remaining)
+
+        orphaned = [ts for ts, count in remaining.items() for _ in range(count)]
+        if orphaned:
+            index.remove_deleted_points(entity_id, orphaned)
+            total_removed += len(orphaned)
+    return total_removed
 
 
 def compact_raw_values(
@@ -1441,7 +1494,7 @@ def compact_raw_values(
     add_raw_value()/purge_*): diese Funktion nimmt selbst keine Sperre.
 
     Räumt außerdem deleted_points-Markierungen im verdichteten Monat auf
-    (siehe _remove_deleted_points_for_month()) — deren ursprüngliche
+    (siehe remove_deleted_points_for_month()) — deren ursprüngliche
     Rohzeitstempel existieren danach nicht mehr, sie blieben sonst dauerhaft
     als "Löschmarkierungen ohne passende Rohdatenzeile" liegen.
 
@@ -1478,7 +1531,7 @@ def compact_raw_values(
         index.add_row_count(entity_id, len(new_rows) - len(rows))
         index.set_compacted_month(entity_id, year, month, target_resolution, now.timestamp())
         months_compacted.append(f"{year:04d}-{month:02d}")
-        stale_markers_removed += _remove_deleted_points_for_month(index, entity_id, year, month, tz)
+        stale_markers_removed += remove_deleted_points_for_month(index, entity_id, year, month, tz)
 
     return {
         "rows_before": rows_before,

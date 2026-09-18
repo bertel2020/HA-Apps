@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 import pyarrow.parquet as pq
 
+from .cleanup import remove_deleted_points_for_month
 from .hotbuffer import hot_path, read_rows
 from .index import Index
 from .paths import entity_dir
@@ -125,13 +126,21 @@ def enforce_retention_for_entity(
 ) -> dict:
     """Löscht archivierte Monate + zugehörige Rollup-Zeilen sowie abgelaufene
     Zeilen im Hot Buffer, die älter als die konfigurierte Aufbewahrungsfrist
-    dieser Entität sind. Gibt eine Zusammenfassung zurück."""
+    dieser Entität sind. Gibt eine Zusammenfassung zurück.
+
+    Räumt dabei auch deleted_points-Markierungen der entfernten Zeitstempel
+    auf (siehe cleanup.remove_deleted_points_for_month(), dasselbe Muster
+    wie bei compact_raw_values()) — sie blieben sonst dauerhaft als
+    "Löschmarkierungen ohne passende Rohdatenzeile" liegen, weil die
+    zugehörige Rohdatenzeile durch die Aufbewahrung unwiederbringlich
+    verschwindet."""
     cutoff_ts = _cutoff_ts(retention, now)
     if cutoff_ts is None:
-        return {"rows_deleted": 0, "bytes_freed": 0, "months_deleted": 0}
+        return {"rows_deleted": 0, "bytes_freed": 0, "months_deleted": 0, "stale_markers_removed": 0}
 
     rows_deleted = 0
     bytes_freed = 0
+    stale_markers_removed = 0
     deleted_months: set[tuple[int, int]] = set()
 
     archive_dir = entity_dir(data_dir, "archive", entity_id)
@@ -148,6 +157,7 @@ def enforce_retention_for_entity(
             bytes_freed += path.stat().st_size
             path.unlink()
             deleted_months.add((year, month))
+            stale_markers_removed += remove_deleted_points_for_month(index, entity_id, year, month, tz)
 
     entity = index.get_entity(entity_id)
     aggregation_type = entity["aggregation_type"] if entity else "standard"
@@ -166,15 +176,24 @@ def enforce_retention_for_entity(
     hot_file = hot_path(data_dir, entity_id, now.timestamp(), tz)
     if hot_file.exists():
         rows = read_rows(hot_file)
-        kept = [(ts, v) for ts, v in rows if ts >= cutoff_ts]
-        expired = len(rows) - len(kept)
-        if expired:
+        expired_rows = [(ts, v) for ts, v in rows if ts < cutoff_ts]
+        if expired_rows:
+            kept = [(ts, v) for ts, v in rows if ts >= cutoff_ts]
             tmp_path = hot_file.with_suffix(".tmp")
             with tmp_path.open("w", encoding="utf-8") as f:
                 for ts, v in kept:
                     f.write(f"{ts},{v}\n")
             tmp_path.replace(hot_file)
-            rows_deleted += expired
+            rows_deleted += len(expired_rows)
+            deleted_counts = index.get_deleted_counts_for_entity(entity_id)
+            if deleted_counts:
+                expired_ts = {ts for ts, _v in expired_rows}
+                matching = [
+                    ts for ts, count in deleted_counts.items() if ts in expired_ts for _ in range(count)
+                ]
+                if matching:
+                    index.remove_deleted_points(entity_id, matching)
+                    stale_markers_removed += len(matching)
 
     if rows_deleted:
         index.add_row_count(entity_id, -rows_deleted)
@@ -183,7 +202,12 @@ def enforce_retention_for_entity(
     if months_deleted:
         _update_first_ts(data_dir, index, entity_id, tz, now)
 
-    return {"rows_deleted": rows_deleted, "bytes_freed": bytes_freed, "months_deleted": months_deleted}
+    return {
+        "rows_deleted": rows_deleted,
+        "bytes_freed": bytes_freed,
+        "months_deleted": months_deleted,
+        "stale_markers_removed": stale_markers_removed,
+    }
 
 
 def enforce_retention_all(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None) -> dict:
@@ -191,7 +215,10 @@ def enforce_retention_all(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
     (retention != "unlimited") — aufgerufen sowohl vom manuellen Anstoß in den
     Einstellungen als auch vom persistenten täglichen Wartungsplaner."""
     now = now or datetime.now(tz)
-    totals = {"rows_deleted": 0, "bytes_freed": 0, "months_deleted": 0, "entities_affected": 0}
+    totals = {
+        "rows_deleted": 0, "bytes_freed": 0, "months_deleted": 0,
+        "entities_affected": 0, "stale_markers_removed": 0,
+    }
     for entity in index.list_entities():
         retention = entity["retention"]
         if retention == "unlimited":
@@ -202,6 +229,7 @@ def enforce_retention_all(data_dir: Path, index: Index, tz: ZoneInfo, now: datet
         totals["rows_deleted"] += result["rows_deleted"]
         totals["bytes_freed"] += result["bytes_freed"]
         totals["months_deleted"] += result["months_deleted"]
+        totals["stale_markers_removed"] += result["stale_markers_removed"]
     return totals
 
 

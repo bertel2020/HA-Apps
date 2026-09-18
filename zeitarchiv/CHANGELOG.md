@@ -73,6 +73,14 @@
   „Rohdaten" gesperrt (Auswahlfeld im Formular deaktiviert). Duplikate
   (unveränderter Zustand) filtert weiterhin unabhängig davon der
   Wertänderungsfilter.
+- Aufbewahrung: löschte beim endgültigen Entfernen eines abgelaufenen
+  Archiv-Monats dessen Löschmarkierungen nicht mit — eine bereits als
+  gelöscht markierte Zeile, deren Monat komplett wegfiel, blieb dadurch
+  dauerhaft als „Löschmarkierung ohne passende Rohdatenzeile" liegen
+  (derselbe Fund wie beim Verdichten oben, hier aber schon länger
+  bestehend, weil die betroffene Rohdatenzeile durch die Aufbewahrung
+  ebenso unwiederbringlich verschwindet). Ein einmaliger Nachzieh-Lauf beim
+  nächsten Start räumt auch den bereits vorhandenen Bestand auf.
 
 ## 0.97.0 - 2026-09-16
 

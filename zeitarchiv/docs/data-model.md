@@ -145,8 +145,9 @@ zwei identischen Zeitstempeln lässt sich so gezielt nur einmal entfernen).
   (`older_than`-Parameter, bezogen auf `deleted_points.deleted_at` statt
   auf den Zeitpunkt des Datenpunkts selbst — ein Sicherheitsfenster, damit
   „Rückgängig" eine gerade erst markierte Charge noch zurückholen kann).
-- **Verdichten** entfernt Markierungen ebenfalls, als Nebeneffekt einer
-  Auflösungsänderung statt eines expliziten Löschvorgangs — siehe unten.
+- **Verdichten** und **Aufbewahrung** entfernen Markierungen ebenfalls, als
+  Nebeneffekt einer Auflösungsänderung bzw. einer Monats-Löschung statt
+  eines expliziten Löschvorgangs — siehe unten.
 
 ## Verdichten (rückwirkende Kompaktierung archivierter Monate)
 
@@ -181,6 +182,21 @@ wodurch Rollup-Zeilen anhand ihres `bucket_start` konsistent mitentfernt
 werden können, ohne einen riskanten Parquet-Rewrite. Entitäten mit
 Aufbewahrung `unlimited` sind von jeder automatischen Durchsetzung
 ausgenommen.
+
+Ein gelöschter Monat kann trotzdem bereits markierte (aber noch nicht
+purgte) Zeilen enthalten haben — `enforce_retention_for_entity()` entfernt
+deshalb dieselben `deleted_points`-Markierungen mit
+(`cleanup.remove_deleted_points_for_month()`, dasselbe Muster wie beim
+Verdichten oben), sowohl für komplett gelöschte Archiv-Monate als auch für
+per Aufbewahrung abgelaufene Zeilen im laufenden Hot-Buffer-Monat. Anders
+als beim Verdichten gibt es für bereits VOR diesem Fix per Aufbewahrung
+gelöschte Monate keine Tabelle, die festhält, welche das waren — der
+einmalige Nachzieh-Lauf beim App-Start
+(`cleanup.remove_deleted_points_with_no_matching_row()`) prüft deshalb
+direkt gegen die Realität (Hot Buffer + noch vorhandene Archiv-Monate,
+dieselbe Abgleichslogik wie `preview_purge()`) statt gegen eine Monatsliste
+— und deckt dadurch auch jede andere, noch unbekannte Ursache für verwaiste
+Markierungen mit ab.
 
 ## SQLite-Schema (`index.sqlite`)
 

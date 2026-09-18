@@ -142,8 +142,75 @@ def test_enforce_retention_skips_unlimited_retention() -> None:
         now = datetime(2024, 8, 15, tzinfo=TZ)
         result = retention.enforce_retention_for_entity(tmp, index, entity_id, "unlimited", TZ, now)
 
-        assert result == {"rows_deleted": 0, "bytes_freed": 0, "months_deleted": 0}
+        assert result == {
+            "rows_deleted": 0, "bytes_freed": 0, "months_deleted": 0, "stale_markers_removed": 0,
+        }
         assert old_path.exists()
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_enforce_retention_removes_stale_markers_of_the_deleted_archive_month() -> None:
+    """Fund vom 18.09.2026 (siehe test_cleanup.py, dasselbe Muster für
+    compact_raw_values()): eine Löschmarkierung für einen Zeitstempel, dessen
+    kompletter Archiv-Monat per Aufbewahrung gelöscht wird, existiert danach
+    für keine Rohdatenzeile mehr — enforce_retention_for_entity() muss sie
+    deshalb selbst aufräumen, sonst bliebe sie für immer als "Löschmarkierung
+    ohne passende Rohdatenzeile" liegen. Eine Markierung in einem NICHT
+    gelöschten Monat bleibt dagegen unangetastet."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-retention-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        old_ts = _ts(2024, 1, 10, 8)
+        _write_archive_month(tmp, entity_id, 2024, 1, [(old_ts, 1.0)])
+        recent_ts = _ts(2024, 7, 10, 8)
+        _write_archive_month(tmp, entity_id, 2024, 7, [(recent_ts, 2.0)])
+        index.add_row_count(entity_id, 2)
+        index.mark_deleted(entity_id, [old_ts, recent_ts])
+        assert index.get_deleted_points_count() == 2
+
+        now = datetime(2024, 8, 15, tzinfo=TZ)
+        result = retention.enforce_retention_for_entity(tmp, index, entity_id, "30d", TZ, now)
+
+        assert result["stale_markers_removed"] == 1
+        remaining = index.get_deleted_counts_for_entity(entity_id)
+        assert old_ts not in remaining
+        assert remaining.get(recent_ts) == 1
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_enforce_retention_removes_stale_markers_of_expired_hot_buffer_rows() -> None:
+    """Wie oben, aber für den seltenen Fall, dass die Aufbewahrungsfrist schon
+    mitten in den laufenden (Hot-Buffer-)Monat hineinreicht."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-retention-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+
+        now = datetime(2024, 8, 31, 23, 59, tzinfo=TZ)
+        expired_ts = _ts(2024, 8, 1, 0, 0)
+        kept_ts = _ts(2024, 8, 20, 0, 0)
+        hotbuffer.append(tmp, entity_id, expired_ts, 1.0, TZ)
+        hotbuffer.append(tmp, entity_id, kept_ts, 2.0, TZ)
+        index.add_row_count(entity_id, 2)
+        index.mark_deleted(entity_id, [expired_ts, kept_ts])
+        assert index.get_deleted_points_count() == 2
+
+        result = retention.enforce_retention_for_entity(tmp, index, entity_id, "30d", TZ, now)
+
+        assert result["stale_markers_removed"] == 1
+        remaining = index.get_deleted_counts_for_entity(entity_id)
+        assert expired_ts not in remaining
+        assert remaining.get(kept_ts) == 1
 
         index.close()
     finally:
@@ -200,7 +267,11 @@ def test_preview_matches_enforcement_without_deleting_files() -> None:
         assert index.get_entity(entity_id)["row_count"] == 2
 
         actual = retention.enforce_retention_all(tmp, index, TZ, now=now)
-        assert actual == preview
+        # stale_markers_removed hat preview_retention_all() nicht (siehe
+        # preview_compact_raw_values() als Präzedenzfall: Vorschauen zeigen
+        # bewusst keine Aufräum-Nebeneffekte) — hier ohnehin 0, da nichts
+        # markiert wurde.
+        assert actual == {**preview, "stale_markers_removed": 0}
         assert not old_path.exists()
         index.close()
     finally:

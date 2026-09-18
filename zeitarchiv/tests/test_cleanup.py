@@ -516,6 +516,48 @@ def test_preview_purge_reports_hot_archive_and_missing_without_changes() -> None
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_remove_deleted_points_with_no_matching_row_cleans_up_only_orphans() -> None:
+    """Fund vom 18.09.2026: retention.enforce_retention_for_entity() räumte
+    deleted_points bisher nicht auf, wenn die Aufbewahrung einen kompletten
+    Archiv-Monat löschte — für bereits VOR diesem Fix so entstandene
+    Markierungen gibt es (anders als bei compact_raw_values(), siehe
+    compacted_months oben) keine Tabelle, die festhält, welche Monate das
+    waren. Dieser Nachzieh-Lauf prüft deshalb direkt gegen die Realität und
+    entfernt nur, was nirgends mehr eine passende Rohdatenzeile hat — eine
+    noch nicht purgte Markierung in Hot Buffer oder Archiv bleibt
+    unangetastet."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+        now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+        hot_ts = _ts(2024, 8, 10, 8)
+        archive_ts = _ts(2024, 7, 5, 8)
+        orphaned_ts = _ts(2024, 6, 1, 8)  # z. B. per Aufbewahrung gelöschter Monat
+
+        hotbuffer.append(tmp, entity_id, hot_ts, 21.0, TZ)
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        pq.write_table(
+            pa.table({"ts": [archive_ts], "value": [19.5]}), archive_dir / "2024-07.parquet"
+        )
+        cleanup.soft_delete(index, entity_id, [hot_ts, archive_ts, orphaned_ts])
+        assert index.get_deleted_points_count() == 3
+
+        removed_first = cleanup.remove_deleted_points_with_no_matching_row(tmp, index, TZ, now=now)
+        assert removed_first == 1
+        remaining = index.get_deleted_counts_for_entity(entity_id)
+        assert remaining == {hot_ts: 1, archive_ts: 1}
+
+        removed_second = cleanup.remove_deleted_points_with_no_matching_row(tmp, index, TZ, now=now)
+        assert removed_second == 0  # idempotent, nichts mehr zu tun
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_preview_purge_does_not_open_archive_months_without_marked_rows(monkeypatch) -> None:
     """ZP-005 (PERFORMANCE.md): ein Archiv-Monat ohne markierte Zeitstempel
     darf in der Vorschau nicht geöffnet/gelesen werden, auch wenn andere
