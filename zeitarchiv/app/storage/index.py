@@ -749,7 +749,7 @@ class Index:
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._read_local = threading.local()
-        self._read_conns: list[sqlite3.Connection] = []
+        self._read_conns: list[tuple[threading.Thread, sqlite3.Connection]] = []
         self._read_conns_registry_lock = threading.Lock()
         # Phase 1 von ROADMAP.md 1.14 (Index/Storage-Lock-Umbau): WAL statt
         # des SQLite-Standard-Rollback-Journals — Leser blockieren Schreiber
@@ -796,7 +796,19 @@ class Index:
             conn.row_factory = sqlite3.Row
             self._read_local.conn = conn
             with self._read_conns_registry_lock:
-                self._read_conns.append(conn)
+                # The anyio thread pool retires idle workers after 10 s, so
+                # threads come and go all the time. Close the connections of
+                # threads that no longer exist; otherwise the registry keeps
+                # them alive and each one holds two file descriptors
+                # (index.sqlite + -wal) until the process runs out of them.
+                alive = []
+                for thread, stale in self._read_conns:
+                    if thread.is_alive():
+                        alive.append((thread, stale))
+                    else:
+                        stale.close()
+                alive.append((threading.current_thread(), conn))
+                self._read_conns = alive
         return conn
 
     def _migrate(self) -> None:
@@ -3805,6 +3817,6 @@ class Index:
         # mitschließen — sonst blieben sie als offene Dateihandles auf
         # index.sqlite zurück, unsichtbar für den Aufrufer dieser Methode.
         with self._read_conns_registry_lock:
-            for conn in self._read_conns:
+            for _thread, conn in self._read_conns:
                 conn.close()
             self._read_conns.clear()
