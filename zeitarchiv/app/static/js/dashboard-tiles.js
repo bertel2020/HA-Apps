@@ -1064,13 +1064,27 @@
   // hier genauso wie in der vollen Ansicht.
   async function renderTableTile(el) {
     // Ausgeblendete Spalten/Zeilen (Tabelleneditor, col.hidden/row.hidden)
-    // fliegen hier raus — dieselbe Regel wie in table_editor.html: nicht
-    // gerendert, aber weiterhin Teil der Berechnung (computeValues()
-    // bekommt hier ohnehin nur den bereits gekürzten Ausschnitt, siehe
-    // TableCompute.computeValues()-Kommentar dort zur Formel-Buchstaben-
-    // Einschränkung auf die Kachel).
+    // werden nicht gerendert, bleiben aber Teil der Berechnung — dieselbe
+    // Regel wie in table_editor.html. computeValues() bekommt deshalb ALLE
+    // Zeilen, sonst verschieben sich die Formel-Buchstaben und eine Formel,
+    // die auf eine ausgeblendete Zeile zeigt, liefert "Fehler". Damit die
+    // Kachel trotzdem nur abfragt, was sie braucht, verlieren ausgeblendete
+    // Entität-/Gruppenzeilen, die keine Formel referenziert, ihre entity_ids
+    // (Buchstabe bleibt, kein Request). Erst danach werden die sichtbaren
+    // Zeilen herausgezogen.
     const visibleCols = JSON.parse(el.dataset.columns || '[]').filter(c => !c.hidden);
-    const visibleRows = JSON.parse(el.dataset.rows || '[]').filter(r => !r.hidden);
+    const allRows = JSON.parse(el.dataset.rows || '[]');
+    const rowLetters = TableCompute.rowLetters(allRows);
+    const referencedLetters = new Set(allRows
+      .filter(r => r.row_type === 'formula')
+      .flatMap(r => (r.formula || '').toUpperCase().match(/[A-Z]/g) || []));
+    const computeRows = allRows.map((r, i) => (
+      r.hidden && (r.row_type === 'entity' || r.row_type === 'group') && !referencedLetters.has(rowLetters[i])
+        ? {...r, entity_ids: []}
+        : r
+    ));
+    const visibleRowIndexes = allRows.map((r, i) => (r.hidden ? -1 : i)).filter(i => i >= 0);
+    const visibleRows = visibleRowIndexes.map(i => allRows[i]);
     const style = JSON.parse(el.dataset.style || '{}');
     const previewEl = el.querySelector('.dtile-table-preview');
     if (!previewEl) return;
@@ -1082,7 +1096,8 @@
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
     let values, windowStarts, windowEnds, isCurrent, elapsedSeconds;
     try {
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, visibleRows));
+      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, computeRows));
+      values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
       return;
