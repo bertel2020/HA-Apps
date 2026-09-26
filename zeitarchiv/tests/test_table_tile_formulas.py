@@ -1,9 +1,10 @@
-"""Regression tests for hidden rows in the dashboard table tile."""
+"""Regression tests for formula rows and hidden rows in the dashboard table tile."""
 
 
 from _paths import APP
 
 
+COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 
 
@@ -22,3 +23,8 @@ def test_tile_sections_include_hidden_rows_like_the_editor() -> None:
     # table_editor.js iterate this.rows without a visibility filter).
     assert "allValues[ci] && allValues[ci][j]" in DASHBOARD
     assert "visibleRows[j].row_type" not in DASHBOARD
+
+
+def test_division_by_zero_yields_no_value_instead_of_error() -> None:
+    assert "if (!Number.isFinite(result)) return null;" in COMPUTE
+    assert "throw new Error('Ergebnis ist nicht endlich" not in COMPUTE
