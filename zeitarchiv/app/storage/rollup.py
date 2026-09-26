@@ -55,21 +55,22 @@ def _month_str(year: int, month: int) -> str:
     return f"{year:04d}-{month:02d}"
 
 
-def _prev_month(year: int, month: int) -> tuple[int, int]:
-    return (year - 1, 12) if month == 1 else (year, month - 1)
-
-
 def last_value_before_month(data_dir: Path, entity_id: str, year: int, month: int) -> float | None:
-    """Letzter Rohwert der unmittelbar vorherigen Archiv-Monatsdatei — Referenzwert
-    für die Zähler-Delta-Berechnung am Monatsanfang (Konzept Abschnitt 05)."""
-    prev_year, prev_month = _prev_month(year, month)
-    path = entity_dir(data_dir, "archive", entity_id) / f"{_month_str(prev_year, prev_month)}.parquet"
-    if not path.exists():
+    """Last raw value of the most recent archive month file before ``year-month``,
+    the reference value for the counter delta at the start of the month (concept
+    section 05). Searches backwards past months without any file, so the first
+    increase after a quiet month is not lost (same rule as query._boundary_value)."""
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+    if not archive_dir.exists():
         return None
-    table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
-    if table.num_rows == 0:
-        return None
-    return table.column("value")[-1].as_py()
+    target = _month_str(year, month)
+    for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
+        if path.stem >= target:
+            continue
+        table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
+        if table.num_rows:
+            return table.column("value")[-1].as_py()
+    return None
 
 
 def _bucket_key(ts: float, tz: ZoneInfo, level: str) -> datetime:
