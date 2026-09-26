@@ -4,6 +4,7 @@
 from _paths import APP
 
 
+COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
 DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
 
 
@@ -22,3 +23,7 @@ def test_tile_still_skips_queries_for_unreferenced_hidden_rows() -> None:
     assert "!referencedLetters.has(rowLetters[i])" in DASHBOARD
     assert "? {...r, entity_ids: []}" in DASHBOARD
 
+
+def test_division_by_zero_yields_no_value_instead_of_error() -> None:
+    assert "if (!Number.isFinite(result)) return null;" in COMPUTE
+    assert "throw new Error('Ergebnis ist nicht endlich" not in COMPUTE

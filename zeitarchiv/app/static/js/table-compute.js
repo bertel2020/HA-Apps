@@ -68,7 +68,10 @@ window.TableCompute = (() => {
     }
     const result = parseExpr();
     if (pos < s.length) throw new Error('Unerwarteter Rest in der Formel');
-    if (!Number.isFinite(result)) throw new Error('Ergebnis ist nicht endlich (z. B. Division durch 0)');
+    // Division durch 0 (auch 0 / 0) ist kein Fehler in der Formel, sondern
+    // eine Periode ohne Bezugsgröße (z. B. "km / Einheiten" in einem Monat
+    // ohne Einheit) — deshalb kein Wert ("–") statt "Fehler".
+    if (!Number.isFinite(result)) return null;
     return result;
   }
 
