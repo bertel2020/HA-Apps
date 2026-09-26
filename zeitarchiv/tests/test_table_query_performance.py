@@ -183,7 +183,11 @@ def test_fixed_tooltip_script_loaded_wherever_data_tooltip_fixed_is_used() -> No
 
 
 def test_dashboard_only_computes_visible_table_slice() -> None:
-    assert "computeValues(base, visibleCols, visibleRows)" in DASHBOARD
+    # Hidden rows stay in the computation (formula letters), but hidden
+    # entity/group rows that no formula references carry no entity_ids, so
+    # they cause no query. See test_table_tile_formulas.py.
+    assert "computeValues(base, visibleCols, computeRows)" in DASHBOARD
+    assert "? {...r, entity_ids: []}" in DASHBOARD
 
 
 # --- Rollup-Cache für grobe Stufen (PERFORMANCE.md, ZP-008) -----------------
