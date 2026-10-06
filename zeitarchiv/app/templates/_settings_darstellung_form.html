@@ -2,6 +2,23 @@
 <div class="settings-compact-list">
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _('Sprache') }} {{ hint_button(_('Sprache')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _('Sprache der Oberfläche. Noch nicht alle Seiten sind übersetzt; was fehlt, erscheint auf Deutsch.') }}{% endcall %}
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="language-btn" onclick="toggleDDPicker('language')">{% for k, l in language_options %}{% if k == language_setting %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      {# Eigene Route statt /settings/darstellung: sie lädt die Seite neu (HX-Refresh), weil sich alle Texte ändern. #}
+      <input type="hidden" name="language" id="language-input" value="{{ language_setting }}"
+             hx-post="settings/language" hx-trigger="change" hx-swap="none">
+      <div class="dd-picker-popover" id="language-popover">
+        {% for key, label in language_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('language', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">Startseite {{ hint_button('Startseite') }}</div>
       {% call hint_body('settings-compact-hint') %}Erste Seite beim Öffnen, z. B. über die HA-Sidebar{% endcall %}
     </div>

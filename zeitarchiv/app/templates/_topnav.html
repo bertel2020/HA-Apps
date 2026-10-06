@@ -98,15 +98,15 @@
     </a>
 
     <nav class="topnav-links">
-      <a class="topnav-link{{ ' is-active' if nav_home }}" href="{{ app_root }}/uebersicht">{{ nav_icon('home') }}Übersicht</a>
+      <a class="topnav-link{{ ' is-active' if nav_home }}" href="{{ app_root }}/uebersicht">{{ nav_icon('home') }}{{ _("Übersicht") }}</a>
       <div class="topnav-system{{ ' is-active' if nav_dashboards }}" @click.outside="dashboardsOpen = false">
         <button type="button" class="topnav-system-btn" @click="dashboardsOpen = !dashboardsOpen" :aria-expanded="dashboardsOpen.toString()">
-          {{ nav_icon('dashboards') }}Dashboards{{ nav_chevron() }}
+          {{ nav_icon('dashboards') }}{{ _("Dashboards") }}{{ nav_chevron() }}
         </button>
         <div class="topnav-menu topnav-menu-dashboards" x-show="dashboardsOpen" x-cloak @click="dashboardsOpen = false">
-          <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}Alle Dashboards</a>
+          <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}{{ _("Alle Dashboards") }}</a>
           {% if nav_energiedashboard_enabled %}
-          <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}Energiedashboard</a>
+          <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}{{ _("Energiedashboard") }}</a>
           {% endif %}
           {% if nav_dashboards_list %}
           <div class="topnav-menu-divider"></div>
@@ -117,22 +117,22 @@
           {% endif %}
         </div>
       </div>
-      <a class="topnav-link{{ ' is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}Entitäten</a>
-      <a class="topnav-link{{ ' is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}Charts</a>
-      <a class="topnav-link{{ ' is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}Tabellen</a>
+      <a class="topnav-link{{ ' is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}{{ _("Entitäten") }}</a>
+      <a class="topnav-link{{ ' is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}{{ _("Charts") }}</a>
+      <a class="topnav-link{{ ' is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}{{ _("Tabellen") }}</a>
       <div class="topnav-system{{ ' is-active' if nav_system }}" @click.outside="systemOpen = false">
         <button type="button" class="topnav-system-btn" @click="systemOpen = !systemOpen" :aria-expanded="systemOpen.toString()">
-          {{ nav_icon('system') }}System{{ nav_chevron() }}
+          {{ nav_icon('system') }}{{ _("System") }}{{ nav_chevron() }}
         </button>
         <div class="topnav-menu" x-show="systemOpen" x-cloak @click="systemOpen = false">
-          <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ nav_icon('statistik') }}Statistik</a>
-          <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">{{ nav_icon('housekeeping') }}Housekeeping</a>
-          <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ nav_icon('import') }}Import</a>
-          <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ nav_icon('export') }}Export</a>
-          <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ nav_icon('backup') }}Backup / Restore</a>
-          <a class="{{ 'is-active' if nav_logs }}" href="{{ app_root }}/logs">{{ nav_icon('logs') }}Protokoll</a>
+          <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ nav_icon('statistik') }}{{ _("Statistik") }}</a>
+          <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">{{ nav_icon('housekeeping') }}{{ _("Housekeeping") }}</a>
+          <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ nav_icon('import') }}{{ _("Import") }}</a>
+          <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ nav_icon('export') }}{{ _("Export") }}</a>
+          <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ nav_icon('backup') }}{{ _("Backup / Restore") }}</a>
+          <a class="{{ 'is-active' if nav_logs }}" href="{{ app_root }}/logs">{{ nav_icon('logs') }}{{ _("Protokoll") }}</a>
           <div class="topnav-menu-divider"></div>
-          <a class="{{ 'is-active' if nav_settings }}" href="{{ app_root }}/settings">{{ nav_icon('settings') }}Einstellungen</a>
+          <a class="{{ 'is-active' if nav_settings }}" href="{{ app_root }}/settings">{{ nav_icon('settings') }}{{ _("Einstellungen") }}</a>
         </div>
       </div>
     </nav>
@@ -155,7 +155,7 @@
          Screenreader nichts, egal wie deutlich es aussieht. #}
       <button type="button" class="notice-btn{{ ' is-open' if noticesOpen }}" @click="noticesOpen = !noticesOpen"
               :aria-expanded="noticesOpen.toString()" aria-haspopup="true"
-              aria-label="Meldungen{% if activity %} — {{ activity | length }} {{ 'Vorgang läuft' if activity | length == 1 else 'Vorgänge laufen' }}{% endif %}">
+              aria-label="{{ _('Meldungen') }}{% if activity %} — {{ activity | length }} {{ _('Vorgang läuft') if activity | length == 1 else _('Vorgänge laufen') }}{% endif %}">
         {% if activity %}<span class="notice-badge is-activity">{{ activity | length if activity | length > 1 else '' }}</span>{% endif %}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         {% if notices %}<span class="notice-badge">{{ notices | length if notices | length <= 9 else '9+' }}</span>{% endif %}
@@ -289,7 +289,7 @@
       }
     </script>
 
-    <button type="button" class="topnav-burger" @click="drawerOpen = true" aria-label="Menü öffnen">
+    <button type="button" class="topnav-burger" @click="drawerOpen = true" aria-label="{{ _('Menü öffnen') }}">
       {{ nav_icon('menu') }}
     </button>
   </div>
@@ -298,39 +298,39 @@
   <div class="topnav-drawer" :class="{ 'is-open': drawerOpen }" x-cloak>
     <div class="topnav-drawer-head">
       <span>Zeitarchiv</span>
-      <button type="button" class="topnav-drawer-close" @click="drawerOpen = false" aria-label="Menü schließen">{{ nav_icon('x') }}</button>
+      <button type="button" class="topnav-drawer-close" @click="drawerOpen = false" aria-label="{{ _('Menü schließen') }}">{{ nav_icon('x') }}</button>
     </div>
     <nav>
-      <a class="{{ 'is-active' if nav_home }}" href="{{ app_root }}/uebersicht">{{ nav_icon('home') }}Übersicht</a>
+      <a class="{{ 'is-active' if nav_home }}" href="{{ app_root }}/uebersicht">{{ nav_icon('home') }}{{ _("Übersicht") }}</a>
       <button type="button" class="topnav-drawer-system-btn{{ ' is-active' if nav_dashboards }}" @click="drawerDashboardsOpen = !drawerDashboardsOpen" :aria-expanded="drawerDashboardsOpen.toString()">
-        <span class="topnav-drawer-system-label">{{ nav_icon('dashboards') }}Dashboards</span>
+        <span class="topnav-drawer-system-label">{{ nav_icon('dashboards') }}{{ _("Dashboards") }}</span>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" :class="{ 'is-open': drawerDashboardsOpen }" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
       </button>
       <div class="topnav-drawer-sub" x-show="drawerDashboardsOpen">
-        <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">Alle Dashboards</a>
+        <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ _("Alle Dashboards") }}</a>
         {% if nav_energiedashboard_enabled %}
-        <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}Energiedashboard</a>
+        <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}{{ _("Energiedashboard") }}</a>
         {% endif %}
         {% for d in nav_dashboards_list %}
         {% set d_path = '/dashboards/' ~ d.id|string %}
         <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ d.name }}</a>
         {% endfor %}
       </div>
-      <a class="{{ 'is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}Entitäten</a>
-      <a class="{{ 'is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}Charts</a>
-      <a class="{{ 'is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}Tabellen</a>
+      <a class="{{ 'is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}{{ _("Entitäten") }}</a>
+      <a class="{{ 'is-active' if nav_charts }}" href="{{ app_root }}/charts">{{ nav_icon('charts') }}{{ _("Charts") }}</a>
+      <a class="{{ 'is-active' if nav_tables }}" href="{{ app_root }}/tables">{{ nav_icon('tables') }}{{ _("Tabellen") }}</a>
       <button type="button" class="topnav-drawer-system-btn{{ ' is-active' if nav_system }}" @click="drawerSystemOpen = !drawerSystemOpen" :aria-expanded="drawerSystemOpen.toString()">
-        <span class="topnav-drawer-system-label">{{ nav_icon('system') }}System</span>
+        <span class="topnav-drawer-system-label">{{ nav_icon('system') }}{{ _("System") }}</span>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" :class="{ 'is-open': drawerSystemOpen }" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
       </button>
       <div class="topnav-drawer-sub" x-show="drawerSystemOpen">
-        <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">Statistik</a>
-        <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">Housekeeping</a>
-        <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">Import</a>
-        <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">Export</a>
-        <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">Backup / Restore</a>
-        <a class="{{ 'is-active' if nav_logs }}" href="{{ app_root }}/logs">Protokoll</a>
-        <a class="{{ 'is-active' if nav_settings }}" href="{{ app_root }}/settings">Einstellungen</a>
+        <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ _("Statistik") }}</a>
+        <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">{{ _("Housekeeping") }}</a>
+        <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ _("Import") }}</a>
+        <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ _("Export") }}</a>
+        <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ _("Backup / Restore") }}</a>
+        <a class="{{ 'is-active' if nav_logs }}" href="{{ app_root }}/logs">{{ _("Protokoll") }}</a>
+        <a class="{{ 'is-active' if nav_settings }}" href="{{ app_root }}/settings">{{ _("Einstellungen") }}</a>
       </div>
     </nav>
   </div>

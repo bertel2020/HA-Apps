@@ -1,0 +1,36 @@
+{
+  "app": {
+    "Übersicht": "Overview",
+    "Dashboards": "Dashboards",
+    "Alle Dashboards": "All dashboards",
+    "Energiedashboard": "Energy dashboard",
+    "Entitäten": "Entities",
+    "Charts": "Charts",
+    "Tabellen": "Tables",
+    "System": "System",
+    "Statistik": "Statistics",
+    "Housekeeping": "Housekeeping",
+    "Import": "Import",
+    "Export": "Export",
+    "Backup / Restore": "Backup / Restore",
+    "Protokoll": "Log",
+    "Einstellungen": "Settings",
+    "Menü öffnen": "Open menu",
+    "Menü schließen": "Close menu",
+    "Meldungen": "Notices",
+    "Vorgang läuft": "task running",
+    "Vorgänge laufen": "tasks running",
+    "Vorgang": "task",
+    "Vorgänge": "tasks",
+    "Läuft gerade": "Running now",
+    "{done} von {total}": "{done} of {total}",
+    "Sprache": "Language",
+    "Sprache der Oberfläche. Noch nicht alle Seiten sind übersetzt; was fehlt, erscheint auf Deutsch.": "Language of the interface. Not all pages are translated yet; anything missing appears in German.",
+    "Automatisch (Browser)": "Automatic (browser)"
+  },
+  "js": {
+    "Meldungen": "Notices",
+    "Vorgang läuft": "task running",
+    "Vorgänge laufen": "tasks running"
+  }
+}

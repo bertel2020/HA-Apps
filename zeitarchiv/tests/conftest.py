@@ -22,6 +22,23 @@ import _paths  # noqa: F401
 _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="zeitarchiv-pytest-"))
 os.environ.setdefault("ZEITARCHIV_DATA_DIR", str(_TEST_DATA_DIR))
 
+# Mehrere Tests rendern Templates mit einer eigenen, nackten jinja2.Environment
+# (ohne die App). Seit die Templates `_("…")` für die Übersetzung nutzen, brauchen
+# auch sie diese Funktion — hier einmal für alle, statt in jedem Test.
+import jinja2  # noqa: E402
+
+from app import i18n  # noqa: E402
+
+_environment_init = jinja2.Environment.__init__
+
+
+def _environment_with_gettext(self, *args, **kwargs):
+    _environment_init(self, *args, **kwargs)
+    self.globals.setdefault("_", i18n._gettext)
+
+
+jinja2.Environment.__init__ = _environment_with_gettext
+
 # Erst NACH os.environ.setdefault oben — siehe Modul-Docstring.
 import pytest  # noqa: E402
 from starlette.testclient import TestClient  # noqa: E402

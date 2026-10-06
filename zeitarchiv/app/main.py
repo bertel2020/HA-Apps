@@ -83,7 +83,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
-from . import demo_mode
+from . import demo_mode, i18n
 from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
@@ -388,8 +388,10 @@ def _notices_context(request: Request) -> dict:
 app = FastAPI(title="Zeitarchiv")
 templates = Jinja2Templates(
     directory=str(APP_DIR / "templates"),
-    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context],
+    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context, i18n.make_context_processor(lambda: index)],
 )
+i18n.install(templates)
+app.include_router(i18n.make_router(lambda: index))
 
 
 class RequestLoggingMiddleware:

@@ -112,7 +112,12 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Wieder neue Nutzer-Funktionalität, kein schleichendes Wachstum an schon
     # bekannter Stelle. main.py wuchs von 5.555 auf 5.673 — Schwelle nach
     # "Ist-Stand plus kleiner Puffer": 5.730 gegen die heutigen 5.673.
-    assert len(main.splitlines()) < 5_730
+    #
+    # Am 6. Oktober 2026 auf 5.740 angehoben — Mehrsprachigkeit (Roadmap 1.21):
+    # main.py bekam nur die Anbindung (Import, Kontextprozessor, Jinja-Funktion
+    # `_()`, Sprach-Route = 2 neue Zeilen); die Logik liegt in app/i18n/. Ist-Stand
+    # 5.731.
+    assert len(main.splitlines()) < 5_740
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:
