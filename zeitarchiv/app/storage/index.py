@@ -292,6 +292,10 @@ CREATE TABLE IF NOT EXISTS entities (
     value_filter TEXT NOT NULL DEFAULT 'off',
     gap_threshold TEXT NOT NULL DEFAULT '15',
     outlier_threshold TEXT NOT NULL DEFAULT '50',
+    counter_decreases TEXT NOT NULL DEFAULT 'report',
+    counter_auto_mark INTEGER NOT NULL DEFAULT 0,
+    counter_auto_since REAL,
+    counter_auto_halted_at REAL,
     unit TEXT,
     state_class TEXT,
     friendly_name TEXT,
@@ -316,6 +320,13 @@ CREATE TABLE IF NOT EXISTS entities (
 -- einem Duplikat (zwei Rohwerte mit exakt demselben Zeitstempel) muss sich
 -- gezielt nur eines der beiden Vorkommen entfernen lassen, ohne das andere
 -- gleich mit zu löschen.
+-- Zeitstempel, die bei einem Zähler mit Regel „Fehlwerte automatisch markieren“ zurückgenommen wurden:
+-- sie gelten als bewusst behalten und werden von der Regel nicht erneut markiert (counter_auto.py).
+CREATE TABLE IF NOT EXISTS counter_mark_ignored (
+    entity_id TEXT NOT NULL,
+    ts REAL NOT NULL,
+    PRIMARY KEY (entity_id, ts)
+);
 CREATE TABLE IF NOT EXISTS deleted_points (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_id TEXT NOT NULL,
@@ -836,6 +847,17 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN gap_threshold TEXT NOT NULL DEFAULT '15'")
         if "outlier_threshold" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN outlier_threshold TEXT NOT NULL DEFAULT '50'")
+        if "counter_decreases" not in columns:
+            # "report" = Rückgänge eines Zählers werden markiert/gemeldet (Standard),
+            # "allow" = der Zähler setzt sich planmäßig zurück (siehe counter_bulk.py).
+            self._conn.execute("ALTER TABLE entities ADD COLUMN counter_decreases TEXT NOT NULL DEFAULT 'report'")
+        for column, ddl in (
+            ("counter_auto_mark", "INTEGER NOT NULL DEFAULT 0"),
+            ("counter_auto_since", "REAL"),
+            ("counter_auto_halted_at", "REAL"),
+        ):
+            if column not in columns:
+                self._conn.execute(f"ALTER TABLE entities ADD COLUMN {column} {ddl}")
         if "is_favorite" not in columns:
             # Favoriten (Konzept-Erweiterung) — Entitäten lassen sich markieren,
             # um sie in der Übersicht/Liste immer oben zu finden.
@@ -2732,6 +2754,36 @@ class Index:
             self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (pin_id, pin_id))
             return pin_id
 
+    def pin_cleanup_to_dashboard(self, dashboard_id: int) -> int | None:
+        """Heftet die Kachel „Bereinigung“ an (cleanup_tile.py) — höchstens eine je Dashboard. Gibt die
+        Pin-ID zurück, bei einer schon vorhandenen deren ID, oder None, wenn DASHBOARD_TILE_LIMIT erreicht
+        ist. Wie bei Werte-Kacheln trägt item_id die eigene Zeilen-ID, damit Umsortieren sie findet."""
+        with self._lock, self._conn:
+            existing = self._conn.execute(
+                "SELECT item_id FROM dashboard_pins WHERE dashboard_id = ? AND item_type = 'cleanup'", (dashboard_id,)
+            ).fetchone()
+            if existing:
+                return existing["item_id"]
+            count = self._conn.execute(
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'", (dashboard_id,)
+            ).fetchone()[0]
+            if count >= self.DASHBOARD_TILE_LIMIT:
+                return None
+            max_pos = self._conn.execute(
+                "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
+            cursor = self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, grid_cols, grid_rows) "
+                "VALUES (?, 'cleanup', 0, ?, 2, 1)",
+                (dashboard_id, (max_pos or 0) + 1),
+            )
+            self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (cursor.lastrowid, cursor.lastrowid))
+            return cursor.lastrowid
+
+    def count_marked_values(self) -> int:
+        """Alle zur Löschung markierten, noch nicht endgültig entfernten Werte (über alle Entitäten)."""
+        return self._read_conn().execute("SELECT COUNT(*) FROM deleted_points").fetchone()[0]
+
     def unpin_entity_from_dashboard(self, dashboard_id: int, pin_id: int) -> None:
         with self._lock, self._conn:
             self._conn.execute(
@@ -3374,7 +3426,7 @@ class Index:
     _COUNTER_DECREASE_SNAPSHOT_KEY = "counter_decrease_snapshot_cache"
     # Hochzählen, sobald sich die Regeln der Erkennung ändern: ein Schnappschuss nach
     # alten Regeln gilt dann sofort als veraltet statt bis zu einer Stunde weiterzuwirken.
-    _COUNTER_DECREASE_RULES = 2
+    _COUNTER_DECREASE_RULES = 3
 
     def is_counter_decrease_snapshot_stale(self, min_interval_seconds: float = 3600) -> bool:
         """Wie is_duplicate_snapshot_stale(): die Zählung braucht den Storage-Layer und bleibt
@@ -3614,6 +3666,57 @@ class Index:
             (entity_id,),
         ).fetchone()
 
+    def set_counter_decreases(self, entity_id: str, mode: str) -> None:
+        """"report" oder "allow" — bei "allow" gelten Rückgänge dieses Zählers als normal."""
+        if mode not in ("report", "allow"):
+            raise ValueError(mode)
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE entities SET counter_decreases = ? WHERE entity_id = ?", (mode, entity_id))
+            if mode == "allow":  # erlaubte Rückgänge: die Regel „Fehlwerte markieren“ gibt es dann nicht
+                self._conn.execute(
+                    "UPDATE entities SET counter_auto_mark = 0, counter_auto_since = NULL, counter_auto_halted_at = NULL "
+                    "WHERE entity_id = ?", (entity_id,),
+                )
+
+    def set_counter_auto_mark(self, entity_id: str, enabled: bool, now: float) -> None:
+        """Regel „Fehlwerte automatisch markieren“ (counter_auto.py) ein-/ausschalten. Eingeschaltet gilt sie
+        nur für Rückgänge ab ``now``; ein Wiedereinschalten hebt auch ein „angehalten“ auf."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE entities SET counter_auto_mark = ?, counter_auto_since = ?, counter_auto_halted_at = NULL "
+                "WHERE entity_id = ?", (int(enabled), now if enabled else None, entity_id),
+            )
+
+    def set_counter_auto_halted(self, entity_id: str, now: float) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE entities SET counter_auto_halted_at = ? WHERE entity_id = ?", (now, entity_id))
+
+    def list_counter_auto_entities(self) -> list[sqlite3.Row]:
+        return self._read_conn().execute(
+            "SELECT * FROM entities WHERE counter_auto_mark = 1 AND counter_decreases != 'allow' "
+            "AND state_class = 'total_increasing'"
+        ).fetchall()
+
+    def list_counter_mark_ignored(self, entity_id: str) -> set[float]:
+        rows = self._read_conn().execute("SELECT ts FROM counter_mark_ignored WHERE entity_id = ?", (entity_id,)).fetchall()
+        return {row["ts"] for row in rows}
+
+    def _remember_undone(self, entity_id: str, where: str, params: tuple) -> None:
+        """Merkt sich die Zeitstempel zurückgenommener Markierungen, wenn der Zähler die Regel nutzt —
+        sonst käme derselbe Rückgang beim nächsten Lauf sofort wieder. Läuft in der Transaktion des Aufrufers."""
+        self._conn.execute(
+            "INSERT OR IGNORE INTO counter_mark_ignored (entity_id, ts) "
+            f"SELECT entity_id, ts FROM deleted_points WHERE entity_id = ? AND {where} "
+            "AND EXISTS (SELECT 1 FROM entities WHERE entity_id = ? AND counter_auto_mark = 1)",
+            (entity_id, *params, entity_id),
+        )
+
+    def list_counter_decreases_allowed(self) -> list[sqlite3.Row]:
+        return self._read_conn().execute(
+            "SELECT entity_id, custom_name, friendly_name FROM entities "
+            "WHERE counter_decreases = 'allow' ORDER BY COALESCE(custom_name, friendly_name, entity_id)"
+        ).fetchall()
+
     def clear_entity_data(self, entity_id: str) -> None:
         """Setzt eine Entität auf leer zurück, behält aber ihre Konfiguration."""
         validate_entity_id(entity_id)
@@ -3694,6 +3797,7 @@ class Index:
             latest = row["latest"] if row else None
             if latest is None:
                 return 0
+            self._remember_undone(entity_id, "deleted_at = ?", (latest,))
             cursor = self._conn.execute(
                 "DELETE FROM deleted_points WHERE entity_id = ? AND deleted_at = ?",
                 (entity_id, latest),
@@ -3708,6 +3812,7 @@ class Index:
         """Nimmt Markierungen zurück, die `where` trifft, und führt deleted_count
         im selben Schritt nach — dieselbe Buchführung wie undo_last_deleted_batch()."""
         with self._lock, self._conn:
+            self._remember_undone(entity_id, where, params)
             cursor = self._conn.execute(
                 f"DELETE FROM deleted_points WHERE entity_id = ? AND {where}", (entity_id, *params)
             )

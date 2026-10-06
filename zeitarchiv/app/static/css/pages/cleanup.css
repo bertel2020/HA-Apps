@@ -492,4 +492,9 @@
   font-size:calc(12px * var(--font-scale, 1));background:var(--accent-line-soft);color:var(--accent-line);
 }
 .marked-due.soon{background:var(--danger-soft);color:var(--danger);}
+/* Herkunft der Charge (manuell, Duplikate, Sammelaktion …) — ruhiger als die Fälligkeit daneben. */
+.marked-source{
+  display:inline-block;margin-right:8px;padding:0 8px;border-radius:10px;
+  font-size:calc(12px * var(--font-scale, 1));background:var(--surface-alt);color:var(--ink-muted);
+}
 .marked-zone p a{color:var(--accent-line);white-space:nowrap;}

@@ -153,7 +153,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats
+from . import cleanup_stats, cleanup_tile
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
@@ -1109,6 +1109,7 @@ def _settings_background_processes_context() -> dict:
             (index.get_duplicate_snapshot() or {}).get("checked_at"),
         ),
         row(tr("Zählerrückgang-Erkennung"), tr("Sucht Rückgänge bei Zählern der letzten 30 Tage · stündlich"), (index.get_counter_decrease_snapshot() or {}).get("checked_at")),
+        row(tr("Fehlwerte-Regel"), tr("Markiert bei Zählern mit eingeschalteter Regel zurückkehrende Rückgänge · stündlich"), float(index.get_setting("counter_auto_mark_last_run") or 0) or None),
         row(
             tr("Versionsprüfung"), tr("Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich"),
             version_state.get("checked_at") if version_state else None,
@@ -3912,6 +3913,9 @@ def _dashboard_tiles_context(
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
             groups[-1]["tiles"].append(tiles[-1])
+        elif p["item_type"] == "cleanup":
+            tiles.append(cleanup_tile.build(index, TZ, p))
+            groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "entity":
             e = index.get_entity(p["item_entity_id"])
             if e is None:
@@ -4207,6 +4211,21 @@ async def dashboard_entity_change(
         request, "_dashboard_tiles.html",
         _dashboard_tiles_context(dashboard_id, auto_open_pin_id=pin_id),
     )
+
+
+@app.post("/dashboard/pin-cleanup", response_class=HTMLResponse)
+def dashboard_pin_cleanup(request: Request, dashboard_id: int = 1) -> HTMLResponse:
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    index.pin_cleanup_to_dashboard(dashboard_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
+
+
+@app.post("/dashboard/unpin-cleanup/{pin_id}", response_class=HTMLResponse)
+def dashboard_unpin_cleanup(request: Request, pin_id: int, dashboard_id: int = 1) -> HTMLResponse:
+    _require_dashboard_unlocked(dashboard_id)
+    index.unpin_item_from_dashboard(dashboard_id, "cleanup", pin_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.post("/dashboard/unpin-entity/{pin_id}", response_class=HTMLResponse)
@@ -4980,7 +4999,7 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "outlier_detection_enabled": effective_outlier_threshold(
                 entity["aggregation_type"], entity["outlier_threshold"]
             ) != "off",
-            "counter_decrease_enabled": entity["state_class"] == "total_increasing",
+            "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
@@ -5127,7 +5146,7 @@ def _rows_fragment(
             ),
             tz=TZ,
             decimals=entity["decimals"],
-            counter_decrease_enabled=entity["state_class"] == "total_increasing",
+            counter_decrease_enabled=cleanup_stats.counter_decreases_flagged(entity),
             outlier_mode=cleanup_stats.outlier_mode(entity),
         )
         counts = analysis["counts"]
@@ -5165,7 +5184,7 @@ def _rows_fragment(
         repetitions = cleanup.detect_repetitions(rows, entity["decimals"], TZ)
         counter_decreases = (
             cleanup.detect_counter_decreases(rows)
-            if entity["state_class"] == "total_increasing"
+            if cleanup_stats.counter_decreases_flagged(entity)
             else {}
         )
         counts = {
@@ -5269,7 +5288,7 @@ def _rows_fragment(
             "pagination": pagination,
             "gap_detection_enabled": gap_threshold != "off",
             "outlier_detection_enabled": outlier_threshold != "off",
-            "counter_decrease_enabled": entity["state_class"] == "total_increasing",
+            "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "last_batch_count": len(index.get_last_deleted_batch(entity_id)),
             "marked_count": int(entity["deleted_count"] or 0),
             "first_date": first_date,
@@ -5316,7 +5335,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
 
     def delete_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
-            cleanup.soft_delete(index, entity_id, timestamps)
+            cleanup.soft_delete(index, entity_id, timestamps, source=str(form.get("source", "manual")))
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode,
                 deleted_count=len(timestamps) or None,
@@ -5656,11 +5675,11 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
             for ts, _value in cleanup.iter_repeated_rows(rows, entity["decimals"]):
                 batch.append(ts)
                 if len(batch) >= 10_000:
-                    index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                    cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="repetitions")
                     deleted_total += len(batch)
                     batch = []
             if batch:
-                index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="repetitions")
                 deleted_total += len(batch)
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode,

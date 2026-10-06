@@ -46,6 +46,7 @@
               <span class="marked-chev" :class="{ open: open }" aria-hidden="true">&#9656;</span>
               {% if group.size == 1 %}{{ _("Charge vom {label} · 1 Wert", label=group.label) }}{% else %}{{ _("Charge vom {label} · {count} Werte", label=group.label, count=(group.size | format_int)) }}{% endif %}
             </button>
+            <span class="marked-source">{{ group.source }}</span>
             {% if group.due %}<span class="marked-due{{ ' soon' if group.due.soon }}">{{ group.due.label }}</span>{% endif %}
             <button type="button" class="btn btn-sm"
                     hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/confirm" hx-vals='{"mode": "batch", "batch": "{{ group.deleted_at }}"}'>

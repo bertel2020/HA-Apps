@@ -117,6 +117,7 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
             entity_id, list({row["deleted_at"] for row in result["rows"]})
         )
         decimals_int = decimals_to_int(entity["decimals"])
+        sources = entity_history.mark_sources(deps.index, entity_id)
         auto = purge_auto.settings(deps.index)
         groups: list[dict] = []
         for row in result["rows"]:
@@ -125,6 +126,7 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
                     "deleted_at": row["deleted_at"],
                     "label": f"{format_timestamp(row['deleted_at'], deps.tz)} {format_time(row['deleted_at'], deps.tz)}",
                     "size": batch_sizes.get(row["deleted_at"], 0),
+                    "source": tr(entity_history.SOURCE_LABELS[sources[row["deleted_at"]]]) if row["deleted_at"] in sources else tr("unbekannt"),
                     "due": purge_auto.batch_due(row["deleted_at"], auto["min_age_days"], deps.tz) if auto["enabled"] else None,
                     "rows": [],
                 })

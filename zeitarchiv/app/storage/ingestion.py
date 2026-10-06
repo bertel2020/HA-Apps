@@ -422,6 +422,7 @@ class IngestionService:
 
         counter_decrease = (
             entity["state_class"] == "total_increasing"
+            and entity["counter_decreases"] != "allow"
             and entity["last_value"] is not None
             and entity["last_ts"] is not None
             and event.ts > entity["last_ts"]

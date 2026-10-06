@@ -57,7 +57,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
     """Die Partials tragen die Knöpfe, geladen wird das Skript aber von der
     Seite, in die sie hineingerendert werden."""
     seiten = {
-        "entity_config.html": ["_entity_config_form.html"],
+        "entity_config.html": ["_entity_config_form.html", "_counter_decrease_field.html"],
         "energiedashboard.html": ["_energiedashboard_setup.html"],
         "backup.html": ["_settings_backup_ready.html"],
         "housekeeping.html": [

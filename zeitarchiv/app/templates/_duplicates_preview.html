@@ -18,6 +18,7 @@
   {% endif %}
 
   <form id="confirm-duplicates-form">
+    <input type="hidden" name="source" value="duplicates">
     {% for ts in all_timestamps %}<input type="hidden" name="ts" value="{{ ts }}">{% endfor %}
   </form>
   <div class="actionbar" style="margin-top:14px;">

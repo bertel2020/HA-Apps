@@ -171,6 +171,8 @@
   {% endif %}
   {% call hint_body() %}{{ _("Ab welchem Vielfachen des für diese Entität Üblichen ein Wert als Ausreißer markiert wird — bei Zählern bezogen auf den üblichen Zuwachs, bei allen anderen Sensoren auf die übliche Schwankung der letzten 15 Werte. Kleinere Zahl = empfindlicher, „Aus“ schaltet die Erkennung ab. Mehr dazu im Handbuch.") }}{% endcall %}
 </div>
+{% set counter_mode = counter_decrease_mode(entity_id) if counter_decrease_mode is defined else none %}
+{% if counter_mode %}{% include "_counter_decrease_field.html" %}{% endif %}
 {% if aggregation_type == 'switch' %}
 <div class="field">
   <label>{{ _("Anzeigemodus") }} {{ hint_button(_('Anzeigemodus')) }}</label>

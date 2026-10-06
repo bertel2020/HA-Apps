@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import cleanup_stats
+from . import cleanup_stats, counter_auto
 from . import purge_auto
 from . import ha_integration
 from . import tips as tips_mod
@@ -43,6 +43,7 @@ from .formatting import (
 )
 from .index_optimization import get_index_optimization_state
 from .report_routes import SOURCE_LABELS
+from .storage import cleanup
 from .route_support import dir_size_and_newest_mtime
 from .storage import import_reports
 from .storage.index import should_raise_gap_threshold
@@ -744,9 +745,11 @@ def build_notices(
             "link": "/housekeeping#duplikate",
         })
 
-    counter_notice = counter_decrease_notice(
-        (index.get_counter_decrease_snapshot() or {}).get("rows", []), tz
-    )
+    counter_rows = (index.get_counter_decrease_snapshot() or {}).get("rows", [])
+    pattern_rows = [row for row in counter_rows if len(row.get("returning_days", [])) >= cleanup.COUNTER_PATTERN_MIN_DAYS]
+    notices.extend(counter_pattern_notice(row) for row in pattern_rows)
+    notices.extend(counter_auto.notices(index, tz))
+    counter_notice = counter_decrease_notice([row for row in counter_rows if row not in pattern_rows], tz)
     if counter_notice:
         notices.append(counter_notice)
 
@@ -1016,6 +1019,22 @@ def backup_activity(backup_progress) -> dict | None:
 def counter_value_label(value: float, row: dict) -> str:
     label = format_value(value, decimals_to_int(row.get("decimals")))
     return f"{label} {row['unit']}" if row.get("unit") else label
+
+
+def counter_pattern_notice(row: dict) -> dict:
+    """Ein Zähler, dessen Stand an mehreren Tagen kurz abfiel und zurückkehrte: das spricht für ein Problem
+    an der Quelle (Gerät, Integration), nicht an einzelnen Werten. Ersetzt für diesen Zähler die
+    Einzelmeldung (counter_decrease_notice) — zwei Meldungen zum selben Zähler wären nur Lärm."""
+    name = row.get("friendly_name") or row["entity_id"]
+    return {
+        "id": f"housekeeping.counter_pattern.{row['entity_id']}", "severity": "warn",
+        "title": tr("„{name}“ liefert wiederholt Fehlwerte", name=name),
+        "detail": tr(
+            "An {days} der letzten {window} Tage fiel der Zählerstand kurz ab und kehrte zurück. Das spricht für ein Problem an der Quelle (Gerät oder Integration), nicht an den einzelnen Werten. Setzt sich der Zähler planmäßig zurück, lassen sich Rückgänge in der Konfiguration erlauben.",
+            days=len(row["returning_days"]), window=cleanup.COUNTER_PATTERN_DAYS,
+        ),
+        "meta": tr("Zählerrückgänge"), "link": f"/entities/{row['entity_id']}/cleanup",
+    }
 
 
 def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:

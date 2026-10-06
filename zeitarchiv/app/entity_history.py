@@ -49,6 +49,27 @@ _TAGS = {
 }
 
 
+# Herkunft einer Markierung → Beschriftung (Reiter „Markiert“ und „Verlauf“).
+SOURCE_LABELS = {
+    "manual": N_("Manuell"),
+    "duplicates": N_("Duplikate"),
+    "repetitions": N_("Wiederholungen"),
+    "counter_bulk": N_("Zählerrückgänge · Sammelaktion"),
+    "counter_rule": N_("Zählerrückgänge · Regel"),
+}
+
+
+def mark_sources(index, entity_id: str) -> dict[float, str]:
+    """Chargenzeit (``deleted_at``) → Herkunft der Markierung, aus dem Protokoll. Ältere Markierungen
+    kennen die Angabe nicht und fehlen hier — der Reiter „Markiert“ zeigt sie als „unbekannt“."""
+    sources: dict[float, str] = {}
+    for row in index.list_entity_actions_for_entity(entity_id, actions=("mark",), limit=1000):
+        detail = _detail(row)
+        if isinstance(detail.get("batch"), (int, float)) and detail.get("source") in SOURCE_LABELS:
+            sources.setdefault(float(detail["batch"]), detail["source"])
+    return sources
+
+
 def _detail(row) -> dict:
     try:
         value = json.loads(row["detail"]) if row["detail"] else {}
@@ -85,6 +106,7 @@ def _event(row, tz: ZoneInfo, decimals: int | None, unit: str | None) -> dict:
     }
     if action == "mark":
         event["title"] = tr("1 Wert zum Entfernen markiert") if count == 1 else tr("{count} Werte zum Entfernen markiert", count=count)
+        event["sub"] = tr(SOURCE_LABELS[detail["source"]]) if detail.get("source") in SOURCE_LABELS else ""
     elif action == "undo":
         event["title"] = tr("1 Wert wieder aktiv") if count == 1 else tr("{count} Werte wieder aktiv", count=count)
         event["sub"] = {

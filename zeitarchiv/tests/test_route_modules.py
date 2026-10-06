@@ -117,7 +117,11 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # main.py bekam nur die Anbindung (Import, Kontextprozessor, Jinja-Funktion
     # `_()`, Sprach-Route = 2 neue Zeilen); die Logik liegt in app/i18n/. Ist-Stand
     # 5.731.
-    assert len(main.splitlines()) < 5_740
+    # Am 6. Oktober 2026 auf 5.760 angehoben — Dashboard-Kachel „Bereinigung“ (item_type='cleanup'):
+    # Zweig in _dashboard_tiles_context() und die Routen pin-cleanup/unpin-cleanup, die wie die
+    # übrigen Kachel-Routen das Raster-Fragment aus main.py zurückgeben müssen. Die Daten der Kachel
+    # stehen in cleanup_tile.py, nicht hier (main.py wuchs von 5.739 auf 5.757).
+    assert len(main.splitlines()) < 5_760
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

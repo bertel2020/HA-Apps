@@ -52,6 +52,12 @@ OUTLIER_RATE_NOTABLE_PERCENT = 1.0
 OUTLIER_RATE_REFRESH_AGE_SECONDS = 6 * 60 * 60
 
 
+def counter_decreases_flagged(entity) -> bool:
+    """Ob Rückgänge dieser Entität als auffällig gelten: nur bei Zählern, und nur solange sie nicht
+    als planmäßig zurücksetzend freigegeben sind (Konfiguration → „Zählerrückgänge“ = „Erlauben“)."""
+    return entity["state_class"] == "total_increasing" and entity["counter_decreases"] != "allow"
+
+
 def outlier_mode(entity) -> str:
     """Bezugsgröße der Ausreißer-Erkennung (siehe cleanup.OutlierDetector).
 
@@ -128,7 +134,7 @@ def alltime_counts(
         outlier_factor=None if outlier_threshold == "off" else float(outlier_threshold),
         tz=tz,
         decimals=entity["decimals"],
-        counter_decrease_enabled=entity["state_class"] == "total_increasing",
+        counter_decrease_enabled=counter_decreases_flagged(entity),
         outlier_mode=outlier_mode(entity),
     )
     counts = analysis["counts"]

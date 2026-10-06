@@ -55,11 +55,12 @@ def mark_returning(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | N
     batch_at = time.time()
     marked: dict[str, int] = {}
     for row in (before or {}).get("rows", []):
-        if not row.get("returning"):
-            continue
+        entity = index.get_entity(row["entity_id"])
+        if not row.get("returning") or (entity is not None and entity["counter_auto_mark"]):
+            continue  # Zähler mit eingeschalteter Regel markiert der stündliche Lauf selbst
         timestamps = returning_timestamps(data_dir, index, tz, row["entity_id"], now)
         if timestamps:
-            cleanup.soft_delete(index, row["entity_id"], timestamps, deleted_at=batch_at)
+            cleanup.soft_delete(index, row["entity_id"], timestamps, deleted_at=batch_at, source="counter_bulk")
             marked[row["entity_id"]] = len(timestamps)
     refresh_snapshot(data_dir, index, tz, before, set(marked))
     return {"batch_at": batch_at, "entities": marked, "values": sum(marked.values())}
@@ -117,3 +118,11 @@ def verdicts_for_rows(
         tz,
     )
     return {item["ts"]: item["returns"] for item in decreases if item["ts"] in stamps and item["returns"] is not None}
+
+
+def set_mode(data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, mode: str) -> None:
+    """„report“ oder „allow“ für einen Zähler setzen und den Schnappschuss der Rückgänge für genau
+    diese Entität nachführen (erlaubt: Zeilen fallen weg; wieder gemeldet: neu berechnet)."""
+    before = index.get_counter_decrease_snapshot()
+    index.set_counter_decreases(entity_id, mode)
+    refresh_snapshot(data_dir, index, tz, before, {entity_id})

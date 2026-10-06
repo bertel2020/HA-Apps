@@ -39,7 +39,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import cleanup_stats
-from . import counter_bulk
+from . import counter_auto, counter_bulk
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -293,8 +293,38 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "verdict": verdict,
                 "note": note,
             })
+        # Zähler mit der Regel „Fehlwerte automatisch markieren“: ihr Stand neben den offenen Rückgängen,
+        # auch wenn nichts mehr offen ist (die Regel hat es ja schon erledigt).
+        rule = counter_auto.summary(deps.index)
+        for row in rows:
+            row["rule"] = rule.get(row["entity_id"])
+        listed = {row["entity_id"] for row in rows}
+        for entity_id, state in rule.items():
+            if entity_id in listed or not (state["marked"] or state["halted"]):
+                continue
+            entity = deps.index.get_entity(entity_id)
+            rows.append({
+                "entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"], "returning": 0,
+                "unit_label": "", "count": 0, "count_label": "0", "last_ts": 0, "last_label": "—", "change": "",
+                "verdict": "none", "note": tr("nichts offen"), "rule": state,
+            })
         return rows
 
+    # Zählermodus („report“/„allow“) für das Konfigurationsfeld; None bei allem, was kein Zähler ist.
+    def _counter_mode(entity_id: str) -> str | None:
+        entity = deps.index.get_entity(entity_id)
+        if entity is None or entity["state_class"] != "total_increasing":
+            return None
+        return "allow" if entity["counter_decreases"] == "allow" else "report"
+
+    deps.templates.env.globals["counter_decrease_mode"] = _counter_mode
+    deps.templates.env.globals["counter_auto_limit"] = counter_auto.MAX_PER_RUN
+
+    def _counter_auto_state(entity_id: str) -> dict:
+        entity = deps.index.get_entity(entity_id)
+        return {"on": bool(entity and entity["counter_auto_mark"]), "halted": bool(entity and entity["counter_auto_halted_at"] is not None)}
+
+    deps.templates.env.globals["counter_auto_state"] = _counter_auto_state
     # Einordnung der Zählerrückgänge in der Bereinigungsansicht (_rows_table.html).
     deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdicts_for_rows(
         deps.data_dir, deps.index, deps.tz, entity_id, rows
@@ -326,6 +356,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             }
         return {
             "counter_decreases": rows,
+            "counter_allowed": [
+                {"entity_id": row["entity_id"], "name": row["custom_name"] or row["friendly_name"] or row["entity_id"]}
+                for row in deps.index.list_counter_decreases_allowed()
+            ],
             "counter_bulk": bulk,
             "counter_result": result,
         }
@@ -1221,6 +1255,33 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 result = tr("Retention fehlgeschlagen: {error}", error=outcome['error'])
         return deps.templates.TemplateResponse(
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
+        )
+
+    @router.post("/entities/{entity_id}/counter-decreases", response_class=HTMLResponse)
+    async def entity_counter_decreases(request: Request, entity_id: str) -> HTMLResponse:
+        """Stellt einen Zähler auf „Melden“ oder „Erlauben“ (planmäßig zurücksetzender Zähler).
+        Kommt von der Konfigurationsseite (liefert nur das Feld zurück) oder aus Housekeeping
+        (Feld ``from=housekeeping``, liefert den Abschnitt Zählerrückgänge zurück)."""
+        form = await request.form()
+        auto_mark = form.get("auto_mark")
+        mode = str(form.get("counter_decreases", "" if auto_mark else "x"))
+        if (mode and mode not in ("report", "allow")) or auto_mark not in (None, "on", "off"):
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        current = _counter_mode(entity_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail=tr("Kein Zähler"))
+        if mode:
+            await run_in_threadpool(counter_bulk.set_mode, deps.data_dir, deps.index, deps.tz, entity_id, mode)
+            current = mode
+        if auto_mark:
+            if current != "report":  # die Regel gibt es nur bei „Melden“
+                raise HTTPException(status_code=409, detail=tr("Nur bei „Melden“ möglich"))
+            deps.index.set_counter_auto_mark(entity_id, auto_mark == "on", time.time())
+        mode = current
+        if form.get("from") == "housekeeping":
+            return deps.templates.TemplateResponse(request, "_counter_decreases.html", _counter_decreases_context())
+        return deps.templates.TemplateResponse(
+            request, "_counter_decrease_field.html", {"entity_id": entity_id, "counter_mode": mode}
         )
 
     @router.post("/housekeeping/counter-decreases/mark-returning", response_class=HTMLResponse)

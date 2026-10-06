@@ -120,6 +120,23 @@
      Zeile, volle Breite), der Wert (mit Einheit/Alter) füllt den Rest der
      Höhe (flex:1) und wird darin auf beiden Achsen zentriert. Titel/Sparkline
      bekommen dadurch flex:none, damit nur die Wert-Zeile wächst/schrumpft. */
+  /* Kachel „Bereinigung“ (item_type='cleanup', cleanup_tile.py): drei Zeilen mit Zahl und Link nach
+     Housekeeping; Auffälliges in Warnfarbe, ohne Befund wird die Kachel ruhig. 1×1 zeigt nur die Summe. */
+  .dtile-cleanup-body{display:flex;flex-direction:column;height:100%;box-sizing:border-box;padding:14px 14px 10px;overflow:hidden;border-radius:inherit;}
+  .dtile-cleanup-items{display:grid;gap:2px;}
+  .dtile-cleanup-item{
+    display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0;
+    border-bottom:1px solid var(--border);color:var(--ink);text-decoration:none;
+    font-size:calc(13px * var(--font-scale, 1));
+  }
+  .dtile-cleanup-item:last-child{border-bottom:0;}
+  .dtile-cleanup-item b{font-variant-numeric:tabular-nums;font-size:calc(16px * var(--font-scale, 1));}
+  .dtile-cleanup-item.is-warn b{color:var(--notice-warn);}
+  .dtile-cleanup-sub{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
+  .dtile-cleanup-compact{display:flex;flex-direction:column;align-items:flex-start;color:inherit;text-decoration:none;}
+  .dtile-cleanup-total{font-size:calc(28px * var(--font-scale, 1));font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--notice-warn);}
+  .dtile-cleanup.is-clear .dtile-cleanup-total{color:var(--positive);}
+  .dtile-picker-hint{margin:0 0 10px;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
   .dtile-entity-body{display:flex;flex-direction:column;gap:4px;}
   /* Nur Layout, keine eigene Schrift: der Titel sieht aus wie auf jeder
      anderen Kachel (13,5px, --ink, 600 aus .dtile-title). Er war bis 0.88.1
@@ -228,7 +245,9 @@
     padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface-alt);
     color:var(--ink);margin:10px 16px 0;width:calc(100% - 32px);
   }
-  .dtile-picker-list{max-height:280px;overflow-y:auto;padding:10px 10px 12px;}
+  /* Feste Popup-Höhe (siehe .dtile-picker-modal): die Liste füllt den Rest und scrollt, damit das Popup bei
+     jedem Reiter gleich hoch bleibt, auch bei den kurzen (Bereinigung, Sektion). */
+  .dtile-picker-list{flex:1;min-height:0;overflow-y:auto;padding:10px 10px 12px;}
   /* Optionale Chart-Legende unter der Kachel — siehe entities.html (dieselbe
      Regeln, hier dupliziert wie der Rest des .dtile-Blocks). Die Chips selbst
      nutzen .chart-legend-item aus app.css unverändert — Aussehen UND Inhalte
@@ -260,7 +279,7 @@
     display:flex;align-items:center;justify-content:center;padding:16px;cursor:default;
   }
   .dtile-picker-modal{
-    width:360px;max-width:100%;max-height:100%;background:var(--surface);border-radius:12px;
+    width:480px;max-width:100%;height:min(520px,100%);background:var(--surface);border-radius:12px;
     box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;text-align:left;
   }
   .dtile-picker-header{
@@ -279,6 +298,12 @@
     color:var(--ink-muted);font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));cursor:pointer;
   }
   .dtile-picker-tabs button.active{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
+  /* Schmal: Charts · Tabellen · Werte in der ersten Zeile, Bereinigung · Sektion in der zweiten. */
+  @media (max-width:520px){
+    .dtile-picker-tabs{flex-wrap:wrap;}
+    .dtile-picker-tabs button{flex:1 1 calc(33% - 4px);}
+    .dtile-picker-tabs button:nth-child(n+4){flex-basis:calc(50% - 4px);}
+  }
   .dtile-picker-item{
     display:block;width:100%;text-align:left;padding:8px 10px;border-radius:7px;border:none;background:none;
     color:var(--ink);font-size:calc(13px * var(--font-scale, 1));cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;

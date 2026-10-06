@@ -688,6 +688,9 @@ def count_duplicate_rows_by_entity(
 # „Kehrt zurück“: nach einem Rückgang erreicht ein Folgewert den Vorwert wieder, innerhalb
 # von 30 Minuten ODER 10 Werten (je nach Sendetakt zählt das eine oder das andere).
 COUNTER_WINDOW_DAYS = 30
+# Fehlwert-Häufung (Meldung): an so vielen verschiedenen Tagen der letzten 14 Tage kehrte ein Rückgang zurück.
+COUNTER_PATTERN_DAYS = 14
+COUNTER_PATTERN_MIN_DAYS = 3
 COUNTER_RETURN_SECONDS = 1800
 COUNTER_RETURN_VALUES = 10
 
@@ -768,7 +771,7 @@ def scan_counter_decreases(
     window_end = now.timestamp()
     results: list[dict] = []
     for entity in index.list_entities():
-        if entity["state_class"] != "total_increasing":
+        if entity["state_class"] != "total_increasing" or entity["counter_decreases"] == "allow":
             continue
         entity_id = entity["entity_id"]
         if entity_ids is not None and entity_id not in entity_ids:
@@ -786,6 +789,11 @@ def scan_counter_decreases(
             "decimals": entity["decimals"],
             "count": len(decreases),
             "returning": sum(1 for item in decreases if item["returns"]),
+            "returning_days": sorted({
+                datetime.fromtimestamp(item["ts"], tz).date().isoformat()
+                for item in decreases
+                if item["returns"] and item["ts"] >= now.timestamp() - COUNTER_PATTERN_DAYS * 86400
+            }),
             "last": {key: last[key] for key in ("ts", "previous", "value", "returns", "recovered_value", "recovered_after")},
         })
     results.sort(key=lambda r: r["last"]["ts"], reverse=True)
@@ -848,16 +856,23 @@ def detect_outliers(
     return flagged
 
 
+#: Herkunft einer Markierung (Reiter „Markiert“, „Verlauf“): was die Chargen auslöste.
+MARK_SOURCES = ("manual", "duplicates", "repetitions", "counter_bulk", "counter_rule")
+
+
 def soft_delete(
-    index: Index, entity_id: str, timestamps: list[float], deleted_at: float | None = None
+    index: Index, entity_id: str, timestamps: list[float], deleted_at: float | None = None,
+    source: str = "manual", trigger: str = "manual",
 ) -> None:
     started_at = time.time()
+    deleted_at = started_at if deleted_at is None else deleted_at
     index.mark_deleted(entity_id, timestamps, deleted_at=deleted_at)
     if timestamps:
         index.invalidate_counter_decrease_snapshot()
         index.log_entity_action(
-            entity_id, "mark", "manual", started_at, time.time(), "success",
+            entity_id, "mark", trigger, started_at, time.time(), "success",
             rows_affected=len(timestamps),
+            detail=json.dumps({"source": source if source in MARK_SOURCES else "manual", "batch": deleted_at}),
         )
 
 

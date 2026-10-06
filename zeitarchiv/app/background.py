@@ -45,7 +45,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .i18n import N_, tr
-from . import cleanup_stats
+from . import cleanup_stats, counter_auto
 from . import demo_mode
 from . import ha_integration
 from . import notices as notices_mod
@@ -1064,6 +1064,8 @@ class BackgroundService:
                     self._refresh_duplicate_snapshot_if_stale()
                 with self._maintenance_step("counter_decrease_snapshot"):
                     self._refresh_counter_decrease_snapshot_if_stale()
+                with self._maintenance_step("counter_auto_mark"):
+                    counter_auto.run_if_due(self.data_dir, self.index, self.tz, self.coordinator.entity)
                 with self._maintenance_step("outlier_rate"):
                     self._refresh_one_outlier_rate()
                 with self._maintenance_step("stale_entity_count"):
