@@ -171,10 +171,10 @@ TIPS = [
     },
     {
         "slug": "zaehlerrueckgaenge",
-        "title": N_("Tipp: Zählerrückgänge erkennen"),
-        "detail": N_("Bei Zähler-Entitäten (z. B. Stromzähler) lässt sich erkennen, wenn ein Wert unerwartet sinkt — oft ein Hinweis auf einen Zählertausch oder -reset."),
+        "title": N_("Tipp: Zählerrückgänge werden gemeldet"),
+        "detail": N_("Sinkt ein Zählerstand, meldet das Meldungs-Center es und ordnet es ein: „kehrt zurück“ ist meist ein Fehlwert, „bleibt niedrig“ eher ein Zählertausch. Housekeeping → Zählerrückgänge listet alle Fälle."),
         "meta": N_("Bereinigung"),
-        "link": None,
+        "link": "/housekeeping#zaehlerrueckgaenge",
     },
     {
         "slug": "vorperiode_vergleichen",
@@ -252,6 +252,27 @@ TIPS = [
         "detail": N_("Dieselbe Entität lässt sich mehrfach als Werte-Kachel anheften — z. B. einmal mit dem aktuellen Wert, einmal mit dem Durchschnitt, jede mit eigenen Einstellungen."),
         "meta": N_("Dashboards"),
         "link": "/dashboards",
+    },
+    {
+        "slug": "verlauf_pro_entitaet",
+        "title": N_("Tipp: Änderungen an einer Entität nachlesen"),
+        "detail": N_("Der Reiter „Verlauf“ in „Werte bearbeiten“ zeigt, was an genau dieser Entität geändert wurde: markiert, zurückgenommen, korrigiert (mit altem und neuem Wert), hinzugefügt, entfernt oder verdichtet."),
+        "meta": N_("Entitäten"),
+        "link": None,
+    },
+    {
+        "slug": "automatische_bereinigung",
+        "title": N_("Tipp: Markierte Werte automatisch entfernen"),
+        "detail": N_("Markierte Werte lassen sich nach einem Mindestalter automatisch endgültig entfernen (Housekeeping → Speicherplatz). Im Reiter „Markiert“ steht je Charge, ab wann sie dran ist; bis dahin kannst du sie zurücknehmen."),
+        "meta": N_("Housekeeping"),
+        "link": "/housekeeping",
+    },
+    {
+        "slug": "legende_als_tabelle",
+        "title": N_("Tipp: Chart-Legende als Tabelle"),
+        "detail": N_("Unter Optionen → Legenden-Stil → Tabelle stehen die Kennzahlen als Spalten statt in Chips — auch beim Jahresvergleich mit Laufsumme, mit einer Zeile je Entität und Jahr."),
+        "meta": N_("Charts"),
+        "link": None,
     },
 ]
 
