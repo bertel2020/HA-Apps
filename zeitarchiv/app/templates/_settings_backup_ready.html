@@ -86,13 +86,13 @@
             <button type="button" class="btn"
                     hx-post="backup/rollback/restore/{{ rollback.name }}"
                     hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this"
-                    hx-confirm="Stand {{ rollback.name }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird dabei selbst als neuer Rollback behalten.">
+                    hx-confirm="{{ _('Stand {name} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird dabei selbst als neuer Rollback behalten.', name=rollback.name) }}">
               {{ _("Diesen Stand wiederherstellen") }}
             </button>
             <button type="button" class="btn btn-danger"
                     hx-post="backup/rollback/delete/{{ rollback.name }}"
                     hx-target="#backup-status" hx-swap="outerHTML"
-                    hx-confirm="Rollback {{ rollback.name }} endgültig löschen?">
+                    hx-confirm="{{ _('Rollback {name} endgültig löschen?', name=rollback.name) }}">
               {{ _("Rollback löschen") }}
             </button>
           </span>

@@ -23,7 +23,7 @@
      Absatz im selben `.field`:
 
        <div class="field">
-         <label>Auflösung {{ hint_button('Auflösung') }}</label>
+         <label>Auflösung {{ hint_button(_('Auflösung')) }}</label>
          <input …>
          {% call hint_body() %}Mindestabstand zum …{% endcall %}
        </div>
@@ -31,7 +31,7 @@
      oder in einer Überschrift — der Hinweis ist dann der Absatz direkt
      dahinter (`klasse` setzt die Kontextklasse, z. B. `tbl-hint`):
 
-       <h3 class="tbl-h">Spalten {{ hint_button('Spalten') }}</h3>
+       <h3 class="tbl-h">Spalten {{ hint_button(_('Spalten')) }}</h3>
        {% call hint_body('tbl-hint') %}Jede Spalte ist …{% endcall %}
 
    Eingebunden wird das Makro mit

@@ -14,8 +14,8 @@
           <input type="search" class="search card-browser-search" placeholder="{{ _('Tabelle suchen …') }}" aria-label="{{ _('Tabellen durchsuchen') }}">
           <span class="card-browser-sortgroup">
             {% set sort_options = [
-              ('neueste', 'Neueste zuerst'), ('aelteste', 'Älteste zuerst'),
-              ('name_asc', 'Name A–Z'), ('name_desc', 'Name Z–A')
+              ('neueste', _('Neueste zuerst')), ('aelteste', _('Älteste zuerst')),
+              ('name_asc', _('Name A–Z')), ('name_desc', _('Name Z–A'))
             ] %}
             <span class="dd-picker-wrap">
               <button type="button" class="btn" id="tables-sort-btn" onclick="toggleDDPicker('tables-sort')">{{ _("Neueste zuerst ▾") }}</button>

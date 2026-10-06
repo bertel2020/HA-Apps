@@ -145,7 +145,7 @@
   <button type="button" class="btn btn-danger" {% if retention_running %}disabled{% endif %}
           hx-post="settings/retention-enforcement/run" hx-target="#retention-form" hx-swap="innerHTML"
           hx-disabled-elt="this"
-          hx-confirm="Werte jenseits der konfigurierten Aufbewahrungsfrist jetzt endgültig löschen? Das lässt sich nicht rückgängig machen.">
+          hx-confirm="{{ _('Werte jenseits der konfigurierten Aufbewahrungsfrist jetzt endgültig löschen? Das lässt sich nicht rückgängig machen.') }}">
     {% if retention_running %}{{ _("Retention läuft&hellip;") }}{% else %}{{ _("Jetzt anwenden") }}{% endif %}
   </button>
 </div>

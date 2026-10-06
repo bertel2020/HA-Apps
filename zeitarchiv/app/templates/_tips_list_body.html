@@ -14,7 +14,7 @@
       <td>{{ tip.meta }}</td>
       <td>
         {% if tip.is_today %}
-        <span class="tip-status {{ 'hidden' if tip.hidden_today else 'today' }}">{{ 'Heute ausgeblendet' if tip.hidden_today else 'Heute aktiv' }}</span>
+        <span class="tip-status {{ 'hidden' if tip.hidden_today else 'today' }}">{{ _('Heute ausgeblendet') if tip.hidden_today else _('Heute aktiv') }}</span>
         {% else %}
         <span class="tip-status-none">—</span>
         {% endif %}

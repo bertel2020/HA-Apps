@@ -91,7 +91,7 @@
           <button type="button" class="dsection-menu-item dsection-menu-item-danger" role="menuitem"
                   hx-post="{{ href_base }}dashboard/section/{{ group.section_id }}/remove?dashboard_id={{ dashboard_id }}"
                   hx-target="#dashboard-grid" hx-swap="outerHTML"
-                  hx-confirm="Diese Sektion wirklich entfernen? Die Kacheln bleiben erhalten und rutschen in die vorherige Sektion (oder werden „ohne Sektion“, falls es die erste war)."
+                  hx-confirm="{{ _('Diese Sektion wirklich entfernen? Die Kacheln bleiben erhalten und rutschen in die vorherige Sektion (oder werden „ohne Sektion“, falls es die erste war).') }}"
                   @click="menuOpen = false">{{ _("Sektion entfernen") }}</button>
         </div>
       </div>

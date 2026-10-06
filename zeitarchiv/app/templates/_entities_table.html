@@ -60,7 +60,7 @@
           {% else %}
             <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
           {% endif %}
-          <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
+          <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
         </a>
       </td>
       {% if 'type' in visible_columns %}<td class="va-mid col-type"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>{% endif %}

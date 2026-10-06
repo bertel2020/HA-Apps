@@ -42,7 +42,7 @@
     <button type="button" class="btn" onclick="copyToken()">{{ _("Kopieren") }}</button>
     <button type="button" class="btn btn-danger"
             hx-post="settings/token/generate" hx-target="#verbindung-form" hx-swap="innerHTML"
-            hx-confirm="Neuen Token erzeugen? Der bisherige wird sofort ungültig — die Integration in Home Assistant muss danach mit dem neuen Wert aktualisiert werden.">
+            hx-confirm="{{ _('Neuen Token erzeugen? Der bisherige wird sofort ungültig — die Integration in Home Assistant muss danach mit dem neuen Wert aktualisiert werden.') }}">
       {{ _("Neu generieren") }}
     </button>
   </div>

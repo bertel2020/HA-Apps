@@ -21,14 +21,14 @@
    außerhalb des hx-targets — deshalb hx-swap-oob, damit die Zahlen bei jedem
    Zeitraum-/Seitenwechsel mitwandern. #}
 {% set optionen = [
-     {'wert': 'all', 'text': 'Alle', 'anzahl': counts['all']},
-     ({'wert': 'outliers', 'text': 'Ausreißer', 'anzahl': counts['outliers']} if outlier_detection_enabled else none),
-     ({'wert': 'gaps', 'text': 'Lücken', 'anzahl': counts['gaps']} if gap_detection_enabled else none),
-     {'wert': 'duplicates', 'text': 'Duplikate', 'anzahl': counts['duplicates']},
-     {'wert': 'repetitions', 'text': 'Wiederholungen', 'anzahl': counts['repetitions']},
-     ({'wert': 'counter_decreases', 'text': 'Zählerrückgänge', 'anzahl': counts['counter_decreases']} if counter_decrease_enabled else none),
+     {'wert': 'all', 'text': _('Alle'), 'anzahl': counts['all']},
+     ({'wert': 'outliers', 'text': _('Ausreißer'), 'anzahl': counts['outliers']} if outlier_detection_enabled else none),
+     ({'wert': 'gaps', 'text': _('Lücken'), 'anzahl': counts['gaps']} if gap_detection_enabled else none),
+     {'wert': 'duplicates', 'text': _('Duplikate'), 'anzahl': counts['duplicates']},
+     {'wert': 'repetitions', 'text': _('Wiederholungen'), 'anzahl': counts['repetitions']},
+     ({'wert': 'counter_decreases', 'text': _('Zählerrückgänge'), 'anzahl': counts['counter_decreases']} if counter_decrease_enabled else none),
    ] | reject('none') | list %}
-{% set aktuell = (optionen | selectattr('wert', 'equalto', filter) | map(attribute='text') | first) | default('Alle') %}
+{% set aktuell = (optionen | selectattr('wert', 'equalto', filter) | map(attribute='text') | first) | default(_('Alle')) %}
 <span class="dd-picker-wrap rows-filter" id="rows-filter-menu" hx-swap-oob="true">
   <button type="button" class="btn dd-picker-btn{{ ' is-active' if filter != 'all' }}" id="rows-filter-btn"
           onclick="toggleDDPicker('rows-filter')">Markierung: {{ aktuell }} &#9662;</button>

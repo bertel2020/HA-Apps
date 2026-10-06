@@ -137,7 +137,7 @@
             {% set gesperrt = value not in tile.available_metrics or value == tile.primary_metric %}
             <button type="button" draggable="false" data-metric="{{ value }}"
                     class="dtile-choice-cell dtile-stats-cell{% if value in tile.stats_metrics %} is-selected{% endif %}{% if gesperrt %} is-off{% endif %}"
-                    {% if gesperrt %}disabled title="{{ 'Steht schon als Hauptwert' if value == tile.primary_metric else 'Für diese Entität keine sinnvolle Kennzahl' }}"{% endif %}>{{ label }}</button>
+                    {% if gesperrt %}disabled title="{{ _('Steht schon als Hauptwert') if value == tile.primary_metric else _('Für diese Entität keine sinnvolle Kennzahl') }}"{% endif %}>{{ label }}</button>
             {% endfor %}
           </div>
         </div>
@@ -171,7 +171,7 @@
           <div class="dtile-sparkline-resolution-row" role="group" aria-label="{{ _('Sparkline-Auflösung wählen') }}">
             {% for value, label in [('raw', 'Roh'), ('5min', '5 Min'), ('15min', '15 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
             <button type="button" class="dtile-sparkline-resolution-cell{% if tile.sparkline_resolution == value %} is-selected{% endif %}"
-                    data-resolution="{{ value }}" title="{{ {'raw': 'Alle gespeicherten Rohdatenpunkte', '5min': 'Ein Punkt je 5 Minuten', '15min': 'Ein Punkt je 15 Minuten', '30min': 'Ein Punkt je 30 Minuten', '1h': 'Ein Punkt je Stunde'}[value] }}">{{ label }}</button>
+                    data-resolution="{{ value }}" title="{{ {'raw': _('Alle gespeicherten Rohdatenpunkte'), '5min': _('Ein Punkt je 5 Minuten'), '15min': _('Ein Punkt je 15 Minuten'), '30min': _('Ein Punkt je 30 Minuten'), '1h': _('Ein Punkt je Stunde')}[value] }}">{{ label }}</button>
             {% endfor %}
           </div>
         </div>
@@ -192,7 +192,7 @@
             {% for value, label in [('auto', 'Auto'), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
             <button type="button" class="dtile-decimals-cell{% if tile.decimals == value %} is-selected{% endif %}"
                     data-decimals="{{ value }}"
-                    title="{{ 'Automatisch' if value == 'auto' else (value ~ ' Nachkommastelle' ~ ('n' if value != '1' else '')) }}">{{ label }}</button>
+                    title="{{ _('Automatisch') if value == 'auto' else (value ~ _(' Nachkommastelle') ~ ('n' if value != '1' else '')) }}">{{ label }}</button>
             {% endfor %}
           </div>
         </div>
@@ -202,7 +202,7 @@
         <button type="button" class="btn danger btn-sm" draggable="false"
                 hx-post="{{ href_base }}dashboard/unpin-entity/{{ tile.pin_id }}?dashboard_id={{ dashboard_id }}"
                 hx-target="#dashboard-grid" hx-swap="outerHTML"
-                hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?">{{ _("Vom Dashboard entfernen") }}</button>
+                hx-confirm="{{ _('Diese Kachel wirklich vom Dashboard entfernen?') }}">{{ _("Vom Dashboard entfernen") }}</button>
         <button type="button" class="btn btn-sm" @click="menuOpen = false">{{ _("Fertig") }}</button>
       </div>
     </div>
@@ -246,7 +246,7 @@
     <button type="button" class="dtile-menu-remove" role="menuitem" draggable="false"
             hx-post="{{ href_base }}{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin?dashboard_id={{ dashboard_id }}"
             hx-target="#dashboard-grid" hx-swap="outerHTML"
-            hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?"
+            hx-confirm="{{ _('Diese Kachel wirklich vom Dashboard entfernen?') }}"
             @click="menuOpen = false">{{ _("Vom Dashboard entfernen") }}</button>
   </div>
   {% endif %}

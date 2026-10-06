@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 
@@ -20,6 +21,21 @@ def _literals(folder: str, suffixes: tuple[str, ...], pattern: re.Pattern[str]) 
     for path in (APP / folder).rglob("*"):
         if path.suffix in suffixes and "vendor" not in path.parts:
             found.update(re.sub(r"\\(.)", r"\1", m.group("text")) for m in pattern.finditer(path.read_text(encoding="utf-8")))
+    return found
+
+
+def _python_literals() -> set[str]:
+    """Erste Textargumente von tr(...)/N_(...) in app/**/*.py (Python-seitige Texte)."""
+    found: set[str] = set()
+    for path in APP.rglob("*.py"):
+        if "i18n" in path.parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (
+                isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in {"tr", "N_"}
+                and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
+            ):
+                found.add(node.args[0].value)
     return found
 
 
@@ -52,7 +68,7 @@ def test_language_setting_resolution() -> None:
 
 
 def test_every_text_marked_for_translation_has_an_english_entry() -> None:
-    fehlend_app = _literals("templates", (".html",), TEMPLATE_CALL) - set(CATALOG["app"])
+    fehlend_app = (_literals("templates", (".html",), TEMPLATE_CALL) | _python_literals()) - set(CATALOG["app"])
     fehlend_js = (
         _literals("static/js", (".js",), SCRIPT_CALL) | _literals("templates", (".html",), SCRIPT_CALL)
     ) - set(CATALOG["js"])
@@ -119,3 +135,13 @@ def test_settings_page_offers_the_language_choice(client, german_again) -> None:
     assert 'id="language-input"' in html and 'hx-post="settings/language"' in html
     client.post("/settings/language", data={"language": "en"})
     assert "English" in client.get("/settings").text
+
+
+def test_python_texts_follow_the_language_of_the_request(client, german_again) -> None:
+    """Meldungen und Tipps entstehen in Python (tr()/N_()) — sie folgen der Anfrage-Sprache."""
+    client.post("/settings/language", data={"language": "en"})
+    panel = client.get("/notices/panel").text
+    assert "Tip:" in panel and "Tipp:" not in panel
+    client.post("/settings/language", data={"language": "de"})
+    panel = client.get("/notices/panel").text
+    assert "Tipp:" in panel and "Tip:" not in panel

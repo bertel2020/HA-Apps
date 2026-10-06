@@ -107,8 +107,8 @@
   <button type="button" class="btn btn-danger-outline"
           hx-post="settings/storage-index/repair" hx-target="#storage-index-form" hx-swap="innerHTML"
           hx-disabled-elt="this"
-          hx-confirm="Die angezeigten Indexabweichungen jetzt anhand der gespeicherten Rohdaten korrigieren? Rohwerte und Rollups werden nicht verändert."
-          data-confirm-label="Index reparieren">
+          hx-confirm="{{ _('Die angezeigten Indexabweichungen jetzt anhand der gespeicherten Rohdaten korrigieren? Rohwerte und Rollups werden nicht verändert.') }}"
+          data-confirm-label="{{ _('Index reparieren') }}">
     {{ _("Index reparieren") }}
   </button>
   {% endif %}

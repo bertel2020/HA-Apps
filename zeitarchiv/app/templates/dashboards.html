@@ -20,8 +20,8 @@
         <span class="card-browser-sortgroup">
           <span class="card-browser-sort-label">{{ _("Sortierung") }}</span>
           {% set sort_options = [
-            ('neueste', 'Neueste zuerst'), ('aelteste', 'Älteste zuerst'),
-            ('name_asc', 'Name A–Z'), ('name_desc', 'Name Z–A')
+            ('neueste', _('Neueste zuerst')), ('aelteste', _('Älteste zuerst')),
+            ('name_asc', _('Name A–Z')), ('name_desc', _('Name Z–A'))
           ] %}
           <span class="dd-picker-wrap">
             <button type="button" class="btn" id="dashboards-sort-btn" onclick="toggleDDPicker('dashboards-sort')">{{ _("Neueste zuerst ▾") }}</button>
@@ -69,7 +69,7 @@
               </div>
               <button type="button" class="edash-pin-toggle{{ ' is-on' if nav_energiedashboard_enabled }}"
                       aria-pressed="{{ 'true' if nav_energiedashboard_enabled else 'false' }}"
-                      title="{{ 'Deaktivieren' if nav_energiedashboard_enabled else 'Aktivieren' }}"
+                      title="{{ _('Deaktivieren') if nav_energiedashboard_enabled else _('Aktivieren') }}"
                       onclick="toggleEnergieDashboard(this)"></button>
             </div>
             <div class="edash-pin-meta">

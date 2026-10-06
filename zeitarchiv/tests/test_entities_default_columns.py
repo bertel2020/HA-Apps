@@ -6,7 +6,7 @@ import ast
 
 import pytest
 
-from _paths import APP, TEMPLATES, page_text
+from _paths import APP, TEMPLATES, page_text, german
 
 
 MAIN_PATH = APP / "main.py"
@@ -52,7 +52,7 @@ def test_visible_data_columns_are_left_aligned() -> None:
 
 
 def test_entity_tooltip_contains_friendly_name_and_entity_id() -> None:
-    template = ENTITIES_TABLE_PATH.read_text(encoding="utf-8")
+    template = german(ENTITIES_TABLE_PATH.read_text(encoding="utf-8"))
     assert 'class="entity-tooltip-host"' in template
     assert '<strong>{{ row.friendly_name or \'Kein Friendly Name\' }}</strong>' in template
     assert "<code>{{ row.entity_id }}</code>" in template
