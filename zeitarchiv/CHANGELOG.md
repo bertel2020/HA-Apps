@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.1.0 - 2026-10-06
+
+### Neu
+
+- Werte-Kachel: Wann eine Kachel als „veraltet" gelb bzw. rot umrandet wird,
+  lässt sich jetzt je Kachel einstellen (Standard, Täglich, Selten oder Aus).
+  Tageswerte und selten meldende Zähler stehen dadurch nicht mehr dauerhaft
+  auf Rot. Bestehende Kacheln bleiben auf „Standard".
+
+### Behoben
+
+- Zu viele offene Dateien: Bei längerem Betrieb konnte die App nach einigen
+  Stunden keine Dateien mehr öffnen („Too many open files"), die Oberfläche
+  und die Annahme neuer Werte fielen aus. Die Ursache ist behoben (Dank an
+  dnlbbrg).
+- Wartungsplaner: Eine Entität mit sehr vielen Rohwerten im Monat ließ die
+  Duplikat-Prüfung scheitern, wodurch auch Backup-Zeitplan, Aufbewahrung,
+  Kompaktierung und automatische Löschung nicht mehr liefen. Die Prüfung
+  kommt jetzt mit beliebig vielen Werten zurecht, und ein fehlschlagender
+  Wartungsschritt blockiert die übrigen nicht mehr. Wiederholte Fehler
+  werden im Log höchstens stündlich gemeldet. Wer 1.0.0 mit sehr dichten
+  Entitäten betrieben hat, sollte prüfen, ob in der Zwischenzeit Backups
+  oder Löschläufe ausgeblieben sind.
+- Zeiträume und Beschriftungen stimmen jetzt auch, wenn der Browser in einer
+  anderen Zeitzone als Home Assistant läuft: Im Energiedashboard und in
+  Tabellen mit Jahres- oder Monatsvergleich erschien sonst kurz nach
+  Periodenbeginn der Vormonat bzw. das Vorjahr.
+- Gestapelte Balken: Beginnen die Datenreihen in verschiedenen Monaten oder
+  Jahren, saßen die späteren Balken auf dem falschen Zeitraum.
+- Tabellen-Kachel: Zeilenbeschriftungen wurden bei schmaler Kachel Buchstabe
+  für Buchstabe umgebrochen. Sie brechen jetzt nur noch an Wortgrenzen, die
+  Tabelle scrollt bei Bedarf waagerecht.
+- Tabellen-Kachel: Ausgeblendete Zeilen werden wie im Editor mitgerechnet,
+  sodass Summen und Anteile übereinstimmen. Eine Division durch 0 in einer
+  Formel zeigt „–" statt „Fehler" (Dank an dnlbbrg).
+- Zähler: Der Bezugswert eines Monats wird auch über Monate ohne Archivdatei
+  korrekt gefunden. Bereits berechnete Monatswerte korrigieren sich erst nach
+  einem Neuaufbau der Rollups der betroffenen Zähler (Dank an dnlbbrg).
+- Das Favicon fehlte im Container-Image.
+
+### Geändert
+
+- Healthcheck-Zeile im Log widerspricht sich nicht mehr selbst.
+
 ## 1.0.0 - 2026-09-22
 
 ### Neu
