@@ -963,7 +963,9 @@ Eine Spalte ist ein Zeitraum: frei benannt (z. B. „Heute", „Aug Vorjahr",
 Dekade) und einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger,
 usw.). So lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende
 Jahre in zwölf Spalten nebeneinanderstellen. Die Beschriftung kann
-Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten,
+Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten
+(auch englisch: `{year}`, `{month}`, `{quarter}`, `{week}` — beide Schreibweisen
+funktionieren in jeder Sprache, die Einfüge-Hilfe nutzt die der Oberfläche),
 die sich automatisch auf den jeweiligen Zeitraum der Spalte auflösen
 (Einfüge-Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des
 aufgelösten Werts). Maßgeblich ist die Zeitzone der App (Option `timezone`),

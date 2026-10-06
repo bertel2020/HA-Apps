@@ -529,7 +529,15 @@ window.TableCompute = (() => {
   // Nur diese Namen werden ersetzt; ein Tippfehler wie "{jhar}" matcht das
   // Muster nicht und bleibt deshalb sichtbar im Text stehen, statt
   // kommentarlos zu verschwinden.
-  const LABEL_TOKEN_PATTERN = /\{(jahr|jahr_kurz|quartal|monat|monat_kurz|monat_nr|woche|tag|dekade)\}/g;
+  // Zu jedem deutschen Namen gibt es einen englischen Alias; gespeichert wird,
+  // was im Feld steht, beide Schreibweisen funktionieren in jeder Sprache. Die
+  // deutschen Namen bleiben gültig, weil sie in bestehenden Tabellen stehen.
+  const LABEL_TOKEN_ALIASES = {
+    year: 'jahr', year_short: 'jahr_kurz', quarter: 'quartal', month: 'monat',
+    month_short: 'monat_kurz', month_no: 'monat_nr', week: 'woche', day: 'tag', decade: 'dekade',
+  };
+  const LABEL_TOKEN_PATTERN = new RegExp(
+    '\\{(' + [...Object.keys(LABEL_TOKEN_ALIASES), ...Object.values(LABEL_TOKEN_ALIASES)].join('|') + ')\\}', 'g');
 
   // Ersetzt Platzhalter in einer Spalten-Beschriftung durch Kalenderwerte des
   // TATSÄCHLICH aufgelösten Zeitraums dieser Spalte (windowStartEpoch, aus
@@ -559,9 +567,9 @@ window.TableCompute = (() => {
       // Zweistellig wie monat_nr (01 statt 1) — konsistent mit dem
       // "DD.MM."-Format, in dem Tag/Monat sonst überall in der App erscheinen.
       tag: String(d.getDate()).padStart(2, '0'),
-      dekade: `${Math.floor(d.getFullYear() / 10) * 10}er`,
+      dekade: t('{decade}er', {decade: Math.floor(d.getFullYear() / 10) * 10}),
     };
-    return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[token]);
+    return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[LABEL_TOKEN_ALIASES[token] || token]);
   }
 
   // Einfügehilfe im Editor (siehe table_editor.html) — Token + Anzeigename,
@@ -569,11 +577,15 @@ window.TableCompute = (() => {
   // Object.keys() auf tokenValues in resolveLabel(), weil die Anzeige-
   // Reihenfolge (grob → fein) bewusst anders ist als der Ersetzungs-Code sie
   // bräuchte.
+  // Eingefügt wird der Name in der Sprache der Oberfläche ({year} statt {jahr}).
   const LABEL_VARIABLES = [
     ['jahr', t('Jahr')], ['jahr_kurz', t('Jahr (kurz)')], ['quartal', t('Quartal')],
     ['monat', t('Monat')], ['monat_kurz', t('Monat (kurz)')], ['monat_nr', t('Monat (Nr.)')],
     ['woche', t('Woche')], ['tag', t('Tag')], ['dekade', t('Dekade')],
-  ];
+  ].map(([token, label]) => {
+    const english = Object.keys(LABEL_TOKEN_ALIASES).find((key) => LABEL_TOKEN_ALIASES[key] === token);
+    return [document.documentElement.lang === 'en' ? english : token, label];
+  });
 
   // CSS-Klassen für die Darstellungs-Optionen (Zebra/Rahmen/Dichte/Kopfzeile)
   // — dieselbe Zuordnung für die volle Tabellen-Seite UND die Dashboard-

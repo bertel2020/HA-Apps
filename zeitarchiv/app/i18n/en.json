@@ -2308,6 +2308,7 @@
     "Kennzahlen konnten nicht gespeichert werden": "Key figures could not be saved",
     "Zeitraum-Anzeige konnte nicht gespeichert werden": "Period display could not be saved",
     "Nachkommastellen konnten nicht gespeichert werden": "Decimal places could not be saved",
-    "Titel konnte nicht gespeichert werden": "Title could not be saved"
+    "Titel konnte nicht gespeichert werden": "Title could not be saved",
+    "{decade}er": "{decade}s"
   }
 }

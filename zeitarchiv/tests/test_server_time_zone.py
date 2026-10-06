@@ -17,10 +17,10 @@ OKT_BERLIN = 1790805600  # 2026-10-01 00:00 Europe/Berlin
 JAN_BERLIN = 1767222000  # 2026-01-01 00:00 Europe/Berlin
 
 
-def _node(tz: str, body: str):
+def _node(tz: str, body: str, lang: str = "de"):
     skript = f"""
     global.window = global;
-    global.document = {{documentElement: {{dataset: {{tz: 'Europe/Berlin'}}}}}};
+    global.document = {{documentElement: {{lang: '{lang}', dataset: {{tz: 'Europe/Berlin'}}}}}};
     {(JS / "server-time.js").read_text()}
     {(JS / "i18n.js").read_text()}
     {(JS / "table-compute.js").read_text()}
@@ -39,6 +39,24 @@ def test_labels_zeigen_den_zeitraum_des_servers_in_jeder_browserzone(browser_tz)
     monat = _node(browser_tz, f"TableCompute.resolveLabel('{{monat}} {{tag}}.{{monat_nr}}.', {OKT_BERLIN})")
     assert jahr == "2026"
     assert monat == "Oktober 01.10."
+
+
+def test_englische_platzhalter_loesen_wie_die_deutschen_auf():
+    paare = [("year", "jahr"), ("year_short", "jahr_kurz"), ("quarter", "quartal"), ("month", "monat"),
+             ("month_short", "monat_kurz"), ("month_no", "monat_nr"), ("week", "woche"), ("day", "tag"),
+             ("decade", "dekade")]
+    englisch = " ".join("{" + en + "}" for en, _ in paare)
+    deutsch = " ".join("{" + de + "}" for _, de in paare)
+    assert _node("UTC", f"TableCompute.resolveLabel('{englisch}', {OKT_BERLIN})") == \
+        _node("UTC", f"TableCompute.resolveLabel('{deutsch}', {OKT_BERLIN})")
+    # Tippfehler bleiben sichtbar stehen
+    assert _node("UTC", f"TableCompute.resolveLabel('{{yaer}}', {OKT_BERLIN})") == "{yaer}"
+
+
+def test_einfuegehilfe_setzt_den_platzhalter_in_der_sprache_der_oberflaeche():
+    token = "TableCompute.LABEL_VARIABLES.map(v => v[0])"
+    assert _node("UTC", token)[:2] == ["jahr", "jahr_kurz"]
+    assert _node("UTC", token, lang="en")[:2] == ["year", "year_short"]
 
 
 def test_cutoff_texte_nutzen_die_serverzone():
