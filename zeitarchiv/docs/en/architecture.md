@@ -77,7 +77,7 @@ moment. The generation itself (`run_generation()`) lives in
 `app/demo_generation.py`, not in the CLI script `scripts/generate_demo_data.py`
 — since then, the latter imports from `app/` in the opposite direction, so that
 the Housekeeping routes can call the same simulation core without a backward
-dependency `app/` → `scripts/` (see [demo-data.md](../demo-data.md), German).
+dependency `app/` → `scripts/` (see [demo-data.md](demo-data.md)).
 
 ## Request flow (write path)
 

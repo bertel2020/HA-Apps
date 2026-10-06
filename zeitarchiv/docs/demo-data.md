@@ -1,5 +1,7 @@
 # Demo-Daten
 
+*[English version](en/demo-data.md)*
+
 `scripts/generate_demo_data.py` füllt ein Zeitarchiv-Datenverzeichnis mit
 realistisch aussehenden, synthetischen Beispieldaten — für Screenshots,
 Doku, eine vorzeigbare Demo-Instanz oder einfach zum lokalen Entwickeln ohne

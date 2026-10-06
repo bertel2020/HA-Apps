@@ -66,4 +66,4 @@ python3 scripts/sync_versions.py --check
 ## Demo data
 
 For a data directory with realistic-looking sample data (without a real Home
-Assistant connection), see [demo-data.md](../demo-data.md) (German).
+Assistant connection), see [demo-data.md](demo-data.md).

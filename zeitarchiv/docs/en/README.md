@@ -5,11 +5,8 @@
 For a short overview (installation, feature list) see the
 [app README](../../README.en.md).
 
-> **Language note:** The user guide, this index, `operations.md`,
-> `security.md`, `logging.md`, `ingestion.md`, `development.md`,
-> `architecture.md`, `api-reference.md`, `testing.md`, `data-model.md` and `frontend.md` are
-> also available in English (`docs/en/`). The remaining developer documents are
-> currently German only.
+> **Language note:** All documents listed here are available in English in
+> `docs/en/`; the German originals live one level up.
 
 **Two separate products, one data flow.** These documents describe only the
 **app** (`addon/`, here in the repo as `app/`). The write path on the Home
@@ -45,9 +42,7 @@ Support the project: [Buy Me a Coffee](https://buymeacoffee.com/bertel2020) ·
 | [security.md](security.md) | Auth model, network separation, path/zip validation, resource limits |
 | [testing.md](testing.md) | Test suite overview, execution |
 | [development.md](development.md) | Local setup (Docker Compose or venv), test run, version sync |
-| [demo-data.md](../demo-data.md) | Generating and importing synthetic demo data (`scripts/generate_demo_data.py`) |
-
-Documents not listed in `docs/en/` are German only.
+| [demo-data.md](demo-data.md) | Generating and importing synthetic demo data (`scripts/generate_demo_data.py`) |
 
 ## Rough layout
 
