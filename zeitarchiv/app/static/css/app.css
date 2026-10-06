@@ -1112,7 +1112,13 @@ a.menu-row{text-decoration:none;}
    "Legenden-Stil") statt der Chip-Reihe — dieselben table.dt-Regeln oben,
    nur mit rechtsbündigen Zahlenspalten und Farbpunkt in der Namensspalte. */
 .chart-legend-table th:not(.legend-name-col),.chart-legend-table td:not(.legend-name-col){
-  text-align:right;font-variant-numeric:tabular-nums;
+  text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* Mobil: Zahl und Einheit nie trennen (oben); der Name bekommt eine feste
+   Breite und bricht dort um (zwei Zeilen statt vier), damit die Werte neben
+   ihm noch ins Bild passen. Die Tabelle scrollt seitlich. */
+@media (max-width:640px){
+  .chart-legend-table .legend-name-col{width:14rem;min-width:14rem;max-width:14rem;}
 }
 .chart-legend-table td.legend-name-col{font-weight:600;color:var(--ink);}
 .chart-legend-table .legend-name-cell{display:inline-flex;align-items:center;gap:8px;}
