@@ -11,7 +11,7 @@
 
     <div class="settings-panel">
         <div class="chart-title-row">
-          <h2 x-text="editing ? (chartId ? 'Chart bearbeiten' : 'Neuer Chart') : (name || 'Neuer Chart')"></h2>
+          <h2 x-text="editing ? (chartId ? t('Chart bearbeiten') : t('Neuer Chart')) : (name || t('Neuer Chart'))"></h2>
           <div style="display:flex;gap:8px;">
             <button type="button" class="btn" x-show="hasData" data-tooltip="{{ _('Aktuell angezeigte Chart-Daten als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if chart_id %}

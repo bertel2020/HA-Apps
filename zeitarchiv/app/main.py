@@ -897,7 +897,7 @@ def entities_list_view(request: Request) -> HTMLResponse:
     Fragment, nur der umgebende Seitenrahmen ist jetzt die settings-layout-
     Familie (Sidebar wie Statistik/Import/Export/Backup)."""
     units = index.list_distinct_units()
-    unit_options = [{"value": "__none__" if u is None else u, "label": "Ohne Einheit" if u is None else u} for u in units]
+    unit_options = [{"value": "__none__" if u is None else u, "label": tr("Ohne Einheit") if u is None else u} for u in units]
     return templates.TemplateResponse(
         request,
         "entities_list.html",
@@ -1399,7 +1399,7 @@ def logs_view(request: Request) -> HTMLResponse:
         request,
         "logs.html",
         {
-            "log_filter_options": [("all", "Alle"), *LOG_LEVEL_LABELS.items()],
+            "log_filter_options": [("all", tr("Alle")), *LOG_LEVEL_LABELS.items()],
             **_settings_logging_context(),
         },
     )
@@ -1656,7 +1656,7 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
 # Adapter selbst stehen in notices.py, wo auch der Rest der Glocken-Anzeige
 # lebt — main.py hat ein Zeilenbudget (test_route_modules.py), und
 # Anzeigelogik ist genau das, was hier nicht mehr dazukommen soll.
-register_source("retention", "Aufbewahrung", lambda: notices_mod.retention_activity(_background.retention_progress))
+register_source("retention", N_("Aufbewahrung"), lambda: notices_mod.retention_activity(_background.retention_progress))
 register_source("backup", N_("Backup"), lambda: notices_mod.backup_activity(_background.backup_progress))
 
 
@@ -1784,7 +1784,7 @@ def _backup_context(
     for event in backup.list_restore_events(DATA_DIR):
         jobs.append({
             "trigger": "Wiederherstellung",
-            "status": "Erfolgreich",
+            "status": tr("Erfolgreich"),
             "status_key": "success",
             "created_at": f"{format_timestamp(event['created_at'], TZ)} {format_time(event['created_at'], TZ)}",
             "created_at_ts": event["created_at"],
@@ -1832,9 +1832,9 @@ def _backup_context(
     global _restore_startup_result
     if message is None and _restore_startup_result:
         if _restore_startup_result.get("success"):
-            message = (
-                f"{_restore_startup_result['source']} wurde wiederhergestellt. "
-                f"Der vorherige Stand liegt in {_restore_startup_result['rollback']}."
+            message = tr(
+                "{source} wurde wiederhergestellt. Der vorherige Stand liegt in {rollback}.",
+                source=_restore_startup_result["source"], rollback=_restore_startup_result["rollback"],
             )
         else:
             message = tr("Wiederherstellung fehlgeschlagen: {get}", get=_restore_startup_result.get('error', 'Unbekannter Fehler'))
@@ -2188,7 +2188,7 @@ def _storage_breakdown() -> list[dict]:
         row["size_bytes"] for row in backup.list_restore_rollback_details(DATA_DIR)
     )
     return [
-        {"key": "archive", "label": "Archiv", "bytes": index.get_overview()["total_size_bytes"]},
+        {"key": "archive", "label": tr("Archiv"), "bytes": index.get_overview()["total_size_bytes"]},
         {"key": "rollup", "label": "Rollups", "bytes": dir_size(DATA_DIR / "rollup")},
         {"key": "hot", "label": tr("Laufender Monat (Hot Buffer)"), "bytes": dir_size(DATA_DIR / "hot")},
         {"key": "index", "label": tr("Index"), "bytes": index_path.stat().st_size if index_path.exists() else 0},
@@ -2492,7 +2492,7 @@ def export_page(request: Request) -> HTMLResponse:
     Liste lädt wie bei der Entitäten-Übersicht per htmx aus /export-table, damit
     Suche/Filter/Sortierung ohne Reload greifen."""
     units = index.list_distinct_units()
-    unit_options = [{"value": "__none__" if u is None else u, "label": "Ohne Einheit" if u is None else u} for u in units]
+    unit_options = [{"value": "__none__" if u is None else u, "label": tr("Ohne Einheit") if u is None else u} for u in units]
     return templates.TemplateResponse(request, "export.html", {"unit_options": unit_options})
 
 
@@ -4462,7 +4462,7 @@ def dashboards_create(body: _DashboardCreateBody) -> dict:
     # Ohne Eingabe einen freien Vorgabenamen wählen ("Neues Dashboard 2", …)
     # statt an der Eindeutigkeitsprüfung zu scheitern — der Nutzer hat hier
     # ja gerade KEINEN Namen genannt, den man ihm zurückweisen könnte.
-    name = body.name.strip() or index.free_name_for("dashboards", "Neues Dashboard")
+    name = body.name.strip() or index.free_name_for("dashboards", tr("Neues Dashboard"))
     dashboard_id = index.create_dashboard(name)
     return {"id": dashboard_id, "name": name}
 
@@ -5034,8 +5034,8 @@ def _paginate_meta(total: int, page: int, page_size: int) -> dict:
 _STREAMING_RANGE_KEYS = ("year", "all")
 
 _MONTH_NAMES_DE = (
-    "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
+    N_("Januar"), N_("Februar"), N_("März"), N_("April"), N_("Mai"), N_("Juni"),
+    N_("Juli"), N_("August"), N_("September"), N_("Oktober"), N_("November"), N_("Dezember"),
 )
 
 
@@ -5051,14 +5051,14 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
         return f"{window_start.strftime('%d.%m.%Y')} · {window_start.strftime('%H:%M')}–{display_end.strftime('%H:%M')} Uhr"
     if range_key == "day":
         if offset == 0:
-            return "Heute"
+            return tr("Heute")
         if offset == -1:
-            return "Gestern"
+            return tr("Gestern")
         return window_start.strftime("%d.%m.%Y")
     if range_key == "week":
         return f"{window_start.strftime('%d.%m.')}–{display_end.strftime('%d.%m.')} {display_end.year}"
     if range_key == "month":
-        label = f"{_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
+        label = f"{tr(_MONTH_NAMES_DE[window_start.month - 1])} {window_start.year}"
         return tr("{label} (bis heute)", label=label) if window_end >= now else label
     if range_key == "year":
         return tr("{year} (bis heute)", year=window_start.year) if window_end >= now else f"{window_start.year}"

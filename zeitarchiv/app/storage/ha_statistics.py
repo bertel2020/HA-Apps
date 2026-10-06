@@ -27,7 +27,7 @@ Fetch-Module beschränkt."""
 
 from __future__ import annotations
 
-from ..i18n import tr
+from ..i18n import N_, tr
 
 import json
 import logging
@@ -65,7 +65,7 @@ MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 # die Wartezeit je Nachricht, dieser Zähler zusätzlich die Gesamtzahl.
 MAX_MESSAGES_PER_CALL = 2000
 
-PERIODS = {"hour": "Stundenwerte", "day": "Tageswerte"}
+PERIODS = {"hour": N_("Stundenwerte"), "day": N_("Tageswerte")}
 DEFAULT_PERIOD = "hour"
 
 
@@ -326,7 +326,7 @@ def fetch_statistics_rows(
             result.rows.append((ts, value))
             if len(result.rows) > max_rows:
                 raise ValueError(
-                    f"HA-Langzeitstatistik enthält mehr als {max_rows:,} Datenpunkte".replace(",", ".")
+                    tr("HA-Langzeitstatistik enthält mehr als {limit} Datenpunkte", limit=f"{max_rows:,}".replace(",", "."))
                 )
     result.rows.sort(key=lambda row: row[0])
     return result

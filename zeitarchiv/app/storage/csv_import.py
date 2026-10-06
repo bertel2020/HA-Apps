@@ -12,7 +12,7 @@ verwerfen (dieselbe Haltung wie beim Symcon-Import)."""
 
 from __future__ import annotations
 
-from ..i18n import N_
+from ..i18n import N_, tr
 
 import csv
 import math
@@ -255,7 +255,7 @@ def parse_rows(
             result.rows.append((ts, value))
             if len(result.rows) > max_rows:
                 raise ValueError(
-                    f"CSV enthält mehr als {max_rows:,} gültige Datenzeilen".replace(",", ".")
+                    tr("CSV enthält mehr als {limit} gültige Datenzeilen", limit=f"{max_rows:,}".replace(",", "."))
                 )
     if on_progress is not None:
         on_progress(gelesen)

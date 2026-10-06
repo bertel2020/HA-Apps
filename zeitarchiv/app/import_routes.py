@@ -608,7 +608,7 @@ class ImportService:
                     if history_source == "full":
                         available_label = tr("Keine importierbaren Daten im gewählten Zeitraum")
                     else:
-                        kind = tr("Statistik") if history_source == "stats" else "Rohhistorie"
+                        kind = tr("Statistik") if history_source == "stats" else tr("Rohhistorie")
                         available_label = tr("Keine {kind} im gewählten Zeitraum", kind=kind)
             entities.append({
                 "entity_id": entity_id,
@@ -852,7 +852,7 @@ class ImportService:
                 "phase": "Schritt 1/2 · Berechne Vorschau…" if planung else tr("Schritt 2/2 · Import läuft…"),
                 "done": min(done, total) if total else done,
                 "total": total,
-                "unit": "Variablen" if planung else tr("Monate"),
+                "unit": tr("Variablen") if planung else tr("Monate"),
                 "detail": self._import_progress.current_variable,
                 "percent": int(min(done, total) / total * 100) if total else 0,
             }
@@ -1192,7 +1192,7 @@ class ImportService:
             )
         noun = tr("Statistik-Werte") if history_source == "stats" else tr("Werte")
         if not history.rows:
-            return tr("Keine {v} im gewählten Zeitraum gefunden", v='Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie')
+            return tr("Keine {v} im gewählten Zeitraum gefunden", v=tr('Langzeitstatistik') if history_source == 'stats' else tr('Rohhistorie'))
         first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
         return (
             f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
@@ -1228,7 +1228,7 @@ class ImportService:
             stats_label = "Nicht angefordert"
         return {
             "stats_label": stats_label,
-            "raw_label": range_label(raw, "Rohwerte"),
+            "raw_label": range_label(raw, tr("Rohwerte")),
             "cutover_label": (
                 f"{format_timestamp(float(cutover_ts), self.deps.tz)} "
                 f"{format_time(float(cutover_ts), self.deps.tz)}"
@@ -1306,7 +1306,7 @@ class ImportService:
         history_source == "stats" holt stattdessen Langzeitstatistik über
         ha_statistics.py (WebSocket-API) statt Rohhistorie über ha_import.py
         (REST-API) — dieselbe Fehlerbehandlung/Logging-Struktur für beide."""
-        label = "Langzeitstatistik" if history_source == "stats" else "HA-Historie"
+        label = tr("Langzeitstatistik") if history_source == "stats" else tr("HA-Historie")
         fetched: dict[str, ha_import.HistoryFetchResult] = {}
         errors: list[str] = []
         for nummer, entity_id in enumerate(entity_ids):
@@ -1419,7 +1419,7 @@ class ImportService:
         combined_rows = sorted([*used_stats, *used_raw])
         if len(combined_rows) > MAX_IMPORT_ROWS_PER_ENTITY:
             raise ValueError(
-                f"HA-Vollimport enthält mehr als {MAX_IMPORT_ROWS_PER_ENTITY:,} Datenpunkte".replace(",", ".")
+                tr("HA-Vollimport enthält mehr als {limit} Datenpunkte", limit=f"{MAX_IMPORT_ROWS_PER_ENTITY:,}".replace(",", "."))
             )
 
         discarded = [

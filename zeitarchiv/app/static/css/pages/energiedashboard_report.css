@@ -49,7 +49,7 @@
      schnellen Überfliegen des gedruckten Berichts. */
   .section-title-icon{flex:none;display:flex;}
 
-  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--border);
     border:1px solid var(--border);border-radius:10px;overflow:hidden;}
   .kpi{background:var(--surface);padding:16px 16px 14px;position:relative;}
   /* Farbiger Streifen oben je Kachel, in derselben Rollenfarbe wie die
@@ -65,7 +65,10 @@
   .kpi-head svg{flex:none;}
   .kpi-label{font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);}
   .kpi-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;margin-top:5px;letter-spacing:-.01em;}
-  .kpi-delta{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));margin-top:4px;white-space:nowrap;color:var(--ink-faint);}
+  .kpi-delta{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));margin-top:4px;color:var(--ink-faint);}
+  /* Zahl und Vergleichstext je in einem Stück; der Umbruch darf nur dazwischen fallen,
+     damit alle drei Spalten gleich breit bleiben (minmax(0,1fr) oben). */
+  .kpi-delta-num,.kpi-delta-cmp{white-space:nowrap;}
   .kpi-delta.up{color:var(--positive);}
   .kpi-delta.down{color:var(--danger);}
 

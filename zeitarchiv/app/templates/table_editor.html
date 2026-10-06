@@ -13,7 +13,7 @@
 
     <div class="settings-panel">
         <div class="chart-title-row">
-          <h2 x-text="editing ? (tableId ? 'Tabelle bearbeiten' : 'Neue Tabelle') : (name || 'Neue Tabelle')"></h2>
+          <h2 x-text="editing ? (tableId ? t('Tabelle bearbeiten') : t('Neue Tabelle')) : (name || t('Neue Tabelle'))"></h2>
           <div style="display:flex;gap:8px;">
             <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="{{ _('Aktuell berechnete Tabelle als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if table_id %}
@@ -219,7 +219,7 @@
                              placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
                              :data-tooltip="t('Formel — verfügbar: {rows}', {rows: (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || t('– (keine Zeile oberhalb)'))})">
                       <input type="text" class="tbl-formula-input tbl-formula-unit-inline" x-show="row.row_type === 'formula'"
-                             :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" data-tooltip="{{ _('Einheit') }}">
+                             :placeholder="suggestFormulaUnit(row) || t('Auto')" x-model="row.formula_unit" @change="load()" data-tooltip="{{ _('Einheit') }}">
 
                       <span class="tbl-row-gap tbl-row-gap-agg" aria-hidden="true"
                             x-show="row.row_type === 'separator'"></span>

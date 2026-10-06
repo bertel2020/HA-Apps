@@ -307,7 +307,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # leere Wert = "kein Filter", genau wie bei den bestehenden dd-picker-
     # Filtern (siehe _rows_filter_menu.html). Die Entität-Liste ist dynamisch
     # (siehe _settings_activity_context) und deshalb kein Modulkonstante.
-    _ACTIVITY_ACTION_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_ACTION_LABELS.items())
+    _ACTIVITY_ACTION_FILTER_OPTIONS = [("", tr("Alle"))] + list(_ACTIVITY_ACTION_LABELS.items())
     _ACTIVITY_STATUS_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_STATUS_LABELS.items())
     _ACTIVITY_DAYS_FILTER_OPTIONS = [("", "Alle"), ("7", tr("7 Tage")), ("30", tr("30 Tage")), ("90", tr("90 Tage"))]
 
@@ -315,8 +315,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # wie main.py:_MONTH_NAMES_DE, hier lokal statt geteilt, weil sonst nirgends
     # in diesem Modul gebraucht.
     _MONTH_NAMES_DE = (
-        "Januar", "Februar", tr("März"), "April", "Mai", "Juni",
-        "Juli", "August", "September", "Oktober", "November", "Dezember",
+        N_("Januar"), N_("Februar"), N_("März"), N_("April"), N_("Mai"), N_("Juni"),
+        N_("Juli"), N_("August"), N_("September"), N_("Oktober"), N_("November"), N_("Dezember"),
     )
 
     def _month_year_label(month_key: str) -> str:
@@ -326,7 +326,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         deren genaues Format sich in einer künftigen Version ändern könnte."""
         try:
             year_str, month_str = month_key.split("-")
-            return f"{_MONTH_NAMES_DE[int(month_str) - 1]} {year_str}"
+            return f"{tr(_MONTH_NAMES_DE[int(month_str) - 1])} {year_str}"
         except (ValueError, IndexError):
             return month_key
 
@@ -408,7 +408,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "action": _ACTIVITY_ACTION_LABELS.get(a["action"], a["action"]),
                 "entity_key": a["entity_id"] or "",
                 "entity_label": entity_label,
-                "trigger": "Automatisch" if a["trigger"] == "automatic" else "Manuell",
+                "trigger": tr("Automatisch") if a["trigger"] == "automatic" else tr("Manuell"),
                 "rows_affected": format_int(a["rows_affected"]) if a["rows_affected"] is not None else "—",
                 "status": _ACTIVITY_STATUS_LABELS.get(a["status"], a["status"]),
                 "status_key": a["status"],
@@ -425,7 +425,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "entity_label": (
                     tr("{count} Entitäten", count=job["entities_affected"]) if job["entities_affected"] else tr("mehrere Entitäten")
                 ),
-                "trigger": "Automatisch" if job["trigger"] == "scheduled" else "Manuell",
+                "trigger": tr("Automatisch") if job["trigger"] == "scheduled" else tr("Manuell"),
                 "rows_affected": format_int(job["rows_deleted"]) if job["rows_deleted"] is not None else "—",
                 "status": _ACTIVITY_STATUS_LABELS.get(job["status"], job["status"]),
                 "status_key": job["status"],

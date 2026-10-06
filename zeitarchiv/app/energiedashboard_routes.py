@@ -74,8 +74,8 @@ RANGE_KEYS = tuple(RANGE_LABELS)
 # (Unterstrich-Präfix), und eine einzelne kurze Konstante rechtfertigt keine
 # Kopplung zwischen den Modulen.
 _MONTH_NAMES_DE = (
-    "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
+    N_("Januar"), N_("Februar"), N_("März"), N_("April"), N_("Mai"), N_("Juni"),
+    N_("Juli"), N_("August"), N_("September"), N_("Oktober"), N_("November"), N_("Dezember"),
 )
 # Energiebericht (siehe /energiedashboard/report): nur für Monat/Jahr
 # sinnvoll — Stunde/Tag sind zu kurze Zeiträume für einen druckbaren
@@ -164,7 +164,7 @@ _WEEK_GROUP_STARTS = (1, 8, 15, 22, 29)
 _OUTAGE_EPSILON_KWH = 0.01
 
 
-DEFAULT_HUB_NAME = "Haus"
+DEFAULT_HUB_NAME = N_("Haus")
 
 # Auffälligkeiten (Schwellenwert-Färbung): bewusst eine EIGENE Leiter und
 # ausdrücklich NICHT die Ausreißer-Schwelle je Entität (OUTLIER_THRESHOLD_
@@ -387,7 +387,7 @@ def _speicher_link_entities(config: dict) -> list[dict]:
     die Speicher-Rollen braucht, nicht alle Konfig-Rollen."""
     entities: list[dict] = []
     for sp in config.get("speicher") or []:
-        sp_name = sp.get("name") or "Speicher"
+        sp_name = sp.get("name") or tr("Speicher")
         if sp.get("laden_entity_id"):
             entities.append({"entity_id": sp["laden_entity_id"], "name": f"{sp_name} (Ladung)"})
         if sp.get("entladen_entity_id"):
@@ -742,7 +742,7 @@ class EnergieDashboardService:
         for ts in all_ts:
             local = datetime.fromtimestamp(ts, tz)
             group: dict = {
-                "label": _MONTH_NAMES_DE[local.month - 1][:3],
+                "label": tr(_MONTH_NAMES_DE[local.month - 1])[:3],
                 "day_count": calendar.monthrange(local.year, local.month)[1],
             }
             for role, series in series_by_role.items():
@@ -909,7 +909,7 @@ class EnergieDashboardService:
             local = datetime.fromtimestamp(ts, tz)
             delta = (v - avg) if as_points else ((v - avg) / avg * 100 if avg else None)
             return {
-                "date_label": f"{local.day}. {_MONTH_NAMES_DE[local.month - 1][:3]}",
+                "date_label": f"{local.day}. {tr(_MONTH_NAMES_DE[local.month - 1])[:3]}",
                 "value": v,
                 "delta": round(delta, 1) if delta is not None else None,
             }
@@ -967,18 +967,18 @@ class EnergieDashboardService:
         tz = self.deps.tz
         rows = []
         for label, role, invert in (
-            ("Stromertrag", "erzeugung", False),
-            ("Netzbezug", "netzbezug", True),
-            ("Verbrauch", "verbrauch", True),
-            ("Einspeisung", "einspeisung", False),
+            (tr("Stromertrag"), "erzeugung", False),
+            (tr("Netzbezug"), "netzbezug", True),
+            (tr("Verbrauch"), "verbrauch", True),
+            (tr("Einspeisung"), "einspeisung", False),
         ):
             result = self._strongest_weakest_row(
                 series.get(role, {}), erzeugung_by_day, verbrauch_by_day, invert, tz,
             )
             rows.append({"label": label, "role": role, "unit": "kWh", "decimals": 1, "is_pkt": False, **result})
         for label, role, values_by_day in (
-            ("Autarkie", "autarkie", autarkie_pct_by_day),
-            ("Eigenverbrauch", "eigenverbrauch", eigenverbrauch_pct_by_day),
+            (tr("Autarkie"), "autarkie", autarkie_pct_by_day),
+            (tr("Eigenverbrauch"), "eigenverbrauch", eigenverbrauch_pct_by_day),
         ):
             result = self._strongest_weakest_row(
                 values_by_day, erzeugung_by_day, verbrauch_by_day, False, tz, as_points=True,
@@ -1064,9 +1064,9 @@ class EnergieDashboardService:
         fälschlich als Fehler markieren."""
         roles: list[tuple[str, str]] = []
         if config.get("netzbezug"):
-            roles.append((config["netzbezug"], config.get("netzbezug_name") or "Netzbezug"))
+            roles.append((config["netzbezug"], config.get("netzbezug_name") or tr("Netzbezug")))
         if config.get("einspeisung"):
-            roles.append((config["einspeisung"], config.get("einspeisung_name") or "Einspeisung"))
+            roles.append((config["einspeisung"], config.get("einspeisung_name") or tr("Einspeisung")))
         for erz in config.get("erzeuger") or []:
             entity_id = erz.get("entity_id")
             if entity_id:
@@ -1076,7 +1076,7 @@ class EnergieDashboardService:
             if entity_id:
                 roles.append((entity_id, self._display_name(entity_id, verbraucher.get("name", ""))))
         for sp in config.get("speicher") or []:
-            sp_name = sp.get("name") or "Speicher"
+            sp_name = sp.get("name") or tr("Speicher")
             if sp.get("laden_entity_id"):
                 roles.append((sp["laden_entity_id"], f"{sp_name} (Ladung)"))
             if sp.get("entladen_entity_id"):
@@ -1162,7 +1162,7 @@ class EnergieDashboardService:
         # da es dafür keine feste HA-Konvention gibt (siehe Recherche zum
         # offiziellen Energy-Dashboard: der dortige Sankey benennt seinen
         # Sammelpunkt gar nicht prominent).
-        hub_name = (config.get("hub_name") or "").strip() or DEFAULT_HUB_NAME
+        hub_name = (config.get("hub_name") or "").strip() or tr(DEFAULT_HUB_NAME)
 
         nodes: list[dict] = []
         links: list[dict] = []
@@ -1236,13 +1236,13 @@ class EnergieDashboardService:
             netzbezug_series, stale = entity_series(netzbezug_id)
             netzbezug_val = self._series_total(netzbezug_series)
             nodes.append({
-                "name": "Netzbezug", "entity_id": netzbezug_id, "role": "source",
+                "name": tr("Netzbezug"), "entity_id": netzbezug_id, "role": "source",
                 "value": max(netzbezug_val, 0.0), "stale": stale,
-                "label": config.get("netzbezug_name") or "Netzbezug",
+                "label": config.get("netzbezug_name") or tr("Netzbezug"),
             })
-            links.append({"source": "Netzbezug", "target": hub_name, "value": max(netzbezug_val, 0.0)})
+            links.append({"source": tr("Netzbezug"), "target": hub_name, "value": max(netzbezug_val, 0.0)})
             bus_in += netzbezug_val
-            add_stale_issue(config.get("netzbezug_name") or "Netzbezug", stale)
+            add_stale_issue(config.get("netzbezug_name") or tr("Netzbezug"), stale)
 
         for erz in config.get("erzeuger") or []:
             entity_id = erz.get("entity_id")
@@ -1293,7 +1293,7 @@ class EnergieDashboardService:
         soc_now_breakdown: list[dict] = []
         speicher_breakdown: list[dict] = []
         for sp in speicher_list:
-            sp_name = sp.get("name") or "Speicher"
+            sp_name = sp.get("name") or tr("Speicher")
             sp_entladen_val = 0.0
             sp_laden_val = 0.0
             if sp.get("entladen_entity_id"):
@@ -1683,17 +1683,17 @@ class EnergieDashboardService:
             einspeisung_series, stale = entity_series(einspeisung_id)
             einspeisung_val = self._series_total(einspeisung_series)
             nodes.append({
-                "name": "Einspeisung", "entity_id": einspeisung_id, "role": "sink",
+                "name": tr("Einspeisung"), "entity_id": einspeisung_id, "role": "sink",
                 "value": max(einspeisung_val, 0.0), "stale": stale,
-                "label": config.get("einspeisung_name") or "Einspeisung",
+                "label": config.get("einspeisung_name") or tr("Einspeisung"),
             })
-            links.append({"source": hub_name, "target": "Einspeisung", "value": max(einspeisung_val, 0.0)})
-            add_stale_issue(config.get("einspeisung_name") or "Einspeisung", stale)
+            links.append({"source": hub_name, "target": tr("Einspeisung"), "value": max(einspeisung_val, 0.0)})
+            add_stale_issue(config.get("einspeisung_name") or tr("Einspeisung"), stale)
 
         for sp, sp_laden_val in zip(speicher_list, speicher_laden_vals):
             if not sp.get("laden_entity_id"):
                 continue
-            sp_name = sp.get("name") or "Speicher"
+            sp_name = sp.get("name") or tr("Speicher")
             label = f"{sp_name} (Ladung)"
             nodes.append({
                 "name": label, "entity_id": sp["laden_entity_id"], "role": "sink",
@@ -1769,13 +1769,13 @@ class EnergieDashboardService:
         versorgung_breakdown: list[dict] = [dict(item) for item in erzeuger_breakdown]
         if netzbezug_id:
             versorgung_breakdown.append({
-                "name": config.get("netzbezug_name") or "Netzbezug",
+                "name": config.get("netzbezug_name") or tr("Netzbezug"),
                 "value": round(max(netzbezug_val, 0.0), 3),
                 "entity_id": netzbezug_id,
             })
         if speicher_laden_val or speicher_entladen_val:
             versorgung_breakdown.append({
-                "name": "Speichernutzung", "value": round(speicher_entladen_val - speicher_laden_val, 3),
+                "name": tr("Speichernutzung"), "value": round(speicher_entladen_val - speicher_laden_val, 3),
             })
         # Summe der Zeilen statt bus_in als Nenner — deckt sich dadurch immer
         # mit Verbrauch + Einspeisung (der Teil, der wirklich "versorgt"
@@ -2017,12 +2017,12 @@ class EnergieDashboardService:
         if any(sp.get("entladen_entity_id") for sp in speicher_list):
             balance_sources.append("Speicherentladung")
         if netzbezug_id:
-            balance_sources.append(config.get("netzbezug_name") or "Netzbezug")
-        balance_sinks = ["Verbrauch"]
+            balance_sources.append(config.get("netzbezug_name") or tr("Netzbezug"))
+        balance_sinks = [tr("Verbrauch")]
         if any(sp.get("laden_entity_id") for sp in speicher_list):
             balance_sinks.append("Speicherladung")
         if einspeisung_id:
-            balance_sinks.append(config.get("einspeisung_name") or "Einspeisung")
+            balance_sinks.append(config.get("einspeisung_name") or tr("Einspeisung"))
         balance_description = (
             tr("{join} entsprechen {join2}, innerhalb der Toleranz. Nicht einzeln gemessene Lasten erscheinen als „Grundlast“.", join=' + '.join(balance_sources), join2=' + '.join(balance_sinks))
             if balance_sources else
@@ -2103,7 +2103,7 @@ class EnergieDashboardService:
                 ),
             },
             {
-                "label": "Einheit korrekt (kWh)",
+                "label": tr("Einheit korrekt (kWh)"),
                 "ok": not metadata["unit_issues"],
                 "detail": (
                     "Nicht in kWh: " + ", ".join(metadata["unit_issues"])
@@ -2665,7 +2665,7 @@ class EnergieDashboardService:
             if verbrauch_month > 0:
                 autarkie_month = round(max(0.0, min(1.0, 1 - netzbezug_month / verbrauch_month)) * 100, 1)
             rows_by_month[dt.month] = {
-                "name": _MONTH_NAMES_DE[dt.month - 1],
+                "name": tr(_MONTH_NAMES_DE[dt.month - 1]),
                 "erzeugung": round(erzeugung_month, 1),
                 "verbrauch": round(verbrauch_month, 1),
                 "netzbezug": round(netzbezug_month, 1),
@@ -2692,7 +2692,7 @@ class EnergieDashboardService:
                 break
             flow = self.compute_flow(config, "month", offset, read_cache=read_cache)
             for anomaly in flow.get("anomalien") or []:
-                result.append({"month": _MONTH_NAMES_DE[month - 1], **anomaly})
+                result.append({"month": tr(_MONTH_NAMES_DE[month - 1]), **anomaly})
         return result
 
     def _page_context(self, request: Request) -> dict:
@@ -3051,16 +3051,20 @@ class EnergieDashboardService:
             if range == "year":
                 period_title = tr("Jahr {year}", year=window_start.year)
                 if offset == 0:
-                    period_range_text = (
-                        f"1. Januar – {display_end.day}. {_MONTH_NAMES_DE[display_end.month - 1]} {display_end.year}"
+                    period_range_text = tr(
+                        "1. Januar – {day}. {month} {year}",
+                        day=display_end.day, month=tr(_MONTH_NAMES_DE[display_end.month - 1]), year=display_end.year,
                     )
                 else:
-                    period_range_text = f"1. Januar – 31. Dezember {window_start.year}"
+                    period_range_text = tr("1. Januar – 31. Dezember {year}", year=window_start.year)
                 monatsverlauf = self._monatsverlauf_for_year(config, window_start.year, now, read_cache)
                 anomalien_report = self._anomalien_for_months(config, window_start.year, now, read_cache)
             else:
-                period_title = f"{_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
-                period_range_text = f"1.–{display_end.day}. {_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
+                period_title = f"{tr(_MONTH_NAMES_DE[window_start.month - 1])} {window_start.year}"
+                period_range_text = tr(
+                    "1.–{day}. {month} {year}",
+                    day=display_end.day, month=tr(_MONTH_NAMES_DE[window_start.month - 1]), year=window_start.year,
+                )
                 monatsverlauf = []
                 anomalien_report = [{"month": None, **a} for a in (current.get("anomalien") or [])]
             detail_charts = self._report_detail_charts(config, range, offset, now, read_cache)
@@ -3069,8 +3073,8 @@ class EnergieDashboardService:
                 # Autarkie/Eigenverbrauch nur, wenn die KPI-Kachel selbst
                 # existiert (dieselbe Bedingung wie im KPI-Grid) — ein
                 # System ohne Erzeuger hat schlicht keine dieser Quoten.
-                if row["label"] != "Autarkie" or current["kpi"].get("autarkie") is not None
-                if row["label"] != "Eigenverbrauch" or current["kpi"].get("eigenverbrauch") is not None
+                if row["label"] != tr("Autarkie") or current["kpi"].get("autarkie") is not None
+                if row["label"] != tr("Eigenverbrauch") or current["kpi"].get("eigenverbrauch") is not None
             ]
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_report.html",
@@ -3091,7 +3095,7 @@ class EnergieDashboardService:
                     "detail_charts": detail_charts,
                     "staerkster_schwaechster": staerkster_schwaechster,
                     "generated_at": now,
-                    "month_names": _MONTH_NAMES_DE,
+                    "month_names": [tr(name) for name in _MONTH_NAMES_DE],
                     # app_root deckt auch diese Seite ab, obwohl sie eine Ebene
                     # tiefer liegt als die übrigen — genau dafür ist der Präfix
                     # absolut statt relativ (ZG-03).

@@ -255,7 +255,8 @@
   // versehentlichen Doppelklick.
   async removeRow(list, idx, row, kind) {
     const name = row && row.name;
-    const message = name ? kind + " „" + name + "\" wirklich entfernen?" : kind + " wirklich entfernen?";
+    const label = t(kind);
+    const message = name ? t("{kind} „{name}“ wirklich entfernen?", {kind: label, name}) : t("{kind} wirklich entfernen?", {kind: label});
     const ok = await window.appConfirm(message, {danger: true, confirmLabel: t("Entfernen")});
     if (ok) list.splice(idx, 1);
   },
@@ -305,9 +306,10 @@
   async deleteGroup(name) {
     const count = this.groupUsage(name);
     if (count > 0) {
-      const suffix = count === 1 ? "" : "n";
       const ok = await window.appConfirm(
-        "Gruppe „" + name + "\" wird von " + count + " Verbraucher" + suffix + " verwendet. Beim Löschen wird dort nur die Gruppen-Zuordnung entfernt, die Verbraucher selbst bleiben erhalten.",
+        count === 1
+          ? t("Gruppe „{name}“ wird von 1 Verbraucher verwendet. Beim Löschen wird dort nur die Gruppen-Zuordnung entfernt, die Verbraucher selbst bleiben erhalten.", {name})
+          : t("Gruppe „{name}“ wird von {count} Verbrauchern verwendet. Beim Löschen wird dort nur die Gruppen-Zuordnung entfernt, die Verbraucher selbst bleiben erhalten.", {name, count}),
         {danger: true, confirmLabel: t("Löschen")}
       );
       if (!ok) return;
@@ -409,7 +411,7 @@
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
-              <span class="edash-item-name" x-text="netzbezugName || 'Netzbezug'"></span>
+              <span class="edash-item-name" x-text="netzbezugName || t('Netzbezug')"></span>
               <span class="edash-item-req">{{ _("Pflicht") }}</span>
             </div>
             <div class="edash-item-bottom">
@@ -423,7 +425,7 @@
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
-              <span class="edash-item-name" x-text="einspeisungName || 'Einspeisung'"></span>
+              <span class="edash-item-name" x-text="einspeisungName || t('Einspeisung')"></span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !einspeisung}" x-text="einspeisung ? nameFor(einspeisung) : 'Nicht zugeordnet'"></span>
@@ -504,7 +506,7 @@
                   <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(erzeuger, idx)" @dragend="dragEnd()">⠿</span>
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
-                  <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : 'Erzeuger')"></span>
+                  <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Erzeuger'))"></span>
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : 'Nicht zugeordnet'"></span>
@@ -568,7 +570,7 @@
                   <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(speicher, idx)" @dragend="dragEnd()">⠿</span>
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
-                  <span class="edash-item-name" x-text="row.name || 'Speicher'"></span>
+                  <span class="edash-item-name" x-text="row.name || t('Speicher')"></span>
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-meta" :class="{'is-empty': !row.capacity_entity_id && !row.capacity_kwh}"
@@ -660,7 +662,7 @@
                   <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(verbraucher, idx)" @dragend="dragEnd()">⠿</span>
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
-                  <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : 'Verbraucher')"></span>
+                  <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Verbraucher'))"></span>
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-chip" x-show="row.gruppe" x-text="row.gruppe"></span>

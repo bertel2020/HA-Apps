@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .i18n import tr
+from .i18n import N_, tr
 
 import logging
 import secrets
@@ -246,12 +246,12 @@ def _duration_noun(seconds: int) -> str:
     """"Stunde", "5 Minuten", "2 Stunden" — für Tooltip-Text, nicht für Rechnen."""
     if seconds % 3600 == 0:
         hours = seconds // 3600
-        return "Stunde" if hours == 1 else f"{hours} Stunden"
+        return tr("Stunde") if hours == 1 else tr("{hours} Stunden", hours=hours)
     minutes = max(1, seconds // 60)
-    return "Minute" if minutes == 1 else f"{minutes} Minuten"
+    return tr("Minute") if minutes == 1 else tr("{minutes} Minuten", minutes=minutes)
 
 
-_ROLLUP_LEVEL_NOUNS = {"minute": "Minute", "stunde": "Stunde", "tag": "Tag", "monat": "Monat", "jahr": "Jahr"}
+_ROLLUP_LEVEL_NOUNS = {"minute": N_("Minute"), "stunde": N_("Stunde"), "tag": N_("Tag"), "monat": N_("Monat"), "jahr": N_("Jahr")}
 
 
 def _counter_bucket_label(range_key: str) -> str | None:

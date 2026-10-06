@@ -84,7 +84,7 @@ def restart_addon() -> None:
         raise RuntimeError(tr("Neustart über Supervisor fehlgeschlagen")) from exc
     if payload.get("result") != "ok":
         raise RuntimeError(
-            tr("Supervisor meldete: {v}", v=payload.get('message') or 'unbekannter Fehler')
+            tr("Supervisor meldete: {v}", v=payload.get('message') or tr("unbekannter Fehler"))
         )
 
 
@@ -94,7 +94,7 @@ def describe_memory_usage() -> str:
     try:
         return format_size(fetch_memory_usage_bytes())
     except RuntimeError:
-        return "nicht verfügbar (kein Supervisor)"
+        return tr("nicht verfügbar (kein Supervisor)")
 
 
 def maybe_record_memory_snapshot(index: "Index") -> None:

@@ -383,10 +383,10 @@ def _parse_csv_file(
             rows.append((ts, value))
             if max_rows is not None and len(rows) > max_rows:
                 raise ValueError(
-                    (
-                        f"mehr als {MAX_IMPORT_ROWS_PER_ENTITY:,} Datenzeilen; "
-                        "Importlimit überschritten"
-                    ).replace(",", ".")
+                    tr(
+                        "mehr als {limit} Datenzeilen; Importlimit überschritten",
+                        limit=f"{MAX_IMPORT_ROWS_PER_ENTITY:,}".replace(",", "."),
+                    )
                 )
     return rows
 

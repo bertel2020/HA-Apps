@@ -21,10 +21,10 @@
 {% macro kpi_delta(compare, invert=false) %}
   {%- if compare and compare.pct is not none -%}
     {%- set favorable = (compare.pct >= 0) != invert -%}
-    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ _("{v1} {pct} % ggü. {compare_label}", v1=('▲' if compare.pct >= 0 else '▼'), pct=(compare.pct | abs | format_value(1)), compare_label=compare_label) }}</div>
+    <div class="kpi-delta {{ 'up' if favorable else 'down' }}"><span class="kpi-delta-num">{{ '▲' if compare.pct >= 0 else '▼' }} {{ compare.pct | abs | format_value(1) }} %</span> <span class="kpi-delta-cmp">{{ _("ggü. {compare_label}", compare_label=compare_label) }}</span></div>
   {%- elif compare and compare.abs is not none -%}
     {%- set favorable = (compare.abs >= 0) != invert -%}
-    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ _("{v1} {abs} kWh ggü. {compare_label}", v1=('▲' if compare.abs >= 0 else '▼'), abs=(compare.abs | abs | format_value(1)), compare_label=compare_label) }}</div>
+    <div class="kpi-delta {{ 'up' if favorable else 'down' }}"><span class="kpi-delta-num">{{ '▲' if compare.abs >= 0 else '▼' }} {{ compare.abs | abs | format_value(1) }} kWh</span> <span class="kpi-delta-cmp">{{ _("ggü. {compare_label}", compare_label=compare_label) }}</span></div>
   {%- endif -%}
 {% endmacro %}
 
@@ -155,7 +155,7 @@
         </div>
         <div class="kpi-value">{{ current.kpi.autarkie | format_value(0) }} %</div>
         {%- if autarkie_delta_pkt is not none %}
-        <div class="kpi-delta {{ 'up' if autarkie_delta_pkt >= 0 else 'down' }}">{{ _("{v1} {autarkie_delta_pkt} Pkt. ggü. {compare_label}", v1=('▲' if autarkie_delta_pkt >= 0 else '▼'), autarkie_delta_pkt=(autarkie_delta_pkt | abs | format_value(1)), compare_label=compare_label) }}</div>
+        <div class="kpi-delta {{ 'up' if autarkie_delta_pkt >= 0 else 'down' }}"><span class="kpi-delta-num">{{ _("{v1} {delta} Pkt.", v1=('▲' if autarkie_delta_pkt >= 0 else '▼'), delta=(autarkie_delta_pkt | abs | format_value(1))) }}</span> <span class="kpi-delta-cmp">{{ _("ggü. {compare_label}", compare_label=compare_label) }}</span></div>
         {%- endif %}
       </div>
       {% endif %}
@@ -168,7 +168,7 @@
         </div>
         <div class="kpi-value">{{ current.kpi.eigenverbrauch | format_value(0) }} %</div>
         {%- if eigenverbrauch_delta_pkt is not none %}
-        <div class="kpi-delta {{ 'up' if eigenverbrauch_delta_pkt >= 0 else 'down' }}">{{ _("{v1} {eigenverbrauch_delta_pkt} Pkt. ggü. {compare_label}", v1=('▲' if eigenverbrauch_delta_pkt >= 0 else '▼'), eigenverbrauch_delta_pkt=(eigenverbrauch_delta_pkt | abs | format_value(1)), compare_label=compare_label) }}</div>
+        <div class="kpi-delta {{ 'up' if eigenverbrauch_delta_pkt >= 0 else 'down' }}"><span class="kpi-delta-num">{{ _("{v1} {delta} Pkt.", v1=('▲' if eigenverbrauch_delta_pkt >= 0 else '▼'), delta=(eigenverbrauch_delta_pkt | abs | format_value(1))) }}</span> <span class="kpi-delta-cmp">{{ _("ggü. {compare_label}", compare_label=compare_label) }}</span></div>
         {%- endif %}
       </div>
       {% endif %}
@@ -232,7 +232,7 @@
         {% endif %}
         {% if current.kpi.net_cost is not none %}
         <div class="stat-total {{ 'is-surplus' if current.kpi.net_cost < 0 else 'is-cost' }}">
-          <span>{{ _("Saldo &#8213; {v1}", v1=("gespart" if current.kpi.net_cost < 0 else _("Kosten"))) }}</span>
+          <span>{{ _("Saldo &#8213; {v1}", v1=(_("gespart") if current.kpi.net_cost < 0 else _("Kosten"))) }}</span>
           <span class="mono">{{ '+' if current.kpi.net_cost < 0 else '' }}{{ (current.kpi.net_cost * -1) | format_value(2) if current.kpi.net_cost < 0 else current.kpi.net_cost | format_value(2) }} €</span>
         </div>
         {% endif %}
@@ -258,7 +258,7 @@
            Hintergrund) übersteht den Druck verlustfrei. #}
         {% set co2_bilanz = current.kpi.co2_ausstoss - current.kpi.co2_vermieden %}
         <div class="stat-total {{ 'is-surplus' if co2_bilanz < 0 else 'is-cost' }}">
-          <span>{{ _("Bilanz &#8213; {v1}", v1=("sauber" if co2_bilanz < 0 else "belastet")) }}</span>
+          <span>{{ _("Bilanz &#8213; {v1}", v1=(_("sauber") if co2_bilanz < 0 else _("belastet"))) }}</span>
           <span class="mono">{{ _("{co2_bilanz} kg", co2_bilanz=(co2_bilanz | format_value(1))) }}</span>
         </div>
         {% endif %}

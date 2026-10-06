@@ -144,7 +144,7 @@
           <span class="edash-quality-check-icon">!</span>
           <span>
             <strong x-text="a.name"></strong> —
-            <span x-text="fmt(a.value, 1) + ' kWh, +' + a.pct + ' % über dem Schnitt der letzten Perioden (' + fmt(a.baseline, 1) + ' kWh)'"></span>
+            <span x-text="t('{value} kWh, +{pct} % über dem Schnitt der letzten Perioden ({baseline} kWh)', {value: fmt(a.value, 1), pct: a.pct, baseline: fmt(a.baseline, 1)})"></span>
           </span>
         </li>
       </template>
@@ -418,7 +418,7 @@
       </div>
       <div class="edash-hero-item" x-show="kpi.net_cost != null">
         <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2.2"/><path d="M14.5 9a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
-        <strong x-text="fmtCurrency(kpi.net_cost)"></strong><span x-text="kpi.net_cost < 0 ? 'gespart' : 'Kosten'"></span>
+        <strong x-text="fmtCurrency(kpi.net_cost)"></strong><span x-text="kpi.net_cost < 0 ? t('gespart') : t('Kosten')"></span>
       </div>
       <div class="edash-hero-item edash-hero-prognose" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
         <svg width="16" height="13" viewBox="0 0 26 20"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--chart-3)" opacity=".8"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface)" stroke="var(--chart-3)" stroke-width="1.6"/></svg>

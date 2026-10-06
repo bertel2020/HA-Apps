@@ -322,7 +322,7 @@ def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: 
         # Zentralverzeichnis auf (619 Byte je Eintrag), und die Grenze darunter
         # käme zu spät. Siehe zip_guard.
         zip_guard.ensure_entry_count_allowed(
-            path, MAX_ZIP_MEMBERS, "Backup enthält zu viele Dateien"
+            path, MAX_ZIP_MEMBERS, tr("Backup enthält zu viele Dateien")
         )
         with zipfile.ZipFile(path) as zf:
             members = zf.infolist()

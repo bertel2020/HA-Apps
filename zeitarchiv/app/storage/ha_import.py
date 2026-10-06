@@ -246,7 +246,7 @@ def fetch_history_rows(
             changed = entry.get("last_changed") or entry.get("last_updated")
             if not changed:
                 result.skipped += 1
-                _discard(result, "Zeitstempel fehlt", entry)
+                _discard(result, tr("Zeitstempel fehlt"), entry)
                 continue
             try:
                 ts = datetime.fromisoformat(str(changed).replace("Z", "+00:00")).timestamp()
@@ -266,7 +266,7 @@ def fetch_history_rows(
             last_ts = ts
             if len(result.rows) > max_rows:
                 raise ValueError(
-                    f"HA-Historie enthält mehr als {max_rows:,} Datenpunkte".replace(",", ".")
+                    tr("HA-Historie enthält mehr als {limit} Datenpunkte", limit=f"{max_rows:,}".replace(",", "."))
                 )
         window_start = window_end
     return result

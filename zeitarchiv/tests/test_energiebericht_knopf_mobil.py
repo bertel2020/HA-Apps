@@ -26,4 +26,4 @@ def test_the_report_itself_still_has_no_mobile_layout() -> None:
     css = (APP / "static/css/pages/energiedashboard_report.css").read_text(encoding="utf-8")
     medien = [z.strip() for z in css.splitlines() if z.strip().startswith("@media")]
     assert medien == ["@media print{"], medien
-    assert "grid-template-columns:repeat(3,1fr)" in css.replace(" ", "")
+    assert "grid-template-columns:repeat(3,minmax(0,1fr))" in css.replace(" ", "")

@@ -197,7 +197,7 @@ def build_index_detail_context(
         "index_optimization": {
             **optimization,
             "status_label": (
-                "Optimierung empfohlen"
+                tr("Optimierung empfohlen")
                 if optimization["recommended"] else tr("Optimierung nicht nötig")
             ),
             "reclaimable_size": format_size(optimization["reclaimable_bytes"]),
