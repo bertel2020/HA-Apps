@@ -176,6 +176,9 @@
           <a class="dtile-cleanup-compact" href="{{ href_base }}housekeeping" draggable="false">
             <span class="dtile-cleanup-total">{{ tile.open_label if not tile.all_clear else '✓' }}</span>
             <span class="dtile-cleanup-sub">{{ _("offen") if not tile.all_clear else _("in Ordnung") }}</span>
+            <span class="dtile-cleanup-mini">
+              {% for item in tile.lines %}<span class="dtile-cleanup-mini-row{{ ' is-warn' if item.warn else '' }}"><span>{{ item.label }}</span><b>{{ item.count_label }}</b></span>{% endfor %}
+            </span>
           </a>
           {% else %}
           <div class="dtile-cleanup-items">

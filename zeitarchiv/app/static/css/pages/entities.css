@@ -109,6 +109,15 @@
   .dtile-cleanup.is-clear .dtile-cleanup-total{color:var(--positive);}
   /* Erläuterung unter dem Reiter „Bereinigung“: auf Lesebreite begrenzt und mit demselben Einzug wie die
      Einträge der Listen (6px zusätzlich zum Listen-Padding), statt über die ganze Popup-Breite zu laufen. */
+  /* 1×1: unter der Summe die drei Zahlen klein, aber nur, wenn die Kachel hoch genug ist (Container-Abfrage),
+     damit nichts halb abgeschnitten wird. */
+  .dtile-cleanup-body{container-type:size;}
+  .dtile-cleanup-compact{height:100%;}
+  .dtile-cleanup-mini{display:none;margin-top:auto;width:100%;padding-top:6px;border-top:1px solid var(--border);}
+  .dtile-cleanup-mini-row{display:flex;justify-content:space-between;gap:8px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.5;}
+  .dtile-cleanup-mini-row b{font-variant-numeric:tabular-nums;color:var(--ink);}
+  .dtile-cleanup-mini-row.is-warn b{color:var(--notice-warn);}
+  @container (min-height:150px){.dtile-cleanup-mini{display:block;}}
   .dtile-picker-hint{margin:0 0 14px;padding:0 6px;max-width:30em;line-height:1.5;text-wrap:balance;color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));}
   .dtile-picker-list > div > .dtile-picker-section-submit{margin:0 6px;}
   .dtile-entity-body{display:flex;flex-direction:column;gap:4px;}
