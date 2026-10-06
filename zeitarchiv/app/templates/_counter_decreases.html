@@ -1,0 +1,47 @@
+{# Inhalt von <div id="counter-decreases"> in housekeeping.html — die Sammelaktion
+   (counter_bulk.py) tauscht dieses Partial per hx-target="#counter-decreases" aus. #}
+{% if counter_result %}
+<div class="counter-result" role="status">
+  <span>{{ counter_result.message }}</span>
+  {% if counter_result.undo_vals %}
+  <button type="button" class="btn btn-sm" hx-post="housekeeping/counter-decreases/undo" hx-target="#counter-decreases" hx-swap="innerHTML"
+          hx-vals='{{ counter_result.undo_vals }}'>{{ _("Rückgängig") }}</button>
+  <a href="{{ counter_result.link }}">{{ _("Markierte Werte ansehen ›") }}</a>
+  {% endif %}
+</div>
+{% endif %}
+{% if counter_bulk %}
+<div class="counter-bulk">
+  <p><strong>{{ counter_bulk.lead }}</strong> {{ counter_bulk.rest }}</p>
+  <button type="button" class="btn primary" hx-post="housekeeping/counter-decreases/mark-returning" hx-target="#counter-decreases" hx-swap="innerHTML"
+          hx-confirm="{{ counter_bulk.confirm }}">{{ counter_bulk.button }}</button>
+</div>
+{% endif %}
+        <div class="tbl-wrap">
+          {% if counter_decreases %}
+          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+            <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th></tr></thead>
+            <tbody>
+            {% for row in counter_decreases %}
+            <tr>
+              <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
+                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+                  {% if row.friendly_name %}
+                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  {% else %}
+                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+                  {% endif %}
+                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
+                </a>
+              </td>
+              <td data-sort="{{ row.count }}">{{ row.count_label }}</td>
+              <td data-sort="{{ row.last_ts }}">{{ row.last_label }}<div class="counter-note">{{ row.change }}</div></td>
+              <td><span class="counter-verdict {{ row.verdict }}">{% if row.verdict == 'returns' %}{{ _("kehrt zurück") }}{% elif row.verdict == 'stays' %}{{ _("bleibt niedrig") }}{% else %}{{ _("noch offen") }}{% endif %}</span><div class="counter-note">{{ row.note }}</div></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty">{{ _("Keine Zählerrückgänge in den letzten 30 Tagen gefunden.") }}</div>
+          {% endif %}
+        </div>

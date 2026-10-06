@@ -661,8 +661,7 @@ storage_coordinator = StorageCoordinator()
 # count_stale_entities als Lambda, weil _count_stale_entities() weiter unten in
 # dieser Datei steht — aufgelöst wird es erst beim Aufruf.
 _background = BackgroundService(BackgroundDependencies(
-    data_dir=DATA_DIR,
-    tz=TZ,
+    data_dir=DATA_DIR, tz=TZ,
     index=index,
     coordinator=storage_coordinator,
     base_dir=BASE_DIR, demo_mode_active=DEMO_MODE,
@@ -5722,6 +5721,7 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     storage_locked=_storage_locked,
     settings_archivierung_context=_settings_archivierung_context,
     refresh_purge_preview_if_stale=_background.refresh_purge_preview_if_stale,
+    invalidate_purge_preview=_background.invalidate_purge_preview,
     refresh_retention_overview_if_stale=_background.refresh_retention_overview_if_stale,
     begin_retention_job=_background.begin_retention_job,
     finish_retention_job=_background.finish_retention_job,

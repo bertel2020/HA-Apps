@@ -92,34 +92,7 @@
       <section id="zaehlerrueckgaenge" class="settings-section">
         <h2 class="settings-section-title">{{ _("Zählerrückgänge") }} {{ hint_button(_('Zählerrückgänge')) }}</h2>
         {% call hint_body('settings-section-description') %}{{ _("Zähler, deren Stand in den letzten 30 Tagen gefallen ist. „Kehrt zurück“ heißt: ein Folgewert erreicht den Vorwert innerhalb von 30 Minuten oder 10 Werten wieder, das sieht nach einem Fehlwert aus. „Bleibt niedrig“ deutet auf einen Zählerwechsel oder Rücksetzer hin. Das ist nur eine Einschätzung, gelöscht wird nichts. Die Bereinigungs-Seite der Entität markiert die Rückgänge.") }}{% endcall %}
-        <div class="tbl-wrap">
-          {% if counter_decreases %}
-          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-            <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th></tr></thead>
-            <tbody>
-            {% for row in counter_decreases %}
-            <tr>
-              <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
-                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
-                  {% if row.friendly_name %}
-                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
-                  {% else %}
-                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
-                  {% endif %}
-                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
-                </a>
-              </td>
-              <td data-sort="{{ row.count }}">{{ row.count_label }}</td>
-              <td data-sort="{{ row.last_ts }}">{{ row.last_label }}<div class="counter-note">{{ row.change }}</div></td>
-              <td><span class="counter-verdict {{ row.verdict }}">{% if row.verdict == 'returns' %}{{ _("kehrt zurück") }}{% elif row.verdict == 'stays' %}{{ _("bleibt niedrig") }}{% else %}{{ _("noch offen") }}{% endif %}</span><div class="counter-note">{{ row.note }}</div></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          <div class="empty">{{ _("Keine Zählerrückgänge in den letzten 30 Tagen gefunden.") }}</div>
-          {% endif %}
-        </div>
+        <div id="counter-decreases">{% include "_counter_decreases.html" %}</div>
       </section>
 
       <section id="ausreisser" class="settings-section">

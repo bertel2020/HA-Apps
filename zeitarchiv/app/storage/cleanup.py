@@ -18,7 +18,7 @@ import json
 import statistics
 import time
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -687,6 +687,7 @@ def count_duplicate_rows_by_entity(
 
 # „Kehrt zurück“: nach einem Rückgang erreicht ein Folgewert den Vorwert wieder, innerhalb
 # von 30 Minuten ODER 10 Werten (je nach Sendetakt zählt das eine oder das andere).
+COUNTER_WINDOW_DAYS = 30
 COUNTER_RETURN_SECONDS = 1800
 COUNTER_RETURN_VALUES = 10
 
@@ -754,8 +755,9 @@ def scan_counter_decreases(
     data_dir: Path,
     index: Index,
     tz: ZoneInfo,
-    window_days: int = 30,
+    window_days: int = COUNTER_WINDOW_DAYS,
     now: datetime | None = None,
+    entity_ids: Collection[str] | None = None,
 ) -> list[dict]:
     """Zählerrückgänge der letzten Tage je Zähler (state_class total_increasing) für die Meldung
     und den Housekeeping-Abschnitt. Dasselbe Streaming und dieselbe Fensterbegrenzung wie
@@ -769,6 +771,8 @@ def scan_counter_decreases(
         if entity["state_class"] != "total_increasing":
             continue
         entity_id = entity["entity_id"]
+        if entity_ids is not None and entity_id not in entity_ids:
+            continue
         decreases = classify_counter_decreases(
             iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now), tz
         )
@@ -844,9 +848,11 @@ def detect_outliers(
     return flagged
 
 
-def soft_delete(index: Index, entity_id: str, timestamps: list[float]) -> None:
+def soft_delete(
+    index: Index, entity_id: str, timestamps: list[float], deleted_at: float | None = None
+) -> None:
     started_at = time.time()
-    index.mark_deleted(entity_id, timestamps)
+    index.mark_deleted(entity_id, timestamps, deleted_at=deleted_at)
     if timestamps:
         index.invalidate_counter_decrease_snapshot()
         index.log_entity_action(

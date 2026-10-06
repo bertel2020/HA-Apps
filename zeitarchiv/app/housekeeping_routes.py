@@ -34,10 +34,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import cleanup_stats
+from . import counter_bulk
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -142,6 +144,7 @@ class HousekeepingDependencies:
     storage_locked: Callable[..., Callable]
     settings_archivierung_context: Callable[..., dict]
     refresh_purge_preview_if_stale: Callable[..., object]
+    invalidate_purge_preview: Callable[[], None]
     refresh_retention_overview_if_stale: Callable[..., object]
     begin_retention_job: Callable[..., object]
     finish_retention_job: Callable[..., object]
@@ -276,6 +279,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             rows.append({
                 "entity_id": row["entity_id"],
                 "friendly_name": row["friendly_name"],
+                "returning": row.get("returning", 0),
+                "unit_label": row.get("unit") or "",
                 "count": row["count"],
                 "count_label": format_int(row["count"]),
                 "last_ts": last["ts"],
@@ -289,6 +294,44 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "note": note,
             })
         return rows
+
+    # Einordnung der Zählerrückgänge in der Bereinigungsansicht (_rows_table.html).
+    deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdicts_for_rows(
+        deps.data_dir, deps.index, deps.tz, entity_id, rows
+    )
+
+    def _counter_decreases_context(result: dict | None = None) -> dict:
+        """Kontext von _counter_decreases.html: die Tabelle samt Sammelaktion „Fehlwerte markieren“
+        und, nach einer Aktion, dem Ergebnishinweis mit „Rückgängig“."""
+        rows = _counter_decreases_for_display()
+        returning = sum(row["returning"] for row in rows)
+        bulk = None
+        if returning:
+            total = sum(row["count"] for row in rows)
+            lines = [
+                tr("{name}: {count}", name=row["friendly_name"] or row["entity_id"], count=_values_label(row["returning"]))
+                for row in rows if row["returning"]
+            ]
+            bulk = {
+                "lead": tr("{returning} von {total} Rückgängen kehren sofort zurück", returning=returning, total=total),
+                "rest": tr("und sehen nach Fehlwerten aus."),
+                "button": tr("1 Fehlwert markieren …") if returning == 1 else tr("{returning} Fehlwerte markieren …", returning=returning),
+                "confirm": "\n".join((
+                    tr("{what} markieren?", what=tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)),
+                    tr("Markiert werden die Werte, auf die der Zähler kurz fiel und von denen er sofort zurückkehrte:"),
+                    *(f"• {line}" for line in lines),
+                    "",
+                    tr("Sie bleiben im Reiter „Markiert“ und lassen sich zurücknehmen. Endgültig entfernt wird nichts."),
+                )),
+            }
+        return {
+            "counter_decreases": rows,
+            "counter_bulk": bulk,
+            "counter_result": result,
+        }
+
+    def _values_label(count: int) -> str:
+        return tr("1 Wert") if count == 1 else tr("{count} Werte", count=count)
 
     def _host_disk_usage_context() -> dict:
         """Für die immer sichtbare Host-Speicherplatz-Zeile in housekeeping.html —
@@ -768,7 +811,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "table_count": deps.index.count_saved_tables(),
                 "duplicates_by_entity": duplicates_by_entity,
                 "duplicates_total": duplicates_total,
-                "counter_decreases": _counter_decreases_for_display(),
+                **_counter_decreases_context(),
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(
@@ -1179,6 +1222,46 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         return deps.templates.TemplateResponse(
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
         )
+
+    @router.post("/housekeeping/counter-decreases/mark-returning", response_class=HTMLResponse)
+    async def housekeeping_counter_mark_returning(request: Request) -> HTMLResponse:
+        """Markiert alle zurückkehrenden Zählerrückgänge zur Löschung (counter_bulk.py)."""
+
+        def run() -> dict:
+            outcome = counter_bulk.mark_returning(deps.data_dir, deps.index, deps.tz)
+            entity_ids = list(outcome["entities"])
+            if not entity_ids:
+                return {"message": tr("Nichts zu markieren: es kehrt kein Rückgang mehr zurück.")}
+            one = len(entity_ids) == 1
+            return {
+                "message": (
+                    tr("{values} markiert.", values=_values_label(outcome["values"]))
+                    if one else
+                    tr("{values} bei {entities} Entitäten markiert.", values=_values_label(outcome["values"]), entities=len(entity_ids))
+                ),
+                "undo_vals": json.dumps({"batch_at": repr(outcome["batch_at"]), "entity_ids": ",".join(entity_ids)}),
+                "link": f"entities/{entity_ids[0]}/cleanup?tab=marked" if one else "housekeeping#speicherplatz",
+            }
+
+        result = await run_in_threadpool(run)
+        deps.invalidate_purge_preview()
+        return deps.templates.TemplateResponse(request, "_counter_decreases.html", _counter_decreases_context(result))
+
+    @router.post("/housekeeping/counter-decreases/undo", response_class=HTMLResponse)
+    async def housekeeping_counter_undo(request: Request) -> HTMLResponse:
+        """Nimmt eine Sammelmarkierung von oben wieder zurück (gleiche Charge, gleiche Entitäten)."""
+        form = await request.form()
+        try:
+            batch_at = float(form.get("batch_at", ""))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe")) from None
+        entity_ids = [e for e in str(form.get("entity_ids", "")).split(",") if e]
+        restored = await run_in_threadpool(
+            counter_bulk.undo_batch, deps.data_dir, deps.index, deps.tz, batch_at, entity_ids
+        )
+        deps.invalidate_purge_preview()
+        result = {"message": tr("{values} wieder aktiv.", values=_values_label(restored))}
+        return deps.templates.TemplateResponse(request, "_counter_decreases.html", _counter_decreases_context(result))
 
     @router.post("/housekeeping/demo-data/append-now", response_class=HTMLResponse)
     def housekeeping_demo_data_append_now(request: Request) -> HTMLResponse:

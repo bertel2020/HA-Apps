@@ -198,6 +198,7 @@
       {% endif %}
       <th>{{ _("Zeitstempel") }}</th><th>{{ _("Wert") }}</th><th>{{ _("Status") }}</th>
     </tr>
+    {% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
     {% for row in rows %}
     <tr class="{{ 'flag' if row.flags else '' }}">
       {% if mode == 'correct' %}
@@ -212,7 +213,7 @@
       <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
-        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}</span>{% endfor %}
+        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}{% if flag.label == _("Zählerrückgang") and counter_verdicts_map and row.ts in counter_verdicts_map %} · {{ _("kehrt zurück") if counter_verdicts_map[row.ts] else _("bleibt niedrig") }}{% endif %}</span>{% endfor %}
         {% if not row.flags %}&mdash;{% endif %}
       </td>
     </tr>
