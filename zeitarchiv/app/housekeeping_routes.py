@@ -1284,6 +1284,20 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             request, "_counter_decrease_field.html", {"entity_id": entity_id, "counter_mode": mode}
         )
 
+    @router.post("/dashboard/cleanup-size/{pin_id}", response_class=HTMLResponse)
+    def dashboard_cleanup_size(pin_id: int, dashboard_id: int = 1, size: str = "large") -> HTMLResponse:
+        """Größe der Kachel „Bereinigung“: ``large`` (2×2, drei Zeilen) oder ``small`` (1×1, nur die Summe).
+        Die Antwort lässt htmx die Seite neu laden (HX-Refresh), das Raster baut main.py auf."""
+        if size not in ("large", "small"):
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        dashboard = deps.index.get_dashboard(dashboard_id)
+        if dashboard is not None and dashboard["locked"]:
+            raise HTTPException(status_code=423, detail=tr("Dashboard ist fixiert — Layout-Änderungen sind gesperrt"))
+        span = 2 if size == "large" else 1
+        if not deps.index.set_dashboard_cleanup_size(dashboard_id, pin_id, span, span):
+            raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
+
     @router.post("/housekeeping/counter-decreases/mark-returning", response_class=HTMLResponse)
     async def housekeeping_counter_mark_returning(request: Request) -> HTMLResponse:
         """Markiert alle zurückkehrenden Zählerrückgänge zur Löschung (counter_bulk.py)."""

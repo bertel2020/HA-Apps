@@ -73,3 +73,38 @@ def test_the_routes_pin_render_and_unpin_the_tile(client) -> None:
 def test_the_picker_offers_the_tile(client) -> None:
     html = client.get("/dashboards/1").text
     assert "dashboard/pin-cleanup" in html
+
+
+def test_the_size_can_be_switched_between_large_and_small(client) -> None:
+    from app.main import index
+
+    try:
+        client.post("/dashboard/pin-cleanup?dashboard_id=1")
+        pin = next(p for p in index.list_dashboard_pins(1) if p["item_type"] == "cleanup")
+        assert (pin["grid_cols"], pin["grid_rows"]) == (2, 2)
+
+        small = client.post(f"/dashboard/cleanup-size/{pin['item_id']}?dashboard_id=1&size=small")
+        assert small.status_code == 200 and small.headers["HX-Refresh"] == "true"
+        pin = next(p for p in index.list_dashboard_pins(1) if p["item_type"] == "cleanup")
+        assert (pin["grid_cols"], pin["grid_rows"]) == (1, 1)
+        assert "dtile-cleanup-compact" in client.post("/dashboard/pin-cleanup?dashboard_id=1").text
+
+        assert client.post(f"/dashboard/cleanup-size/{pin['item_id']}?dashboard_id=1&size=huge").status_code == 400
+        assert client.post("/dashboard/cleanup-size/999999?dashboard_id=1&size=large").status_code == 404
+    finally:
+        for pin in index.list_dashboard_pins(1):
+            if pin["item_type"] == "cleanup":
+                index.unpin_item_from_dashboard(1, "cleanup", pin["item_id"])
+
+
+def test_a_locked_dashboard_refuses_the_size_change(client) -> None:
+    from app.main import index
+
+    index.pin_cleanup_to_dashboard(1)
+    pin = next(p for p in index.list_dashboard_pins(1) if p["item_type"] == "cleanup")
+    try:
+        index.set_dashboard_locked(1, True)
+        assert client.post(f"/dashboard/cleanup-size/{pin['item_id']}?dashboard_id=1&size=small").status_code == 423
+    finally:
+        index.set_dashboard_locked(1, False)
+        index.unpin_item_from_dashboard(1, "cleanup", pin["item_id"])

@@ -156,6 +156,13 @@
           <button type="button" class="dtile-menu-btn" draggable="false" @pointerdown.stop @click.prevent.stop="menuOpen = !menuOpen"
                   :aria-expanded="menuOpen.toString()" aria-haspopup="menu" aria-label="{{ _('Kachelmenü öffnen') }}" title="{{ _('Kachelmenü') }}">⋮</button>
           <div class="dtile-menu-popover" x-show="menuOpen" x-cloak role="menu" @pointerdown.stop @click.outside="menuOpen = false">
+            <div class="dtile-size-picker-head">{{ _("Kachelgröße") }}</div>
+            {% for key, label, span in [('large', _("Groß (2×2)"), 2), ('small', _("Klein (1×1)"), 1)] %}
+            <button type="button" class="menu-row{{ ' active' if tile.grid_cols == span else '' }}" role="menuitem" draggable="false"
+                    hx-post="{{ href_base }}dashboard/cleanup-size/{{ tile.pin_id }}?dashboard_id={{ dashboard_id }}&size={{ key }}"
+                    hx-swap="none" @click="menuOpen = false">{{ label }}</button>
+            {% endfor %}
+            <div class="dtile-menu-divider"></div>
             <button type="button" class="dtile-menu-remove" role="menuitem" draggable="false"
                     hx-post="{{ href_base }}dashboard/unpin-cleanup/{{ tile.pin_id }}?dashboard_id={{ dashboard_id }}"
                     hx-target="#dashboard-grid" hx-swap="outerHTML"

@@ -2756,7 +2756,7 @@ class Index:
 
     def pin_cleanup_to_dashboard(self, dashboard_id: int) -> int | None:
         """Heftet die Kachel „Bereinigung“ an (cleanup_tile.py) — höchstens eine je Dashboard. Gibt die
-        Pin-ID zurück, bei einer schon vorhandenen deren ID, oder None, wenn DASHBOARD_TILE_LIMIT erreicht
+        Pin-ID zurück (Größe 2×2: drei Zeilen passen in 2×1 nicht), bei einer schon vorhandenen deren ID, oder None, wenn DASHBOARD_TILE_LIMIT erreicht
         ist. Wie bei Werte-Kacheln trägt item_id die eigene Zeilen-ID, damit Umsortieren sie findet."""
         with self._lock, self._conn:
             existing = self._conn.execute(
@@ -2774,7 +2774,7 @@ class Index:
             ).fetchone()[0]
             cursor = self._conn.execute(
                 "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, grid_cols, grid_rows) "
-                "VALUES (?, 'cleanup', 0, ?, 2, 1)",
+                "VALUES (?, 'cleanup', 0, ?, 2, 2)",
                 (dashboard_id, (max_pos or 0) + 1),
             )
             self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (cursor.lastrowid, cursor.lastrowid))
@@ -2820,6 +2820,16 @@ class Index:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
+                (int(grid_cols), int(grid_rows), dashboard_id, pin_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_cleanup_size(self, dashboard_id: int, pin_id: int, grid_cols: int, grid_rows: int) -> bool:
+        """Größe der Kachel „Bereinigung“ (cleanup_tile.py): 2×2 mit den drei Zeilen oder 1×1 mit der Summe."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
+                "WHERE dashboard_id = ? AND item_type = 'cleanup' AND item_id = ?",
                 (int(grid_cols), int(grid_rows), dashboard_id, pin_id),
             )
             return cursor.rowcount > 0
