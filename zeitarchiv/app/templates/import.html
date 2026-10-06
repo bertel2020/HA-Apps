@@ -15,6 +15,7 @@
       <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">{{ _("Symcon") }}</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">{{ _("CSV-Datei") }}</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'ha' %} active{% endif %}" id="tab-btn-ha" onclick="showImportTab('ha')">{{ _("Home Assistant") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'vm' %} active{% endif %}" id="tab-btn-vm" onclick="showImportTab('vm')">{{ _("VictoriaMetrics") }}</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">{{ _("Reports") }}</button>
     </div>
 
@@ -214,6 +215,20 @@
       <p class="symcon-import-note">{{ _("Bereits archivierte Monate werden nur ergänzt, wenn &bdquo;Archivlücken füllen&ldquo; aktiviert ist.") }}</p>
     </div>
     {% include "_ha_import_section.html" %}
+    </div>
+
+    <div id="tab-vm" class="import-tab"{% if active_import_tab != 'vm' %} style="display:none;"{% endif %}>
+    <div class="callout" data-collapsible>
+      <strong class="callout-title">{{ _("So funktioniert der Import aus VictoriaMetrics:") }}</strong>
+      <ol class="import-steps">
+        <li>{{ _("Adresse der VictoriaMetrics-API prüfen. Als Vorgabe steht der interne Add-on-Hostname; er enthält einen installationsabhängigen Teil und kann hier angepasst werden.") }}</li>
+        <li>{{ _("Zeitraum festlegen und bei Bedarf die Verfügbarkeit prüfen. Zur Auswahl stehen Entitäten, die bereits mindestens einen Live-Wert an Zeitarchiv übertragen haben.") }}</li>
+        <li>{{ _("Entitäten markieren und den Dry Run starten. Die Vorschau zeigt, welche Werte gefunden wurden und welche Monate neu angelegt oder ergänzt würden.") }}</li>
+        <li>{{ _("Import starten. Vorhandene Zeitstempel und Werte werden niemals ersetzt; der laufende Monat wird im Hot Buffer ergänzt.") }}</li>
+      </ol>
+      <p class="symcon-import-note">{{ _("Gelesen werden die von der Home-Assistant-Integration influxdb gespeicherten Zustandswechsel der Messreihe &bdquo;&lt;entity_id&gt;_value&ldquo; — also die tatsächlichen Rohwerte, keine interpolierten Zwischenwerte. Es ist ein einmaliger Import; fortlaufend synchronisiert wird nicht.") }}</p>
+    </div>
+    {% include "_vm_import_section.html" %}
     </div>
 
     <div id="tab-reports" class="import-tab"{% if active_import_tab != 'reports' %} style="display:none;"{% endif %}>

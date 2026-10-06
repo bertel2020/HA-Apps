@@ -27,7 +27,7 @@ STATUS_LABELS = {
     "no_changes": N_("Keine Änderungen"),
     "failed": N_("Fehlgeschlagen"),
 }
-SOURCE_LABELS = {"symcon": N_("Symcon"), "csv": N_("CSV"), "ha": N_("Home Assistant")}
+SOURCE_LABELS = {"symcon": N_("Symcon"), "csv": N_("CSV"), "ha": N_("Home Assistant"), "vm": N_("VictoriaMetrics")}
 SORT_COLUMNS = [
     ("finished_at", N_("Zeitpunkt")), ("source_type", N_("Quelle")),
     ("status", N_("Status")), ("targets", N_("Ziele")),

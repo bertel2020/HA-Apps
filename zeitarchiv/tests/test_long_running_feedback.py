@@ -588,6 +588,7 @@ ERWARTETE_QUELLEN = {
     "symcon-dry-run": "Symcon-Vorschau",
     "csv-import": "CSV-Import",
     "ha-import": "Home-Assistant-Import",
+    "vm-import": "VictoriaMetrics-Import",
     # --- ab hier die fünf ohne Auslöser ---
     "storage-reconcile": "Speicherabgleich",
     "rotation": "Rotation",

@@ -1,4 +1,5 @@
-"""Die drei „So funktioniert …“-Anleitungen auf der Import-Seite.
+"""Die vier „So funktioniert …“-Anleitungen auf der Import-Seite (Symcon, CSV,
+Home Assistant, VictoriaMetrics).
 
 Gemessen bei 375px nimmt die Symcon-Anleitung 660 von 812 px — 81 % einer
 Telefonhöhe zwischen Reiterzeile und Formular, für einen Text, der eine
@@ -14,10 +15,10 @@ from __future__ import annotations
 from _paths import APP, template_text
 
 
-def test_all_three_how_to_blocks_are_marked_collapsible() -> None:
+def test_all_how_to_blocks_are_marked_collapsible() -> None:
     quelle = template_text("import.html")
-    assert quelle.count('<div class="callout" data-collapsible>') == 3
-    assert quelle.count('<strong class="callout-title">') == 3
+    assert quelle.count('<div class="callout" data-collapsible>') == 4
+    assert quelle.count('<strong class="callout-title">') == 4
     # Der Hinweis auf die fehlende settings.json ist KEINE Anleitung, sondern
     # eine Meldung zum aktuellen Zustand — er bleibt immer sichtbar.
     assert 'id="settings-hint"' in quelle

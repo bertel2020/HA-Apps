@@ -52,7 +52,7 @@ from .limits import (
 )
 from .progress import JobBusy, JobProgress, register_source
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size
-from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import
+from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import, vm_import
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
 from .storage.paths import entity_dir
@@ -106,6 +106,21 @@ HA_RANGE_PRESETS_FULL_STATS = {
 # Stunden alte Prüfung könnte längst nicht mehr stimmen, ohne dass die
 # Tabelle das erkennen lässt.
 HA_AVAILABILITY_STALE_SECONDS = 15 * 60
+
+# VictoriaMetrics-Import: einmaliger Backfill aus dem Rohdatenexport. Anders
+# als bei Home Assistant gibt es keine Quellen-/Auflösungswahl — VictoriaMetrics
+# hält jeden Zustandswechsel vor (retention bis 99y), "max" ist hier nur durch
+# die Zahl der Abfragefenster begrenzt (vm_import.HISTORY_CHUNK), nicht durch
+# die Quelle.
+VM_RANGE_PRESETS = {
+    "max": N_("Gesamte Historie (max.)"),
+    "365d": N_("Letztes Jahr"),
+    "90d": N_("Letzte 90 Tage"),
+    "30d": N_("Letzte 30 Tage"),
+    "custom": N_("Eigener Zeitraum …"),
+}
+VM_RANGE_PRESET_DAYS = {"30d": 30, "90d": 90, "365d": 365}
+VM_MAX_RANGE_DAYS = 3650
 
 
 class _ScanCache:
@@ -228,6 +243,12 @@ class ImportService:
         # nicht zwei verschiedene Wörter für denselben Schritt benutzen.
         register_source("symcon-import", tr("Symcon-Import"), self._symcon_activity)
         self._ha_availability_cache = _HaAvailabilityCache()
+        self._vm_progress = JobProgress("vm-import", unit=N_("Entitäten"), label=N_("VictoriaMetrics-Import"))
+        # Genau ein Eintrag (zuletzt geprüfte Adresse/Zeitraum) statt eines
+        # Caches je Konfiguration wie bei HA: es gibt hier keine Quellen-/
+        # Periodenwahl, die mehrere gleichzeitig gültige Stände bräuchte.
+        self._vm_availability_lock = threading.Lock()
+        self._vm_availability: dict | None = None
 
 
     @staticmethod
@@ -652,6 +673,159 @@ class ImportService:
                 stats_range_preset if stats_range_preset in HA_RANGE_PRESETS_FULL_STATS else "max"
             ),
             "ha_include_long_term_stats": include_long_term_stats,
+        }
+
+
+
+    @staticmethod
+    def _vm_cache_key(base_url: str, range_preset: str, date_from: str, date_to: str) -> tuple:
+        custom = range_preset == "custom"
+        return (base_url, range_preset, date_from if custom else "", date_to if custom else "")
+
+    def _vm_import_context(self,
+        selected_ids: set[str] | None = None,
+        range_preset: str = "max",
+        date_from: str = "",
+        date_to: str = "",
+        include_existing_months: bool = False,
+        base_url: str = "",
+    ) -> dict:
+        """Auswahlliste für den VictoriaMetrics-Reiter — wie beim HA-Import aus
+        index.list_entities() (nur in Zeitarchiv bekannte Entitäten), nicht aus
+        VictoriaMetrics selbst entdeckt. Die Verfügbarkeitsspalte bleibt bis
+        zum expliziten Klick leer (jede Prüfung ist eine Netzwerkabfrage) und
+        kommt danach aus dem Einzeleintrag self._vm_availability, damit sie
+        einen Seitenwechsel überlebt. Bewusst KEINE Erreichbarkeitsprüfung beim
+        Aufbau: GET /import würde sonst bei jedem Aufruf auf eine womöglich
+        nicht erreichbare Adresse warten."""
+        now = datetime.now(timezone.utc)
+        base_url = base_url.strip() or vm_import.DEFAULT_BASE_URL
+        if range_preset not in VM_RANGE_PRESETS:
+            range_preset = "max"
+        with self._vm_availability_lock:
+            entry = self._vm_availability
+        if entry is not None and entry["key"] != self._vm_cache_key(base_url, range_preset, date_from, date_to):
+            entry = None
+        availability: dict[str, ha_import.EntityAvailability] = entry["availability"] if entry else {}
+        checked_at = entry["checked_at"] if entry else None
+        entities = []
+        for row in self.deps.index.list_entities():
+            entity_id = row["entity_id"]
+            avail = availability.get(entity_id)
+            available_range = available_count = available_label = None
+            if avail is not None:
+                if avail.has_data:
+                    available_range, available_count = self._ha_availability_range_and_count(avail)
+                else:
+                    available_label = tr("Keine Daten im gewählten Zeitraum")
+            entities.append({
+                "entity_id": entity_id,
+                "friendly_name": entity_display_name(entity_id, row["friendly_name"], row["custom_name"]),
+                "unit": row["unit"],
+                "aggregation_type": row["aggregation_type"],
+                "type_label": format_type(row["aggregation_type"]),
+                "has_data": avail.has_data if avail is not None else None,
+                "available_label": available_label,
+                "available_range": available_range,
+                "available_count": available_count,
+                "available_first_ts": avail.first_ts if avail is not None else None,
+            })
+        return {
+            "vm_base_url": base_url,
+            "vm_default_base_url": vm_import.DEFAULT_BASE_URL,
+            "vm_entities": entities,
+            "vm_selected_ids": selected_ids or set(),
+            "vm_availability_checked": entry is not None,
+            "vm_availability_error": entry["error"] if entry else None,
+            "vm_availability_checked_at_label": (
+                f"{format_timestamp(checked_at, self.deps.tz)} {format_time(checked_at, self.deps.tz)}"
+                if checked_at is not None else None
+            ),
+            "vm_availability_stale": checked_at is not None and (now.timestamp() - checked_at) > HA_AVAILABILITY_STALE_SECONDS,
+            "vm_range_options": list(VM_RANGE_PRESETS.items()),
+            "vm_range_preset": range_preset,
+            "vm_date_from": date_from or (now - timedelta(days=30)).strftime("%Y-%m-%d"),
+            "vm_date_to": date_to or now.strftime("%Y-%m-%d"),
+            "vm_include_existing_months": include_existing_months,
+        }
+
+    def _vm_form_params(self, form) -> tuple[list[str], str, str, str, bool, str]:
+        entity_ids = [str(v).strip() for v in form.getlist("entity_ids") if str(v).strip()]
+        range_preset = str(form.get("range_preset") or "max")
+        if range_preset not in VM_RANGE_PRESETS:
+            range_preset = "max"
+        base_url = str(form.get("base_url") or "").strip() or vm_import.DEFAULT_BASE_URL
+        return (
+            entity_ids, range_preset, str(form.get("date_from") or ""), str(form.get("date_to") or ""),
+            form.get("include_existing_months") == "on", base_url,
+        )
+
+    @staticmethod
+    def _vm_date_range(range_preset: str, date_from: str, date_to: str) -> tuple[datetime, datetime]:
+        """Wie _ha_date_range(), aber mit den VM-Voreinstellungen: UTC-Fenster,
+        date_to inklusiv gemeint (deshalb +1 Tag), nie über "jetzt" hinaus."""
+        now = datetime.now(timezone.utc)
+        if range_preset == "max":
+            return now - timedelta(days=VM_MAX_RANGE_DAYS), now
+        if range_preset in VM_RANGE_PRESET_DAYS:
+            return now - timedelta(days=VM_RANGE_PRESET_DAYS[range_preset]), now
+        try:
+            start = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            start = now - timedelta(days=30)
+        try:
+            end = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+        except ValueError:
+            end = now
+        end = min(end, now)
+        if end <= start:
+            end = start + timedelta(days=1)
+        return start, end
+
+    def _fetch_vm_history(self,
+        entity_ids: list[str], start: datetime, end: datetime, base_url: str,
+        on_entity: Callable[[int, str], None] | None = None,
+    ) -> tuple[dict[str, ha_import.HistoryFetchResult], list[str]]:
+        """Netzwerkteil außerhalb jeder Datei-/Indexsperre (wie
+        _fetch_ha_history()): ein Export je Entität, Fehler je Entität gesammelt
+        statt den ganzen Import abzubrechen."""
+        fetched: dict[str, ha_import.HistoryFetchResult] = {}
+        errors: list[str] = []
+        for nummer, entity_id in enumerate(entity_ids):
+            if on_entity is not None:
+                on_entity(nummer, entity_id)
+            try:
+                fetched[entity_id] = vm_import.fetch_history_rows(entity_id, start, end, base_url)
+            except (vm_import.VmApiError, ValueError) as exc:
+                logger.warning("VictoriaMetrics-Historie für %s nicht abrufbar · %s", entity_id, exc)
+                errors.append(f"{entity_id}: {exc}")
+        if on_entity is not None:
+            on_entity(len(entity_ids), "")
+        return fetched, errors
+
+    def _fetch_vm_availability(
+        self, entity_ids: list[str], start: datetime, end: datetime, base_url: str,
+    ) -> tuple[dict[str, ha_import.EntityAvailability], str | None]:
+        try:
+            return vm_import.fetch_availability(entity_ids, start, end, base_url), None
+        except vm_import.VmApiError as exc:
+            logger.warning("VictoriaMetrics-Verfügbarkeitsprüfung fehlgeschlagen · Entitäten=%d · %s", len(entity_ids), exc)
+            return {}, str(exc)
+
+    def _vm_available_label(self, history: ha_import.HistoryFetchResult) -> str:
+        if not history.rows:
+            return tr("Keine Werte im gewählten Zeitraum gefunden")
+        first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
+        return (
+            f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
+            f"{format_int(len(history.rows))} {tr('Werte')}"
+        )
+
+    def _vm_progress_context(self) -> dict:
+        return {
+            **self._vm_progress.snapshot(),
+            "progress_id": "vm-progress",
+            "poll_url": "import/vm/progress",
         }
 
 
@@ -1820,7 +1994,7 @@ class ImportService:
             die Seite zeigt bis dahin dieselbe Fortschrittsanzeige wie nach einem
             Upload — synchron würde das bei einem großen Export die Seite für die
             volle Scan-Dauer blockieren."""
-            active_tab = tab if tab in {"symcon", "csv", "ha", "reports"} else "symcon"
+            active_tab = tab if tab in {"symcon", "csv", "ha", "vm", "reports"} else "symcon"
             common_context = {
                 "active_import_tab": active_tab,
                 **self.deps.reports_context(source, status, search, date_from, date_to, sort, dir, page, page_size),
@@ -1828,6 +2002,7 @@ class ImportService:
                 # Auswahlliste kommt aus index.list_entities() (reiner DB-Read),
                 # keine HA-API-Anfrage nötig (siehe _ha_import_context()).
                 **self._ha_import_context(),
+                **self._vm_import_context(),
             }
             source_exists = self.deps.symcon_import_dir.exists() and any(self.deps.symcon_import_dir.iterdir())
             if source_exists:
@@ -2945,6 +3120,268 @@ class ImportService:
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_result.html", ergebnis
             )
+
+        @router.post("/import/vm/availability", response_class=HTMLResponse)
+        async def import_vm_availability(request: Request) -> HTMLResponse:
+            """Verfügbarkeits-Vorschau der markierten Entitäten — expliziter
+            Klick wie beim HA-Import, jede Prüfung ist eine Netzwerkabfrage an
+            VictoriaMetrics. Rendert die ganze Sektion neu und reicht die
+            angehakten Entitäten durch, damit die Auswahl erhalten bleibt."""
+            form = await request.form()
+            (
+                selected_ids, range_preset, date_from, date_to, include_existing_months, base_url,
+            ) = self._vm_form_params(form)
+            known_ids, unknown_ids = self._known_ha_entity_ids(selected_ids)
+            if unknown_ids:
+                logger.warning(
+                    "VictoriaMetrics-Verfügbarkeitsprüfung: unbekannte Entitäts-IDs verworfen · %s", unknown_ids
+                )
+            if known_ids:
+                start, end = self._vm_date_range(range_preset, date_from, date_to)
+                availability, availability_error = await run_in_threadpool(
+                    self._fetch_vm_availability, known_ids, start, end, base_url
+                )
+                # Auch ein Fehlschlag wird festgehalten, sonst fiele die Anzeige
+                # nach dem Neuzeichnen kommentarlos auf "noch nie geprüft" zurück.
+                with self._vm_availability_lock:
+                    self._vm_availability = {
+                        "key": self._vm_cache_key(base_url, range_preset, date_from, date_to),
+                        "checked_at": datetime.now(timezone.utc).timestamp(),
+                        "availability": availability,
+                        "error": availability_error,
+                    }
+                if availability_error is None:
+                    logger.info(
+                        "VictoriaMetrics-Verfügbarkeit geprüft · Entitäten=%d · mit Daten=%d · Zeitraum=%s",
+                        len(known_ids), sum(1 for a in availability.values() if a.has_data), range_preset,
+                    )
+            context = self._vm_import_context(
+                selected_ids=set(selected_ids), range_preset=range_preset, date_from=date_from,
+                date_to=date_to, include_existing_months=include_existing_months, base_url=base_url,
+            )
+            if not known_ids:
+                context["vm_availability_error"] = tr("Bitte mindestens eine Entität markieren.")
+            return self.deps.templates.TemplateResponse(request, "_vm_import_section.html", context)
+
+
+        @router.post("/import/vm/dry-run", response_class=HTMLResponse)
+        async def import_vm_dry_run(request: Request) -> HTMLResponse:
+            """Vorschau ohne Schreibvorgang: holt dieselben Rohdaten wie der
+            Import und plant sie gegen das vorhandene Archiv."""
+            form = await request.form()
+            (
+                raw_entity_ids, range_preset, date_from, date_to, include_existing_months, base_url,
+            ) = self._vm_form_params(form)
+            entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
+            items: list[dict] = []
+            errors: list[str] = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
+            if not entity_ids:
+                if not unknown_ids:
+                    errors.append(tr("Bitte mindestens eine Entität auswählen."))
+                return self.deps.templates.TemplateResponse(
+                    request, "_vm_import_dry_run.html", {"items": items, "errors": errors}
+                )
+
+            start, end = self._vm_date_range(range_preset, date_from, date_to)
+            fetched, fetch_errors = await run_in_threadpool(
+                self._fetch_vm_history, entity_ids, start, end, base_url
+            )
+            errors.extend(fetch_errors)
+
+            def plan_locked() -> list[dict]:
+                with self.deps.coordinator.entities(list(fetched.keys())):
+                    result = []
+                    for entity_id, history in fetched.items():
+                        entity = self.deps.index.get_entity(entity_id)
+                        try:
+                            plan = symcon_import.plan_import_rows(
+                                self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
+                                source_label=entity_id, skipped_rows=history.skipped,
+                                include_existing_months=include_existing_months,
+                            )
+                        except ValueError as exc:
+                            errors.append(f"{entity_id}: {exc}")
+                            continue
+                        result.append({
+                            "entity_id": entity_id,
+                            "friendly_name": entity_display_name(
+                                entity_id,
+                                entity["friendly_name"] if entity else None,
+                                entity["custom_name"] if entity else None,
+                            ),
+                            "available_label": self._vm_available_label(history),
+                            "plan": plan,
+                        })
+                    return result
+
+            if fetched:
+                items = await run_in_threadpool(plan_locked)
+            logger.debug(
+                "VictoriaMetrics-Dry-Run · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
+                len(items),
+                sum(i["plan"].rows_to_import + i["plan"].rows_to_merge + i["plan"].rows_to_update for i in items),
+                len(errors),
+            )
+            return self.deps.templates.TemplateResponse(
+                request, "_vm_import_dry_run.html", {"items": items, "errors": errors}
+            )
+
+
+        @router.post("/import/vm/start", response_class=HTMLResponse)
+        async def import_vm_start(request: Request) -> HTMLResponse:
+            """Läuft wie der HA-Import im Hintergrund mit Fortschritt je
+            Entität: der Netzwerkabruf (der langsame Teil) liegt vor jeder
+            Sperre, exclusive() hält nur den Schreib- und Indexabgleich."""
+            started_at = datetime.now(timezone.utc)
+            form = await request.form()
+            (
+                raw_entity_ids, range_preset, date_from, date_to, include_existing_months, base_url,
+            ) = self._vm_form_params(form)
+            entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
+            vorab_fehler = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
+            if not entity_ids:
+                if not unknown_ids:
+                    vorab_fehler.append(tr("Bitte mindestens eine Entität auswählen."))
+                return self.deps.templates.TemplateResponse(
+                    request, "_vm_import_result.html", {"items": [], "errors": vorab_fehler}
+                )
+
+            def execute_vm_import(
+                fetched: dict[str, ha_import.HistoryFetchResult], errors: list[str],
+            ) -> tuple[list[dict], dict | None]:
+                with self.deps.coordinator.exclusive():
+                    run_items = []
+                    for nummer, (entity_id, history) in enumerate(fetched.items()):
+                        self._vm_progress.advance(nummer, entity_id)
+                        entity = self.deps.index.get_entity(entity_id)
+                        try:
+                            result = symcon_import.import_rows(
+                                self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
+                                source_label=entity_id, skipped_rows=history.skipped,
+                                include_existing_months=include_existing_months,
+                            )
+                        except ValueError as exc:
+                            errors.append(f"{entity_id}: {exc}")
+                            continue
+                        run_items.append({
+                            "entity_id": entity_id,
+                            "friendly_name": entity_display_name(
+                                entity_id,
+                                entity["friendly_name"] if entity else None,
+                                entity["custom_name"] if entity else None,
+                            ),
+                            "available_label": self._vm_available_label(history),
+                            "result": result,
+                        })
+                    self._vm_progress.advance(len(fetched), "")
+                    reconciliation = self.deps.run_storage_reconciliation(
+                        entity_ids=sorted(fetched.keys()), repair=True
+                    ) if fetched else None
+                    return run_items, reconciliation
+
+            def write_vm_report(
+                items: list[dict], errors: list[str], reconciliation_report: dict | None,
+            ) -> None:
+                """Auch nach einem Fehlschlag: der Bericht ist die einzige
+                dauerhafte Spur des Versuchs."""
+                with self.deps.coordinator.exclusive():
+                    report_results = []
+                    for item in items:
+                        result_payload = dataclasses.asdict(item["result"])
+                        result_payload["available_label"] = item["available_label"]
+                        report_results.append(result_payload)
+                    import_reports.create(
+                        self.deps.data_dir,
+                        source_type="vm",
+                        started_at=started_at,
+                        source={"filename": "VictoriaMetrics", "size_bytes": 0},
+                        configuration={
+                            "entity_ids": raw_entity_ids,
+                            "base_url": base_url,
+                            "range_preset": range_preset,
+                            "date_from": date_from,
+                            "date_to": date_to,
+                            "include_existing_months": include_existing_months,
+                        },
+                        results=report_results,
+                        errors=errors,
+                        reconciliation=reconciliation_report,
+                    )
+
+            def run_vm_import() -> dict:
+                items: list[dict] = []
+                errors: list[str] = list(vorab_fehler)
+                reconciliation_report = None
+                logger.info(
+                    "VictoriaMetrics-Import gestartet · Entitäten=%d · Zeitraum=%s", len(entity_ids), range_preset,
+                )
+                start, end = self._vm_date_range(range_preset, date_from, date_to)
+                self._vm_progress.set_phase(
+                    N_("Schritt 1/2 · Daten werden aus VictoriaMetrics geholt…"), len(entity_ids), unit=N_("Abrufe"),
+                )
+                fetched, fetch_errors = self._fetch_vm_history(
+                    entity_ids, start, end, base_url, on_entity=self._vm_progress.advance,
+                )
+                errors.extend(fetch_errors)
+
+                if fetched:
+                    self._vm_progress.set_phase(
+                        N_("Schritt 2/2 · Werte werden geschrieben…"), len(fetched), unit=N_("Entitäten"),
+                    )
+                    try:
+                        items, reconciliation_report = execute_vm_import(fetched, errors)
+                        results = [item["result"] for item in items]
+                        rows_imported = sum(r.rows_imported for r in results)
+                        rows_merged = sum(r.rows_merged for r in results)
+                        rows_updated = sum(r.rows_updated for r in results)
+                        logger.info(
+                            "VictoriaMetrics-Import abgeschlossen · Entitäten=%d · Zeilen importiert=%d · "
+                            "Zeilen zusammengeführt=%d · bestehende Monate ergänzt=%d · Fehler=%d",
+                            len(results), rows_imported, rows_merged, rows_updated, len(errors),
+                        )
+                        if results and not errors and rows_imported + rows_merged + rows_updated == 0:
+                            # Unterscheidet "nichts Neues seit dem letzten Import"
+                            # von einem stillen Fehlschlag, der in der Oberfläche
+                            # wie ein normaler Erfolg aussähe.
+                            logger.warning(
+                                "VictoriaMetrics-Import ohne Fehler abgeschlossen, aber 0 Zeilen geschrieben · Entitäten=%d",
+                                len(results),
+                            )
+                    except Exception as exc:  # noqa: BLE001 — landet als Text im Ergebnis
+                        logger.exception("VictoriaMetrics-Import unerwartet fehlgeschlagen")
+                        errors.append(tr("Import abgebrochen: {exc}", exc=exc))
+
+                try:
+                    self._vm_progress.set_phase(N_("Importbericht wird geschrieben…"))
+                    write_vm_report(items, errors, reconciliation_report)
+                except Exception:  # noqa: BLE001 — ein fehlender Bericht darf den Import nicht kippen
+                    logger.exception("VictoriaMetrics-Importreport konnte nicht gespeichert werden")
+                return {"items": items, "errors": errors}
+
+            try:
+                self._vm_progress.start(run_vm_import, logger)
+            except JobBusy:
+                logger.info("VictoriaMetrics-Import bereits aktiv · event=vm_import_already_running")
+            return self.deps.templates.TemplateResponse(
+                request, "_job_progress.html", self._vm_progress_context()
+            )
+
+
+        @router.get("/import/vm/progress", response_class=HTMLResponse)
+        def import_vm_progress(request: Request) -> HTMLResponse:
+            """Poll-Ziel des VictoriaMetrics-Imports — Anzeige oder Endergebnis,
+            letzteres ohne hx-trigger, wodurch das Polling von selbst endet."""
+            stand = self._vm_progress.snapshot()
+            if not stand["started"]:
+                return HTMLResponse("")
+            if stand["running"]:
+                return self.deps.templates.TemplateResponse(
+                    request, "_job_progress.html", self._vm_progress_context()
+                )
+            ergebnis = dict(stand["result"] or {"items": [], "errors": []})
+            if stand["error"]:
+                ergebnis["errors"] = [*ergebnis.get("errors", []), f"Abgebrochen: {stand['error']}"]
+            return self.deps.templates.TemplateResponse(request, "_vm_import_result.html", ergebnis)
 
 
         return router

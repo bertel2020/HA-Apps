@@ -60,13 +60,14 @@
     <div class="field">
       <label>{{ _("Quelle") }}</label>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': _('Alle Quellen'), 'symcon': _('Symcon'), 'csv': _('CSV'), 'ha': _('Home Assistant')}[source] }} ▾</button>
+        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': _('Alle Quellen'), 'symcon': _('Symcon'), 'csv': _('CSV'), 'ha': _('Home Assistant'), 'vm': _('VictoriaMetrics')}[source] }} ▾</button>
         <input type="hidden" name="source" form="report-filter" id="report-source-input" value="{{ source }}">
         <div class="dd-picker-popover" id="report-source-popover">
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'all', t('Alle Quellen')); resetReportsPage();">{{ _("Alle Quellen") }}</div>
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'symcon', 'Symcon'); resetReportsPage();">{{ _("Symcon") }}</div>
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'csv', 'CSV'); resetReportsPage();">{{ _("CSV") }}</div>
           <div class="dd-picker-row" onclick="selectDDOption('report-source', 'ha', 'Home Assistant'); resetReportsPage();">{{ _("Home Assistant") }}</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'vm', 'VictoriaMetrics'); resetReportsPage();">{{ _("VictoriaMetrics") }}</div>
         </div>
       </span>
     </div>
