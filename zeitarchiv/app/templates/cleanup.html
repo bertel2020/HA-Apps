@@ -33,6 +33,8 @@
 
     {% with active = 'werte' %}{% include "_entity_tabs.html" %}{% endwith %}
 
+    {% include "_pending_purge_banner.html" %}
+
     <div class="entity-stats-groups" id="rows-summary" aria-live="polite">
       <span class="entity-stats-loading">{{ _("Kennzahlen werden geladen …") }}</span>
     </div>
@@ -44,6 +46,15 @@
       {% if aggregation_type != 'switch' %}
       <button type="button" :class="{active: tab === 'compact'}" @click="setTab('compact')">{{ _("Verdichten") }}</button>
       {% endif %}
+      <button type="button" :class="{active: tab === 'marked'}" @click="setTab('marked')">{{ _("Markiert") }} (<span id="marked-tab-count">{{ marked_count | format_int }}</span>)</button>
+    </div>
+
+    {# Alle zur Löschung markierten Werte der Entität, nach Charge gruppiert, mit
+       Zurücknehmen (einzeln, je Charge, alle). Wird beim ersten Öffnen des Reiters
+       geholt (setTab() löst "load-marked" aus). #}
+    <div x-show="tab === 'marked'" x-cloak class="marked-card">
+      <p class="sub" style="margin-top:12px;">{{ _("Zur Löschung markierte Werte sind noch nicht endgültig entfernt. Hier lassen sich einzelne Werte, eine ganze Charge oder alle zurücknehmen. Die endgültige Bereinigung läuft unter Housekeeping → Speicherplatz.") }}</p>
+      <div id="marked-panel" hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-trigger="load-marked" hx-swap="innerHTML"></div>
     </div>
 
     <div x-show="tab === 'add'" x-cloak class="add-value-card">

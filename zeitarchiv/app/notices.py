@@ -23,7 +23,6 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from . import cleanup_stats
@@ -687,9 +686,8 @@ def build_notices(
     removable_rows = purge_totals.get("removable_rows", 0)
     if removable_rows:
         entities_affected = purge_totals.get("entities_affected", 0)
-        # Genau eine betroffene Entität: beim Namen nennen und direkt auf deren
-        # Bereinigung verlinken, statt auf die globale Übersicht. Mit mehreren
-        # bleibt es bei der Sammelmeldung — welche gemeint ist, zeigt dann die
+        # Genau eine betroffene Entität: beim Namen nennen. Mit mehreren bleibt
+        # es bei der Sammelmeldung — welche gemeint ist, zeigt dann die
         # Entitätenliste (markierte Zeilen).
         single = None
         if entities_affected == 1:
@@ -701,12 +699,8 @@ def build_notices(
                 if removable_rows == 1
                 else tr("{format_int} markierte Datensätze bei „{name}“ können endgültig entfernt werden.", format_int=format_int(removable_rows), name=name)
             )
-            link = f"/entities/{quote(single['entity_id'], safe='')}/cleanup"
-            meta = tr("Entität")
         else:
             detail = tr("{format_int} markierte Datensätze über {entities} können endgültig entfernt werden.", format_int=format_int(removable_rows), entities=(tr("{count} Entität", count=entities_affected) if entities_affected == 1 else tr("{count} Entitäten", count=entities_affected)))
-            link = "/housekeeping#speicherplatz"
-            meta = tr("Housekeeping")
         # Nur wenn tatsächlich archivierte Monate betroffen sind: der laufende
         # Monat hat keine Rollups, seine Aggregation entsteht live aus dem
         # (bereits gefilterten) Hot Buffer.
@@ -717,8 +711,11 @@ def build_notices(
             "severity": "warn",
             "title": tr("Endgültige Bereinigung möglich"),
             "detail": detail,
-            "meta": meta,
-            "link": link,
+            "meta": tr("Housekeeping"),
+            # Immer die globale Bereinigung: nur dort läuft das endgültige
+            # Entfernen. Die Seite der einzelnen Entität ("Werte bearbeiten")
+            # markiert nur und wäre für die Meldung eine Sackgasse.
+            "link": "/housekeeping#speicherplatz",
         })
 
     # Derselbe stündliche globale Duplikat-Schnappschuss, der bereits die

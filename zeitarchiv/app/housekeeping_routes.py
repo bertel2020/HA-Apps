@@ -91,6 +91,11 @@ logger = logging.getLogger(__name__)
 #: gleichzeitig — der Auftrag hält die globale Wartungssperre, ein zweiter
 #: könnte ohnehin nur warten.
 _purge_progress = JobProgress("purge", unit=N_("Monate"), label=N_("Bereinigung"))
+#: Öffentlicher Name für den Reiter „Markiert“ einer Entität (marked_values_routes.py):
+#: die Bereinigung genau EINER Entität teilt sich diesen Auftrag. Es läuft damit
+#: weiterhin höchstens eine Bereinigung gleichzeitig, und sie steht in der
+#: Kopfleiste und in Housekeeping, egal von wo sie angestoßen wurde.
+purge_progress = _purge_progress
 
 #: Fortschritt der manuellen Rotation. Sie bleibt bewusst synchron — wer sie
 #: auslöst, wartet auf die Antwort und braucht keine eigene Anzeige. In der

@@ -1,0 +1,25 @@
+{# Rückfrage vor dem endgültigen Entfernen einer Entität (Teilstück, landet in
+   #marked-purge). Die Zahlen sind frisch gerechnet, nicht aus der bis zu einer
+   Stunde alten Bereinigungsvorschau: wer hier bestätigt, soll genau das sehen,
+   was passiert. Der Start läuft über #marked-panel, damit die Anzeige des Laufs
+   die ganze Ansicht ersetzt. #}
+<div class="marked-danger" role="alertdialog" aria-label="{{ _('Endgültig entfernen') }}">
+  <p><strong>{{ _("Endgültig entfernen? Das lässt sich nicht rückgängig machen.") }}</strong>
+    {{ _("Die Werte verschwinden aus den Rohdaten, auch „Zurücknehmen“ geht danach nicht mehr. Die betroffenen Monate werden neu berechnet, Tages-, Monats- und Jahreswerte ändern sich dadurch.") }}</p>
+  <div class="marked-nums">
+    <div><b>{{ totals.removable_rows | format_int }}</b><span>{{ _("Werte werden entfernt") }}</span></div>
+    <div><b>{{ totals.archive_months | format_int }}</b><span>{{ _("Archivmonate neu berechnet") }}</span></div>
+    <div><b>{{ totals.hot_rows | format_int }}</b><span>{{ _("im laufenden Monat") }}</span></div>
+    <div><b>{{ totals.not_removable_rows | format_int }}</b><span>{{ _("nicht auffindbar, bleiben markiert") }}</span></div>
+  </div>
+  <p class="marked-danger-note">{{ _("Solange der Lauf geht, nimmt diese Entität keine neuen Werte auf. Die Aufnahme holt das danach nach.") }}</p>
+  <div class="marked-confirm-actions">
+    {% if totals.removable_rows %}
+    <button type="button" class="btn btn-danger"
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/purge" hx-target="#marked-panel" hx-swap="innerHTML">
+      {{ _("{count} Werte endgültig entfernen", count=(totals.removable_rows | format_int)) }}
+    </button>
+    {% endif %}
+    <button type="button" class="btn" onclick="this.closest('#marked-purge').innerHTML = ''">{{ _("Abbrechen") }}</button>
+  </div>
+</div>

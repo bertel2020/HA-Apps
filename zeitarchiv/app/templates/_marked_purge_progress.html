@@ -1,0 +1,7 @@
+{# Fortschritt des endgültigen Entfernens einer Entität. Dasselbe Fragment wie bei
+   der Bereinigung unter Housekeeping; nur der Poll-Endpunkt ist ein anderer, weil
+   er am Ende die Liste dieser Entität liefert. #}
+{% with progress_id = 'marked-purge-progress', poll_url = app_root ~ '/entities/' ~ entity_id ~ '/marked/purge/progress' %}
+{% include "_job_progress.html" %}
+{% endwith %}
+<p class="marked-danger-note">{{ _("Du kannst die Seite verlassen, der Lauf geht weiter.") }}</p>

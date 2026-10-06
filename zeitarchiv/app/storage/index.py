@@ -3621,6 +3621,54 @@ class Index:
             )
             return cursor.rowcount
 
+    def _undo_deleted_where(self, entity_id: str, where: str, params: tuple) -> int:
+        """Nimmt Markierungen zurück, die `where` trifft, und führt deleted_count
+        im selben Schritt nach — dieselbe Buchführung wie undo_last_deleted_batch()."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                f"DELETE FROM deleted_points WHERE entity_id = ? AND {where}", (entity_id, *params)
+            )
+            self._conn.execute(
+                "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
+                (cursor.rowcount, entity_id),
+            )
+            return cursor.rowcount
+
+    def undo_deleted_ids(self, entity_id: str, ids: list[int]) -> int:
+        """Nimmt einzelne Markierungen zurück (deleted_points.id, nicht der
+        Zeitstempel: bei Duplikaten mit gleichem Zeitstempel trifft das genau die
+        gewählte Markierung). In Stücken, damit die Zahl der Platzhalter nie an
+        eine SQLite-Grenze stößt."""
+        restored = 0
+        for start in range(0, len(ids), 500):
+            chunk = [int(i) for i in ids[start:start + 500]]
+            restored += self._undo_deleted_where(
+                entity_id, f"id IN ({','.join('?' * len(chunk))})", tuple(chunk)
+            )
+        return restored
+
+    def undo_deleted_batch(self, entity_id: str, deleted_at: float) -> int:
+        """Nimmt EINE bestimmte Charge zurück (gleicher deleted_at-Wert), nicht nur
+        die jüngste wie undo_last_deleted_batch()."""
+        return self._undo_deleted_where(entity_id, "deleted_at = ?", (deleted_at,))
+
+    def undo_all_deleted(self, entity_id: str) -> int:
+        """Nimmt alle Markierungen einer Entität zurück."""
+        return self._undo_deleted_where(entity_id, "1 = 1", ())
+
+    def count_deleted_by_batch(self, entity_id: str, deleted_ats: list[float]) -> dict[float, int]:
+        """Größe der angegebenen Chargen (deleted_at -> Anzahl Markierungen) — nur
+        für die Chargen, die eine Seite der Markiert-Ansicht gerade zeigt."""
+        if not deleted_ats:
+            return {}
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                f"SELECT deleted_at, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? "
+                f"AND deleted_at IN ({','.join('?' * len(deleted_ats))}) GROUP BY deleted_at",
+                (entity_id, *deleted_ats),
+            ).fetchall()
+            return {row["deleted_at"]: row["n"] for row in rows}
+
     def get_last_deleted_batch(self, entity_id: str) -> list[float]:
         """Zeitstempel der zuletzt gelöschten Charge (gleicher deleted_at-Wert),
         OHNE etwas zu ändern — für die "Rückgängig"-Vorschau (zeigt, was der

@@ -17,7 +17,8 @@ def test_cleanup_delete_requires_reversible_confirmation() -> None:
     rows = template_text("_rows_table.html")
     assert "hx-confirm=" in rows
     assert "noch nicht endgültig gelöscht" in rows
-    assert "Rückgängig (letzte Löschung)" in rows
+    assert "Letzte Löschung rückgängig" in rows
+    assert "Reiter „Markiert“" in rows
 
 
 def test_destructive_entity_actions_have_explicit_confirmations() -> None:

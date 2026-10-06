@@ -765,12 +765,16 @@ def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict
 
 
 def preview_purge(
-    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None,
+    entity_ids: list[str] | None = None,
 ) -> dict:
     """Ermittelt exakt, welche Soft-Deletes der manuelle Purge entfernen kann.
 
     Es werden nur Zeitstempelspalten und der aktuelle Hot Buffer gelesen. Archiv,
     Rollups, Indexzähler und Löschmarkierungen bleiben unverändert.
+
+    ``entity_ids`` beschränkt auf diese Entitäten (Reiter „Markiert“ einer
+    einzelnen Entität); None = alle.
     """
     now = now or datetime.now(tz)
     rows: list[dict] = []
@@ -792,7 +796,7 @@ def preview_purge(
                 removed += 1
         return removed
 
-    for entity in index.list_entities():
+    for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         deleted = index.get_deleted_counts_for_entity(entity_id)
         marked = sum(deleted.values())
@@ -850,8 +854,18 @@ def preview_purge(
     return {"totals": totals, "rows": rows}
 
 
+def _entities_in_scope(index: Index, entity_ids: list[str] | None):
+    """Alle Entitäten, oder nur die genannten (Purge einer einzelnen Entität)."""
+    entities = index.list_entities()
+    if entity_ids is None:
+        return entities
+    wanted = set(entity_ids)
+    return [entity for entity in entities if entity["entity_id"] in wanted]
+
+
 def purge_hot_buffer(
-    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None, older_than: float | None = None
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None, older_than: float | None = None,
+    entity_ids: list[str] | None = None,
 ) -> int:
     """Entfernt weich gelöschte Vorkommen physisch aus dem Hot Buffer (laufender
     Monat, unkomprimiertes CSV) — der laufende Monat hat keine Rollup-Datei,
@@ -864,11 +878,13 @@ def purge_hot_buffer(
     Markierungen, die mindestens so alt sind — für die automatische
     Bereinigung (background.py). Der manuelle Purge lässt es weg.
 
+    ``entity_ids`` beschränkt auf diese Entitäten, None = alle.
+
     Gibt die Anzahl tatsächlich physisch entfernter Zeilen zurück."""
     now = now or datetime.now(tz)
     current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
     purged_total = 0
-    for entity in index.list_entities():
+    for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         deleted = index.get_deleted_counts_for_entity(entity_id, older_than=older_than)
         relevant = {ts: count for ts, count in deleted.items() if ts >= current_month_start}
@@ -923,6 +939,7 @@ def purge_archived_months(
     now: datetime | None = None,
     on_month: Callable[[int, str], None] | None = None,
     older_than: float | None = None,
+    entity_ids: list[str] | None = None,
 ) -> dict:
     """Entfernt weich gelöschte Vorkommen physisch aus bereits archivierten
     Monaten — schreibt die betroffene Parquet-Datei ohne die gelöschten
@@ -948,11 +965,13 @@ def purge_archived_months(
     CSV je Entität für den laufenden Monat und in Bruchteilen einer Sekunde
     durch.
 
+    ``entity_ids`` beschränkt auf diese Entitäten, None = alle.
+
     Gibt eine Zusammenfassung zurück (rows_purged, months_purged)."""
     now = now or datetime.now(tz)
     rows_purged = 0
     months_purged = 0
-    for entity in index.list_entities():
+    for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         aggregation_type = entity["aggregation_type"]
         hourly_rollup = bool(entity["hourly_rollup"])

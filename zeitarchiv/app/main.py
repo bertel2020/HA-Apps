@@ -143,6 +143,7 @@ from .housekeeping_routes import (
     create_housekeeping_router,
     demo_data_context,
 )
+from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
     SETTING_HOURLY_BACKFILL_PENDING,
@@ -4984,6 +4985,8 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
+            "marked_count": int(entity["deleted_count"] or 0),
+            "pending_purge": notices_mod.pending_purge_for(entity, _background.load_purge_preview()["rows"]),
         },
     )
 
@@ -5268,11 +5271,13 @@ def _rows_fragment(
             "gap_detection_enabled": gap_threshold != "off",
             "outlier_detection_enabled": outlier_threshold != "off",
             "counter_decrease_enabled": entity["state_class"] == "total_increasing",
-            "undo_available": bool(index.get_last_deleted_batch(entity_id)),
+            "last_batch_count": len(index.get_last_deleted_batch(entity_id)),
+            "marked_count": int(entity["deleted_count"] or 0),
             "first_date": first_date,
             "last_date": last_date,
             "deleted_count": deleted_count,
             "compacted_month_hint": compacted_month_hint,
+            "pending_purge": notices_mod.pending_purge_for(entity, _background.load_purge_preview()["rows"]),
         },
     )
 
@@ -5695,6 +5700,11 @@ app.include_router(_import_service.router())
 # hereingereichten Funktionen bleiben bewusst hier: sie werden auch vom
 # Hintergrund-Scheduler und von der Einstellungsseite gebraucht (siehe
 # Modul-Docstring in housekeeping_routes.py).
+app.include_router(create_marked_values_router(MarkedValuesDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
+    invalidate_purge_preview=_background.invalidate_purge_preview,
+    load_purge_rows=lambda: _background.load_purge_preview()["rows"],
+)))
 app.include_router(create_housekeeping_router(HousekeepingDependencies(
     data_dir=DATA_DIR,
     tz=TZ,

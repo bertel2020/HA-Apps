@@ -4,6 +4,7 @@
      trotzdem in derselben Zeile stehen können, siehe Kommentar in
      cleanup.html. htmx erkennt "id" hier und swappt gegen das gleichnamige
      Element im Rest der Seite, statt es in #rows-table einzufügen. -->
+{% with oob = true %}{% include "_pending_purge_banner.html" %}{% endwith %}
 <div class="nav" id="rows-nav" hx-swap-oob="true">
   <button class="btn navbtn" {% if range == 'all' %}disabled{% endif %} onclick="stepOffset(-1)" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
   <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ app_root | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
@@ -125,7 +126,7 @@
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
           hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
           hx-disabled-elt="this"
-          hx-confirm="{{ _('Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.') }}">
+          hx-confirm="{{ _('Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Letzte Löschung rückgängig“ oder im Reiter „Markiert“ wiederhergestellt werden.') }}">
     {{ _("Löschen") }}
   </button>
   {# Rechts steht, was NICHT an der Auswahl hängt: "Rückgängig" gilt für die
@@ -152,11 +153,21 @@
     {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
        (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
        über seinen Beschriftungstext suchen. #}
-    <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="{{ _('Keine Löschung zum Rückgängigmachen vorhanden') }}"{% endif %}
+    {# Ohne Markierungen entfallen Link und Knopf ganz, statt ausgegraut
+       dazustehen. Der Knopf trägt die Größe der Charge, die er zurücknimmt —
+       bei sechsstelligen Chargen soll man das vorher sehen. Der Link führt in
+       den Reiter "Markiert": dort geht auch alles, was älter als die jüngste
+       Charge ist. #}
+    {% if marked_count %}
+    <a href="#" class="marked-link" onclick="setTab('marked'); return false;">{{ _("Alle {count} markierten Werte ansehen", count=(marked_count | format_int)) }}</a>
+    {% endif %}
+    {% if last_batch_count %}
+    <button class="btn" id="undo-preview-btn"
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
             hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-      {{ _("Rückgängig (letzte Löschung)") }}
+      {{ _("Letzte Löschung rückgängig ({count} Werte)", count=(last_batch_count | format_int)) }}
     </button>
+    {% endif %}
   </span>
   {% endif %}
 </div>

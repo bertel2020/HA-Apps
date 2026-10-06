@@ -391,3 +391,57 @@
        oben — sie gilt in beiden Breiten. */
   }
 
+
+/* Reiter "Markiert": alle zur Löschung markierten Werte, nach Charge gruppiert. */
+.marked-card{margin-top:4px;}
+.marked-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+/* Chargenkopf: eigene Zeile, damit die Zeilen darunter erkennbar zusammengehören. */
+.marked-group td{
+  background:var(--surface-alt);color:var(--ink-muted);font-weight:600;
+  font-size:calc(12.5px * var(--font-scale, 1));
+}
+.marked-group td>span{margin-right:12px;}
+.marked-confirm{
+  margin:0 0 12px;padding:10px 14px;border:1px solid var(--notice-warn);border-radius:8px;
+  background:var(--warning-soft);font-size:calc(13px * var(--font-scale, 1));
+}
+.marked-confirm p{margin:0 0 10px;line-height:1.5;}
+.marked-confirm-actions{display:flex;gap:8px;}
+/* Link neben dem Rückgängig-Knopf in der Aktionszeile. */
+.marked-link{font-size:calc(13px * var(--font-scale, 1));color:var(--accent-line);margin-right:10px;white-space:nowrap;}
+
+/* Chargen einklappbar: der Kopf ist der Schalter, der Pfeil dreht sich. */
+.marked-toggle{
+  all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-right:12px;
+}
+.marked-toggle:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;border-radius:4px;}
+.marked-chev{display:inline-block;transition:transform .15s;font-size:11px;}
+.marked-chev.open{transform:rotate(90deg);}
+.marked-notice{
+  margin:10px 0;padding:8px 12px;border-radius:8px;font-size:calc(13px * var(--font-scale, 1));
+  background:var(--accent-soft, var(--surface-alt));color:var(--ink);
+}
+.marked-notice.err{background:var(--danger-soft);color:var(--danger);}
+
+/* Endgültig entfernen: eigener Bereich ganz unten, getrennt vom Zurücknehmen. */
+.marked-zone{
+  margin-top:16px;padding-top:12px;border-top:1px solid var(--border);
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+}
+.marked-zone p{margin:0;flex:1;min-width:220px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+.marked-danger{
+  margin-top:12px;padding:12px 14px;border:1px solid var(--danger);border-radius:8px;
+  background:var(--danger-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));
+}
+.marked-danger p{margin:0 0 10px;line-height:1.5;}
+.marked-danger-note{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.marked-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 10px;}
+.marked-nums div{background:var(--surface);border-radius:8px;padding:8px 10px;}
+.marked-nums b{display:block;font-size:calc(18px * var(--font-scale, 1));font-weight:600;}
+.marked-nums span{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);}
+
+/* Mit dem fünften Reiter ("Markiert") ist die Zeile bei 375px zu schmal: lieber umbrechen,
+   als den neuen Reiter hinter dem Rand zu verstecken. */
+@media (max-width:480px){
+  .edit-tabs{flex-wrap:wrap;row-gap:4px;}
+}

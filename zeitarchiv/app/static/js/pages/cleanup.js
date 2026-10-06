@@ -13,6 +13,24 @@
         modeField.value = newMode;
         modeField.dispatchEvent(new Event('change', {bubbles: true}));
       }
+      // "Markiert" lädt seine Liste bei JEDEM Öffnen frisch: dort wird zurückgenommen,
+      // und die Zahlen sollen stimmen, wenn man aus "Bereinigen" hierher wechselt.
+      if (tab === 'marked') htmx.trigger(document.getElementById('marked-panel'), 'load-marked');
+    }
+
+    // Auswahl-Zähler im Reiter "Markiert": die Zeilen kommen per htmx (immer
+    // wieder neu), deshalb ein delegierter Listener statt Handlern an den Kästchen.
+    document.addEventListener('change', (e) => {
+      if (!e.target.classList || !e.target.classList.contains('marked-sel')) return;
+      const n = document.querySelectorAll('.marked-sel:checked').length;
+      document.getElementById('marked-sel-count').textContent = String(n);
+      document.getElementById('marked-undo-selection').disabled = n === 0;
+    });
+
+    // Direkteinstieg …/cleanup?tab=marked (z. B. aus dem Link "Alle markierten Werte
+    // ansehen"): den Reiter gleich öffnen.
+    if (new URLSearchParams(location.search).get('tab') === 'marked') {
+      document.addEventListener('DOMContentLoaded', () => setTab('marked'));
     }
 
     async function submitAddValue() {

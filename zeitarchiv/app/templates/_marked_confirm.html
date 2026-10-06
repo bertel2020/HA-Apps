@@ -1,0 +1,27 @@
+{# Rückfrage vor dem Zurücknehmen (Teilstück, landet in #marked-confirm). Ein
+   <form> statt hx-vals, weil die angekreuzten Zeilen als wiederholtes Feld "id"
+   mitgehen müssen — hx-vals kennt keine Listen. #}
+<form class="marked-confirm" hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/undo"
+      hx-target="#marked-panel" hx-swap="innerHTML">
+  <input type="hidden" name="mode" value="{{ confirm.mode }}">
+  <input type="hidden" name="page" value="{{ confirm.page }}">
+  <input type="hidden" name="page_size" value="{{ confirm.page_size }}">
+  {% if confirm.batch is not none %}<input type="hidden" name="batch" value="{{ confirm.batch }}">{% endif %}
+  {% for id in confirm.ids %}<input type="hidden" name="id" value="{{ id }}">{% endfor %}
+  <p>
+    {% if not confirm.count %}
+    <strong>{{ _("Nichts zum Zurücknehmen.") }}</strong>
+    {% elif confirm.mode == 'selection' %}
+    <strong>{{ _("{count} ausgewählte Markierung(en) werden zurückgenommen.", count=(confirm.count | format_int)) }}</strong>
+    {% elif confirm.mode == 'batch' %}
+    <strong>{% if confirm.count == 1 %}{{ _("Die Charge vom {label} wird zurückgenommen (1 Wert).", label=confirm.label) }}{% else %}{{ _("Die Charge vom {label} wird zurückgenommen ({count} Werte).", label=confirm.label, count=(confirm.count | format_int)) }}{% endif %}</strong>
+    {% else %}
+    <strong>{{ _("Alle {count} Markierungen werden zurückgenommen.", count=(confirm.count | format_int)) }}</strong>
+    {% endif %}
+    {{ _("Die Werte erscheinen wieder in allen Ansichten. Archivierte Tages-, Monats- und Jahreswerte bleiben unverändert, denn das Markieren hat sie nie angefasst.") }}
+  </p>
+  <div class="marked-confirm-actions">
+    {% if confirm.count %}<button type="submit" class="btn primary">{{ _("Zurücknehmen") }}</button>{% endif %}
+    <button type="button" class="btn" onclick="this.closest('#marked-confirm').innerHTML = ''">{{ _("Abbrechen") }}</button>
+  </div>
+</form>

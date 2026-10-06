@@ -1,0 +1,112 @@
+{# Inhalt von #marked-panel (Reiter "Markiert" in Werte bearbeiten): alle zur
+   Löschung markierten Werte der Entität, nach Charge gruppiert und einklappbar.
+   Eine Charge ist alles, was mit EINEM Klick auf "Löschen" markiert wurde
+   (gleicher deleted_at). Nur die erste Charge der Seite ist aufgeklappt: bei
+   vielen Chargen wäre sonst nur eine endlose Liste zu sehen.
+
+   Angekreuzte Zeilen gehen als wiederholtes Feld "id" mit — deshalb liegt die
+   Tabelle in einem <form>; ein hx-post-Knopf darin nimmt dessen Felder
+   automatisch mit. Das Blättern steht bewusst AUSSERHALB des Formulars: sein
+   Seitenfeld hieße sonst auch "page" und ginge bei jedem Zurücknehmen mit.
+   Außerhalb des Panels aktualisiert die Antwort per hx-swap-oob den Banner und
+   die Zahl im Reiter. #}
+<span id="marked-tab-count" hx-swap-oob="true">{{ total | format_int }}</span>
+{% with oob = true %}{% include "_pending_purge_banner.html" %}{% endwith %}
+
+{% if notice %}
+<p class="marked-notice{{ ' err' if notice_is_error }}" role="status">{{ notice }}</p>
+{% endif %}
+
+{% if total %}
+<form id="marked-form" hx-target="#marked-confirm" hx-swap="innerHTML">
+  <input type="hidden" name="page" value="{{ pagination.page }}">
+  <input type="hidden" name="page_size" value="{{ pagination.page_size }}">
+  <div class="marked-toolbar">
+    <button type="button" class="btn btn-danger-outline" id="marked-undo-selection" disabled
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/confirm" hx-vals='{"mode": "selection"}'>
+      {{ _("Auswahl zurücknehmen") }} (<span id="marked-sel-count">0</span>)
+    </button>
+    <button type="button" class="btn"
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/confirm" hx-vals='{"mode": "all"}'>
+      {{ _("Alle {total} zurücknehmen", total=(total | format_int)) }}
+    </button>
+  </div>
+  <div id="marked-confirm" aria-live="polite"></div>
+
+  <div class="tbl-wrap">
+    <table class="dt compact marked-table" data-cards="off">
+      <thead>
+        <tr><th></th><th>{{ _("Messzeitpunkt") }}</th><th class="num">{{ _("Wert") }}</th></tr>
+      </thead>
+      {% for group in groups %}
+      <tbody x-data="{ open: {{ 'true' if loop.first else 'false' }} }">
+        <tr class="marked-group">
+          <td colspan="3">
+            <button type="button" class="marked-toggle" @click="open = !open" :aria-expanded="open">
+              <span class="marked-chev" :class="{ open: open }" aria-hidden="true">&#9656;</span>
+              {% if group.size == 1 %}{{ _("Charge vom {label} · 1 Wert", label=group.label) }}{% else %}{{ _("Charge vom {label} · {count} Werte", label=group.label, count=(group.size | format_int)) }}{% endif %}
+            </button>
+            <button type="button" class="btn btn-sm"
+                    hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/confirm" hx-vals='{"mode": "batch", "batch": "{{ group.deleted_at }}"}'>
+              {{ _("Charge zurücknehmen") }}
+            </button>
+          </td>
+        </tr>
+        {% for row in group.rows %}
+        <tr x-show="open">
+          <td><input type="checkbox" class="marked-sel" name="id" value="{{ row.id }}"></td>
+          <td class="nowrap">{{ row.measured_at }}</td>
+          <td class="num">{{ row.value_label }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% endfor %}
+    </table>
+  </div>
+</form>
+
+{# Blättern wie in den übrigen Listen (siehe _settings_marked_points_entity.html):
+   erste/vorige/Seite n von m/nächste/letzte, dazu die Seitengröße. Zahlen mit
+   Tausenderpunkt. #}
+<div class="pager marked-pager" style="justify-content:space-between;">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=(pagination.start | format_int), end=(pagination.end | format_int), total=(pagination.total | format_int)) }}</span>
+    <button class="btn navbtn" type="button" title="{{ _('Erste Seite') }}" {% if pagination.page <= 1 %}disabled{% endif %}
+            hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-vals='{"page": 1}'
+            hx-include="#marked-page-size" hx-target="#marked-panel" hx-swap="innerHTML">«</button>
+    <button class="btn navbtn" type="button" {% if pagination.page <= 1 %}disabled{% endif %}
+            hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-vals='{"page": {{ pagination.page - 1 }}}'
+            hx-include="#marked-page-size" hx-target="#marked-panel" hx-swap="innerHTML">‹</button>
+    <span class="pager-page">{{ _("Seite") }}
+      <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}"
+             hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-trigger="change"
+             hx-include="#marked-page-size" hx-target="#marked-panel" hx-swap="innerHTML">
+      / {{ pagination.total_pages | format_int }}</span>
+    <button class="btn navbtn" type="button" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}
+            hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-vals='{"page": {{ pagination.page + 1 }}}'
+            hx-include="#marked-page-size" hx-target="#marked-panel" hx-swap="innerHTML">›</button>
+    <button class="btn navbtn" type="button" title="{{ _('Letzte Seite') }}" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}
+            hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-vals='{"page": {{ pagination.total_pages }}}'
+            hx-include="#marked-page-size" hx-target="#marked-panel" hx-swap="innerHTML">»</button>
+  </div>
+  <select id="marked-page-size" name="page_size" title="{{ _('Zeilen pro Seite') }}"
+          hx-get="{{ app_root }}/entities/{{ entity_id }}/marked" hx-target="#marked-panel" hx-swap="innerHTML">
+    {% for size in page_sizes %}
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+{# Eigener Bereich ganz unten, getrennt vom Zurücknehmen: das hier lässt sich nicht
+   rückgängig machen. Die Rückfrage mit den Zahlen landet in #marked-purge. #}
+<div class="marked-zone">
+  <p>{{ _("Entfernt alle {total} markierten Werte dieser Entität endgültig und berechnet die betroffenen Monate neu. Das lässt sich nicht rückgängig machen.", total=(total | format_int)) }}</p>
+  <button type="button" class="btn btn-danger-outline"
+          hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/purge-preview" hx-target="#marked-purge" hx-swap="innerHTML">
+    {{ _("Endgültig entfernen …") }}
+  </button>
+</div>
+<div id="marked-purge" aria-live="polite"></div>
+{% else %}
+<div class="empty">{{ _("Keine zur Löschung markierten Werte.") }}</div>
+{% endif %}

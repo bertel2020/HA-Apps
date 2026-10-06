@@ -68,14 +68,16 @@ def _purge_notice(purge_totals: dict, purge_rows: list[dict] | None) -> dict:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def test_purge_available_notice_names_single_entity_and_links_to_its_cleanup() -> None:
+def test_purge_available_notice_names_single_entity_and_links_to_the_global_cleanup() -> None:
     notice = _purge_notice(
         {"removable_rows": 1, "entities_affected": 1, "archive_rows": 1},
         [{"entity_id": "sensor.strom_haus", "friendly_name": "Stromzähler Haus", "removable_rows": 1, "archive_rows": 1}],
     )
     assert "Stromzähler Haus" in notice["detail"]
     assert "Jahreswerte" in notice["detail"]
-    assert notice["link"] == "/entities/sensor.strom_haus/cleanup"
+    # Nicht die Seite der Entität: "Werte bearbeiten" markiert nur, die endgültige
+    # Bereinigung läuft ausschließlich unter Housekeeping.
+    assert notice["link"] == "/housekeeping#speicherplatz"
 
 
 def test_purge_available_notice_stays_global_for_several_entities() -> None:
