@@ -1,5 +1,7 @@
 # Architektur
 
+*[English version](en/architecture.md)*
+
 ## Prozessmodell
 
 Ein Container, zwei Prozesse, ein Anwendungscode:

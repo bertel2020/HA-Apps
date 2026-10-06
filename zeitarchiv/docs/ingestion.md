@@ -1,5 +1,7 @@
 # Schreibpfad (Ingestion)
 
+*[English version](en/ingestion.md)*
+
 `storage/ingestion.py` — `IngestionService.ingest()` ist der einzige Weg, wie
 ein Wert dauerhaft wird. Sowohl `/api/write` (Integration) als auch Import
 (Symcon/CSV) laufen letztlich hier durch.

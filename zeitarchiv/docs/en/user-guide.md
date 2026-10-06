@@ -1,12 +1,12 @@
 # User guide
 
-*[Deutsche Version](user-guide.md)*
+*[Deutsche Version](../user-guide.md)*
 
 This document is the detailed guide for users of the app — step by step,
 task-oriented, every page in detail. For a short overview (what the app is,
-core features at a glance) see the [app README](../README.en.md); technical
+core features at a glance) see the [app README](../../README.en.md); technical
 internals for developers are in the other documents of this folder (see
-[README.md](README.md), German).
+[README.md](README.md)).
 
 ## Contents
 
@@ -100,7 +100,7 @@ internals for developers are in the other documents of this folder (see
 
 1. **Install the app** — via the add-on store (add the repository
    `https://github.com/bertel2020/HA-Apps`) or manually. Details:
-   [App README → Installation](../README.en.md#installation).
+   [App README → Installation](../../README.en.md#installation).
 2. **Copy the API token** — open Zeitarchiv from the Home Assistant sidebar,
    **Settings → Connection**, copy the token. The token is generated
    automatically on first start and is valid only for this Zeitarchiv

@@ -9,7 +9,7 @@ its own folder and can be installed and updated independently.
 
 | App | Version | Description | Documentation |
 | --- | --- | --- | --- |
-| Zeitarchiv | 1.1.0 | Compact time series archive with Parquet, Ingress, energy dashboard, charts, imports, and safe logging and ingest diagnostics. | [Guide](zeitarchiv/README.en.md) · [User guide](zeitarchiv/docs/user-guide.en.md) |
+| Zeitarchiv | 1.1.0 | Compact time series archive with Parquet, Ingress, energy dashboard, charts, imports, and safe logging and ingest diagnostics. | [Guide](zeitarchiv/README.en.md) · [User guide](zeitarchiv/docs/en/user-guide.md) |
 
 Further apps can later be added as an additional folder in the repository root
 and entered in this table.

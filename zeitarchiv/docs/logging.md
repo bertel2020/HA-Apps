@@ -1,5 +1,7 @@
 # Logging und Ingest-Observability
 
+*[English version](en/logging.md)*
+
 Zeitarchiv schreibt Anwendungslogs nach `stdout`/`stderr`; Home Assistant
 Supervisor übernimmt die dauerhafte Haltung. Zusätzlich hält der Prozess
 einen thread-sicheren Ringpuffer mit höchstens 2.000 Einträgen für die lokale

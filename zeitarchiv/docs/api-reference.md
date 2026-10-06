@@ -1,5 +1,7 @@
 # API-Referenz
 
+*[English version](en/api-reference.md)*
+
 Zwei Zielgruppen, zwei Erreichbarkeiten (siehe [security.md](security.md)):
 
 - **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices`.

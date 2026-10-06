@@ -1,5 +1,7 @@
 # Betrieb
 
+*[English version](en/operations.md)*
+
 ## Backup und Restore
 
 Implementierung: `storage/backup.py`.

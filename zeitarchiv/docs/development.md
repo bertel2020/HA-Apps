@@ -1,5 +1,7 @@
 # Lokal entwickeln
 
+*[English version](en/development.md)*
+
 Im Verzeichnis `addon/`:
 
 ```bash

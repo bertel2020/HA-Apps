@@ -32,7 +32,7 @@ period of the Home Assistant recorder. The
 the desired values; this app stores, compacts, searches and visualizes them.
 
 A detailed, task-oriented user guide:
-[docs/user-guide.en.md](docs/user-guide.en.md).
+[docs/en/user-guide.md](docs/en/user-guide.md).
 
 ## What Zeitarchiv is
 
@@ -139,7 +139,7 @@ for data but archives nothing.
 ## Core features
 
 Details on using each page are in the
-[user guide](docs/user-guide.en.md); this is only a functional overview.
+[user guide](docs/en/user-guide.md); this is only a functional overview.
 
 **Dashboards.** Charts and comparison tables can be arranged as tiles on any
 number of freely named dashboards — not just on a single start page. The
@@ -223,7 +223,7 @@ PV system, wallbox, balcony power plant and home battery. It generates itself
 on first start, can be kept current on a schedule or supplemented or
 regenerated manually at any time, and removed without a trace — handy for a
 first impression or a permanent shop-window instance. Details: [User guide →
-Demo mode](docs/user-guide.en.md#demo-mode).
+Demo mode](docs/en/user-guide.md#demo-mode).
 
 **Import and export.** Existing history can be taken over from Symcon exports,
 freely mappable CSV files, or directly from the running Home Assistant
@@ -308,12 +308,12 @@ patterns, and dynamic content is served with restrictive security headers.
 
 Appearance, archiving defaults, connection, diagnostics and more are managed
 entirely in the app and stored in the Zeitarchiv index — see [User guide →
-Settings in detail](docs/user-guide.en.md#settings-in-detail). Storage,
-retention and rotation live in the dedicated [Housekeeping area](docs/user-guide.en.md#housekeeping).
+Settings in detail](docs/en/user-guide.md#settings-in-detail). Storage,
+retention and rotation live in the dedicated [Housekeeping area](docs/en/user-guide.md#housekeeping).
 The Supervisor options are `timezone` (IANA time zone, default
 `Europe/Berlin`) and `demo_mode` (switches the app to a synthetic
 showcase/test instance, see [User guide →
-Demo mode](docs/user-guide.en.md#demo-mode)) — both need an add-on restart after
+Demo mode](docs/en/user-guide.md#demo-mode)) — both need an add-on restart after
 a change.
 
 At startup and after data imports, Zeitarchiv automatically reconciles the

@@ -1,5 +1,7 @@
 # Frontend-Architektur
 
+*[English version](en/frontend.md)*
+
 Kein Build-Schritt, kein Bundler, kein npm. `static/vendor/` enthält
 unveränderte Kopien von Alpine.js, htmx und ECharts; alle App-eigenen Skripte
 liegen unkompiliert unter `static/js/`.

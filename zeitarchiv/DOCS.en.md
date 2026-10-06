@@ -8,7 +8,7 @@ integration sends the state changes to the app; Ingress provides archive,
 charts, tables, import/export, cleanup, retention and backup / restore in the
 Home Assistant interface.
 
-**[User guide](docs/user-guide.en.md)** — setup, every page in detail,
+**[User guide](docs/en/user-guide.md)** — setup, every page in detail,
 settings reference, typical tasks.
 
 <p align="center">
@@ -48,7 +48,7 @@ and stored persistently in the app data directory.
 
 The app option `demo_mode` switches the app to a separate instance, completely
 isolated from the real data, with synthetic showcase/test data — see
-[User guide → Demo mode](docs/user-guide.en.md#demo-mode). Both options require
+[User guide → Demo mode](docs/en/user-guide.md#demo-mode). Both options require
 an add-on restart after a change.
 
 The optional energy dashboard (energy flow as a Sankey diagram, plus
