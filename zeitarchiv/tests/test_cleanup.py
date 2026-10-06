@@ -1306,3 +1306,36 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_count_duplicate_rows_by_entity_counts_dense_entities_without_a_row_limit() -> None:
+    """Regression: der Wartungsplaner rief die Zählung mit max_rows_per_entity=
+    500.000 auf; eine einzige dichte Entität (hier 600.000 Werte im 30-Tage-
+    Fenster) ließ ResultLimitExceeded fliegen und den ganzen Durchlauf
+    scheitern. Gezählt wird jetzt im Streaming, ohne Zeilenlimit."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        now = datetime(2024, 9, 10, 12, tzinfo=TZ)
+        entity_id = "sensor.dense"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "W", friendly_name="Dicht")
+        start = _ts(2024, 8, 12, 0)
+        count = 600_000
+        # Ein Wert je Sekunde, jeder 60.000. Zeitstempel doppelt: 10 Duplikate.
+        timestamps = [start + i for i in range(count)]
+        for i in range(0, count, 60_000):
+            timestamps.insert(i + 1 + i // 60_000, timestamps[i + i // 60_000])
+        timestamps.sort()
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        pq.write_table(
+            pa.table({"ts": timestamps, "value": [1.0] * len(timestamps)}), archive_dir / "2024-08.parquet"
+        )
+        index.add_row_count(entity_id, len(timestamps))
+
+        results = cleanup.count_duplicate_rows_by_entity(tmp, index, TZ, window_days=30, now=now)
+
+        assert results == [{"entity_id": entity_id, "friendly_name": "Dicht", "count": 10}]
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

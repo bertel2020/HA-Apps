@@ -203,8 +203,9 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
 #: sein Ergebnis genau so lange gilt wie der Prozess.
 ZEILE_AUSSERHALB_DES_TAKTS = "Speicherindex-Abgleich"
 
-#: Kein Arbeitsschritt, sondern Gerüst der Schleife selbst.
-KEIN_SCHRITT = {"debug", "exception", "wait", "is_set", "now", "time"}
+#: Kein Arbeitsschritt, sondern Gerüst der Schleife selbst (auch die
+#: Fehlerklammer _maintenance_step, die jeden Schritt einzeln umschließt).
+KEIN_SCHRITT = {"debug", "exception", "wait", "is_set", "now", "time", "_maintenance_step"}
 
 
 def _wartungsplaner_schritte() -> set[str]:

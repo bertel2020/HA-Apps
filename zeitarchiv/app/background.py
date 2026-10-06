@@ -31,6 +31,7 @@ Zeile Logik unbemerkt verloren geht.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import secrets
@@ -61,7 +62,6 @@ from .energiedashboard_routes import (
     refresh_heatmap_weekday_cache_if_stale,
     sync_hourly_rollup_flags_for_current_config,
 )
-from .limits import MAX_UI_ANALYSIS_ROWS
 from .progress import JobBusy, JobProgress
 from .route_support import dir_size
 from .storage import backup, cleanup, hotbuffer, reconcile
@@ -825,7 +825,7 @@ class BackgroundService:
         if not self.index.is_duplicate_snapshot_stale():
             return
         rows = cleanup.count_duplicate_rows_by_entity(
-            self.data_dir, self.index, self.tz, max_rows_per_entity=MAX_UI_ANALYSIS_ROWS
+            self.data_dir, self.index, self.tz
         )
         self.index.set_duplicate_snapshot(
             [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
@@ -979,35 +979,71 @@ class BackgroundService:
             )
             self.refresh_purge_preview_if_stale(force=True)
 
+    @contextlib.contextmanager
+    def _maintenance_step(self, name: str):
+        """Fängt den Fehler EINES Wartungsschritts ab, damit die übrigen im
+        selben Takt trotzdem laufen. Vorher standen alle Schritte in einem
+        gemeinsamen try: ein dauerhaft scheiternder Schritt weit vorn (z. B.
+        der Duplikat-Scan) übersprang bei jedem 30-s-Takt alles danach —
+        Backup-Zeitplan, Aufbewahrung, Kompaktierung und automatische Löschung
+        liefen dann nie."""
+        try:
+            yield
+        except Exception:
+            logger.exception(
+                "Wartungsschritt fehlgeschlagen · event=maintenance_step_failed step=%s", name
+            )
+
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
         while not self._maintenance_scheduler_stop.is_set():
             try:
-                if self.index.record_stats_snapshot_if_stale():
-                    logger.debug(
-                        "Stündlicher Statistik-Schnappschuss gespeichert · "
-                        "event=hourly_stats_snapshot_completed"
-                    )
-                supervisor_stats.maybe_record_memory_snapshot(self.index)
-                self.refresh_retention_overview_if_stale()
-                self.refresh_purge_preview_if_stale()
-                self._refresh_duplicate_snapshot_if_stale()
-                self._refresh_one_outlier_rate()
-                self._refresh_stale_entity_count()
-                self._refresh_host_disk_usage()
-                notices_mod.refresh_import_leftovers_if_stale(self.symcon_import_dir, self.csv_import_dir)
-                version_check.refresh_if_stale(self.index)
-                ha_integration.refresh_integration_version_check_if_stale(self.index)
-                process_pending_hourly_backfill(self.data_dir, self.index, self.tz, self.coordinator)
-                refresh_heatmap_weekday_cache_if_stale(self.energiedashboard_service)
-                self._run_backup_schedule_if_due(datetime.now(self.tz))
-                self._run_retention_enforcement_if_due(datetime.now(self.tz))
-                self._refresh_demo_dir_info_if_stale()
-                self._refresh_rollup_hot_size_if_stale()
-                self._run_demo_append_if_due(datetime.now(self.tz))
-                self._flush_stale_resolution_windows(datetime.now(self.tz))
-                self._run_automatic_compaction_if_due(datetime.now(self.tz))
-                self._run_automatic_purge_if_due(datetime.now(self.tz))
+                with self._maintenance_step("stats_snapshot"):
+                    if self.index.record_stats_snapshot_if_stale():
+                        logger.debug(
+                            "Stündlicher Statistik-Schnappschuss gespeichert · "
+                            "event=hourly_stats_snapshot_completed"
+                        )
+                with self._maintenance_step("memory_snapshot"):
+                    supervisor_stats.maybe_record_memory_snapshot(self.index)
+                with self._maintenance_step("retention_overview"):
+                    self.refresh_retention_overview_if_stale()
+                with self._maintenance_step("purge_preview"):
+                    self.refresh_purge_preview_if_stale()
+                with self._maintenance_step("duplicate_snapshot"):
+                    self._refresh_duplicate_snapshot_if_stale()
+                with self._maintenance_step("outlier_rate"):
+                    self._refresh_one_outlier_rate()
+                with self._maintenance_step("stale_entity_count"):
+                    self._refresh_stale_entity_count()
+                with self._maintenance_step("host_disk_usage"):
+                    self._refresh_host_disk_usage()
+                with self._maintenance_step("import_leftovers"):
+                    notices_mod.refresh_import_leftovers_if_stale(self.symcon_import_dir, self.csv_import_dir)
+                with self._maintenance_step("version_check"):
+                    version_check.refresh_if_stale(self.index)
+                with self._maintenance_step("integration_version_check"):
+                    ha_integration.refresh_integration_version_check_if_stale(self.index)
+                with self._maintenance_step("hourly_backfill"):
+                    process_pending_hourly_backfill(self.data_dir, self.index, self.tz, self.coordinator)
+                with self._maintenance_step("heatmap_weekday_cache"):
+                    refresh_heatmap_weekday_cache_if_stale(self.energiedashboard_service)
+                with self._maintenance_step("backup_schedule"):
+                    self._run_backup_schedule_if_due(datetime.now(self.tz))
+                with self._maintenance_step("retention_enforcement"):
+                    self._run_retention_enforcement_if_due(datetime.now(self.tz))
+                with self._maintenance_step("demo_dir_info"):
+                    self._refresh_demo_dir_info_if_stale()
+                with self._maintenance_step("rollup_hot_size"):
+                    self._refresh_rollup_hot_size_if_stale()
+                with self._maintenance_step("demo_append"):
+                    self._run_demo_append_if_due(datetime.now(self.tz))
+                with self._maintenance_step("flush_resolution_windows"):
+                    self._flush_stale_resolution_windows(datetime.now(self.tz))
+                with self._maintenance_step("automatic_compaction"):
+                    self._run_automatic_compaction_if_due(datetime.now(self.tz))
+                with self._maintenance_step("automatic_purge"):
+                    self._run_automatic_purge_if_due(datetime.now(self.tz))
             except Exception:
                 logger.exception(
                     "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "

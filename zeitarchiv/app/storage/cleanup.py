@@ -657,7 +657,6 @@ def count_duplicate_rows_by_entity(
     tz: ZoneInfo,
     window_days: int = 30,
     now: datetime | None = None,
-    max_rows_per_entity: int | None = None,
 ) -> list[dict]:
     """Aufschlüsselung erkannter Duplikate je Entität für die Statistik-
     Übersicht — bewusst auf ein Zeitfenster begrenzt (Standard: letzte 30
@@ -665,6 +664,14 @@ def count_duplicate_rows_by_entity(
     Vorkommen (eigene Tabelle, billig abzufragen) sind Duplikate nirgends
     persistiert, eine archiv-weite Suche über Jahre an Rohdaten für jede
     Entität wäre bei mehreren Millionen Zeilen pro Entität spürbar langsam.
+
+    Zählt im Streaming (iter_raw_rows + iter_duplicate_rows_to_delete) statt
+    die Zeilen in eine Liste zu lesen: Speicherbedarf und Dauer hängen nicht
+    an der Zeilenzahl, und es gibt bewusst KEIN Zeilenlimit. Das frühere
+    max_rows_per_entity (MAX_UI_ANALYSIS_ROWS, 500.000) war ein Schutz für
+    die Oberfläche; im Hintergrundlauf ließ eine einzige dichte Entität
+    (ein Wert alle ~5 s über 30 Tage) ResultLimitExceeded fliegen und den
+    ganzen Wartungsplaner-Durchlauf scheitern.
 
     Gibt nur Entitäten mit mindestens einem gefundenen Duplikat zurück,
     sortiert nach Anzahl absteigend."""
@@ -674,11 +681,8 @@ def count_duplicate_rows_by_entity(
     results: list[dict] = []
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
-        rows = list_raw_rows(
-            data_dir, index, entity_id, window_start, window_end, tz,
-            now=now, max_rows=max_rows_per_entity
-        )
-        count = len(duplicate_rows_to_delete(rows))
+        rows = iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now)
+        count = sum(1 for _ in iter_duplicate_rows_to_delete(rows))
         if count:
             results.append({
                 "entity_id": entity_id,
