@@ -45,6 +45,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import Receive, Scope, Send
 
+from .staleness import staleness as staleness_for, stale_thresholds
 from .formatting import (
     BACKUP_KEEP_COUNT_LABELS,
     BACKUP_SCHEDULE_LABELS,
@@ -3937,20 +3938,16 @@ def _dashboard_tiles_context(
             else:
                 value_text = format_value(e["last_value"], decimals_to_int(effective_decimals))
             seconds_ago = (time.time() - e["last_ts"]) if e["last_ts"] is not None else None
-            # Zwei Schwellen (Konzept-Wunsch): 15 Minuten (gelb) und eine
-            # Stunde (rot) — unabhängig vom Auflösungsintervall der Entität,
-            # bewusst feste, für den Nutzer nachvollziehbare Werte statt einer
-            # datenabhängigen Heuristik. Nur der Kartenrahmen zeigt das an
-            # (siehe .dtile-entity.is-warn/is-stale), der Wert selbst bleibt
-            # immer schwarz.
-            if seconds_ago is None:
-                staleness = "fresh"
-            elif seconds_ago > 3600:
-                staleness = "stale"
-            elif seconds_ago > 900:
-                staleness = "warn"
-            else:
-                staleness = "fresh"
+            # Zwei Schwellen je Kachel (Stufe stale_mode, siehe staleness.py);
+            # Standard ist 15 Minuten (gelb) / eine Stunde (rot), unabhängig
+            # vom Auflösungsintervall der Entität. Bewusst feste, für den
+            # Nutzer nachvollziehbare Stufen statt einer datenabhängigen
+            # Heuristik. Nur der Kartenrahmen zeigt das an (siehe
+            # .dtile-entity.is-warn/is-stale), der Wert selbst bleibt immer
+            # schwarz.
+            stale_mode = p["stale_mode"]
+            staleness = staleness_for(seconds_ago, stale_mode)
+            stale_limits = stale_thresholds(stale_mode)
             tiles.append({
                 "kind": "entity", "entity_id": e["entity_id"],
                 # Eigene Zeilen-ID der Kachel (nicht der Entität!) — macht
@@ -3969,6 +3966,9 @@ def _dashboard_tiles_context(
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
                 "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),
+                "stale_mode": stale_mode,
+                "stale_warn_after": stale_limits[0] if stale_limits else "",
+                "stale_stale_after": stale_limits[1] if stale_limits else "",
                 "sparkline_resolution": p["sparkline_resolution"],
                 **metric_context,
             })
@@ -4282,6 +4282,29 @@ def dashboard_entity_show_age(body: _ShowAgeDashboardTileBody) -> dict:
     if not index.set_dashboard_entity_pin_show_age(body.dashboard_id, body.pin_id, body.show_age):
         raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
     return {"ok": True, "show_age": body.show_age}
+
+
+class _StaleModeDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    pin_id: int
+    stale_mode: str
+
+
+@app.post("/dashboard/entity-stale-mode")
+def dashboard_entity_stale_mode(body: _StaleModeDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        updated = index.set_dashboard_entity_pin_stale_mode(body.dashboard_id, body.pin_id, body.stale_mode)
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+    thresholds = stale_thresholds(body.stale_mode)
+    return {
+        "ok": True, "stale_mode": body.stale_mode,
+        "stale_warn_after": thresholds[0] if thresholds else "",
+        "stale_stale_after": thresholds[1] if thresholds else "",
+    }
 
 
 class _ShowPeriodDashboardTileBody(BaseModel):

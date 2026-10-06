@@ -991,6 +991,15 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
   margin:7px 0 0;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.45;
 }
 .dtile-sparkline-resolution-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;}
+/* Veraltet-Schwelle: dieselbe Optik wie die Auflösungs-Reihe, vier Stufen. */
+.dtile-stale-mode-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+.dtile-stale-mode-cell{
+  padding:5px 3px;border:1px solid var(--border);border-radius:6px;background:var(--surface-alt);
+  color:var(--ink);font-family:var(--font-display);font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
+  white-space:nowrap;
+}
+.dtile-stale-mode-cell:hover{border-color:var(--accent-line);}
+.dtile-stale-mode-cell.is-selected{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
 /* Wie .dtile-choice-cell Display statt Mono: "Roh"/"5 Min"/"1 Std" sind
    Beschriftungen. Die Nachkommastellen-Reihe daneben behält Mono, weil sie
    überwiegend Ziffern zeigt (0/1/2/3) — dort ist der Text der Wert selbst. */

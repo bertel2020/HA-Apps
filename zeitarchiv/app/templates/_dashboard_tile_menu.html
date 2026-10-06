@@ -177,6 +177,16 @@
         </div>
 
         <div class="dtile-settings-section">
+          <div class="dtile-decimals-picker-head">Als veraltet markieren</div>
+          <div class="dtile-stale-mode-row" role="group" aria-label="Veraltet-Schwelle wählen">
+            {% for value, label, hint in [('standard', 'Standard', 'Gelb nach 15 Minuten, rot nach 1 Stunde'), ('daily', 'Täglich', 'Gelb nach 26 Stunden, rot nach 48 Stunden — für Tageswerte'), ('rare', 'Selten', 'Gelb nach 3 Tagen, rot nach 7 Tagen — für Zähler, die nur bei Aktivität melden'), ('off', 'Aus', 'Nie als veraltet markieren')] %}
+            <button type="button" class="dtile-stale-mode-cell{% if tile.stale_mode == value %} is-selected{% endif %}"
+                    data-stale-mode="{{ value }}" title="{{ hint }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="dtile-settings-section">
           <div class="dtile-decimals-picker-head">Nachkommastellen</div>
           <div class="dtile-decimals-row" role="group" aria-label="Nachkommastellen wählen">
             {% for value, label in [('auto', 'Auto'), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}

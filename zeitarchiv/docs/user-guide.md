@@ -353,9 +353,11 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   Zeitraum-Etikett (z. B. „Monat" unter dem Hauptwert) lässt sich separat
   ein-/ausblenden — unabhängig von der Anzeige der letzten Aktualisierung,
   beide lassen sich gleichzeitig zeigen. Ist der
-  letzte Wert älter als 15
-  Minuten bzw. eine Stunde, hebt sich der Kartenrahmen gelb bzw. rot
-  hervor. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
+  letzte Wert zu alt, hebt sich der Kartenrahmen gelb bzw. rot hervor.
+  Ab wann, stellst du je Kachel unter **Als veraltet markieren** ein:
+  **Standard** (gelb nach 15 Minuten, rot nach 1 Stunde), **Täglich**
+  (26 bzw. 48 Stunden, für Tageswerte), **Selten** (3 bzw. 7 Tage, für
+  Zähler, die nur bei Aktivität melden) oder **Aus**. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
   größeren Einstellungs-Popup (⋮), da hier deutlich mehr Optionen als bei
   Chart-/Tabellen-Kacheln zusammenkommen.
 - **Kachel hinzufügen:** die "+"-Kachel öffnet ein Popup mit Registerkarten

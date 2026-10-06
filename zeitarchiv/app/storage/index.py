@@ -17,6 +17,7 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
+from ..staleness import STALE_MODES
 from .paths import validate_entity_id
 
 SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
@@ -559,6 +560,9 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     -- Nur bei Werte-Kacheln: "vor X"-Alter neben dem Wert ein-/ausblendbar —
     -- Standard an, da das bisherige (einzige) Verhalten.
     show_age INTEGER NOT NULL DEFAULT 1,
+    -- Nur bei Werte-Kacheln: ab wann der Rahmen "veraltet" anzeigt (Stufen
+    -- siehe staleness.py) — 'standard' ist das bisherige, einzige Verhalten.
+    stale_mode TEXT NOT NULL DEFAULT 'standard',
     -- Nur bei Werte-Kacheln: das Zeitraum-Etikett ("Jahr" etc., sonst
     -- automatisch in Kennzahlen-Zeile oder Wert-Bereich platziert, siehe
     -- _tile_metric_context() in main.py) ein-/ausblendbar, unabhängig von
@@ -1227,6 +1231,10 @@ class Index:
             # "vor X"-Alter neben dem Wert ein-/ausblendbar — Standard an
             # (bisheriges, einziges Verhalten).
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN show_age INTEGER NOT NULL DEFAULT 1")
+        if "stale_mode" not in dashboard_columns:
+            # Veraltet-Schwelle je Kachel — 'standard' (15 Min./1 Std.) ist
+            # das bisherige Verhalten, bestehende Kacheln ändern sich nicht.
+            self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN stale_mode TEXT NOT NULL DEFAULT 'standard'")
         if "show_period" not in dashboard_columns:
             # Zeitraum-Etikett ein-/ausblendbar — Standard an (bisheriges,
             # einziges Verhalten).
@@ -2388,7 +2396,7 @@ class Index:
             new_id = cursor.lastrowid
             pins = self._conn.execute(
                 "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, sparkline_resolution, decimals, title, show_age, show_period, "
+                "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
                 "range_key, continuous, primary_metric, stats_metrics "
                 "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
                 (dashboard_id,),
@@ -2396,15 +2404,15 @@ class Index:
             self._conn.executemany(
                 "INSERT INTO dashboard_pins "
                 "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, sparkline_resolution, decimals, title, show_age, show_period, "
+                "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
                 "range_key, continuous, primary_metric, stats_metrics) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
                         p["grid_cols"], p["grid_rows"], p["show_legend"], p["show_sparkline"],
                         p["sparkline_resolution"],
-                        p["decimals"], p["title"], p["show_age"], p["show_period"],
+                        p["decimals"], p["title"], p["show_age"], p["stale_mode"], p["show_period"],
                         p["range_key"], p["continuous"], p["primary_metric"], p["stats_metrics"],
                     )
                     for p in pins
@@ -2771,6 +2779,17 @@ class Index:
                 "UPDATE dashboard_pins SET show_age = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
                 (int(show_age), dashboard_id, pin_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_entity_pin_stale_mode(self, dashboard_id: int, pin_id: int, stale_mode: str) -> bool:
+        if stale_mode not in STALE_MODES:
+            raise ValueError("Ungültige Veraltet-Stufe")
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET stale_mode = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
+                (stale_mode, dashboard_id, pin_id),
             )
             return cursor.rowcount > 0
 

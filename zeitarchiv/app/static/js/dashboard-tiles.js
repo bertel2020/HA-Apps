@@ -1585,14 +1585,18 @@
       ageEl.textContent = secondsAgo == null ? 'nie' : `vor ${NumberFormat.fmtDuration(secondsAgo)}`;
     }
     // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
-    // is-stale), der Wert bleibt immer schwarz — dieselben zwei Schwellen
-    // (15 Min./1 Std.) wie beim Server-Rendern. Hängt weiterhin am letzten
+    // is-stale), der Wert bleibt immer schwarz. Die Schwellen kommen je Kachel
+    // vom Server (data-stale-warn-after/-stale-after, Stufe stale_mode, siehe
+    // staleness.py); leer heißt "nie markieren". Hängt weiterhin am letzten
     // ROHWERT, auch wenn die große Zahl eine Aggregation ist: "veraltet"
     // meint die Entität, nicht die Kennzahl.
     const tileEl = el.closest('.dtile');
-    if (tileEl && secondsAgo != null) {
-      tileEl.classList.toggle('is-warn', secondsAgo > 900 && secondsAgo <= 3600);
-      tileEl.classList.toggle('is-stale', secondsAgo > 3600);
+    if (tileEl) {
+      const warnAfter = parseFloat(el.dataset.staleWarnAfter);
+      const staleAfter = parseFloat(el.dataset.staleStaleAfter);
+      const mark = secondsAgo != null && !Number.isNaN(warnAfter) && !Number.isNaN(staleAfter);
+      tileEl.classList.toggle('is-warn', mark && secondsAgo > warnAfter && secondsAgo <= staleAfter);
+      tileEl.classList.toggle('is-stale', mark && secondsAgo > staleAfter);
     }
 
     el.querySelectorAll('.dtile-entity-stat').forEach(statEl => {
@@ -1706,6 +1710,7 @@
       const sparklineCheckbox = control.querySelector('.dtile-sparkline-checkbox');
       const sparklineResolutionCells = Array.from(control.querySelectorAll('.dtile-sparkline-resolution-cell'));
       const showAgeCheckbox = control.querySelector('.dtile-show-age-checkbox');
+      const staleModeCells = Array.from(control.querySelectorAll('.dtile-stale-mode-cell'));
       const showPeriodCheckbox = control.querySelector('.dtile-show-period-checkbox');
       const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
       const dtileBody = tile.querySelector('.dtile-body');
@@ -1878,6 +1883,32 @@
             }
           } catch (e) {
             trigger.title = 'Sparkline-Auflösung konnte nicht gespeichert werden';
+          }
+        });
+      });
+
+      staleModeCells.forEach(cell => {
+        cell.addEventListener('click', async () => {
+          const staleMode = cell.dataset.staleMode;
+          try {
+            const response = await fetch(`${base}/dashboard/entity-stale-mode`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, pin_id: parseInt(tile.dataset.itemId, 10), stale_mode: staleMode,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
+            staleModeCells.forEach(option => option.classList.toggle('is-selected', option === cell));
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) {
+              entityBody.dataset.staleWarnAfter = result.stale_warn_after;
+              entityBody.dataset.staleStaleAfter = result.stale_stale_after;
+              await renderEntityTile(entityBody);
+            }
+          } catch (e) {
+            trigger.title = 'Veraltet-Schwelle konnte nicht gespeichert werden';
           }
         });
       });
