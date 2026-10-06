@@ -20,6 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY VERSION ./VERSION
 COPY app ./app
+# Die Route /favicon.ico (app/main.py) liest APP_DIR.parent / "icon.png".
+COPY icon.png ./icon.png
 COPY nginx.conf /etc/nginx/conf.d/zeitarchiv.conf
 COPY run.sh /usr/local/bin/zeitarchiv-run
 RUN chmod 0755 /usr/local/bin/zeitarchiv-run \
