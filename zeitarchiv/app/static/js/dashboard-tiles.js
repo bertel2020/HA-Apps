@@ -1066,23 +1066,12 @@
     // Ausgeblendete Spalten/Zeilen (Tabelleneditor, col.hidden/row.hidden)
     // werden nicht gerendert, bleiben aber Teil der Berechnung — dieselbe
     // Regel wie in table_editor.html. computeValues() bekommt deshalb ALLE
-    // Zeilen, sonst verschieben sich die Formel-Buchstaben und eine Formel,
-    // die auf eine ausgeblendete Zeile zeigt, liefert "Fehler". Damit die
-    // Kachel trotzdem nur abfragt, was sie braucht, verlieren ausgeblendete
-    // Entität-/Gruppenzeilen, die keine Formel referenziert, ihre entity_ids
-    // (Buchstabe bleibt, kein Request). Erst danach werden die sichtbaren
-    // Zeilen herausgezogen.
+    // Zeilen: sonst verschieben sich die Formel-Buchstaben, Formeln auf eine
+    // ausgeblendete Zeile liefern "Fehler", und Summen-/Anteilszeilen
+    // weichen vom Editor ab. Erst danach werden die sichtbaren Zeilen
+    // herausgezogen.
     const visibleCols = JSON.parse(el.dataset.columns || '[]').filter(c => !c.hidden);
     const allRows = JSON.parse(el.dataset.rows || '[]');
-    const rowLetters = TableCompute.rowLetters(allRows);
-    const referencedLetters = new Set(allRows
-      .filter(r => r.row_type === 'formula')
-      .flatMap(r => (r.formula || '').toUpperCase().match(/[A-Z]/g) || []));
-    const computeRows = allRows.map((r, i) => (
-      r.hidden && (r.row_type === 'entity' || r.row_type === 'group') && !referencedLetters.has(rowLetters[i])
-        ? {...r, entity_ids: []}
-        : r
-    ));
     const visibleRowIndexes = allRows.map((r, i) => (r.hidden ? -1 : i)).filter(i => i >= 0);
     const visibleRows = visibleRowIndexes.map(i => allRows[i]);
     const style = JSON.parse(el.dataset.style || '{}');
@@ -1094,9 +1083,10 @@
       return;
     }
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
-    let values, windowStarts, windowEnds, isCurrent, elapsedSeconds;
+    let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds;
     try {
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, computeRows));
+      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows));
+      allValues = values;
       values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
@@ -1106,18 +1096,21 @@
     // Abschnitts-Mitglieder (Entität-/Gruppen-Zeilen zwischen zwei Trennlinien
     // derselben Spalte) — Traversal-Gegenstück zu sectionMemberCells() in
     // table_editor.html, hier index- statt uid-basiert (dieselbe Datenform
-    // wie computeValues()). Die eigentliche Anteilsrechnung bleibt in
+    // wie computeValues()). Läuft wie dort über ALLE Zeilen des Abschnitts,
+    // auch ausgeblendete (allRows/allValues, ri ist der Index der sichtbaren
+    // Zeile). Die eigentliche Anteilsrechnung bleibt in
     // TableCompute.percentOfTotalCell(), damit beide Seiten denselben
     // Rechenkern nutzen.
     function sectionMemberCells(ci, ri) {
+      const idx = visibleRowIndexes[ri];
       let start = 0;
-      for (let j = ri - 1; j >= 0; j--) { if (visibleRows[j].row_type === 'separator') { start = j + 1; break; } }
-      let end = visibleRows.length;
-      for (let j = ri + 1; j < visibleRows.length; j++) { if (visibleRows[j].row_type === 'separator') { end = j; break; } }
+      for (let j = idx - 1; j >= 0; j--) { if (allRows[j].row_type === 'separator') { start = j + 1; break; } }
+      let end = allRows.length;
+      for (let j = idx + 1; j < allRows.length; j++) { if (allRows[j].row_type === 'separator') { end = j; break; } }
       const cells = [];
       for (let j = start; j < end; j++) {
-        if (visibleRows[j].row_type !== 'entity' && visibleRows[j].row_type !== 'group') continue;
-        cells.push(values[ci] && values[ci][j]);
+        if (allRows[j].row_type !== 'entity' && allRows[j].row_type !== 'group') continue;
+        cells.push(allValues[ci] && allValues[ci][j]);
       }
       return cells;
     }
@@ -1130,14 +1123,15 @@
     // Formelzeile ist fast immer das Maximum ihres Abschnitts und würde die
     // Skala sonst allein durch ihre Natur verzerren.
     function columnHeatmapRange(ci, ri) {
+      const idx = visibleRowIndexes[ri];
       let start = 0;
-      for (let j = ri - 1; j >= 0; j--) { if (visibleRows[j].row_type === 'separator') { start = j + 1; break; } }
-      let end = visibleRows.length;
-      for (let j = ri + 1; j < visibleRows.length; j++) { if (visibleRows[j].row_type === 'separator') { end = j; break; } }
+      for (let j = idx - 1; j >= 0; j--) { if (allRows[j].row_type === 'separator') { start = j + 1; break; } }
+      let end = allRows.length;
+      for (let j = idx + 1; j < allRows.length; j++) { if (allRows[j].row_type === 'separator') { end = j; break; } }
       const vals = [];
       for (let j = start; j < end; j++) {
-        if (visibleRows[j].row_type !== 'entity' && visibleRows[j].row_type !== 'group') continue;
-        const cell = values[ci] && values[ci][j];
+        if (allRows[j].row_type !== 'entity' && allRows[j].row_type !== 'group') continue;
+        const cell = allValues[ci] && allValues[ci][j];
         if (cell && !cell.error && cell.value != null) vals.push(cell.value);
       }
       if (!vals.length) return null;

@@ -182,12 +182,11 @@ def test_fixed_tooltip_script_loaded_wherever_data_tooltip_fixed_is_used() -> No
         assert "js/fixed-tooltip.js" in html, name
 
 
-def test_dashboard_only_computes_visible_table_slice() -> None:
-    # Hidden rows stay in the computation (formula letters), but hidden
-    # entity/group rows that no formula references carry no entity_ids, so
-    # they cause no query. See test_table_tile_formulas.py.
-    assert "computeValues(base, visibleCols, computeRows)" in DASHBOARD
-    assert "? {...r, entity_ids: []}" in DASHBOARD
+def test_dashboard_computes_hidden_rows_like_the_editor() -> None:
+    # Hidden rows are not rendered but stay part of the computation (formula
+    # letters, sums, percent shares, heatmap range), exactly as in the table
+    # editor. See test_table_tile_formulas.py.
+    assert "computeValues(base, visibleCols, allRows)" in DASHBOARD
 
 
 # --- Rollup-Cache für grobe Stufen (PERFORMANCE.md, ZP-008) -----------------
