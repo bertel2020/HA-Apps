@@ -311,6 +311,35 @@
       return d.toLocaleDateString(LOCALE, {year: 'numeric'});
     }
 
+    // ECharts stapelt auf einer Zeit-Achse nach INDEX in den Daten, nicht nach
+    // Zeitstempel (nachgemessen mit ECharts 5.6: Serie B mit Beginn im April
+    // landete auf Serie A vom Januar). Der Server liefert Buckets aber erst ab
+    // dem ersten vorhandenen Wert — beginnen gestapelte Serien in
+    // verschiedenen Perioden, rutscht die spätere nach links. Deshalb werden
+    // alle Serien eines Stapels vor dem Zeichnen auf die Vereinigung ihrer
+    // Zeitstempel gebracht; fehlende Stellen bekommen einen null-Wert (kein
+    // Balken, keine erfundene "0"). Tooltips lassen null-Zeilen weg.
+    // Gleiche Funktion in dashboard-tiles.js bzw. chart_editor.js.
+    function padStackedSeries(seriesList) {
+      const groups = new Map();
+      seriesList.forEach(s => {
+        if (!s.stack) return;
+        if (!groups.has(s.stack)) groups.set(s.stack, []);
+        groups.get(s.stack).push(s);
+      });
+      groups.forEach(list => {
+        if (list.length < 2) return;
+        const xs = new Set();
+        list.forEach(s => s.data.forEach(p => xs.add(p[0])));
+        const sorted = [...xs].sort((a, b) => a - b);
+        list.forEach(s => {
+          if (s.data.length === sorted.length) return;
+          const byX = new Map(s.data.map(p => [p[0], p]));
+          s.data = sorted.map(x => byX.get(x) || [x, null]);
+        });
+      });
+    }
+
     function resamplePoints(points, range, preset, aggregationType, windowStart) {
       const seconds = RESOLUTION_SECONDS[range] && RESOLUTION_SECONDS[range][preset];
       if (!seconds || !points.length || windowStart == null) return points;
@@ -1598,6 +1627,7 @@
               echartsSeries.push(cmp);
             }
           });
+          padStackedSeries(echartsSeries);
           chartInstance.setOption({
             toolbox: toolboxOption(
               this.exportFilename,
@@ -1685,7 +1715,10 @@
               // (Vergleich aktiv), bekommt jede Zeile ihr eigenes Datum, aber
               // weiterhin einheitlich ÜBER dem Wert (wie überall sonst in der
               // App, siehe dashboard-tiles.js/entity_detail.html).
-              formatter: params => {
+              formatter: allParams => {
+                // Auffüll-Punkte gestapelter Serien (padStackedSeries) haben keinen Wert.
+                const params = allParams.filter(p => p.data[1] != null);
+                if (!params.length) return '';
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
                 // 100%-Normierung: zeigt IMMER beides — Anteil und
