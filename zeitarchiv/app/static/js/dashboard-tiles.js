@@ -136,10 +136,10 @@
 
   function fmtAxis(range, ts) {
     const d = new Date(ts * 1000);
-    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
-    if (range === 'week' || range === 'month') return d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
-    if (range === 'decade') return d.toLocaleDateString(LOCALE, {year: 'numeric'});
-    return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
+    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(LOCALE, window.ServerTime.withZone({hour: '2-digit', minute: '2-digit'}));
+    if (range === 'week' || range === 'month') return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit'}));
+    if (range === 'decade') return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({year: 'numeric'}));
+    return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({month: 'short', year: 'numeric'}));
   }
 
   // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie in
@@ -181,17 +181,17 @@
   function fmtTooltipTimestamp(ms, bucketSeconds) {
     const d = new Date(ms);
     if (bucketSeconds == null || bucketSeconds < 86400) {
-      return d.toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+      return d.toLocaleString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}));
     }
     if (bucketSeconds < 86400 * 25) {
-      const weekday = d.toLocaleDateString(LOCALE, {weekday: 'short'}).replace(/\.$/, '');
-      const date = d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const weekday = d.toLocaleDateString(LOCALE, window.ServerTime.withZone({weekday: 'short'})).replace(/\.$/, '');
+      const date = d.toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric'}));
       return `${weekday}, ${date}`;
     }
     if (bucketSeconds < 86400 * 200) {
-      return d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+      return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({month: 'long', year: 'numeric'}));
     }
-    return d.toLocaleDateString(LOCALE, {year: 'numeric'});
+    return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({year: 'numeric'}));
   }
 
   // "Ø"/"Σ" statt Text — dieselben Symbole wie chart_editor.js/entity_detail.js
@@ -905,7 +905,7 @@
           // Kopfzeile zeigt stattdessen weiterhin den Periodenbeginn direkt
           // aus window_start, wie vor der Kategorie-je-Entität-Umstellung.
           const header = singleBucket
-            ? (data.window_start != null ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'}) : '')
+            ? (data.window_start != null ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric'})) : '')
             : fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
           const rows = params.map(p => {
             const unit = p.data[2] || '';
@@ -999,7 +999,7 @@
         formatter: p => {
           const [catIndex, startMs, endMs] = p.value;
           const pad = n => String(n).padStart(2, '0');
-          const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+          const fmtTime = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.hour)}:${pad(t.minute)}`; };
           return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
         },
         appendToBody: true,

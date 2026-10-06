@@ -598,6 +598,9 @@ templates.env.filters["format_value"] = format_value
 # Cache-Buster mitgeliefert; welcher der drei Ordner gemeint ist, muss es nicht
 # mehr wissen. Die Begründung für den Inhalts-Hash steht bei _AssetVersions.
 templates.env.globals["asset"] = asset
+# Zeitzone des Servers für die Oberfläche (data-tz am <html>, static/js/server-time.js):
+# Datumsangaben dürfen nicht in der Zeitzone des Browsers entstehen.
+templates.env.globals["server_tz"] = str(TZ)
 # Namenslänge für Dashboards/Charts/Tabellen: als maxlength in die
 # Eingabefelder, damit die Grenze schon beim Tippen gilt statt erst beim
 # Speichern. Die verbindliche Prüfung bleibt serverseitig

@@ -202,20 +202,21 @@
   const CURRENT_PERIOD_SUFFIX_RANGES = new Set(['week', 'month', 'year']);
 
   function periodLabel(data) {
+    const zone = window.ServerTime.withZone;
     const start = new Date(data.window_start_ts * 1000);
     if (data.range === 'hour') {
       const end = new Date(data.window_end_ts * 1000 - 1000);
-      const fmtTime = (d) => d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
-      const day = start.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const fmtTime = (d) => d.toLocaleTimeString('de-DE', zone({hour: '2-digit', minute: '2-digit'}));
+      const day = start.toLocaleDateString('de-DE', zone({day: '2-digit', month: '2-digit', year: 'numeric'}));
       return `${day} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
     }
     let opts = {weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric'};
     if (data.range === 'month') opts = {month: 'long', year: 'numeric'};
     if (data.range === 'year') opts = {year: 'numeric'};
-    let label = start.toLocaleDateString('de-DE', opts);
+    let label = start.toLocaleDateString('de-DE', zone(opts));
     if (data.offset === 0 && CURRENT_PERIOD_SUFFIX_RANGES.has(data.range)) {
       const end = new Date(data.window_end_ts * 1000);
-      label += ` · bis ${end.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'})}`;
+      label += ` · bis ${end.toLocaleDateString('de-DE', zone({day: '2-digit', month: '2-digit'}))}`;
     }
     return label;
   }

@@ -37,7 +37,8 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
     _loadSeq: 0,  // gegen ein Wettrennen bei schnell hintereinander gewähltem Jahr/Monat (siehe loadMonth)
 
     init() {
-      const ref = lastYm || { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
+      const now = window.ServerTime.parts(Date.now() / 1000);
+      const ref = lastYm || { y: now.year, m: now.month };
       this.year = ref.y;
       this.month = ref.m;
       window.addEventListener('resize', () => { if (this.open) this.reposition(); });
@@ -79,8 +80,8 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
       const parentData = pageRoot ? Alpine.$data(pageRoot) : null;
       const windowStart = parentData ? parentData.windowStart : null;
       if (windowStart == null) return null;
-      const d = new Date(windowStart * 1000);
-      return { y: d.getFullYear(), m: d.getMonth() + 1 };
+      const d = window.ServerTime.parts(windowStart);
+      return { y: d.year, m: d.month };
     },
     toggle() {
       this.open = !this.open;
@@ -212,10 +213,10 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
       else this.loadMonth();
     },
     async goToday() {
-      const today = new Date();
-      const y = today.getFullYear();
-      const m = today.getMonth() + 1;
-      const d = today.getDate();
+      const today = window.ServerTime.parts(Date.now() / 1000);
+      const y = today.year;
+      const m = today.month;
+      const d = today.day;
       if (y !== this.year || m !== this.month) {
         this.year = y;
         this.month = m;

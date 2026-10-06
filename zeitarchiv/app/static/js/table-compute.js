@@ -413,6 +413,10 @@ window.TableCompute = (() => {
     return {values, windowStarts, windowEnds, isCurrent, elapsedSeconds};
   }
 
+  // Datum/Uhrzeit in der Zeitzone des Servers (static/js/server-time.js), nicht
+  // des Browsers — sonst zeigt ein Browser hinter der Serverzone den Vortag.
+  const zoned = (options) => window.ServerTime.withZone(options);
+
   // Uhrzeit-Text für den fairen Vergleichswert einer same_elapsed-Spalte
   // (z. B. "bis 12:16 Uhr", siehe elapsed_seconds oben) — der tatsächliche
   // Bezugszeitpunkt ist windowStart + elapsedSeconds derselben Spalte. null,
@@ -425,9 +429,9 @@ window.TableCompute = (() => {
   function comparisonElapsedTimeText(windowStart, elapsedSeconds, rangeKey) {
     if (windowStart == null || elapsedSeconds == null) return null;
     const cutoff = new Date((windowStart + elapsedSeconds) * 1000);
-    const timeText = `${cutoff.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} Uhr`;
+    const timeText = `${cutoff.toLocaleTimeString('de-DE', zoned({hour: '2-digit', minute: '2-digit'}))} Uhr`;
     if (rangeKey === 'hour' || rangeKey === 'day') return timeText;
-    const dateText = cutoff.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+    const dateText = cutoff.toLocaleDateString('de-DE', zoned({day: '2-digit', month: '2-digit'}));
     return `${dateText}, ${timeText}`;
   }
 
@@ -436,7 +440,7 @@ window.TableCompute = (() => {
   // Spalte, siehe shortCutoffText()/currentPeriodNote() unten.
   function shortDateText(epochSeconds) {
     if (epochSeconds == null) return null;
-    return new Date(epochSeconds * 1000).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+    return new Date(epochSeconds * 1000).toLocaleDateString('de-DE', zoned({day: '2-digit', month: '2-digit'}));
   }
 
   // "HH:MM Uhr" für eine noch laufende Stunde/Tag-Spalte — ein Datum wäre
@@ -445,7 +449,7 @@ window.TableCompute = (() => {
   // nicht, WIE weit der Tag/die Stunde bereits gelaufen ist.
   function shortTimeText(epochSeconds) {
     if (epochSeconds == null) return null;
-    return `${new Date(epochSeconds * 1000).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} Uhr`;
+    return `${new Date(epochSeconds * 1000).toLocaleTimeString('de-DE', zoned({hour: '2-digit', minute: '2-digit'}))} Uhr`;
   }
 
   // Cutoff-Text passend zum Zeitraumtyp — Uhrzeit bei Stunde/Tag, sonst
@@ -537,7 +541,10 @@ window.TableCompute = (() => {
   // Beschriftung unverändert zurück.
   function resolveLabel(label, windowStartEpoch) {
     if (!label || !label.includes('{') || windowStartEpoch == null) return label;
-    const d = new Date(windowStartEpoch * 1000);
+    // Kalenderwerte der SERVERzone; als lokales Date neu aufgebaut, damit
+    // isoWeekNumber() und die getMonth()-Zugriffe unten unverändert bleiben.
+    const sp = window.ServerTime.parts(windowStartEpoch);
+    const d = new Date(sp.year, sp.month - 1, sp.day);
     const tokenValues = {
       jahr: String(d.getFullYear()),
       jahr_kurz: String(d.getFullYear()).slice(-2),
