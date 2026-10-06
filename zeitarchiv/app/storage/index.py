@@ -3371,6 +3371,48 @@ class Index:
         except json.JSONDecodeError:
             return None
 
+    _COUNTER_DECREASE_SNAPSHOT_KEY = "counter_decrease_snapshot_cache"
+    # Hochzählen, sobald sich die Regeln der Erkennung ändern: ein Schnappschuss nach
+    # alten Regeln gilt dann sofort als veraltet statt bis zu einer Stunde weiterzuwirken.
+    _COUNTER_DECREASE_RULES = 2
+
+    def is_counter_decrease_snapshot_stale(self, min_interval_seconds: float = 3600) -> bool:
+        """Wie is_duplicate_snapshot_stale(): die Zählung braucht den Storage-Layer und bleibt
+        Sache des Aufrufers, der Index kennt nur den Cache-Stand."""
+        raw = self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY)
+        if raw is None:
+            return True
+        try:
+            snapshot = json.loads(raw)
+            checked_at = snapshot.get("checked_at")
+            rules = snapshot.get("rules")
+        except (json.JSONDecodeError, AttributeError):
+            return True
+        if rules != self._COUNTER_DECREASE_RULES:
+            return True
+        return checked_at is None or time.time() - checked_at >= min_interval_seconds
+
+    def set_counter_decrease_snapshot(self, rows: list[dict]) -> None:
+        payload = json.dumps({"checked_at": time.time(), "rules": self._COUNTER_DECREASE_RULES, "rows": rows})
+        self.set_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY, payload)
+
+    def get_counter_decrease_snapshot(self) -> dict | None:
+        raw = self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY)
+        if raw is None:
+            return None
+        try:
+            snapshot = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        # Nach anderen Regeln berechnet: lieber keine Zahlen als falsche, bis der nächste Lauf neu rechnet.
+        return snapshot if snapshot.get("rules") == self._COUNTER_DECREASE_RULES else None
+
+    def invalidate_counter_decrease_snapshot(self) -> None:
+        """Nach dem Markieren: die Meldung soll nicht eine Stunde lang auf einen Rückgang
+        zeigen, den man gerade zur Löschung markiert hat. Der nächste Wartungstakt rechnet neu."""
+        if self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY) is not None:
+            self.set_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY, json.dumps({"checked_at": 0, "rules": self._COUNTER_DECREASE_RULES, "rows": []}))
+
     _HEATMAP_WEEKDAY_CACHE_KEY = "energiedashboard_heatmap_weekday_cache"
 
     def is_heatmap_weekday_stale(self, range_key: str, min_interval_seconds: float = 86400) -> bool:

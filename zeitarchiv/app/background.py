@@ -838,6 +838,16 @@ class BackgroundService:
             [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
         )
 
+    def _refresh_counter_decrease_snapshot_if_stale(self) -> None:
+        """Zählerrückgänge der letzten 30 Tage für die Meldung und Housekeeping →
+        Zählerrückgänge, höchstens einmal pro Stunde (wie die Duplikat-Zählung) — oder
+        sofort, wenn das Markieren den Stand ungültig gemacht hat."""
+        if not self.index.is_counter_decrease_snapshot_stale():
+            return
+        self.index.set_counter_decrease_snapshot(
+            cleanup.scan_counter_decreases(self.data_dir, self.index, self.tz)
+        )
+
     def _refresh_one_outlier_rate(self) -> None:
         """Erneuert die Gesamt-Zählung EINER Entität je Takt — Grundlage für
         Housekeeping → Ausreißer und die zugehörige Meldung.
@@ -1052,6 +1062,8 @@ class BackgroundService:
                     self.refresh_purge_preview_if_stale()
                 with self._maintenance_step("duplicate_snapshot"):
                     self._refresh_duplicate_snapshot_if_stale()
+                with self._maintenance_step("counter_decrease_snapshot"):
+                    self._refresh_counter_decrease_snapshot_if_stale()
                 with self._maintenance_step("outlier_rate"):
                     self._refresh_one_outlier_rate()
                 with self._maintenance_step("stale_entity_count"):

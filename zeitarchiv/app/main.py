@@ -1084,7 +1084,6 @@ def _settings_background_processes_context() -> dict:
         last_run = tr("vor {dauer}", dauer=format_uptime(now - ts)) if ts is not None else tr("noch nie gelaufen")
         return {"name": name, "hint": hint, "last_run": last_run, "pill_class": pill_class, "pill_label": pill_label}
 
-    duplicate_snapshot = index.get_duplicate_snapshot()
     version_state = version_check.get_cached_state(index)
     reconcile = _background.storage_reconcile_last or {}
     reconcile_ts = reconcile.get("checked_at") or reconcile.get("started_at")
@@ -1108,8 +1107,9 @@ def _settings_background_processes_context() -> dict:
         ),
         row(
             tr("Duplikat-Erkennung"), tr("Zählt doppelte Zeitstempel je Entität vor · stündlich"),
-            duplicate_snapshot.get("checked_at") if duplicate_snapshot else None,
+            (index.get_duplicate_snapshot() or {}).get("checked_at"),
         ),
+        row(tr("Zählerrückgang-Erkennung"), tr("Sucht Rückgänge bei Zählern der letzten 30 Tage · stündlich"), (index.get_counter_decrease_snapshot() or {}).get("checked_at")),
         row(
             tr("Versionsprüfung"), tr("Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich"),
             version_state.get("checked_at") if version_state else None,

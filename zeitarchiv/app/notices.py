@@ -33,9 +33,11 @@ from .i18n import N_, tr
 from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETTING_HOURLY_BACKFILL_PENDING
 from .formatting import (
     GAP_THRESHOLD_LABELS,
+    decimals_to_int,
     format_int,
     format_resolution,
     format_size,
+    format_timestamp,
     format_value,
 )
 from .index_optimization import get_index_optimization_state
@@ -735,6 +737,12 @@ def build_notices(
             "link": "/housekeeping#duplikate",
         })
 
+    counter_notice = counter_decrease_notice(
+        (index.get_counter_decrease_snapshot() or {}).get("rows", []), tz
+    )
+    if counter_notice:
+        notices.append(counter_notice)
+
     if stale_entity_count:
         notices.append({
             "id": "housekeeping.rotation_pending",
@@ -995,6 +1003,66 @@ def backup_activity(backup_progress) -> dict | None:
         "unit": "Dateien",
         "detail": "",
         "percent": int(min(done, total) / total * 100) if total else 0,
+    }
+
+
+def counter_value_label(value: float, row: dict) -> str:
+    label = format_value(value, decimals_to_int(row.get("decimals")))
+    return f"{label} {row['unit']}" if row.get("unit") else label
+
+
+def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
+    """Meldung zu Zählerrückgängen der letzten 30 Tage (Schnappschuss aus
+    cleanup.scan_counter_decreases). Eine einzige zählende Meldung statt je einer pro Zähler:
+    bei einem betroffenen Zähler mit dem Hergang und Link auf seine Bereinigungsseite, bei
+    mehreren mit Link auf die Übersicht in Housekeeping. Sie endet von selbst, sobald der
+    Rückgang markiert oder entfernt ist (der Schnappschuss wird dann neu berechnet) oder
+    aus dem 30-Tage-Fenster fällt."""
+    if not rows:
+        return None
+    total = sum(row["count"] for row in rows)
+    title = tr("Zählerrückgang erkannt") if total == 1 else tr("Zählerrückgänge erkannt")
+    if len(rows) > 1:
+        returning = sum(row["returning"] for row in rows)
+        detail = tr(
+            "{total} Rückgänge bei {entities} Zählern in den letzten 30 Tagen.",
+            total=format_int(total), entities=format_int(len(rows)),
+        )
+        if returning:
+            detail += " " + (
+                tr("Bei einem davon kehrt der Stand sofort zurück, das sieht nach einem Fehlwert aus.")
+                if returning == 1
+                else tr("Bei {count} davon kehrt der Stand sofort zurück, das sieht nach Fehlwerten aus.", count=format_int(returning))
+            )
+        return {
+            "id": "housekeeping.counter_decreases", "severity": "warn", "title": title, "detail": detail,
+            "meta": tr("Zählerrückgänge"), "link": "/housekeeping#zaehlerrueckgaenge",
+        }
+    row = rows[0]
+    name = row.get("friendly_name") or row["entity_id"]
+    last = row["last"]
+    when = format_timestamp(last["ts"], tz)[:6]
+    if row["count"] > 1:
+        detail = tr(
+            "Bei „{name}“ gab es {count} Zählerrückgänge in den letzten 30 Tagen, zuletzt am {when}.",
+            name=name, count=format_int(row["count"]), when=when,
+        )
+    else:
+        detail = tr(
+            "Bei „{name}“ fiel der Zählerstand am {when} von {previous} auf {value}.",
+            name=name, when=when, previous=counter_value_label(last["previous"], row),
+            value=counter_value_label(last["value"], row),
+        )
+        if last["returns"]:
+            detail += " " + tr(
+                "Danach stieg er wieder auf {recovered}. Wahrscheinlich ein Fehlwert.",
+                recovered=counter_value_label(last["recovered_value"], row),
+            )
+        elif last["returns"] is False:
+            detail += " " + tr("Er blieb danach niedrig. Möglicherweise ein Zählerwechsel.")
+    return {
+        "id": "housekeeping.counter_decreases", "severity": "warn", "title": title, "detail": detail,
+        "meta": tr("Zählerrückgänge"), "link": f"/entities/{row['entity_id']}/cleanup",
     }
 
 

@@ -685,6 +685,109 @@ def count_duplicate_rows_by_entity(
     return results
 
 
+# „Kehrt zurück“: nach einem Rückgang erreicht ein Folgewert den Vorwert wieder, innerhalb
+# von 30 Minuten ODER 10 Werten (je nach Sendetakt zählt das eine oder das andere).
+COUNTER_RETURN_SECONDS = 1800
+COUNTER_RETURN_VALUES = 10
+
+
+# Zähler mit planmäßigem Rücksetzen (Tages-, Monatsertrag: „… heute“) fallen jede Nacht auf
+# nahe 0. Das ist kein Fehler und würde die Meldung dauerhaft füllen.
+PERIODIC_RESET_MAX_RATIO = 0.1
+
+
+def _is_periodic_reset(previous_ts: float, ts: float, previous: float, value: float, tz: ZoneInfo) -> bool:
+    """Der Rückgang liegt über einem Kalendertagwechsel und fällt auf höchstens ein Zehntel
+    des Vorwerts — so setzt sich ein Tages-, Wochen- oder Monatszähler selbst zurück."""
+    if datetime.fromtimestamp(previous_ts, tz).date() == datetime.fromtimestamp(ts, tz).date():
+        return False
+    return previous > 0 and value <= previous * PERIODIC_RESET_MAX_RATIO
+
+
+def classify_counter_decreases(
+    rows: Iterable[tuple[float, float]], tz: ZoneInfo | None = None
+) -> list[dict]:
+    """Rückgänge eines Zählers samt Einordnung — im Streaming, ohne die Zeilen zu halten.
+
+    Ein Rückgang ist wie in detect_counter_decreases() die erste niedrigere Zeile nach einem
+    höheren Stand; danach gilt der niedrige Wert als neue Bezugsgröße. ``returns`` ist
+    True, wenn ein Folgewert den Vorwert wieder erreicht (Fehlwert), False, wenn das
+    in beiden Grenzen (Zeit UND Anzahl) ausbleibt (Zählerwechsel oder Rücksetzer), und
+    None, solange die Daten enden, bevor sich das entscheiden lässt.
+
+    Mit ``tz`` werden planmäßige Rücksetzer um Mitternacht (siehe _is_periodic_reset) nicht
+    mitgezählt; ohne bleibt es bei jedem Rückgang."""
+    found: list[dict] = []
+    pending: list[dict] = []
+    previous_ts: float | None = None
+    previous_value: float | None = None
+    for ts, value in rows:
+        for item in list(pending):
+            item["seen"] += 1
+            if value >= item["previous"]:
+                item.update(returns=True, recovered_value=value, recovered_after=ts - item["ts"])
+                pending.remove(item)
+            elif ts - item["ts"] > COUNTER_RETURN_SECONDS and item["seen"] > COUNTER_RETURN_VALUES:
+                item["returns"] = False
+                pending.remove(item)
+        if previous_ts is None:
+            previous_ts, previous_value = ts, value
+            continue
+        if ts <= previous_ts:
+            continue
+        if previous_value is not None and value < previous_value and not (
+            tz is not None and _is_periodic_reset(previous_ts, ts, previous_value, value, tz)
+        ):
+            item = {
+                "ts": ts, "previous": previous_value, "value": value,
+                "returns": None, "recovered_value": None, "recovered_after": None, "seen": 0,
+            }
+            found.append(item)
+            pending.append(item)
+        previous_ts, previous_value = ts, value
+    for item in found:
+        item.pop("seen", None)
+    return found
+
+
+def scan_counter_decreases(
+    data_dir: Path,
+    index: Index,
+    tz: ZoneInfo,
+    window_days: int = 30,
+    now: datetime | None = None,
+) -> list[dict]:
+    """Zählerrückgänge der letzten Tage je Zähler (state_class total_increasing) für die Meldung
+    und den Housekeeping-Abschnitt. Dasselbe Streaming und dieselbe Fensterbegrenzung wie
+    count_duplicate_rows_by_entity(): eine Suche über die ganze Historie wäre bei Millionen
+    Zeilen spürbar langsam, und ein Rückgang von vor Monaten ist längst entschieden."""
+    now = now or datetime.now(tz)
+    window_start = (now - timedelta(days=window_days)).timestamp()
+    window_end = now.timestamp()
+    results: list[dict] = []
+    for entity in index.list_entities():
+        if entity["state_class"] != "total_increasing":
+            continue
+        entity_id = entity["entity_id"]
+        decreases = classify_counter_decreases(
+            iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now), tz
+        )
+        if not decreases:
+            continue
+        last = decreases[-1]
+        results.append({
+            "entity_id": entity_id,
+            "friendly_name": entity["custom_name"] or entity["friendly_name"],
+            "unit": entity["unit"],
+            "decimals": entity["decimals"],
+            "count": len(decreases),
+            "returning": sum(1 for item in decreases if item["returns"]),
+            "last": {key: last[key] for key in ("ts", "previous", "value", "returns", "recovered_value", "recovered_after")},
+        })
+    results.sort(key=lambda r: r["last"]["ts"], reverse=True)
+    return results
+
+
 def detect_gaps(
     rows: list[tuple[float, float]],
     threshold_minutes: float | None,
@@ -745,6 +848,7 @@ def soft_delete(index: Index, entity_id: str, timestamps: list[float]) -> None:
     started_at = time.time()
     index.mark_deleted(entity_id, timestamps)
     if timestamps:
+        index.invalidate_counter_decrease_snapshot()
         index.log_entity_action(
             entity_id, "mark", "manual", started_at, time.time(), "success",
             rows_affected=len(timestamps),

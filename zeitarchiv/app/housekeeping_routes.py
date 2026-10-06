@@ -254,6 +254,42 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
         return duplicate_rows, duplicates_by_entity, duplicates_total
 
+    def _counter_decreases_for_display() -> list[dict]:
+        """Housekeeping → Zählerrückgänge: der gecachte Schnappschuss (stündlich, oder sofort
+        neu nach dem Markieren), je Zähler mit dem letzten Rückgang und seiner Einordnung."""
+        rows = []
+        for row in (deps.index.get_counter_decrease_snapshot() or {}).get("rows", []):
+            last = row["last"]
+            if last["returns"]:
+                verdict = "returns"
+                note = tr(
+                    "nach {minutes} Min. wieder auf {value}",
+                    minutes=max(1, round((last["recovered_after"] or 0) / 60)),
+                    value=notices_mod.counter_value_label(last["recovered_value"], row),
+                )
+            elif last["returns"] is False:
+                verdict = "stays"
+                note = tr("kein Wiederanstieg auf den Vorwert in den folgenden 30 Minuten")
+            else:
+                verdict = "open"
+                note = tr("noch zu wenige Folgewerte")
+            rows.append({
+                "entity_id": row["entity_id"],
+                "friendly_name": row["friendly_name"],
+                "count": row["count"],
+                "count_label": format_int(row["count"]),
+                "last_ts": last["ts"],
+                "last_label": f"{format_timestamp(last['ts'], deps.tz)[:6]} {format_time(last['ts'], deps.tz)[:5]}",
+                "change": tr(
+                    "{previous} → {value}",
+                    previous=notices_mod.counter_value_label(last["previous"], row),
+                    value=notices_mod.counter_value_label(last["value"], row),
+                ),
+                "verdict": verdict,
+                "note": note,
+            })
+        return rows
+
     def _host_disk_usage_context() -> dict:
         """Für die immer sichtbare Host-Speicherplatz-Zeile in housekeeping.html —
         andere Frage als Zeitarchivs eigene interne Aufschlüsselung (Speicherindex,
@@ -732,6 +768,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "table_count": deps.index.count_saved_tables(),
                 "duplicates_by_entity": duplicates_by_entity,
                 "duplicates_total": duplicates_total,
+                "counter_decreases": _counter_decreases_for_display(),
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(

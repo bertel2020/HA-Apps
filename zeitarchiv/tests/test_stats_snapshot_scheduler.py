@@ -166,6 +166,7 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     "refresh_retention_overview_if_stale": "Aufbewahrung-Übersicht",
     "refresh_purge_preview_if_stale": "Löschvorschau",
     "_refresh_duplicate_snapshot_if_stale": "Duplikat-Erkennung",
+    "_refresh_counter_decrease_snapshot_if_stale": "Zählerrückgang-Erkennung",
     "_refresh_one_outlier_rate": "Ausreißer-Quoten",
     "refresh_if_stale": "Versionsprüfung",
     "process_pending_hourly_backfill": "Energiedashboard · Stunden-Rollup-Backfill",
