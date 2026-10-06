@@ -24,6 +24,7 @@ COPY app ./app
 COPY icon.png ./icon.png
 COPY nginx.conf /etc/nginx/conf.d/zeitarchiv.conf
 COPY run.sh /usr/local/bin/zeitarchiv-run
+COPY icon.png /app/icon.png
 RUN chmod 0755 /usr/local/bin/zeitarchiv-run \
     && nginx -t
 

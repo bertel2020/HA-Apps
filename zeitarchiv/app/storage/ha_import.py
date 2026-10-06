@@ -81,15 +81,37 @@ def token_available() -> bool:
     return bool(os.environ.get("SUPERVISOR_TOKEN"))
 
 
+#def _token() -> str:
+#    token = os.environ.get("SUPERVISOR_TOKEN")
+#    if not token:
+#        raise HaApiError("Supervisor ist in dieser Umgebung nicht verfügbar")
+#    return token
+
+HA_API_BASE = os.environ.get(
+    "HA_API_BASE",
+    "http://supervisor/core/api"
+).rstrip("/")
+
 def _token() -> str:
-    token = os.environ.get("SUPERVISOR_TOKEN")
+    token = (
+        os.environ.get("HA_ACCESS_TOKEN")
+        or os.environ.get("SUPERVISOR_TOKEN")
+    )
     if not token:
-        raise HaApiError("Supervisor ist in dieser Umgebung nicht verfügbar")
+        raise HaApiError(
+            "Kein Home-Assistant-Token konfiguriert"
+        )
     return token
 
+def token_available() -> bool:
+    return bool(
+        os.environ.get("HA_ACCESS_TOKEN")
+        or os.environ.get("SUPERVISOR_TOKEN")
+    )
 
 def _get(path: str, params: dict | None = None) -> object:
-    url = f"{CORE_API_BASE}{path}"
+    #url = f"{CORE_API_BASE}{path}"
+    url = f"{HA_API_BASE}{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
     request = urllib.request.Request(
