@@ -120,3 +120,62 @@ def test_every_statement_of_the_scheduler_loop_runs_in_its_own_step() -> None:
         namen.append(aufruf.args[0].value)
     assert len(namen) == len(set(namen))
     assert {"duplicate_snapshot", "backup_schedule", "automatic_purge"} <= set(namen)
+
+
+def _schritt(dienst, name, fehler=None):
+    with dienst._maintenance_step(name):
+        if fehler is not None:
+            raise fehler
+
+
+def test_repeated_failures_log_one_traceback_then_at_most_one_short_line_per_hour(
+    dienst, monkeypatch, caplog
+) -> None:
+    import app.background as background
+
+    uhr = [1000.0]
+    monkeypatch.setattr(background.time, "monotonic", lambda: uhr[0])
+
+    with caplog.at_level(logging.INFO):
+        for _ in range(5):  # 5 Takte à 30 s
+            _schritt(dienst, "duplicate_snapshot", RuntimeError("kaputt"))
+            uhr[0] += 30
+        erste = [r for r in caplog.records if "event=maintenance_step_failed" in r.getMessage()]
+        assert len(erste) == 1 and erste[0].exc_info
+        assert not any("still_failing" in r.getMessage() for r in caplog.records)
+
+        uhr[0] += 3600  # eine Stunde später
+        _schritt(dienst, "duplicate_snapshot", RuntimeError("kaputt"))
+        _schritt(dienst, "duplicate_snapshot", RuntimeError("kaputt"))  # gleicher Takt, nichts Neues
+
+    kurz = [r for r in caplog.records if "event=maintenance_step_still_failing" in r.getMessage()]
+    assert len(kurz) == 1
+    assert not kurz[0].exc_info
+    meldung = kurz[0].getMessage()
+    assert "step=duplicate_snapshot" in meldung and "failures=6" in meldung
+    assert "since_last_log=5" in meldung and "RuntimeError: kaputt" in meldung
+
+
+def test_recovery_is_logged_once_and_resets_the_state(dienst, monkeypatch, caplog) -> None:
+    import app.background as background
+
+    monkeypatch.setattr(background.time, "monotonic", lambda: 1000.0)
+    with caplog.at_level(logging.INFO):
+        _schritt(dienst, "backup_schedule", RuntimeError("kaputt"))
+        _schritt(dienst, "backup_schedule", RuntimeError("kaputt"))
+        _schritt(dienst, "backup_schedule")
+        _schritt(dienst, "backup_schedule")  # läuft weiter fehlerfrei: keine zweite Meldung
+        _schritt(dienst, "backup_schedule", RuntimeError("wieder kaputt"))  # neuer Verlauf: wieder mit Traceback
+
+    wieder = [r for r in caplog.records if "event=maintenance_step_recovered" in r.getMessage()]
+    assert len(wieder) == 1 and "failures=2" in wieder[0].getMessage()
+    traceback_zeilen = [r for r in caplog.records if "event=maintenance_step_failed" in r.getMessage()]
+    assert len(traceback_zeilen) == 2
+
+
+def test_throttling_is_tracked_per_step(dienst, caplog) -> None:
+    with caplog.at_level(logging.INFO):
+        _schritt(dienst, "a", RuntimeError("x"))
+        _schritt(dienst, "b", RuntimeError("y"))
+    gemeldet = [r.getMessage() for r in caplog.records if "event=maintenance_step_failed" in r.getMessage()]
+    assert len(gemeldet) == 2

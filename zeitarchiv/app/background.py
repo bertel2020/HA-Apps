@@ -133,6 +133,9 @@ class BackgroundDependencies:
 class BackgroundService:
     """Wartungsplaner, Backup-, Retention- und Abgleich-Läufe samt ihrem Zustand."""
 
+    # Mindestabstand zwischen zwei Kurzzeilen eines dauerhaft scheiternden Wartungsschritts.
+    _STEP_FAILURE_LOG_INTERVAL_SECONDS = 3600
+
     def __init__(self, deps: BackgroundDependencies) -> None:
         self.deps = deps
         # Abhängigkeiten flach am Dienst, nicht über self.deps.x: Der Code
@@ -187,6 +190,9 @@ class BackgroundService:
         self._storage_reconcile_stop = threading.Event()
         self._storage_reconcile_completed = False
         self._maintenance_scheduler_stop = threading.Event()
+        # Fehlerzustand je Wartungsschritt für die Log-Drosselung (_note_step_failure);
+        # nur vom Planer-Thread berührt.
+        self._step_failures: dict[str, dict] = {}
         self._maintenance_scheduler_thread: threading.Thread | None = None
 
         # Vom Wartungsplaner (alle 30s) gepflegter Zwischenstand für die Meldungen
@@ -989,9 +995,42 @@ class BackgroundService:
         liefen dann nie."""
         try:
             yield
-        except Exception:
+        except Exception as exc:
+            self._note_step_failure(name, exc)
+        else:
+            self._note_step_success(name)
+
+    def _note_step_failure(self, name: str, exc: Exception) -> None:
+        """Drosselt die Fehlermeldungen eines dauerhaft scheiternden Schritts:
+        der erste Fehler kommt mit Traceback, danach höchstens einmal je
+        Stunde eine Kurzzeile mit Zähler. Bei 30-s-Takt wären es sonst 120
+        identische Tracebacks pro Stunde, die das Log verdrängen."""
+        now = time.monotonic()
+        state = self._step_failures.get(name)
+        if state is None:
+            self._step_failures[name] = {"count": 1, "since_log": 0, "last_log": now}
             logger.exception(
                 "Wartungsschritt fehlgeschlagen · event=maintenance_step_failed step=%s", name
+            )
+            return
+        state["count"] += 1
+        state["since_log"] += 1
+        if now - state["last_log"] >= self._STEP_FAILURE_LOG_INTERVAL_SECONDS:
+            logger.error(
+                "Wartungsschritt scheitert weiterhin · event=maintenance_step_still_failing "
+                "step=%s failures=%d since_last_log=%d error=%s: %s",
+                name, state["count"], state["since_log"], type(exc).__name__, exc,
+            )
+            state["since_log"] = 0
+            state["last_log"] = now
+
+    def _note_step_success(self, name: str) -> None:
+        state = self._step_failures.pop(name, None)
+        if state is not None:
+            logger.info(
+                "Wartungsschritt wieder erfolgreich · event=maintenance_step_recovered "
+                "step=%s failures=%d",
+                name, state["count"],
             )
 
     def _maintenance_scheduler_loop(self) -> None:
