@@ -14,7 +14,9 @@ from __future__ import annotations
 
 from ..i18n import tr
 
+import json
 import statistics
+import time
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
 from datetime import datetime, timedelta
@@ -740,13 +742,26 @@ def detect_outliers(
 
 
 def soft_delete(index: Index, entity_id: str, timestamps: list[float]) -> None:
+    started_at = time.time()
     index.mark_deleted(entity_id, timestamps)
+    if timestamps:
+        index.log_entity_action(
+            entity_id, "mark", "manual", started_at, time.time(), "success",
+            rows_affected=len(timestamps),
+        )
 
 
 def undo_last_delete(index: Index, entity_id: str) -> int:
     """Macht die zuletzt gelöschte Charge rückgängig (ein Klick = ein 'Löschen'-Vorgang
     rückgängig, wie im Konzept-Mockup "Rückgängig" beschrieben)."""
-    return index.undo_last_deleted_batch(entity_id)
+    started_at = time.time()
+    count = index.undo_last_deleted_batch(entity_id)
+    if count:
+        index.log_entity_action(
+            entity_id, "undo", "manual", started_at, time.time(), "success",
+            rows_affected=count, detail=json.dumps({"mode": "last"}),
+        )
+    return count
 
 
 def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict[float, int]]:

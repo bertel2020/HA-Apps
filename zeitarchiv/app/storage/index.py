@@ -437,6 +437,8 @@ CREATE TABLE IF NOT EXISTS entity_actions (
 );
 CREATE INDEX IF NOT EXISTS idx_entity_actions_created_at
     ON entity_actions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_entity_actions_entity
+    ON entity_actions(entity_id, created_at DESC);
 
 -- Persistente Idempotenz für den Live-Schreibpfad. "processing" wird vor
 -- dem Dateianhang gespeichert; "done" wird gemeinsam mit den Entitäts-
@@ -2025,6 +2027,33 @@ class Index:
             return self._conn.execute(
                 "SELECT * FROM entity_actions ORDER BY created_at DESC, id DESC LIMIT ?",
                 (safe_limit,),
+            ).fetchall()
+
+    def list_entity_actions_for_entity(
+        self,
+        entity_id: str,
+        *,
+        since_ts: float | None = None,
+        actions: tuple[str, ...] = (),
+        limit: int = 500,
+    ) -> list[sqlite3.Row]:
+        """Verlauf EINER Entität (Reiter „Verlauf“) — dieselbe Tabelle wie die
+        globale Aktivität, nur gefiltert. Läufe ohne Entität (z. B. die globale
+        Aufbewahrung) gehören nicht dazu."""
+        where = ["entity_id = ?"]
+        params: list = [entity_id]
+        if since_ts is not None:
+            where.append("created_at >= ?")
+            params.append(since_ts)
+        if actions:
+            where.append(f"action IN ({','.join('?' * len(actions))})")
+            params.extend(actions)
+        params.append(max(1, min(int(limit), 1000)))
+        with self._lock, self._conn:
+            return self._conn.execute(
+                f"SELECT * FROM entity_actions WHERE {' AND '.join(where)} "
+                "ORDER BY created_at DESC, id DESC LIMIT ?",
+                params,
             ).fetchall()
 
     # -- Eindeutige Namen (Dashboards/Charts/Tabellen) -------------------------

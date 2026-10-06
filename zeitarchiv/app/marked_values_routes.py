@@ -19,6 +19,7 @@ globalen Bereinigung, es läuft also höchstens eine gleichzeitig."""
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -31,6 +32,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.concurrency import run_in_threadpool
 from fastapi.templating import Jinja2Templates
 
+from . import entity_history
 from .formatting import decimals_to_int, format_time, format_timestamp, format_value
 from .housekeeping_routes import purge_progress
 from .i18n import N_, tr
@@ -192,19 +194,62 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
         entity_or_404(entity_id)
 
         def undo() -> HTMLResponse:
+            started_at = time.time()
             with deps.coordinator.entity(entity_id):
                 if mode == "selection":
-                    deps.index.undo_deleted_ids(entity_id, ids)
+                    count = deps.index.undo_deleted_ids(entity_id, ids)
                 elif mode == "batch":
                     if batch is None:
                         raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
-                    deps.index.undo_deleted_batch(entity_id, batch)
+                    count = deps.index.undo_deleted_batch(entity_id, batch)
                 else:
-                    deps.index.undo_all_deleted(entity_id)
+                    count = deps.index.undo_all_deleted(entity_id)
+            if count:
+                deps.index.log_entity_action(
+                    entity_id, "undo", "manual", started_at, time.time(), "success",
+                    rows_affected=count, detail=json.dumps({"mode": mode}),
+                )
             deps.invalidate_purge_preview()
             return panel(request, entity_id, page, page_size)
 
         return await run_in_threadpool(undo)
+
+    # -- Verlauf -------------------------------------------------------------
+
+    @router.get("/entities/{entity_id}/history", response_class=HTMLResponse)
+    async def entity_history_panel(
+        request: Request, entity_id: str, filter: str = "all", days: int = entity_history.DEFAULT_DAYS,
+    ) -> HTMLResponse:
+        entity = entity_or_404(entity_id)
+        filter_key = filter if filter in entity_history.FILTERS else "all"
+        days_key = days if days in entity_history.DAYS_OPTIONS else entity_history.DEFAULT_DAYS
+
+        def build() -> dict:
+            rows = deps.index.list_entity_actions_for_entity(
+                entity_id,
+                since_ts=time.time() - days_key * 86400 if days_key else None,
+                actions=entity_history.FILTERS[filter_key],
+                limit=entity_history.LIMIT,
+            )
+            return {
+                "days_list": entity_history.build_days(rows, deps.tz, decimals_to_int(entity["decimals"]), entity["unit"]),
+                "truncated": len(rows) >= entity_history.LIMIT,
+            }
+
+        context = await run_in_threadpool(build)
+        return deps.templates.TemplateResponse(
+            request,
+            "_entity_history.html",
+            {
+                "entity_id": entity_id,
+                "filter_key": filter_key,
+                "days_key": days_key,
+                "filters": [(key, entity_history.FILTER_LABELS[key]) for key in entity_history.FILTERS],
+                "days_options": entity_history.DAYS_OPTIONS,
+                "limit": entity_history.LIMIT,
+                **context,
+            },
+        )
 
     # -- Endgültiges Entfernen genau dieser Entität --------------------------
 

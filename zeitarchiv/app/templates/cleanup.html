@@ -47,6 +47,14 @@
       <button type="button" :class="{active: tab === 'compact'}" @click="setTab('compact')">{{ _("Verdichten") }}</button>
       {% endif %}
       <button type="button" :class="{active: tab === 'marked'}" @click="setTab('marked')">{{ _("Markiert") }} (<span id="marked-tab-count">{{ marked_count | format_int }}</span>)</button>
+      <button type="button" :class="{active: tab === 'history'}" @click="setTab('history')">{{ _("Verlauf") }}</button>
+    </div>
+
+    {# Protokoll der Änderungen an dieser Entität (Markieren, Zurücknehmen, Korrigieren,
+       Hinzufügen, Entfernen, Verdichten). Wird bei jedem Öffnen des Reiters frisch
+       geholt (setTab() löst "load-history" aus). #}
+    <div x-show="tab === 'history'" x-cloak class="history-card">
+      <div id="history-panel" hx-get="{{ app_root }}/entities/{{ entity_id }}/history" hx-trigger="load-history" hx-swap="innerHTML"></div>
     </div>
 
     {# Alle zur Löschung markierten Werte der Entität, nach Charge gruppiert, mit

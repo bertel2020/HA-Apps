@@ -300,6 +300,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # _settings_retention_context() — nur für diese eine Seite gebraucht.
     _ACTIVITY_ACTION_LABELS = {
         "add": N_("Hinzufügen"), "correct": N_("Korrektur"), "purge": N_("Bereinigen"),
+        "mark": N_("Markieren"), "undo": N_("Rückgängig"),
         "compact": N_("Verdichten"), "retention": N_("Aufbewahrung"),
     }
     _ACTIVITY_STATUS_LABELS = {

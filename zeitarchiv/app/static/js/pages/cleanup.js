@@ -16,6 +16,8 @@
       // "Markiert" lädt seine Liste bei JEDEM Öffnen frisch: dort wird zurückgenommen,
       // und die Zahlen sollen stimmen, wenn man aus "Bereinigen" hierher wechselt.
       if (tab === 'marked') htmx.trigger(document.getElementById('marked-panel'), 'load-marked');
+      // "Verlauf" ebenso: jedes Öffnen zeigt den aktuellen Stand der Protokolleinträge.
+      if (tab === 'history') htmx.trigger(document.getElementById('history-panel'), 'load-history');
     }
 
     // Auswahl-Zähler im Reiter "Markiert": die Zeilen kommen per htmx (immer
@@ -29,8 +31,9 @@
 
     // Direkteinstieg …/cleanup?tab=marked (z. B. aus dem Link "Alle markierten Werte
     // ansehen"): den Reiter gleich öffnen.
-    if (new URLSearchParams(location.search).get('tab') === 'marked') {
-      document.addEventListener('DOMContentLoaded', () => setTab('marked'));
+    const directTab = new URLSearchParams(location.search).get('tab');
+    if (directTab === 'marked' || directTab === 'history') {
+      document.addEventListener('DOMContentLoaded', () => setTab(directTab));
     }
 
     async function submitAddValue() {

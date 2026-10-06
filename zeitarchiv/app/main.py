@@ -5349,7 +5349,7 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     started_at = time.time()
     cleanup.add_raw_value(DATA_DIR, index, entity_id, body.ts, body.value, TZ, now=now)
     index.log_entity_action(
-        entity_id, "add", "manual", started_at, time.time(), "success", rows_affected=1
+        entity_id, "add", "manual", started_at, time.time(), "success", 1, json.dumps({"ts": body.ts, "value": body.value})
     )
     return {"ok": True}
 
@@ -5378,7 +5378,8 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
     if not changed:
         raise HTTPException(status_code=404, detail=tr("Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)"))
     index.log_entity_action(
-        entity_id, "correct", "manual", started_at, time.time(), "success", rows_affected=1
+        entity_id, "correct", "manual", started_at, time.time(), "success", rows_affected=1,
+        detail=json.dumps({"ts": body.ts, "old": body.old_value, "new": body.new_value}),
     )
     return {"ok": True}
 

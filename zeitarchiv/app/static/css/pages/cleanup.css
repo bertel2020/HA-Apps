@@ -445,3 +445,42 @@
 @media (max-width:480px){
   .edit-tabs{flex-wrap:wrap;row-gap:4px;}
 }
+
+/* Reiter "Verlauf": Protokoll der Änderungen an einer Entität, nach Tagen gruppiert. */
+.history-card{margin-top:4px;}
+.history-filters{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0;align-items:center;}
+.history-days{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;}
+.history-chip{
+  border:1px solid var(--border);border-radius:14px;padding:3px 10px;background:transparent;
+  color:var(--ink-muted);font:inherit;font-size:calc(12px * var(--font-scale, 1));cursor:pointer;
+}
+.history-chip:hover:not(.on){background:var(--surface-alt);color:var(--ink);}
+.history-chip.on{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
+.history-day{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-weight:600;margin:14px 0 4px;}
+.history-event{
+  display:grid;grid-template-columns:48px 108px 1fr auto;gap:10px;align-items:start;
+  padding:9px 0;border-top:1px solid var(--border);
+}
+.history-time{color:var(--ink-muted);font-variant-numeric:tabular-nums;font-size:calc(13px * var(--font-scale, 1));}
+.history-tag{
+  display:inline-block;padding:1px 8px;border-radius:10px;font-weight:600;
+  font-size:calc(12px * var(--font-scale, 1));
+}
+.history-tag.t-mark{background:var(--warning-soft);color:var(--notice-warn);}
+.history-tag.t-undo{background:var(--surface-alt);color:var(--positive);}
+.history-tag.t-fix{background:var(--accent-line-soft);color:var(--accent-line);}
+.history-tag.t-purge{background:var(--danger-soft);color:var(--danger);}
+.history-tag.t-misc{background:var(--surface-alt);color:var(--ink-muted);}
+.history-sub{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin-top:2px;}
+.history-old{text-decoration:line-through;}
+.history-link{font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);white-space:nowrap;}
+
+@media (max-width:640px){
+  /* Schmale Breite: Marke und Zeit in einer Zeile, darunter der Text als Karte. */
+  .history-event{grid-template-columns:auto 1fr auto;row-gap:2px;}
+  .history-time{order:2;}
+  .history-none{order:5;}
+  .history-what{grid-column:1 / -1;order:4;}
+  .history-link{order:3;justify-self:end;}
+  .history-days{margin-left:0;}
+}
