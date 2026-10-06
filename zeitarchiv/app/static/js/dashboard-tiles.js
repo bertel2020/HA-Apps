@@ -197,7 +197,7 @@
   // "Ø"/"Σ" statt Text — dieselben Symbole wie chart_editor.js/entity_detail.js
   // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; t("Summe")
   // war bis jetzt der einzige verbliebene Text-Ausreißer.
-  const LEGEND_METRIC_LABELS = {last: t('Aktuell'), min: 'Min', max: 'Max', average: 'Ø', sum: 'Σ'};
+  const LEGEND_METRIC_LABELS = {last: t('Aktuell'), min: t('Min'), max: t('Max'), average: 'Ø', sum: 'Σ'};
 
   function escLegend(s) {
     return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -1335,8 +1335,8 @@
               windowStarts[comparisonIndex], elapsedSeconds[comparisonIndex], visibleCols[comparisonIndex].range_key)
           : null;
         const deviationTitle = comparisonIndex < 0 ? '' : comparisonValueStr
-          ? `Gegenüber ${comparisonLabel}${comparisonTimeStr ? ` bis ${comparisonTimeStr}` : ''}: ${comparisonValueStr}`
-          : `Gegenüber ${comparisonLabel}`;
+          ? (comparisonTimeStr ? t('Gegenüber {label} bis {time}: {value}',{label: comparisonLabel, time: comparisonTimeStr, value: comparisonValueStr}) : t('Gegenüber {label}: {value}',{label: comparisonLabel, value: comparisonValueStr}))
+          : t('Gegenüber {label}',{label: comparisonLabel});
         const widthCss = col.width ? `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` : '';
         const heatmapCss = (col.heatmap && (row.row_type === 'entity' || row.row_type === 'group'))
           ? TableCompute.heatmapStyle(values[ci] && values[ci][ri], columnHeatmapRange(ci, ri)) : '';
@@ -1423,7 +1423,7 @@
   // ctx.metric_labels vom Server: dort hängt genau eines am Entitätstyp — bei
   // einem Zähler heißt die Summe "+", weil sie der Zuwachs des Zählerstands
   // ist (siehe _tile_metric_labels() in main.py).
-  const TILE_METRIC_LABELS = {last: '', min: 'Min', avg: 'Ø', max: 'Max', sum: 'Σ'};
+  const TILE_METRIC_LABELS = {last: '', min: t('Min'), avg: 'Ø', max: t('Max'), sum: 'Σ'};
 
   function tileRangeLabel(el) {
     const pair = TILE_RANGE_LABELS[el.dataset.range] || TILE_RANGE_LABELS.day;
@@ -1571,7 +1571,7 @@
       // "An"/"Aus" nur für den Momentanwert — eine Summe über Schalter ist
       // eine Einschaltdauer in Sekunden, kein Zustand.
       numberEl.textContent = istSchalter && primary === 'last'
-        ? (wert ? 'An' : 'Aus')
+        ? (wert ? 'An' : t('Aus'))
         : (istSchalter && primary === 'sum'
             ? NumberFormat.fmtDuration(wert)
             : NumberFormat.fmt(wert, dezimal));
@@ -1908,7 +1908,7 @@
               await renderEntityTile(entityBody);
             }
           } catch (e) {
-            trigger.title = 'Veraltet-Schwelle konnte nicht gespeichert werden';
+            trigger.title = t('Veraltet-Schwelle konnte nicht gespeichert werden');
           }
         });
       });
@@ -2083,7 +2083,7 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             uebernehmen(await response.json());
           } catch (e) {
-            trigger.title = 'Kennzahlen konnten nicht gespeichert werden';
+            trigger.title = t('Kennzahlen konnten nicht gespeichert werden');
           }
         };
 
@@ -2107,7 +2107,7 @@
               uebernehmen(await response.json());
             } catch (e) {
               showPeriodCheckbox.checked = !showPeriod;
-              trigger.title = 'Zeitraum-Anzeige konnte nicht gespeichert werden';
+              trigger.title = t('Zeitraum-Anzeige konnte nicht gespeichert werden');
             } finally {
               showPeriodCheckbox.disabled = false;
             }
@@ -2147,7 +2147,7 @@
 
       const decimalsCells = Array.from(control.querySelectorAll('.dtile-decimals-cell'));
       const decimalsHead = control.querySelector('.dtile-decimals-picker-head strong');
-      const DECIMALS_HEAD_LABELS = {auto: 'Auto', '0': '0', '1': '1', '2': '2', '3': '3'};
+      const DECIMALS_HEAD_LABELS = {auto: t('Auto'), '0': '0', '1': '1', '2': '2', '3': '3'};
       decimalsCells.forEach(cell => {
         cell.addEventListener('click', async () => {
           const decimals = cell.dataset.decimals;
@@ -2166,7 +2166,7 @@
               await renderEntityTile(entityBody);
             }
           } catch (e) {
-            trigger.title = 'Nachkommastellen konnten nicht gespeichert werden';
+            trigger.title = t('Nachkommastellen konnten nicht gespeichert werden');
           }
         });
       });
@@ -2189,7 +2189,7 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             if (titleEl) titleEl.textContent = title || titleInput.placeholder;
           } catch (e) {
-            trigger.title = 'Titel konnte nicht gespeichert werden';
+            trigger.title = t('Titel konnte nicht gespeichert werden');
           }
         };
         titleInput.addEventListener('blur', saveTitle);
@@ -2369,7 +2369,7 @@
       const n = group.querySelectorAll('[data-section-grid] .dtile:not(.dtile-add)').length;
       if (group.classList.contains('collapsed') && n > 0) {
         countEl.hidden = false;
-        countEl.textContent = `(${n} Kachel${n === 1 ? '' : 'n'} ausgeblendet)`;
+        countEl.textContent = (n === 1 ? t('(1 Kachel ausgeblendet)') : t('({n} Kacheln ausgeblendet)',{n}));
       } else {
         countEl.hidden = true;
       }

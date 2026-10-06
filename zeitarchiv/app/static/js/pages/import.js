@@ -157,7 +157,7 @@
     async function confirmSymconDelete(event, form) {
       event.preventDefault();
       const confirmed = await appConfirm(
-        'Hochgeladene Symcon-Quelldaten einschließlich der optionalen settings.json wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten.',
+        t('Hochgeladene Symcon-Quelldaten einschließlich der optionalen settings.json wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten.'),
         {danger: true, confirmLabel: t('Quelldaten löschen')}
       );
       if (confirmed) form.submit();
@@ -310,13 +310,13 @@
           if (xhr.status === 200) {
             pollUploadProgress();
           } else {
-            let message = 'ZIP konnte nicht verarbeitet werden.';
+            let message = t('ZIP konnte nicht verarbeitet werden.');
             try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
             appendUploadError(uploadArea, message);
           }
         };
         xhr.onerror = () => {
-          appendUploadError(uploadArea, 'Upload fehlgeschlagen — Verbindung unterbrochen.');
+          appendUploadError(uploadArea, t('Upload fehlgeschlagen — Verbindung unterbrochen.'));
         };
         xhr.send(formData);
       }
@@ -447,11 +447,11 @@
           location.reload();
           return;
         }
-        let message = 'settings.json konnte nicht verarbeitet werden.';
+        let message = t('settings.json konnte nicht verarbeitet werden.');
         try { message = (await r.json()).detail || message; } catch (e) {}
         appendUploadError(hint, message, true);
       }).catch(() => {
-        appendUploadError(hint, 'Upload fehlgeschlagen — Verbindung unterbrochen.', true);
+        appendUploadError(hint, t('Upload fehlgeschlagen — Verbindung unterbrochen.'), true);
       });
     }
 
@@ -494,7 +494,7 @@
       const markedCount = table.querySelectorAll('tr.marked').length;
       const chip = document.getElementById('marked-count');
       chip.classList.toggle('active', markedCount > 0);
-      chip.textContent = markedCount + ' markiert';
+      chip.textContent = t('{count} markiert',{count: markedCount});
       applyImportPaging();  // Markieren ändert die Zeilenreihenfolge -> sichtbaren Bereich neu berechnen
     }
 

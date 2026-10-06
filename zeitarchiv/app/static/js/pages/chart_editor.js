@@ -10,8 +10,8 @@
     // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
     const LEGEND_METRIC_OPTIONS = [
       {value: 'last', label: t('Aktuell')},
-      {value: 'min', label: 'Min'},
-      {value: 'max', label: 'Max'},
+      {value: 'min', label: t('Min')},
+      {value: 'max', label: t('Max')},
       // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
       // Zeichen, mit denen Durchschnitt/Summe schon überall sonst in der App
       // beschriftet sind (Ø in der Legende selbst, s. u.; Ø auch in der
@@ -73,7 +73,7 @@
       const start = new Date(windowStart * 1000);
       const end = new Date(windowEnd * 1000 - 1000);
       switch (range) {
-        case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
+        case 'hour': return t('{range} Uhr',{range: `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)}`});
         case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? t('Heute') : fmtDay(start));
         case 'week': return `${fmtDayMonth(start)}–${fmtDayMonth(end)} ${end.getFullYear()}`;
         case 'month': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? t('{period} (bis heute)', {period: fmtMonthYear(start)}) : fmtMonthYear(start));
@@ -129,7 +129,7 @@
       return {
         show: true, right: 6, top: 0,
         feature: {
-          saveAsImage: {title: 'Als Bild speichern', backgroundColor: surface, name: exportFilename},
+          saveAsImage: {title: t('Als Bild speichern'), backgroundColor: surface, name: exportFilename},
         },
         iconStyle: {borderColor: inkFaint},
       };
@@ -137,16 +137,16 @@
 
     function previousPeriodLabel(range) {
       return ({
-        hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche',
-        month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade',
-      })[range] || 'Vorperiode';
+        hour: t('Vorherige Stunde'), day: t('Vortag'), week: t('Vorwoche'),
+        month: t('Vormonat'), year: t('Vorjahr'), decade: t('Vorherige Dekade'),
+      })[range] || t('Vorperiode');
     }
 
     function previousYearPeriodLabel(range) {
       return ({
-        hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche',
-        month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade',
-      })[range] || 'Vorjahreszeitraum';
+        hour: t('Vorjahresstunde'), day: t('Vorjahrestag'), week: t('Vorjahreswoche'),
+        month: t('Vorjahresmonat'), year: t('Vorjahr'), decade: t('Vorjahresdekade'),
+      })[range] || t('Vorjahreszeitraum');
     }
 
     // Zwei Zeiträume bekommen keine zweite Vergleichszeile, aus zwei
@@ -220,12 +220,12 @@
       decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
     };
     const RESOLUTION_LABELS = {
-      hour: {medium: '5 Minuten', coarse: '15 Minuten'},
-      day: {medium: '30 Minuten', coarse: '1 Stunde', full: 'Tag'},
-      week: {medium: '6 Stunden', coarse: '1 Tag', full: 'Woche'},
-      month: {medium: '1 Tag', coarse: '1 Woche', full: 'Monat'},
-      year: {medium: '1 Monat', coarse: '3 Monate', full: 'Jahr'},
-      decade: {medium: '1 Jahr', coarse: '2 Jahre'},
+      hour: {medium: t('5 Minuten'), coarse: t('15 Minuten')},
+      day: {medium: t('30 Minuten'), coarse: t('1 Stunde'), full: t('Tag')},
+      week: {medium: t('6 Stunden'), coarse: t('1 Tag'), full: t('Woche')},
+      month: {medium: t('1 Tag'), coarse: t('1 Woche'), full: t('Monat')},
+      year: {medium: t('1 Monat'), coarse: t('3 Monate'), full: t('Jahr')},
+      decade: {medium: t('1 Jahr'), coarse: t('2 Jahre')},
     };
 
     // Zeigt bei "Automatisch" die tatsächlich vom Server gelieferte Auflösung
@@ -266,23 +266,23 @@
     }
 
     const DURATION_UNITS = [
-      [365 * 24 * 3600, 'Jahr', 'Jahre'],
-      [30 * 24 * 3600, 'Monat', 'Monate'],
-      [7 * 24 * 3600, 'Woche', 'Wochen'],
-      [24 * 3600, 'Tag', 'Tage'],
-      [3600, 'Stunde', 'Stunden'],
-      [60, 'Minute', 'Minuten'],
-      [1, 'Sekunde', 'Sekunden'],
+      [365 * 24 * 3600, t('Jahr'), t('Jahre')],
+      [30 * 24 * 3600, t('Monat'), t('Monate')],
+      [7 * 24 * 3600, t('Woche'), t('Wochen')],
+      [24 * 3600, t('Tag'), t('Tage')],
+      [3600, t('Stunde'), t('Stunden')],
+      [60, t('Minute'), t('Minuten')],
+      [1, t('Sekunde'), t('Sekunden')],
     ];
     function fmtDurationLabel(seconds) {
       if (seconds == null) return '';
       for (const [unitSeconds, singular, plural] of DURATION_UNITS) {
         if (seconds >= unitSeconds * 0.9) {
           const n = Math.max(1, Math.round(seconds / unitSeconds));
-          return `${n} ${n === 1 ? singular : plural}`;
+          return `${n} ${t(n === 1 ? singular : plural)}`;
         }
       }
-      return `${Math.round(seconds)} Sekunden`;
+      return t('{n} Sekunden',{n: Math.round(seconds)});
     }
 
     // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
@@ -666,7 +666,7 @@
         get resolutionOptions() {
           const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
           const options = [
-            {value: 'auto', label: 'Automatisch'},
+            {value: 'auto', label: t('Automatisch')},
             {value: 'medium', label: labels.medium},
             {value: 'coarse', label: labels.coarse},
           ];
@@ -745,7 +745,7 @@
             // Legende sie als gedämpfte Unterzeile je Entität zeigen können.
             const compare = (this.compare && s.compare_points && s.compare_points.length)
               ? {
-                  seriesLabel: this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode',
+                  seriesLabel: this.compareMode === 'year' ? t('Vorjahr') : t('Vorperiode'),
                   period: formatPeriodLabel(this.range, this.continuous, s.compare_window_start, s.compare_window_end, false),
                   ...this.seriesStatsFor(s, s.compare_points, s.compare_window_end),
                 }
@@ -827,7 +827,7 @@
         // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
         // die beiden Label-Getter oben automatisch an den Zeitraum an.
         get compareButtonLabel() {
-          if (!this.compare) return 'Vergleichen';
+          if (!this.compare) return t('Vergleichen');
           return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
         // EIN Ort für "zeichnet render() gerade über renderYearsCompare()"
@@ -1320,7 +1320,7 @@
             const axisDynamic = dynamicYAxis && !axisHasBar.has(u);
             return {
               type: 'value',
-              name: isPercentAxis ? 'Anteil' : (isDuration ? 'Dauer' : (u || undefined)),
+              name: isPercentAxis ? t('Anteil') : (isDuration ? t('Dauer') : (u || undefined)),
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
@@ -1567,7 +1567,7 @@
               // einzeln umschaltbar (wie cmp auch nicht) — sie gehört
               // sichtbar zur Hauptserie, kein eigener Umschalt-Anspruch.
               echartsSeries.push({
-                name: `${displayName} (Ø gleitend)`,
+                name: t('{name} (Ø gleitend)',{name: displayName}),
                 type: 'line',
                 yAxisIndex: units.indexOf(axisKey(s)),
                 data: rollingData,
@@ -1594,7 +1594,7 @@
               const compareLabel = formatPeriodLabel(
                 this.range, this.continuous, s.compare_window_start, s.compare_window_end, false
               );
-              const seriesLabel = this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode';
+              const seriesLabel = this.compareMode === 'year' ? t('Vorjahr') : t('Vorperiode');
               const comparePoints = resamplePoints(
                 s.compare_points, this.range, this.resolutionPreset,
                 s.aggregation_type, s.compare_window_start
@@ -1921,7 +1921,7 @@
               // abzuschalten nimmt der Achse jeden Platzanspruch, show:false
               // bleibt zusätzlich als Absicherung stehen.
               show: !hidden,
-              name: hidden ? '' : (isDuration ? 'Dauer' : u || '') + (isCum ? ' kumuliert' : '') || undefined,
+              name: hidden ? '' : (isDuration ? t('Dauer') : u || '') + (isCum ? t(' kumuliert') : '') || undefined,
               nameLocation: 'end',
               position: pos % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(pos / 2) * 55,
@@ -2007,7 +2007,7 @@
               });
               if (this.compareCumsum) {
                 echartsSeries.push({
-                  name: `${displayName} (${year}) kumuliert`,
+                  name: t('{name} ({year}) kumuliert',{name: displayName, year}),
                   type: 'line',
                   yAxisIndex: cumAxisIndex(axisUnit(s)),
                   data: cumulate(monthly),
@@ -2136,7 +2136,7 @@
           const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
           const lines = [];
           if (this.donut) {
-            lines.push(['Entität', 'Wert'].map(csvEscape).join(';'));
+            lines.push([t('Entität'), t('Wert')].map(csvEscape).join(';'));
             this.series.forEach(s => {
               const name = this.entityNames[s.entity_id] || s.friendly_name;
               const value = fmtNum(this.donutValueFor(s), this.effectiveDecimals(s)) + (s.unit ? ` ${s.unit}` : '');
@@ -2147,7 +2147,7 @@
             this.series.forEach(s => s.points.forEach(p => tsSet.add(p.ts)));
             const timestamps = [...tsSet].sort((a, b) => a - b);
             const names = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
-            lines.push(['Zeit', ...names].map(csvEscape).join(';'));
+            lines.push([t('Zeit'), ...names].map(csvEscape).join(';'));
             timestamps.forEach(ts => {
               const row = [new Date(ts * 1000).toLocaleString(LOCALE)];
               this.series.forEach(s => {
@@ -2213,7 +2213,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              appAlert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || t('Speichern fehlgeschlagen.'));
               return;
             }
             const data = await res.json();
@@ -2221,7 +2221,7 @@
               window.location.href = `${BASE}/charts/${data.id}`;
               return;
             }
-            this.savedMessage = '✓ Gespeichert';
+            this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
             setTimeout(() => { this.savedMessage = ''; }, 2000);
           } finally {

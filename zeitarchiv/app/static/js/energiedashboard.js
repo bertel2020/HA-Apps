@@ -299,7 +299,7 @@
   window.energieFlow = function energieFlow() {
     const initialPeriod = readInitialRangeOffset();
     return {
-      ranges: [{key: 'hour', label: t('Stunde')}, {key: 'day', label: 'Tag'}, {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}],
+      ranges: [{key: 'hour', label: t('Stunde')}, {key: 'day', label: t('Tag')}, {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}],
       range: initialPeriod.range,
       offset: initialPeriod.offset,
       loading: false,
@@ -482,7 +482,7 @@
       co2VermiedenKmText() {
         if (this.kpi.co2_vermieden == null) return '';
         const km = (this.kpi.co2_vermieden * 1000) / 130;
-        return '≈ ' + this.fmt(km, 0) + ' km Autofahrt';
+        return '≈ ' + this.fmt(km, 0) + t(' km Autofahrt');
       },
 
       // Netto-CO2 für die dritte KPI-Kachel im CO2-Dialog — negativ heißt
@@ -802,8 +802,8 @@
       // periodText kommt aus load() (derselbe range/offset), deshalb hier
       // ohne eigene Datumsformatierung wiederverwendet.
       heatmapNote() {
-        if (this.range === 'month' || this.range === 'year') return `Ø je Wochentag · ${this.periodText}`;
-        return 'letzte 7 Tage';
+        if (this.range === 'month' || this.range === 'year') return t('Ø je Wochentag · {period}',{period: this.periodText});
+        return t('letzte 7 Tage');
       },
 
       // Als ECharts-heatmap-Serie statt eigenem HTML/CSS-Grid gerendert —

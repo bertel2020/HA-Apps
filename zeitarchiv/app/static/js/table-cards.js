@@ -187,7 +187,7 @@
   function setMenuLabel(button, head) {
     const cell = activeCell(head);
     const name = cell ? labelOf(cell) : '';
-    button.textContent = name ? `Sortieren: ${name} ${directionOf(cell)}`.trim() : 'Sortieren ▾';
+    button.textContent = name ? `${t('Sortieren:')} ${name} ${directionOf(cell)}`.trim() : t('Sortieren ▾');
     button.classList.toggle('dt-cards-sort-active', Boolean(name));
   }
 

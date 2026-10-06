@@ -13,15 +13,15 @@
 
     // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Typ, Einheit)
     // kommt aus dem gemeinsamen static/js/dd-picker.js.
-    const EXPORT_TYPE_LABELS = {standard: 'Standard', counter: t('Zähler'), switch: t('Schalter')};
+    const EXPORT_TYPE_LABELS = {standard: t('Standard'), counter: t('Zähler'), switch: t('Schalter')};
     function updateExportTypeFilterLabel() {
       const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
       const btn = document.getElementById('export-type-filter-btn');
       if (!checked.length || checked.some(cb => cb.value === 'all')) {
-        btn.textContent = 'Typ: Alle ▾';
+        btn.textContent = t('Typ: Alle ▾');
         return;
       }
-      btn.textContent = 'Typ: ' + checked.map(cb => EXPORT_TYPE_LABELS[cb.value]).join(', ') + ' ▾';
+      btn.textContent = t('Typ: ') + checked.map(cb => EXPORT_TYPE_LABELS[cb.value]).join(', ') + ' ▾';
     }
 
     // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —

@@ -62,7 +62,7 @@ window.TableCompute = (() => {
       }
       const start = pos;
       while (peek() && (/[0-9.]/.test(peek()) || peek() === FORMULA_DECIMAL_SEP)) pos++;
-      if (pos === start) throw new Error(`Unerwartetes Zeichen "${peek() ?? ''}"`);
+      if (pos === start) throw new Error(t('Unerwartetes Zeichen „{char}“',{char: peek() ?? ''}));
       const numText = s.slice(start, pos);
       return parseFloat(FORMULA_DECIMAL_SEP === '.' ? numText : numText.replace(FORMULA_DECIMAL_SEP, '.'));
     }
@@ -319,7 +319,7 @@ window.TableCompute = (() => {
             })),
           }),
         });
-        if (!res.ok) throw new Error(`Tabellenabfrage fehlgeschlagen (${res.status})`);
+        if (!res.ok) throw new Error(t('Tabellenabfrage fehlgeschlagen ({status})',{status: res.status}));
         columnData = (await res.json()).columns || [];
       } catch (e) {
         columnData = [];

@@ -247,12 +247,12 @@
     // siehe TableCompute.computeValues()/memberValueFor(). Kurze
     // Button-Labels (siehe .tbl-agg-picker-Kommentar oben im CSS), volle
     // Bezeichnung im Popover UND als title-Tooltip auf dem Button.
-    const AGG_OPTIONS = [['auto', t('Automatisch')], ['avg', 'Ø Durchschnitt'], ['min', 'Min'], ['max', 'Max'], ['sum', 'Σ Summe']];
+    const AGG_OPTIONS = [['auto', t('Automatisch')], ['avg', t('Ø Durchschnitt')], ['min', t('Min')], ['max', t('Max')], ['sum', t('Σ Summe')]];
     // Summenzeile kennt nur Summe/Durchschnitt — t("Automatisch")/"Min"/"Max"
     // ergeben für eine Summenzeile keinen Sinn (die bezieht sich immer auf
     // MEHRERE bereits aggregierte Zeilen, nicht auf einzelne Rohwerte).
-    const SUMMARY_AGG_OPTIONS = [['sum', 'Σ Summe'], ['avg', 'Ø Durchschnitt']];
-    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: 'Min', max: 'Max', sum: 'Σ'};
+    const SUMMARY_AGG_OPTIONS = [['sum', t('Σ Summe')], ['avg', t('Ø Durchschnitt')]];
+    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: t('Min'), max: t('Max'), sum: 'Σ'};
     const AGG_TITLES = {
       auto: t('Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)'),
       avg: t('Durchschnitt'), min: t('Minimum'), max: t('Maximum'), sum: t('Summe'),
@@ -846,7 +846,7 @@
               window.location.href = `${BASE}/tables/${data.id}`;
               return;
             }
-            this.savedMessage = '✓ Gespeichert';
+            this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
             setTimeout(() => { this.savedMessage = ''; }, 2000);
           } finally {

@@ -19,7 +19,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              appAlert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || t('Speichern fehlgeschlagen.'));
               return;
             }
             const data = await res.json();

@@ -30,8 +30,8 @@
     // Legenden-Chip statt einer Serienliste.
     const LEGEND_METRIC_OPTIONS = [
       {value: 'last', label: t('Aktuell')},
-      {value: 'min', label: 'Min'},
-      {value: 'max', label: 'Max'},
+      {value: 'min', label: t('Min')},
+      {value: 'max', label: t('Max')},
       // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
       // Zeichen wie in der Legende selbst (Ø) und in chart_editor.js
       // (LEGEND_METRIC_OPTIONS, identische Begründung dort).
@@ -94,7 +94,7 @@
       const fmtTime = d => d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
       switch (range) {
         case 'hour':
-          return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
+          return t('{range} Uhr',{range: `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)}`});
         case 'day':
           if (!continuous) {
             if (!skipRelative && offset === 0) return t('Heute');

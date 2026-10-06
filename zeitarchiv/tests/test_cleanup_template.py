@@ -44,7 +44,7 @@ def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
     assert "pageData.rangeAnchorMs = picked.getTime()" in cleanup
     assert "pageData.windowEnd = {{ window_end_ts }}" in rows
     assert "pageData.isCurrent = {{ is_current | tojson }}" in rows
-    assert "`${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`" in chart_editor
+    assert "t('{range} Uhr',{range: `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)}`})" in chart_editor
     assert "strftime('%d.%m.%Y')} · {window_start.strftime('%H:%M')" in main
 
 
