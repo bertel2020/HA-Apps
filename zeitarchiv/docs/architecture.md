@@ -184,8 +184,12 @@ Daemon-Thread, geprüft alle 30 Sekunden, unabhängig von Seitenaufrufen:
   `ha_integration.py`) — beide rein informativ, ihr Ausfall (z. B. kein
   Internet) blockiert nie den Schreibpfad
 
-Ein Fehler in einem Planer-Durchlauf wird geloggt, bricht die Schleife aber
-nicht ab (`except Exception: logger.exception(...)`).
+Jeder Schritt läuft in einem eigenen `with self._maintenance_step("<name>")`:
+ein Fehler wird dort abgefangen und geloggt (gedrosselt, siehe
+[operations.md](operations.md#wartungsplaner)), die übrigen Schritte des
+Durchlaufs laufen weiter. Das äußere `except Exception` der Schleife bleibt
+als Rückfall. Ein neuer Schritt gehört in so einen `with`-Block —
+`tests/test_maintenance_step_isolation.py` prüft das per AST.
 
 Ein zweiter, unabhängiger Daemon-Thread
 (`background.py:BackgroundService._background_storage_reconciliation()`)

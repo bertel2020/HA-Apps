@@ -966,7 +966,9 @@ Jahre in zwölf Spalten nebeneinanderstellen. Die Beschriftung kann
 Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten,
 die sich automatisch auf den jeweiligen Zeitraum der Spalte auflösen
 (Einfüge-Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des
-aufgelösten Werts).
+aufgelösten Werts). Maßgeblich ist die Zeitzone der App (Option `timezone`),
+nicht die des Browsers — auch auf Reisen zeigt `{jahr}` also das Jahr des
+Zeitraums, den die Tabelle tatsächlich abfragt.
 
 **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch auf
 denselben Zeitraum ein Jahr zuvor (schaltjahrsicher) — verschiebt dabei

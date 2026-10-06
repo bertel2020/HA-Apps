@@ -229,6 +229,12 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   Schriftgröße und wird deshalb per JS gemessen und als Custom Property
   `--tbl-group-header-h` gesetzt (`syncLetterPositions()` im Editor,
   `renderTableTile()` in `dashboard-tiles.js`).
+- **Beschriftungsspalte der Kachel bricht nicht im Wort:** Wertezellen sind
+  `nowrap` (Mindestbreite = Inhalt). Hätte die Beschriftung `word-break:
+  break-word` (Mindestbreite ein Zeichen), drückte das Auto-Layout bei zu
+  schmaler Kachel allein diese Spalte zu einem Buchstabenstreifen zusammen.
+  `th:first-child, td:first-child` setzen deshalb `word-break:normal`; die
+  Tabelle scrollt stattdessen waagerecht (`.dtile-table-preview`).
 - **Gleich breite Werte-Spalten (`style.equal_value_cols`):** ein reiner
   `width:1%`-CSS-Trick verteilt bei `table-layout:auto` den Platz NICHT
   zuverlässig gleichmäßig, sobald sich Zahlenlängen zwischen Spalten stark
@@ -820,6 +826,17 @@ die Liste im Panel sagt ohnehin, was.
   (aktuell deutsch, Komma als Dezimaltrennzeichen); eine künftige
   Sprachumschaltung ändert nur diese eine Datei, nicht jede einzelne
   Tabellen-/Chart-Seite.
+- **`server-time.js`**: Kalenderangaben in der Zeitzone des SERVERS statt des
+  Browsers. Der Server rechnet Zeiträume in seiner Zeitzone (Option `timezone`)
+  und liefert Zeitstempel; wer daraus mit `getFullYear()`/`getMonth()` oder
+  `toLocaleDateString()` ohne `timeZone` ein Datum macht, bekommt bei einem
+  Browser hinter der Serverzone (z. B. Portugal, Server in Deutschland) den
+  Vortag — am 01.10. „September", im Januar das Vorjahr. Die Zone steht als
+  `data-tz` am `<html>` (`base.html`); `ServerTime.withZone(optionen)` ergänzt
+  `timeZone` für `toLocale*String()`, `ServerTime.parts(epochSekunden)` liefert
+  Jahr/Monat/Tag/Stunde/Minute/Wochentag. Neuer Code, der Serverzeitstempel
+  anzeigt, nimmt diesen Helfer. Noch nicht umgestellt (Roadmap): Entitäts-/
+  Chart-Editor und die ECharts-Zeitachsen.
 - **`sortable-table.js`**: einheitliches Sortierverhalten für längere
   Listen-/Verwaltungstabellen (Bereinigungs-Vorschau, Indexkonsistenz,
   Datenintegrität, Ausführungsverläufe, Duplikate je Entität,

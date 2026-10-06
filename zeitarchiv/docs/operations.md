@@ -59,8 +59,17 @@ sowie — nur im Demo-Modus bzw. bei einer liegengebliebenen Demo-Instanz releva
 (siehe [Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) —
 `_refresh_demo_dir_info_if_stale()` (Belegter-Platz-Cache für den Zustand
 „ungenutzt") und `_run_demo_append_if_due()` (fälligkeitsbasiertes
-automatisches Ergänzen der Demo-Daten). Ein Fehler in einem Durchlauf wird
-geloggt und bricht die Schleife nicht ab.
+automatisches Ergänzen der Demo-Daten). Jeder dieser Schritte läuft einzeln
+abgesichert (`_maintenance_step(name)`): scheitert einer, wird das geloggt, und
+die übrigen Schritte desselben Durchlaufs laufen trotzdem — ein dauerhaft
+scheiternder Schritt (z. B. die Duplikat-Übersicht) blockiert damit weder
+Backup-Zeitplan noch Aufbewahrung, Verdichtung oder automatische Bereinigung.
+Das Log ist dabei gedrosselt: der erste Fehler eines Schritts erscheint mit
+Traceback (`event=maintenance_step_failed step=<name>`), danach höchstens
+stündlich eine Kurzzeile mit Zähler
+(`event=maintenance_step_still_failing`), und bei der Rückkehr zum Normalbetrieb
+einmal `event=maintenance_step_recovered`. Ein Fehler außerhalb der Schritte
+(`event=maintenance_scheduler_failed`) bricht die Schleife ebenfalls nicht ab.
 
 Backup, Import, Rotation und Retention greifen wegen
 `StorageCoordinator.exclusive()` nie gleichzeitig auf den Datenbestand zu —
