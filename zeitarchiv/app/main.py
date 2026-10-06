@@ -359,13 +359,15 @@ def _collect_all_notices() -> list[dict]:
     """Ein Aufhänger für drei gleichlautende collect_notices()-Aufrufstellen
     statt derselben elf Argumente je einmal (_background existiert erst
     später im Modul — unproblematisch, gebunden wird erst beim Aufruf)."""
+    purge_preview = _background.load_purge_preview()
     return collect_notices(
-        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+        index, DATA_DIR / "index.sqlite", TZ, purge_preview["totals"],
         _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
         _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
         _background.last_backup_worker_tick, _background.backup_progress.running, _background.demo_dir_info_cached,
         coordinator_busy_events=storage_coordinator.recent_busy_events(),
         duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
+        purge_rows=purge_preview["rows"],
     )
 
 
@@ -1283,15 +1285,17 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     Dauer kommt aus einer festen Preset-Liste (SNOOZE_PRESETS) statt einem
     frei wählbaren Datum — "forever" (None) eingeschlossen, bleibt trotzdem
     sicher, siehe Kommentar dort (Fingerprint statt Ablaufdatum)."""
+    purge_preview = _background.load_purge_preview()
     notice = next(
         (
             n for n in notices_mod.build_notices(
-                index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+                index, DATA_DIR / "index.sqlite", TZ, purge_preview["totals"],
                 _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
                 _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
                 demo_dir_info=_background.demo_dir_info_cached,
                 coordinator_busy_events=storage_coordinator.recent_busy_events(),
                 duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
+                purge_rows=purge_preview["rows"],
             )
             if n["id"] == notice_id
         ),
@@ -2689,6 +2693,9 @@ def _entities_table_response(
             "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
             "has_custom_name": bool(row["custom_name"]),
             "is_favorite": bool(row["is_favorite"]),
+            # Zur Löschung markierte, noch nicht bereinigte Werte — immer
+            # gebraucht (Zeilentönung + Hinweiszeile), keine Spalte zum Abwählen.
+            "pending_purge": int(row["deleted_count"] or 0),
         }
         if "type" in visible_columns:
             entry["aggregation_type"] = row["aggregation_type"]
@@ -4941,6 +4948,7 @@ def entity_detail(
             # Sidebar-Kachel nicht zuverlässig funktioniert (document.referrer
             # fehlt dort).
             "used_in_energiedashboard": entity_has_energiedashboard_role(index, entity_id),
+            "pending_purge": notices_mod.pending_purge_for(entity, _background.load_purge_preview()["rows"]),
         },
     )
 

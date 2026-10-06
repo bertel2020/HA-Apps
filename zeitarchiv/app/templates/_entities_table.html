@@ -48,7 +48,7 @@
       {% endfor %}
     </tr>
     {% for row in rows %}
-    <tr>
+    <tr{% if row.pending_purge %} class="has-pending-purge"{% endif %}>
       <td class="fav-cell col-fav">
         <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
                 title="{{ _('Favorit') }}" onclick="toggleFavorite('entities/{{ row.entity_id }}/favorite', this)">★</button>
@@ -62,6 +62,7 @@
           {% endif %}
           <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
         </a>
+        {% if row.pending_purge %}<span class="pending-purge-note"><i class="pending-dot" aria-hidden="true"></i>{% if row.pending_purge == 1 %}{{ _("1 Wert zur Löschung markiert · Bereinigung ausstehend") }}{% else %}{{ _("{count} Werte zur Löschung markiert · Bereinigung ausstehend", count=(row.pending_purge | format_int)) }}{% endif %}</span>{% endif %}
       </td>
       {% if 'type' in visible_columns %}<td class="va-mid col-type"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>{% endif %}
       {% if 'first_ts' in visible_columns %}<td class="col-date">{{ row.first_ts }}{% if row.first_ts_time %}<span class="ts-time">{{ row.first_ts_time }}</span>{% endif %}</td>{% endif %}

@@ -23,6 +23,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from . import cleanup_stats
@@ -197,6 +198,7 @@ def build_notices(
     demo_dir_info: dict | None = None,
     coordinator_busy_events: int = 0,
     duplicate_ratio_events: int = 0,
+    purge_rows: list[dict] | None = None,
 ) -> list[dict]:
     """Ungefilterte, aktuell aktive Meldungen — auch stummgeschaltete sind
     hier noch enthalten (main.py braucht das z. B. beim Stummschalten selbst,
@@ -685,15 +687,38 @@ def build_notices(
     removable_rows = purge_totals.get("removable_rows", 0)
     if removable_rows:
         entities_affected = purge_totals.get("entities_affected", 0)
+        # Genau eine betroffene Entität: beim Namen nennen und direkt auf deren
+        # Bereinigung verlinken, statt auf die globale Übersicht. Mit mehreren
+        # bleibt es bei der Sammelmeldung — welche gemeint ist, zeigt dann die
+        # Entitätenliste (markierte Zeilen).
+        single = None
+        if entities_affected == 1:
+            single = next((row for row in (purge_rows or []) if row.get("removable_rows")), None)
+        if single:
+            name = single.get("friendly_name") or single["entity_id"]
+            detail = (
+                tr("{format_int} markierter Datensatz bei „{name}“ kann endgültig entfernt werden.", format_int=format_int(removable_rows), name=name)
+                if removable_rows == 1
+                else tr("{format_int} markierte Datensätze bei „{name}“ können endgültig entfernt werden.", format_int=format_int(removable_rows), name=name)
+            )
+            link = f"/entities/{quote(single['entity_id'], safe='')}/cleanup"
+            meta = tr("Entität")
+        else:
+            detail = tr("{format_int} markierte Datensätze über {entities} können endgültig entfernt werden.", format_int=format_int(removable_rows), entities=(tr("{count} Entität", count=entities_affected) if entities_affected == 1 else tr("{count} Entitäten", count=entities_affected)))
+            link = "/housekeeping#speicherplatz"
+            meta = tr("Housekeeping")
+        # Nur wenn tatsächlich archivierte Monate betroffen sind: der laufende
+        # Monat hat keine Rollups, seine Aggregation entsteht live aus dem
+        # (bereits gefilterten) Hot Buffer.
+        if purge_totals.get("archive_rows", 0):
+            detail += " " + tr("Tages-, Monats- und Jahreswerte berücksichtigen die Löschung erst danach.")
         notices.append({
             "id": "housekeeping.purge_available",
             "severity": "warn",
             "title": tr("Endgültige Bereinigung möglich"),
-            "detail": (
-                tr("{format_int} markierte Datensätze über {entities} können endgültig entfernt werden.", format_int=format_int(removable_rows), entities=(tr("{count} Entität", count=entities_affected) if entities_affected == 1 else tr("{count} Entitäten", count=entities_affected)))
-            ),
-            "meta": tr("Housekeeping"),
-            "link": "/housekeeping#speicherplatz",
+            "detail": detail,
+            "meta": meta,
+            "link": link,
         })
 
     # Derselbe stündliche globale Duplikat-Schnappschuss, der bereits die
@@ -976,6 +1001,20 @@ def backup_activity(backup_progress) -> dict | None:
     }
 
 
+def pending_purge_for(entity, purge_rows: list[dict]) -> dict | None:
+    """Banner auf der Verlaufsseite: zur Löschung markierte, noch nicht endgültig
+    entfernte Werte. Die Anzahl kommt aus entities.deleted_count und ist damit
+    sofort nach dem Markieren da; ob archivierte Monate betroffen sind (nur dann
+    enthalten Tages-/Monats-/Jahreswerte die Werte noch), weiß nur die
+    zwischengespeicherte Bereinigungsvorschau und fehlt bis zu deren nächster
+    Aktualisierung — der Banner nennt den Zusatz dann einfach noch nicht."""
+    count = int(entity["deleted_count"] or 0)
+    if not count:
+        return None
+    row = next((r for r in purge_rows if r.get("entity_id") == entity["entity_id"]), None)
+    return {"count": count, "archive": bool(row and row.get("archive_rows"))}
+
+
 def collect_notices(
     index,
     index_path: Path,
@@ -992,6 +1031,7 @@ def collect_notices(
     demo_dir_info: dict | None = None,
     coordinator_busy_events: int = 0,
     duplicate_ratio_events: int = 0,
+    purge_rows: list[dict] | None = None,
 ) -> list[dict]:
     """Für die Anzeige in der Topnav — build_notices() abzüglich aktuell
     gültiger Stummschaltungen (beim Tipp bereits durch _current_tip_notice
@@ -1005,6 +1045,7 @@ def collect_notices(
             backup_worker_last_tick, backup_worker_in_progress, demo_dir_info,
             coordinator_busy_events=coordinator_busy_events,
             duplicate_ratio_events=duplicate_ratio_events,
+            purge_rows=purge_rows,
         )
         if not _is_muted(notice, mutes.get(notice["id"]), now)
     ]

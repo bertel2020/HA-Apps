@@ -31,6 +31,20 @@
 
     {% with active = 'verlauf' %}{% include "_entity_tabs.html" %}{% endwith %}
 
+    {# Zur Löschung markierte, noch nicht endgültig entfernte Werte — unabhängig
+       vom Schalter "Markierte Werte" im Optionen-Menü, denn der steht standardmäßig
+       auf aus, und die Markierung soll nicht davon abhängen, ob man ihn kennt. #}
+    {% if pending_purge %}
+    <div class="entity-purge-banner" role="status">
+      <span class="pending-dot" aria-hidden="true"></span>
+      <p>
+        <strong>{% if pending_purge.count == 1 %}{{ _("1 Wert ist zur Löschung markiert.") }}{% else %}{{ _("{count} Werte sind zur Löschung markiert.", count=(pending_purge.count | format_int)) }}{% endif %}</strong>
+        {% if pending_purge.archive %}{{ _("Tages-, Monats- und Jahreswerte berücksichtigen die Löschung erst nach der Bereinigung.") }}{% else %}{{ _("Die endgültige Bereinigung steht noch aus.") }}{% endif %}
+        <a href="{{ app_root }}/entities/{{ entity_id }}/cleanup">{{ _("Zur Bereinigung") }}</a>
+      </p>
+    </div>
+    {% endif %}
+
     <div class="toolbars">
       <!-- Zeitraum + Navigation zuerst (bestimmt WELCHER Ausschnitt gezeigt
            wird), Vergleichen + Optionen-Menü ans Ende der Zeile — alles

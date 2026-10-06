@@ -47,6 +47,51 @@ def test_purge_available_notice_appears_when_rows_are_removable() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _purge_notice(purge_totals: dict, purge_rows: list[dict] | None) -> dict:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals=purge_totals,
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+            purge_rows=purge_rows,
+        )
+        index.close()
+        return next(n for n in notices if n["id"] == "housekeeping.purge_available")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_purge_available_notice_names_single_entity_and_links_to_its_cleanup() -> None:
+    notice = _purge_notice(
+        {"removable_rows": 1, "entities_affected": 1, "archive_rows": 1},
+        [{"entity_id": "sensor.strom_haus", "friendly_name": "Stromzähler Haus", "removable_rows": 1, "archive_rows": 1}],
+    )
+    assert "Stromzähler Haus" in notice["detail"]
+    assert "Jahreswerte" in notice["detail"]
+    assert notice["link"] == "/entities/sensor.strom_haus/cleanup"
+
+
+def test_purge_available_notice_stays_global_for_several_entities() -> None:
+    notice = _purge_notice(
+        {"removable_rows": 12, "entities_affected": 3, "archive_rows": 0},
+        [{"entity_id": "sensor.a", "friendly_name": "A", "removable_rows": 12, "archive_rows": 0}],
+    )
+    assert notice["link"] == "/housekeeping#speicherplatz"
+    assert "Jahreswerte" not in notice["detail"]
+
+
+def test_purge_available_notice_without_rows_falls_back_to_global_link() -> None:
+    notice = _purge_notice({"removable_rows": 1, "entities_affected": 1}, None)
+    assert notice["link"] == "/housekeeping#speicherplatz"
+
+
 def test_purge_available_notice_absent_when_nothing_removable() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
     try:

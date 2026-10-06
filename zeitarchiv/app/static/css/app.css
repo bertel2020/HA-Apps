@@ -1785,6 +1785,37 @@ button[data-tooltip]{cursor:pointer;}
   background:var(--accent-line);border-radius:2px 2px 0 0;
 }
 
+/* Zur Löschung markierte, noch nicht endgültig entfernte Werte: Banner auf der
+   Verlaufsseite und getönte Zeile in der Entitätenliste. Warnton wie die
+   Meldung in der Glocke (--notice-warn), bewusst NICHT --danger: das gehört dem
+   Chart und dem Markierungs-Chip ("welche Punkte sind markiert"), hier geht es um
+   "es steht noch etwas aus". Die Tönung allein trägt die Aussage nicht — Punkt
+   und Text stehen in jedem Fall dabei. */
+.pending-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none;background:var(--notice-warn);}
+.entity-purge-banner{
+  display:flex;align-items:flex-start;gap:10px;margin:0 0 14px;padding:10px 14px;
+  background:var(--warning-soft);border:1px solid var(--notice-warn);border-radius:8px;
+  font-size:calc(13px * var(--font-scale, 1));color:var(--ink);
+}
+.entity-purge-banner .pending-dot{margin-top:6px;}
+.entity-purge-banner p{margin:0;line-height:1.5;}
+.entity-purge-banner strong{font-weight:600;}
+.entity-purge-banner a{color:var(--accent-line);white-space:nowrap;}
+table.dt tr.has-pending-purge td{background:color-mix(in srgb, var(--warning-soft) 55%, transparent);}
+table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
+.pending-purge-note{
+  display:flex;align-items:center;gap:6px;margin-top:3px;
+  font-size:calc(11.5px * var(--font-scale, 1));color:var(--notice-warn);
+}
+/* Kartenform (Smartphone): die Karte ist der <tr>, nicht die Zellen — getönt wird
+   deshalb die Karte als Ganzes, sonst stünden zwei getönte Streifen in einer
+   weißen Karte. */
+@media (max-width:640px){
+  table.dt.dt-cards tr.has-pending-purge{background:color-mix(in srgb, var(--warning-soft) 55%, var(--surface));}
+  table.dt.dt-cards tr.has-pending-purge td,
+  table.dt.dt-cards tbody tr.has-pending-purge:hover td{background:transparent;}
+}
+
 /* Aktionsleiste unter Tabellen */
 .actionbar{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);flex-wrap:wrap;}
 
