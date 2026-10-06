@@ -1,24 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Charts{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Charts") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/charts.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Charts</h1>
-    <p class="sub">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="charts/new">+ Neuer Chart</a></p>
+    <h1>{{ _("Charts") }}</h1>
+    <p class="sub">{{ _("Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot;") }} <a href="charts/new">{{ _("+ Neuer Chart") }}</a></p>
 
     <div class="settings-panel" data-card-browser-root>
         <div class="card-browser" data-storage-key="zeitarchiv.charts.sort">
-          <input type="search" class="search card-browser-search" placeholder="Chart suchen …" aria-label="Charts durchsuchen">
+          <input type="search" class="search card-browser-search" placeholder="{{ _('Chart suchen …') }}" aria-label="{{ _('Charts durchsuchen') }}">
           <span class="card-browser-sortgroup">
             {% set sort_options = [
               ('neueste', 'Neueste zuerst'), ('aelteste', 'Älteste zuerst'),
               ('name_asc', 'Name A–Z'), ('name_desc', 'Name Z–A')
             ] %}
             <span class="dd-picker-wrap">
-              <button type="button" class="btn" id="charts-sort-btn" onclick="toggleDDPicker('charts-sort')">Neueste zuerst ▾</button>
+              <button type="button" class="btn" id="charts-sort-btn" onclick="toggleDDPicker('charts-sort')">{{ _("Neueste zuerst ▾") }}</button>
               <input type="hidden" id="charts-sort-input" class="card-browser-sort" value="neueste">
               <div class="dd-picker-popover" id="charts-sort-popover">
                 {% for value, label in sort_options %}
@@ -29,8 +29,8 @@
             </span>
           </span>
           <button type="button" class="chip card-browser-fav" data-aktiv="1" aria-pressed="true"
-                  title="Favoriten unabhängig von der Sortierung nach oben ziehen">★ Favoriten zuerst</button>
-          <p class="card-browser-empty" hidden>Kein Chart passt zur Suche.</p>
+                  title="{{ _('Favoriten unabhängig von der Sortierung nach oben ziehen') }}">{{ _("★ Favoriten zuerst") }}</button>
+          <p class="card-browser-empty" hidden>{{ _("Kein Chart passt zur Suche.") }}</p>
         </div>
         <div class="chart-grid" data-card-grid>
           {% for row in rows %}
@@ -38,7 +38,7 @@
                data-favorite="{{ 1 if row.is_favorite else 0 }}">
             <div class="card-top-actions">
               <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
-                      title="Favorit" onclick="toggleFavorite('charts/{{ row.id }}/favorite', this)">★</button>
+                      title="{{ _('Favorit') }}" onclick="toggleFavorite('charts/{{ row.id }}/favorite', this)">★</button>
               <!-- click.outside am Wrapper (der den Button einschließt), nicht am
                    Popover: am Popover zählte der Klick auf den eigenen Button als
                    "außen" und schloss das Menü sofort wieder, was nur ein
@@ -50,12 +50,12 @@
                    @click.outside="menuOpen = false">
                 <button type="button" class="card-menu-btn" @click="menuOpen = !menuOpen"
                         :aria-expanded="menuOpen.toString()" aria-haspopup="menu"
-                        aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
+                        aria-label="{{ _('Kachelmenü öffnen') }}" title="{{ _('Kachelmenü') }}">⋮</button>
                 <div class="card-menu-popover" x-show="menuOpen" x-cloak role="menu">
-                  <a class="card-menu-item" role="menuitem" href="charts/{{ row.id }}?edit=1">Bearbeiten</a>
-                  <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateChart({{ row.id }})">Duplizieren</button>
+                  <a class="card-menu-item" role="menuitem" href="charts/{{ row.id }}?edit=1">{{ _("Bearbeiten") }}</a>
+                  <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateChart({{ row.id }})">{{ _("Duplizieren") }}</button>
                   <div class="card-menu-divider"></div>
-                  <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteChart({{ row.id }}, $el)">Löschen</button>
+                  <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteChart({{ row.id }}, $el)">{{ _("Löschen") }}</button>
                 </div>
               </div>
             </div>
@@ -63,7 +63,7 @@
             <div class="meta">{% if row.type_label %}{{ row.type_label }} &middot; {% endif %}{{ row.entity_count }} Entität{{ 'en' if row.entity_count != 1 else '' }} &middot; {{ row.range_label }}</div>
           </div>
           {% endfor %}
-          <a class="card chart-grid-add card-browser-add" href="charts/new" title="Neuer Chart">
+          <a class="card chart-grid-add card-browser-add" href="charts/new" title="{{ _('Neuer Chart') }}">
             <span class="chart-grid-add-btn">+</span>
           </a>
         </div>

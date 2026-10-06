@@ -20,13 +20,13 @@
             @click="toggleOpen($refs.search)"
             x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
     <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
-            @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+            @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
-      <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen …">
+      <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
       <template x-for="opt in filtered()" :key="opt.entity_id">
         <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
           <span x-text="opt.label"></span>
-          <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+          <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="{{ _('App-eigener Anzeigename') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
         </div>
       </template>
     </div>
@@ -72,18 +72,18 @@
           @click="toggleOpen($refs.search)"
           x-text="value || 'Gruppe wählen …'"></button>
   <button type="button" class="dd-picker-clear" x-show="value" x-cloak
-          @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+          @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
   <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:220px;overflow-y:auto;">
-    <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen oder neu anlegen …">
+    <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen oder neu anlegen …') }}">
     <template x-for="g in filtered()" :key="g">
       <div class="dd-picker-row" :class="{active: value === g}" @click="select(g)">
         <span x-text="g"></span>
       </div>
     </template>
     <div class="dd-picker-row edash-group-create-row" x-show="search.trim() && !exactMatch()" @click="createAndSelect()">
-      <span>+ „<span x-text="search.trim()"></span>" anlegen</span>
+      <span>+ „<span x-text="search.trim()"></span>{{ _('" anlegen') }}</span>
     </div>
-    <p class="hint hint-status" x-show="!groups.length && !search.trim()" style="padding:5px 4px;margin:0;">Noch keine Gruppen — Namen eingeben, um eine anzulegen.</p>
+    <p class="hint hint-status" x-show="!groups.length && !search.trim()" style="padding:5px 4px;margin:0;">{{ _("Noch keine Gruppen — Namen eingeben, um eine anzulegen.") }}</p>
   </div>
   <input type="hidden" name="{{ name }}" :value="value">
 </span>
@@ -94,7 +94,7 @@
    falsche Einheiten aus, statt (wie bei kWh/%-Rollen) auf wenige erlaubte
    Werte zu verengen — für Preis/CO2 gibt es keinen einzelnen kanonischen
    Einheiten-String über alle HA-Integrationen hinweg. #}
-{% set OBVIOUSLY_WRONG_UNITS = ['kWh', 'Wh', 'MWh', '%', '°C', '°F', 'W', 'kW', 'V', 'A', 'Hz', 'hPa', 'mbar'] %}
+{% set OBVIOUSLY_WRONG_UNITS = ['kWh', 'Wh', _('MWh'), '%', '°C', '°F', 'W', 'kW', 'V', 'A', 'Hz', 'hPa', 'mbar'] %}
 
 <script>
   // showModal() fokussiert per Spec automatisch ein Element im Dialog (das
@@ -329,22 +329,22 @@
   dragEnd() { this.dragList = null; this.dragIdx = null; this.dragOverIdx = null; },
 }' class="settings-panel">
   <div class="edash-title-row">
-    <h1>Energiedashboard</h1>
+    <h1>{{ _("Energiedashboard") }}</h1>
   </div>
-  <p class="sub">Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.</p>
+  <p class="sub">{{ _("Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.") }}</p>
   <form hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
 
     <section class="settings-section edash-section-allgemein">
-      <h2 class="settings-section-title">Allgemein</h2>
-      <p class="settings-section-description">Grundeinstellungen für das Energiedashboard.</p>
+      <h2 class="settings-section-title">{{ _("Allgemein") }}</h2>
+      <p class="settings-section-description">{{ _("Grundeinstellungen für das Energiedashboard.") }}</p>
       <div class="edash-field-grid">
         <div class="field">
-          <label>Name des zentralen Knotens {{ hint_button('Name des zentralen Knotens') }}</label>
-          <input type="text" name="hub_name" value="{{ config.hub_name or '' }}" placeholder="Haus" maxlength="40">
-          {% call hint_body() %}Beschriftung des Sammelknotens in der Sankey-Mitte.{% endcall %}
+          <label>{{ _("Name des zentralen Knotens") }} {{ hint_button(_('Name des zentralen Knotens')) }}</label>
+          <input type="text" name="hub_name" value="{{ config.hub_name or '' }}" placeholder="{{ _('Haus') }}" maxlength="40">
+          {% call hint_body() %}{{ _("Beschriftung des Sammelknotens in der Sankey-Mitte.") }}{% endcall %}
         </div>
         <div class="field">
-          <label>Auffälligkeiten {{ hint_button('Auffälligkeiten') }}</label>
+          <label>{{ _("Auffälligkeiten") }} {{ hint_button(_('Auffälligkeiten')) }}</label>
           <span class="dd-picker-wrap">
             <button type="button" class="btn" id="anomalie-schwelle-btn" onclick="toggleDDPicker('anomalie-schwelle')">{% for k, l in anomalie_schwelle_options %}{% if k == config.anomalie_schwelle %}{{ l }}{% endif %}{% endfor %} ▾</button>
             <input type="hidden" name="anomalie_schwelle" id="anomalie-schwelle-input" value="{{ config.anomalie_schwelle }}">
@@ -354,7 +354,7 @@
               {% endfor %}
             </div>
           </span>
-          {% call hint_body() %}Schwellenwert für die Auffälligkeiten-Markierung. „Aus" deaktiviert die Prüfung.{% endcall %}
+          {% call hint_body() %}{{ _('Schwellenwert für die Auffälligkeiten-Markierung. „Aus" deaktiviert die Prüfung.') }}{% endcall %}
         </div>
       </div>
       {# Chip-Mehrfachauswahl (.filter-chip, app-weiter Standard z. B. in
@@ -362,17 +362,17 @@
          gleiche Funktion, aber deutlich kompakter (eine umbrechende Zeile
          statt sechs) und einheitlich mit dem Rest der App. #}
       <div class="field" style="margin-bottom:0;">
-        <label>Sichtbare Kacheln {{ hint_button('Sichtbare Kacheln') }}</label>
+        <label>{{ _("Sichtbare Kacheln") }} {{ hint_button(_('Sichtbare Kacheln')) }}</label>
         <div class="edash-toggle-list">
-          <label class="filter-chip"><input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}><span>Autarkie &amp; Speicher</span></label>
-          <label class="filter-chip"><input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}><span>Verbraucheranteile</span></label>
-          <label class="filter-chip"><input type="checkbox" name="show_versorgungsanteile" {% if config.show_versorgungsanteile %}checked{% endif %}><span>Versorgungsanteile</span></label>
-          <label class="filter-chip"><input type="checkbox" name="show_kostenanalyse" {% if config.show_kostenanalyse %}checked{% endif %}><span>Kostenanalyse</span></label>
-          <label class="filter-chip"><input type="checkbox" name="show_co2" {% if config.show_co2 %}checked{% endif %}><span>CO2-Bilanz</span></label>
-          <label class="filter-chip"><input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}><span>Tageslastprofil</span></label>
-          <label class="filter-chip"><input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}><span>Bilanz &amp; Datenqualität</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_autarkie" {% if config.show_autarkie %}checked{% endif %}><span>{{ _("Autarkie &amp; Speicher") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_verbraucheranteile" {% if config.show_verbraucheranteile %}checked{% endif %}><span>{{ _("Verbraucheranteile") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_versorgungsanteile" {% if config.show_versorgungsanteile %}checked{% endif %}><span>{{ _("Versorgungsanteile") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_kostenanalyse" {% if config.show_kostenanalyse %}checked{% endif %}><span>{{ _("Kostenanalyse") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_co2" {% if config.show_co2 %}checked{% endif %}><span>{{ _("CO2-Bilanz") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_tageslastprofil" {% if config.show_tageslastprofil %}checked{% endif %}><span>{{ _("Tageslastprofil") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_bilanz_datenqualitaet" {% if config.show_bilanz_datenqualitaet %}checked{% endif %}><span>{{ _("Bilanz &amp; Datenqualität") }}</span></label>
         </div>
-        {% call hint_body() %}Energiefluss ist immer sichtbar — alle anderen Kacheln lassen sich hier einzeln ausblenden.{% endcall %}
+        {% call hint_body() %}{{ _("Energiefluss ist immer sichtbar — alle anderen Kacheln lassen sich hier einzeln ausblenden.") }}{% endcall %}
       </div>
       {# Eigenes Feld statt eines weiteren Chips in "Sichtbare Kacheln"
          darüber: die Legende ist keine Kachel, sondern ein Bestandteil der
@@ -380,28 +380,28 @@
          zum dortigen Hinweis ("Energiefluss ist immer sichtbar"). Gleiche
          .filter-chip-Optik wie oben, damit es trotzdem zusammengehört. #}
       <div class="field" style="margin-bottom:0;margin-top:14px;">
-        <label>Energiefluss {{ hint_button('Energiefluss') }}</label>
+        <label>{{ _("Energiefluss") }} {{ hint_button(_('Energiefluss')) }}</label>
         <div class="edash-toggle-list">
-          <label class="filter-chip"><input type="checkbox" name="show_sankey_legende" {% if config.show_sankey_legende %}checked{% endif %}><span>Farblegende</span></label>
+          <label class="filter-chip"><input type="checkbox" name="show_sankey_legende" {% if config.show_sankey_legende %}checked{% endif %}><span>{{ _("Farblegende") }}</span></label>
         </div>
-        {% call hint_body() %}Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.{% endcall %}
+        {% call hint_body() %}{{ _("Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.") }}{% endcall %}
       </div>
       {# Eigenes Feld statt eines weiteren Chips in "Sichtbare Kacheln": das
          ist kein Ein/Aus-Schalter für eine Kachel, sondern ein Darstellungs-
          Modus INNERHALB der Verbraucheranteile-Kachel — dieselbe Begründung
          wie beim Energiefluss-Feld oben. #}
       <div class="field" style="margin-bottom:0;margin-top:14px;">
-        <label>Verbraucheranteile {{ hint_button('Verbraucheranteile-Gruppierung') }}</label>
+        <label>{{ _("Verbraucheranteile") }} {{ hint_button(_('Verbraucheranteile-Gruppierung')) }}</label>
         <div class="edash-toggle-list">
-          <label class="filter-chip"><input type="checkbox" name="verbraucheranteile_gruppieren" {% if config.verbraucheranteile_gruppieren %}checked{% endif %}><span>Nach Gruppe anzeigen</span></label>
+          <label class="filter-chip"><input type="checkbox" name="verbraucheranteile_gruppieren" {% if config.verbraucheranteile_gruppieren %}checked{% endif %}><span>{{ _("Nach Gruppe anzeigen") }}</span></label>
         </div>
-        {% call hint_body() %}Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann als eine gemeinsame Zeile statt einzeln — Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.{% endcall %}
+        {% call hint_body() %}{{ _("Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann als eine gemeinsame Zeile statt einzeln — Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.") }}{% endcall %}
       </div>
     </section>
 
     <section class="settings-section edash-section-netz">
-      <h2 class="settings-section-title">Netz</h2>
-      <p class="settings-section-description">Netzbezug ist die einzige Pflicht-Rolle. Alles andere bleibt leer, bis passende Sensoren zugeordnet sind.</p>
+      <h2 class="settings-section-title">{{ _("Netz") }}</h2>
+      <p class="settings-section-description">{{ _("Netzbezug ist die einzige Pflicht-Rolle. Alles andere bleibt leer, bis passende Sensoren zugeordnet sind.") }}</p>
       <div class="edash-item-grid">
         <button type="button" class="edash-item-tile"
                 @click="draft.netzbezug = netzbezug; draft.netzbezugName = netzbezugName; activePopup = 'netzbezug'; openEdashDialog('edash-dlg-netzbezug')">
@@ -410,7 +410,7 @@
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
               <span class="edash-item-name" x-text="netzbezugName || 'Netzbezug'"></span>
-              <span class="edash-item-req">Pflicht</span>
+              <span class="edash-item-req">{{ _("Pflicht") }}</span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !netzbezug}" x-text="netzbezug ? nameFor(netzbezug) : 'Nicht zugeordnet'"></span>
@@ -434,42 +434,42 @@
 
       <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-1)" id="edash-dlg-netzbezug" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Netzbezug</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-netzbezug').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Netzbezug") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-netzbezug').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         <template x-if="activePopup === 'netzbezug'">
           <div>
             <div class="edash-dialog-fields">
-              <div class="field"><label>Name</label><input type="text" x-model="draft.netzbezugName" placeholder="Netzbezug" maxlength="40"></div>
+              <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draft.netzbezugName" placeholder="{{ _('Netzbezug') }}" maxlength="40"></div>
               <div class="field">
-                <label>Entität * {{ hint_button('Netzbezug-Entität') }}</label>
+                <label>{{ _("Entität *") }} {{ hint_button(_('Netzbezug-Entität')) }}</label>
                 {{ entity_field('netzbezug_draft', 'draft.netzbezug', "(id) => { draft.netzbezug = id; }", allow_units=['kWh'], require_counter=true) }}
-                {% call hint_body() %}Zähler „aus dem Netz bezogene Energie" (kWh, steigend).{% endcall %}
+                {% call hint_body() %}{{ _('Zähler „aus dem Netz bezogene Energie" (kWh, steigend).') }}{% endcall %}
               </div>
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="netzbezug = draft.netzbezug; netzbezugName = draft.netzbezugName; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="netzbezug = draft.netzbezug; netzbezugName = draft.netzbezugName; $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
       </dialog>
       <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-2)" id="edash-dlg-einspeisung" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Einspeisung</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-einspeisung').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Einspeisung") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-einspeisung').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         <template x-if="activePopup === 'einspeisung'">
           <div>
             <div class="edash-dialog-fields">
-              <div class="field"><label>Name</label><input type="text" x-model="draft.einspeisungName" placeholder="Einspeisung" maxlength="40"></div>
+              <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draft.einspeisungName" placeholder="{{ _('Einspeisung') }}" maxlength="40"></div>
               <div class="field">
-                <label>Entität {{ hint_button('Einspeisung-Entität') }}</label>
+                <label>{{ _("Entität") }} {{ hint_button(_('Einspeisung-Entität')) }}</label>
                 {{ entity_field('einspeisung_draft', 'draft.einspeisung', "(id) => { draft.einspeisung = id; }", allow_units=['kWh'], require_counter=true) }}
-                {% call hint_body() %}Zähler „ins Netz eingespeiste Energie" (kWh, steigend).{% endcall %}
+                {% call hint_body() %}{{ _('Zähler „ins Netz eingespeiste Energie" (kWh, steigend).') }}{% endcall %}
               </div>
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="einspeisung = draft.einspeisung; einspeisungName = draft.einspeisungName; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="einspeisung = draft.einspeisung; einspeisungName = draft.einspeisungName; $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -490,8 +490,8 @@
     </section>
 
     <section class="settings-section edash-section-erzeuger">
-      <h2 class="settings-section-title">Erzeuger</h2>
-      <p class="settings-section-description">Beliebig viele Erzeuger, z. B. Dach-PV und ein zusätzliches Balkonkraftwerk.</p>
+      <h2 class="settings-section-title">{{ _("Erzeuger") }}</h2>
+      <p class="settings-section-description">{{ _("Beliebig viele Erzeuger, z. B. Dach-PV und ein zusätzliches Balkonkraftwerk.") }}</p>
       <div class="edash-item-grid">
         <template x-for="(row, idx) in erzeuger" :key="row._key">
           <div style="display:contents">
@@ -501,7 +501,7 @@
               <div class="edash-item-accent" style="background:var(--chart-3);"></div>
               <div class="edash-item-body">
                 <div class="edash-item-head">
-                  <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren" @click.stop
+                  <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(erzeuger, idx)" @dragend="dragEnd()">⠿</span>
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
                   <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : 'Erzeuger')"></span>
@@ -513,22 +513,22 @@
             </button>
             <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-3)" :id="'edash-dlg-erz-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
               <div class="detail-dialog-header">
-                <h2>Erzeuger</h2>
-                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="Schließen">✕</button>
+                <h2>{{ _("Erzeuger") }}</h2>
+                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
               </div>
               <template x-if="activePopup === row._key">
                 <div>
                   <div class="edash-dialog-fields">
-                    <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="Name" maxlength="40"></div>
+                    <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draftRow.name" placeholder="{{ _('Name') }}" maxlength="40"></div>
                     <div class="field">
-                      <label>Entität {{ hint_button('Erzeuger-Entität') }}</label>
+                      <label>{{ _("Entität") }} {{ hint_button(_('Erzeuger-Entität')) }}</label>
                       {{ entity_field('erzeuger_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      {% call hint_body() %}Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).{% endcall %}
+                      {% call hint_body() %}{{ _('Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
-                    <button type="button" class="btn btn-danger" @click="removeRow(erzeuger, idx, row, 'Erzeuger')">Erzeuger entfernen</button>
-                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">Übernehmen</button>
+                    <button type="button" class="btn btn-danger" @click="removeRow(erzeuger, idx, row, 'Erzeuger')">{{ _("Erzeuger entfernen") }}</button>
+                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
               </template>
@@ -554,8 +554,8 @@
     </section>
 
     <section class="settings-section edash-section-speicher">
-      <h2 class="settings-section-title">Speicher</h2>
-      <p class="settings-section-description">Beliebig viele Batteriespeicher, z. B. ein Hausspeicher und ein separates Balkonkraftwerk mit eigenem Speicher. Werte über mehrere Speicher hinweg werden addiert (Energie) bzw. kapazitätsgewichtet gemittelt (Ladezustand).</p>
+      <h2 class="settings-section-title">{{ _("Speicher") }}</h2>
+      <p class="settings-section-description">{{ _("Beliebig viele Batteriespeicher, z. B. ein Hausspeicher und ein separates Balkonkraftwerk mit eigenem Speicher. Werte über mehrere Speicher hinweg werden addiert (Energie) bzw. kapazitätsgewichtet gemittelt (Ladezustand).") }}</p>
       <div class="edash-item-grid">
         <template x-for="(row, idx) in speicher" :key="row._key">
           <div style="display:contents">
@@ -565,7 +565,7 @@
               <div class="edash-item-accent" style="background:var(--chart-4);"></div>
               <div class="edash-item-body">
                 <div class="edash-item-head">
-                  <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren" @click.stop
+                  <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(speicher, idx)" @dragend="dragEnd()">⠿</span>
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
                   <span class="edash-item-name" x-text="row.name || 'Speicher'"></span>
@@ -579,43 +579,43 @@
             </button>
             <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-4)" :id="'edash-dlg-sp-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
               <div class="detail-dialog-header">
-                <h2>Speicher</h2>
-                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="Schließen">✕</button>
+                <h2>{{ _("Speicher") }}</h2>
+                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
               </div>
               <template x-if="activePopup === row._key">
                 <div>
                   <div class="edash-dialog-fields">
-                    <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="z. B. Hausspeicher" maxlength="40"></div>
+                    <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draftRow.name" placeholder="{{ _('z. B. Hausspeicher') }}" maxlength="40"></div>
                     <div class="field">
-                      <label>Entladung {{ hint_button('Entladung') }}</label>
+                      <label>{{ _("Entladung") }} {{ hint_button(_('Entladung')) }}</label>
                       {{ entity_field('speicher_entladen_entity_id_draft', 'draftRow.entladen_entity_id', "(id) => { draftRow.entladen_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      {% call hint_body() %}Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).{% endcall %}
+                      {% call hint_body() %}{{ _('Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field">
-                      <label>Ladung {{ hint_button('Ladung') }}</label>
+                      <label>{{ _("Ladung") }} {{ hint_button(_('Ladung')) }}</label>
                       {{ entity_field('speicher_laden_entity_id_draft', 'draftRow.laden_entity_id', "(id) => { draftRow.laden_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      {% call hint_body() %}Zähler „in den Speicher geladene Energie" (kWh, steigend).{% endcall %}
+                      {% call hint_body() %}{{ _('Zähler „in den Speicher geladene Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field">
-                      <label>Ladezustand</label>
+                      <label>{{ _("Ladezustand") }}</label>
                       {{ entity_field('speicher_soc_entity_id_draft', 'draftRow.soc_entity_id', "(id) => { draftRow.soc_entity_id = id; }", allow_units=['%']) }}
-                      <p class="hint">Aktueller Füllstand in Prozent (SOC).</p>
+                      <p class="hint">{{ _("Aktueller Füllstand in Prozent (SOC).") }}</p>
                     </div>
                     <div class="field">
-                      <label>Kapazität {{ hint_button('Kapazität') }}</label>
+                      <label>{{ _("Kapazität") }} {{ hint_button(_('Kapazität')) }}</label>
                       {% call entity_field('speicher_capacity_entity_id_draft', 'draftRow.capacity_entity_id', "(id) => { draftRow.capacity_entity_id = id; }", allow_units=['kWh', 'Wh'], inline_fallback=true) %}
                         <span class="edash-unit-input edash-speicher-capacity-input" x-show="!entityId">
                           <input type="text" inputmode="decimal" x-model="draftRow.capacity_kwh"
                                  class="edash-fixed-price-input">
-                          <span class="edash-unit-suffix">kWh</span>
+                          <span class="edash-unit-suffix">{{ _("kWh") }}</span>
                         </span>
                       {% endcall %}
-                      {% call hint_body() %}Nutzbare Gesamtkapazität, nur nötig für die kWh-Anzeige. Entität hat Vorrang, Wh wird automatisch umgerechnet.{% endcall %}
+                      {% call hint_body() %}{{ _("Nutzbare Gesamtkapazität, nur nötig für die kWh-Anzeige. Entität hat Vorrang, Wh wird automatisch umgerechnet.") }}{% endcall %}
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
-                    <button type="button" class="btn btn-danger" @click="removeRow(speicher, idx, row, 'Speicher')">Speicher entfernen</button>
-                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">Übernehmen</button>
+                    <button type="button" class="btn btn-danger" @click="removeRow(speicher, idx, row, 'Speicher')">{{ _("Speicher entfernen") }}</button>
+                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
               </template>
@@ -644,10 +644,10 @@
 
     <section class="settings-section edash-section-verbraucher">
       <div class="edash-section-title-row">
-        <h2 class="settings-section-title">Verbraucher</h2>
-        <button type="button" class="btn edash-manage-groups-btn" @click="openEdashDialog($refs.gruppenDialog)">Gruppen</button>
+        <h2 class="settings-section-title">{{ _("Verbraucher") }}</h2>
+        <button type="button" class="btn edash-manage-groups-btn" @click="openEdashDialog($refs.gruppenDialog)">{{ _("Gruppen") }}</button>
       </div>
-      <p class="settings-section-description">Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen.</p>
+      <p class="settings-section-description">{{ _('Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen.') }}</p>
       <div class="edash-item-grid">
         <template x-for="(row, idx) in verbraucher" :key="row._key">
           <div style="display:contents">
@@ -657,41 +657,41 @@
               <div class="edash-item-accent" style="background:var(--chart-7);"></div>
               <div class="edash-item-body">
                 <div class="edash-item-head">
-                  <span class="edash-drag-handle" draggable="true" title="Ziehen zum Sortieren" @click.stop
+                  <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(verbraucher, idx)" @dragend="dragEnd()">⠿</span>
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
                   <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : 'Verbraucher')"></span>
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-chip" x-show="row.gruppe" x-text="row.gruppe"></span>
-                  <span class="edash-item-chip edash-item-chip-empty" x-show="!row.gruppe">Keine Gruppe</span>
+                  <span class="edash-item-chip edash-item-chip-empty" x-show="!row.gruppe">{{ _("Keine Gruppe") }}</span>
                   <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : 'Nicht zugeordnet'"></span>
                 </div>
               </div>
             </button>
             <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-7)" :id="'edash-dlg-vb-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
               <div class="detail-dialog-header">
-                <h2>Verbraucher</h2>
-                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="Schließen">✕</button>
+                <h2>{{ _("Verbraucher") }}</h2>
+                <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
               </div>
               <template x-if="activePopup === row._key">
                 <div>
                   <div class="edash-dialog-fields">
-                    <div class="field"><label>Name</label><input type="text" x-model="draftRow.name" placeholder="Name" maxlength="40"></div>
+                    <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draftRow.name" placeholder="{{ _('Name') }}" maxlength="40"></div>
                     <div class="field">
-                      <label>Entität {{ hint_button('Verbraucher-Entität') }}</label>
+                      <label>{{ _("Entität") }} {{ hint_button(_('Verbraucher-Entität')) }}</label>
                       {{ entity_field('verbraucher_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
-                      {% call hint_body() %}Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).{% endcall %}
+                      {% call hint_body() %}{{ _('Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field">
-                      <label>Gruppe {{ hint_button('Gruppe') }}</label>
+                      <label>{{ _("Gruppe") }} {{ hint_button(_('Gruppe')) }}</label>
                       {{ group_field('verbraucher_gruppe_draft', 'draftRow.gruppe', "(name) => { draftRow.gruppe = name; }") }}
-                      {% call hint_body() %}Optional — fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen.{% endcall %}
+                      {% call hint_body() %}{{ _("Optional — fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen.") }}{% endcall %}
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
-                    <button type="button" class="btn btn-danger" @click="removeRow(verbraucher, idx, row, 'Verbraucher')">Verbraucher entfernen</button>
-                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">Übernehmen</button>
+                    <button type="button" class="btn btn-danger" @click="removeRow(verbraucher, idx, row, 'Verbraucher')">{{ _("Verbraucher entfernen") }}</button>
+                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
               </template>
@@ -702,7 +702,7 @@
           <span class="edash-item-add-btn">+</span>
         </button>
       </div>
-      <p class="hint">Der Rest (Netzbezug + Erzeuger − Verbraucher − Einspeisung − Speicherladung) erscheint automatisch als „Grundlast" — kein eigener Sensor nötig.</p>
+      <p class="hint">{{ _('Der Rest (Netzbezug + Erzeuger − Verbraucher − Einspeisung − Speicherladung) erscheint automatisch als „Grundlast" — kein eigener Sensor nötig.') }}</p>
       <template x-for="row in verbraucher" :key="'hidden-vb-' + row._key">
         <span>
           <input type="hidden" name="verbraucher_name" :value="row.name">
@@ -716,15 +716,15 @@
     </section>
 
     <section class="settings-section edash-section-neutral">
-      <h2 class="settings-section-title">Kosten</h2>
-      <p class="settings-section-description">Optional — Preis-Sensoren für Netzbezug und Einspeisung. Bucket-genau verrechnet, funktioniert also auch mit variablen/dynamischen Tarifen. Ohne passende Preis-Entität kann ersatzweise ein fester Preis in Cent je kWh eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
+      <h2 class="settings-section-title">{{ _("Kosten") }}</h2>
+      <p class="settings-section-description">{{ _("Optional — Preis-Sensoren für Netzbezug und Einspeisung. Bucket-genau verrechnet, funktioniert also auch mit variablen/dynamischen Tarifen. Ohne passende Preis-Entität kann ersatzweise ein fester Preis in Cent je kWh eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.") }}</p>
       <div class="edash-item-grid">
         <button type="button" class="edash-item-tile" @click="draft.kostenBezugEntity = kostenBezugEntity; activePopup = 'kosten-bezug'; openEdashDialog('edash-dlg-kosten-bezug')">
           <div class="edash-item-accent edash-item-accent-neutral"></div>
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
-              <span class="edash-item-name">Netzbezug-Preis</span>
+              <span class="edash-item-name">{{ _("Netzbezug-Preis") }}</span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !kostenBezugEntity && kostenBezugFixed === null}" x-text="priceLabel(kostenBezugEntity, kostenBezugFixed, 'Ct/kWh')"></span>
@@ -736,7 +736,7 @@
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
-              <span class="edash-item-name">Einspeisevergütung</span>
+              <span class="edash-item-name">{{ _("Einspeisevergütung") }}</span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !kostenEinspeisungEntity && kostenEinspeisungFixed === null}" x-text="priceLabel(kostenEinspeisungEntity, kostenEinspeisungFixed, 'Ct/kWh')"></span>
@@ -756,8 +756,8 @@
           <template x-if="!kostenEigenverbrauchEntity && kostenEigenverbrauchFixed === null">
             <div class="edash-item-body edash-item-body-activator">
               <span class="edash-item-add-btn">+</span>
-              <span class="edash-item-name">Eigenverbrauchsvergütung</span>
-              <span class="edash-item-chip edash-item-chip-empty">Aktivieren</span>
+              <span class="edash-item-name">{{ _("Eigenverbrauchsvergütung") }}</span>
+              <span class="edash-item-chip edash-item-chip-empty">{{ _("Aktivieren") }}</span>
             </div>
           </template>
           <template x-if="kostenEigenverbrauchEntity || kostenEigenverbrauchFixed !== null">
@@ -766,7 +766,7 @@
               <div class="edash-item-body">
                 <div class="edash-item-head edash-item-head-wrap">
                   <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--ink-faint)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
-                  <span class="edash-item-name">Eigenverbrauchsvergütung</span>
+                  <span class="edash-item-name">{{ _("Eigenverbrauchsvergütung") }}</span>
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-meta" x-text="priceLabel(kostenEigenverbrauchEntity, kostenEigenverbrauchFixed, 'Ct/kWh')"></span>
@@ -794,21 +794,21 @@
          synchron gehalten. #}
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-bezug" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Netzbezug-Preis</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-bezug').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Netzbezug-Preis") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-bezug').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         {% set kb_fixed = config.kosten.get('preis_netzbezug_fixed') if config.kosten else none %}
         <template x-if="activePopup === 'kosten-bezug'">
           <div>
             <div class="field">
-              <label>Preis {{ hint_button('Preis') }}</label>
+              <label>{{ _("Preis") }} {{ hint_button(_('Preis')) }}</label>
               {% call entity_field('preis_netzbezug_draft', 'draft.kostenBezugEntity', "(id) => { draft.kostenBezugEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              {% call hint_body() %}Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.{% endcall %}
+              {% call hint_body() %}{{ _("Preis in Cent/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.") }}{% endcall %}
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; kostenBezugFixed = readFixedInput('preis_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; kostenBezugFixed = readFixedInput('preis_netzbezug_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -817,21 +817,21 @@
       </dialog>
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-einspeisung" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Einspeisevergütung</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-einspeisung').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Einspeisevergütung") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-einspeisung').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         {% set ke_fixed = config.kosten.get('preis_einspeisung_fixed') if config.kosten else none %}
         <template x-if="activePopup === 'kosten-einspeisung'">
           <div>
             <div class="field">
-              <label>Vergütung {{ hint_button('Vergütung') }}</label>
+              <label>{{ _("Vergütung") }} {{ hint_button(_('Vergütung')) }}</label>
               {% call entity_field('preis_einspeisung_draft', 'draft.kostenEinspeisungEntity', "(id) => { draft.kostenEinspeisungEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              {% call hint_body() %}Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.{% endcall %}
+              {% call hint_body() %}{{ _("Vergütung in Cent/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.") }}{% endcall %}
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; kostenEinspeisungFixed = readFixedInput('preis_einspeisung_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; kostenEinspeisungFixed = readFixedInput('preis_einspeisung_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -840,23 +840,23 @@
       </dialog>
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-eigenverbrauch" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Eigenverbrauchsvergütung</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-eigenverbrauch').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Eigenverbrauchsvergütung") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-eigenverbrauch').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         {% set kev_fixed = config.kosten.get('preis_eigenverbrauch_fixed') if config.kosten else none %}
         <template x-if="activePopup === 'kosten-eigenverbrauch'">
           <div>
             <div class="field">
-              <label>Vergütung {{ hint_button('Vergütung Eigenverbrauch') }}</label>
+              <label>{{ _("Vergütung") }} {{ hint_button(_('Vergütung Eigenverbrauch')) }}</label>
               {% call entity_field('preis_eigenverbrauch_draft', 'draft.kostenEigenverbrauchEntity', "(id) => { draft.kostenEigenverbrauchEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_eigenverbrauch_fixed_draft', (kev_fixed * 100) if kev_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_eigenverbrauch_fixed_real\').value = event.target.value"', 'Ct/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              {% call hint_body() %}Nur für Anlagen mit einer echten Zahlung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — für die meisten Anlagen bleibt dieses Feld leer. Vergütung in Cent/kWh, wird mit dem Eigenverbrauch (Erzeugung minus Einspeisung) verrechnet und fließt zusätzlich zum Einspeisung-Erlös in den Saldo ein.{% endcall %}
+              {% call hint_body() %}{{ _("Nur für Anlagen mit einer echten Zahlung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — für die meisten Anlagen bleibt dieses Feld leer. Vergütung in Cent/kWh, wird mit dem Eigenverbrauch (Erzeugung minus Einspeisung) verrechnet und fließt zusätzlich zum Einspeisung-Erlös in den Saldo ein.") }}{% endcall %}
             </div>
             <div class="edash-dialog-footer" style="justify-content:space-between;">
               <button type="button" class="btn btn-danger" x-show="kostenEigenverbrauchEntity || kostenEigenverbrauchFixed !== null"
-                      @click="kostenEigenverbrauchEntity = ''; kostenEigenverbrauchFixed = null; document.getElementById('preis_eigenverbrauch_fixed_real').value = ''; $el.closest('dialog').close();">Feld deaktivieren</button>
-              <button type="button" class="btn primary" @click="kostenEigenverbrauchEntity = draft.kostenEigenverbrauchEntity; kostenEigenverbrauchFixed = readFixedInput('preis_eigenverbrauch_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
+                      @click="kostenEigenverbrauchEntity = ''; kostenEigenverbrauchFixed = null; document.getElementById('preis_eigenverbrauch_fixed_real').value = ''; $el.closest('dialog').close();">{{ _("Feld deaktivieren") }}</button>
+              <button type="button" class="btn primary" @click="kostenEigenverbrauchEntity = draft.kostenEigenverbrauchEntity; kostenEigenverbrauchFixed = readFixedInput('preis_eigenverbrauch_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -875,15 +875,15 @@
     </section>
 
     <section class="settings-section edash-section-neutral">
-      <h2 class="settings-section-title">PV-Prognose</h2>
-      <p class="settings-section-description">Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast.</p>
+      <h2 class="settings-section-title">{{ _("PV-Prognose") }}</h2>
+      <p class="settings-section-description">{{ _("Optional — Prognose-Sensoren, z. B. von Forecast.Solar oder Solcast.") }}</p>
       <div class="edash-item-grid">
         <button type="button" class="edash-item-tile" @click="draft.prognoseHeute = prognoseHeute; activePopup = 'prog-heute'; openEdashDialog('edash-dlg-prog-heute')">
           <div class="edash-item-accent edash-item-accent-neutral"></div>
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="18" height="14" viewBox="0 0 26 20" aria-hidden="true"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--ink-faint)" opacity=".7"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface-alt)" stroke="var(--ink-faint)" stroke-width="1.6"/></svg></span>
-              <span class="edash-item-name">Rest heute</span>
+              <span class="edash-item-name">{{ _("Rest heute") }}</span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !prognoseHeute}" x-text="prognoseHeute ? nameFor(prognoseHeute) : 'Nicht konfiguriert'"></span>
@@ -895,7 +895,7 @@
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="18" height="14" viewBox="0 0 26 20" aria-hidden="true"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--ink-faint)" opacity=".7"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface-alt)" stroke="var(--ink-faint)" stroke-width="1.6"/></svg></span>
-              <span class="edash-item-name">Morgen</span>
+              <span class="edash-item-name">{{ _("Morgen") }}</span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !prognoseMorgen}" x-text="prognoseMorgen ? nameFor(prognoseMorgen) : 'Nicht konfiguriert'"></span>
@@ -906,18 +906,18 @@
 
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-prog-heute" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Prognose Rest heute</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-prog-heute').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Prognose Rest heute") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-prog-heute').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         <template x-if="activePopup === 'prog-heute'">
           <div>
             <div class="field">
-              <label>Entität {{ hint_button('Prognose-Entität für heute') }}</label>
+              <label>{{ _("Entität") }} {{ hint_button(_('Prognose-Entität für heute')) }}</label>
               {{ entity_field('prognose_rest_heute_entity_id_draft', 'draft.prognoseHeute', "(id) => { draft.prognoseHeute = id; }", allow_units=['kWh']) }}
-              {% call hint_body() %}kWh, die heute noch erwartet werden (z. B. Forecast.Solar „Geschätzte Energieerzeugung – Resttag“).{% endcall %}
+              {% call hint_body() %}{{ _("kWh, die heute noch erwartet werden (z. B. Forecast.Solar „Geschätzte Energieerzeugung – Resttag“).") }}{% endcall %}
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="prognoseHeute = draft.prognoseHeute; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="prognoseHeute = draft.prognoseHeute; $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -925,18 +925,18 @@
       </dialog>
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-prog-morgen" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Prognose morgen</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-prog-morgen').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Prognose morgen") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-prog-morgen').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         <template x-if="activePopup === 'prog-morgen'">
           <div>
             <div class="field">
-              <label>Entität {{ hint_button('Prognose-Entität für morgen') }}</label>
+              <label>{{ _("Entität") }} {{ hint_button(_('Prognose-Entität für morgen')) }}</label>
               {{ entity_field('prognose_morgen_entity_id_draft', 'draft.prognoseMorgen', "(id) => { draft.prognoseMorgen = id; }", allow_units=['kWh']) }}
-              {% call hint_body() %}kWh, die für morgen insgesamt erwartet werden.{% endcall %}
+              {% call hint_body() %}{{ _("kWh, die für morgen insgesamt erwartet werden.") }}{% endcall %}
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="prognoseMorgen = draft.prognoseMorgen; $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="prognoseMorgen = draft.prognoseMorgen; $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -945,15 +945,15 @@
     </section>
 
     <section class="settings-section edash-section-neutral">
-      <h2 class="settings-section-title">CO₂</h2>
-      <p class="settings-section-description">Optional — CO2-Intensität des bezogenen Netzstroms (g/kWh), z. B. über eine Electricity-Maps-/CO2-Signal-Entität. PV und Speicher gelten als emissionsfrei, brauchen also keinen eigenen Faktor. Ohne passende Entität kann ersatzweise ein fester Wert eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.</p>
+      <h2 class="settings-section-title">{{ _("CO₂") }}</h2>
+      <p class="settings-section-description">{{ _("Optional — CO2-Intensität des bezogenen Netzstroms (g/kWh), z. B. über eine Electricity-Maps-/CO2-Signal-Entität. PV und Speicher gelten als emissionsfrei, brauchen also keinen eigenen Faktor. Ohne passende Entität kann ersatzweise ein fester Wert eingetragen werden — ist eine Entität gewählt, hat sie Vorrang.") }}</p>
       <div class="edash-item-grid">
         <button type="button" class="edash-item-tile" @click="draft.co2Entity = co2Entity; activePopup = 'co2'; openEdashDialog('edash-dlg-co2')">
           <div class="edash-item-accent edash-item-accent-neutral"></div>
           <div class="edash-item-body">
             <div class="edash-item-head">
               <span class="edash-item-glyph"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19c-2-7 2-14 14-14 1 8-4 13-11 13-1 0-2 .3-3 1Z" fill="var(--ink-faint)" opacity=".65"/><path d="M6.5 17.5 C10 14 14 10 17.5 6.5" stroke="var(--surface)" stroke-width="1.3" fill="none" opacity=".55"/></svg></span>
-              <span class="edash-item-name">Netzbezug CO2-Intensität</span>
+              <span class="edash-item-name">{{ _("Netzbezug CO2-Intensität") }}</span>
             </div>
             <div class="edash-item-bottom">
               <span class="edash-item-meta" :class="{'is-empty': !co2Entity && co2Fixed === null}" x-text="priceLabel(co2Entity, co2Fixed, 'g/kWh')"></span>
@@ -964,21 +964,21 @@
 
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-co2" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
-          <h2>Netzbezug CO2-Intensität</h2>
-          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-co2').close()" aria-label="Schließen">✕</button>
+          <h2>{{ _("Netzbezug CO2-Intensität") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-co2').close()" aria-label="{{ _('Schließen') }}">✕</button>
         </div>
         {% set co2_fixed = config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none %}
         <template x-if="activePopup === 'co2'">
           <div>
             <div class="field">
-              <label>Entität {{ hint_button('CO2-Faktor-Entität') }}</label>
+              <label>{{ _("Entität") }} {{ hint_button(_('CO2-Faktor-Entität')) }}</label>
               {% call entity_field('co2_faktor_netzbezug_entity_draft', 'draft.co2Entity', "(id) => { draft.co2Entity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('co2_faktor_netzbezug_fixed_draft', co2_fixed, '', 'x-show="!entityId" oninput="document.getElementById(\'co2_faktor_netzbezug_fixed_real\').value = event.target.value"', 'g/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
-              {% call hint_body() %}g CO2/kWh &mdash; ergibt mit dem Netzbezug den Ausstoß, mit dem PV-Eigenverbrauch das vermiedene CO2.{% endcall %}
+              {% call hint_body() %}{{ _("g CO2/kWh &mdash; ergibt mit dem Netzbezug den Ausstoß, mit dem PV-Eigenverbrauch das vermiedene CO2.") }}{% endcall %}
             </div>
             <div class="edash-dialog-footer">
-              <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; co2Fixed = readFixedInput('co2_faktor_netzbezug_fixed_real'); $el.closest('dialog').close();">Übernehmen</button>
+              <button type="button" class="btn primary" @click="co2Entity = draft.co2Entity; co2Fixed = readFixedInput('co2_faktor_netzbezug_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
             </div>
           </div>
         </template>
@@ -988,8 +988,8 @@
     </section>
 
     <div class="actionbar" style="justify-content:flex-end;">
-      <a class="btn" href="energiedashboard">Abbrechen</a>
-      <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">Speichern</button>
+      <a class="btn" href="energiedashboard">{{ _("Abbrechen") }}</a>
+      <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">{{ _("Speichern") }}</button>
     </div>
   </form>
 
@@ -1000,24 +1000,24 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="gruppen-dialog-title">Verbraucher-Gruppen</h2>
-        <p class="hint">Fasst mehrere Verbraucher im Energiefluss zu einer Bahn zusammen, z. B. „Mobilität“.</p>
+        <h2 id="gruppen-dialog-title">{{ _("Verbraucher-Gruppen") }}</h2>
+        <p class="hint">{{ _("Fasst mehrere Verbraucher im Energiefluss zu einer Bahn zusammen, z. B. „Mobilität“.") }}</p>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
     <div class="edash-gruppen-list" x-show="gruppen.length">
       <template x-for="g in gruppen" :key="g">
         <div class="edash-gruppen-row">
           <input type="text" class="edash-gruppen-rename-input" :value="g" @change="renameGroup(g, $event.target.value)" maxlength="40">
           <span class="edash-gruppen-usage" x-text="groupUsage(g) + ' Verbraucher'"></span>
-          <button type="button" class="edash-list-remove" @click="deleteGroup(g)" title="Gruppe löschen">✕</button>
+          <button type="button" class="edash-list-remove" @click="deleteGroup(g)" title="{{ _('Gruppe löschen') }}">✕</button>
         </div>
       </template>
     </div>
-    <p class="hint hint-status" x-show="!gruppen.length">Noch keine Gruppen angelegt.</p>
+    <p class="hint hint-status" x-show="!gruppen.length">{{ _("Noch keine Gruppen angelegt.") }}</p>
     <div class="edash-gruppen-add">
-      <input type="text" x-model="newGroupName" placeholder="Neue Gruppe …" maxlength="40" @keydown.enter.prevent="addGroup()">
-      <button type="button" class="edash-setup-add" @click="addGroup()">+ Hinzufügen</button>
+      <input type="text" x-model="newGroupName" placeholder="{{ _('Neue Gruppe …') }}" maxlength="40" @keydown.enter.prevent="addGroup()">
+      <button type="button" class="edash-setup-add" @click="addGroup()">{{ _("+ Hinzufügen") }}</button>
     </div>
   </dialog>
 </div>

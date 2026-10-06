@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Dashboards{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Dashboards") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/dashboards.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Dashboards</h1>
-    <p class="sub">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite — jedes mit eigenen angehefteten Charts und Tabellen.</p>
+    <h1>{{ _("Dashboards") }}</h1>
+    <p class="sub">{{ _("Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite — jedes mit eigenen angehefteten Charts und Tabellen.") }}</p>
 
     <div class="settings-panel" data-card-browser-root>
       <!-- "Neueste/Älteste zuerst" stützt sich hier auf position statt auf ein
@@ -16,15 +16,15 @@
            Umsortierfunktion, die sie später ändern würde — sie ist damit die
            Anlagereihenfolge. -->
       <div class="card-browser" data-storage-key="zeitarchiv.dashboards.sort">
-        <input type="search" class="search card-browser-search" placeholder="Dashboard suchen …" aria-label="Dashboards durchsuchen">
+        <input type="search" class="search card-browser-search" placeholder="{{ _('Dashboard suchen …') }}" aria-label="{{ _('Dashboards durchsuchen') }}">
         <span class="card-browser-sortgroup">
-          <span class="card-browser-sort-label">Sortierung</span>
+          <span class="card-browser-sort-label">{{ _("Sortierung") }}</span>
           {% set sort_options = [
             ('neueste', 'Neueste zuerst'), ('aelteste', 'Älteste zuerst'),
             ('name_asc', 'Name A–Z'), ('name_desc', 'Name Z–A')
           ] %}
           <span class="dd-picker-wrap">
-            <button type="button" class="btn" id="dashboards-sort-btn" onclick="toggleDDPicker('dashboards-sort')">Neueste zuerst ▾</button>
+            <button type="button" class="btn" id="dashboards-sort-btn" onclick="toggleDDPicker('dashboards-sort')">{{ _("Neueste zuerst ▾") }}</button>
             <input type="hidden" id="dashboards-sort-input" class="card-browser-sort" value="neueste">
             <div class="dd-picker-popover" id="dashboards-sort-popover">
               {% for value, label in sort_options %}
@@ -35,8 +35,8 @@
           </span>
         </span>
         <button type="button" class="chip card-browser-fav" data-aktiv="1" aria-pressed="true"
-                title="Favoriten unabhängig von der Sortierung nach oben ziehen">★ Favoriten zuerst</button>
-        <p class="card-browser-empty" hidden>Kein Dashboard passt zur Suche.</p>
+                title="{{ _('Favoriten unabhängig von der Sortierung nach oben ziehen') }}">{{ _("★ Favoriten zuerst") }}</button>
+        <p class="card-browser-empty" hidden>{{ _("Kein Dashboard passt zur Suche.") }}</p>
       </div>
       <div class="dash-grid" data-card-grid>
         <div class="card edash-pin-card{{ ' is-off' if not nav_energiedashboard_enabled }}" id="edash-pin-card">
@@ -53,16 +53,16 @@
                 </svg>
                 <div class="edash-pin-title">
                   {% if nav_energiedashboard_enabled %}
-                  <a href="energiedashboard">Energiedashboard</a>
+                  <a href="energiedashboard">{{ _("Energiedashboard") }}</a>
                   {% else %}
-                  Energiedashboard
+                  {{ _("Energiedashboard") }}
                   {% endif %}
                 </div>
                 {% if startseite == 'energiedashboard' %}
                 {# Gleicher Haus-Pfad wie nav_icon('home') in _topnav.html —
                    dasselbe Symbol wie in der Seitenleiste für "Startseite",
                    hier nur als kleines Abzeichen statt als Navigationslink. #}
-                <span class="edash-pin-home-badge" data-tooltip="Aktuelle Startseite" aria-label="Aktuelle Startseite">
+                <span class="edash-pin-home-badge" data-tooltip="{{ _('Aktuelle Startseite') }}" aria-label="{{ _('Aktuelle Startseite') }}">
                   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h5v-6h2v6h5v-9"/></svg>
                 </span>
                 {% endif %}
@@ -74,11 +74,11 @@
             </div>
             <div class="edash-pin-meta">
               {% if not nav_energiedashboard_enabled %}
-              Deaktiviert — Sankey-Energiefluss aus PV, Netz &amp; Speicher, einmal einrichten
+              {{ _("Deaktiviert — Sankey-Energiefluss aus PV, Netz &amp; Speicher, einmal einrichten") }}
               {% elif energiedashboard_configured %}
               {{ energiedashboard_role_count }} Roll{{ 'e' if energiedashboard_role_count == 1 else 'en' }} zugeordnet
               {% else %}
-              Noch nicht eingerichtet
+              {{ _("Noch nicht eingerichtet") }}
               {% endif %}
             </div>
           </div>
@@ -90,7 +90,7 @@
           <div class="card-top-actions">
             {% if not d.is_default %}
             <button type="button" class="fav-star {{ 'active' if d.is_favorite else '' }}" aria-pressed="{{ 'true' if d.is_favorite else 'false' }}"
-                    title="Favorit" onclick="toggleFavorite('dashboards/{{ d.id }}/favorite', this)">★</button>
+                    title="{{ _('Favorit') }}" onclick="toggleFavorite('dashboards/{{ d.id }}/favorite', this)">★</button>
             {% endif %}
             <!-- click.outside am Wrapper (der den Button einschließt), nicht am
                  Popover: am Popover zählte der Klick auf den eigenen Button als
@@ -103,14 +103,14 @@
                  @click.outside="menuOpen = false">
               <button type="button" class="card-menu-btn" @click="menuOpen = !menuOpen"
                       :aria-expanded="menuOpen.toString()" aria-haspopup="menu"
-                      aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
+                      aria-label="{{ _('Kachelmenü öffnen') }}" title="{{ _('Kachelmenü') }}">⋮</button>
               <div class="card-menu-popover" x-show="menuOpen" x-cloak role="menu">
-                <a class="card-menu-item" role="menuitem" href="dashboards/{{ d.id }}/edit">Bearbeiten</a>
-                <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateDashboard({{ d.id }})">Duplizieren</button>
+                <a class="card-menu-item" role="menuitem" href="dashboards/{{ d.id }}/edit">{{ _("Bearbeiten") }}</a>
+                <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; duplicateDashboard({{ d.id }})">{{ _("Duplizieren") }}</button>
                 {% if not d.is_default %}
-                <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; setDefaultDashboard({{ d.id }})">Als Standard festlegen</button>
+                <button type="button" class="card-menu-item" role="menuitem" @click="menuOpen = false; setDefaultDashboard({{ d.id }})">{{ _("Als Standard festlegen") }}</button>
                 <div class="card-menu-divider"></div>
-                <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteDashboard({{ d.id }}, $el)">Löschen</button>
+                <button type="button" class="card-menu-item card-menu-item-danger" role="menuitem" @click="menuOpen = false; deleteDashboard({{ d.id }}, $el)">{{ _("Löschen") }}</button>
                 {% endif %}
               </div>
             </div>
@@ -119,7 +119,7 @@
           <div class="meta">{{ pin_counts.get(d.id, 0) }} Kachel{{ 'n' if pin_counts.get(d.id, 0) != 1 else '' }}{{ ' · Standard' if d.is_default else '' }}{{ ' · 🔒 Fixiert' if d.locked else '' }}</div>
         </div>
         {% endfor %}
-        <a class="card dash-grid-add card-browser-add" href="dashboards/new" title="Neues Dashboard">
+        <a class="card dash-grid-add card-browser-add" href="dashboards/new" title="{{ _('Neues Dashboard') }}">
           <span class="dash-grid-add-btn">+</span>
         </a>
       </div>

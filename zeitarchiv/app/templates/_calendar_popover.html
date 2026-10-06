@@ -31,7 +31,7 @@
      umständlich aussieht. -->
 <div class="calendar-popover" x-ref="popover" x-show="open" x-cloak @click.outside="open = false" @keydown.escape.window="open = false">
   <div class="calendar-header">
-    <button type="button" class="btn navbtn" x-show="typeof range === 'undefined' || (range !== 'year' && range !== 'month')" @click="prevMonth()" :disabled="loading || !canGoPrevMonth" aria-label="Vorheriger Monat">‹</button>
+    <button type="button" class="btn navbtn" x-show="typeof range === 'undefined' || (range !== 'year' && range !== 'month')" @click="prevMonth()" :disabled="loading || !canGoPrevMonth" aria-label="{{ _('Vorheriger Monat') }}">‹</button>
     <!-- :selected je <option> statt :value/x-model am <select>: beide banden
          den initial angezeigten Wert nicht zuverlässig an month/year (zeigte
          beim Öffnen immer die erste Option, "Januar", unabhängig vom
@@ -40,22 +40,22 @@
          und wiederholt das (ohne erneute Änderung von month/year) danach
          nicht mehr. :selected auf der Option selbst läuft dagegen erst, wenn
          die jeweilige Option schon im DOM ist, keine Wettlaufsituation. -->
-    <select class="calendar-month-select" x-show="typeof range === 'undefined' || range !== 'year'" @change="onMonthChange($event.target.value)" :disabled="loading" aria-label="Monat">
+    <select class="calendar-month-select" x-show="typeof range === 'undefined' || range !== 'year'" @change="onMonthChange($event.target.value)" :disabled="loading" aria-label="{{ _('Monat') }}">
       <template x-for="(name, idx) in monthNames" :key="idx">
         <option :value="idx + 1" :selected="idx + 1 === month" x-text="name"></option>
       </template>
     </select>
-    <select class="calendar-year-select" @change="onYearChange($event.target.value)" :disabled="loading" aria-label="Jahr">
+    <select class="calendar-year-select" @change="onYearChange($event.target.value)" :disabled="loading" aria-label="{{ _('Jahr') }}">
       <template x-for="y in yearOptions" :key="y">
         <option :value="y" :selected="y === year" x-text="y"></option>
       </template>
     </select>
-    <button type="button" class="btn navbtn" x-show="typeof range === 'undefined' || (range !== 'year' && range !== 'month')" @click="nextMonth()" :disabled="loading || !canGoNextMonth" aria-label="Nächster Monat">›</button>
+    <button type="button" class="btn navbtn" x-show="typeof range === 'undefined' || (range !== 'year' && range !== 'month')" @click="nextMonth()" :disabled="loading || !canGoNextMonth" aria-label="{{ _('Nächster Monat') }}">›</button>
   </div>
   <template x-if="typeof range === 'undefined' || (range !== 'month' && range !== 'year' && range !== 'decade' && range !== 'all')">
     <div>
       <div class="calendar-weekdays">
-        <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+        <span>{{ _("Mo") }}</span><span>{{ _("Di") }}</span><span>{{ _("Mi") }}</span><span>{{ _("Do") }}</span><span>{{ _("Fr") }}</span><span>{{ _("Sa") }}</span><span>{{ _("So") }}</span>
       </div>
       <div class="calendar-grid">
         <template x-for="(cell, idx) in days" :key="idx">
@@ -77,8 +77,8 @@
                   @click="pick(cell)"></button>
         </template>
       </div>
-      <p class="calendar-loading" x-show="loading">Lädt&hellip;</p>
-      <button type="button" class="btn calendar-today-btn" @click="goToday()">Heute</button>
+      <p class="calendar-loading" x-show="loading">{{ _("Lädt&hellip;") }}</p>
+      <button type="button" class="btn calendar-today-btn" @click="goToday()">{{ _("Heute") }}</button>
     </div>
   </template>
 </div>

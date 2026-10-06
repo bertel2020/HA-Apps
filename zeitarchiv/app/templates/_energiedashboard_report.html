@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Energiebericht — {{ period_title }}{% endblock %}
+{% block title %}{{ _("Energiebericht — {period_title}", period_title=period_title) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/energiedashboard_report.css') }}">
 {% endblock %}
@@ -21,10 +21,10 @@
 {% macro kpi_delta(compare, invert=false) %}
   {%- if compare and compare.pct is not none -%}
     {%- set favorable = (compare.pct >= 0) != invert -%}
-    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ '▲' if compare.pct >= 0 else '▼' }} {{ compare.pct | abs | format_value(1) }} % ggü. {{ compare_label }}</div>
+    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ _("{v1} {pct} % ggü. {compare_label}", v1=('▲' if compare.pct >= 0 else '▼'), pct=(compare.pct | abs | format_value(1)), compare_label=compare_label) }}</div>
   {%- elif compare and compare.abs is not none -%}
     {%- set favorable = (compare.abs >= 0) != invert -%}
-    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ '▲' if compare.abs >= 0 else '▼' }} {{ compare.abs | abs | format_value(1) }} kWh ggü. {{ compare_label }}</div>
+    <div class="kpi-delta {{ 'up' if favorable else 'down' }}">{{ _("{v1} {abs} kWh ggü. {compare_label}", v1=('▲' if compare.abs >= 0 else '▼'), abs=(compare.abs | abs | format_value(1)), compare_label=compare_label) }}</div>
   {%- endif -%}
 {% endmacro %}
 
@@ -70,14 +70,14 @@
      Zeitraum zeigt, aus dem heraus der Bericht geöffnet wurde (liest sie per
      readInitialRangeOffset(), siehe energiedashboard.js), statt auf die
      Standardansicht ('Tag', heute) zurückzufallen. #}
-  <a href="{{ app_root }}/energiedashboard?range={{ range }}&offset={{ offset }}">&larr; Zurück zum Energiedashboard</a>
+  <a href="{{ app_root }}/energiedashboard?range={{ range }}&offset={{ offset }}">{{ _("&larr; Zurück zum Energiedashboard") }}</a>
   <button class="btn primary" onclick="window.print()">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <polyline points="6,9 6,2 18,2 18,9"/>
       <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
       <rect x="6" y="14" width="12" height="8"/>
     </svg>
-    Drucken / Als PDF speichern
+    {{ _("Drucken / Als PDF speichern") }}
   </button>
 </div>
 
@@ -88,7 +88,7 @@
        am Repo-Root sind reine Add-on-Store-Metadaten, vom laufenden Server
        nicht ausgeliefert). #}
     <div class="mark">
-      <svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
+      <svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{{ _('Zeitarchiv-Logo') }}">
         <rect width="64" height="64" rx="14" fill="#13211C"/>
         <rect x="13" y="44" width="6" height="7" rx="1.5" fill="#E79A5B"/>
         <rect x="23.8" y="35.87" width="6" height="15.13" rx="1.5" fill="#E79A5B"/>
@@ -99,51 +99,51 @@
         <circle cx="37.6" cy="23.73" r="1.4" fill="#57C9BB"/>
         <circle cx="48.4" cy="15.6" r="2.6" fill="#57C9BB"/>
       </svg>
-      <span class="mark-name">ZEITARCHIV</span>
+      <span class="mark-name">{{ _("ZEITARCHIV") }}</span>
     </div>
     <div class="report-head-title">
-      <h1>Energiebericht</h1>
+      <h1>{{ _("Energiebericht") }}</h1>
       <div class="period">{{ period_title }} &middot; {{ period_range_text }}</div>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">Kennzahlen im Überblick</div>
+    <div class="section-title">{{ _("Kennzahlen im Überblick") }}</div>
     <div class="kpi-grid">
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-3);"></div>
         <div class="kpi-head">
           <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
-          <div class="kpi-label">Erzeugung</div>
+          <div class="kpi-label">{{ _("Erzeugung") }}</div>
         </div>
-        <div class="kpi-value">{{ current.kpi.erzeugung | format_value(1) }} kWh</div>
+        <div class="kpi-value">{{ _("{erzeugung} kWh", erzeugung=(current.kpi.erzeugung | format_value(1))) }}</div>
         {{ kpi_delta(kpi_compare.erzeugung) }}
       </div>
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-1);"></div>
         <div class="kpi-head">
           <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
-          <div class="kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+          <div class="kpi-label">{{ config.netzbezug_name or _("Netzbezug") }}</div>
         </div>
-        <div class="kpi-value">{{ current.kpi.netzbezug | format_value(1) }} kWh</div>
+        <div class="kpi-value">{{ _("{netzbezug} kWh", netzbezug=(current.kpi.netzbezug | format_value(1))) }}</div>
         {{ kpi_delta(kpi_compare.netzbezug, invert=true) }}
       </div>
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-7);"></div>
         <div class="kpi-head">
           <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg>
-          <div class="kpi-label">Verbrauch</div>
+          <div class="kpi-label">{{ _("Verbrauch") }}</div>
         </div>
-        <div class="kpi-value">{{ current.kpi.verbrauch | format_value(1) }} kWh</div>
+        <div class="kpi-value">{{ _("{verbrauch} kWh", verbrauch=(current.kpi.verbrauch | format_value(1))) }}</div>
         {{ kpi_delta(kpi_compare.verbrauch, invert=true) }}
       </div>
       <div class="kpi">
         <div class="kpi-accent" style="background:var(--chart-2);"></div>
         <div class="kpi-head">
           <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
-          <div class="kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
+          <div class="kpi-label">{{ config.einspeisung_name or _("Einspeisung") }}</div>
         </div>
-        <div class="kpi-value">{{ current.kpi.einspeisung | format_value(1) }} kWh</div>
+        <div class="kpi-value">{{ _("{einspeisung} kWh", einspeisung=(current.kpi.einspeisung | format_value(1))) }}</div>
         {{ kpi_delta(kpi_compare.einspeisung) }}
       </div>
       {% if current.kpi.autarkie is not none %}
@@ -151,11 +151,11 @@
         <div class="kpi-accent" style="background:var(--chart-1);"></div>
         <div class="kpi-head">
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--chart-1)" stroke-width="2.2"/><path d="M8 12l3 3 5-6" stroke="var(--chart-1)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <div class="kpi-label">Autarkie</div>
+          <div class="kpi-label">{{ _("Autarkie") }}</div>
         </div>
         <div class="kpi-value">{{ current.kpi.autarkie | format_value(0) }} %</div>
         {%- if autarkie_delta_pkt is not none %}
-        <div class="kpi-delta {{ 'up' if autarkie_delta_pkt >= 0 else 'down' }}">{{ '▲' if autarkie_delta_pkt >= 0 else '▼' }} {{ autarkie_delta_pkt | abs | format_value(1) }} Pkt. ggü. {{ compare_label }}</div>
+        <div class="kpi-delta {{ 'up' if autarkie_delta_pkt >= 0 else 'down' }}">{{ _("{v1} {autarkie_delta_pkt} Pkt. ggü. {compare_label}", v1=('▲' if autarkie_delta_pkt >= 0 else '▼'), autarkie_delta_pkt=(autarkie_delta_pkt | abs | format_value(1)), compare_label=compare_label) }}</div>
         {%- endif %}
       </div>
       {% endif %}
@@ -164,11 +164,11 @@
         <div class="kpi-accent" style="background:var(--chart-3);"></div>
         <div class="kpi-head">
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--chart-3)" opacity=".85"/></svg>
-          <div class="kpi-label">Eigenverbrauch</div>
+          <div class="kpi-label">{{ _("Eigenverbrauch") }}</div>
         </div>
         <div class="kpi-value">{{ current.kpi.eigenverbrauch | format_value(0) }} %</div>
         {%- if eigenverbrauch_delta_pkt is not none %}
-        <div class="kpi-delta {{ 'up' if eigenverbrauch_delta_pkt >= 0 else 'down' }}">{{ '▲' if eigenverbrauch_delta_pkt >= 0 else '▼' }} {{ eigenverbrauch_delta_pkt | abs | format_value(1) }} Pkt. ggü. {{ compare_label }}</div>
+        <div class="kpi-delta {{ 'up' if eigenverbrauch_delta_pkt >= 0 else 'down' }}">{{ _("{v1} {eigenverbrauch_delta_pkt} Pkt. ggü. {compare_label}", v1=('▲' if eigenverbrauch_delta_pkt >= 0 else '▼'), eigenverbrauch_delta_pkt=(eigenverbrauch_delta_pkt | abs | format_value(1)), compare_label=compare_label) }}</div>
         {%- endif %}
       </div>
       {% endif %}
@@ -177,9 +177,9 @@
 
   {% if detail_charts %}
   <div class="section">
-    <div class="section-title">Erzeugung &amp; Verbrauch im Detail</div>
-    {{ detail_chart("Stromertrag", detail_charts.stromertrag, "--chart-3", "Eigenverbrauch", "--chart-2", config.einspeisung_name or "Einspeisung") }}
-    {{ detail_chart("Verbrauch", detail_charts.verbrauch, "--chart-1", config.netzbezug_name or "Netzbezug", "--chart-3", "Eigenversorgung") }}
+    <div class="section-title">{{ _("Erzeugung &amp; Verbrauch im Detail") }}</div>
+    {{ detail_chart(_("Stromertrag"), detail_charts.stromertrag, "--chart-3", _("Eigenverbrauch"), "--chart-2", config.einspeisung_name or _("Einspeisung")) }}
+    {{ detail_chart(_("Verbrauch"), detail_charts.verbrauch, "--chart-1", config.netzbezug_name or _("Netzbezug"), "--chart-3", _("Eigenversorgung")) }}
   </div>
   {% endif %}
 
@@ -187,23 +187,23 @@
   <div class="section">
     <div class="section-title">
       <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
-      Speicher
+      {{ _("Speicher") }}
     </div>
     <div class="stat-card">
       {% if current.kpi.speicher_laden is not none %}
-      <div class="stat-line"><span>Ladung</span><strong>{{ current.kpi.speicher_laden | format_value(1) }} kWh</strong></div>
+      <div class="stat-line"><span>{{ _("Ladung") }}</span><strong>{{ _("{speicher_laden} kWh", speicher_laden=(current.kpi.speicher_laden | format_value(1))) }}</strong></div>
       {% endif %}
       {% if current.kpi.speicher_entladen is not none %}
-      <div class="stat-line"><span>Entladung</span><strong>{{ current.kpi.speicher_entladen | format_value(1) }} kWh</strong></div>
+      <div class="stat-line"><span>{{ _("Entladung") }}</span><strong>{{ _("{speicher_entladen} kWh", speicher_entladen=(current.kpi.speicher_entladen | format_value(1))) }}</strong></div>
       {% endif %}
       {% if current.kpi.speicher_soc is not none %}
       <div class="stat-line">
-        <span>Ladezustand (Ø {{ period_title }})</span>
+        <span>{{ _("Ladezustand (Ø {period_title})", period_title=period_title) }}</span>
         <strong>{{ current.kpi.speicher_soc | format_value(0) }} %{{ " (" ~ (current.kpi.speicher_soc_kwh | format_value(1)) ~ " kWh)" if current.kpi.speicher_soc_kwh is not none else "" }}</strong>
       </div>
       {% endif %}
       {% if current.kpi.speicher_efficiency is not none %}
-      <div class="stat-line"><span>Wirkungsgrad</span><strong>{{ current.kpi.speicher_efficiency | format_value(0) }} %</strong></div>
+      <div class="stat-line"><span>{{ _("Wirkungsgrad") }}</span><strong>{{ current.kpi.speicher_efficiency | format_value(0) }} %</strong></div>
       {% endif %}
     </div>
   </div>
@@ -213,26 +213,26 @@
   <div class="section">
     <div class="section-title">
       <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--accent-bar)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
-      Kosten &amp; CO₂-Bilanz
+      {{ _("Kosten &amp; CO₂-Bilanz") }}
     </div>
     <div class="two-col">
       <div class="stat-card">
-        <div class="stat-title">Kosten</div>
+        <div class="stat-title">{{ _("Kosten") }}</div>
         {% if current.kpi.netzbezug_cost is not none %}
-        <div class="stat-line"><span>{{ config.netzbezug_name or "Netzbezug" }}</span><strong>{{ current.kpi.netzbezug_cost | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ config.netzbezug_name or _("Netzbezug") }}</span><strong>{{ current.kpi.netzbezug_cost | format_value(2) }} €</strong></div>
         {% endif %}
         {% if current.kpi.einspeisung_revenue is not none %}
-        <div class="stat-line"><span>{{ config.einspeisung_name or "Einspeisung" }}</span><strong>{{ current.kpi.einspeisung_revenue | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ config.einspeisung_name or _("Einspeisung") }}</span><strong>{{ current.kpi.einspeisung_revenue | format_value(2) }} €</strong></div>
         {% endif %}
         {% if current.kpi.eigenverbrauch_verguetung is not none %}
-        <div class="stat-line"><span>Eigenverbrauchsvergütung</span><strong>{{ current.kpi.eigenverbrauch_verguetung | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ _("Eigenverbrauchsvergütung") }}</span><strong>{{ current.kpi.eigenverbrauch_verguetung | format_value(2) }} €</strong></div>
         {% endif %}
         {% if current.kpi.vermiedene_kosten is not none %}
-        <div class="stat-line"><span>Vermiedene Kosten (Eigenverbrauch)</span><strong>{{ current.kpi.vermiedene_kosten | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ _("Vermiedene Kosten (Eigenverbrauch)") }}</span><strong>{{ current.kpi.vermiedene_kosten | format_value(2) }} €</strong></div>
         {% endif %}
         {% if current.kpi.net_cost is not none %}
         <div class="stat-total {{ 'is-surplus' if current.kpi.net_cost < 0 else 'is-cost' }}">
-          <span>Saldo &#8213; {{ "gespart" if current.kpi.net_cost < 0 else "Kosten" }}</span>
+          <span>{{ _("Saldo &#8213; {v1}", v1=("gespart" if current.kpi.net_cost < 0 else _("Kosten"))) }}</span>
           <span class="mono">{{ '+' if current.kpi.net_cost < 0 else '' }}{{ (current.kpi.net_cost * -1) | format_value(2) if current.kpi.net_cost < 0 else current.kpi.net_cost | format_value(2) }} €</span>
         </div>
         {% endif %}
@@ -243,13 +243,13 @@
          kg-Zahl, bewusst als Annahme ausgewiesen statt als exakter Wert. #}
       {% set CAR_G_PER_KM = 130 %}
       <div class="stat-card">
-        <div class="stat-title">CO₂</div>
+        <div class="stat-title">{{ _("CO₂") }}</div>
         {% if current.kpi.co2_ausstoss is not none %}
-        <div class="stat-line"><span>Ausstoß ({{ config.netzbezug_name or "Netzbezug" }})</span><strong>{{ current.kpi.co2_ausstoss | format_value(1) }} kg</strong></div>
+        <div class="stat-line"><span>{{ _("Ausstoß ({v1})", v1=(config.netzbezug_name or _("Netzbezug"))) }}</span><strong>{{ _("{co2_ausstoss} kg", co2_ausstoss=(current.kpi.co2_ausstoss | format_value(1))) }}</strong></div>
         {% endif %}
         {% if current.kpi.co2_vermieden is not none %}
-        <div class="stat-line"><span>Vermieden (Eigenverbrauch)</span><strong>{{ current.kpi.co2_vermieden | format_value(1) }} kg</strong></div>
-        <div class="stat-subnote">&#8618; &#8776; {{ (current.kpi.co2_vermieden * 1000 / CAR_G_PER_KM) | format_value(0) }} km Autofahrt</div>
+        <div class="stat-line"><span>{{ _("Vermieden (Eigenverbrauch)") }}</span><strong>{{ _("{co2_vermieden} kg", co2_vermieden=(current.kpi.co2_vermieden | format_value(1))) }}</strong></div>
+        <div class="stat-subnote">{{ _("&#8618; &#8776; {v1} km Autofahrt", v1=((current.kpi.co2_vermieden * 1000 / CAR_G_PER_KM) | format_value(0))) }}</div>
         {% endif %}
         {% if current.kpi.co2_ausstoss is not none and current.kpi.co2_vermieden is not none %}
         {# Dasselbe .stat-total-Muster wie der Kosten-Saldo links — "sauber"/
@@ -258,8 +258,8 @@
            Hintergrund) übersteht den Druck verlustfrei. #}
         {% set co2_bilanz = current.kpi.co2_ausstoss - current.kpi.co2_vermieden %}
         <div class="stat-total {{ 'is-surplus' if co2_bilanz < 0 else 'is-cost' }}">
-          <span>Bilanz &#8213; {{ "sauber" if co2_bilanz < 0 else "belastet" }}</span>
-          <span class="mono">{{ co2_bilanz | format_value(1) }} kg</span>
+          <span>{{ _("Bilanz &#8213; {v1}", v1=("sauber" if co2_bilanz < 0 else "belastet")) }}</span>
+          <span class="mono">{{ _("{co2_bilanz} kg", co2_bilanz=(co2_bilanz | format_value(1))) }}</span>
         </div>
         {% endif %}
       </div>
@@ -272,14 +272,14 @@
   <div class="section">
     <div class="section-title">
       <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
-      Erzeuger
+      {{ _("Erzeuger") }}
     </div>
     <table class="report-table value-table">
       {# Leere 4. Spalte ohne Überschrift/Inhalt — nur damit sich die Tabelle
          trotz nur 3 echter Spalten auf 100% Breite streckt und Name/kWh/
          Anteil exakt so breit wie in der Verbraucheranteile-Tabelle bleiben
          (siehe CSS-Kommentar bei .value-table). #}
-      <thead><tr><th>Erzeuger</th><th>kWh</th><th>Anteil</th><th class="placeholder-col"></th></tr></thead>
+      <thead><tr><th>{{ _("Erzeuger") }}</th><th>{{ _("kWh") }}</th><th>{{ _("Anteil") }}</th><th class="placeholder-col"></th></tr></thead>
       <tbody>
         {% for item in current.erzeuger_breakdown %}
         <tr>
@@ -290,7 +290,7 @@
         </tr>
         {% endfor %}
         <tr class="total">
-          <td>Gesamt</td>
+          <td>{{ _("Gesamt") }}</td>
           <td>{{ erz_total | format_value(1) }}</td>
           <td>100 %</td>
           <td class="placeholder-col"></td>
@@ -305,10 +305,10 @@
   <div class="section">
     <div class="section-title">
       <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
-      Verbraucheranteile
+      {{ _("Verbraucheranteile") }}
     </div>
     <table class="report-table value-table">
-      <thead><tr><th>Verbraucher</th><th>kWh</th><th>Anteil</th>{% if show_kosten_col %}<th>Kosten</th>{% endif %}</tr></thead>
+      <thead><tr><th>{{ _("Verbraucher") }}</th><th>{{ _("kWh") }}</th><th>{{ _("Anteil") }}</th>{% if show_kosten_col %}<th>{{ _("Kosten") }}</th>{% endif %}</tr></thead>
       <tbody>
         {% set total_kwh = namespace(v=0) %}
         {% set total_kosten = namespace(v=0) %}
@@ -323,7 +323,7 @@
         {% if item.kosten is not none %}{% set total_kosten.v = total_kosten.v + item.kosten %}{% endif %}
         {% endfor %}
         <tr class="total">
-          <td>Gesamt</td>
+          <td>{{ _("Gesamt") }}</td>
           <td>{{ total_kwh.v | format_value(1) }}</td>
           <td>100 %</td>
           {% if show_kosten_col %}<td>{{ total_kosten.v | format_value(2) }} €</td>{% endif %}
@@ -337,10 +337,10 @@
   <div class="section">
     <div class="section-title">
       <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><polyline points="3,18 9,12 14,15 21,6" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="6" r="2" fill="var(--ink-faint)"/></svg></span>
-      Monatsverlauf
+      {{ _("Monatsverlauf") }}
     </div>
     <table class="report-table">
-      <thead><tr><th>Monat</th><th>Erzeugung</th><th>Verbrauch</th><th>{{ config.netzbezug_name or "Netzbezug" }}</th><th>Autarkie</th></tr></thead>
+      <thead><tr><th>{{ _("Monat") }}</th><th>{{ _("Erzeugung") }}</th><th>{{ _("Verbrauch") }}</th><th>{{ config.netzbezug_name or _("Netzbezug") }}</th><th>{{ _("Autarkie") }}</th></tr></thead>
       <tbody>
         {% for row in monatsverlauf %}
         <tr>
@@ -358,9 +358,9 @@
 
   {% if staerkster_schwaechster %}
   <div class="section">
-    <div class="section-title">Stärkster &amp; schwächster Tag</div>
+    <div class="section-title">{{ _("Stärkster &amp; schwächster Tag") }}</div>
     <table class="report-table records-table">
-      <thead><tr><th>Kennzahl</th><th>Stärkster Tag</th><th>Schwächster Tag</th></tr></thead>
+      <thead><tr><th>{{ _("Kennzahl") }}</th><th>{{ _("Stärkster Tag") }}</th><th>{{ _("Schwächster Tag") }}</th></tr></thead>
       <tbody>
         {% for row in staerkster_schwaechster %}
         <tr>
@@ -386,7 +386,7 @@
             {%- if row.best -%}
             <div class="records-cell">
               <span>{{ row.best.date_label }} · {{ row.best.value | format_value(row.decimals) }} {{ row.unit }}</span>
-              <span class="kpi-delta up">{{ '▲' if row.best.delta >= 0 else '▼' }} {{ row.best.delta | abs | format_value(1) }} {{ '%-Pkt.' if row.is_pkt else '%' }} ggü. Ø {{ row.avg | format_value(row.decimals) }} {{ row.unit }}</span>
+              <span class="kpi-delta up">{{ _("{v1} {delta} {v2} ggü. Ø {avg} {unit}", v1=('▲' if row.best.delta >= 0 else '▼'), delta=(row.best.delta | abs | format_value(1)), v2=('%-Pkt.' if row.is_pkt else '%'), avg=(row.avg | format_value(row.decimals)), unit=row.unit) }}</span>
             </div>
             {%- else -%}–{%- endif -%}
           </td>
@@ -394,7 +394,7 @@
             {%- if row.worst -%}
             <div class="records-cell">
               <span>{{ row.worst.date_label }} · {{ row.worst.value | format_value(row.decimals) }} {{ row.unit }}</span>
-              <span class="kpi-delta down">{{ '▲' if row.worst.delta >= 0 else '▼' }} {{ row.worst.delta | abs | format_value(1) }} {{ '%-Pkt.' if row.is_pkt else '%' }} ggü. Ø {{ row.avg | format_value(row.decimals) }} {{ row.unit }}</span>
+              <span class="kpi-delta down">{{ _("{v1} {delta} {v2} ggü. Ø {avg} {unit}", v1=('▲' if row.worst.delta >= 0 else '▼'), delta=(row.worst.delta | abs | format_value(1)), v2=('%-Pkt.' if row.is_pkt else '%'), avg=(row.avg | format_value(row.decimals)), unit=row.unit) }}</span>
             </div>
             {%- else -%}–{%- endif -%}
           </td>
@@ -406,25 +406,25 @@
   {% endif %}
 
   <div class="section" style="margin-bottom:0;">
-    <div class="section-title">Auffälligkeiten{{ " im Jahresverlauf" if range == "year" else "" }}</div>
+    <div class="section-title">{{ _("Auffälligkeiten im Jahresverlauf") if range == "year" else _("Auffälligkeiten") }}</div>
     {% if anomalien_report %}
     <div class="anomaly-note">
       {% for a in anomalien_report %}
       <div class="anomaly-line">
         <span class="icon">!</span>
-        <span>{% if a.month %}<b>{{ a.month }}:</b> {% endif %}{{ a.name }} {{ a.value | format_value(1) }} kWh, {{ a.pct | format_value(0) }} % über dem Schnitt ({{ a.baseline | format_value(1) }} kWh).</span>
+        <span>{% if a.month %}<b>{{ a.month }}:</b> {% endif %}{{ _("{name} {value} kWh, {pct} % über dem Schnitt ({baseline} kWh).", name=a.name, value=(a.value | format_value(1)), pct=(a.pct | format_value(0)), baseline=(a.baseline | format_value(1))) }}</span>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <div class="quality-plausible-line"><span class="dot"></span> Keine Auffälligkeiten in diesem Zeitraum.</div>
+    <div class="quality-plausible-line"><span class="dot"></span> {{ _("Keine Auffälligkeiten in diesem Zeitraum.") }}</div>
     {% endif %}
   </div>
 
 
   <div class="report-foot">
-    <span>Zeitarchiv &middot; lokal erzeugt, keine Cloud-Übertragung</span>
-    <span>Erstellt am {{ generated_at.day }}. {{ month_names[generated_at.month - 1] }} {{ generated_at.year }}</span>
+    <span>{{ _("Zeitarchiv &middot; lokal erzeugt, keine Cloud-Übertragung") }}</span>
+    <span>{{ _("Erstellt am {day}. {v1} {year}", day=generated_at.day, v1=(month_names[generated_at.month - 1]), year=generated_at.year) }}</span>
   </div>
 </div>
 {% endblock %}

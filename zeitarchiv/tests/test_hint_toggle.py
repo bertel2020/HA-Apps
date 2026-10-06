@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 
-from _paths import APP_CSS, APP_JS, TEMPLATES
+from _paths import APP_CSS, APP_JS, TEMPLATES, template_text
 
 
 JS = (APP_JS / "hint-toggle.js").read_text(encoding="utf-8")
@@ -141,7 +141,7 @@ def test_the_same_markup_serves_every_screen_width() -> None:
 def test_the_body_starts_folded() -> None:
     """`hidden` steht im Markup, nicht im Skript — sonst blitzt der Text beim
     Laden einmal auf."""
-    hints = (TEMPLATES / "_hints.html").read_text(encoding="utf-8")
+    hints = template_text("_hints.html")
     assert re.search(r'<p class="\{\{ klasse \}\}" hidden>', hints)
 
 

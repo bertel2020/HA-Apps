@@ -31,36 +31,35 @@
      Zustand anhält — unpassend für einen andauernden statt einmaligen
      Zustand. #}
   <div style="margin:0 0 14px;">
-    <strong style="display:block;margin-bottom:7px;">Vorhandenes Backup importieren</strong>
+    <strong style="display:block;margin-bottom:7px;">{{ _("Vorhandenes Backup importieren") }}</strong>
     <form hx-post="backup/import" hx-encoding="multipart/form-data"
           hx-target="#backup-status" hx-swap="outerHTML">
       <label class="backup-dropzone" data-backup-dropzone for="backup-import-input"
              role="button" tabindex="0">
-        <span>Backup-ZIP hierher ziehen oder klicken zum Auswählen</span>
+        <span>{{ _("Backup-ZIP hierher ziehen oder klicken zum Auswählen") }}</span>
         <span class="backup-dropzone-hint">
-          Max. {{ import_limits.zip_upload_gib }} GiB Upload, {{ import_limits.zip_uncompressed_gib }} GiB entpackt
-          und {{ import_limits.zip_members }} Einträge. Wird vor der Übernahme vollständig geprüft.
+          {{ _("Max. {zip_upload_gib} GiB Upload, {zip_uncompressed_gib} GiB entpackt und {zip_members} Einträge. Wird vor der Übernahme vollständig geprüft.", zip_upload_gib=import_limits.zip_upload_gib, zip_uncompressed_gib=import_limits.zip_uncompressed_gib, zip_members=import_limits.zip_members) }}
         </span>
         <input type="file" name="file" id="backup-import-input"
                accept=".zip,application/zip" required hidden>
       </label>
       <p class="backup-upload-state" data-backup-upload-state aria-live="polite">
-        <span class="htmx-indicator">Upload und Prüfung laufen&hellip;</span>
+        <span class="htmx-indicator">{{ _("Upload und Prüfung laufen&hellip;") }}</span>
       </p>
     </form>
   </div>
   <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
-    Backup jetzt erstellen
+    {{ _("Backup jetzt erstellen") }}
   </button>
   {% include "_backup_table.html" %}
   {% if backup_jobs %}
-  <h3 style="margin:24px 0 10px;">Ausführungsverlauf</h3>
+  <h3 style="margin:24px 0 10px;">{{ _("Ausführungsverlauf") }}</h3>
   <div class="tbl-wrap">
     <table class="dt" data-sortable data-paginate data-page-size="10">
-      <thead><tr><th>Zeitpunkt</th><th>Auslöser</th><th>Status</th><th>Dauer</th><th>Größe</th></tr></thead>
+      <thead><tr><th>{{ _("Zeitpunkt") }}</th><th>{{ _("Auslöser") }}</th><th>{{ _("Status") }}</th><th>{{ _("Dauer") }}</th><th>{{ _("Größe") }}</th></tr></thead>
       <tbody>
       {% for job in backup_jobs %}
-      <tr{% if job.error %} class="job-row-error" data-error="{{ job.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% endif %}>
+      <tr{% if job.error %} class="job-row-error" data-error="{{ job.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="{{ _('Fehlergrund anzeigen') }}"{% endif %}>
         <td data-sort="{{ job.created_at_ts }}">{{ job.created_at }}</td>
         <td>{{ job.trigger }}</td>
         <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>
@@ -73,12 +72,11 @@
   </div>
   {% endif %}
   {% if backup_rollbacks %}
-  <h3 style="margin:24px 0 10px;">Restore-Rollback {{ hint_button('Restore-Rollback') }}</h3>
-  {% call hint_body() %}Enthält den Datenstand unmittelbar vor der letzten Wiederherstellung — ein neuer Restore
-  ersetzt ihn automatisch.{% endcall %}
+  <h3 style="margin:24px 0 10px;">{{ _("Restore-Rollback") }} {{ hint_button(_('Restore-Rollback')) }}</h3>
+  {% call hint_body() %}{{ _("Enthält den Datenstand unmittelbar vor der letzten Wiederherstellung — ein neuer Restore ersetzt ihn automatisch.") }}{% endcall %}
   <div class="tbl-wrap" style="margin-top:14px;">
     <table class="dt">
-      <tr><th>Zeitpunkt</th><th>Größe</th><th></th></tr>
+      <tr><th>{{ _("Zeitpunkt") }}</th><th>{{ _("Größe") }}</th><th></th></tr>
       {% for rollback in backup_rollbacks %}
       <tr>
         <td>{{ rollback.created_at }}</td>
@@ -89,13 +87,13 @@
                     hx-post="backup/rollback/restore/{{ rollback.name }}"
                     hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this"
                     hx-confirm="Stand {{ rollback.name }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird dabei selbst als neuer Rollback behalten.">
-              Diesen Stand wiederherstellen
+              {{ _("Diesen Stand wiederherstellen") }}
             </button>
             <button type="button" class="btn btn-danger"
                     hx-post="backup/rollback/delete/{{ rollback.name }}"
                     hx-target="#backup-status" hx-swap="outerHTML"
                     hx-confirm="Rollback {{ rollback.name }} endgültig löschen?">
-              Rollback löschen
+              {{ _("Rollback löschen") }}
             </button>
           </span>
         </td>

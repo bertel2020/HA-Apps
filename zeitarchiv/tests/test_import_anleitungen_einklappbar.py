@@ -11,11 +11,11 @@ Protokollierungs-Karte der Log-Seite.
 
 from __future__ import annotations
 
-from _paths import APP, TEMPLATES
+from _paths import APP, template_text
 
 
 def test_all_three_how_to_blocks_are_marked_collapsible() -> None:
-    quelle = (TEMPLATES / "import.html").read_text(encoding="utf-8")
+    quelle = template_text("import.html")
     assert quelle.count('<div class="callout" data-collapsible>') == 3
     assert quelle.count('<strong class="callout-title">') == 3
     # Der Hinweis auf die fehlende settings.json ist KEINE Anleitung, sondern

@@ -6,7 +6,7 @@
   <button type="button" class="dtile-menu-btn" draggable="false"
           @pointerdown.stop @click.prevent.stop="menuOpen = !menuOpen"
           :aria-expanded="menuOpen.toString()" aria-haspopup="{{ 'dialog' if tile.kind == 'entity' else 'menu' }}"
-          aria-label="Kachelmenü öffnen" title="Kachelmenü">⋮</button>
+          aria-label="{{ _('Kachelmenü öffnen') }}" title="{{ _('Kachelmenü') }}">⋮</button>
   {% if tile.kind == 'entity' %}
   <!-- Werte-Kacheln bekommen ein eigenes, größeres Einstellungs-Popup statt
        der kleinen Popover-Liste von Chart/Tabelle-Kacheln — deutlich mehr
@@ -18,18 +18,18 @@
        den Hintergrund kommt (kein Auto-Schließen je Einstellung wie beim
        kleinen Menü) — mehrere Einstellungen sollen sich in einem Aufruf
        ändern lassen. -->
-  <div class="dtile-settings-overlay" x-show="menuOpen" x-cloak role="dialog" aria-modal="true" aria-label="Kachel-Einstellungen"
+  <div class="dtile-settings-overlay" x-show="menuOpen" x-cloak role="dialog" aria-modal="true" aria-label="{{ _('Kachel-Einstellungen') }}"
        @pointerdown.stop @click.self="menuOpen = false" @keydown.escape.window="menuOpen = false">
     <div class="dtile-settings-modal">
       <div class="dtile-settings-header">
         <p class="dtile-settings-title">{{ tile.name }}</p>
-        <button type="button" class="dtile-settings-close" @click="menuOpen = false" aria-label="Schließen">✕</button>
+        <button type="button" class="dtile-settings-close" @click="menuOpen = false" aria-label="{{ _('Schließen') }}">✕</button>
       </div>
       <div class="dtile-settings-body">
 
         <div class="dtile-settings-section">
           <div class="dtile-title-field">
-            <span class="menu-row-label">Entität</span>
+            <span class="menu-row-label">{{ _("Entität") }}</span>
             <form class="dd-picker-wrap dtile-entity-picker"
                   x-data='entityPicker({{ entity_pin_options | tojson }}, {{ tile.entity_id | tojson }})'
                   x-ref="entityForm" @click.outside="open = false"
@@ -41,7 +41,7 @@
                       x-text="label(entityId) + ' ▾'"></button>
               <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak>
                 <input type="search" class="dd-picker-popover-search" x-ref="tileEntitySearch"
-                       x-model="search" placeholder="Entität suchen …">
+                       x-model="search" placeholder="{{ _('Entität suchen …') }}">
                 <div class="dtile-entity-picker-list">
                   <!-- Auch bereits angeheftete Entitäten wählbar (Mehrfach-
                        Anheften-Feature) — kein Ausschluss-Filter mehr wie
@@ -51,7 +51,7 @@
                          @click="select(opt.entity_id); $nextTick(() => $refs.entityForm.requestSubmit())"
                          @mouseenter="scheduleHover(opt, $event.currentTarget)" @mouseleave="clearHover()">
                       <span x-text="opt.label"></span>
-                      <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+                      <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="{{ _('App-eigener Anzeigename') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
                     </div>
                   </template>
                 </div>
@@ -69,20 +69,20 @@
 
         <div class="dtile-settings-section">
           <div class="dtile-title-field">
-            <span class="menu-row-label">Titel</span>
+            <span class="menu-row-label">{{ _("Titel") }}</span>
             <input type="text" class="dtile-title-input" value="{{ tile.custom_title }}" placeholder="{{ tile.name }}">
           </div>
         </div>
 
         <div class="dtile-settings-section">
-          <div class="dtile-size-picker-head">Kachelgröße <strong>{{ tile.grid_cols }}×{{ tile.grid_rows }}</strong></div>
-          <div class="dtile-size-grid" role="grid" aria-label="Kachelgröße bis {{ size_max }} mal {{ size_max }} auswählen">
+          <div class="dtile-size-picker-head">{{ _("Kachelgröße <strong>{grid_cols}×{grid_rows}</strong>", grid_cols=tile.grid_cols, grid_rows=tile.grid_rows) }}</div>
+          <div class="dtile-size-grid" role="grid" aria-label="{{ _('Kachelgröße bis {size_max} mal {size_max2} auswählen', size_max=size_max, size_max2=size_max) }}">
             {% for row in range(1, size_max + 1) %}
             {% for col in range(1, size_max + 1) %}
             <button type="button"
                     class="dtile-size-cell{% if col <= tile.grid_cols and row <= tile.grid_rows %} is-selected{% endif %}"
                     role="gridcell" draggable="false" data-cols="{{ col }}" data-rows="{{ row }}"
-                    aria-label="{{ col }} mal {{ row }}" title="{{ col }}×{{ row }}"></button>
+                    aria-label="{{ _('{col} mal {row}', col=col, row=row) }}" title="{{ col }}×{{ row }}"></button>
             {% endfor %}
             {% endfor %}
           </div>
@@ -93,8 +93,8 @@
            und ein Endpunkt (/dashboard/entity-metrics): die vier Werte hängen
            voneinander ab, der Hauptwert fällt aus der Zeile heraus. #}
         <div class="dtile-settings-section">
-          <div class="dtile-decimals-picker-head">Zeitraum</div>
-          <div class="dtile-choice-row dtile-range-row" role="group" aria-label="Zeitraum wählen">
+          <div class="dtile-decimals-picker-head">{{ _("Zeitraum") }}</div>
+          <div class="dtile-choice-row dtile-range-row" role="group" aria-label="{{ _('Zeitraum wählen') }}">
             {% for value, label in [('hour', 'Std.'), ('day', 'Tag'), ('week', 'Woche'), ('month', 'Monat'), ('year', 'Jahr')] %}
             <button type="button" class="dtile-choice-cell dtile-range-cell{% if tile.range_key == value %} is-selected{% endif %}"
                     draggable="false" data-range="{{ value }}">{{ label }}</button>
@@ -103,35 +103,35 @@
           {# Zwei benannte Pole statt eines An/Aus-Schalters: bei "aus" müsste
              man erraten, was das Gegenteil ist. Die Wörter sind die des
              Handbuchs (docs/user-guide.md). #}
-          <div class="dtile-choice-row dtile-choice-row-sub dtile-continuous-row" role="group" aria-label="Kalendergrenze oder rollierendes Fenster">
+          <div class="dtile-choice-row dtile-choice-row-sub dtile-continuous-row" role="group" aria-label="{{ _('Kalendergrenze oder rollierendes Fenster') }}">
             <button type="button" class="dtile-choice-cell dtile-continuous-cell{% if not tile.continuous %} is-selected{% endif %}"
                     draggable="false" data-continuous="false"
-                    title="Angefangene Kalenderperiode — „Tag“ heißt ab Mitternacht">Laufend</button>
+                    title="{{ _('Angefangene Kalenderperiode — „Tag“ heißt ab Mitternacht') }}">{{ _("Laufend") }}</button>
             <button type="button" class="dtile-choice-cell dtile-continuous-cell{% if tile.continuous %} is-selected{% endif %}"
                     draggable="false" data-continuous="true"
-                    title="Festes Fenster relativ zu jetzt — „Tag“ heißt die letzten 24 Stunden">Rollierend</button>
+                    title="{{ _('Festes Fenster relativ zu jetzt — „Tag“ heißt die letzten 24 Stunden') }}">{{ _("Rollierend") }}</button>
           </div>
-          <p class="dtile-settings-hint">Gilt für Kennzahlen und Sparkline.</p>
+          <p class="dtile-settings-hint">{{ _("Gilt für Kennzahlen und Sparkline.") }}</p>
 
-          <div class="dtile-decimals-picker-head dtile-choice-head-gap">Hauptwert</div>
-          <div class="dtile-choice-row dtile-primary-row" role="group" aria-label="Hauptwert wählen">
+          <div class="dtile-decimals-picker-head dtile-choice-head-gap">{{ _("Hauptwert") }}</div>
+          <div class="dtile-choice-row dtile-primary-row" role="group" aria-label="{{ _('Hauptwert wählen') }}">
             <button type="button" class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == 'last' %} is-selected{% endif %}"
-                    draggable="false" data-primary="last">Aktuell</button>
+                    draggable="false" data-primary="last">{{ _("Aktuell") }}</button>
             {% for value in ['min', 'avg', 'max', 'sum'] %}{% set label = tile.metric_labels[value] %}
             <button type="button" draggable="false" data-primary="{{ value }}"
                     class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == value %} is-selected{% endif %}{% if value not in tile.available_metrics %} is-off{% endif %}"
-                    {% if value not in tile.available_metrics %}disabled title="Für diese Entität keine sinnvolle Kennzahl"{% endif %}>{{ label }}</button>
+                    {% if value not in tile.available_metrics %}disabled title="{{ _('Für diese Entität keine sinnvolle Kennzahl') }}"{% endif %}>{{ label }}</button>
             {% endfor %}
           </div>
 
           <label class="menu-row dtile-stats-toggle-row">
-            <span class="menu-row-label dtile-choice-head-label">Kennzahlen-Zeile</span>
+            <span class="menu-row-label dtile-choice-head-label">{{ _("Kennzahlen-Zeile") }}</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-stats-checkbox" {% if tile.stats_metrics %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
             </span>
           </label>
-          <div class="dtile-choice-row dtile-stats-row" role="group" aria-label="Kennzahlen wählen"
+          <div class="dtile-choice-row dtile-stats-row" role="group" aria-label="{{ _('Kennzahlen wählen') }}"
                {% if not tile.stats_metrics %}hidden{% endif %}>
             {% for value in ['min', 'avg', 'max', 'sum'] %}{% set label = tile.metric_labels[value] %}
             {% set gesperrt = value not in tile.available_metrics or value == tile.primary_metric %}
@@ -144,21 +144,21 @@
 
         <div class="dtile-settings-section">
           <label class="menu-row dtile-sparkline-row">
-            <span class="menu-row-label">Sparkline</span>
+            <span class="menu-row-label">{{ _("Sparkline") }}</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-sparkline-checkbox" {% if tile.show_sparkline %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
             </span>
           </label>
           <label class="menu-row dtile-show-age-row">
-            <span class="menu-row-label">Letzte Aktualisierung</span>
+            <span class="menu-row-label">{{ _("Letzte Aktualisierung") }}</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-show-age-checkbox" {% if tile.show_age %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
             </span>
           </label>
           <label class="menu-row dtile-show-period-row">
-            <span class="menu-row-label">Zeitraum anzeigen</span>
+            <span class="menu-row-label">{{ _("Zeitraum anzeigen") }}</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-show-period-checkbox" {% if tile.show_period %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
@@ -167,8 +167,8 @@
         </div>
 
         <div class="dtile-settings-section">
-          <div class="dtile-decimals-picker-head">Sparkline-Auflösung</div>
-          <div class="dtile-sparkline-resolution-row" role="group" aria-label="Sparkline-Auflösung wählen">
+          <div class="dtile-decimals-picker-head">{{ _("Sparkline-Auflösung") }}</div>
+          <div class="dtile-sparkline-resolution-row" role="group" aria-label="{{ _('Sparkline-Auflösung wählen') }}">
             {% for value, label in [('raw', 'Roh'), ('5min', '5 Min'), ('15min', '15 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
             <button type="button" class="dtile-sparkline-resolution-cell{% if tile.sparkline_resolution == value %} is-selected{% endif %}"
                     data-resolution="{{ value }}" title="{{ {'raw': 'Alle gespeicherten Rohdatenpunkte', '5min': 'Ein Punkt je 5 Minuten', '15min': 'Ein Punkt je 15 Minuten', '30min': 'Ein Punkt je 30 Minuten', '1h': 'Ein Punkt je Stunde'}[value] }}">{{ label }}</button>
@@ -177,8 +177,8 @@
         </div>
 
         <div class="dtile-settings-section">
-          <div class="dtile-decimals-picker-head">Als veraltet markieren</div>
-          <div class="dtile-stale-mode-row" role="group" aria-label="Veraltet-Schwelle wählen">
+          <div class="dtile-decimals-picker-head">{{ _("Als veraltet markieren") }}</div>
+          <div class="dtile-stale-mode-row" role="group" aria-label="{{ _('Veraltet-Schwelle wählen') }}">
             {% for value, label, hint in [('standard', 'Standard', 'Gelb nach 15 Minuten, rot nach 1 Stunde'), ('daily', 'Täglich', 'Gelb nach 26 Stunden, rot nach 48 Stunden — für Tageswerte'), ('rare', 'Selten', 'Gelb nach 3 Tagen, rot nach 7 Tagen — für Zähler, die nur bei Aktivität melden'), ('off', 'Aus', 'Nie als veraltet markieren')] %}
             <button type="button" class="dtile-stale-mode-cell{% if tile.stale_mode == value %} is-selected{% endif %}"
                     data-stale-mode="{{ value }}" title="{{ hint }}">{{ label }}</button>
@@ -187,8 +187,8 @@
         </div>
 
         <div class="dtile-settings-section">
-          <div class="dtile-decimals-picker-head">Nachkommastellen</div>
-          <div class="dtile-decimals-row" role="group" aria-label="Nachkommastellen wählen">
+          <div class="dtile-decimals-picker-head">{{ _("Nachkommastellen") }}</div>
+          <div class="dtile-decimals-row" role="group" aria-label="{{ _('Nachkommastellen wählen') }}">
             {% for value, label in [('auto', 'Auto'), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
             <button type="button" class="dtile-decimals-cell{% if tile.decimals == value %} is-selected{% endif %}"
                     data-decimals="{{ value }}"
@@ -202,22 +202,22 @@
         <button type="button" class="btn danger btn-sm" draggable="false"
                 hx-post="{{ href_base }}dashboard/unpin-entity/{{ tile.pin_id }}?dashboard_id={{ dashboard_id }}"
                 hx-target="#dashboard-grid" hx-swap="outerHTML"
-                hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?">Vom Dashboard entfernen</button>
-        <button type="button" class="btn btn-sm" @click="menuOpen = false">Fertig</button>
+                hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?">{{ _("Vom Dashboard entfernen") }}</button>
+        <button type="button" class="btn btn-sm" @click="menuOpen = false">{{ _("Fertig") }}</button>
       </div>
     </div>
   </div>
   {% else %}
   <div class="dtile-menu-popover" x-show="menuOpen" x-cloak role="menu"
        @pointerdown.stop @click.outside="menuOpen = false">
-    <div class="dtile-size-picker-head">Kachelgröße <strong>{{ tile.grid_cols }}×{{ tile.grid_rows }}</strong></div>
-    <div class="dtile-size-grid" role="grid" aria-label="Kachelgröße bis {{ size_max }} mal {{ size_max }} auswählen">
+    <div class="dtile-size-picker-head">{{ _("Kachelgröße <strong>{grid_cols}×{grid_rows}</strong>", grid_cols=tile.grid_cols, grid_rows=tile.grid_rows) }}</div>
+    <div class="dtile-size-grid" role="grid" aria-label="{{ _('Kachelgröße bis {size_max} mal {size_max2} auswählen', size_max=size_max, size_max2=size_max) }}">
       {% for row in range(1, size_max + 1) %}
       {% for col in range(1, size_max + 1) %}
       <button type="button"
               class="dtile-size-cell{% if col <= tile.grid_cols and row <= tile.grid_rows %} is-selected{% endif %}"
               role="gridcell" draggable="false" data-cols="{{ col }}" data-rows="{{ row }}"
-              aria-label="{{ col }} mal {{ row }}" title="{{ col }}×{{ row }}"
+              aria-label="{{ _('{col} mal {row}', col=col, row=row) }}" title="{{ col }}×{{ row }}"
               @click.prevent.stop="menuOpen = false"></button>
       {% endfor %}
       {% endfor %}
@@ -234,7 +234,7 @@
     <div class="dtile-legend-wrap" style="{{ '' if tile.grid_cols >= legend_threshold and tile.grid_rows >= legend_threshold else 'display:none;' }}">
       <div class="dtile-menu-divider"></div>
       <label class="menu-row dtile-legend-row">
-        <span class="menu-row-label">Legende anzeigen</span>
+        <span class="menu-row-label">{{ _("Legende anzeigen") }}</span>
         <span class="menu-toggle">
           <input type="checkbox" class="dtile-legend-checkbox" {% if tile.show_legend %}checked{% endif %}>
           <span class="track"><span class="thumb"></span></span>
@@ -247,7 +247,7 @@
             hx-post="{{ href_base }}{{ 'charts' if tile.kind == 'chart' else 'tables' }}/{{ tile.id }}/unpin?dashboard_id={{ dashboard_id }}"
             hx-target="#dashboard-grid" hx-swap="outerHTML"
             hx-confirm="Diese Kachel wirklich vom Dashboard entfernen?"
-            @click="menuOpen = false">Vom Dashboard entfernen</button>
+            @click="menuOpen = false">{{ _("Vom Dashboard entfernen") }}</button>
   </div>
   {% endif %}
 </div>

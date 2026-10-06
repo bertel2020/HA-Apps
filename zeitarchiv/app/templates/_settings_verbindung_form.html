@@ -1,33 +1,33 @@
-<p>API-Token für die Integration &mdash; zum Einrichten kopieren (<strong>Einstellungen → Geräte &amp; Dienste → Zeitarchiv</strong>).</p>
+<p>{{ _("API-Token für die Integration &mdash; zum Einrichten kopieren (<strong>Einstellungen → Geräte &amp; Dienste → Zeitarchiv</strong>).") }}</p>
 
 <div class="field">
-  <label>Verbindungsstatus</label>
+  <label>{{ _("Verbindungsstatus") }}</label>
   <div class="status-grid connection-status-grid">
     <div class="connection-status-cards">
       <div class="status-card">
-        <span class="status-card-label">Letzter empfangener Wert</span>
-        <strong class="status-card-mono">{{ last_write_at or "Noch kein Wert" }}</strong>
+        <span class="status-card-label">{{ _("Letzter empfangener Wert") }}</span>
+        <strong class="status-card-mono">{{ last_write_at or _("Noch kein Wert") }}</strong>
       </div>
       <div class="status-card">
-        <span class="status-card-label">Schreibzugriffe seit Start</span>
+        <span class="status-card-label">{{ _("Schreibzugriffe seit Start") }}</span>
         <strong>{{ write_requests_ok }}</strong>
       </div>
       <div class="status-card{% if auth_failures %} status-card-danger{% endif %}">
-        <span class="status-card-label">Auth-Fehler seit Start</span>
+        <span class="status-card-label">{{ _("Auth-Fehler seit Start") }}</span>
         <strong>{{ auth_failures }}</strong>
-        {% if last_auth_failure_at %}<span class="status-card-detail">Zuletzt {{ last_auth_failure_at }}</span>{% endif %}
+        {% if last_auth_failure_at %}<span class="status-card-detail">{{ _("Zuletzt {last_auth_failure_at}", last_auth_failure_at=last_auth_failure_at) }}</span>{% endif %}
       </div>
       <div class="status-card{% if integration_outdated %} status-card-danger{% endif %}">
-        <span class="status-card-label">Integrations-Version</span>
-        <strong>{{ integration_version or "Keine Verbindung erkannt" }}</strong>
-        {% if integration_last_seen_at %}<span class="status-card-detail">Zuletzt gesehen {{ integration_last_seen_at }}</span>{% endif %}
-        {% if integration_outdated %}<span class="status-card-detail">Update verfügbar — siehe Hinweis-Center</span>{% endif %}
+        <span class="status-card-label">{{ _("Integrations-Version") }}</span>
+        <strong>{{ integration_version or _("Keine Verbindung erkannt") }}</strong>
+        {% if integration_last_seen_at %}<span class="status-card-detail">{{ _("Zuletzt gesehen {integration_last_seen_at}", integration_last_seen_at=integration_last_seen_at) }}</span>{% endif %}
+        {% if integration_outdated %}<span class="status-card-detail">{{ _("Update verfügbar — siehe Hinweis-Center") }}</span>{% endif %}
       </div>
       {% if integration_update_kind %}
       <div class="status-card{% if integration_update_kind == 'feature' %} status-card-accent-strong{% else %} status-card-accent{% endif %}">
-        <span class="status-card-label">Integrations-Update</span>
+        <span class="status-card-label">{{ _("Integrations-Update") }}</span>
         <strong>{{ integration_latest_version }}</strong>
-        <span class="status-card-detail">{{ "Bugfix verfügbar" if integration_update_kind == "bugfix" else "Neue Funktionsversion verfügbar" }}</span>
+        <span class="status-card-detail">{{ _("Bugfix verfügbar") if integration_update_kind == "bugfix" else _("Neue Funktionsversion verfügbar") }}</span>
       </div>
       {% endif %}
     </div>
@@ -35,17 +35,17 @@
 </div>
 
 <div class="field">
-  <label>API-Token</label>
+  <label>{{ _("API-Token") }}</label>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <div class="val mono" id="token-value" data-token="{{ api_token }}" data-masked="true" style="flex:1;min-width:110px;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">••••••••••••••••</div>
-    <button type="button" class="btn" onclick="toggleTokenVisibility(this)">Anzeigen</button>
-    <button type="button" class="btn" onclick="copyToken()">Kopieren</button>
+    <button type="button" class="btn" onclick="toggleTokenVisibility(this)">{{ _("Anzeigen") }}</button>
+    <button type="button" class="btn" onclick="copyToken()">{{ _("Kopieren") }}</button>
     <button type="button" class="btn btn-danger"
             hx-post="settings/token/generate" hx-target="#verbindung-form" hx-swap="innerHTML"
             hx-confirm="Neuen Token erzeugen? Der bisherige wird sofort ungültig — die Integration in Home Assistant muss danach mit dem neuen Wert aktualisiert werden.">
-      Neu generieren
+      {{ _("Neu generieren") }}
     </button>
   </div>
   <p class="hint hint-status" id="token-copy-status">&nbsp;</p>
 </div>
-{% if token_saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+{% if token_saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}

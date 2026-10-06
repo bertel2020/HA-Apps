@@ -6,10 +6,10 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.formatting import format_int, format_value
 
-from _paths import TEMPLATES
+from _paths import TEMPLATES, template_text
 
 
-SOURCE = (TEMPLATES / "import.html").read_text(encoding="utf-8")
+SOURCE = template_text("import.html")
 
 
 def test_hint_describes_the_zip_upload_flow_without_bind_mount() -> None:

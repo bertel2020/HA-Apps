@@ -19,7 +19,7 @@ import re
 
 import pytest
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, template_text
 from app.formatting import format_int
 from app.progress import JobBusy, JobProgress
 
@@ -303,7 +303,7 @@ def test_a_button_with_an_indicator_still_shows_that_it_runs() -> None:
     Text und bleibt auch nach der Anfrage stehen). Genau dieser Knopf bekäme
     also nie .htmx-request — und muss trotzdem gezeichnet werden.
     """
-    quelle = (TEMPLATES / "_ha_import_section.html").read_text(encoding="utf-8")
+    quelle = template_text("_ha_import_section.html")
     block = quelle[quelle.index('hx-post="import/ha/availability"'):]
     block = block[: block.index(">")]
     assert 'hx-indicator="#ha-availability-status"' in block
@@ -354,7 +354,7 @@ def test_the_clock_script_is_loaded_where_the_buttons_are() -> None:
     Die Knöpfe stehen über die halbe App verteilt. Das Skript des Vorgängers
     musste jede Seite einzeln einbinden — eine Liste, die mit jeder neuen
     Seite falsch werden konnte."""
-    topnav = (TEMPLATES / "_topnav.html").read_text(encoding="utf-8")
+    topnav = template_text("_topnav.html")
     assert "js/btn-elapsed.js" in topnav
     for seite in TEMPLATES.glob("*.html"):
         if seite.name == "_topnav.html":
@@ -556,7 +556,7 @@ def test_the_header_script_is_loaded_where_the_header_is() -> None:
     """Die Kopfleiste steht auf rund zwanzig Seiten. Das Skript hängt deshalb
     an _topnav.html selbst — wie Alpine — statt an einer Liste von Seiten, die
     sich mit jeder neuen Seite verschöbe."""
-    topnav = (TEMPLATES / "_topnav.html").read_text(encoding="utf-8")
+    topnav = template_text("_topnav.html")
     assert "js/topnav-activity.js" in topnav
     for seite in TEMPLATES.glob("*.html"):
         if seite.name.startswith("_"):

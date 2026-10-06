@@ -27,6 +27,7 @@ from typing import Any
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import Response
 from jinja2 import pass_context
+from markupsafe import Markup
 
 SOURCE_LANGUAGE = "de"
 LANGUAGES = {"de": "Deutsch", "en": "English"}
@@ -72,10 +73,18 @@ def _selected_setting(raw: str | None) -> str:
     return raw if raw in LANGUAGE_CHOICES else DEFAULT_SETTING
 
 
+def translate_html(text: str, lang: str, **values: Any) -> Markup:
+    """Wie ``translate``, für Templates: der Schlüssel ist HTML-Quelltext (``&hellip;``,
+    ``<strong>`` …) und das Ergebnis ein ``Markup`` — Kataloge sind vertrauenswürdig.
+    Eingesetzte Werte werden dagegen maskiert, außer sie sind selbst ``Markup``."""
+    result = Markup(load_catalog(lang)["app"].get(text, text))
+    return result.format(**values) if values else result
+
+
 @pass_context
-def _gettext(context, text: str, **values: Any) -> str:
+def _gettext(context, text: str, **values: Any) -> Markup:
     """Jinja-Funktion ``_()``: Sprache aus dem Seitenkontext (siehe ``make_context_processor``)."""
-    return translate(text, context.get("lang", SOURCE_LANGUAGE), **values)
+    return translate_html(text, context.get("lang", SOURCE_LANGUAGE), **values)
 
 
 def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], dict]:

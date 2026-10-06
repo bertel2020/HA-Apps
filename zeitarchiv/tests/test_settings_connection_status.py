@@ -4,10 +4,10 @@
 import pytest
 from jinja2 import Environment, FileSystemLoader
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, template_text
 
 
-SOURCE = (TEMPLATES / "_settings_verbindung_form.html").read_text(encoding="utf-8")
+SOURCE = template_text("_settings_verbindung_form.html")
 CSS = (APP / "static/css/app.css").read_text(encoding="utf-8")
 
 

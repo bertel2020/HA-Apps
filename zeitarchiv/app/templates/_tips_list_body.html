@@ -6,7 +6,7 @@
    ist (tägliche Rotation, siehe notices.TIP_ROTATION_DAYS). #}
 <div class="tbl-wrap">
   <table class="dt">
-    <thead><tr><th>Tipp</th><th>Kategorie</th><th>Status</th><th data-no-sort></th></tr></thead>
+    <thead><tr><th>{{ _("Tipp") }}</th><th>{{ _("Kategorie") }}</th><th>{{ _("Status") }}</th><th data-no-sort></th></tr></thead>
     <tbody>
     {% for tip in tips_list %}
     <tr>
@@ -22,9 +22,9 @@
       <td>
         {% if tip.is_today %}
         {% if tip.hidden_today %}
-        <button type="button" class="btn btn-sm" hx-post="settings/tips/unhide" hx-target="#tips-list-body" hx-swap="innerHTML">Wieder einblenden</button>
+        <button type="button" class="btn btn-sm" hx-post="settings/tips/unhide" hx-target="#tips-list-body" hx-swap="innerHTML">{{ _("Wieder einblenden") }}</button>
         {% else %}
-        <button type="button" class="btn btn-sm" hx-post="settings/tips/hide" hx-vals='{"slug": "{{ tip.slug }}"}' hx-target="#tips-list-body" hx-swap="innerHTML">Ausblenden</button>
+        <button type="button" class="btn btn-sm" hx-post="settings/tips/hide" hx-vals='{"slug": "{{ tip.slug }}"}' hx-target="#tips-list-body" hx-swap="innerHTML">{{ _("Ausblenden") }}</button>
         {% endif %}
         {% endif %}
       </td>

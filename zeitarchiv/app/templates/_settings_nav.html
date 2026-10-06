@@ -7,13 +7,13 @@
    entfernt, um nicht zwei parallele Navigationsquellen zu pflegen. #}
 {% set prefix = app_root ~ '/' %}
 <nav class="settings-nav">
-  <a href="{{ prefix }}settings#darstellung" {% if nav_active == 'darstellung' %}class="active"{% endif %}>Darstellung</a>
-  <a href="{{ prefix }}settings#archivierung" {% if nav_active == 'archivierung' %}class="active"{% endif %}>Archivierung</a>
-  <a href="{{ prefix }}settings#meldungen" {% if nav_active == 'meldungen' %}class="active"{% endif %}>Meldungen</a>
-  <a href="{{ prefix }}settings#verbindung" {% if nav_active == 'verbindung' %}class="active"{% endif %}>Verbindung</a>
-  <a href="{{ prefix }}settings#diagnose" {% if nav_active == 'diagnose' %}class="active"{% endif %}>Diagnose</a>
+  <a href="{{ prefix }}settings#darstellung" {% if nav_active == 'darstellung' %}class="active"{% endif %}>{{ _("Darstellung") }}</a>
+  <a href="{{ prefix }}settings#archivierung" {% if nav_active == 'archivierung' %}class="active"{% endif %}>{{ _("Archivierung") }}</a>
+  <a href="{{ prefix }}settings#meldungen" {% if nav_active == 'meldungen' %}class="active"{% endif %}>{{ _("Meldungen") }}</a>
+  <a href="{{ prefix }}settings#verbindung" {% if nav_active == 'verbindung' %}class="active"{% endif %}>{{ _("Verbindung") }}</a>
+  <a href="{{ prefix }}settings#diagnose" {% if nav_active == 'diagnose' %}class="active"{% endif %}>{{ _("Diagnose") }}</a>
   {% if demo_state %}
-  <a href="{{ prefix }}settings#demo-daten" id="demo-nav-entry" {% if nav_active == 'demo-daten' %}class="active"{% endif %}>Demo-Daten</a>
+  <a href="{{ prefix }}settings#demo-daten" id="demo-nav-entry" {% if nav_active == 'demo-daten' %}class="active"{% endif %}>{{ _("Demo-Daten") }}</a>
   {% endif %}
-  <a href="{{ prefix }}settings#ueber" {% if nav_active == 'ueber' %}class="active"{% endif %}>Über Zeitarchiv</a>
+  <a href="{{ prefix }}settings#ueber" {% if nav_active == 'ueber' %}class="active"{% endif %}>{{ _("Über Zeitarchiv") }}</a>
 </nav>

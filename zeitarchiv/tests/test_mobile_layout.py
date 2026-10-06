@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from _paths import APP_CSS, APP_JS, TEMPLATES, page_text
+from _paths import APP_CSS, APP_JS, TEMPLATES, page_text, template_text
 
 
 def _media_block(css: str, query: str) -> str:
@@ -252,7 +252,7 @@ def test_the_lead_value_of_a_row_card_can_be_named_by_the_table() -> None:
     auf dem Telefon danach, wann eine Entität zuletzt etwas geliefert hat.
     Deshalb data-card-lead, und deshalb genau dort gesetzt."""
     js = (APP_JS / "table-cards.js").read_text(encoding="utf-8")
-    tabelle = (TEMPLATES / "_entities_table.html").read_text(encoding="utf-8")
+    tabelle = template_text("_entities_table.html")
     assert "table.dataset.cardLead" in js
     # Greift der Name ins Leere, gilt wieder die erste Spalte: ein Tippfehler im
     # Template darf das Einklappen nicht abschalten.

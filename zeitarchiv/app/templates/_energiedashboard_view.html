@@ -1,11 +1,11 @@
 {% if not configured %}
 <div class="edash-title-row">
-  <h1>Energiedashboard</h1>
+  <h1>{{ _("Energiedashboard") }}</h1>
 </div>
-<p class="sub">Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.</p>
+<p class="sub">{{ _("Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.") }}</p>
 <div class="edash-setup-cta">
-  <p>Noch nicht eingerichtet. Ordnet Netzbezug, Erzeuger, Speicher und Verbraucher jeweils einer Entität zu — der Sankey-Fluss entsteht danach automatisch.</p>
-  <button type="button" class="btn" hx-get="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">Rollen zuordnen</button>
+  <p>{{ _("Noch nicht eingerichtet. Ordnet Netzbezug, Erzeuger, Speicher und Verbraucher jeweils einer Entität zu — der Sankey-Fluss entsteht danach automatisch.") }}</p>
+  <button type="button" class="btn" hx-get="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">{{ _("Rollen zuordnen") }}</button>
 </div>
 {% else %}
 {# Vor der ersten Verwendung gesetzt (Auswahlfenster für Erzeugung/Verbrauch
@@ -21,8 +21,8 @@
    erzeugt hatte. #}
 <div x-data="energieFlow()">
   <div class="edash-title-row">
-    <h1>Energiedashboard</h1>
-    <button type="button" class="edash-title-edit" title="Rollen bearbeiten"
+    <h1>{{ _("Energiedashboard") }}</h1>
+    <button type="button" class="edash-title-edit" title="{{ _('Rollen bearbeiten') }}"
             hx-get="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">&#9998;</button>
     {# Rechtsbündige Badge-Gruppe als EIN Flex-Kind (margin-left:auto auf dem
        Container, nicht auf dem ersten Badge) — bleibt so robust, egal welche
@@ -68,25 +68,25 @@
          .edash-quality-badge-text in energiedashboard.html) ausgeblendet wird und
          der Chip dann nur noch aus dem Symbol besteht. #}
       <button type="button" class="edash-quality-badge" :class="{'is-warn': !quality.plausible || anomalien.length > 0}"
-              title="Status" aria-label="Status"
+              title="{{ _('Status') }}" aria-label="{{ _('Status') }}"
               @click="$refs.qualityDialog.showModal()">
         <span x-text="(quality.plausible && !anomalien.length) ? '✓' : '!'"></span>
-        <span class="edash-quality-badge-text">Status</span>
+        <span class="edash-quality-badge-text">{{ _("Status") }}</span>
       </button>
       {% endif %}
     </div>
   </div>
-  <p class="sub">Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.</p>
+  <p class="sub">{{ _("Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.") }}</p>
 
   {% if config.show_bilanz_datenqualitaet %}
   <dialog class="detail-dialog" x-ref="qualityDialog" aria-labelledby="quality-dialog-title"
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="quality-dialog-title">Bilanz, Datenqualität &amp; Auffälligkeiten</h2>
-        <p class="hint">Energiebilanz-Prüfung, Datenqualitäts-Checks und ungewöhnlich hoher Verbrauch für den gewählten Zeitraum.</p>
+        <h2 id="quality-dialog-title">{{ _("Bilanz, Datenqualität &amp; Auffälligkeiten") }}</h2>
+        <p class="hint">{{ _("Energiebilanz-Prüfung, Datenqualitäts-Checks und ungewöhnlich hoher Verbrauch für den gewählten Zeitraum.") }}</p>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
 
     <div class="edash-quality-row" :class="{'is-warn': !bilanzCheck.ok}">
@@ -101,8 +101,8 @@
         <div class="edash-balance-bar-fill" :style="{width: (100 - grundlastShare) + '%'}"></div>
       </div>
       <div class="edash-balance-bar-legend">
-        <span><span class="edash-balance-dot is-tracked"></span>Erfasste Verbraucher <strong x-text="fmt(100 - grundlastShare, 0) + ' %'"></strong></span>
-        <span><span class="edash-balance-dot is-grundlast"></span>Grundlast <strong x-text="fmt(grundlastShare, 0) + ' %'"></strong></span>
+        <span><span class="edash-balance-dot is-tracked"></span>{{ _("Erfasste Verbraucher <strong x-text=\"fmt(100 - grundlastShare, 0) + ' %'\"></strong>") }}</span>
+        <span><span class="edash-balance-dot is-grundlast"></span>{{ _("Grundlast <strong x-text=\"fmt(grundlastShare, 0) + ' %'\"></strong>") }}</span>
       </div>
     </div>
 
@@ -135,7 +135,7 @@
       <div class="edash-quality-icon" x-text="anomalien.length ? '!' : '✓'"></div>
       <div>
         <strong x-text="anomalien.length ? (anomalien.length + ' Auffälligkeit' + (anomalien.length === 1 ? '' : 'en')) : 'Keine Auffälligkeiten'"></strong>
-        <p class="hint hint-status" style="margin:0;" x-show="!anomalien.length">Kein Verbraucher/keine Gruppe deutlich über dem üblichen Schnitt.</p>
+        <p class="hint hint-status" style="margin:0;" x-show="!anomalien.length">{{ _("Kein Verbraucher/keine Gruppe deutlich über dem üblichen Schnitt.") }}</p>
       </div>
     </div>
     <ul class="edash-quality-list" x-show="anomalien.length">
@@ -157,18 +157,18 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="co2-dialog-title">CO2-Bilanz</h2>
-        <p class="hint">CO2-Ausstoß durch Netzbezug und vermiedenes CO2 durch PV-Eigenverbrauch, für den gewählten Zeitraum.</p>
+        <h2 id="co2-dialog-title">{{ _("CO2-Bilanz") }}</h2>
+        <p class="hint">{{ _("CO2-Ausstoß durch Netzbezug und vermiedenes CO2 durch PV-Eigenverbrauch, für den gewählten Zeitraum.") }}</p>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
     <div class="edash-kpi-row">
       <div class="edash-kpi" x-show="kpi.co2_ausstoss != null">
-        <div class="edash-kpi-label">CO2-Ausstoß</div>
+        <div class="edash-kpi-label">{{ _("CO2-Ausstoß") }}</div>
         <div class="edash-kpi-val" x-text="fmt(kpi.co2_ausstoss, 2) + ' kg'"></div>
       </div>
       <div class="edash-kpi" x-show="kpi.co2_vermieden != null">
-        <div class="edash-kpi-label">Vermiedenes CO2</div>
+        <div class="edash-kpi-label">{{ _("Vermiedenes CO2") }}</div>
         <div class="edash-kpi-val" x-text="fmt(kpi.co2_vermieden, 2) + ' kg'"></div>
         <div class="edash-kpi-sub" x-show="co2VermiedenKmText()" x-text="co2VermiedenKmText()"></div>
       </div>
@@ -182,7 +182,7 @@
       <div class="edash-kpi" x-show="co2Bilanz() != null"
            :class="{'is-bilanz-win': co2Bilanz() < 0, 'is-cost': co2Bilanz() >= 0}">
         <div class="edash-kpi-sparkle" x-show="co2Bilanz() < 0">★</div>
-        <div class="edash-kpi-label">Bilanz</div>
+        <div class="edash-kpi-label">{{ _("Bilanz") }}</div>
         <div class="edash-kpi-val" x-text="fmt(co2Bilanz(), 2) + ' kg'"></div>
       </div>
     </div>
@@ -193,8 +193,8 @@
        die eigentlichen Kacheln nicht mehr die volle Breite ausfüllten,
        sondern nur ihre Mindestbreite behielten — sichtbar als Lücke rechts
        neben der dritten Kachel. #}
-    <div class="edash-kpi-win-note" x-show="co2Bilanz() < 0">🌿 Mehr vermieden als verursacht.</div>
-    <p class="hint" style="margin-top:10px;">Vermiedenes CO2 = PV-Eigenverbrauch × CO2-Faktor Netzbezug, also das CO2, das der Netzbezug sonst verursacht hätte. Bilanz = Ausstoß − Vermieden.</p>
+    <div class="edash-kpi-win-note" x-show="co2Bilanz() < 0">{{ _("🌿 Mehr vermieden als verursacht.") }}</div>
+    <p class="hint" style="margin-top:10px;">{{ _("Vermiedenes CO2 = PV-Eigenverbrauch × CO2-Faktor Netzbezug, also das CO2, das der Netzbezug sonst verursacht hätte. Bilanz = Ausstoß − Vermieden.") }}</p>
   </dialog>
   {% endif %}
 
@@ -203,18 +203,18 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="cost-dialog-title">Kostenanalyse</h2>
-        <p class="hint">Netzbezug-Kosten, Einspeisung-Erlös und Saldo für den gewählten Zeitraum.</p>
+        <h2 id="cost-dialog-title">{{ _("Kostenanalyse") }}</h2>
+        <p class="hint">{{ _("Netzbezug-Kosten, Einspeisung-Erlös und Saldo für den gewählten Zeitraum.") }}</p>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
     <div class="edash-kpi-row">
       <div class="edash-kpi" x-show="kpi.netzbezug_cost != null">
-        <div class="edash-kpi-label">Netzbezug Kosten</div>
+        <div class="edash-kpi-label">{{ _("Netzbezug Kosten") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.netzbezug_cost)"></div>
       </div>
       <div class="edash-kpi" x-show="kpi.einspeisung_revenue != null">
-        <div class="edash-kpi-label">Einspeisung Erlös</div>
+        <div class="edash-kpi-label">{{ _("Einspeisung Erlös") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.einspeisung_revenue)"></div>
       </div>
       {# Eigene Kachel statt Einrechnen in "Einspeisung Erlös" — beide sind
@@ -224,11 +224,11 @@
          bleibt sonst null). Anders als "Einsparung" direkt darunter (rein
          rechnerischer Vergleichswert, kein Geldfluss) zählt sie zum Saldo. #}
       <div class="edash-kpi" x-show="kpi.eigenverbrauch_verguetung != null">
-        <div class="edash-kpi-label">EV-Vergütung</div>
+        <div class="edash-kpi-label">{{ _("EV-Vergütung") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.eigenverbrauch_verguetung)"></div>
       </div>
       <div class="edash-kpi" x-show="kpi.vermiedene_kosten != null">
-        <div class="edash-kpi-label">Einsparung</div>
+        <div class="edash-kpi-label">{{ _("Einsparung") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.vermiedene_kosten)"></div>
       </div>
       {# Dieselbe Farb-/Erfolgslogik wie die CO2-Bilanz-Kachel oben — Saldo
@@ -239,7 +239,7 @@
       <div class="edash-kpi" x-show="kpi.net_cost != null"
            :class="{'is-bilanz-win': kpi.net_cost < 0, 'is-cost': kpi.net_cost >= 0}">
         <div class="edash-kpi-sparkle" x-show="kpi.net_cost < 0">★</div>
-        <div class="edash-kpi-label">Saldo</div>
+        <div class="edash-kpi-label">{{ _("Saldo") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.net_cost)"></div>
       </div>
     </div>
@@ -247,7 +247,7 @@
        oben (grid-column:1/-1 verhindert sonst das Kollabieren ungenutzter
        auto-fit-Spalten). #}
     <div class="edash-kpi-win-note" x-show="kpi.net_cost < 0" x-text="costWinText()"></div>
-    <p class="hint" style="margin-top:10px;">Einsparung = PV-Eigenverbrauch × Netzbezug-Preis, rein rechnerisch, fließt nicht ins Saldo ein. Saldo = Kosten Netzbezug − Erlös Einspeisung.</p>
+    <p class="hint" style="margin-top:10px;">{{ _("Einsparung = PV-Eigenverbrauch × Netzbezug-Preis, rein rechnerisch, fließt nicht ins Saldo ein. Saldo = Kosten Netzbezug − Erlös Einspeisung.") }}</p>
   </dialog>
   {% endif %}
 
@@ -264,16 +264,16 @@
         <h2 id="{{ title_id }}">{{ title }}</h2>
         <p class="hint">{{ description }}</p>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
     {# Die Trend-Daten kommen erst beim Öffnen dieses Popups vom Server
        (openTrend() -> /energiedashboard/trends, siehe energiedashboard.js) —
        bis dahin ein Ladehinweis statt des "keine Historie"-Textes, der sonst
        kurz aufblitzen und etwas Falsches behaupten würde. #}
-    <p class="hint hint-status" x-show="trendsLoading">Trend wird geladen …</p>
-    <p class="hint hint-status" x-show="trendsError">Trend konnte nicht geladen werden.</p>
+    <p class="hint hint-status" x-show="trendsLoading">{{ _("Trend wird geladen …") }}</p>
+    <p class="hint hint-status" x-show="trendsError">{{ _("Trend konnte nicht geladen werden.") }}</p>
     <div x-show="trendsLoaded && {{ trend_expr }}.length" style="margin-bottom:16px;">
-      <div class="edash-kpi-label" style="margin-bottom:4px;">Gesamt</div>
+      <div class="edash-kpi-label" style="margin-bottom:4px;">{{ _("Gesamt") }}</div>
       <div x-html="trendOverallSvg({{ trend_expr }})"></div>
     </div>
     <div x-show="trendsLoaded && {{ trend_expr }}.length" style="display:flex;flex-direction:column;gap:12px;">
@@ -290,24 +290,24 @@
   {% endmacro %}
 
   {{ trend_dialog('efficiencyDialog', 'efficiency-dialog-title', 'Wirkungsgrad-Trend',
-     'Entladung ÷ Ladung je Monat (letzte drei Jahre) — zeigt, ob sich der Speicher-Wirkungsgrad über die Zeit verändert (z. B. durch Batterie-Alterung).',
+     _('Entladung ÷ Ladung je Monat (letzte drei Jahre) — zeigt, ob sich der Speicher-Wirkungsgrad über die Zeit verändert (z. B. durch Batterie-Alterung).'),
      'speicherEfficiencyTrend',
-     'Noch nicht genug Historie für einen Trend — braucht mindestens einen vollen Monat mit Lade-/Entladeaktivität.') }}
+     _('Noch nicht genug Historie für einen Trend — braucht mindestens einen vollen Monat mit Lade-/Entladeaktivität.')) }}
 
   {{ trend_dialog('autarkieDialog', 'autarkie-dialog-title', 'Autarkie-Trend',
-     'Anteil des Verbrauchs, der NICHT aus dem Netz kam, je Monat (letzte drei Jahre).',
+     _('Anteil des Verbrauchs, der NICHT aus dem Netz kam, je Monat (letzte drei Jahre).'),
      'autarkieTrend',
-     'Noch nicht genug Historie für einen Trend.') }}
+     _('Noch nicht genug Historie für einen Trend.')) }}
 
   {{ trend_dialog('eigenverbrauchDialog', 'eigenverbrauch-dialog-title', 'Eigenverbrauch-Trend',
-     'Anteil der Erzeugung, der selbst verbraucht (nicht eingespeist) wurde, je Monat (letzte drei Jahre).',
+     _('Anteil der Erzeugung, der selbst verbraucht (nicht eingespeist) wurde, je Monat (letzte drei Jahre).'),
      'eigenverbrauchTrend',
-     'Noch nicht genug Historie für einen Trend.') }}
+     _('Noch nicht genug Historie für einen Trend.')) }}
 
   {{ trend_dialog('socDialog', 'soc-dialog-title', 'Speicher-SOC-Trend',
-     'Ø Ladezustand je Monat (letzte drei Jahre).',
+     _('Ø Ladezustand je Monat (letzte drei Jahre).'),
      'speicherSocTrend',
-     'Noch nicht genug Historie für einen Trend.') }}
+     _('Noch nicht genug Historie für einen Trend.')) }}
 
   {# Auswahlfenster für Erzeugung/Verbrauch/Speicher, wenn mehr als eine
      Ziel-Entität infrage kommt (siehe Kommentar bei .edash-kpi-row unten) —
@@ -323,9 +323,9 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="erzeuger-picker-title">Erzeugung — welche Entität?</h2>
+        <h2 id="erzeuger-picker-title">{{ _("Erzeugung — welche Entität?") }}</h2>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">×</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
     </div>
     <ul class="edash-entity-picker-list">
       {% for erz in erzeuger_list %}
@@ -342,9 +342,9 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="verbraucher-picker-title">Verbrauch — welche Entität?</h2>
+        <h2 id="verbraucher-picker-title">{{ _("Verbrauch — welche Entität?") }}</h2>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">×</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
     </div>
     <ul class="edash-entity-picker-list">
       {% for verbraucher in verbraucher_list %}
@@ -361,9 +361,9 @@
           @click="if ($event.target === $el) $el.close()">
     <div class="detail-dialog-header">
       <div>
-        <h2 id="speicher-picker-title">Speicher — welche Entität?</h2>
+        <h2 id="speicher-picker-title">{{ _("Speicher — welche Entität?") }}</h2>
       </div>
-      <form method="dialog"><button class="btn" aria-label="Dialog schließen">×</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
     </div>
     <ul class="edash-entity-picker-list">
       {% for sp in speicher_link_entities %}
@@ -375,7 +375,7 @@
 
   <div class="edash-card edash-span3 edash-flow-card">
     <div class="edash-card-head">
-      <div class="edash-card-title">Energiefluss</div>
+      <div class="edash-card-title">{{ _("Energiefluss") }}</div>
       <div class="edash-period-controls">
         <div class="edash-period-pills">
           <template x-for="r in ranges" :key="r.key">
@@ -383,9 +383,9 @@
           </template>
         </div>
         <div class="edash-period-nav">
-          <button type="button" @click="goBack()" title="Vorherige Periode">&#8249;</button>
+          <button type="button" @click="goBack()" title="{{ _('Vorherige Periode') }}">&#8249;</button>
           <span class="edash-period-nav-label" x-text="periodText"></span>
-          <button type="button" @click="goForward()" :disabled="!canGoForward" title="Nächste Periode">&#8250;</button>
+          <button type="button" @click="goForward()" :disabled="!canGoForward" title="{{ _('Nächste Periode') }}">&#8250;</button>
         </div>
         {# Energiebericht (ROADMAP.md 1.7): nur bei Monat/Jahr sinnvoll (siehe
            REPORT_RANGE_KEYS in energiedashboard_routes.py) — Stunde/Tag sind
@@ -394,7 +394,7 @@
            einen eigenen "Zurück"-Link (siehe _energiedashboard_report.html). #}
         <a class="edash-report-btn" x-show="range === 'month' || range === 'year'" x-cloak
            :href="'energiedashboard/report?range=' + range + '&offset=' + offset"
-           title="Energiebericht (drucken / als PDF speichern)">
+           title="{{ _('Energiebericht (drucken / als PDF speichern)') }}">
           <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 3v4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 13h7M8.5 16.5h7M8.5 9.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         </a>
       </div>
@@ -410,11 +410,11 @@
     <div class="edash-hero" x-show="kpi.autarkie != null || kpi.co2_vermieden != null || kpi.net_cost != null || kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
       <div class="edash-hero-item" x-show="kpi.autarkie != null">
         <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--chart-1)" stroke-width="2.2"/><path d="M8 12l3 3 5-6" stroke="var(--chart-1)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <strong x-text="ratioText(kpi.autarkie)"></strong><span>Autarkie</span>
+        <strong x-text="ratioText(kpi.autarkie)"></strong><span>{{ _("Autarkie") }}</span>
       </div>
       <div class="edash-hero-item" x-show="kpi.co2_vermieden != null">
         <svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 19c-2-7 2-14 14-14 1 8-4 13-11 13-1 0-2 .3-3 1Z" fill="var(--positive)" opacity=".85"/></svg>
-        <strong x-text="fmt(kpi.co2_vermieden, 1) + ' kg'"></strong><span>CO2 vermieden</span>
+        <strong x-text="fmt(kpi.co2_vermieden, 1) + ' kg'"></strong><span>{{ _("CO2 vermieden") }}</span>
       </div>
       <div class="edash-hero-item" x-show="kpi.net_cost != null">
         <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2.2"/><path d="M14.5 9a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
@@ -429,12 +429,12 @@
            Block, der mobil sauber untereinander bricht. #}
         <span>Prognose:</span>
         <span class="edash-hero-prognose-werte">
-          <span x-show="kpi.prognose_rest_heute != null">noch <strong x-text="fmt(kpi.prognose_rest_heute, 1) + ' kWh'"></strong> heute</span>
+          <span x-show="kpi.prognose_rest_heute != null">{{ _("noch <strong x-text=\"fmt(kpi.prognose_rest_heute, 1) + ' kWh'\"></strong> heute") }}</span>
           {# Der Trennpunkt sitzt in einem eigenen Element, weil er nur in der
              einzeiligen (Desktop-)Darstellung Sinn ergibt — sobald "morgen"
              mobil in die zweite Zeile rutscht, würde er dort als führendes
              Satzzeichen stehen. #}
-          <span class="edash-hero-morgen" x-show="kpi.prognose_morgen != null"><span class="edash-hero-sep">&middot; </span>morgen <strong x-text="fmt(kpi.prognose_morgen, 1) + ' kWh'"></strong></span>
+          <span class="edash-hero-morgen" x-show="kpi.prognose_morgen != null"><span class="edash-hero-sep">&middot; </span>{{ _("morgen <strong x-text=\"fmt(kpi.prognose_morgen, 1) + ' kWh'\"></strong>") }}</span>
         </span>
       </div>
     </div>
@@ -462,7 +462,7 @@
         <div class="edash-kpi-accent" style="background:var(--chart-3);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
-          <div class="edash-kpi-label">Erzeugung</div>
+          <div class="edash-kpi-label">{{ _("Erzeugung") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.erzeugung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('erzeugung')" x-text="deltaText('erzeugung')"></div>
@@ -473,21 +473,21 @@
         <div class="edash-kpi-accent" style="background:var(--chart-1);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
-          <div class="edash-kpi-label">{{ config.netzbezug_name or "Netzbezug" }}</div>
+          <div class="edash-kpi-label">{{ config.netzbezug_name or _("Netzbezug") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
         <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
       </a>
       <a class="edash-kpi has-tooltip{{ ' is-pickable' if verbraucher_list|length > 1 else '' }}"
-         data-tooltip="Gesamtverbrauch im gewählten Zeitraum: erfasste Verbraucher zusammen mit der Grundlast (nicht einzeln gemessene Geräte, rechnerisch aus der Bilanz ermittelt)."
+         data-tooltip="{{ _('Gesamtverbrauch im gewählten Zeitraum: erfasste Verbraucher zusammen mit der Grundlast (nicht einzeln gemessene Geräte, rechnerisch aus der Bilanz ermittelt).') }}"
          {% if single_verbraucher_id %}:href="`{{ app_root }}/entities/{{ single_verbraucher_id }}?range=${range}&offset=${offset}`"
          {% elif verbraucher_list|length > 1 %}@click="$refs.verbraucherPickerDialog.showModal()"
          {% endif %}>
         <div class="edash-kpi-accent" style="background:var(--chart-7);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg></span>
-          <div class="edash-kpi-label">Verbrauch</div>
+          <div class="edash-kpi-label">{{ _("Verbrauch") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.verbrauch, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('verbrauch')" x-text="deltaText('verbrauch')"></div>
@@ -498,7 +498,7 @@
         <div class="edash-kpi-accent" style="background:var(--chart-2);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
-          <div class="edash-kpi-label">{{ config.einspeisung_name or "Einspeisung" }}</div>
+          <div class="edash-kpi-label">{{ config.einspeisung_name or _("Einspeisung") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('einspeisung')" x-text="deltaText('einspeisung')"></div>
@@ -512,7 +512,7 @@
         <div class="edash-kpi-accent" style="background:var(--chart-4);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
-          <div class="edash-kpi-label">Speicher</div>
+          <div class="edash-kpi-label">{{ _("Speicher") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.speicher_netto, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('speicher_netto')" x-text="deltaText('speicher_netto')"></div>
@@ -527,23 +527,22 @@
        Energieerhaltungs-Prüfung/Grundlast, hier rein um Netzbezug vs.
        Einspeisung). #}
     <div class="edash-netbalance" x-show="kpi.netzbezug != null && kpi.einspeisung != null"
-         data-tooltip="Netzenergiebilanz = Netzbezug − Einspeisung. Positiv: mehr bezogen als eingespeist (Netto-Bezug). Negativ: mehr eingespeist als bezogen (Netto-Einspeisung).">
+         data-tooltip="{{ _('Netzenergiebilanz = Netzbezug − Einspeisung. Positiv: mehr bezogen als eingespeist (Netto-Bezug). Negativ: mehr eingespeist als bezogen (Netto-Einspeisung).') }}">
       <div class="edash-netbalance-label">
-        Netzenergiebilanz ·
-        <strong x-text="fmt(kpi.netzbezug, 2) + ' kWh − ' + fmt(kpi.einspeisung, 2) + ' kWh = ' + fmt(netBalanceValue(), 2) + ' kWh'"></strong>
+        {{ _("Netzenergiebilanz · <strong x-text=\"fmt(kpi.netzbezug, 2) + ' kWh − ' + fmt(kpi.einspeisung, 2) + ' kWh = ' + fmt(netBalanceValue(), 2) + ' kWh'\"></strong>") }}
       </div>
       <div class="edash-netbalance-track">
         <div class="edash-netbalance-fill" :class="netBalanceValue() >= 0 ? 'is-import' : 'is-export'" :style="netBalanceFillStyle()"></div>
         <div class="edash-netbalance-divider"></div>
       </div>
       <div class="edash-netbalance-ends">
-        <span>{{ config.einspeisung_name or "Einspeisung" }}</span>
-        <span>{{ config.netzbezug_name or "Bezug" }}</span>
+        <span>{{ config.einspeisung_name or _("Einspeisung") }}</span>
+        <span>{{ config.netzbezug_name or _("Bezug") }}</span>
       </div>
     </div>
 
     <div class="edash-sankey-wrap">
-      <div class="edash-sankey-empty" x-show="!hasFlow && !loading">Für diesen Zeitraum liegen keine Werte &gt; 0 vor.</div>
+      <div class="edash-sankey-empty" x-show="!hasFlow && !loading">{{ _("Für diesen Zeitraum liegen keine Werte &gt; 0 vor.") }}</div>
       <div x-ref="sankeyEl" style="width:100%;height:100%;" x-show="hasFlow || loading"></div>
     </div>
     {# Farblegende: dasselbe .chart-legend/.chart-legend-item-Muster wie die
@@ -574,12 +573,12 @@
     <div class="edash-share-row">
       {% if config.show_versorgungsanteile %}
       <div class="edash-card edash-versorgung-card" x-show="versorgungBreakdown.length">
-        <div class="edash-card-head"><div class="edash-card-title">Versorgungsanteile</div></div>
+        <div class="edash-card-head"><div class="edash-card-title">{{ _("Versorgungsanteile") }}</div></div>
         <div class="edash-share-wrap edash-share-wrap-stacked">
           <div class="edash-share-donut" x-ref="versorgungChartEl"></div>
           <div class="tbl-wrap">
             <table class="dt edash-share-table">
-              <thead><tr><th>Quelle</th><th>kWh</th><th>Anteil</th></tr></thead>
+              <thead><tr><th>{{ _("Quelle") }}</th><th>{{ _("kWh") }}</th><th>{{ _("Anteil") }}</th></tr></thead>
               <tbody>
                 <template x-for="(item, idx) in versorgungBreakdown" :key="item.name">
                   <tr @mouseenter="highlightVersorgung(item.name)" @mouseleave="unhighlightVersorgung(item.name)">
@@ -593,7 +592,7 @@
                   </tr>
                 </template>
               </tbody>
-              <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong x-text="fmt(versorgungTotal(), 1)"></strong></td><td><strong>100 %</strong></td></tr></tfoot>
+              <tfoot><tr><td class="label"><strong>{{ _("Gesamt") }}</strong></td><td><strong x-text="fmt(versorgungTotal(), 1)"></strong></td><td><strong>100 %</strong></td></tr></tfoot>
             </table>
           </div>
         </div>
@@ -602,12 +601,12 @@
 
       {% if config.show_verbraucheranteile %}
       <div class="edash-card edash-verbraucher-card" x-show="verbraucherBreakdown.length">
-        <div class="edash-card-head"><div class="edash-card-title">Verbraucheranteile</div></div>
+        <div class="edash-card-head"><div class="edash-card-title">{{ _("Verbraucheranteile") }}</div></div>
         <div class="edash-share-wrap">
           <div class="edash-share-donut" x-ref="shareChartEl"></div>
           <div class="tbl-wrap">
             <table class="dt edash-share-table">
-              <thead><tr><th>Verbraucher</th><th>kWh</th><th>Anteil</th><th x-show="verbraucherHasKosten">Kosten</th></tr></thead>
+              <thead><tr><th>{{ _("Verbraucher") }}</th><th>{{ _("kWh") }}</th><th>{{ _("Anteil") }}</th><th x-show="verbraucherHasKosten">{{ _("Kosten") }}</th></tr></thead>
               <tbody>
                 <template x-for="(item, idx) in visibleVerbraucherBreakdown()" :key="item.name">
                   <tr @mouseenter="highlightShare(item.name)" @mouseleave="unhighlightShare(item.name)">
@@ -628,7 +627,7 @@
                   </td>
                 </tr>
               </tbody>
-              <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong x-text="fmt(kpi.verbrauch, 1)"></strong></td><td><strong>100 %</strong></td><td x-show="verbraucherHasKosten"><strong x-text="fmtCurrency(verbraucherKostenTotal())"></strong></td></tr></tfoot>
+              <tfoot><tr><td class="label"><strong>{{ _("Gesamt") }}</strong></td><td><strong x-text="fmt(kpi.verbrauch, 1)"></strong></td><td><strong>100 %</strong></td><td x-show="verbraucherHasKosten"><strong x-text="fmtCurrency(verbraucherKostenTotal())"></strong></td></tr></tfoot>
             </table>
           </div>
         </div>
@@ -640,20 +639,19 @@
     {% if config.show_autarkie %}
     <div class="edash-card edash-ring-card">
       <div class="edash-card-head">
-        <div class="edash-card-title">Autarkie &amp; Speicher</div>
+        <div class="edash-card-title">{{ _("Autarkie &amp; Speicher") }}</div>
         {# Unabhängig von Tag/Monat/Jahr — der Speicher-SOC-Ring darunter
            zeigt den Ø-Wert ÜBER DIE PERIODE, was bei Monat/Jahr deutlich
            vom tatsächlichen Füllstand gerade eben abweichen kann. #}
         <div class="edash-soc-now has-tooltip tooltip-lines" x-show="kpi.speicher_soc_now != null"
              :data-tooltip="socNowTooltipText()">
-          <span class="edash-soc-now-dot"></span>Jetzt
-          <strong x-text="fmt(kpi.speicher_soc_now, 0) + ' %'"></strong>
+          <span class="edash-soc-now-dot"></span>{{ _("Jetzt <strong x-text=\"fmt(kpi.speicher_soc_now, 0) + ' %'\"></strong>") }}
           <span x-show="kpi.speicher_soc_now_kwh != null" x-text="'(' + fmt(kpi.speicher_soc_now_kwh, 1) + ' kWh)'"></span>
         </div>
       </div>
       <div class="edash-ring-panel">
         <div class="edash-ring-item edash-ring-clickable"
-             @click="openTrend($refs.autarkieDialog)" title="Autarkie-Trend anzeigen">
+             @click="openTrend($refs.autarkieDialog)" title="{{ _('Autarkie-Trend anzeigen') }}">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-autarkie" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -665,11 +663,11 @@
             <circle cx="50" cy="50" r="42" fill="none" stroke="url(#edash-grad-autarkie)" stroke-width="10" stroke-linecap="round"
                     stroke-dasharray="263.894" :stroke-dashoffset="ringOffset(kpi.autarkie)" transform="rotate(-90 50 50)"/>
             <text x="50" y="45" text-anchor="middle" class="edash-ring-num" x-text="ratioText(kpi.autarkie)"></text>
-            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">Autarkie</text>
+            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">{{ _("Autarkie") }}</text>
           </svg>
         </div>
         <div class="edash-ring-item edash-ring-clickable"
-             @click="openTrend($refs.eigenverbrauchDialog)" title="Eigenverbrauch-Trend anzeigen">
+             @click="openTrend($refs.eigenverbrauchDialog)" title="{{ _('Eigenverbrauch-Trend anzeigen') }}">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-eigenverbrauch" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -681,11 +679,11 @@
             <circle cx="50" cy="50" r="42" fill="none" stroke="url(#edash-grad-eigenverbrauch)" stroke-width="10" stroke-linecap="round"
                     stroke-dasharray="263.894" :stroke-dashoffset="ringOffset(kpi.eigenverbrauch)" transform="rotate(-90 50 50)"/>
             <text x="50" y="45" text-anchor="middle" class="edash-ring-num" x-text="ratioText(kpi.eigenverbrauch)"></text>
-            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">Eigenverbrauch</text>
+            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">{{ _("Eigenverbrauch") }}</text>
           </svg>
         </div>
         <div class="edash-ring-item edash-ring-clickable" x-show="kpi.speicher_soc != null"
-             @click="openTrend($refs.socDialog)" title="Speicher-SOC-Trend anzeigen">
+             @click="openTrend($refs.socDialog)" title="{{ _('Speicher-SOC-Trend anzeigen') }}">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-soc" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -697,11 +695,11 @@
             <circle cx="50" cy="50" r="42" fill="none" stroke="url(#edash-grad-soc)" stroke-width="10" stroke-linecap="round"
                     stroke-dasharray="263.894" :stroke-dashoffset="ringOffset(kpi.speicher_soc)" transform="rotate(-90 50 50)"/>
             <text x="50" y="45" text-anchor="middle" class="edash-ring-num" x-text="ratioText(kpi.speicher_soc)"></text>
-            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">Speicher SOC</text>
+            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">{{ _("Speicher SOC") }}</text>
           </svg>
         </div>
         <div class="edash-ring-item edash-ring-clickable" x-show="kpi.speicher_efficiency != null"
-             @click="openTrend($refs.efficiencyDialog)" title="Wirkungsgrad-Trend anzeigen">
+             @click="openTrend($refs.efficiencyDialog)" title="{{ _('Wirkungsgrad-Trend anzeigen') }}">
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-effizienz" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -713,7 +711,7 @@
             <circle cx="50" cy="50" r="42" fill="none" stroke="url(#edash-grad-effizienz)" stroke-width="10" stroke-linecap="round"
                     stroke-dasharray="263.894" :stroke-dashoffset="ringOffset(kpi.speicher_efficiency)" transform="rotate(-90 50 50)"/>
             <text x="50" y="45" text-anchor="middle" class="edash-ring-num" x-text="ratioText(kpi.speicher_efficiency)"></text>
-            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">Wirkungsgrad</text>
+            <text x="50" y="60" text-anchor="middle" class="edash-ring-sub">{{ _("Wirkungsgrad") }}</text>
           </svg>
         </div>
       </div>
@@ -722,7 +720,7 @@
 
     {% if config.show_tageslastprofil %}
     <div class="edash-card edash-span3 edash-tageslast-card" x-show="heatmap.rows && heatmap.rows.length">
-      <div class="edash-card-head"><div class="edash-card-title">Tageslastprofil<span class="n" x-text="heatmapNote()"></span></div></div>
+      <div class="edash-card-head"><div class="edash-card-title">{{ _("Tageslastprofil") }}<span class="n" x-text="heatmapNote()"></span></div></div>
       <div class="edash-heatmap-wrap" x-ref="heatmapEl"></div>
     </div>
     {% endif %}

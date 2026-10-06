@@ -1,7 +1,7 @@
 <div class="settings-compact-list">
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Auflösung</div>
+      <div class="settings-compact-label">{{ _("Standard-Auflösung") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-resolution-btn" onclick="toggleDDPicker('default-resolution')">{% for k, l in resolution_options %}{% if k == default_resolution %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -16,7 +16,7 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Aufbewahrung</div>
+      <div class="settings-compact-label">{{ _("Standard-Aufbewahrung") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-retention-btn" onclick="toggleDDPicker('default-retention')">{% for k, l in retention_options %}{% if k == default_retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -31,7 +31,7 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Verdichtungsziel</div>
+      <div class="settings-compact-label">{{ _("Standard-Verdichtungsziel") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-compact-target-btn" onclick="toggleDDPicker('default-compact-target')">{% for k, l in compact_target_options %}{% if k == default_compact_target %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -46,7 +46,7 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Nachkommastellen</div>
+      <div class="settings-compact-label">{{ _("Standard-Nachkommastellen") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-decimals-btn" onclick="toggleDDPicker('default-decimals')">{% for k, l in decimals_options %}{% if k == default_decimals %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -61,7 +61,7 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Wertänderungsfilter</div>
+      <div class="settings-compact-label">{{ _("Standard-Wertänderungsfilter") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-value-filter-btn" onclick="toggleDDPicker('default-value-filter')">{% for k, l in value_filter_options %}{% if k == default_value_filter %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -76,7 +76,7 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Lücken-Erkennung</div>
+      <div class="settings-compact-label">{{ _("Standard-Lücken-Erkennung") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-gap-threshold-btn" onclick="toggleDDPicker('default-gap-threshold')">{% for k, l in gap_threshold_options %}{% if k == default_gap_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -91,7 +91,7 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Standard-Ausreißer-Erkennung</div>
+      <div class="settings-compact-label">{{ _("Standard-Ausreißer-Erkennung") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="default-outlier-threshold-btn" onclick="toggleDDPicker('default-outlier-threshold')">{% for k, l in outlier_threshold_options %}{% if k == default_outlier_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -105,7 +105,7 @@
     </span>
   </div>
 </div>
-{% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+{% if saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}
 {% if gap_threshold_auto_adjusted %}
 <script>
   appAlert({{ gap_threshold_auto_adjusted_message | tojson }});

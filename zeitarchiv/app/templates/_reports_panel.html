@@ -47,36 +47,36 @@
   @media(max-width:900px){.report-cards{grid-template-columns:repeat(2,1fr)}}
 </style>
 <div class="report-cards">
-  <div class="report-card"><strong>{{ total_reports }}</strong><span>Gesamt</span></div>
-  <div class="report-card"><strong>{{ counts.success }}</strong><span>Erfolgreich</span></div>
-  <div class="report-card"><strong>{{ counts.partial }}</strong><span>Teilweise</span></div>
-  <div class="report-card"><strong>{{ counts.no_changes }}</strong><span>Ohne Änderungen</span></div>
-  <div class="report-card"><strong>{{ counts.failed }}</strong><span>Fehlgeschlagen</span></div>
+  <div class="report-card"><strong>{{ total_reports }}</strong><span>{{ _("Gesamt") }}</span></div>
+  <div class="report-card"><strong>{{ counts.success }}</strong><span>{{ _("Erfolgreich") }}</span></div>
+  <div class="report-card"><strong>{{ counts.partial }}</strong><span>{{ _("Teilweise") }}</span></div>
+  <div class="report-card"><strong>{{ counts.no_changes }}</strong><span>{{ _("Ohne Änderungen") }}</span></div>
+  <div class="report-card"><strong>{{ counts.failed }}</strong><span>{{ _("Fehlgeschlagen") }}</span></div>
 </div>
 <div class="report-toolbar">
   <form class="report-filter" id="report-filter" method="get" action="import">
     <input type="hidden" name="tab" value="reports">
     <input type="hidden" name="page" id="report-page" value="1">
     <div class="field">
-      <label>Quelle</label>
+      <label>{{ _("Quelle") }}</label>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': 'Alle Quellen', 'symcon': 'Symcon', 'csv': 'CSV', 'ha': 'Home Assistant'}[source] }} ▾</button>
+        <button type="button" class="btn" id="report-source-btn" onclick="toggleDDPicker('report-source')">{{ {'all': _('Alle Quellen'), 'symcon': _('Symcon'), 'csv': _('CSV'), 'ha': _('Home Assistant')}[source] }} ▾</button>
         <input type="hidden" name="source" form="report-filter" id="report-source-input" value="{{ source }}">
         <div class="dd-picker-popover" id="report-source-popover">
-          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'all', 'Alle Quellen'); resetReportsPage();">Alle Quellen</div>
-          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'symcon', 'Symcon'); resetReportsPage();">Symcon</div>
-          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'csv', 'CSV'); resetReportsPage();">CSV</div>
-          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'ha', 'Home Assistant'); resetReportsPage();">Home Assistant</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'all', 'Alle Quellen'); resetReportsPage();">{{ _("Alle Quellen") }}</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'symcon', 'Symcon'); resetReportsPage();">{{ _("Symcon") }}</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'csv', 'CSV'); resetReportsPage();">{{ _("CSV") }}</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-source', 'ha', 'Home Assistant'); resetReportsPage();">{{ _("Home Assistant") }}</div>
         </div>
       </span>
     </div>
     <div class="field">
-      <label>Status</label>
+      <label>{{ _("Status") }}</label>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="report-status-btn" onclick="toggleDDPicker('report-status')">{{ 'Alle Status' if status == 'all' else status_options.get(status, 'Alle Status') }} ▾</button>
+        <button type="button" class="btn" id="report-status-btn" onclick="toggleDDPicker('report-status')">{{ _('Alle Status') if status == 'all' else status_options.get(status, _('Alle Status')) }} ▾</button>
         <input type="hidden" name="status" form="report-filter" id="report-status-input" value="{{ status }}">
         <div class="dd-picker-popover" id="report-status-popover">
-          <div class="dd-picker-row" onclick="selectDDOption('report-status', 'all', 'Alle Status'); resetReportsPage();">Alle Status</div>
+          <div class="dd-picker-row" onclick="selectDDOption('report-status', 'all', 'Alle Status'); resetReportsPage();">{{ _("Alle Status") }}</div>
           {% for value, label in status_options.items() %}
           <div class="dd-picker-row" onclick="selectDDOption('report-status', '{{ value }}', '{{ label }}'); resetReportsPage();">{{ label }}</div>
           {% endfor %}
@@ -85,7 +85,7 @@
     </div>
   </form>
   <form class="report-delete-form" method="post" action="reports/delete-all" onsubmit="confirmReportsDelete(event, this)">
-    <button class="btn btn-danger" type="submit" {% if not total_reports %}disabled{% endif %}>Alle Reports löschen</button>
+    <button class="btn btn-danger" type="submit" {% if not total_reports %}disabled{% endif %}>{{ _("Alle Reports löschen") }}</button>
   </form>
 </div>
 {% if reports %}
@@ -97,17 +97,17 @@
 </tr>
 {% for report in reports %}<tr class="report-row" onclick="location.href='reports/{{ report.id }}'"><td class="mono nowrap">{{ report.finished_label }}</td><td>{{ report.source_label }}</td><td><span class="report-status report-status-{{ report.status }}">{{ report.status_label }}</span></td><td>{{ report.summary_label.targets }}</td><td>{{ report.rows_written_label }}</td><td>{{ report.rows_skipped_label }}</td><td>{{ report.duration_label }} s</td></tr>{% endfor %}
 </table></div>
-{% else %}<p class="report-empty">Keine passenden Import-Reports vorhanden.</p>{% endif %}
+{% else %}<p class="report-empty">{{ _("Keine passenden Import-Reports vorhanden.") }}</p>{% endif %}
 <div class="pager" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
-    <button type="button" class="btn navbtn" onclick="jumpReportsPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
+    <button type="button" class="btn navbtn" onclick="jumpReportsPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="{{ _('Erste Seite') }}">«</button>
     <button type="button" class="btn navbtn" onclick="stepReportsPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToReportsPage(this)"> / {{ pagination.total_pages }}</span>
+    <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToReportsPage(this)"> / {{ pagination.total_pages }}</span>
     <button type="button" class="btn navbtn" onclick="stepReportsPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
-    <button type="button" class="btn navbtn" onclick="jumpReportsPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+    <button type="button" class="btn navbtn" onclick="jumpReportsPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="{{ _('Letzte Seite') }}">»</button>
   </div>
-  <select name="page_size" form="report-filter" onchange="resetReportsPage()" title="Zeilen pro Seite">
-    {% for size in [10, 20, 50, 100, 500, 1000] %}<option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>{% endfor %}
+  <select name="page_size" form="report-filter" onchange="resetReportsPage()" title="{{ _('Zeilen pro Seite') }}">
+    {% for size in [10, 20, 50, 100, 500, 1000] %}<option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>{% endfor %}
   </select>
 </div>

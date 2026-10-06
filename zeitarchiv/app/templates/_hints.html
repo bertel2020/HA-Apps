@@ -41,7 +41,7 @@
    Geklappt wird von static/js/hint-toggle.js, das die Seite einbinden muss. #}
 
 {% macro hint_button(feld) -%}
-<button type="button" class="hint-toggle" aria-expanded="false" aria-label="Hinweis zu {{ feld }}">i</button>
+<button type="button" class="hint-toggle" aria-expanded="false" aria-label="{{ _('Hinweis zu {feld}', feld=feld) }}">i</button>
 {%- endmacro %}
 
 {% macro hint_body(klasse='hint') -%}

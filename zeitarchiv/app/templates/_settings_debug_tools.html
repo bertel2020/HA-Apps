@@ -1,44 +1,44 @@
 <div id="debug-tools" {% if capture_armed or trace_entity_id %}hx-get="settings/logging/debug" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
 
   <div class="settings-subsection">
-    <h3 class="settings-subsection-title">Nächsten Schreibvorgang aufzeichnen</h3>
-    <p class="hint hint-warn">Zeichnet einmalig den nächsten Schreibvorgang auf (ohne API-Token), dann automatisch aus. Enthält sensible Entitäts-IDs und Rohwerte, wird nach spätestens 60 Minuten gelöscht.</p>
+    <h3 class="settings-subsection-title">{{ _("Nächsten Schreibvorgang aufzeichnen") }}</h3>
+    <p class="hint hint-warn">{{ _("Zeichnet einmalig den nächsten Schreibvorgang auf (ohne API-Token), dann automatisch aus. Enthält sensible Entitäts-IDs und Rohwerte, wird nach spätestens 60 Minuten gelöscht.") }}</p>
     {% if capture_armed %}
-    <p class="save-status">⏳ Wartet auf den nächsten Schreibvorgang …</p>
+    <p class="save-status">{{ _("⏳ Wartet auf den nächsten Schreibvorgang …") }}</p>
     <div style="display:flex;justify-content:flex-end;">
-      <button type="button" class="btn btn-danger" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Abbrechen</button>
+      <button type="button" class="btn btn-danger" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">{{ _("Abbrechen") }}</button>
     </div>
     {% elif capture_payload_json %}
-    <p class="hint hint-status" style="margin:0 0 10px;">Aufgezeichnet um {{ capture_captured_at }} &middot; {{ capture_event_count }} Event(s) &middot; automatische Löschung in {{ capture_expires_in_minutes }} Minute(n)</p>
+    <p class="hint hint-status" style="margin:0 0 10px;">{{ _("Aufgezeichnet um {capture_captured_at} &middot; {capture_event_count} Event(s) &middot; automatische Löschung in {capture_expires_in_minutes} Minute(n)", capture_captured_at=capture_captured_at, capture_event_count=capture_event_count, capture_expires_in_minutes=capture_expires_in_minutes) }}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;justify-content:flex-end;">
-      <a class="btn" href="settings/logging/capture-write/download">Herunterladen</a>
-      <button type="button" class="btn" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">Löschen</button>
+      <a class="btn" href="settings/logging/capture-write/download">{{ _("Herunterladen") }}</a>
+      <button type="button" class="btn" hx-post="settings/logging/capture-write/clear" hx-target="#debug-tools" hx-swap="outerHTML">{{ _("Löschen") }}</button>
     </div>
     <details>
-      <summary class="hint" style="cursor:pointer;display:inline;">Vorschau anzeigen</summary>
+      <summary class="hint" style="cursor:pointer;display:inline;">{{ _("Vorschau anzeigen") }}</summary>
       <pre style="margin-top:8px;max-height:280px;overflow:auto;background:var(--surface-alt);border:1px solid var(--border);padding:12px;border-radius:8px;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));white-space:pre-wrap;word-break:break-word;">{{ capture_payload_json }}</pre>
     </details>
     {% else %}
     <div style="display:flex;justify-content:flex-end;">
-      <button type="button" class="btn" hx-post="settings/logging/capture-write/arm" hx-target="#debug-tools" hx-swap="outerHTML">Nächsten Schreibvorgang aufzeichnen</button>
+      <button type="button" class="btn" hx-post="settings/logging/capture-write/arm" hx-target="#debug-tools" hx-swap="outerHTML">{{ _("Nächsten Schreibvorgang aufzeichnen") }}</button>
     </div>
     {% endif %}
   </div>
 
   <div class="settings-subsection">
-    <h3 class="settings-subsection-title">Entität verfolgen</h3>
-    <p class="hint hint-warn">Protokolliert 15 Minuten lang Werte und Ingest-Ergebnisse einer Entität, dann automatisch aus. Die Rohwerte bleiben entsprechend der Supervisor-Aufbewahrung im Protokoll.</p>
+    <h3 class="settings-subsection-title">{{ _("Entität verfolgen") }}</h3>
+    <p class="hint hint-warn">{{ _("Protokolliert 15 Minuten lang Werte und Ingest-Ergebnisse einer Entität, dann automatisch aus. Die Rohwerte bleiben entsprechend der Supervisor-Aufbewahrung im Protokoll.") }}</p>
     {% if trace_entity_id %}
-    <p class="save-status">🔴 Verfolgt <code>{{ trace_entity_id }}</code> &middot; noch {{ trace_expires_in_minutes }} Minute(n)</p>
+    <p class="save-status">{{ _("🔴 Verfolgt <code>{trace_entity_id}</code> &middot; noch {trace_expires_in_minutes} Minute(n)", trace_entity_id=trace_entity_id, trace_expires_in_minutes=trace_expires_in_minutes) }}</p>
     <div style="display:flex;justify-content:flex-end;">
-      <button type="button" class="btn btn-danger" hx-post="settings/logging/trace/stop" hx-target="#debug-tools" hx-swap="outerHTML">Trace beenden</button>
+      <button type="button" class="btn btn-danger" hx-post="settings/logging/trace/stop" hx-target="#debug-tools" hx-swap="outerHTML">{{ _("Trace beenden") }}</button>
     </div>
     {% else %}
     <form hx-post="settings/logging/trace/start" hx-target="#debug-tools" hx-swap="outerHTML"
           style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;"
           x-data='entityPicker({{ entity_options | tojson }}, "")'>
       <div class="field" style="margin:0;">
-        <label>Entität</label>
+        <label>{{ _("Entität") }}</label>
         <span class="dd-picker-wrap" style="display:block;width:250px;" @click.outside="open = false">
           <button type="button" class="btn" style="width:100%;text-align:left;"
                   :class="{'dd-picker-btn-clearable': entityId}"
@@ -46,16 +46,16 @@
                   @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
                   x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
           <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
-                  @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+                  @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
           <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="width:100%;max-height:280px;overflow-y:auto;">
-            <input type="search" class="dd-picker-popover-search" x-ref="tracePickerSearch" x-model="search" placeholder="Suchen …">
+            <input type="search" class="dd-picker-popover-search" x-ref="tracePickerSearch" x-model="search" placeholder="{{ _('Suchen …') }}">
             <template x-for="opt in filtered()" :key="opt.entity_id">
               <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
                    @click="select(opt.entity_id)"
                    @mouseenter="scheduleHover(opt, $event.currentTarget)"
                    @mouseleave="clearHover()">
                 <span x-text="opt.label"></span>
-                <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+                <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="{{ _('App-eigener Anzeigename') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
               </div>
             </template>
           </div>
@@ -69,7 +69,7 @@
           </div>
         </template>
       </div>
-      <button type="submit" class="btn" style="margin-left:auto;" :disabled="!entityId">Verfolgen starten (15 Min.)</button>
+      <button type="submit" class="btn" style="margin-left:auto;" :disabled="!entityId">{{ _("Verfolgen starten (15 Min.)") }}</button>
     </form>
     {% endif %}
   </div>

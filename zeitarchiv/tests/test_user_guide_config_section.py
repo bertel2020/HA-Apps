@@ -12,7 +12,7 @@ still, wenn jemand eine Stufe ergänzt oder einen Grenzwert ändert.
 
 from __future__ import annotations
 
-from _paths import DOCS, TEMPLATES
+from _paths import DOCS, template_text
 from app.formatting import (
     GAP_THRESHOLD_LABELS,
     OUTLIER_THRESHOLD_LABELS,
@@ -37,7 +37,7 @@ FLACH = " ".join(ABSCHNITT.split())
 def test_every_field_of_the_form_has_its_own_section() -> None:
     """Acht Felder, acht Überschriften — ein neu hinzugefügtes Feld soll nicht
     unbeschrieben bleiben."""
-    formular = (TEMPLATES / "_entity_config_form.html").read_text(encoding="utf-8")
+    formular = template_text("_entity_config_form.html")
     felder = {
         zeile.split("<label>")[1].split(" {{")[0].split("</label>")[0].strip()
         for zeile in formular.splitlines()

@@ -8,12 +8,12 @@ restlichen drei Dashboard-Karten)."""
 from __future__ import annotations
 
 
-from _paths import APP, page_text
+from _paths import APP, page_text, template_text
 
 
 
 JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
-VIEW = (APP / "templates/_energiedashboard_view.html").read_text(encoding="utf-8")
+VIEW = template_text("_energiedashboard_view.html")
 DASHBOARD_HTML = page_text("energiedashboard.html")
 REPORT = page_text("_energiedashboard_report.html")
 

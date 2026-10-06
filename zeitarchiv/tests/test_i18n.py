@@ -11,7 +11,7 @@ from _paths import APP
 from app import i18n
 
 CATALOG = json.loads((APP / "i18n" / "en.json").read_text(encoding="utf-8"))
-TEMPLATE_CALL = re.compile(r"""\b_\(\s*(?P<q>['"])(?P<text>.+?)(?P=q)\s*[,)]""")
+TEMPLATE_CALL = re.compile(r"""\b_\(\s*(?P<q>['"])(?P<text>(?:\\.|(?!(?P=q)).)*)(?P=q)""", re.S)
 SCRIPT_CALL = re.compile(r"""(?<![\w.$])t\(\s*(?P<q>['"])(?P<text>.+?)(?P=q)\s*[,)]""")
 
 
@@ -19,7 +19,7 @@ def _literals(folder: str, suffixes: tuple[str, ...], pattern: re.Pattern[str]) 
     found: set[str] = set()
     for path in (APP / folder).rglob("*"):
         if path.suffix in suffixes and "vendor" not in path.parts:
-            found.update(m.group("text") for m in pattern.finditer(path.read_text(encoding="utf-8")))
+            found.update(re.sub(r"\\(.)", r"\1", m.group("text")) for m in pattern.finditer(path.read_text(encoding="utf-8")))
     return found
 
 
@@ -60,7 +60,7 @@ def test_every_text_marked_for_translation_has_an_english_entry() -> None:
 
 def test_catalog_has_no_dead_entries() -> None:
     quellen = "\n".join(
-        path.read_text(encoding="utf-8")
+        path.read_text(encoding="utf-8").replace('\\"', '"').replace("\\'", "'")
         for path in APP.rglob("*")
         if path.suffix in {".html", ".js", ".py"} and "vendor" not in path.parts
     )

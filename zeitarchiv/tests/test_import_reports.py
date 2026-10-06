@@ -10,7 +10,7 @@ from pathlib import Path
 
 from app.storage import import_reports
 
-from _paths import TEMPLATES
+from _paths import template_text
 
 
 
@@ -103,7 +103,7 @@ def test_invalid_report_ids_cannot_escape_report_directory() -> None:
 
 
 def test_ha_report_detail_reflects_current_full_import_fields() -> None:
-    source = (TEMPLATES / "report_detail.html").read_text(encoding="utf-8")
+    source = template_text("report_detail.html")
 
     assert "'full': 'Vollimport'" in source
     assert "Statistikzeitraum" in source

@@ -1,34 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Entitäten{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Entitäten") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/entities_list.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Entitäten</h1>
-    <p class="sub">Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.</p>
+    <h1>{{ _("Entitäten") }}</h1>
+    <p class="sub">{{ _("Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.") }}</p>
 
     <div class="settings-panel">
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">
-          <input type="search" name="search" placeholder="Entität suchen …" onchange="resetEntitiesPage()">
-          <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>★ Nur Favoriten</span></label>
+          <input type="search" name="search" placeholder="{{ _('Entität suchen …') }}" onchange="resetEntitiesPage()">
+          <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>{{ _("★ Nur Favoriten") }}</span></label>
           <span id="type-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'type' in visible_columns else 'none' }};">
-            <button type="button" class="btn" id="type-filter-btn" onclick="toggleDDPicker('type-filter')">Typ: Alle ▾</button>
+            <button type="button" class="btn" id="type-filter-btn" onclick="toggleDDPicker('type-filter')">{{ _("Typ: Alle ▾") }}</button>
             <div class="dd-picker-popover" id="type-filter-popover">
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="all" checked onchange="onTypeAllChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Alle</span></label>
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Standard</span></label>
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Zähler</span></label>
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>Schalter</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="all" checked onchange="onTypeAllChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Alle") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Standard") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Zähler") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Schalter") }}</span></label>
             </div>
           </span>
           <span id="unit-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">
-            <button type="button" class="btn" id="unit-filter-btn" onclick="toggleDDPicker('unit-filter')">Einheit: Alle ▾</button>
+            <button type="button" class="btn" id="unit-filter-btn" onclick="toggleDDPicker('unit-filter')">{{ _("Einheit: Alle ▾") }}</button>
             <input type="hidden" name="unit" id="unit-filter-input" value="all">
             <div class="dd-picker-popover" id="unit-filter-popover">
-              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', 'Alle'); resetEntitiesPage();">Alle Einheiten</div>
+              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', 'Alle'); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
               {% for opt in unit_options %}
               <div class="dd-picker-row" onclick="selectDDOption('unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetEntitiesPage();">{{ opt.label }}</div>
               {% endfor %}
@@ -45,7 +45,7 @@
                zurücksetzen, siehe Kommentar bei der Route in main.py. -->
           <input type="hidden" name="columns_submitted" value="1">
           <div class="dd-picker-wrap">
-            <button type="button" class="btn" onclick="toggleDDPicker('col-picker')">Spalten ▾</button>
+            <button type="button" class="btn" onclick="toggleDDPicker('col-picker')">{{ _("Spalten ▾") }}</button>
             <div class="dd-picker-popover" id="col-picker-popover">
               {% for key, label in column_options %}
               <label class="dd-picker-row">

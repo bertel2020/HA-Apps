@@ -5,11 +5,11 @@
 {% if entities %}
 <div class="tbl-wrap">
   <table class="dt" data-sortable style="min-width:680px;">
-    <thead><tr><th>Entität</th><th>Markierungen</th><th>Zuletzt markiert</th></tr></thead>
+    <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Markierungen") }}</th><th>{{ _("Zuletzt markiert") }}</th></tr></thead>
     <tbody>
     {% for row in entities %}
       <tr class="job-row-nav" tabindex="0" role="button"
-          aria-label="Markierungen von {{ row.friendly_name or row.entity_id }} anzeigen"
+          aria-label="{{ _('Markierungen von {v1} anzeigen', v1=(row.friendly_name or row.entity_id)) }}"
           hx-get="settings/purge/marked/{{ row.entity_id }}" hx-target="#marked-points-list" hx-swap="innerHTML"
           hx-trigger="click, keyup[key=='Enter' || key==' ']">
         <td data-sort="{{ row.friendly_name or row.entity_id }}">
@@ -24,22 +24,22 @@
   </table>
 </div>
 {% else %}
-<div class="empty">Keine passenden markierten Entitäten gefunden.</div>
+<div class="empty">{{ _("Keine passenden markierten Entitäten gefunden.") }}</div>
 {% endif %}
 
 {% if pagination.total %}
 <div class="pager" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
     <button class="btn navbtn" type="button"
             hx-get="settings/purge/marked" hx-vals='{"page": 1}'
             hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
-            {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+            {% if pagination.page <= 1 %}disabled{% endif %} title="{{ _('Erste Seite') }}">«</button>
     <button class="btn navbtn" type="button"
             hx-get="settings/purge/marked" hx-vals='{"page": {{ pagination.page - 1 }}}'
             hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
             {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite
+    <span class="pager-page">{{ _("Seite") }}
       <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}"
              hx-get="settings/purge/marked" hx-trigger="change"
              hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list">
@@ -51,12 +51,12 @@
     <button class="btn navbtn" type="button"
             hx-get="settings/purge/marked" hx-vals='{"page": {{ pagination.total_pages }}}'
             hx-include="#marked-points-search, #marked-points-page-size" hx-target="#marked-points-list"
-            {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+            {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="{{ _('Letzte Seite') }}">»</button>
   </div>
-  <select id="marked-points-page-size" name="page_size" title="Zeilen pro Seite"
+  <select id="marked-points-page-size" name="page_size" title="{{ _('Zeilen pro Seite') }}"
           hx-get="settings/purge/marked" hx-include="#marked-points-search" hx-target="#marked-points-list">
     {% for size in [10, 20, 50, 100, 200] %}
-    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
     {% endfor %}
   </select>
 </div>

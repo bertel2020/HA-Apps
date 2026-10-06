@@ -51,7 +51,7 @@
     <tr>
       <td class="fav-cell col-fav">
         <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
-                title="Favorit" onclick="toggleFavorite('entities/{{ row.entity_id }}/favorite', this)">★</button>
+                title="{{ _('Favorit') }}" onclick="toggleFavorite('entities/{{ row.entity_id }}/favorite', this)">★</button>
       </td>
       <td class="entity col-entity">
         <a href="entities/{{ row.entity_id }}" class="entity-tooltip-host">
@@ -78,28 +78,28 @@
     {% endfor %}
   </table>
   {% else %}
-  <div class="empty">Keine Entitäten gefunden.</div>
+  <div class="empty">{{ _("Keine Entitäten gefunden.") }}</div>
   {% endif %}
 </div>
 
 <div class="pager" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
     {% if pagination.page_size %}
-    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
-    <button class="btn navbtn" onclick="setEntitiesPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
+    <button class="btn navbtn" onclick="setEntitiesPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="{{ _('Erste Seite') }}">«</button>
     <button class="btn navbtn" onclick="stepEntitiesPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToEntitiesPage(this)"> / {{ pagination.total_pages }}</span>
+    <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToEntitiesPage(this)"> / {{ pagination.total_pages }}</span>
     <button class="btn navbtn" onclick="stepEntitiesPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
-    <button class="btn navbtn" onclick="setEntitiesPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+    <button class="btn navbtn" onclick="setEntitiesPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="{{ _('Letzte Seite') }}">»</button>
     {% endif %}
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
     {% if pagination.page_size %}
-    <select name="page_size" title="Zeilen pro Seite"
+    <select name="page_size" title="{{ _('Zeilen pro Seite') }}"
             hx-get="entities-table" hx-include="#controls" hx-target="#entities-table" hx-swap="innerHTML"
             onchange="resetEntitiesPage()">
       {% for size in [10, 20, 50, 100, 500, 1000] %}
-      <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+      <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
       {% endfor %}
     </select>
     {% endif %}

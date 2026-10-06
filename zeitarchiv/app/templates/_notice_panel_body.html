@@ -5,7 +5,7 @@
    #notice-panel-body) exakt dasselbe Markup erzeugen, statt es zweimal zu
    pflegen. #}
 <div class="notice-panel-head">
-  <h3><a class="notice-panel-title-link" href="{{ app_root }}/settings#meldungen">Meldungen</a></h3>
+  <h3><a class="notice-panel-title-link" href="{{ app_root }}/settings#meldungen">{{ _("Meldungen") }}</a></h3>
   <span>{{ notices | length ~ ' offen' if notices else 'Alles erledigt' }}</span>
 </div>
 <ul class="notice-list"{% if not notices %} hidden{% endif %}>
@@ -31,13 +31,13 @@
        des allgemeinen Stummschalt-Systems mit Dauer-Presets — dafür bräuchte
        ein Tipp gar keine Dauer, "für den Rest des heutigen Tages" ist die
        einzig sinnvolle. Ein Klick blendet sofort aus, kein Untermenü nötig. #}
-    <button type="button" class="notice-mute-btn" data-tooltip="Für heute ausblenden"
-            aria-label="Für heute ausblenden" onclick="hideTipNotice(event)">
+    <button type="button" class="notice-mute-btn" data-tooltip="{{ _('Für heute ausblenden') }}"
+            aria-label="{{ _('Für heute ausblenden') }}" onclick="hideTipNotice(event)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
     </button>
     {% elif notice.mutable %}
-    <button type="button" class="notice-mute-btn" data-tooltip="Stumm schalten"
-            aria-label="Stumm schalten" onclick="toggleSnoozeOptions(event)">
+    <button type="button" class="notice-mute-btn" data-tooltip="{{ _('Stumm schalten') }}"
+            aria-label="{{ _('Stumm schalten') }}" onclick="toggleSnoozeOptions(event)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
     </button>
     {# Ersetzt Link+Mute-Button INNERHALB derselben Zeile (siehe
@@ -47,13 +47,13 @@
        vorher schon den Tooltip (siehe :has()-Fix weiter oben in
        app.css). Inline vermeidet das Problem von vornherein. #}
     <div class="notice-snooze-options" hidden>
-      <span class="notice-snooze-label">Stumm schalten für</span>
+      <span class="notice-snooze-label">{{ _("Stumm schalten für") }}</span>
       <span class="notice-snooze-buttons">
         {% for key in ['1h', '1d', '7d', '30d', 'forever'] %}
         <button type="button" data-duration="{{ key }}" onclick="muteNotice(event)">{{ snooze_labels[key] }}</button>
         {% endfor %}
       </span>
-      <button type="button" class="notice-snooze-cancel" aria-label="Abbrechen" onclick="toggleSnoozeOptions(event)">
+      <button type="button" class="notice-snooze-cancel" aria-label="{{ _('Abbrechen') }}" onclick="toggleSnoozeOptions(event)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
       </button>
     </div>
@@ -63,5 +63,5 @@
 </ul>
 <div class="notice-empty"{% if notices %} hidden{% endif %}>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-  <div>Keine offenen Meldungen.</div>
+  <div>{{ _("Keine offenen Meldungen.") }}</div>
 </div>

@@ -7,18 +7,18 @@
 {% block content %}
   
   <div class="page" x-data="dashboardEditor()">
-    <h1>Dashboards</h1>
-    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot; <a href="{{ app_root }}/dashboards">&larr; zurück zu Dashboards</a></p>
+    <h1>{{ _("Dashboards") }}</h1>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot;") }} <a href="{{ app_root }}/dashboards">{{ _("&larr; zurück zu Dashboards") }}</a></p>
 
     <div class="settings-panel">
       <div class="dash-editor-title-row">
         <h2>{{ "Dashboard bearbeiten" if dashboard else "Neues Dashboard" }}</h2>
       </div>
-      <p class="sub">Name und Fixierung dieses Dashboards.</p>
+      <p class="sub">{{ _("Name und Fixierung dieses Dashboards.") }}</p>
 
       <div class="field">
-        <label for="dash-name">Name</label>
-        <input id="dash-name" type="text" x-model="name" maxlength="{{ max_name_length }}" placeholder="Name des Dashboards …" @keydown.enter="save()">
+        <label for="dash-name">{{ _("Name") }}</label>
+        <input id="dash-name" type="text" x-model="name" maxlength="{{ max_name_length }}" placeholder="{{ _('Name des Dashboards …') }}" @keydown.enter="save()">
       </div>
 
       {% if dashboard %}
@@ -30,7 +30,7 @@
           </span>
           <label for="dash-locked">Fixiert {{ hint_button('Fixiert') }}</label>
         </div>
-        {% call hint_body() %}Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.{% endcall %}
+        {% call hint_body() %}{{ _("Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.") }}{% endcall %}
       </div>
 
       <div class="field">
@@ -41,7 +41,7 @@
           </span>
           <label for="dash-precise">Präziser Modus {{ hint_button('Präziser Modus') }}</label>
         </div>
-        {% call hint_body() %}Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.{% endcall %}
+        {% call hint_body() %}{{ _("Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.") }}{% endcall %}
       </div>
 
       <div class="field">
@@ -52,15 +52,15 @@
           </span>
           <label for="dash-fill-gaps">Lücken auffüllen {{ hint_button('Lücken auffüllen') }}</label>
         </div>
-        {% call hint_body() %}Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.{% endcall %}
+        {% call hint_body() %}{{ _("Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.") }}{% endcall %}
       </div>
       {% endif %}
 
       <div class="save-row">
         {% if dashboard and not dashboard.is_default %}
-        <button type="button" class="btn btn-danger" @click="deleteDashboard()">Löschen</button>
+        <button type="button" class="btn btn-danger" @click="deleteDashboard()">{{ _("Löschen") }}</button>
         {% endif %}
-        <a class="btn" href="{{ app_root }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">Abbrechen</a>
+        <a class="btn" href="{{ app_root }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">{{ _("Abbrechen") }}</a>
         <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
         <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
       </div>

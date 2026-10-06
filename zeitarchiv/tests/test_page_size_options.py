@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ast
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, template_text
 
 
 
@@ -17,7 +17,7 @@ def test_all_list_size_selects_offer_1000_instead_of_unlimited() -> None:
         assert "[10, 20, 50, 100, 500, 1000]" in source, name
         assert '<option value="0">Alle</option>' not in source, name
 
-    import_source = (TEMPLATES / "import.html").read_text(encoding="utf-8")
+    import_source = template_text("import.html")
     assert '<option value="1000">1000 / Seite</option>' in import_source
     assert '<option value="0">Alle</option>' not in import_source
 

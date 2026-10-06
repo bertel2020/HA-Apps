@@ -1,12 +1,12 @@
 <div class="stat-row" style="margin-bottom:16px;">
   <div class="stat" style="flex:0 1 220px;">
-    <div class="label">Ausstehende Rotation</div>
+    <div class="label">{{ _("Ausstehende Rotation") }}</div>
     <div class="value">{{ stale_count }}</div>
-    <div class="sub-value">Entität{{ "en" if stale_count != 1 else "" }}</div>
+    <div class="sub-value">{{ _("Entität") if stale_count == 1 else _("Entitäten") }}</div>
   </div>
 </div>
 <div style="display:flex;justify-content:flex-end;">
   <button type="button" class="btn" hx-post="settings/rotation" hx-target="#rotation-form" hx-swap="innerHTML"
-          hx-confirm="Ausstehende Entitäten jetzt rotieren (letzte Hot-Datei ins Archiv verschieben)?">Jetzt rotieren</button>
+          hx-confirm="Ausstehende Entitäten jetzt rotieren (letzte Hot-Datei ins Archiv verschieben)?">{{ _("Jetzt rotieren") }}</button>
 </div>
 {% if result %}<p class="save-status">✓ {{ result }}</p>{% endif %}

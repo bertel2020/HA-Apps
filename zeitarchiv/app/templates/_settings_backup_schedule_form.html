@@ -2,15 +2,15 @@
       style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border);">
   <div class="status-grid">
     <div class="status-card">
-      <span class="status-card-label">Nächster Lauf</span>
+      <span class="status-card-label">{{ _("Nächster Lauf") }}</span>
       <strong>{{ backup_next_run }}</strong>
     </div>
     <div class="status-card">
-      <span class="status-card-label">Letzter Erfolg</span>
+      <span class="status-card-label">{{ _("Letzter Erfolg") }}</span>
       <strong>{{ backup_last_success }}</strong>
     </div>
     <div class="status-card">
-      <span class="status-card-label">Letzter Fehler</span>
+      <span class="status-card-label">{{ _("Letzter Fehler") }}</span>
       <strong>{{ backup_last_failure }}</strong>
     </div>
   </div>
@@ -21,7 +21,7 @@
   {% endfor %}
   <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
-    Automatisch erstellen
+    {{ _("Automatisch erstellen") }}
     <span class="dd-picker-wrap">
       <button type="button" class="btn" id="backup-schedule-btn" onclick="toggleDDPicker('backup-schedule')">{% for v, l in backup_schedule_options %}{% if v == backup_schedule %}{{ l }}{% endif %}{% endfor %} ▾</button>
       <input type="hidden" name="backup_schedule" id="backup-schedule-input" value="{{ backup_schedule }}">
@@ -33,7 +33,7 @@
     </span>
   </label>
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
-    Uhrzeit ({{ backup_timezone|default('lokal') }})
+    {{ _("Uhrzeit ({tz})", tz=(backup_timezone|default(_("lokal")))) }}
     {% set current_hour = backup_schedule_time.split(':')[0] %}
     {% set current_minute = backup_schedule_time.split(':')[1] %}
     <span class="dd-picker-wrap">
@@ -41,17 +41,17 @@
       <div class="dd-picker-popover dd-time-popover" id="backup-time-popover">
         <div class="dd-time-spin">
           <div class="dd-time-spin-box">
-            <button type="button" class="dd-time-spin-arrow" aria-label="Stunde eins hoch" onclick="stepDDTime('backup-time', 'hour', 1)">▲</button>
+            <button type="button" class="dd-time-spin-arrow" aria-label="{{ _('Stunde eins hoch') }}" onclick="stepDDTime('backup-time', 'hour', 1)">▲</button>
             <input type="text" inputmode="numeric" maxlength="2" class="dd-time-spin-input" id="backup-time-hour-field"
                    value="{{ current_hour }}" onfocus="this.select()" onchange="commitDDTimeField('backup-time', 'hour', this)">
-            <button type="button" class="dd-time-spin-arrow" aria-label="Stunde eins runter" onclick="stepDDTime('backup-time', 'hour', -1)">▼</button>
+            <button type="button" class="dd-time-spin-arrow" aria-label="{{ _('Stunde eins runter') }}" onclick="stepDDTime('backup-time', 'hour', -1)">▼</button>
           </div>
           <span class="dd-time-spin-sep">:</span>
           <div class="dd-time-spin-box">
-            <button type="button" class="dd-time-spin-arrow" aria-label="Minute eins hoch" onclick="stepDDTime('backup-time', 'minute', 1)">▲</button>
+            <button type="button" class="dd-time-spin-arrow" aria-label="{{ _('Minute eins hoch') }}" onclick="stepDDTime('backup-time', 'minute', 1)">▲</button>
             <input type="text" inputmode="numeric" maxlength="2" class="dd-time-spin-input" id="backup-time-minute-field"
                    value="{{ current_minute }}" onfocus="this.select()" onchange="commitDDTimeField('backup-time', 'minute', this)">
-            <button type="button" class="dd-time-spin-arrow" aria-label="Minute eins runter" onclick="stepDDTime('backup-time', 'minute', -1)">▼</button>
+            <button type="button" class="dd-time-spin-arrow" aria-label="{{ _('Minute eins runter') }}" onclick="stepDDTime('backup-time', 'minute', -1)">▼</button>
           </div>
         </div>
       </div>
@@ -60,7 +60,7 @@
   </label>
   {% if backup_schedule == 'weekly' %}
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
-    Wochentag
+    {{ _("Wochentag") }}
     <span class="dd-picker-wrap">
       <button type="button" class="btn" id="backup-schedule-weekday-btn" onclick="toggleDDPicker('backup-schedule-weekday')">{% for v, l in backup_weekday_options %}{% if v == backup_schedule_weekday %}{{ l }}{% endif %}{% endfor %} ▾</button>
       <input type="hidden" name="backup_schedule_weekday" id="backup-schedule-weekday-input" value="{{ backup_schedule_weekday }}">
@@ -75,7 +75,7 @@
   <input type="hidden" name="backup_schedule_weekday" value="{{ backup_schedule_weekday }}">
   {% endif %}
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
-    Anzahl behalten
+    {{ _("Anzahl behalten") }}
     <span class="dd-picker-wrap">
       <button type="button" class="btn" id="backup-keep-count-btn" onclick="toggleDDPicker('backup-keep-count')">{% for v, l in backup_keep_count_options %}{% if v == backup_keep_count %}{{ l }}{% endif %}{% endfor %} ▾</button>
       <input type="hidden" name="backup_keep_count" id="backup-keep-count-input" value="{{ backup_keep_count }}">
@@ -87,7 +87,7 @@
     </span>
   </label>
   <label style="display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">
-    Max. Alter
+    {{ _("Max. Alter") }}
     <span class="dd-picker-wrap">
       <button type="button" class="btn" id="backup-keep-days-btn" onclick="toggleDDPicker('backup-keep-days')">{% for v, l in backup_keep_days_options %}{% if v == backup_keep_days %}{{ l }}{% endif %}{% endfor %} ▾</button>
       <input type="hidden" name="backup_keep_days" id="backup-keep-days-input" value="{{ backup_keep_days }}">
@@ -99,5 +99,5 @@
     </span>
   </label>
   </div>
-  <p class="hint hint-warn hint-warn-strong" style="margin:12px 0 0;">Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen.</p>
+  <p class="hint hint-warn hint-warn-strong" style="margin:12px 0 0;">{{ _("Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen.") }}</p>
 </form>

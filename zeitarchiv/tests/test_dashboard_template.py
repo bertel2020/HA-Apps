@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import TEMPLATES, page_text
+from _paths import TEMPLATES, page_text, template_text
 from app.main import asset as asset_helper
 
 
@@ -133,8 +133,8 @@ def test_dashboard_tile_title_only_reserves_space_for_one_menu_button() -> None:
 
 
 def test_value_tile_editor_and_sparkline_defaults_are_exposed() -> None:
-    menu = (TEMPLATES_DIR / "_dashboard_tile_menu.html").read_text(encoding="utf-8")
-    tiles = (TEMPLATES_DIR / "_dashboard_tiles.html").read_text(encoding="utf-8")
+    menu = template_text("_dashboard_tile_menu.html")
+    tiles = template_text("_dashboard_tiles.html")
     script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
     assert "auto_open_pin_id == tile.pin_id" in menu
     assert 'name="new_entity_id"' in menu
@@ -217,7 +217,7 @@ def test_only_the_size_heading_repeats_its_value() -> None:
     Wert, denn dort gibt es keinen beschrifteten Knopf, aus dem „1×1" abzulesen
     wäre, sondern ein Ziehgitter.
     """
-    menu = (TEMPLATES_DIR / "_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    menu = template_text("_dashboard_tile_menu.html")
     for titel in ("Zeitraum", "Hauptwert", "Nachkommastellen", "Sparkline-Auflösung"):
         assert f'<div class="dtile-decimals-picker-head">{titel}</div>' in menu or (
             f'dtile-choice-head-gap">{titel}</div>' in menu
@@ -236,7 +236,7 @@ def test_metric_section_labels_are_all_the_same_size() -> None:
     Überschriften darüber. Ohne eigene Regel erbt .menu-row-label die größere
     Schrift der Zeile — der Abschnitt liefe nach zwei kleinen Überschriften
     plötzlich groß weiter (genau so sah es zuerst aus)."""
-    menu = (TEMPLATES_DIR / "_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    menu = template_text("_dashboard_tile_menu.html")
     css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
     assert 'class="menu-row-label dtile-choice-head-label"' in menu
     assert ".dtile-choice-head-label{" in css

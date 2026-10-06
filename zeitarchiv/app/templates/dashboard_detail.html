@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — {{ dashboard.name }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — {name}", name=dashboard.name) }}{% endblock %}
 {% block root_vars %}--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/dashboard_detail.css') }}">
@@ -10,9 +10,9 @@
     <div class="dash-title-row">
       <h1>{{ dashboard.name }}</h1>
       {% if dashboard.locked %}
-      <span class="dash-locked-badge" title="Fixiert">🔒</span>
+      <span class="dash-locked-badge" title="{{ _('Fixiert') }}">🔒</span>
       {% else %}
-      <a class="dash-rename-btn" href="{{ app_root }}/dashboards/{{ dashboard.id }}/edit" title="Bearbeiten">✎</a>
+      <a class="dash-rename-btn" href="{{ app_root }}/dashboards/{{ dashboard.id }}/edit" title="{{ _('Bearbeiten') }}">✎</a>
       {% endif %}
     </div>
 

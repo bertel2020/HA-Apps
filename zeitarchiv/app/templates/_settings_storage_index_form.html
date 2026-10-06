@@ -1,30 +1,30 @@
 {% from "_hints.html" import hint_button, hint_body %}
 <div class="settings-subsection">
-<h3 class="settings-subsection-title">Indexkonsistenz {{ hint_button('Indexkonsistenz') }}</h3>
+<h3 class="settings-subsection-title">{{ _("Indexkonsistenz") }} {{ hint_button(_('Indexkonsistenz')) }}</h3>
 {% call hint_body() %}
-  Vergleicht Index mit den gespeicherten Rohdaten. Prüfung liest nur, Reparatur korrigiert nur abgeleitete Werte.
+  {{ _("Vergleicht Index mit den gespeicherten Rohdaten. Prüfung liest nur, Reparatur korrigiert nur abgeleitete Werte.") }}
 {% endcall %}
 {% if storage_audit %}
 <div class="status-grid">
   <div class="status-card">
-    <span class="status-card-label">Letzte Prüfung</span>
+    <span class="status-card-label">{{ _("Letzte Prüfung") }}</span>
     <strong class="status-card-mono">{{ storage_audit.checked_at_label }}</strong>
   </div>
   <div class="status-card">
-    <span class="status-card-label">Geprüfte Entitäten</span>
+    <span class="status-card-label">{{ _("Geprüfte Entitäten") }}</span>
     <strong>{{ storage_audit.entities_checked }}</strong>
   </div>
   <div class="status-card{% if storage_audit.rows or storage_audit.errors %} status-card-danger{% endif %}">
-    <span class="status-card-label">Abweichungen</span>
+    <span class="status-card-label">{{ _("Abweichungen") }}</span>
     <strong>{{ storage_audit.rows | length }}</strong>
-    {% if storage_audit.repaired %}<span class="status-card-detail">repariert</span>{% endif %}
+    {% if storage_audit.repaired %}<span class="status-card-detail">{{ _("repariert") }}</span>{% endif %}
   </div>
 </div>
 
 {% if storage_audit.rows %}
 <div class="tbl-wrap">
   <table class="dt compact" data-sortable data-paginate data-page-size="10">
-    <thead><tr><th>Entität</th><th>Index</th><th>Tatsächlich</th><th>Differenz</th><th>Archivgröße</th></tr></thead>
+    <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Index") }}</th><th>{{ _("Tatsächlich") }}</th><th>{{ _("Differenz") }}</th><th>{{ _("Archivgröße") }}</th></tr></thead>
     <tbody>
     {% for row in storage_audit.rows %}
       <tr>
@@ -39,17 +39,17 @@
   </table>
 </div>
 {% if storage_audit.repaired %}
-<p class="save-status">✓ {{ storage_audit.rows | length }} Abweichung{% if storage_audit.rows | length != 1 %}en{% endif %} repariert.</p>
+<p class="save-status">{% if storage_audit.rows | length == 1 %}{{ _("✓ {rows} Abweichung repariert.", rows=1) }}{% else %}{{ _("✓ {rows} Abweichungen repariert.", rows=(storage_audit.rows | length)) }}{% endif %}</p>
 {% else %}
-<p class="hint hint-status" style="color:var(--danger);">Die Vorschau hat noch nichts verändert.</p>
+<p class="hint hint-status" style="color:var(--danger);">{{ _("Die Vorschau hat noch nichts verändert.") }}</p>
 {% endif %}
 {% elif not storage_audit.errors %}
-<p class="save-status">✓ Index stimmt mit den gespeicherten Rohdaten überein.</p>
+<p class="save-status">{{ _("✓ Index stimmt mit den gespeicherten Rohdaten überein.") }}</p>
 {% endif %}
 
 {% if storage_audit.errors %}
 <p class="hint hint-status" style="color:var(--danger);">
-  {{ storage_audit.errors | length }} Entität{% if storage_audit.errors | length != 1 %}en konnten{% else %} konnte{% endif %} nicht vollständig geprüft werden.
+  {% if storage_audit.errors | length == 1 %}{{ _("{errors} Entität konnte nicht vollständig geprüft werden.", errors=1) }}{% else %}{{ _("{errors} Entitäten konnten nicht vollständig geprüft werden.", errors=(storage_audit.errors | length)) }}{% endif %}
 </p>
 {% endif %}
 {% endif %}
@@ -57,26 +57,24 @@
 
 {% if storage_audit %}
 <div class="settings-subsection">
-<h3 class="settings-subsection-title">Datenintegrität {{ hint_button('Datenintegrität') }}</h3>
+<h3 class="settings-subsection-title">{{ _("Datenintegrität") }} {{ hint_button(_('Datenintegrität')) }}</h3>
 {% call hint_body() %}
-  Prüft, ob die Rohdaten im Hot Buffer selbst noch lesbar sind — unabhängig vom Indexabgleich oben, läuft aber
-  mit derselben Prüfung mit. Beschädigungen entstehen fast immer durch einen unsauberen Neustart (Stromausfall,
-  harter Kill) und sind nicht reparierbar — die betroffenen Werte sind unwiederbringlich verloren.
+  {{ _("Prüft, ob die Rohdaten im Hot Buffer selbst noch lesbar sind — unabhängig vom Indexabgleich oben, läuft aber mit derselben Prüfung mit. Beschädigungen entstehen fast immer durch einen unsauberen Neustart (Stromausfall, harter Kill) und sind nicht reparierbar — die betroffenen Werte sind unwiederbringlich verloren.") }}
 {% endcall %}
 {% if storage_audit.corrupted %}
 {% set corrupt_line_total = storage_audit.corrupted | sum(attribute='corrupt_line_count') %}
 <div class="status-grid">
   <div class="status-card status-card-danger">
-    <span class="status-card-label">Beschädigte Zeilen</span>
+    <span class="status-card-label">{{ _("Beschädigte Zeilen") }}</span>
     <strong>{{ corrupt_line_total }}</strong>
     <span class="status-card-detail">
-      in {{ storage_audit.corrupted | length }} Entität{% if storage_audit.corrupted | length != 1 %}en{% endif %}
+      {% if storage_audit.corrupted | length == 1 %}{{ _("in {corrupted} Entität", corrupted=1) }}{% else %}{{ _("in {corrupted} Entitäten", corrupted=(storage_audit.corrupted | length)) }}{% endif %}
     </span>
   </div>
 </div>
 <div class="tbl-wrap">
   <table class="dt compact" data-sortable data-paginate data-page-size="10">
-    <thead><tr><th>Entität</th><th>Beschädigte Zeilen</th><th>Betroffene Monate</th></tr></thead>
+    <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Beschädigte Zeilen") }}</th><th>{{ _("Betroffene Monate") }}</th></tr></thead>
     <tbody>
     {% for entity in storage_audit.corrupted %}
       <tr>
@@ -89,7 +87,7 @@
   </table>
 </div>
 {% else %}
-<p class="save-status">✓ Keine beschädigten Rohdaten gefunden.</p>
+<p class="save-status">{{ _("✓ Keine beschädigten Rohdaten gefunden.") }}</p>
 {% endif %}
 </div>
 {% endif %}
@@ -103,7 +101,7 @@
   <button type="button" class="btn"
           hx-post="settings/storage-index/check" hx-target="#storage-index-form" hx-swap="innerHTML"
           hx-disabled-elt="this">
-    Speicher prüfen
+    {{ _("Speicher prüfen") }}
   </button>
   {% if storage_audit and storage_audit.rows and not storage_audit.repaired %}
   <button type="button" class="btn btn-danger-outline"
@@ -111,7 +109,7 @@
           hx-disabled-elt="this"
           hx-confirm="Die angezeigten Indexabweichungen jetzt anhand der gespeicherten Rohdaten korrigieren? Rohwerte und Rollups werden nicht verändert."
           data-confirm-label="Index reparieren">
-    Index reparieren
+    {{ _("Index reparieren") }}
   </button>
   {% endif %}
 </div>

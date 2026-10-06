@@ -8,13 +8,13 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.formatting import format_int, format_value
 
-from _paths import APP, TEMPLATES, page_text
+from _paths import APP, TEMPLATES, page_text, template_text
 
 
 
 
 def test_cleanup_delete_requires_reversible_confirmation() -> None:
-    rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
+    rows = template_text("_rows_table.html")
     assert "hx-confirm=" in rows
     assert "noch nicht endgültig gelöscht" in rows
     assert "Rückgängig (letzte Löschung)" in rows
@@ -35,7 +35,7 @@ def test_destructive_entity_actions_have_explicit_confirmations() -> None:
 
 def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
     cleanup = page_text("cleanup.html")
-    rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
+    rows = template_text("_rows_table.html")
     chart_editor = page_text("chart_editor.html")
     main = (APP / "main.py").read_text(encoding="utf-8")
     assert "js/period-navigation.js" in cleanup
@@ -58,7 +58,7 @@ def test_cleanup_templates_compile() -> None:
 
 
 def test_settings_purge_shows_read_only_preview_permanently() -> None:
-    purge = (TEMPLATES / "_settings_purge_form.html").read_text(encoding="utf-8")
+    purge = template_text("_settings_purge_form.html")
     assert 'settings/purge/preview' not in purge
     assert "Vorschau der Bereinigung" in purge
     assert "Diese Vorschau verändert keine Daten." in purge
@@ -73,8 +73,8 @@ def test_marked_points_are_loaded_on_demand_in_a_dialog() -> None:
     # Speicherplatz/"Endgültige Bereinigung" (samt Dialog) lebt seit 0.75.0 in
     # Housekeeping statt Einstellungen — die Formular-/Partial-Dateien selbst
     # blieben unverändert, nur eingebunden von einer anderen Seite.
-    purge = (TEMPLATES / "_settings_purge_form.html").read_text(encoding="utf-8")
-    housekeeping = (TEMPLATES / "housekeeping.html").read_text(encoding="utf-8")
+    purge = template_text("_settings_purge_form.html")
+    housekeeping = template_text("housekeeping.html")
     assert "Markierte Datensätze anzeigen" in purge
     assert 'hx-get="settings/purge/marked"' in purge
     assert '<dialog id="marked-points-dialog"' in housekeeping
@@ -88,8 +88,8 @@ def test_marked_points_are_a_two_level_drill_down() -> None:
     flach untereinander — bei einer Entität mit hunderttausenden Markierungen
     wäre das eine endlose Liste ohne Orientierung), Klick auf eine Entität
     lädt die zweite Ebene mit den einzelnen Markierungen samt Wert."""
-    ebene1 = (TEMPLATES / "_settings_marked_points.html").read_text(encoding="utf-8")
-    ebene2 = (TEMPLATES / "_settings_marked_points_entity.html").read_text(encoding="utf-8")
+    ebene1 = template_text("_settings_marked_points.html")
+    ebene2 = template_text("_settings_marked_points_entity.html")
     assert "Markierungen" in ebene1 and "Zuletzt markiert" in ebene1
     assert 'hx-get="settings/purge/marked/{{ row.entity_id }}"' in ebene1
     assert "Messzeitpunkt" in ebene2 and "Wert" in ebene2 and "Markiert am" in ebene2

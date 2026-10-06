@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv{% endblock %}
+{% block title %}{{ _("Zeitarchiv") }}{% endblock %}
 {% block root_vars %}--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/entities.css') }}">
@@ -9,12 +9,12 @@
   <div class="page">
     <div class="stat-row">
       <a class="stat" href="entities">
-        <div class="label">Entitäten</div>
+        <div class="label">{{ _("Entitäten") }}</div>
         <div class="value">{{ entity_count }}</div>
         {% if type_breakdown %}<div class="sub-value">{{ type_breakdown }}</div>{% endif %}
       </a>
       <a class="stat" href="statistik">
-        <div class="label">Datensätze gesamt</div>
+        <div class="label">{{ _("Datensätze gesamt") }}</div>
         <div class="value">{{ total_rows }}</div>
         {% if rows_sparkline %}
         <svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">
@@ -24,7 +24,7 @@
         {% endif %}
       </a>
       <a class="stat" href="statistik">
-        <div class="label">Größe</div>
+        <div class="label">{{ _("Größe") }}</div>
         <div class="value">{{ total_size }}</div>
         {% if size_sparkline %}
         <svg class="sparkline" viewBox="0 0 84 28" preserveAspectRatio="none">

@@ -7,7 +7,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.formatting import format_int, format_value
 
-from _paths import TEMPLATES, APP_CSS
+from _paths import TEMPLATES, APP_CSS, template_text
 
 
 CSS = (APP_CSS).read_text(
@@ -24,7 +24,7 @@ def test_settings_main_areas_are_second_level_sections() -> None:
     # existiert im gerenderten HTML aber nur mit aktivem Demo-Modus/liegen-
     # gebliebenen Demo-Daten (siehe demo_mode.current_demo_state()) — der
     # Abschnitts-Tag selbst steht trotzdem immer im Template-Quelltext.
-    source = (TEMPLATES / "settings.html").read_text(encoding="utf-8")
+    source = template_text("settings.html")
     section_ids = (
         "darstellung",
         "archivierung",
@@ -45,14 +45,10 @@ def test_settings_main_areas_are_second_level_sections() -> None:
 
 def test_storage_and_retention_use_distinct_sublevels() -> None:
     # Speicherplatz/Endgültige Bereinigung lebt seit 0.75.0 in housekeeping.html.
-    housekeeping = (TEMPLATES / "housekeeping.html").read_text(encoding="utf-8")
-    storage = (TEMPLATES / "_settings_storage_index_form.html").read_text(
-        encoding="utf-8"
-    )
-    purge = (TEMPLATES / "_settings_purge_form.html").read_text(encoding="utf-8")
-    retention = (TEMPLATES / "_settings_retention_form.html").read_text(
-        encoding="utf-8"
-    )
+    housekeeping = template_text("housekeeping.html")
+    storage = template_text("_settings_storage_index_form.html")
+    purge = template_text("_settings_purge_form.html")
+    retention = template_text("_settings_retention_form.html")
 
     # Beide Überschriften tragen seit dem Info-Knopf noch ein Makro vor dem
     # schließenden Tag; geprüft ist hier die Ebene, nicht der Rest der Zeile.

@@ -1,39 +1,39 @@
-<p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">Entfernt markierte Datensätze endgültig und gibt Speicherplatz frei. Rollups werden automatisch neu berechnet.</p>
+<p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">{{ _("Entfernt markierte Datensätze endgültig und gibt Speicherplatz frei. Rollups werden automatisch neu berechnet.") }}</p>
 {% set totals = purge_preview.totals %}
 <div class="settings-minor-section">
-    <h4 class="settings-minor-title">Vorschau der Bereinigung</h4>
-    <p class="hint hint-status" style="margin:0 0 14px;">Diese Vorschau verändert keine Daten.</p>
+    <h4 class="settings-minor-title">{{ _("Vorschau der Bereinigung") }}</h4>
+    <p class="hint hint-status" style="margin:0 0 14px;">{{ _("Diese Vorschau verändert keine Daten.") }}</p>
     <div class="stat-row" style="margin-bottom:14px;">
       <div class="stat">
-        <div class="label">Physisch entfernbar</div>
+        <div class="label">{{ _("Physisch entfernbar") }}</div>
         <div class="value">{{ totals.removable_rows | format_int }}</div>
-        <div class="sub-value">von {{ totals.marked_rows | format_int }} markierten Datensätzen</div>
+        <div class="sub-value">{{ _("von {marked_rows} markierten Datensätzen", marked_rows=(totals.marked_rows | format_int)) }}</div>
       </div>
       <div class="stat">
-        <div class="label">Hot Buffer</div>
+        <div class="label">{{ _("Hot Buffer") }}</div>
         <div class="value">{{ totals.hot_rows | format_int }}</div>
-        <div class="sub-value">Datensätze im laufenden Monat</div>
+        <div class="sub-value">{{ _("Datensätze im laufenden Monat") }}</div>
       </div>
       <div class="stat">
-        <div class="label">Archiv</div>
+        <div class="label">{{ _("Archiv") }}</div>
         <div class="value">{{ totals.archive_rows | format_int }}</div>
-        <div class="sub-value">Datensätze in {{ totals.archive_months }} Monatsdatei{% if totals.archive_months != 1 %}en{% endif %}</div>
+        <div class="sub-value">{% if totals.archive_months == 1 %}{{ _("Datensätze in {archive_months} Monatsdatei", archive_months=totals.archive_months) }}{% else %}{{ _("Datensätze in {archive_months} Monatsdateien", archive_months=totals.archive_months) }}{% endif %}</div>
       </div>
       <div class="stat">
-        <div class="label">Betroffene Entitäten</div>
+        <div class="label">{{ _("Betroffene Entitäten") }}</div>
         <div class="value">{{ totals.entities_affected | format_int }}</div>
-        <div class="sub-value">mit physisch entfernbaren Daten</div>
+        <div class="sub-value">{{ _("mit physisch entfernbaren Daten") }}</div>
       </div>
     </div>
     {% if totals.not_removable_rows %}
       <p class="hint hint-status" style="margin:0 0 14px;color:var(--danger);">
-        {{ totals.not_removable_rows | format_int }} Löschmarkierung{% if totals.not_removable_rows != 1 %}en{% endif %} ohne passende Rohdatenzeile &mdash; {% if totals.not_removable_rows == 1 %}wird{% else %}werden{% endif %} nicht entfernt.
+        {% if totals.not_removable_rows == 1 %}{{ _("{count} Löschmarkierung ohne passende Rohdatenzeile &mdash; wird nicht entfernt.", count=(totals.not_removable_rows | format_int)) }}{% else %}{{ _("{count} Löschmarkierungen ohne passende Rohdatenzeile &mdash; werden nicht entfernt.", count=(totals.not_removable_rows | format_int)) }}{% endif %}
       </p>
     {% endif %}
     {% if purge_preview.rows %}
       <div class="tbl-wrap">
         <table class="dt" data-sortable data-paginate data-page-size="10">
-          <thead><tr><th>Entität</th><th title="Physisch entfernbar / insgesamt markiert">Entfernbar / Markiert</th><th>Hot Buffer</th><th>Archiv</th><th>Monate</th></tr></thead>
+          <thead><tr><th>{{ _("Entität") }}</th><th title="{{ _('Physisch entfernbar / insgesamt markiert') }}">{{ _("Entfernbar / Markiert") }}</th><th>{{ _("Hot Buffer") }}</th><th>{{ _("Archiv") }}</th><th>{{ _("Monate") }}</th></tr></thead>
           <tbody>
           {% for row in purge_preview.rows %}
             <tr>
@@ -55,7 +55,7 @@
                  weil dieser Link als einziger der Seite woanders hinführt. #}
               <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
                 <a href="{{ app_root }}/entities/{{ row.entity_id }}?marked=1"
-                   title="Markierte Werte im Verlauf ansehen">
+                   title="{{ _('Markierte Werte im Verlauf ansehen') }}">
                   {% if row.friendly_name %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
                   {% else %}
@@ -73,7 +73,7 @@
         </table>
       </div>
     {% else %}
-      <div class="empty">Aktuell sind keine Datensätze zur Löschung markiert.</div>
+      <div class="empty">{{ _("Aktuell sind keine Datensätze zur Löschung markiert.") }}</div>
     {% endif %}
 </div>
 <div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;">
@@ -82,7 +82,7 @@
           hx-target="#marked-points-list" hx-swap="innerHTML"
           onclick="document.getElementById('marked-points-dialog').showModal()"
           {% if totals.marked_rows == 0 %}disabled{% endif %}>
-    Markierte Datensätze anzeigen
+    {{ _("Markierte Datensätze anzeigen") }}
   </button>
   {# hx-disabled-elt deckt nur die Sekunde zwischen Klick und Antwort ab —
      die Antwort kommt seit 0.85.0 sofort, weil der Lauf selbst im
@@ -94,7 +94,7 @@
           hx-disabled-elt="this"
           hx-confirm="Zur Löschung markierte Datensätze jetzt endgültig physisch entfernen? Das lässt sich nicht rückgängig machen."
           {% if totals.marked_rows == 0 %}disabled{% endif %}>
-    Jetzt bereinigen
+    {{ _("Jetzt bereinigen") }}
   </button>
 </div>
 {% if result %}<p class="save-status">✓ {{ result }}</p>{% endif %}
