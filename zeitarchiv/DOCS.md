@@ -1,5 +1,7 @@
 # Zeitarchiv
 
+*[English version](DOCS.en.md)*
+
 Zeitarchiv archiviert ausgewählte Home-Assistant-Zustände langfristig und
 platzsparend als Parquet-Dateien. Die separat zu installierende
 Zeitarchiv-Integration sendet die Zustandsänderungen an die App; Ingress

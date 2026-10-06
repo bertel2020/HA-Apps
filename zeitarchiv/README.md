@@ -24,6 +24,8 @@
   <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
+<p align="center"><em><a href="README.en.md">English version</a></em></p>
+
 Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
 Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 [Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv) sammelt

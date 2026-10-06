@@ -1,5 +1,7 @@
 # Home Assistant Apps by bertel2020
 
+*[English version](README.en.md)*
+
 Dieses Repository stellt verschiedene Apps für Home Assistant bereit. Jede App
 liegt in einem eigenen Ordner und kann unabhängig installiert und aktualisiert
 werden.

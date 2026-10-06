@@ -1,5 +1,7 @@
 # Benutzerhandbuch
 
+*[English version](user-guide.en.md)*
+
 Dieses Dokument ist die ausführliche Anleitung für Nutzer der App — Schritt
 für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 Überblick (was die App ist, Kernfunktionen auf einen Blick) siehe die
