@@ -345,6 +345,11 @@
      tableWidthAttr/colgroup dort. */
   table.dt.dtile-mini-table{width:100%;table-layout:auto;}
   .dtile-mini-table th,.dtile-mini-table td{padding:4px 8px;white-space:normal;word-break:break-word;}
+  /* Beschriftungsspalte bricht nie mitten im Wort: die Wertezellen sind nowrap (Mindestbreite =
+     Inhaltsbreite), die Beschriftung mit break-word hätte eine Mindestbreite von einem Zeichen und
+     würde bei zu schmaler Kachel zu einem Streifen mit je 1–2 Buchstaben je Zeile gedrückt. Lieber
+     läuft die Tabelle horizontal über (.dtile-table-preview scrollt). */
+  .dtile-mini-table th:first-child,.dtile-mini-table td:first-child{word-break:normal;overflow-wrap:normal;}
   .dtile-mini-table th:not(:first-child){text-align:right;}
   .dtile-mini-table.tbl-style-header-align-left th:not(:first-child){text-align:left;}
   .dtile-mini-table.tbl-style-header-align-center th:not(:first-child){text-align:center;}
