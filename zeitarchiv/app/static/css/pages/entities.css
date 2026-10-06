@@ -107,7 +107,10 @@
   .dtile-cleanup-compact{display:flex;flex-direction:column;align-items:flex-start;color:inherit;text-decoration:none;}
   .dtile-cleanup-total{font-size:calc(28px * var(--font-scale, 1));font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--notice-warn);}
   .dtile-cleanup.is-clear .dtile-cleanup-total{color:var(--positive);}
-  .dtile-picker-hint{margin:0 0 10px;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
+  /* Erläuterung unter dem Reiter „Bereinigung“: auf Lesebreite begrenzt und mit demselben Einzug wie die
+     Einträge der Listen (6px zusätzlich zum Listen-Padding), statt über die ganze Popup-Breite zu laufen. */
+  .dtile-picker-hint{margin:0 0 14px;padding:0 6px;max-width:30em;line-height:1.5;text-wrap:balance;color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));}
+  .dtile-picker-list > div > .dtile-picker-section-submit{margin:0 6px;}
   .dtile-entity-body{display:flex;flex-direction:column;gap:4px;}
   /* Nur Layout, keine eigene Schrift: der Titel sieht aus wie auf jeder
      anderen Kachel (13,5px, --ink, 600 aus .dtile-title). Er war bis 0.88.1
