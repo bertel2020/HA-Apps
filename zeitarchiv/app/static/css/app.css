@@ -1080,6 +1080,12 @@ a.menu-row{text-decoration:none;}
   text-overflow:ellipsis;max-width:180px;font-size:calc(11px * var(--font-scale, 1));
 }
 .chart-legend-item .compare-row .values{color:var(--ink-faint);}
+/* Summe „bis zum gleichen Tag“ der Vergleichsperiode — als Zusatz neben der Gesamtsumme, damit sie
+   sich vom Rest der gedämpften Zeile abhebt. */
+.chart-legend-item .compare-row .compare-cut{
+  color:var(--accent-line);background:var(--accent-line-soft);border-radius:8px;padding:0 7px;white-space:nowrap;
+}
+.chart-legend-table td .legend-compare-value.compare-cut{color:var(--accent-line);}
 .chart-legend-item:hover{border-color:var(--accent-line);}
 .chart-legend-item.inactive{opacity:.4;}
 /* Für die per role="button"/tabindex="0" bedienbaren Chips in den Dashboard-

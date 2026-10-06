@@ -737,6 +737,18 @@
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },
+        // Summe der Vergleichsperiode „bis zum gleichen Tag“ (bzw. zur gleichen Uhrzeit), solange
+        // die aktuelle Periode läuft. Nur wenn sie sich von der Gesamtsumme daneben unterscheidet —
+        // beim Vorjahr ist das Fenster ohnehin schon gekappt, und zwei gleiche Zahlen wären Lärm.
+        compareCutFor(s) {
+          if (!s.compare_cut_points) return null;
+          const full = this.seriesStatsFor(s, s.compare_points, s.compare_window_end).sum;
+          const cut = this.seriesStatsFor(s, s.compare_cut_points, s.compare_cut_end).sum;
+          if (cut === null || cut === full) return null;
+          const end = new Date(s.compare_cut_end * 1000);
+          const where = ['hour', 'day'].includes(this.range) ? fmtTime(end) : fmtDayMonth(end);
+          return {label: t('bis {cut}', {cut: where}), sum: cut};
+        },
         get seriesStats() {
           return this.series.map((s, i) => {
             // Vergleichs-Nebenserie (Vorjahr/Vorperiode, siehe render()) taucht
@@ -748,6 +760,7 @@
                   seriesLabel: this.compareMode === 'year' ? t('Vorjahr') : t('Vorperiode'),
                   period: formatPeriodLabel(this.range, this.continuous, s.compare_window_start, s.compare_window_end, false),
                   ...this.seriesStatsFor(s, s.compare_points, s.compare_window_end),
+                  cut: this.compareCutFor(s),
                 }
               : null;
             return {

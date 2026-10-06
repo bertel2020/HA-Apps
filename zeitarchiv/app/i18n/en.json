@@ -2478,6 +2478,7 @@
     "Chart bearbeiten": "Edit chart",
     "Neuer Chart": "New chart",
     "Tabelle bearbeiten": "Edit table",
-    "Neue Tabelle": "New table"
+    "Neue Tabelle": "New table",
+    "bis {cut}": "until {cut}"
   }
 }

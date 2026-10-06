@@ -671,6 +671,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     compare_window_start=compare_result["window_start"],
                     compare_window_end=compare_result["window_end"],
                 )
+                # Summe „bis zum gleichen Tag“ (Chart-Legende): nur dort, wo es eine Summe gibt
+                # (Zähler, Schalter) und die aktuelle Periode noch läuft.
+                if result["aggregation_type"] in ("counter", "switch"):
+                    cut = query_mod.query_compare_cut(
+                        deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                        offset=offset, continuous=continuous, year_over_year=compare_mode == "year",
+                    )
+                    if cut:
+                        entry.update(compare_cut_points=cut["points"], compare_cut_end=cut["window_end"])
             series.append(entry)
             if window_start is None:
                 window_start, window_end = result["window_start"], result["window_end"]

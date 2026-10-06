@@ -880,3 +880,47 @@ def test_same_elapsed_comparison_for_the_previous_year_stops_at_the_same_point_i
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_compare_cut_gives_the_comparison_sum_up_to_the_same_point_for_year_and_previous_mode() -> None:
+    """Chart-Legende: die Summe der Vergleichsperiode „bis zum gleichen Tag“. Beim Vorjahr
+    (year_over_year) und bei der Vorperiode (hier: das Vorjahr 2025 zum laufenden Jahr 2026)
+    kommt dieselbe Zahl heraus — und der angeschnittene Oktober zählt nur bis zum 6.10., 18 Uhr."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.ertrag"
+        _archive_counter_year(tmp, index, entity_id, 2025, [(8, 3.0), (20, 7.0)])
+        now = datetime(2026, 10, 6, 18, 0, 0, tzinfo=TZ)
+        expected = 7.0 + 277 * 10.0 + 3.0
+
+        for year_over_year in (True, False):
+            cut = query.query_compare_cut(
+                tmp, index, entity_id, "year", TZ, now,
+                offset=0, continuous=False, year_over_year=year_over_year,
+            )
+            assert cut is not None
+            assert sum(p["value"] for p in cut["points"]) == expected, year_over_year
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_compare_cut_is_only_for_a_running_non_rolling_period() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.ertrag"
+        _archive_counter_year(tmp, index, entity_id, 2025, [(8, 3.0), (20, 7.0)])
+        now = datetime(2026, 10, 6, 18, 0, 0, tzinfo=TZ)
+
+        # Eine abgeschlossene Periode (offset < 0) und ein rollierendes Fenster haben nichts zu kappen.
+        for kwargs in ({"offset": -1, "continuous": False}, {"offset": 0, "continuous": True}):
+            assert query.query_compare_cut(
+                tmp, index, entity_id, "year", TZ, now, year_over_year=False, **kwargs
+            ) is None
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

@@ -986,6 +986,43 @@ def query_series(
     return result
 
 
+def query_compare_cut(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    range_key: str,
+    tz: ZoneInfo,
+    now: datetime,
+    *,
+    offset: int,
+    continuous: bool,
+    year_over_year: bool,
+    chart_type: str | None = None,
+    read_cache: QueryReadCache | None = None,
+) -> dict | None:
+    """Die Vergleichsperiode einer LAUFENDEN Periode, nur bis zum selben Abstand vom
+    Periodenanfang — für die Summe „bis zum gleichen Tag“ in der Chart-Legende.
+
+    Die Vergleichsreihe des Charts zeigt bewusst die ganze Vorperiode (bzw. beim Vorjahr
+    ein Fenster, dessen letzter Bucket meist angeschnitten ist), und deren Summe steht
+    neben der des laufenden, unvollständigen Zeitraums. Diese Abfrage liefert die faire
+    Gegenzahl: dieselbe Kappung wie der Vergleichswert der Tabelle (comparison_points),
+    der letzte Bucket also aus den Rohwerten bis zum Schnittpunkt.
+
+    None, wenn es nichts zu kappen gibt: der Zeitraum ist schon abgeschlossen (offset<0)
+    oder rollierend (continuous, immer volle Länge)."""
+    if offset != 0 or continuous:
+        return None
+    now_local = now.astimezone(tz)
+    current_start, _current_end, _current_natural = _window(range_key, now_local, 0, continuous)
+    result = query_series(
+        data_dir, index, entity_id, range_key, tz, now,
+        offset=0 if year_over_year else -1, continuous=continuous, year_over_year=year_over_year,
+        chart_type=chart_type, read_cache=read_cache, cap_to=now_local - current_start,
+    )
+    return {"points": result["points"], "window_end": result["window_end"]}
+
+
 def query_raw_series(
     data_dir: Path,
     index: Index,

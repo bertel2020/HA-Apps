@@ -550,6 +550,7 @@
                   <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.compare?.max"></strong>') }}</span>
                   <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.compare?.average"></strong></span>
                   <span x-show="legendMetrics.includes('sum') && stat.compare?.sum !== null">Σ <strong x-text="stat.compare?.sum"></strong></span>
+                  <span class="compare-cut" x-show="legendMetrics.includes('sum') && stat.compare?.cut"><span x-text="stat.compare?.cut?.label"></span>: <strong x-text="stat.compare?.cut?.sum"></strong></span>
                 </span>
               </div>
             </button>
@@ -636,6 +637,7 @@
                   <td x-show="legendMetrics.includes('sum')">
                     <span x-text="stat.sum ?? '—'"></span>
                     <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare ? (stat.compare.sum ?? '—') : ''"></span>
+                    <span class="legend-compare-value compare-cut" x-show="stat.compare?.cut" x-text="stat.compare?.cut ? stat.compare.cut.label + ': ' + stat.compare.cut.sum : ''"></span>
                   </td>
                 </tr>
               </template>
