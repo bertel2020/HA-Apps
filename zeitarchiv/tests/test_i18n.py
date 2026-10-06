@@ -76,6 +76,42 @@ def test_every_text_marked_for_translation_has_an_english_entry() -> None:
     assert not fehlend_js, f"fehlt in en.json/js: {sorted(fehlend_js)}"
 
 
+SCRIPT_LITERAL = re.compile(r"""(?P<q>['"])(?P<text>(?:\\.|(?!(?P=q)).)*)(?P=q)""")
+GERMAN_HINT = re.compile(
+    r"[äöüÄÖÜß]|\b(Stunde|Tag|Tage|Woche|Monat|Jahr|Minute|Sekunde|der|die|das|und|oder|nicht|kein|keine|"
+    r"Fehler|Wert|Werte|Zeit|Auswahl|wird|werden|ist|mit|für|von|bei|Alle|Neu|Name|Einheit|Summe)\b"
+)
+# Bewusst deutsch gelassene Literale (Datei -> Texte); neue Einträge brauchen eine Begründung.
+UNTRANSLATED_SCRIPT_TEXT_OK: dict[str, set[str]] = {}
+
+
+def test_no_german_script_text_is_left_outside_t() -> None:
+    """Deutsche Texte in den Skripten ohne t(...) fielen bisher erst im Browser auf.
+
+    Gemeldet wird, was wie ein sichtbarer Text aussieht: ein Literal, das einem Katalogschlüssel
+    gleicht, oder ein mehrwortiges mit deutschem Wort/Umlaut. Kommentarzeilen zählen nicht.
+    """
+    schluessel = set(CATALOG["js"]) | set(CATALOG["app"])
+    gefunden: list[str] = []
+    for path in sorted((APP / "static" / "js").rglob("*.js")):
+        if "vendor" in path.parts or path.name == "i18n.js":
+            continue
+        erlaubt = UNTRANSLATED_SCRIPT_TEXT_OK.get(path.name, set())
+        for nummer, zeile in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if zeile.strip().startswith(("//", "*", "/*")):
+                continue
+            code = re.sub(r"\s//[^'\"`]*$", "", zeile)
+            for treffer in SCRIPT_LITERAL.finditer(code):
+                text = treffer.group("text")
+                if code[max(0, treffer.start() - 2) : treffer.start()].endswith("t("):
+                    continue
+                if len(text) < 3 or not re.search("[A-Za-zäöü]{3}", text) or text in erlaubt:
+                    continue
+                if text in schluessel or (GERMAN_HINT.search(text) and " " in text):
+                    gefunden.append(f"{path.name}:{nummer}: {text[:60]!r}")
+    assert not gefunden, "deutscher Text ohne t(): " + "; ".join(gefunden)
+
+
 def test_catalog_has_no_dead_entries() -> None:
     quellen = "\n".join(
         path.read_text(encoding="utf-8").replace('\\"', '"').replace("\\'", "'")
