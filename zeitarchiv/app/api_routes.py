@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import logging
 import secrets
 import threading
@@ -356,7 +358,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     state.connection_stats["auth_failures"],
                     interval_seconds=300,
                 )
-            raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
+            raise HTTPException(status_code=401, detail=tr("Ungültiger oder fehlender API-Token"))
         if integration_version:
             ha_integration.record_seen(deps.index, integration_version)
 
@@ -365,7 +367,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         if len(ids) > MAX_MULTI_QUERY_ENTITIES:
             raise HTTPException(
                 status_code=413,
-                detail=f"Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage",
+                detail=tr("Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage", MAX_MULTI_QUERY_ENTITIES=MAX_MULTI_QUERY_ENTITIES),
             )
         return ids
 
@@ -562,7 +564,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     ) -> dict:
         _validate_entity_id_or_400(entity_id)
         if chart_type not in (None, "line", "bar"):
-            raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
         now = datetime.now(deps.tz)
         # Ein Cache für beide Abfragen dieses Requests: Mit "Vergleichen" wird
         # dieselbe Entität zweimal abgefragt, nur mit verschobenem Fenster —
@@ -706,9 +708,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         entsteht nur für Kacheln, die auch wirklich eine Kennzahl zeigen.
         """
         if range not in DASHBOARD_TILE_RANGES:
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
         if resolution not in _SPARKLINE_BUCKET_SECONDS:
-            raise HTTPException(status_code=400, detail="Ungültige Sparkline-Auflösung")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Sparkline-Auflösung"))
         ids = list(dict.fromkeys(limited_multi_entity_ids({"entity_ids": entity_ids})))
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
@@ -812,7 +814,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             _validate_entity_id_or_400(entity_id)
         for column in body.columns:
             if column.range_key not in query_mod.RANGE_KEYS:
-                raise HTTPException(status_code=400, detail="Ungültiger Tabellenzeitraum")
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Tabellenzeitraum"))
 
         now = datetime.now(deps.tz)
         read_cache = query_mod.QueryReadCache()

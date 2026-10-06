@@ -104,12 +104,26 @@ def tr(text: str, **values: Any) -> str:
     return translate(text, current_language.get(), **values)
 
 
-def N_(text: str) -> str:
+class Lazy(str):
+    """Ein deutscher Text, der erst beim Anzeigen übersetzt wird.
+
+    Ist ein ``str`` mit dem deutschen Wortlaut (Vergleiche, ``in``, Dict-Zugriffe und JSON-Ausgabe
+    sehen den deutschen Text), erscheint im Template aber in der Sprache der Anfrage: Jinja ruft
+    bei ``{{ wert }}`` ``__html__`` auf."""
+
+    __slots__ = ()
+
+    def __html__(self) -> Markup:
+        return translate_html(str(self), current_language.get())
+
+
+def N_(text: str) -> Lazy:
     """Markiert einen Text als übersetzbar, ohne ihn sofort zu übersetzen (gettext-„noop“).
 
     Für Konstanten, die beim Import angelegt werden (Beschriftungslisten): die Sprache der Anfrage
-    gibt es dann noch nicht. Angezeigt wird später mit ``tr(label)`` bzw. ``_(label)`` im Template."""
-    return text
+    gibt es dann noch nicht. Im Template genügt ``{{ label }}`` — ``Lazy`` übersetzt beim Anzeigen;
+    in Python-Code ``tr(label)``."""
+    return Lazy(text)
 
 
 def dependencies(get_index: Callable[[], Any]) -> list:

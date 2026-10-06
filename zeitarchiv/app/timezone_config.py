@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import os
 from collections.abc import Callable, Mapping
 from datetime import timezone, tzinfo
@@ -32,7 +34,7 @@ def load_timezone(
 
     try:
         if not isinstance(configured, str):
-            raise TypeError("Zeitzonenname muss ein String sein")
+            raise TypeError(tr("Zeitzonenname muss ein String sein"))
         return ZoneInfo(configured)
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         message = (

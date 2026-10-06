@@ -6,6 +6,8 @@ http://supervisor/..., kurzer Timeout)."""
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import json
 import logging
 import os
@@ -31,7 +33,7 @@ def fetch_memory_usage_bytes() -> int:
     Antwort nicht das erwartete Format hat."""
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
-        raise RuntimeError("Supervisor ist in dieser Umgebung nicht verfügbar")
+        raise RuntimeError(tr("Supervisor ist in dieser Umgebung nicht verfügbar"))
     request = urllib.request.Request(
         SUPERVISOR_STATS_URL,
         headers={
@@ -44,11 +46,11 @@ def fetch_memory_usage_bytes() -> int:
         with urllib.request.urlopen(request, timeout=5) as response:
             payload = json.loads(response.read())
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-        raise RuntimeError("Supervisor-Statistik konnte nicht geladen werden") from exc
+        raise RuntimeError(tr("Supervisor-Statistik konnte nicht geladen werden")) from exc
     try:
         return int(payload["data"]["memory_usage"])
     except (KeyError, TypeError, ValueError) as exc:
-        raise RuntimeError("Supervisor-Statistik hat unerwartetes Format") from exc
+        raise RuntimeError(tr("Supervisor-Statistik hat unerwartetes Format")) from exc
 
 
 def restart_addon() -> None:
@@ -65,7 +67,7 @@ def restart_addon() -> None:
     genug, um diese Antwort noch auszuliefern, bevor er tatsächlich fällt."""
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
-        raise RuntimeError("Supervisor ist in dieser Umgebung nicht verfügbar")
+        raise RuntimeError(tr("Supervisor ist in dieser Umgebung nicht verfügbar"))
     request = urllib.request.Request(
         SUPERVISOR_RESTART_URL,
         method="POST",
@@ -79,10 +81,10 @@ def restart_addon() -> None:
         with urllib.request.urlopen(request, timeout=10) as response:
             payload = json.loads(response.read())
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-        raise RuntimeError("Neustart über Supervisor fehlgeschlagen") from exc
+        raise RuntimeError(tr("Neustart über Supervisor fehlgeschlagen")) from exc
     if payload.get("result") != "ok":
         raise RuntimeError(
-            f"Supervisor meldete: {payload.get('message') or 'unbekannter Fehler'}"
+            tr("Supervisor meldete: {v}", v=payload.get('message') or 'unbekannter Fehler')
         )
 
 

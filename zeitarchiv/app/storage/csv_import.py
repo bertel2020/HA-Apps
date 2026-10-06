@@ -12,6 +12,8 @@ verwerfen (dieselbe Haltung wie beim Symcon-Import)."""
 
 from __future__ import annotations
 
+from ..i18n import N_
+
 import csv
 import math
 from collections.abc import Callable
@@ -23,13 +25,13 @@ from zoneinfo import ZoneInfo
 from ..limits import MAX_IMPORT_ROWS_PER_ENTITY
 
 TIMESTAMP_FORMATS = {
-    "unix_s": "Unix-Zeitstempel (Sekunden)",
-    "unix_ms": "Unix-Zeitstempel (Millisekunden)",
-    "iso": "ISO 8601 (z. B. 2024-01-31 10:00:00)",
-    "custom": "Eigenes Format …",
+    "unix_s": N_("Unix-Zeitstempel (Sekunden)"),
+    "unix_ms": N_("Unix-Zeitstempel (Millisekunden)"),
+    "iso": N_("ISO 8601 (z. B. 2024-01-31 10:00:00)"),
+    "custom": N_("Eigenes Format …"),
 }
 
-DELIMITERS = {",": "Komma (,)", ";": "Semikolon (;)", "\t": "Tab"}
+DELIMITERS = {",": N_("Komma (,)"), ";": N_("Semikolon (;)"), "\t": N_("Tab")}
 
 _BOOL_VALUES = {"true": 1.0, "false": 0.0, "wahr": 1.0, "falsch": 0.0}
 

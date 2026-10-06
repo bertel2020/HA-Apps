@@ -16,6 +16,8 @@ Daraus folgen die persistierten Rollup-Stufen:
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import calendar
 import os
 import shutil
@@ -86,7 +88,7 @@ def _bucket_key(ts: float, tz: ZoneInfo, level: str) -> datetime:
         return local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if level == "jahr":
         return local.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    raise ValueError(f"Unbekanntes Bucket-Level: {level}")
+    raise ValueError(tr("Unbekanntes Bucket-Level: {level}", level=level))
 
 
 def _named_bucket_next(level: str):
@@ -103,7 +105,7 @@ def _named_bucket_next(level: str):
         return _next
     if level == "jahr":
         return lambda start: start.replace(year=start.year + 1)
-    raise ValueError(f"Unbekanntes Bucket-Level: {level}")
+    raise ValueError(tr("Unbekanntes Bucket-Level: {level}", level=level))
 
 
 def named_bucket_key(tz: ZoneInfo, level: str):
@@ -214,7 +216,7 @@ def compute_fine_rollup_with_key(
 
     if aggregation_type == "switch":
         if bucket_next_fn is None:
-            raise ValueError("bucket_next_fn wird für Schalter-Entitäten benötigt")
+            raise ValueError(tr("bucket_next_fn wird für Schalter-Entitäten benötigt"))
         on_seconds: dict[datetime, float] = {}
         for i, (ts, value) in enumerate(rows):
             interval_end = rows[i + 1][0] if i + 1 < len(rows) else window_end_ts
@@ -239,7 +241,7 @@ def compute_fine_rollup_with_key(
         ]
         return fine, None
 
-    raise ValueError(f"Unbekannter Aggregationstyp: {aggregation_type}")
+    raise ValueError(tr("Unbekannter Aggregationstyp: {aggregation_type}", aggregation_type=aggregation_type))
 
 
 def _fine_schema(aggregation_type: str) -> pa.Schema:

@@ -17,6 +17,8 @@ zweiter Kompressionslauf kostet nur CPU-Zeit für kaum messbaren Größengewinn.
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import sqlite3
 import hashlib
 import json
@@ -130,7 +132,7 @@ def create_source_snapshot(
     unbeobachtet bliebe.
     """
     if snapshot_dir.exists():
-        raise ValueError("Backup-Snapshot-Verzeichnis existiert bereits")
+        raise ValueError(tr("Backup-Snapshot-Verzeichnis existiert bereits"))
     snapshot_dir.mkdir(parents=True)
 
     ids = sorted(set(entity_ids))
@@ -326,37 +328,37 @@ def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: 
             members = zf.infolist()
             # Auffangnetz für den Fall, dass die Zahl vorab nicht lesbar war.
             if len(members) > MAX_ZIP_MEMBERS:
-                raise ValueError("Backup enthält zu viele Dateien")
+                raise ValueError(tr("Backup enthält zu viele Dateien"))
             uncompressed = sum(member.file_size for member in members)
             if uncompressed > MAX_ZIP_UNCOMPRESSED_BYTES:
-                raise ValueError("Entpackter Backup-Inhalt ist zu groß")
+                raise ValueError(tr("Entpackter Backup-Inhalt ist zu groß"))
             if any(
                 member.file_size > 0
                 and member.file_size / max(1, member.compress_size) > MAX_ZIP_COMPRESSION_RATIO
                 for member in members
             ):
-                raise ValueError("Backup überschreitet das erlaubte Kompressionsverhältnis")
+                raise ValueError(tr("Backup überschreitet das erlaubte Kompressionsverhältnis"))
             names = zf.namelist()
             if any(name.startswith("/") or ".." in Path(name).parts for name in names):
-                raise ValueError("Backup enthält einen unsicheren Dateipfad")
+                raise ValueError(tr("Backup enthält einen unsicheren Dateipfad"))
             broken = zf.testzip()
             if broken is not None:
-                raise ValueError(f"Beschädigte ZIP-Datei: {broken}")
+                raise ValueError(tr("Beschädigte ZIP-Datei: {broken}", broken=broken))
 
             if BACKUP_MANIFEST_NAME in names:
                 try:
                     manifest = json.loads(zf.read(BACKUP_MANIFEST_NAME))
                 except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-                    raise ValueError("Backup-Manifest ist ungültig") from exc
+                    raise ValueError(tr("Backup-Manifest ist ungültig")) from exc
                 if manifest.get("format") != "zeitarchiv-portable-backup":
-                    raise ValueError("Unbekanntes Backup-Format")
+                    raise ValueError(tr("Unbekanntes Backup-Format"))
                 entries = manifest.get("files")
                 if not isinstance(entries, list):
-                    raise ValueError("Backup-Manifest enthält keine Dateiliste")
+                    raise ValueError(tr("Backup-Manifest enthält keine Dateiliste"))
                 for entry in entries:
                     name = entry.get("path") if isinstance(entry, dict) else None
                     if not name or name not in names:
-                        raise ValueError(f"Datei aus Manifest fehlt: {name or '?'}")
+                        raise ValueError(tr("Datei aus Manifest fehlt: {v}", v=name or '?'))
                     if verify_checksums:
                         digest = hashlib.sha256()
                         size = 0
@@ -365,9 +367,9 @@ def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: 
                                 size += len(chunk)
                                 digest.update(chunk)
                         if size != entry.get("size_bytes") or digest.hexdigest() != entry.get("sha256"):
-                            raise ValueError(f"Prüfsumme stimmt nicht: {name}")
+                            raise ValueError(tr("Prüfsumme stimmt nicht: {name}", name=name))
                     elif zf.getinfo(name).file_size != entry.get("size_bytes"):
-                        raise ValueError(f"Dateigröße stimmt nicht: {name}")
+                        raise ValueError(tr("Dateigröße stimmt nicht: {name}", name=name))
             else:
                 manifest = {
                     "format": "zeitarchiv-portable-backup",
@@ -379,7 +381,7 @@ def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: 
             if not check_sqlite:
                 return manifest
             if "index.sqlite" not in names:
-                raise ValueError("index.sqlite fehlt im Backup")
+                raise ValueError(tr("index.sqlite fehlt im Backup"))
             with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tmp:
                 sqlite_path = Path(tmp.name)
                 with zf.open("index.sqlite") as source:
@@ -389,16 +391,16 @@ def validate_backup(path: Path, *, check_sqlite: bool = True, verify_checksums: 
             try:
                 result = connection.execute("PRAGMA integrity_check").fetchone()
                 if result is None or result[0] != "ok":
-                    raise ValueError("SQLite-Integritätsprüfung fehlgeschlagen")
+                    raise ValueError(tr("SQLite-Integritätsprüfung fehlgeschlagen"))
             finally:
                 connection.close()
         except sqlite3.DatabaseError as exc:
-            raise ValueError("index.sqlite ist keine gültige SQLite-Datenbank") from exc
+            raise ValueError(tr("index.sqlite ist keine gültige SQLite-Datenbank")) from exc
         finally:
             sqlite_path.unlink(missing_ok=True)
         return manifest
     except zipfile.BadZipFile as exc:
-        raise ValueError("Datei ist kein gültiges ZIP-Backup") from exc
+        raise ValueError(tr("Datei ist kein gültiges ZIP-Backup")) from exc
 
 
 def install_validated_backup(upload_path: Path, backups_dir: Path, created_at: datetime) -> Path:
@@ -411,14 +413,14 @@ def install_validated_backup(upload_path: Path, backups_dir: Path, created_at: d
         if not destination.exists():
             upload_path.replace(destination)
             return destination
-    raise ValueError("Kein freier Backup-Dateiname verfügbar")
+    raise ValueError(tr("Kein freier Backup-Dateiname verfügbar"))
 
 
 def prepare_restore(data_dir: Path, backups_dir: Path, filename: str) -> dict:
     """Validiert ein lokales Backup und merkt es für den nächsten Start vor."""
     path = resolve_backup_path(backups_dir, filename)
     if path is None or not path.is_file():
-        raise ValueError("Backup nicht gefunden")
+        raise ValueError(tr("Backup nicht gefunden"))
     manifest = validate_backup(path)
     request_path = data_dir / RESTORE_REQUEST_NAME
     tmp_path = request_path.with_suffix(".tmp")
@@ -434,9 +436,9 @@ def prepare_restore_from_rollback(data_dir: Path, name: str) -> None:
     ein Rollback nur löschen, nie tatsächlich einspielen (Konzept
     "Restore-Rollbacks", 22.09.2026)."""
     if not RESTORE_ROLLBACK_RE.fullmatch(name) or Path(name).name != name:
-        raise ValueError("Ungültiger Rollback-Name")
+        raise ValueError(tr("Ungültiger Rollback-Name"))
     if not (data_dir / name).is_dir():
-        raise ValueError("Rollback nicht gefunden")
+        raise ValueError(tr("Rollback nicht gefunden"))
     request_path = data_dir / RESTORE_REQUEST_NAME
     tmp_path = request_path.with_suffix(".tmp")
     tmp_path.write_text(json.dumps({"rollback": name}), encoding="utf-8")
@@ -457,7 +459,7 @@ def _reserve_rollback_dir(data_dir: Path) -> Path:
         )
         if not candidate.exists():
             return candidate
-    raise ValueError("Kein freier Rollback-Verzeichnisname verfügbar")
+    raise ValueError(tr("Kein freier Rollback-Verzeichnisname verfügbar"))
 
 
 def apply_pending_restore(data_dir: Path, backups_dir: Path) -> dict | None:
@@ -491,7 +493,7 @@ def apply_pending_restore(data_dir: Path, backups_dir: Path) -> dict | None:
         if isinstance(rollback_source, str):
             source_dir = data_dir / rollback_source
             if not RESTORE_ROLLBACK_RE.fullmatch(rollback_source) or not source_dir.is_dir():
-                raise ValueError("Vorgemerkter Rollback wurde nicht gefunden")
+                raise ValueError(tr("Vorgemerkter Rollback wurde nicht gefunden"))
             for name in BACKUP_ENTRIES:
                 source = source_dir / name
                 if not source.exists():
@@ -507,7 +509,7 @@ def apply_pending_restore(data_dir: Path, backups_dir: Path) -> dict | None:
         elif isinstance(filename, str):
             path = resolve_backup_path(backups_dir, filename)
             if path is None or not path.is_file():
-                raise ValueError("Vorgemerktes Backup wurde nicht gefunden")
+                raise ValueError(tr("Vorgemerktes Backup wurde nicht gefunden"))
             manifest = validate_backup(path)
             with zipfile.ZipFile(path) as zf:
                 for info in zf.infolist():
@@ -521,13 +523,13 @@ def apply_pending_restore(data_dir: Path, backups_dir: Path) -> dict | None:
             restore_source_label = filename
             format_version = manifest.get("format_version", 0)
         else:
-            raise ValueError("Vorgemerkter Restore hat weder Backup noch Rollback als Quelle")
+            raise ValueError(tr("Vorgemerkter Restore hat weder Backup noch Rollback als Quelle"))
 
         restored_index = staging / "index.sqlite"
         connection = sqlite3.connect(f"file:{restored_index}?mode=ro", uri=True)
         try:
             if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-                raise ValueError("Wiederhergestellter SQLite-Index ist beschädigt")
+                raise ValueError(tr("Wiederhergestellter SQLite-Index ist beschädigt"))
         finally:
             connection.close()
         installed_size_bytes = restored_index.stat().st_size

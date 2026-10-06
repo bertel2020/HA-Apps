@@ -22,6 +22,8 @@ zu wissen, wer sie im Hintergrund pflegt.
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import json
 import logging
 import time
@@ -88,14 +90,14 @@ logger = logging.getLogger(__name__)
 #: Seitenwechsel neu aufgebaut wird. Es gibt genau einen Bereinigungslauf
 #: gleichzeitig — der Auftrag hält die globale Wartungssperre, ein zweiter
 #: könnte ohnehin nur warten.
-_purge_progress = JobProgress("purge", unit="Monate", label="Bereinigung")
+_purge_progress = JobProgress("purge", unit=N_("Monate"), label=N_("Bereinigung"))
 
 #: Fortschritt der manuellen Rotation. Sie bleibt bewusst synchron — wer sie
 #: auslöst, wartet auf die Antwort und braucht keine eigene Anzeige. In der
 #: Kopfleiste steht sie trotzdem, weil sie unter der globalen Wartungssperre
 #: läuft: Für jeden ANDEREN Tab sieht das sonst nach einem grundlos hängenden
 #: Server aus. Siehe JobProgress.track().
-_rotation_progress = JobProgress("rotation", unit="Entitäten", label="Rotation")
+_rotation_progress = JobProgress("rotation", unit=N_("Entitäten"), label=N_("Rotation"))
 
 
 def _rotation_step(nummer: int, gesamt: int, entity_id: str) -> None:
@@ -292,14 +294,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # statt in formatting.py, dasselbe Muster wie status_labels in
     # _settings_retention_context() — nur für diese eine Seite gebraucht.
     _ACTIVITY_ACTION_LABELS = {
-        "add": "Hinzufügen", "correct": "Korrektur", "purge": "Bereinigen",
-        "compact": "Verdichten", "retention": "Aufbewahrung",
+        "add": N_("Hinzufügen"), "correct": N_("Korrektur"), "purge": N_("Bereinigen"),
+        "compact": N_("Verdichten"), "retention": N_("Aufbewahrung"),
     }
     _ACTIVITY_STATUS_LABELS = {
-        "success": "Erfolgreich", "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen",
+        "success": N_("Erfolgreich"), "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"),
         # "queued"/"running"/"skipped" kommen nur von retention_jobs — entity_actions
         # protokolliert ausschließlich bereits abgeschlossene ("success") Aktionen.
-        "queued": "Geplant", "running": "Läuft", "skipped": "Übersprungen",
+        "queued": N_("Geplant"), "running": N_("Läuft"), "skipped": N_("Übersprungen"),
     }
     # Filter-Dropdowns (Aktionstyp/Status/Zeitraum): erste Option ist immer der
     # leere Wert = "kein Filter", genau wie bei den bestehenden dd-picker-
@@ -398,7 +400,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 entity_label = entity_display_name(a["entity_id"], entity["friendly_name"], entity["custom_name"])
                 entity_options_map[a["entity_id"]] = entity_label
             else:
-                entity_label = a["entity_id"] or "mehrere Entitäten"
+                entity_label = a["entity_id"] or tr("mehrere Entitäten")
             rows.append({
                 "created_at": f"{format_timestamp(a['created_at'], deps.tz)} {format_time(a['created_at'], deps.tz)}",
                 "created_at_ts": a["created_at"],
@@ -421,7 +423,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "action": _ACTIVITY_ACTION_LABELS["retention"],
                 "entity_key": "",
                 "entity_label": (
-                    f"{job['entities_affected']} Entitäten" if job["entities_affected"] else "mehrere Entitäten"
+                    tr("{count} Entitäten", count=job["entities_affected"]) if job["entities_affected"] else tr("mehrere Entitäten")
                 ),
                 "trigger": "Automatisch" if job["trigger"] == "scheduled" else "Manuell",
                 "rows_affected": format_int(job["rows_deleted"]) if job["rows_deleted"] is not None else "—",
@@ -448,7 +450,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "activity_action_filter": action_filter,
             "activity_status_filter": status_filter,
             "activity_days_filter": days_filter,
-            "activity_entity_options": [("", "Alle Entitäten")] + sorted(
+            "activity_entity_options": [("", tr("Alle Entitäten"))] + sorted(
                 entity_options_map.items(), key=lambda kv: kv[1]
             ),
             "activity_action_options": _ACTIVITY_ACTION_FILTER_OPTIONS,
@@ -572,8 +574,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             return f"{format_timestamp(ts, deps.tz)} {format_time(ts, deps.tz)}" if ts else "—"
 
         status_labels = {
-            "queued": "Geplant", "running": "Läuft", "success": "Erfolgreich",
-            "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen", "skipped": "Übersprungen",
+            "queued": N_("Geplant"), "running": N_("Läuft"), "success": N_("Erfolgreich"),
+            "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"), "skipped": N_("Übersprungen"),
         }
         jobs = []
         for job in deps.index.list_retention_jobs(8):
@@ -796,7 +798,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         komplett aufhört zu senden, würde ihre letzte Hot-Datei sonst nie von
         selbst archivieren)."""
         with _rotation_progress.track():
-            _rotation_progress.set_phase("Hot-Dateien werden archiviert")
+            _rotation_progress.set_phase(N_("Hot-Dateien werden archiviert"))
             with deps.coordinator.exclusive():
                 rotated = rotate.rotate_all_stale(
                     deps.data_dir, deps.index, deps.tz, on_entity=_rotation_step
@@ -824,9 +826,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         auto_enabled = form.get("compact_auto_enabled")
         min_age_months = form.get("compact_min_age_months")
         if auto_enabled is not None and auto_enabled not in COMPACT_AUTO_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Wert für Automatische Verdichtung")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert für Automatische Verdichtung"))
         if min_age_months is not None and min_age_months not in COMPACT_MIN_AGE_MONTHS_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiges Mindestalter")
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Mindestalter"))
         if auto_enabled is not None:
             deps.index.set_setting("compact_auto_enabled", auto_enabled)
         if min_age_months is not None:
@@ -846,9 +848,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         auto_enabled = form.get("purge_auto_enabled")
         min_age_days = form.get("purge_min_age_days")
         if auto_enabled is not None and auto_enabled not in PURGE_AUTO_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Wert für Automatische Bereinigung")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert für Automatische Bereinigung"))
         if min_age_days is not None and min_age_days not in PURGE_MIN_AGE_DAYS_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiges Mindestalter")
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Mindestalter"))
         if auto_enabled is not None:
             deps.index.set_setting("purge_auto_enabled", auto_enabled)
         if min_age_days is not None:
@@ -895,7 +897,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         # ist ehrlicher als eine geschätzte Gesamtzahl.
         vorschau = deps.load_purge_preview() or {}
         _purge_progress.set_phase(
-            "Bereinigung läuft…",
+            N_("Bereinigung läuft…"),
             int(vorschau.get("totals", {}).get("archive_months", 0) or 0),
         )
         started_at = time.time()
@@ -1036,7 +1038,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         komplette Historie der Entität."""
         entity = deps.index.get_entity(entity_id)
         if entity is None:
-            raise HTTPException(status_code=404, detail="Unbekannte Entität")
+            raise HTTPException(status_code=404, detail=tr("Unbekannte Entität"))
         result = deps.index.list_deleted_points_for_entity(entity_id, page=page, page_size=page_size)
         values = cleanup.read_values_for_timestamps(
             deps.data_dir, entity_id, [row["ts"] for row in result["rows"]], deps.tz
@@ -1076,14 +1078,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         schedule_time = str(form.get("retention_enforcement_time", deps.retention_default_time))
         weekday_raw = str(form.get("retention_enforcement_weekday", deps.retention_default_weekday))
         if schedule not in BACKUP_SCHEDULE_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitplan")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitplan"))
         try:
             parse_schedule_time(schedule_time)
             weekday = int(weekday_raw)
             if weekday not in range(7):
                 raise ValueError
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Ungültige Uhrzeit") from exc
+            raise HTTPException(status_code=400, detail=tr("Ungültige Uhrzeit")) from exc
         deps.index.set_setting("retention_enforcement", schedule)
         deps.index.set_setting("retention_enforcement_time", schedule_time)
         deps.index.set_setting("retention_enforcement_weekday", str(weekday))
@@ -1147,7 +1149,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         Hintergrund; ein zweiter Klick bekommt die Anzeige des schon
         laufenden Auftrags zurück (JobProgress.claim)."""
         if not deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+            raise HTTPException(status_code=409, detail=tr("Nur im Demo-Modus verfügbar"))
         try:
             demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "append"), logger)
         except JobBusy:
@@ -1160,7 +1162,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         komplette Historie neu (Rückfrage per hx-confirm im Template, wie
         beim manuellen Löschen im Bereinigen-Tab)."""
         if not deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+            raise HTTPException(status_code=409, detail=tr("Nur im Demo-Modus verfügbar"))
         try:
             demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "regenerate"), logger)
         except JobBusy:
@@ -1188,11 +1190,11 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         Hook siehe background.py). Nur im Demo-Modus sinnvoll — der Dropdown
         rendert sonst nicht."""
         if not deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+            raise HTTPException(status_code=409, detail=tr("Nur im Demo-Modus verfügbar"))
         form = await request.form()
         interval = form.get("demo_append_interval")
         if interval not in DEMO_APPEND_INTERVAL_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiges Intervall")
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Intervall"))
         deps.index.set_setting("demo_append_interval", str(interval))
         return deps.templates.TemplateResponse(
             request, "_housekeeping_demo_data_body.html",
@@ -1214,7 +1216,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         <script>, das refreshNoticePanel() (_topnav.html) aufruft, damit die
         Glocke sofort verschwindet statt erst beim nächsten Seitenaufruf."""
         if deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nicht möglich, während die Instanz im Demo-Modus läuft")
+            raise HTTPException(status_code=409, detail=tr("Nicht möglich, während die Instanz im Demo-Modus läuft"))
         demo_mode.remove_demo_dir(deps.base_dir)
         return HTMLResponse(
             '<div id="demo-nav-entry" hx-swap-oob="delete"></div>'

@@ -8,6 +8,8 @@ lokalen Venv-Betrieb ohne Supervisor funktioniert.
 
 from __future__ import annotations
 
+from .i18n import N_
+
 import logging
 import re
 import sys
@@ -18,15 +20,15 @@ from datetime import datetime
 
 
 LOG_LEVEL_LABELS = {
-    "error": "Fehler",
-    "warning": "Warnungen",
-    "info": "Informationen",
-    "debug": "Debug",
+    "error": N_("Fehler"),
+    "warning": N_("Warnungen"),
+    "info": N_("Informationen"),
+    "debug": N_("Debug"),
 }
 ACCESS_LOG_LABELS = {
-    "off": "Aus",
-    "errors": "Nur fehlgeschlagene Anfragen",
-    "all": "Alle Anfragen",
+    "off": N_("Aus"),
+    "errors": N_("Nur fehlgeschlagene Anfragen"),
+    "all": N_("Alle Anfragen"),
 }
 
 DEFAULT_LOG_LEVEL = "warning"

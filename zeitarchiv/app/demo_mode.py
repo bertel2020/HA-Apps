@@ -17,6 +17,8 @@ aus der offenen Verbindung — siehe Aufrufer in housekeeping_routes.py.
 
 from __future__ import annotations
 
+from .i18n import N_
+
 import json
 import os
 import random
@@ -47,9 +49,9 @@ DEMO_DIR_NAME = "demo"
 demo_progress = JobProgress("demo-generate", unit="Entitäten", label="Demo-Daten")
 
 _DEMO_PHASE_LABELS = {
-    "append": "Demo-Daten werden ergänzt …",
-    "regenerate": "Demo-Daten werden neu erzeugt …",
-    "fresh": "Demo-Daten werden erstmalig erzeugt …",
+    "append": N_("Demo-Daten werden ergänzt …"),
+    "regenerate": N_("Demo-Daten werden neu erzeugt …"),
+    "fresh": N_("Demo-Daten werden erstmalig erzeugt …"),
 }
 
 # Sekundenwerte zu formatting.DEMO_APPEND_INTERVAL_LABELS — getrennt von den

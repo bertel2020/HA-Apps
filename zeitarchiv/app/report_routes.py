@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,17 +22,17 @@ from .storage.coordinator import StorageCoordinator
 
 
 STATUS_LABELS = {
-    "success": "Erfolgreich",
-    "partial": "Teilweise erfolgreich",
-    "no_changes": "Keine Änderungen",
-    "failed": "Fehlgeschlagen",
+    "success": N_("Erfolgreich"),
+    "partial": N_("Teilweise erfolgreich"),
+    "no_changes": N_("Keine Änderungen"),
+    "failed": N_("Fehlgeschlagen"),
 }
-SOURCE_LABELS = {"symcon": "Symcon", "csv": "CSV", "ha": "Home Assistant"}
+SOURCE_LABELS = {"symcon": N_("Symcon"), "csv": N_("CSV"), "ha": N_("Home Assistant")}
 SORT_COLUMNS = [
-    ("finished_at", "Zeitpunkt"), ("source_type", "Quelle"),
-    ("status", "Status"), ("targets", "Ziele"),
-    ("rows_written", "Importiert"), ("rows_skipped", "Übersprungen"),
-    ("duration_seconds", "Dauer"),
+    ("finished_at", N_("Zeitpunkt")), ("source_type", N_("Quelle")),
+    ("status", N_("Status")), ("targets", N_("Ziele")),
+    ("rows_written", N_("Importiert")), ("rows_skipped", N_("Übersprungen")),
+    ("duration_seconds", N_("Dauer")),
 ]
 
 
@@ -189,7 +191,7 @@ class ReportService:
             with deps.coordinator.exclusive():
                 report = import_reports.load(deps.data_dir, report_id)
             if report is None:
-                raise HTTPException(status_code=404, detail="Report nicht gefunden")
+                raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
             return deps.templates.TemplateResponse(
                 request, "report_detail.html", {"report": self.view(report)}
             )
@@ -199,7 +201,7 @@ class ReportService:
             with deps.coordinator.exclusive():
                 path = import_reports.download_path(deps.data_dir, report_id)
                 if path is None:
-                    raise HTTPException(status_code=404, detail="Report nicht gefunden")
+                    raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
                 content = path.read_bytes()
             return Response(content=content, media_type="application/json", headers={
                 "Content-Disposition": f'attachment; filename="{path.name}"'
@@ -209,7 +211,7 @@ class ReportService:
         def report_delete(request: Request, report_id: str) -> RedirectResponse:
             with deps.coordinator.exclusive():
                 if not import_reports.delete(deps.data_dir, report_id):
-                    raise HTTPException(status_code=404, detail="Report nicht gefunden")
+                    raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
             return RedirectResponse(
                 url=f"{deps.app_root_context(request)['app_root']}/import?tab=reports", status_code=303
             )

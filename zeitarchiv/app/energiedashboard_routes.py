@@ -17,6 +17,8 @@ siehe rollup.py) — kein eigener Subtraktions-/Aggregations-Code."""
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import bisect
 import calendar
 import json
@@ -66,7 +68,7 @@ _backfill_progress = JobProgress("hourly-backfill", label="Stunden-Rollup")
 SETTING_EFFICIENCY_CACHE = "energiedashboard_speicher_efficiency_cache"
 EFFICIENCY_CACHE_TTL_SECONDS = 6 * 60 * 60
 
-RANGE_LABELS = {"hour": "Stunde", "day": "Tag", "month": "Monat", "year": "Jahr"}
+RANGE_LABELS = {"hour": N_("Stunde"), "day": N_("Tag"), "month": N_("Monat"), "year": N_("Jahr")}
 RANGE_KEYS = tuple(RANGE_LABELS)
 # Eigene Kopie statt Import von main.py._MONTH_NAMES_DE — dort modul-privat
 # (Unterstrich-Präfix), und eine einzelne kurze Konstante rechtfertigt keine
@@ -86,7 +88,7 @@ REPORT_RANGE_KEYS = ("month", "year")
 # Labels bewusst weiter "Vortag/Vormonat/Vorjahr" (nicht "letzte 24 Std."
 # o. ä.): auf ±1 Tag/Monat/Jahr genau ist das rollierende Fenster ohnehin
 # dasselbe, nur ohne Kalendergrenze als Bezugspunkt.
-COMPARE_LABELS = {"hour": "Vorstunde", "day": "Vortag", "month": "Vormonat", "year": "Vorjahr"}
+COMPARE_LABELS = {"hour": N_("Vorstunde"), "day": N_("Vortag"), "month": N_("Vormonat"), "year": N_("Vorjahr")}
 
 # Ab diesem Sensor-Alter gilt ein Wert als "seit Längerem keine neuen Daten"
 # und fließt als Warnung in die Bilanz-Kachel ein — unabhängig vom gerade
@@ -170,7 +172,7 @@ DEFAULT_HUB_NAME = "Haus"
 # dem Schnitt der Vorperioden — ein Prozentsatz ist dafür die richtige Größe,
 # weil beide Seiten dieselbe Größenordnung haben. Die Ausreißer-Erkennung sucht
 # dagegen unplausible EINZELwerte und misst deshalb in Vielfachen des Üblichen.
-ANOMALIE_SCHWELLE_LABELS = {"off": "Aus", "25": "25 %", "50": "50 %", "100": "100 %"}
+ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100": "100 %"}
 # Anzahl vorheriger Perioden, deren Schnitt als "üblicher" Vergleichswert
 # dient — mehrere statt nur der einen Vorperiode, damit ein Gerät, das
 # einfach nicht jeden Tag läuft (z. B. Waschmaschine), nicht bei jedem
@@ -1146,7 +1148,7 @@ class EnergieDashboardService:
         request-lokal, siehe dessen Docstring in query.py, wird hier nur
         NICHT mehr implizit pro Aufruf neu erzeugt)."""
         if range_key not in RANGE_KEYS:
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
         now = datetime.now(self.deps.tz)
         if read_cache is None:
             read_cache = query_mod.QueryReadCache()
@@ -2552,7 +2554,7 @@ class EnergieDashboardService:
         Jahresansicht trotzdem mit wenigen Parquet-Lesevorgängen günstig statt
         365 Einzel-Tagesabfragen."""
         if range_key not in ("month", "year"):
-            raise HTTPException(status_code=400, detail="Nur 'month' oder 'year' unterstützt")
+            raise HTTPException(status_code=400, detail=tr("Nur 'month' oder 'year' unterstützt"))
         if read_cache is None:
             read_cache = query_mod.QueryReadCache()
         now = datetime.now(self.deps.tz)
@@ -2815,9 +2817,9 @@ class EnergieDashboardService:
             anomalie_schwelle: str = Form("50"),
         ) -> HTMLResponse:
             if not netzbezug.strip():
-                raise HTTPException(status_code=422, detail="Netzbezug ist Pflicht")
+                raise HTTPException(status_code=422, detail=tr("Netzbezug ist Pflicht"))
             if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
-                raise HTTPException(status_code=422, detail="Ungültige Auffälligkeiten-Schwelle")
+                raise HTTPException(status_code=422, detail=tr("Ungültige Auffälligkeiten-Schwelle"))
 
             def pairs(entity_ids: list[str], names: list[str], gruppen: list[str] | None = None) -> list[dict]:
                 # Reihen ohne gewählte Entität (z. B. eine per "+ hinzufügen"
@@ -2985,7 +2987,7 @@ class EnergieDashboardService:
         def energiedashboard_data(range: str = "day", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             # Ein Cache für alle drei compute_flow()-Aufrufe dieses Requests
             # (aktuell/rollierend-aktuell/rollierend-vorherig) — deren
             # Fenster überlappen oder grenzen direkt aneinander an, ohne
@@ -3010,10 +3012,10 @@ class EnergieDashboardService:
             # bereits im Browser eingebaut (ROADMAP.md 1.7). Nur Monat/Jahr
             # ergeben als Rückblick Sinn, siehe REPORT_RANGE_KEYS.
             if range not in REPORT_RANGE_KEYS:
-                raise HTTPException(status_code=400, detail="Ungültiger Zeitraum für den Energiebericht")
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum für den Energiebericht"))
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             now = datetime.now(self.deps.tz)
             read_cache = query_mod.QueryReadCache()
             current = self.compute_flow(config, range, offset, read_cache=read_cache)
@@ -3109,14 +3111,14 @@ class EnergieDashboardService:
             # bei jedem Perioden-Wechsel mitzuschleppen.
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.compute_trends(config)
 
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             # Tag/Woche: unverändert sieben konkrete Kalendertage (Kachel ist
             # hier bewusst vom Zeitraum-Umschalter entkoppelt). Monat/Jahr:
             # Wochentags-Mittel über den gesamten gewählten Zeitraum, siehe

@@ -95,7 +95,7 @@
         <div class="dtile-settings-section">
           <div class="dtile-decimals-picker-head">{{ _("Zeitraum") }}</div>
           <div class="dtile-choice-row dtile-range-row" role="group" aria-label="{{ _('Zeitraum wählen') }}">
-            {% for value, label in [('hour', 'Std.'), ('day', 'Tag'), ('week', 'Woche'), ('month', 'Monat'), ('year', 'Jahr')] %}
+            {% for value, label in [('hour', 'Std.'), ('day', _('Tag')), ('week', _('Woche')), ('month', _('Monat')), ('year', _('Jahr'))] %}
             <button type="button" class="dtile-choice-cell dtile-range-cell{% if tile.range_key == value %} is-selected{% endif %}"
                     draggable="false" data-range="{{ value }}">{{ label }}</button>
             {% endfor %}
@@ -169,7 +169,7 @@
         <div class="dtile-settings-section">
           <div class="dtile-decimals-picker-head">{{ _("Sparkline-Auflösung") }}</div>
           <div class="dtile-sparkline-resolution-row" role="group" aria-label="{{ _('Sparkline-Auflösung wählen') }}">
-            {% for value, label in [('raw', 'Roh'), ('5min', '5 Min'), ('15min', '15 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
+            {% for value, label in [('raw', _('Roh')), ('5min', '5 Min'), ('15min', '15 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
             <button type="button" class="dtile-sparkline-resolution-cell{% if tile.sparkline_resolution == value %} is-selected{% endif %}"
                     data-resolution="{{ value }}" title="{{ {'raw': _('Alle gespeicherten Rohdatenpunkte'), '5min': _('Ein Punkt je 5 Minuten'), '15min': _('Ein Punkt je 15 Minuten'), '30min': _('Ein Punkt je 30 Minuten'), '1h': _('Ein Punkt je Stunde')}[value] }}">{{ label }}</button>
             {% endfor %}
@@ -179,7 +179,7 @@
         <div class="dtile-settings-section">
           <div class="dtile-decimals-picker-head">{{ _("Als veraltet markieren") }}</div>
           <div class="dtile-stale-mode-row" role="group" aria-label="{{ _('Veraltet-Schwelle wählen') }}">
-            {% for value, label, hint in [('standard', 'Standard', 'Gelb nach 15 Minuten, rot nach 1 Stunde'), ('daily', 'Täglich', 'Gelb nach 26 Stunden, rot nach 48 Stunden — für Tageswerte'), ('rare', 'Selten', 'Gelb nach 3 Tagen, rot nach 7 Tagen — für Zähler, die nur bei Aktivität melden'), ('off', 'Aus', 'Nie als veraltet markieren')] %}
+            {% for value, label, hint in [('standard', _('Standard'), _('Gelb nach 15 Minuten, rot nach 1 Stunde')), ('daily', _('Täglich'), _('Gelb nach 26 Stunden, rot nach 48 Stunden — für Tageswerte')), ('rare', _('Selten'), _('Gelb nach 3 Tagen, rot nach 7 Tagen — für Zähler, die nur bei Aktivität melden')), ('off', _('Aus'), _('Nie als veraltet markieren'))] %}
             <button type="button" class="dtile-stale-mode-cell{% if tile.stale_mode == value %} is-selected{% endif %}"
                     data-stale-mode="{{ value }}" title="{{ hint }}">{{ label }}</button>
             {% endfor %}
@@ -189,7 +189,7 @@
         <div class="dtile-settings-section">
           <div class="dtile-decimals-picker-head">{{ _("Nachkommastellen") }}</div>
           <div class="dtile-decimals-row" role="group" aria-label="{{ _('Nachkommastellen wählen') }}">
-            {% for value, label in [('auto', 'Auto'), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
+            {% for value, label in [('auto', _('Auto')), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
             <button type="button" class="dtile-decimals-cell{% if tile.decimals == value %} is-selected{% endif %}"
                     data-decimals="{{ value }}"
                     title="{{ _('Automatisch') if value == 'auto' else (value ~ _(' Nachkommastelle') ~ ('n' if value != '1' else '')) }}">{{ label }}</button>

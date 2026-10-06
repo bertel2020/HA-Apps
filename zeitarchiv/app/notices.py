@@ -29,6 +29,7 @@ from . import cleanup_stats
 from . import ha_integration
 from . import tips as tips_mod
 from . import version_check
+from .i18n import N_, tr
 from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETTING_HOURLY_BACKFILL_PENDING
 from .formatting import (
     GAP_THRESHOLD_LABELS,
@@ -150,7 +151,7 @@ SNOOZE_PRESETS = {
     "forever": None,
 }
 SNOOZE_LABELS = {
-    "1h": "1 Stunde", "1d": "1 Tag", "7d": "7 Tage", "30d": "30 Tage", "forever": "Dauerhaft",
+    "1h": N_("1 Stunde"), "1d": N_("1 Tag"), "7d": N_("7 Tage"), "30d": N_("30 Tage"), "forever": N_("Dauerhaft"),
 }
 
 
@@ -229,9 +230,9 @@ def build_notices(
         notices.append({
             "id": "system.update_available",
             "severity": "info",
-            "title": "Update verfügbar",
-            "detail": f"Version {latest_version} ist verfügbar (aktuell installiert: {APP_VERSION}).",
-            "meta": "Über Zeitarchiv",
+            "title": tr("Update verfügbar"),
+            "detail": tr("Version {latest_version} ist verfügbar (aktuell installiert: {APP_VERSION}).", latest_version=latest_version, APP_VERSION=APP_VERSION),
+            "meta": tr("Über Zeitarchiv"),
             "link": "/settings#ueber",
         })
 
@@ -240,16 +241,11 @@ def build_notices(
         notices.append({
             "id": "integration.outdated",
             "severity": "warn",
-            "title": "Home-Assistant-Integration veraltet",
+            "title": tr("Home-Assistant-Integration veraltet"),
             "detail": (
-                f"Die Zeitarchiv-Integration meldet sich mit Version "
-                f"{integration_info['version']}, unterstützt wird ab "
-                f"{ha_integration.MIN_SUPPORTED_INTEGRATION_VERSION}. Bitte über "
-                "HACS oder manuell aktualisieren — sonst funktionieren neuere "
-                "Funktionen (z. B. Rückmeldungen an Home Assistant) nicht "
-                "zuverlässig."
+                tr("Die Zeitarchiv-Integration meldet sich mit Version {version}, unterstützt wird ab {MIN_SUPPORTED_INTEGRATION_VERSION}. Bitte über HACS oder manuell aktualisieren — sonst funktionieren neuere Funktionen (z. B. Rückmeldungen an Home Assistant) nicht zuverlässig.", version=integration_info['version'], MIN_SUPPORTED_INTEGRATION_VERSION=ha_integration.MIN_SUPPORTED_INTEGRATION_VERSION)
             ),
-            "meta": "Verbindung",
+            "meta": tr("Verbindung"),
             "link": "/settings#verbindung",
         })
 
@@ -264,15 +260,14 @@ def build_notices(
             "id": "integration.update_available",
             "severity": "info",
             "title": (
-                "Integrations-Bugfix verfügbar"
+                tr("Integrations-Bugfix verfügbar")
                 if integration_update_kind == "bugfix"
-                else "Neue Integrations-Version verfügbar"
+                else tr("Neue Integrations-Version verfügbar")
             ),
             "detail": (
-                f"Version {latest_integration_version} der Home-Assistant-Integration ist verfügbar "
-                f"(aktuell verbunden: {integration_info['version']})."
+                tr("Version {latest_integration_version} der Home-Assistant-Integration ist verfügbar (aktuell verbunden: {version}).", latest_integration_version=latest_integration_version, version=integration_info['version'])
             ),
-            "meta": "Verbindung",
+            "meta": tr("Verbindung"),
             "link": "/settings#verbindung",
         })
 
@@ -282,13 +277,11 @@ def build_notices(
         notices.append({
             "id": "system.index_optimization",
             "severity": "warn",
-            "title": "Index-Optimierung empfohlen",
+            "title": tr("Index-Optimierung empfohlen"),
             "detail": (
-                f"Indexdatei ist {format_size(optimization['file_bytes'])}, davon "
-                f"{format_size(optimization['reclaimable_bytes'])} wiederherstellbar "
-                f"({ratio_percent} %)."
+                tr("Indexdatei ist {format_size}, davon {format_size2} wiederherstellbar ({ratio_percent} %).", format_size=format_size(optimization['file_bytes']), format_size2=format_size(optimization['reclaimable_bytes']), ratio_percent=ratio_percent)
             ),
-            "meta": "Statistik · System",
+            "meta": tr("Statistik · System"),
             "link": "/statistik/index",
         })
 
@@ -305,14 +298,11 @@ def build_notices(
         notices.append({
             "id": "system.scheduler_stalled",
             "severity": "warn",
-            "title": "Wartungsplaner reagiert nicht",
+            "title": tr("Wartungsplaner reagiert nicht"),
             "detail": (
-                f"Seit {round(scheduler_idle_seconds / 60)} Minuten kein "
-                "abgeschlossener Durchlauf des Wartungsplaners — Sicherungs-/"
-                "Aufbewahrungspläne, Statistik-Schnappschüsse und Vorschauen "
-                "könnten veraltet sein."
+                tr("Seit {round} Minuten kein abgeschlossener Durchlauf des Wartungsplaners — Sicherungs-/Aufbewahrungspläne, Statistik-Schnappschüsse und Vorschauen könnten veraltet sein.", round=round(scheduler_idle_seconds / 60))
             ),
-            "meta": "Diagnose",
+            "meta": tr("Diagnose"),
             "link": "/settings#diagnose",
         })
 
@@ -326,13 +316,11 @@ def build_notices(
         notices.append({
             "id": "system.storage_reconcile_stalled",
             "severity": "warn",
-            "title": "Speicherindex-Abgleich reagiert nicht",
+            "title": tr("Speicherindex-Abgleich reagiert nicht"),
             "detail": (
-                f"Seit {round(reconcile_idle_seconds / 60)} Minuten kein "
-                "Fortschritt beim Hintergrundabgleich des Speicherindex — "
-                "möglicherweise an einer Entitäts-Sperre hängengeblieben."
+                tr("Seit {round} Minuten kein Fortschritt beim Hintergrundabgleich des Speicherindex — möglicherweise an einer Entitäts-Sperre hängengeblieben.", round=round(reconcile_idle_seconds / 60))
             ),
-            "meta": "Diagnose",
+            "meta": tr("Diagnose"),
             "link": "/settings#diagnose",
         })
 
@@ -348,13 +336,11 @@ def build_notices(
             notices.append({
                 "id": "system.backup_worker_stalled",
                 "severity": "warn",
-                "title": "Backup reagiert nicht",
+                "title": tr("Backup reagiert nicht"),
                 "detail": (
-                    f"Seit {round(backup_worker_idle_seconds / 60)} Minuten kein "
-                    "Fortschritt beim laufenden Backup — möglicherweise an einer "
-                    "Entitäts-Sperre hängengeblieben."
+                    tr("Seit {round} Minuten kein Fortschritt beim laufenden Backup — möglicherweise an einer Entitäts-Sperre hängengeblieben.", round=round(backup_worker_idle_seconds / 60))
                 ),
-                "meta": "Diagnose",
+                "meta": tr("Diagnose"),
                 "link": "/settings#diagnose",
             })
 
@@ -367,14 +353,11 @@ def build_notices(
         notices.append({
             "id": "system.index_lock_contention",
             "severity": "info",
-            "title": "Kurzzeitige Datenbank-Überlastung erkannt",
+            "title": tr("Kurzzeitige Datenbank-Überlastung erkannt"),
             "detail": (
-                f"{busy_events}× in den letzten 24h musste eine Datenbank-"
-                "Operation abgebrochen werden, weil sie nicht rechtzeitig an "
-                "die Reihe kam — trat z. B. bei einem laufenden VACUUM "
-                "auf und hat sich von selbst gelöst."
+                tr("{busy_events}× in den letzten 24h musste eine Datenbank-Operation abgebrochen werden, weil sie nicht rechtzeitig an die Reihe kam — trat z. B. bei einem laufenden VACUUM auf und hat sich von selbst gelöst.", busy_events=busy_events)
             ),
-            "meta": "Diagnose",
+            "meta": tr("Diagnose"),
             "link": "/settings#diagnose",
         })
 
@@ -390,15 +373,11 @@ def build_notices(
         notices.append({
             "id": "system.storage_lock_contention",
             "severity": "info",
-            "title": "Kurzzeitige Speicherzugriffs-Überlastung erkannt",
+            "title": tr("Kurzzeitige Speicherzugriffs-Überlastung erkannt"),
             "detail": (
-                f"{coordinator_busy}× in den letzten 24h musste ein Datei-"
-                "Zugriff (Archiv/Rollup/Hot) abgebrochen werden, weil er "
-                "nicht rechtzeitig an die Reihe kam — trat z. B. während "
-                "eines laufenden Backups, einer Retention oder eines "
-                "Imports auf und hat sich von selbst gelöst."
+                tr("{coordinator_busy}× in den letzten 24h musste ein Datei-Zugriff (Archiv/Rollup/Hot) abgebrochen werden, weil er nicht rechtzeitig an die Reihe kam — trat z. B. während eines laufenden Backups, einer Retention oder eines Imports auf und hat sich von selbst gelöst.", coordinator_busy=coordinator_busy)
             ),
-            "meta": "Diagnose",
+            "meta": tr("Diagnose"),
             "link": "/settings#diagnose",
         })
 
@@ -419,16 +398,11 @@ def build_notices(
         notices.append({
             "id": "ingest.duplicate_ratio_high",
             "severity": "warn",
-            "title": "Hohe Duplikatquote im Ingest erkannt",
+            "title": tr("Hohe Duplikatquote im Ingest erkannt"),
             "detail": (
-                f"{duplicate_ratio_busy}× in den letzten 24h bestand ein "
-                "Schreibbatch überwiegend aus bereits vorhandenen Werten — "
-                "möglicherweise sendet eine Automation oder ein Sensor "
-                "wiederholt denselben Messwert. Lohnt einen Blick auf die "
-                "sendende Quelle, sonst kein Handlungsbedarf von dieser "
-                "Seite aus."
+                tr("{duplicate_ratio_busy}× in den letzten 24h bestand ein Schreibbatch überwiegend aus bereits vorhandenen Werten — möglicherweise sendet eine Automation oder ein Sensor wiederholt denselben Messwert. Lohnt einen Blick auf die sendende Quelle, sonst kein Handlungsbedarf von dieser Seite aus.", duplicate_ratio_busy=duplicate_ratio_busy)
             ),
-            "meta": "Verbindung",
+            "meta": tr("Verbindung"),
             "link": "/settings#verbindung",
         })
 
@@ -439,13 +413,11 @@ def build_notices(
         notices.append({
             "id": "system.storage_reconcile_errors",
             "severity": "warn",
-            "title": "Speicherindex-Prüfung unvollständig",
+            "title": tr("Speicherindex-Prüfung unvollständig"),
             "detail": (
-                f"{error_count} Entität{'en' if error_count != 1 else ''} "
-                f"{'konnten' if error_count != 1 else 'konnte'} beim letzten Abgleich "
-                "nicht vollständig geprüft werden."
+                (tr("{error_count} Entität konnte beim letzten Abgleich nicht vollständig geprüft werden.", error_count=error_count) if error_count == 1 else tr("{error_count} Entitäten konnten beim letzten Abgleich nicht vollständig geprüft werden.", error_count=error_count))
             ),
-            "meta": "Speicherplatz",
+            "meta": tr("Speicherplatz"),
             "link": "/housekeeping#speicherplatz",
         })
 
@@ -461,7 +433,7 @@ def build_notices(
         notices.append({
             "id": "system.storage_reconcile_mismatches",
             "severity": "info" if repaired else "warn",
-            "title": "Index-Abweichungen automatisch behoben" if repaired else "Index-Abweichungen gefunden",
+            "title": tr("Index-Abweichungen automatisch behoben") if repaired else tr("Index-Abweichungen gefunden"),
             "detail": (
                 f"{mismatch_count} Abweichung{'en' if mismatch_count != 1 else ''} zwischen Index und "
                 "gespeicherten Rohdaten beim letzten Abgleich gefunden"
@@ -471,7 +443,7 @@ def build_notices(
                     else ", aber noch nicht behoben."
                 )
             ),
-            "meta": "Speicherplatz",
+            "meta": tr("Speicherplatz"),
             "link": "/housekeeping#speicherplatz",
         })
 
@@ -489,14 +461,11 @@ def build_notices(
         notices.append({
             "id": "system.storage_reconcile_corrupted",
             "severity": "warn",
-            "title": "Beschädigte Rohdaten gefunden",
+            "title": tr("Beschädigte Rohdaten gefunden"),
             "detail": (
-                f"{line_count} beschädigte Zeile{'n' if line_count != 1 else ''} in "
-                f"{entity_count} Entität{'en' if entity_count != 1 else ''} beim letzten Abgleich "
-                "übersprungen und dauerhaft verloren — meist durch einen unsauberen Neustart "
-                "(Stromausfall, harter Kill)."
+                tr("{lines} in {entities} beim letzten Abgleich übersprungen und dauerhaft verloren — meist durch einen unsauberen Neustart (Stromausfall, harter Kill).", lines=(tr("{count} beschädigte Zeile", count=line_count) if line_count == 1 else tr("{count} beschädigte Zeilen", count=line_count)), entities=(tr("{count} Entität", count=entity_count) if entity_count == 1 else tr("{count} Entitäten", count=entity_count)))
             ),
-            "meta": "Speicherplatz",
+            "meta": tr("Speicherplatz"),
             "link": "/housekeeping#speicherplatz",
         })
 
@@ -505,18 +474,18 @@ def build_notices(
         notices.append({
             "id": "backup.job_failed",
             "severity": "error",
-            "title": "Backup fehlgeschlagen",
+            "title": tr("Backup fehlgeschlagen"),
             "detail": last_backup[0]["error"] or "Die letzte Sicherung konnte nicht abgeschlossen werden.",
-            "meta": "Sicherung",
+            "meta": tr("Sicherung"),
             "link": "/backup",
         })
     elif index.get_setting("backup_schedule", "off") == "off":
         notices.append({
             "id": "backup.no_schedule",
             "severity": "info",
-            "title": "Kein automatisches Backup eingerichtet",
-            "detail": "Es ist aktuell kein Zeitplan für regelmäßige Sicherungen aktiv.",
-            "meta": "Sicherung",
+            "title": tr("Kein automatisches Backup eingerichtet"),
+            "detail": tr("Es ist aktuell kein Zeitplan für regelmäßige Sicherungen aktiv."),
+            "meta": tr("Sicherung"),
             "link": "/backup",
         })
 
@@ -525,12 +494,12 @@ def build_notices(
         notices.append({
             "id": "retention.job_failed",
             "severity": "error",
-            "title": "Automatische Aufbewahrung fehlgeschlagen",
+            "title": tr("Automatische Aufbewahrung fehlgeschlagen"),
             "detail": (
                 last_retention[0]["error"]
                 or "Der letzte geplante Bereinigungslauf ist fehlgeschlagen."
             ),
-            "meta": "Aufbewahrung",
+            "meta": tr("Aufbewahrung"),
             "link": "/housekeeping#aufbewahrung",
         })
     elif index.get_setting("retention_enforcement_schedule", "off") == "off":
@@ -539,13 +508,11 @@ def build_notices(
             notices.append({
                 "id": "retention.enforcement_disabled",
                 "severity": "warn",
-                "title": "Aufbewahrung konfiguriert, aber nicht aktiv",
+                "title": tr("Aufbewahrung konfiguriert, aber nicht aktiv"),
                 "detail": (
-                    f"{limited_count} Entität{'en haben' if limited_count != 1 else ' hat'} eine "
-                    "begrenzte Aufbewahrungsfrist, die automatische Durchsetzung ist aber ausgeschaltet "
-                    "— abgelaufene Werte werden dadurch nie automatisch entfernt."
+                    (tr("{limited_count} Entität hat eine begrenzte Aufbewahrungsfrist, die automatische Durchsetzung ist aber ausgeschaltet — abgelaufene Werte werden dadurch nie automatisch entfernt.", limited_count=limited_count) if limited_count == 1 else tr("{limited_count} Entitäten haben eine begrenzte Aufbewahrungsfrist, die automatische Durchsetzung ist aber ausgeschaltet — abgelaufene Werte werden dadurch nie automatisch entfernt.", limited_count=limited_count))
                 ),
-                "meta": "Aufbewahrung",
+                "meta": tr("Aufbewahrung"),
                 "link": "/housekeeping#aufbewahrung",
             })
 
@@ -557,18 +524,18 @@ def build_notices(
             notices.append({
                 "id": "import.job_failed",
                 "severity": "error",
-                "title": "Import fehlgeschlagen",
-                "detail": f"Der letzte {source_label}-Import konnte nicht abgeschlossen werden.",
-                "meta": "Import",
+                "title": tr("Import fehlgeschlagen"),
+                "detail": tr("Der letzte {source_label}-Import konnte nicht abgeschlossen werden.", source_label=source_label),
+                "meta": tr("Import"),
                 "link": "/import?tab=reports",
             })
         else:
             notices.append({
                 "id": "import.job_failed",
                 "severity": "warn",
-                "title": "Import unvollständig",
-                "detail": f"Der letzte {source_label}-Import wurde nur teilweise abgeschlossen.",
-                "meta": "Import",
+                "title": tr("Import unvollständig"),
+                "detail": tr("Der letzte {source_label}-Import wurde nur teilweise abgeschlossen.", source_label=source_label),
+                "meta": tr("Import"),
                 "link": "/import?tab=reports",
             })
 
@@ -583,14 +550,11 @@ def build_notices(
         notices.append({
             "id": "entities.gap_threshold_conflict",
             "severity": "warn",
-            "title": "Lücken-Erkennung kann strukturell nicht zutreffen",
+            "title": tr("Lücken-Erkennung kann strukturell nicht zutreffen"),
             "detail": (
-                f"{conflict_count} Entität{'en haben' if conflict_count != 1 else ' hat'} eine "
-                "Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die "
-                "gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen "
-                "gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen."
+                (tr("{conflict_count} Entität hat eine Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen.", conflict_count=conflict_count) if conflict_count == 1 else tr("{conflict_count} Entitäten haben eine Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen.", conflict_count=conflict_count))
             ),
-            "meta": "Housekeeping",
+            "meta": tr("Housekeeping"),
             "link": "/housekeeping#konfiguration",
         })
 
@@ -613,14 +577,14 @@ def build_notices(
         notices.append({
             "id": "entities.outlier_rate_high",
             "severity": "info",
-            "title": "Ausreißer-Erkennung markiert auffällig viel",
+            "title": tr("Ausreißer-Erkennung markiert auffällig viel"),
             "detail": (
                 f"Bei {anzahl} Entität{'en' if anzahl != 1 else ''} markiert die eingestellte "
                 f"Schwelle mehr als {marke} % aller Werte"
                 + (f" — am deutlichsten {beispiel}." if anzahl != 1 else f": {beispiel}.")
                 + " Eine zu enge Schwelle markiert normales Verhalten als verdächtig."
             ),
-            "meta": "Housekeeping",
+            "meta": tr("Housekeeping"),
             "link": "/housekeeping#ausreisser",
         })
 
@@ -642,13 +606,11 @@ def build_notices(
         notices.append({
             "id": "energiedashboard.hourly_backfill_pending",
             "severity": "info",
-            "title": "Tageslastprofil wird noch vervollständigt",
+            "title": tr("Tageslastprofil wird noch vervollständigt"),
             "detail": (
-                f"{pending_count} Zähler-Entität{'en holen' if pending_count != 1 else ' holt'} im "
-                "Energiedashboard gerade rückwirkend ihr Stunden-Rollup für bereits archivierte Monate "
-                "nach — das Tageslastprofil nach Wochentag kann bis dahin für ältere Monate unvollständig sein."
+                (tr("{pending_count} Zähler-Entität holt im Energiedashboard gerade rückwirkend ihr Stunden-Rollup für bereits archivierte Monate nach — das Tageslastprofil nach Wochentag kann bis dahin für ältere Monate unvollständig sein.", pending_count=pending_count) if pending_count == 1 else tr("{pending_count} Zähler-Entitäten holen im Energiedashboard gerade rückwirkend ihr Stunden-Rollup für bereits archivierte Monate nach — das Tageslastprofil nach Wochentag kann bis dahin für ältere Monate unvollständig sein.", pending_count=pending_count))
             ),
-            "meta": "Energiedashboard",
+            "meta": tr("Energiedashboard"),
             "link": "/energiedashboard",
         })
 
@@ -670,14 +632,11 @@ def build_notices(
         notices.append({
             "id": "energiedashboard.config_from_newer_version",
             "severity": "warn",
-            "title": "Energiedashboard-Konfiguration von neuerer Version",
+            "title": tr("Energiedashboard-Konfiguration von neuerer Version"),
             "detail": (
-                "Die gespeicherte Energiedashboard-Konfiguration wurde von einer neueren "
-                "Zeitarchiv-Version geschrieben und wird von dieser Version sicherheitshalber "
-                "als leer behandelt, statt sie falsch zu interpretieren. Ein Update auf die "
-                "neuere Version stellt die eigentlichen Einstellungen wieder her."
+                tr("Die gespeicherte Energiedashboard-Konfiguration wurde von einer neueren Zeitarchiv-Version geschrieben und wird von dieser Version sicherheitshalber als leer behandelt, statt sie falsch zu interpretieren. Ein Update auf die neuere Version stellt die eigentlichen Einstellungen wieder her.")
             ),
-            "meta": "Energiedashboard",
+            "meta": tr("Energiedashboard"),
             "link": "/energiedashboard",
         })
 
@@ -697,12 +656,11 @@ def build_notices(
             notices.append({
                 "id": "housekeeping.host_disk_space_low",
                 "severity": "error" if free_ratio < HOST_DISK_ERROR_RATIO else "warn",
-                "title": "Host-Speicherplatz wird knapp",
+                "title": tr("Host-Speicherplatz wird knapp"),
                 "detail": (
-                    f"Noch {format_size(free_bytes)} frei ({round(free_ratio * 100)} % der Partition) "
-                    "auf dem Dateisystem, auf dem Zeitarchiv seine Daten ablegt."
+                    tr("Noch {format_size} frei ({round} % der Partition) auf dem Dateisystem, auf dem Zeitarchiv seine Daten ablegt.", format_size=format_size(free_bytes), round=round(free_ratio * 100))
                 ),
-                "meta": "Speicherplatz",
+                "meta": tr("Speicherplatz"),
                 "link": "/housekeeping#speicherplatz",
             })
 
@@ -718,16 +676,11 @@ def build_notices(
             notices.append({
                 "id": "housekeeping.import_leftovers",
                 "severity": "info",
-                "title": "Import-Quelldaten liegen noch",
+                "title": tr("Import-Quelldaten liegen noch"),
                 "detail": (
-                    f"{format_size(_import_leftovers['bytes'])} entpackte Quelldaten aus einem "
-                    f"Import liegen unverändert seit {age_days} Tag{'en' if age_days != 1 else ''} "
-                    "im Datenverzeichnis. Zeitarchiv behält sie absichtlich, damit sich Zuordnung "
-                    "und Probelauf ohne erneuten Upload wiederholen lassen — nach einem "
-                    "abgeschlossenen Import werden sie nicht mehr gebraucht und lassen sich unter "
-                    "Import mit „Daten löschen\u201c entfernen."
+                    tr("{format_size} entpackte Quelldaten aus einem Import liegen unverändert seit {days} im Datenverzeichnis. Zeitarchiv behält sie absichtlich, damit sich Zuordnung und Probelauf ohne erneuten Upload wiederholen lassen — nach einem abgeschlossenen Import werden sie nicht mehr gebraucht und lassen sich unter Import mit „Daten löschen“ entfernen.", format_size=format_size(_import_leftovers['bytes']), days=(tr("{count} Tag", count=age_days) if age_days == 1 else tr("{count} Tagen", count=age_days)))
                 ),
-                "meta": "Import",
+                "meta": tr("Import"),
                 "link": "/import",
             })
 
@@ -737,13 +690,11 @@ def build_notices(
         notices.append({
             "id": "housekeeping.purge_available",
             "severity": "warn",
-            "title": "Endgültige Bereinigung möglich",
+            "title": tr("Endgültige Bereinigung möglich"),
             "detail": (
-                f"{format_int(removable_rows)} markierte Datensätze über "
-                f"{entities_affected} Entität{'en' if entities_affected != 1 else ''} "
-                "können endgültig entfernt werden."
+                tr("{format_int} markierte Datensätze über {entities} können endgültig entfernt werden.", format_int=format_int(removable_rows), entities=(tr("{count} Entität", count=entities_affected) if entities_affected == 1 else tr("{count} Entitäten", count=entities_affected)))
             ),
-            "meta": "Housekeeping",
+            "meta": tr("Housekeeping"),
             "link": "/housekeeping#speicherplatz",
         })
 
@@ -756,13 +707,11 @@ def build_notices(
         notices.append({
             "id": "housekeeping.duplicates_found",
             "severity": "warn",
-            "title": "Duplikate gefunden",
+            "title": tr("Duplikate gefunden"),
             "detail": (
-                f"{format_int(duplicate_total)} doppelte Zeitstempel über "
-                f"{len(duplicate_rows)} Entität{'en' if len(duplicate_rows) != 1 else ''} "
-                "in den letzten 30 Tagen."
+                tr("{format_int} doppelte Zeitstempel über {entities} in den letzten 30 Tagen.", format_int=format_int(duplicate_total), entities=(tr("{count} Entität", count=len(duplicate_rows)) if len(duplicate_rows) == 1 else tr("{count} Entitäten", count=len(duplicate_rows))))
             ),
-            "meta": "Duplikate",
+            "meta": tr("Duplikate"),
             "link": "/housekeeping#duplikate",
         })
 
@@ -770,12 +719,11 @@ def build_notices(
         notices.append({
             "id": "housekeeping.rotation_pending",
             "severity": "info",
-            "title": "Rotation ausstehend",
+            "title": tr("Rotation ausstehend"),
             "detail": (
-                f"{stale_entity_count} Entität{'en haben' if stale_entity_count != 1 else ' hat'} "
-                "eine noch nicht rotierte Hot-Datei aus einem vergangenen Monat."
+                (tr("{stale_entity_count} Entität hat eine noch nicht rotierte Hot-Datei aus einem vergangenen Monat.", stale_entity_count=stale_entity_count) if stale_entity_count == 1 else tr("{stale_entity_count} Entitäten haben eine noch nicht rotierte Hot-Datei aus einem vergangenen Monat.", stale_entity_count=stale_entity_count))
             ),
-            "meta": "Rotation",
+            "meta": tr("Rotation"),
             "link": "/housekeeping#rotation",
         })
 
@@ -793,13 +741,11 @@ def build_notices(
         notices.append({
             "id": f"housekeeping.inactive_entities_{tier}",
             "severity": severity,
-            "title": "Inaktive Entitäten gefunden",
+            "title": tr("Inaktive Entitäten gefunden"),
             "detail": (
-                f"{count} Entität{'en' if count != 1 else ''} "
-                f"{'haben' if count != 1 else 'hat'} seit mindestens "
-                f"{threshold_days} Tag{'en' if threshold_days != 1 else ''} keinen neuen Wert geliefert."
+                tr("{entities} seit mindestens {days} keinen neuen Wert geliefert.", entities=(tr("{count} Entität hat", count=count) if count == 1 else tr("{count} Entitäten haben", count=count)), days=(tr("{count} Tag", count=threshold_days) if threshold_days == 1 else tr("{count} Tagen", count=threshold_days)))
             ),
-            "meta": "Housekeeping",
+            "meta": tr("Housekeeping"),
             "link": "/housekeeping#entitaeten",
         })
 
@@ -813,12 +759,11 @@ def build_notices(
         notices.append({
             "id": "system.demo_data_orphaned",
             "severity": "info",
-            "title": "Demo-Daten vorhanden",
+            "title": tr("Demo-Daten vorhanden"),
             "detail": (
-                f"{format_size(demo_dir_info['size_bytes'])} unter <DATA_DIR>/demo — "
-                "Demo-Modus ist deaktiviert, die Daten liegen ungenutzt."
+                tr("{format_size} unter <DATA_DIR>/demo — Demo-Modus ist deaktiviert, die Daten liegen ungenutzt.", format_size=format_size(demo_dir_info['size_bytes']))
             ),
-            "meta": "Demo-Daten",
+            "meta": tr("Demo-Daten"),
             "link": "/settings#demo-daten",
         })
 
@@ -928,9 +873,9 @@ def _current_tip_notice(index, tz: ZoneInfo) -> dict | None:
     return {
         "id": f"tips.{tip['slug']}",
         "severity": "info",
-        "title": tip["title"],
-        "detail": tip["detail"],
-        "meta": tip["meta"],
+        "title": tr(tip["title"]),
+        "detail": tr(tip["detail"]),
+        "meta": tr(tip["meta"]),
         "link": tip.get("link"),
         # Eigenes Ausblenden statt des allgemeinen Stummschalt-Systems (siehe
         # hide_tip_today/_settings_tips_form.html) — taucht deshalb auch nicht
@@ -950,6 +895,9 @@ def list_tips_with_status(index, tz: ZoneInfo) -> list[dict]:
     return [
         {
             **tip,
+            "title": tr(tip["title"]),
+            "detail": tr(tip["detail"]),
+            "meta": tr(tip["meta"]),
             "is_today": tip["slug"] == today_tip["slug"],
             "hidden_today": tip["slug"] == today_tip["slug"] and hidden_today,
         }

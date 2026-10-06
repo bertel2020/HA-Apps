@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import logging
 import shutil
 import sqlite3
@@ -89,7 +91,7 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
                 latest = get_index_optimization_state(index, index_path)
                 if not latest["can_optimize"]:
                     raise ValueError(
-                        "Keine vollständig freien SQLite-Seiten mehr vorhanden."
+                        tr("Keine vollständig freien SQLite-Seiten mehr vorhanden.")
                     )
                 vacuum_result = index.vacuum_database()
         before_bytes = int(vacuum_result["before"]["database_bytes"])

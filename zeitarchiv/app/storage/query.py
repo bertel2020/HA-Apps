@@ -15,6 +15,8 @@ Monate/Jahre automatisch korrekt, ohne dass die Split-Logik etwas davon wissen m
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -120,7 +122,7 @@ def _hot_rows(path: Path, read_cache: QueryReadCache | None) -> list[tuple[float
 def _resolved_chart_type(aggregation_type: str, chart_type: str | None) -> str:
     if chart_type is not None:
         if chart_type not in ("line", "bar"):
-            raise ValueError(f"Unbekannter Diagrammtyp: {chart_type}")
+            raise ValueError(tr("Unbekannter Diagrammtyp: {chart_type}", chart_type=chart_type))
         return chart_type
     return "bar" if aggregation_type in ("counter", "switch") else "line"
 
@@ -238,7 +240,7 @@ def _window(
         natural_end = start.replace(year=decade_start_year + 10)
         return start, _cap(start, natural_end), natural_end
 
-    raise ValueError(f"Unbekannter Zeitraum: {range_key}")
+    raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
 
 
 def _read_hot_rows_filtered(
@@ -782,7 +784,7 @@ def query_series(
     same_elapsed: bool = False,
 ) -> dict:
     if range_key not in RANGE_KEYS:
-        raise ValueError(f"Unbekannter Zeitraum: {range_key}")
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
 
     entity = index.get_entity(entity_id)
     if entity is None:
@@ -895,7 +897,7 @@ def query_raw_series(
     immer als Linie — Balken pro Rohwert würden bei tausenden Punkten nur noch
     als flächige Masse erscheinen, nicht als lesbares Diagramm."""
     if range_key not in RANGE_KEYS:
-        raise ValueError(f"Unbekannter Zeitraum: {range_key}")
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
 
     entity = index.get_entity(entity_id)
     if entity is None:

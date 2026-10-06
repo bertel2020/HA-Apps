@@ -227,19 +227,26 @@ def _diagnose_zeilennamen() -> set[str]:
     Energiedashboard-Zeilen entstehen nur bei konfiguriertem Dashboard und
     fehlten in einer Testumgebung sonst immer."""
     funktion = _function("_settings_background_processes_context")
+
+    def text(knoten):
+        """Konstante oder tr("…") um eine Konstante (Übersetzung) → der deutsche Text, sonst None."""
+        if isinstance(knoten, ast.Call) and isinstance(knoten.func, ast.Name) and knoten.func.id == "tr" and knoten.args:
+            knoten = knoten.args[0]
+        return knoten.value if isinstance(knoten, ast.Constant) else None
+
     namen = set()
     for knoten in ast.walk(funktion):
         # row("Name", …) — die festen Zeilen
         if (isinstance(knoten, ast.Call) and isinstance(knoten.func, ast.Name)
                 and knoten.func.id == "row" and knoten.args
-                and isinstance(knoten.args[0], ast.Constant)):
-            namen.add(knoten.args[0].value)
+                and text(knoten.args[0]) is not None):
+            namen.add(text(knoten.args[0]))
         # {"name": "…", …} — die Zeilen mit eigener Pille
         if isinstance(knoten, ast.Dict):
             for schluessel, wert in zip(knoten.keys, knoten.values):
                 if (isinstance(schluessel, ast.Constant) and schluessel.value == "name"
-                        and isinstance(wert, ast.Constant)):
-                    namen.add(wert.value)
+                        and text(wert) is not None):
+                    namen.add(text(wert))
     return namen
 
 

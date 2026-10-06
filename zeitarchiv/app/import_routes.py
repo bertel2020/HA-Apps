@@ -9,6 +9,8 @@ Methoden — dieselbe Technik wie ReportService.router())."""
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import dataclasses
 import io
 import json
@@ -70,10 +72,10 @@ logger = logging.getLogger(__name__)
 # bewusst großzügiger (siehe ha_statistics.py-Moduldocstring), aber ebenso
 # aus Sicherheitsgründen nicht wirklich unbegrenzt.
 HA_RANGE_PRESETS_RAW = {
-    "max": "Verfügbare Historie (max.)",
-    "10d": "Letzte 10 Tage",
-    "30d": "Letzte 30 Tage",
-    "custom": "Eigener Zeitraum …",
+    "max": N_("Verfügbare Historie (max.)"),
+    "10d": N_("Letzte 10 Tage"),
+    "30d": N_("Letzte 30 Tage"),
+    "custom": N_("Eigener Zeitraum …"),
 }
 HA_RANGE_PRESET_DAYS_RAW = {"10d": 10, "30d": 30}
 HA_MAX_RANGE_DAYS_RAW = 365
@@ -82,11 +84,11 @@ HA_RANGE_PRESETS_FULL_RAW = {
 }
 
 HA_RANGE_PRESETS_STATS = {
-    "max": "Verfügbare Statistik (max.)",
-    "30d": "Letzte 30 Tage",
-    "90d": "Letzte 90 Tage",
-    "365d": "Letztes Jahr",
-    "custom": "Eigener Zeitraum …",
+    "max": N_("Verfügbare Statistik (max.)"),
+    "30d": N_("Letzte 30 Tage"),
+    "90d": N_("Letzte 90 Tage"),
+    "365d": N_("Letztes Jahr"),
+    "custom": N_("Eigener Zeitraum …"),
 }
 HA_RANGE_PRESET_DAYS_STATS = {"30d": 30, "90d": 90, "365d": 365}
 HA_MAX_RANGE_DAYS_STATS = 3650
@@ -215,9 +217,9 @@ class ImportService:
         # Vorschau ist für sich abgeschlossen und darf laufen, ohne dass ein
         # Import angestoßen wäre — beides in einem Zustand hieße, "läuft" für
         # zwei Dinge zu benutzen, die einander nicht bedingen.
-        self._dry_run_progress = JobProgress("symcon-dry-run", unit="Variablen", label="Symcon-Vorschau")
-        self._csv_progress = JobProgress("csv-import", unit="Zeilen", label="CSV-Import")
-        self._ha_progress = JobProgress("ha-import", unit="Entitäten", label="Home-Assistant-Import")
+        self._dry_run_progress = JobProgress("symcon-dry-run", unit=N_("Variablen"), label=N_("Symcon-Vorschau"))
+        self._csv_progress = JobProgress("csv-import", unit=N_("Zeilen"), label=N_("CSV-Import"))
+        self._ha_progress = JobProgress("ha-import", unit=N_("Entitäten"), label=N_("Home-Assistant-Import"))
         # Der Symcon-Import hat seinen eigenen, älteren Zustand mit
         # Monatszählern (_ImportProgress) und wird nicht umgeschrieben — er
         # meldet sich mit einem Adapter an, wie Backup und Aufbewahrung in
@@ -919,7 +921,7 @@ class ImportService:
         zusammen mit der gerade bearbeiteten Symcon-ID beschreibt genau den
         Moment, in dem die Anzeige abgerufen wird. Nach dem Aufruf gezählt
         stünde dort die ID der bereits fertigen Variable."""
-        self._dry_run_progress.set_phase("Vorschau wird berechnet…", len(mapped))
+        self._dry_run_progress.set_phase(N_("Vorschau wird berechnet…"), len(mapped))
         with self._import_source_lock:
             with self.deps.coordinator.entities([target for _, target, _ in mapped]):
                 plans = []
@@ -966,11 +968,11 @@ class ImportService:
                 factor = parse_localized_number(raw_factor)
             except ValueError as exc:
                 raise HTTPException(
-                    status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"
+                    status_code=400, detail=tr("Ungültiger Faktor für Symcon-ID {variable_id}", variable_id=variable_id)
                 ) from exc
             if not math.isfinite(factor) or factor == 0 or abs(factor) > 1_000_000_000_000:
                 raise HTTPException(
-                    status_code=400, detail=f"Ungültiger Faktor für Symcon-ID {variable_id}"
+                    status_code=400, detail=tr("Ungültiger Faktor für Symcon-ID {variable_id}", variable_id=variable_id)
                 )
             mapped.append((variable, target_entity_id, factor))
         return mapped
@@ -1872,14 +1874,14 @@ class ImportService:
             Fortschritt, damit ein ZIP mit tausenden Dateien nicht wie ein Hänger
             aussieht, während der Server noch beschäftigt ist."""
             if not file.filename or not file.filename.lower().endswith(".zip"):
-                raise HTTPException(status_code=400, detail="Bitte eine ZIP-Datei hochladen")
+                raise HTTPException(status_code=400, detail=tr("Bitte eine ZIP-Datei hochladen"))
             with self._import_admission_lock:
                 with self._upload_progress.lock:
                     upload_running = self._upload_progress.running
                 with self._import_progress.lock:
                     import_running = self._import_progress.running
                 if upload_running or import_running:
-                    raise HTTPException(status_code=409, detail="Ein Upload, Scan oder Import läuft bereits")
+                    raise HTTPException(status_code=409, detail=tr("Ein Upload, Scan oder Import läuft bereits"))
                 with self._upload_progress.lock:
                     self._upload_progress.running = True
                     self._upload_progress.phase = "receiving"
@@ -1934,7 +1936,7 @@ class ImportService:
             reiner JSON-Text, das Parsen dauert auch bei großen Symcon-Installationen
             nur Millisekunden, eine Fortschrittsanzeige wäre hier unnötige Komplexität."""
             if not file.filename or not file.filename.lower().endswith(".json"):
-                raise HTTPException(status_code=400, detail="Bitte eine JSON-Datei hochladen")
+                raise HTTPException(status_code=400, detail=tr("Bitte eine JSON-Datei hochladen"))
             tmp_json = self.deps.data_dir / "_symcon_settings_upload.json"
             try:
                 await run_in_threadpool(
@@ -1951,10 +1953,10 @@ class ImportService:
             try:
                 names = symcon_import.extract_variable_names(raw)
             except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=400, detail=f"Ungültiges JSON: {exc}") from exc
+                raise HTTPException(status_code=400, detail=tr("Ungültiges JSON: {exc}", exc=exc)) from exc
             if not names:
                 raise HTTPException(
-                    status_code=400, detail="Keine Variablen-Namen gefunden — ist das wirklich die settings.json?"
+                    status_code=400, detail=tr("Keine Variablen-Namen gefunden — ist das wirklich die settings.json?")
                 )
             def store_names() -> None:
                 with self._import_source_lock:
@@ -2076,7 +2078,7 @@ class ImportService:
                     with self._import_progress.lock:
                         already_running = self._import_progress.running
                     if upload_running:
-                        raise HTTPException(status_code=409, detail="Ein Upload oder Scan läuft bereits")
+                        raise HTTPException(status_code=409, detail=tr("Ein Upload oder Scan läuft bereits"))
                     if not already_running:
                         with self._import_source_lock:
                             self._run_import_background(self._mapped_variables(form))
@@ -2120,7 +2122,7 @@ class ImportService:
             Hänger zu wirken — läuft deshalb direkt als htmx-Multipart-Post, keine
             eigene XHR-Fortschrittsanzeige wie beim (potenziell riesigen) Symcon-ZIP."""
             if not file.filename or not file.filename.lower().endswith(".csv"):
-                raise HTTPException(status_code=400, detail="Bitte eine CSV-Datei hochladen")
+                raise HTTPException(status_code=400, detail=tr("Bitte eine CSV-Datei hochladen"))
             staging = self.deps.data_dir / "_csv_upload"
             try:
                 await run_in_threadpool(
@@ -2215,7 +2217,7 @@ class ImportService:
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
                         phase_label="Datei wird gelesen…",
                     )
-                    self._csv_progress.set_phase("Vorschau wird berechnet…")
+                    self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
                     with self.deps.coordinator.entity(entity_id):
                         plan = symcon_import.plan_import_rows(
                             self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
@@ -2335,7 +2337,7 @@ class ImportService:
                 try:
                     path = self._csv_uploaded_path()
                     if path is None:
-                        raise ValueError("Keine CSV-Datei hochgeladen.")
+                        raise ValueError(tr("Keine CSV-Datei hochgeladen."))
                     # Datei lesen, parsen und sortieren passiert VOR der Sperre.
                     # Es berührt keinen Speicherbestand, ist aber der Teil, der
                     # bei großen Dateien den Arbeitsspeicher füllt — vorher lief
@@ -2352,7 +2354,7 @@ class ImportService:
                     # übersprungen). Die Zahl der Monate IN den gelesenen Daten
                     # wäre eine Obergrenze — ein Balken, der nie 100 % erreicht,
                     # ist schlechter als gar keiner.
-                    self._csv_progress.set_phase("Schritt 2/2 · Werte werden geschrieben…", unit="Monate")
+                    self._csv_progress.set_phase(N_("Schritt 2/2 · Werte werden geschrieben…"), unit=N_("Monate"))
                     # Entitätssperre statt exclusive(): dieser Import schreibt
                     # genau eine Entität — Archiv, Rollups, Hot Buffer und
                     # Indexzeilen gehören alle ihr. Die globale Sperre hielt für
@@ -2400,7 +2402,7 @@ class ImportService:
                 # anhält (ZG-25; test_csv_import_locking.py prüft das am
                 # Syntaxbaum und sieht dabei auch verschachtelte Funktionen).
                 try:
-                    self._csv_progress.set_phase("Importbericht wird geschrieben…")
+                    self._csv_progress.set_phase(N_("Importbericht wird geschrieben…"))
                     write_csv_report(results, errors, reconciliation_report)
                 except Exception:  # noqa: BLE001 — ein fehlender Bericht darf den Import nicht kippen
                     logger.exception("CSV-Importreport konnte nicht gespeichert werden")
@@ -2859,7 +2861,7 @@ class ImportService:
                 # siehe _fetch_ha_full_history().
                 schritte = 2 * len(entity_ids) if history_source == "full" else len(entity_ids)
                 self._ha_progress.set_phase(
-                    "Schritt 1/2 · Daten werden aus Home Assistant geholt…", schritte, unit="Abrufe",
+                    N_("Schritt 1/2 · Daten werden aus Home Assistant geholt…"), schritte, unit=N_("Abrufe"),
                 )
                 if history_source == "full":
                     fetched, fetch_errors = self._fetch_ha_full_history(
@@ -2874,7 +2876,7 @@ class ImportService:
 
                 if fetched:
                     self._ha_progress.set_phase(
-                        "Schritt 2/2 · Werte werden geschrieben…", len(fetched), unit="Entitäten",
+                        N_("Schritt 2/2 · Werte werden geschrieben…"), len(fetched), unit=N_("Entitäten"),
                     )
                     try:
                         items, reconciliation_report = execute_ha_import(fetched, errors)
@@ -2910,7 +2912,7 @@ class ImportService:
                         errors.append(f"Import abgebrochen: {exc}")
 
                 try:
-                    self._ha_progress.set_phase("Importbericht wird geschrieben…")
+                    self._ha_progress.set_phase(N_("Importbericht wird geschrieben…"))
                     write_ha_report(items, errors, reconciliation_report)
                 except Exception:  # noqa: BLE001 — ein fehlender Bericht darf den Import nicht kippen
                     logger.exception("Home-Assistant-Importreport konnte nicht gespeichert werden")

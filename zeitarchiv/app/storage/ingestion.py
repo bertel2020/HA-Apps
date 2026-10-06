@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import hashlib
 import json
 import logging
@@ -360,7 +362,7 @@ class IngestionService:
         )
         claim = self._index.claim_ingest_event(event.event_id, event.entity_id, event.ts)
         if claim["entity_id"] != event.entity_id or claim["ts"] != event.ts:
-            raise ValueError("Event-ID wurde bereits für ein anderes Event verwendet")
+            raise ValueError(tr("Event-ID wurde bereits für ein anderes Event verwendet"))
         if claim["status"] == "done":
             return "duplicate"
 

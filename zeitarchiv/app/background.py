@@ -44,6 +44,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .i18n import N_, tr
 from . import cleanup_stats
 from . import demo_mode
 from . import ha_integration
@@ -183,7 +184,7 @@ class BackgroundService:
         #: Eintrag in der Kopfleiste sähe das nach einem grundlos zähen Server
         #: kurz nach dem Start aus.
         self.reconcile_progress = JobProgress(
-            "storage-reconcile", unit="Entitäten", label="Speicherabgleich"
+            "storage-reconcile", unit=N_("Entitäten"), label=N_("Speicherabgleich")
         )
         self.storage_reconcile_last: dict | None = None
         self._storage_reconcile_thread: threading.Thread | None = None
@@ -781,7 +782,7 @@ class BackgroundService:
         # über _storage_reconcile_stop/-_thread beendet — ein zweiter, von
         # JobProgress verwalteter, hätte diesen Abbruchweg unterlaufen.
         with self.reconcile_progress.track():
-            self.reconcile_progress.set_phase("Speicherindex wird geprüft", total=len(entities))
+            self.reconcile_progress.set_phase(N_("Speicherindex wird geprüft"), total=len(entities))
             for entity_id in entities:
                 if self._storage_reconcile_stop.is_set():
                     return
@@ -1213,20 +1214,20 @@ class BackgroundService:
             return {
                 "name": name,
                 "hint": hint,
-                "last_run": "Letzte 24 Stunden",
+                "last_run": tr("Letzte 24 Stunden"),
                 "pill_class": "pending" if count else "ok",
                 "pill_label": f"{count}×" if count else "OK",
             }
 
         return [
             row(
-                "Datenbank-Überlastung",
-                "Wie oft ein Datenbank-Zugriff nicht rechtzeitig drankam · 24h",
+                tr("Datenbank-Überlastung"),
+                tr("Wie oft ein Datenbank-Zugriff nicht rechtzeitig drankam · 24h"),
                 self.index.recent_lock_busy_events(),
             ),
             row(
-                "Speicherzugriff-Überlastung",
-                "Wie oft ein Datei-Zugriff (Archiv/Rollup/Hot) nicht rechtzeitig drankam · 24h",
+                tr("Speicherzugriff-Überlastung"),
+                tr("Wie oft ein Datei-Zugriff (Archiv/Rollup/Hot) nicht rechtzeitig drankam · 24h"),
                 self.coordinator.recent_busy_events(),
             ),
         ]

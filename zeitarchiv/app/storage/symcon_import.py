@@ -19,6 +19,8 @@ der Werte-Vorschau (Min/Max) als einzige Wiedererkennungshilfe.
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import json
 
 import csv
@@ -77,20 +79,20 @@ def extract_zip(
             members = zf.infolist()
             # Auffangnetz für den Fall, dass die Zahl vorab nicht lesbar war.
             if len(members) > max_members:
-                raise ValueError(f"ZIP enthält zu viele Einträge (maximal {max_members})")
+                raise ValueError(tr("ZIP enthält zu viele Einträge (maximal {max_members})", max_members=max_members))
             total_uncompressed = sum(member.file_size for member in members)
             if total_uncompressed > max_uncompressed_bytes:
                 raise ValueError(
-                    "Entpackte ZIP-Größe überschreitet das erlaubte Limit"
+                    tr("Entpackte ZIP-Größe überschreitet das erlaubte Limit")
                 )
             total_compressed = sum(member.compress_size for member in members)
             if total_uncompressed and (
                 total_compressed == 0
                 or total_uncompressed / total_compressed > max_compression_ratio
             ):
-                raise ValueError("ZIP-Kompressionsverhältnis ist nicht zulässig")
+                raise ValueError(tr("ZIP-Kompressionsverhältnis ist nicht zulässig"))
             if any(member.flag_bits & 0x1 for member in members):
-                raise ValueError("Verschlüsselte ZIP-Dateien werden nicht unterstützt")
+                raise ValueError(tr("Verschlüsselte ZIP-Dateien werden nicht unterstützt"))
             staging_dir.mkdir(parents=True)
             staging_resolved = staging_dir.resolve()
             for member in members:
@@ -98,7 +100,7 @@ def extract_zip(
                 # des temporären Zielordners landen.
                 target = (staging_dir / member.filename).resolve()
                 if target != staging_resolved and staging_resolved not in target.parents:
-                    raise ValueError(f"Unsicherer Pfad im ZIP: {member.filename}")
+                    raise ValueError(tr("Unsicherer Pfad im ZIP: {filename}", filename=member.filename))
             total = len(members)
             for i, member in enumerate(members, start=1):
                 zf.extract(member, staging_dir)
@@ -364,7 +366,7 @@ def _parse_csv_file(
             try:
                 ts = float(line[0])
                 if not math.isfinite(ts):
-                    raise ValueError("nicht endlicher Zeitstempel")
+                    raise ValueError(tr("nicht endlicher Zeitstempel"))
             except ValueError:
                 if skipped_counter is not None:
                     skipped_counter[0] += 1
@@ -447,7 +449,7 @@ class ImportResult:
 
 def _scaled_raw_rows(variable: SymconVariable, factor: float) -> list[tuple[float, float]]:
     if not math.isfinite(factor) or factor == 0 or abs(factor) > 1_000_000_000_000:
-        raise ValueError("Ungültiger Umrechnungsfaktor")
+        raise ValueError(tr("Ungültiger Umrechnungsfaktor"))
     rows = raw_rows(variable)
     if factor == 1.0:
         return rows
@@ -678,7 +680,7 @@ def plan_import_rows(
     Berechnung hier ein."""
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     by_month = _group_by_month(rows, tz)
     to_import, to_merge, to_update, to_skip = _classify_months(
         data_dir, entity, by_month, tz, include_existing_months
@@ -766,7 +768,7 @@ def import_rows(
     (csv_import.py) genutzt — siehe plan_import_rows()."""
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     aggregation_type = entity["aggregation_type"]
     hourly_rollup = bool(entity["hourly_rollup"])
 

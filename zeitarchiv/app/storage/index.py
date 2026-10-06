@@ -7,6 +7,8 @@ Tabelle (state_class → Standard/Zähler, Domain → Schalter).
 
 from __future__ import annotations
 
+from ..i18n import N_, tr
+
 import json
 import math
 import sqlite3
@@ -80,9 +82,9 @@ _RESOLUTION_SECONDS = {
 # Kachel-Anheftdialog, Kachelüberschriften) — zwei gleich heißende Einträge
 # sind dort nicht auseinanderzuhalten.
 _NAME_UNIQUE_TABLES = {
-    "dashboards": "Ein Dashboard",
-    "saved_charts": "Ein Chart",
-    "saved_tables": "Eine Tabelle",
+    "dashboards": N_("Ein Dashboard"),
+    "saved_charts": N_("Ein Chart"),
+    "saved_tables": N_("Eine Tabelle"),
 }
 
 
@@ -719,7 +721,7 @@ class _TimeoutLock:
             while self._busy_events and now - self._busy_events[0] > _BUSY_EVENTS_WINDOW_SECONDS:
                 self._busy_events.popleft()
             raise IndexBusy(
-                f"Index-Lock nicht innerhalb von {self._timeout:g}s erhalten"
+                tr("Index-Lock nicht innerhalb von {_timeout:g}s erhalten", _timeout=self._timeout)
             )
 
     def __exit__(self, *exc_info: object) -> None:
@@ -1404,8 +1406,7 @@ class Index:
                 if aggregation_type != old_type:
                     if on_type_change is None:
                         raise ValueError(
-                            f"Aggregationstyp von {entity_id} änderte sich von "
-                            f"{old_type} zu {aggregation_type}; Rollup-Migration erforderlich"
+                            tr("Aggregationstyp von {entity_id} änderte sich von {old_type} zu {aggregation_type}; Rollup-Migration erforderlich", entity_id=entity_id, old_type=old_type, aggregation_type=aggregation_type)
                         )
                     on_type_change(old_type, aggregation_type, bool(row["hourly_rollup"]))
                 self._conn.execute(
@@ -1532,7 +1533,7 @@ class Index:
                 "SELECT status FROM ingested_events WHERE event_id = ?", (event_id,)
             ).fetchone()
             if state is None:
-                raise ValueError("Unbekannte Event-ID kann nicht abgeschlossen werden")
+                raise ValueError(tr("Unbekannte Event-ID kann nicht abgeschlossen werden"))
             if state["status"] == "done":
                 return
             if recorded:
@@ -2040,7 +2041,7 @@ class Index:
         # echte Prüfung statt assert: die fällt unter "python -O" weg und
         # damit genau die Absicherung der Interpolation.
         if table not in _NAME_UNIQUE_TABLES:
-            raise ValueError(f"Keine Namenstabelle: {table}")
+            raise ValueError(tr("Keine Namenstabelle: {table}", table=table))
         rows = self._conn.execute(f"SELECT id, name FROM {table}").fetchall()
         return {
             _normalized_name(row["name"]) for row in rows if row["id"] != exclude_id
@@ -2052,13 +2053,11 @@ class Index:
         trimmed = name.strip()
         if len(trimmed) > MAX_SAVED_NAME_LENGTH:
             raise NameTooLongError(
-                f"Der Name darf höchstens {MAX_SAVED_NAME_LENGTH} Zeichen lang "
-                f"sein (aktuell {len(trimmed)})."
+                tr("Der Name darf höchstens {MAX_SAVED_NAME_LENGTH} Zeichen lang sein (aktuell {len}).", MAX_SAVED_NAME_LENGTH=MAX_SAVED_NAME_LENGTH, len=len(trimmed))
             )
         if _normalized_name(trimmed) in self._taken_names_locked(table, exclude_id):
             raise DuplicateNameError(
-                f'{_NAME_UNIQUE_TABLES[table]} mit dem Namen "{trimmed}" '
-                "gibt es bereits. Bitte einen anderen Namen wählen."
+                tr("{v} mit dem Namen \"{trimmed}\" gibt es bereits. Bitte einen anderen Namen wählen.", v=tr(_NAME_UNIQUE_TABLES[table]), trimmed=trimmed)
             )
 
     def _unused_name_locked(
@@ -2498,7 +2497,7 @@ class Index:
         vermeidet getrennte Pin- und Dashboard-Lookups in den Editor-Routen.
         """
         if item_type not in {"chart", "table"}:
-            raise ValueError("Ungültiger Dashboard-Kacheltyp")
+            raise ValueError(tr("Ungültiger Dashboard-Kacheltyp"))
         with self._lock, self._conn:
             rows = self._conn.execute(
                 "SELECT d.id, d.name, d.is_default "
@@ -2553,9 +2552,9 @@ class Index:
         angegebene Kachel ist nicht (mehr) angeheftet.
         """
         if item_type not in {"chart", "table"}:
-            raise ValueError("Ungültiger Dashboard-Kacheltyp")
+            raise ValueError(tr("Ungültiger Dashboard-Kacheltyp"))
         if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
-            raise ValueError(f"Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen")
+            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max_size))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
@@ -2576,7 +2575,7 @@ class Index:
         nicht verloren geht.
         """
         if item_type != "chart":
-            raise ValueError("Legende ist nur für Charts verfügbar")
+            raise ValueError(tr("Legende ist nur für Charts verfügbar"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET show_legend = ? "
@@ -2735,7 +2734,7 @@ class Index:
         self, dashboard_id: int, pin_id: int, grid_cols: int, grid_rows: int, max_size: int = 6
     ) -> bool:
         if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
-            raise ValueError(f"Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen")
+            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max_size))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
@@ -2759,7 +2758,7 @@ class Index:
         self, dashboard_id: int, pin_id: int, resolution: str
     ) -> bool:
         if resolution not in ("raw", "5min", "15min", "30min", "1h"):
-            raise ValueError("Ungültige Sparkline-Auflösung")
+            raise ValueError(tr("Ungültige Sparkline-Auflösung"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET sparkline_resolution = ? "
@@ -2796,7 +2795,7 @@ class Index:
 
     def set_dashboard_entity_pin_stale_mode(self, dashboard_id: int, pin_id: int, stale_mode: str) -> bool:
         if stale_mode not in STALE_MODES:
-            raise ValueError("Ungültige Veraltet-Stufe")
+            raise ValueError(tr("Ungültige Veraltet-Stufe"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET stale_mode = ? "
@@ -2816,7 +2815,7 @@ class Index:
 
     def set_dashboard_entity_pin_decimals(self, dashboard_id: int, pin_id: int, decimals: str) -> bool:
         if decimals not in ("auto", "0", "1", "2", "3"):
-            raise ValueError("Ungültige Nachkommastellen")
+            raise ValueError(tr("Ungültige Nachkommastellen"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET decimals = ? "
@@ -2851,7 +2850,7 @@ class Index:
         values: list[object] = []
         if range_key is not None:
             if range_key not in DASHBOARD_TILE_RANGES:
-                raise ValueError("Ungültiger Zeitraum")
+                raise ValueError(tr("Ungültiger Zeitraum"))
             fields.append("range_key = ?")
             values.append(range_key)
         if continuous is not None:
@@ -2859,13 +2858,13 @@ class Index:
             values.append(int(continuous))
         if primary_metric is not None:
             if primary_metric not in DASHBOARD_TILE_PRIMARY_METRICS:
-                raise ValueError("Ungültiger Hauptwert")
+                raise ValueError(tr("Ungültiger Hauptwert"))
             fields.append("primary_metric = ?")
             values.append(primary_metric)
         if stats_metrics is not None:
             unknown = set(stats_metrics) - set(DASHBOARD_TILE_STATS_METRICS)
             if unknown:
-                raise ValueError("Ungültige Kennzahl")
+                raise ValueError(tr("Ungültige Kennzahl"))
             ordered = [m for m in DASHBOARD_TILE_STATS_METRICS if m in stats_metrics]
             fields.append("stats_metrics = ?")
             values.append(",".join(ordered))
@@ -3238,7 +3237,7 @@ class Index:
             )
             if quick_check != "ok":
                 raise sqlite3.DatabaseError(
-                    f"SQLite quick_check nach VACUUM: {quick_check}"
+                    tr("SQLite quick_check nach VACUUM: {quick_check}", quick_check=quick_check)
                 )
             after = self._get_database_maintenance_stats_unlocked()
         return {"before": before, "after": after, "quick_check": quick_check}

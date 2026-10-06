@@ -12,6 +12,8 @@ automatisch im Hintergrund ab einem eingestellten Mindestalter der Markierung
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import statistics
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
@@ -463,7 +465,7 @@ def iter_raw_rows(
                 emitted += 1
                 if max_rows is not None and emitted > max_rows:
                     raise ResultLimitExceeded(
-                        f"Ergebnis überschreitet {max_rows} Rohwerte"
+                        tr("Ergebnis überschreitet {max_rows} Rohwerte", max_rows=max_rows)
                     )
                 yield ts, value
 
@@ -1158,7 +1160,7 @@ def add_raw_value(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     now_month_key = now.strftime("%Y-%m")
     ts_dt = datetime.fromtimestamp(ts, tz)
     ts_month_key = ts_dt.strftime("%Y-%m")
@@ -1199,7 +1201,7 @@ def correct_raw_value(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     now_month_key = now.strftime("%Y-%m")
     ts_dt = datetime.fromtimestamp(ts, tz)
     ts_month_key = ts_dt.strftime("%Y-%m")
@@ -1347,10 +1349,10 @@ def _compactable_months(
 
 def _validate_compaction_target(entity: dict, target_resolution: str) -> int:
     if entity["aggregation_type"] == "switch":
-        raise CompactionError("Verdichten ist für Schalter nicht verfügbar")
+        raise CompactionError(tr("Verdichten ist für Schalter nicht verfügbar"))
     interval = resolution_seconds(target_resolution)
     if interval is None:
-        raise CompactionError(f"Ungültiges Verdichtungsziel: {target_resolution}")
+        raise CompactionError(tr("Ungültiges Verdichtungsziel: {target_resolution}", target_resolution=target_resolution))
     return interval
 
 
@@ -1364,7 +1366,7 @@ def preview_compact_raw_values(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     interval = _validate_compaction_target(entity, target_resolution)
     aggregation_type = entity["aggregation_type"]
     current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
@@ -1506,7 +1508,7 @@ def compact_raw_values(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     interval = _validate_compaction_target(entity, target_resolution)
     aggregation_type = entity["aggregation_type"]
     hourly_rollup = bool(entity["hourly_rollup"])

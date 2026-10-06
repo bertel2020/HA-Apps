@@ -84,6 +84,7 @@ from .limits import (
 )
 from .log_source import load_log_lines
 from . import demo_mode, i18n
+from .i18n import N_, tr
 from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
@@ -217,8 +218,8 @@ BACKUP_DEFAULT_WEEKDAY = 6
 RETENTION_DEFAULT_TIME = "04:30"
 RETENTION_DEFAULT_WEEKDAY = 6
 BACKUP_WEEKDAY_OPTIONS = [
-    (0, "Montag"), (1, "Dienstag"), (2, "Mittwoch"), (3, "Donnerstag"),
-    (4, "Freitag"), (5, "Samstag"), (6, "Sonntag"),
+    (0, N_("Montag")), (1, N_("Dienstag")), (2, N_("Mittwoch")), (3, N_("Donnerstag")),
+    (4, N_("Freitag")), (5, N_("Samstag")), (6, N_("Sonntag")),
 ]
 
 
@@ -254,20 +255,20 @@ FONT_SCALE = {"1": "1", "2": "1.125", "3": "1.25"}
 DASHBOARD_ROW_HEIGHT = {"1": 210, "2": 218, "3": 228}
 LEGACY_FONT_SCALE = {"0": "1", "4": "3"}
 COLOR_SCHEME_LABELS = {
-    "zeitarchiv": "Zeitarchiv",
-    "home_assistant": "Home Assistant",
-    "modern": "Modern",
+    "zeitarchiv": N_("Zeitarchiv"),
+    "home_assistant": N_("Home Assistant"),
+    "modern": N_("Modern"),
 }
 COLOR_MODE_LABELS = {
-    "auto": "Automatisch",
-    "light": "Hell",
-    "dark": "Dunkel",
+    "auto": N_("Automatisch"),
+    "light": N_("Hell"),
+    "dark": N_("Dunkel"),
 }
 # Vormals eine pro-Chart-Einstellung (saved_charts.dashboard_animation) — gilt
 # jetzt global für alle Dashboard-Kacheln (Einstellungen → Darstellung), da
 # eine Kachel-für-Kachel-Steuerung in der Praxis kaum genutzt wurde und die
 # Chart-Bearbeitung dafür unnötig überladen hat.
-DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
+DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": N_("Aus")}
 # Steuert, wohin "/" (Ingress-Root — was beim Öffnen von Zeitarchiv über die
 # HA-Sidebar erscheint) weiterleitet. Die Übersicht selbst lebt dafür unter
 # der eigenen URL "/uebersicht" statt weiter unter "/" — die Topnav
@@ -275,7 +276,7 @@ DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
 # Übersicht führt, unabhängig von dieser Einstellung (sonst würde er bei
 # startseite="energiedashboard" auf sich selbst zurückverweisen und die
 # Übersicht wäre über die Topnav gar nicht mehr erreichbar).
-STARTSEITE_LABELS = {"uebersicht": "Übersicht", "energiedashboard": "Energiedashboard"}
+STARTSEITE_LABELS = {"uebersicht": N_("Übersicht"), "energiedashboard": N_("Energiedashboard")}
 
 
 def _current_font_scale() -> str:
@@ -1071,12 +1072,12 @@ def _settings_background_processes_context() -> dict:
 
     def row(name: str, hint: str, ts: float | None, *, error: bool = False) -> dict:
         if error:
-            pill_class, pill_label = "error", "Fehler"
+            pill_class, pill_label = "error", tr("Fehler")
         elif ts is None:
             pill_class, pill_label = "none", "–"
         else:
             pill_class, pill_label = "ok", "OK"
-        last_run = f"vor {format_uptime(now - ts)}" if ts is not None else "noch nie gelaufen"
+        last_run = tr("vor {dauer}", dauer=format_uptime(now - ts)) if ts is not None else tr("noch nie gelaufen")
         return {"name": name, "hint": hint, "last_run": last_run, "pill_class": pill_class, "pill_label": pill_label}
 
     duplicate_snapshot = index.get_duplicate_snapshot()
@@ -1086,31 +1087,31 @@ def _settings_background_processes_context() -> dict:
 
     rows = [
         row(
-            "Statistik-Snapshot", "Kennzahlen-Schnappschuss für die Statistik-Seite · stündlich",
+            tr("Statistik-Snapshot"), tr("Kennzahlen-Schnappschuss für die Statistik-Seite · stündlich"),
             index.get_latest_stats_snapshot_ts(),
         ),
         row(
-            "Arbeitsspeicher-Snapshot", "RAM-Verlauf für die Statistik-Seite · stündlich",
+            tr("Arbeitsspeicher-Snapshot"), tr("RAM-Verlauf für die Statistik-Seite · stündlich"),
             index.get_latest_memory_snapshot_ts(),
         ),
         row(
-            "Aufbewahrung-Übersicht", "Vorschau der von der Frist betroffenen Zeilen · bei Bedarf",
+            tr("Aufbewahrung-Übersicht"), tr("Vorschau der von der Frist betroffenen Zeilen · bei Bedarf"),
             _background.load_retention_overview().get("generated_at"),
         ),
         row(
-            "Löschvorschau", "Vorschau für weich gelöschte, noch nicht entfernte Werte · bei Bedarf",
+            tr("Löschvorschau"), tr("Vorschau für weich gelöschte, noch nicht entfernte Werte · bei Bedarf"),
             _background.load_purge_preview().get("generated_at"),
         ),
         row(
-            "Duplikat-Erkennung", "Zählt doppelte Zeitstempel je Entität vor · stündlich",
+            tr("Duplikat-Erkennung"), tr("Zählt doppelte Zeitstempel je Entität vor · stündlich"),
             duplicate_snapshot.get("checked_at") if duplicate_snapshot else None,
         ),
         row(
-            "Versionsprüfung", "Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich",
+            tr("Versionsprüfung"), tr("Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich"),
             version_state.get("checked_at") if version_state else None,
         ),
         row(
-            "Speicherindex-Abgleich", "Gleicht Zeilenzahl/Größe je Entität mit den Dateien ab · nach Neustart",
+            tr("Speicherindex-Abgleich"), tr("Gleicht Zeilenzahl/Größe je Entität mit den Dateien ab · nach Neustart"),
             reconcile_ts, error=bool(reconcile.get("errors")),
         ),
     ]
@@ -1122,14 +1123,14 @@ def _settings_background_processes_context() -> dict:
     outlier = cleanup_stats.outlier_rate_overview(index)
     outlier_gesamt = outlier["measured"] + outlier["pending"]
     rows.append({
-        "name": "Ausreißer-Quoten",
-        "hint": "Misst je Entität die Markierungsquote über die ganze Historie · 1 Entität/30s",
+        "name": tr("Ausreißer-Quoten"),
+        "hint": tr("Misst je Entität die Markierungsquote über die ganze Historie · 1 Entität/30s"),
         "last_run": (
-            f"{outlier['measured']} von {outlier_gesamt} gemessen" if outlier_gesamt
-            else "keine Entität mit Ausreißer-Erkennung"
+            tr("{measured} von {outlier_gesamt} gemessen", measured=outlier['measured'], outlier_gesamt=outlier_gesamt) if outlier_gesamt
+            else tr("keine Entität mit Ausreißer-Erkennung")
         ),
         "pill_class": "pending" if outlier["pending"] else "ok",
-        "pill_label": f"{outlier['pending']} ausstehend" if outlier["pending"] else "OK",
+        "pill_label": tr("{pending} ausstehend", pending=outlier['pending']) if outlier["pending"] else "OK",
     })
 
     if is_energiedashboard_configured(index):
@@ -1139,11 +1140,11 @@ def _settings_background_processes_context() -> dict:
             pending = []
         pending_count = len(pending) if isinstance(pending, list) else 0
         rows.append({
-            "name": "Energiedashboard · Stunden-Rollup-Backfill",
-            "hint": "Baut die feinere Auflösung für neu zugeordnete Zähler-Rollen rückwirkend auf · 1 Entität/30s",
-            "last_run": "Warteschlange leer" if not pending_count else "–",
+            "name": tr("Energiedashboard · Stunden-Rollup-Backfill"),
+            "hint": tr("Baut die feinere Auflösung für neu zugeordnete Zähler-Rollen rückwirkend auf · 1 Entität/30s"),
+            "last_run": tr("Warteschlange leer") if not pending_count else "–",
             "pill_class": "pending" if pending_count else "ok",
-            "pill_label": f"{pending_count} ausstehend" if pending_count else "OK",
+            "pill_label": tr("{pending_count} ausstehend", pending_count=pending_count) if pending_count else "OK",
         })
 
         heatmap_snapshots = [
@@ -1151,8 +1152,8 @@ def _settings_background_processes_context() -> dict:
         ]
         heatmap_ts_values = [s["checked_at"] for s in heatmap_snapshots if s and s.get("checked_at") is not None]
         rows.append(row(
-            "Energiedashboard · Tageslastprofil-Cache",
-            "Berechnet die Wochentags-Ansicht für Monat/Jahr im Voraus · täglich",
+            tr("Energiedashboard · Tageslastprofil-Cache"),
+            tr("Berechnet die Wochentags-Ansicht für Monat/Jahr im Voraus · täglich"),
             min(heatmap_ts_values) if heatmap_ts_values else None,
         ))
 
@@ -1296,13 +1297,13 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
         None,
     )
     if notice is None:
-        raise HTTPException(status_code=404, detail="Meldung nicht gefunden oder nicht mehr aktiv")
+        raise HTTPException(status_code=404, detail=tr("Meldung nicht gefunden oder nicht mehr aktiv"))
     if not notice["mutable"]:
-        raise HTTPException(status_code=400, detail="Diese Meldung lässt sich nicht stumm schalten")
+        raise HTTPException(status_code=400, detail=tr("Diese Meldung lässt sich nicht stumm schalten"))
     form = await request.form()
     duration = form.get("duration")
     if duration not in notices_mod.SNOOZE_PRESETS:
-        raise HTTPException(status_code=400, detail="Ungültige Dauer")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Dauer"))
     seconds = notices_mod.SNOOZE_PRESETS[duration]
     until = time.time() + seconds if seconds is not None else None
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
@@ -1353,7 +1354,7 @@ async def settings_tips_enabled(request: Request) -> HTMLResponse:
     form = await request.form()
     enabled = form.get("tips_enabled")
     if enabled not in _ON_OFF_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Wert")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Wert"))
     notices_mod.set_tips_enabled(index, enabled == "1")
     return templates.TemplateResponse(request, "_settings_tips_form.html", _settings_notices_context())
 
@@ -1369,7 +1370,7 @@ async def settings_tips_hide(request: Request) -> HTMLResponse:
     slug = form.get("slug")
     today_tip, ordinal = notices_mod.resolve_today_tip(TZ)
     if slug != today_tip["slug"]:
-        raise HTTPException(status_code=400, detail="Nur der heute fällige Tipp lässt sich ausblenden")
+        raise HTTPException(status_code=400, detail=tr("Nur der heute fällige Tipp lässt sich ausblenden"))
     notices_mod.hide_tip_today(index, slug, ordinal)
     return templates.TemplateResponse(request, "_tips_list_body.html", _settings_notices_context())
 
@@ -1407,9 +1408,9 @@ def _validate_log_request(
     level: str, search: str, limit: int, source: str = "local"
 ) -> tuple[str, str, int, str]:
     if level != "all" and level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Logfilter")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Logfilter"))
     if source not in {"local", "supervisor"}:
-        raise HTTPException(status_code=400, detail="Ungültige Logquelle")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Logquelle"))
     return level, search[:200], max(50, min(limit, 5_000)), source
 
 
@@ -1475,25 +1476,25 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
     color_scheme = form.get("color_scheme")
     color_mode = form.get("color_mode")
     if font_scale is not None and font_scale not in FONT_SCALE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Schriftgröße")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Schriftgröße"))
     if font_scale is not None:
         index.set_setting("font_scale", str(font_scale))
     if color_scheme is not None and color_scheme not in COLOR_SCHEME_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges Farbschema")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Farbschema"))
     if color_scheme is not None:
         index.set_setting("color_scheme", str(color_scheme))
     if color_mode is not None and color_mode not in COLOR_MODE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Darstellungsmodus")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Darstellungsmodus"))
     if color_mode is not None:
         index.set_setting("color_mode", str(color_mode))
     dashboard_animation = form.get("dashboard_animation")
     if dashboard_animation is not None and dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Dashboard-Animation")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Dashboard-Animation"))
     if dashboard_animation is not None:
         index.set_setting("dashboard_animation", str(dashboard_animation))
     startseite = form.get("startseite")
     if startseite is not None and startseite not in STARTSEITE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Startseite")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Startseite"))
     if startseite is not None:
         index.set_setting("startseite", str(startseite))
 
@@ -1512,17 +1513,17 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         if value is None:
             continue
         if value not in _ON_OFF_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Wert")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert"))
         _update_entity_chart_default(option_key, value == "1")
     entity_legend_style = form.get("entity_legend_style")
     if entity_legend_style is not None and entity_legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
     if entity_legend_style is not None:
         _update_entity_chart_default("legend_style", entity_legend_style)
     if "entity_legend_metrics" in form:
         entity_legend_metrics = form.getlist("entity_legend_metrics")
         if not set(entity_legend_metrics) <= _CHART_LEGEND_METRICS:
-            raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
         _update_entity_chart_default("legend_metrics", entity_legend_metrics)
 
     return templates.TemplateResponse(
@@ -1537,9 +1538,9 @@ async def settings_logging(request: Request) -> HTMLResponse:
     level = str(form.get("log_level", DEFAULT_LOG_LEVEL))
     access_mode = str(form.get("access_log_mode", DEFAULT_ACCESS_LOG_MODE))
     if level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges Loglevel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Loglevel"))
     if access_mode not in ACCESS_LOG_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges HTTP-Protokoll")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges HTTP-Protokoll"))
     index.set_setting("log_level", level)
     index.set_setting("access_log_mode", access_mode)
     configure_logging(level, access_mode)
@@ -1594,7 +1595,7 @@ def settings_capture_write_download() -> Response:
         payload = _write_capture["payload"]
         captured_at = _write_capture["captured_at"]
     if payload is None:
-        raise HTTPException(status_code=404, detail="Keine Aufzeichnung vorhanden")
+        raise HTTPException(status_code=404, detail=tr("Keine Aufzeichnung vorhanden"))
     filename = f"zeitarchiv-write-capture-{datetime.fromtimestamp(captured_at, TZ).strftime('%Y%m%d-%H%M%S')}.json"
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -1615,7 +1616,7 @@ async def settings_trace_start(request: Request) -> HTMLResponse:
     form = await request.form()
     entity_id = str(form.get("entity_id", "")).strip()
     if not entity_id:
-        raise HTTPException(status_code=400, detail="Entity-ID fehlt")
+        raise HTTPException(status_code=400, detail=tr("Entity-ID fehlt"))
     try:
         validate_entity_id(entity_id)
     except ValueError as exc:
@@ -1691,7 +1692,7 @@ async def _lifespan(_: FastAPI):
 app.router.lifespan_context = _lifespan
 
 
-_BACKUP_SORT_COLUMNS = [("created_at", "Erstellt"), ("size_bytes", "Größe")]
+_BACKUP_SORT_COLUMNS = [("created_at", N_("Erstellt")), ("size_bytes", N_("Größe"))]
 
 
 def _backup_list_context(sort: str = "created_at", direction: str = "desc", page: int = 1, page_size: int = 10) -> dict:
@@ -1751,8 +1752,8 @@ def _backup_context(
     percent = int(done / total * 100) if total else 0
     jobs = []
     status_labels = {
-        "queued": "Geplant", "running": "Läuft", "success": "Erfolgreich",
-        "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen", "skipped": "Übersprungen",
+        "queued": N_("Geplant"), "running": N_("Läuft"), "success": N_("Erfolgreich"),
+        "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"), "skipped": N_("Übersprungen"),
     }
     for job in index.list_backup_jobs(10):
         jobs.append({
@@ -1905,18 +1906,18 @@ async def backup_schedule_save(request: Request) -> HTMLResponse:
     schedule_time = str(form.get("backup_schedule_time", BACKUP_DEFAULT_TIME))
     weekday_raw = str(form.get("backup_schedule_weekday", BACKUP_DEFAULT_WEEKDAY))
     if schedule is not None and schedule not in BACKUP_SCHEDULE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitplan")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitplan"))
     if keep_count is not None and keep_count not in BACKUP_KEEP_COUNT_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Anzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl"))
     if keep_days is not None and keep_days not in RETENTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Aufbewahrung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
     try:
         parse_schedule_time(schedule_time)
         weekday = int(weekday_raw)
         if weekday not in range(7):
             raise ValueError
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Ungültiger Sicherungszeitpunkt") from exc
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Sicherungszeitpunkt")) from exc
     if schedule is not None:
         index.set_setting("backup_schedule", str(schedule))
     if keep_count is not None:
@@ -1935,7 +1936,7 @@ async def backup_schedule_save(request: Request) -> HTMLResponse:
 def backup_verify(request: Request, filename: str) -> HTMLResponse:
     path = backup.resolve_backup_path(BACKUPS_DIR, filename)
     if path is None or not path.is_file():
-        raise HTTPException(status_code=404, detail="Backup nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
     try:
         manifest = backup.validate_backup(path)
     except ValueError as exc:
@@ -2068,7 +2069,7 @@ def backup_rollback_delete(request: Request, name: str) -> HTMLResponse:
     with storage_coordinator.exclusive():
         deleted = backup.delete_restore_rollback(DATA_DIR, name)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Rollback nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Rollback nicht gefunden"))
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
@@ -2098,7 +2099,7 @@ def system_restart(request: Request) -> HTMLResponse:
 def backup_download(filename: str) -> StreamingResponse:
     path = backup.resolve_backup_path(BACKUPS_DIR, filename)
     if path is None or not path.is_file():
-        raise HTTPException(status_code=404, detail="Backup nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
 
     def generate():
         with path.open("rb") as f:
@@ -2118,7 +2119,7 @@ def backup_delete(request: Request, filename: str) -> HTMLResponse:
     with storage_coordinator.exclusive():
         deleted = backup.delete_backup(BACKUPS_DIR, filename)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Backup nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
     return _backup_status_response(request)
 
 
@@ -2151,13 +2152,13 @@ def backup_list(
 
 
 _GROWTH_RANGE_SINCE_SECONDS = {"day": 86400, "month": 30 * 86400, "year": 365 * 86400, "all": None}
-_GROWTH_RANGE_OPTIONS = [("day", "Tag"), ("month", "Monat"), ("year", "Jahr"), ("all", "Gesamt")]
+_GROWTH_RANGE_OPTIONS = [("day", N_("Tag")), ("month", N_("Monat")), ("year", N_("Jahr")), ("all", N_("Gesamt"))]
 
 
 @app.get("/api/stats-snapshots")
 def api_stats_snapshots(range: str = "month") -> dict:
     if range not in _GROWTH_RANGE_SINCE_SECONDS:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     seconds = _GROWTH_RANGE_SINCE_SECONDS[range]
     since_ts = 0.0 if seconds is None else time.time() - seconds
     snapshots = index.get_stats_snapshots(since_ts)
@@ -2405,26 +2406,23 @@ def statistik_view(request: Request) -> HTMLResponse:
 
 _INDEX_DETAIL_GROUPS = [
     {
-        "label": "Entitäten und Archivstatus",
+        "label": N_("Entitäten und Archivstatus"),
         "description": (
-            "Konfiguration, Anzeigenamen, Einheiten, letzter Wert sowie die vom "
-            "Dateibestand abgeleiteten Zeilen- und Größenstände jeder Entität."
+            N_("Konfiguration, Anzeigenamen, Einheiten, letzter Wert sowie die vom Dateibestand abgeleiteten Zeilen- und Größenstände jeder Entität.")
         ),
         "tables": ["entities"],
     },
     {
-        "label": "Schreibsicherheit und Bereinigung",
+        "label": N_("Schreibsicherheit und Bereinigung"),
         "description": (
-            "Idempotenzstatus eingehender Ereignisse und vorgemerkte, noch nicht "
-            "physisch entfernte Rohwerte."
+            N_("Idempotenzstatus eingehender Ereignisse und vorgemerkte, noch nicht physisch entfernte Rohwerte.")
         ),
         "tables": ["ingested_events", "deleted_points"],
     },
     {
-        "label": "Charts, Tabellen und Dashboards",
+        "label": N_("Charts, Tabellen und Dashboards"),
         "description": (
-            "Gespeicherte Ansichten, Tabellenaufbau, Dashboards sowie Position und "
-            "Darstellungsoptionen ihrer Kacheln; keine Messwerte."
+            N_("Gespeicherte Ansichten, Tabellenaufbau, Dashboards sowie Position und Darstellungsoptionen ihrer Kacheln; keine Messwerte.")
         ),
         "tables": [
             "saved_charts", "saved_tables", "table_columns", "table_rows",
@@ -2432,18 +2430,16 @@ _INDEX_DETAIL_GROUPS = [
         ],
     },
     {
-        "label": "Statistikverlauf",
+        "label": N_("Statistikverlauf"),
         "description": (
-            "Stündliche Schnappschüsse von Datenbestand, Speichergröße und optionalem "
-            "RAM-Verbrauch für Verlaufsanzeigen."
+            N_("Stündliche Schnappschüsse von Datenbestand, Speichergröße und optionalem RAM-Verbrauch für Verlaufsanzeigen.")
         ),
         "tables": ["stats_snapshots", "memory_snapshots"],
     },
     {
-        "label": "Einstellungen und Wartung",
+        "label": N_("Einstellungen und Wartung"),
         "description": (
-            "App-Einstellungen sowie Ausführungsverläufe von Backups und "
-            "Aufbewahrungsbereinigungen. Import-Reports selbst liegen als JSON-Dateien vor."
+            N_("App-Einstellungen sowie Ausführungsverläufe von Backups und Aufbewahrungsbereinigungen. Import-Reports selbst liegen als JSON-Dateien vor.")
         ),
         "tables": ["settings", "backup_jobs", "retention_jobs"],
     },
@@ -2541,10 +2537,10 @@ def _export_table_response(
         return "desc" if sort == column and direction == "asc" else "asc"
 
     columns = [
-        ("entity_id", "Entität"),
-        ("type", "Typ"),
-        ("unit", "Einheit"),
-        ("rows", "Datensätze"),
+        ("entity_id", N_("Entität")),
+        ("type", N_("Typ")),
+        ("unit", N_("Einheit")),
+        ("rows", N_("Datensätze")),
     ]
     header_links = [
         {
@@ -2592,7 +2588,7 @@ def export_download(entity_id: str) -> StreamingResponse:
     if _visible_row_count(entity) > MAX_EXPORT_ROWS:
         raise HTTPException(
             status_code=413,
-            detail=f"CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt",
+            detail=tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=MAX_EXPORT_ROWS),
         )
 
     first_ts = entity["first_ts"]
@@ -2633,17 +2629,17 @@ def export_download(entity_id: str) -> StreamingResponse:
 # wird wie font_scale über die settings-Tabelle persistiert (index.get_setting/
 # set_setting), gilt also global fürs ganze Add-on, nicht pro Browser.
 ENTITIES_OPTIONAL_COLUMNS = [
-    ("type", "Typ"),
-    ("first_ts", "Erster Wert"),
-    ("last_ts", "Letzter Wert"),
-    ("resolution", "Auflösung"),
-    ("retention", "Aufbewahrung"),
-    ("unit", "Einheit"),
-    ("rows", "Datensätze"),
-    ("size", "Größe"),
-    ("value_filter", "Wertfilter"),
-    ("gap_threshold", "Lücken"),
-    ("outlier_threshold", "Ausreißer"),
+    ("type", N_("Typ")),
+    ("first_ts", N_("Erster Wert")),
+    ("last_ts", N_("Letzter Wert")),
+    ("resolution", N_("Auflösung")),
+    ("retention", N_("Aufbewahrung")),
+    ("unit", N_("Einheit")),
+    ("rows", N_("Datensätze")),
+    ("size", N_("Größe")),
+    ("value_filter", N_("Wertfilter")),
+    ("gap_threshold", N_("Lücken")),
+    ("outlier_threshold", N_("Ausreißer")),
 ]
 # Nur Auflösung/Aufbewahrung initial aus — diese beiden Konfigurationsdetails
 # sind für den ersten Überblick am ehesten verzichtbar. Alle übrigen Spalten,
@@ -2736,7 +2732,7 @@ def _entities_table_response(
     def _next_dir(column: str) -> str:
         return "desc" if sort == column and direction == "asc" else "asc"
 
-    columns = [("entity_id", "Entität")] + [
+    columns = [("entity_id", N_("Entität"))] + [
         (key, label) for key, label in ENTITIES_OPTIONAL_COLUMNS if key in visible_columns
     ]
     # Eine CSS-Klasse pro Spalte, gemeinsam von <th> und <td> genutzt (siehe
@@ -2969,22 +2965,22 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         if len(custom_name) > MAX_CUSTOM_NAME_LENGTH:
             raise HTTPException(
                 status_code=400,
-                detail=f"Der Anzeigename darf höchstens {MAX_CUSTOM_NAME_LENGTH} Zeichen lang sein",
+                detail=tr("Der Anzeigename darf höchstens {MAX_CUSTOM_NAME_LENGTH} Zeichen lang sein", MAX_CUSTOM_NAME_LENGTH=MAX_CUSTOM_NAME_LENGTH),
             )
     if resolution is not None and resolution not in RESOLUTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Auflösung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Auflösung"))
     if retention is not None and retention not in RETENTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Aufbewahrung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
     if decimals is not None and decimals not in DECIMALS_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Angabe")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Angabe"))
     if value_filter is not None and value_filter not in VALUE_FILTER_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Wertänderungsfilter")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Wertänderungsfilter"))
     if gap_threshold is not None and gap_threshold not in GAP_THRESHOLD_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Lücken-Schwellwert")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Lücken-Schwellwert"))
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Ausreißer-Schwellwert")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Ausreißer-Schwellwert"))
     if compact_target is not None and compact_target not in COMPACT_TARGET_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges Verdichtungsziel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Verdichtungsziel"))
     # Für Zähler/Schalter ist das Feld deaktiviert (siehe
     # outlier_detection_applies()). Ein trotzdem mitgeschickter Wert wird
     # verworfen statt abgelehnt: die Einstellung wirkt für diese Typen ohnehin
@@ -3000,7 +2996,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         resolution = None
         compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Anzeigemodus")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Anzeigemodus"))
     def update_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
             index.set_config(
@@ -3045,7 +3041,7 @@ def _require_entity(entity_id: str):
     _validate_entity_id_or_400(entity_id)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
     return entity
 
 
@@ -3053,7 +3049,7 @@ def _validate_entity_id_or_400(entity_id: str) -> str:
     try:
         return validate_entity_id(entity_id)
     except ValueError as err:
-        raise HTTPException(status_code=400, detail="Ungültige Entitäts-ID") from err
+        raise HTTPException(status_code=400, detail=tr("Ungültige Entitäts-ID")) from err
 
 
 @app.post("/entities/{entity_id}/favorite")
@@ -3221,7 +3217,7 @@ def entity_migrate_preview(request: Request, entity_id: str, body: _EntityMigrat
     source = _require_entity(entity_id)
     target = _require_entity(body.target_entity_id)
     if body.overlap_resolution not in entity_migration.OVERLAP_RESOLUTIONS:
-        raise HTTPException(status_code=400, detail="Ungültiger Umgang mit Überschneidungen")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Umgang mit Überschneidungen"))
     plan = None
     error = None
     result_first_ts = None
@@ -3277,9 +3273,9 @@ def entity_migrate_execute(entity_id: str, body: _EntityMigrateExecuteBody) -> d
     _require_entity(entity_id)
     _require_entity(body.target_entity_id)
     if body.post_action not in entity_migration.POST_ACTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Aktion für die Quelle")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Aktion für die Quelle"))
     if body.overlap_resolution not in entity_migration.OVERLAP_RESOLUTIONS:
-        raise HTTPException(status_code=400, detail="Ungültiger Umgang mit Überschneidungen")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Umgang mit Überschneidungen"))
     try:
         result = entity_migration.execute_migration(
             DATA_DIR, index, entity_id, body.target_entity_id, TZ,
@@ -3312,8 +3308,8 @@ def entity_migrate_execute(entity_id: str, body: _EntityMigrateExecuteBody) -> d
 # ---------------------------------------------------------------------------
 
 _CHART_RANGE_OPTIONS = [
-    ("hour", "Stunde"), ("day", "Tag"), ("week", "Woche"),
-    ("month", "Monat"), ("year", "Jahr"), ("decade", "Dekade"),
+    ("hour", N_("Stunde")), ("day", N_("Tag")), ("week", N_("Woche")),
+    ("month", N_("Monat")), ("year", N_("Jahr")), ("decade", N_("Dekade")),
 ]
 _CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse", "full"}
 _CHART_LEGEND_METRICS = {"last", "min", "max", "average", "sum"}
@@ -3367,20 +3363,20 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "decimals": "auto",
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
-_ON_OFF_LABELS = {"1": "An", "0": "Aus"}
-_ENTITY_LEGEND_STYLE_LABELS = {"chips": "Chips", "table": "Tabelle"}
-_ENTITY_LEGEND_METRIC_LABELS = {"last": "Aktuell", "min": "Min", "max": "Max", "average": "Durchschnitt", "sum": "Summe"}
+_ON_OFF_LABELS = {"1": "An", "0": N_("Aus")}
+_ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle")}
+_ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": N_("Max"), "average": N_("Durchschnitt"), "sum": N_("Summe")}
 
 
 def _validate_entity_chart_options(data: dict) -> None:
     if "chart_type" in data and data["chart_type"] not in _ENTITY_CHART_TYPES:
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if "legend_metrics" in data and not set(data["legend_metrics"]) <= _CHART_LEGEND_METRICS:
-        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if "legend_style" in data and data["legend_style"] not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
     if "decimals" in data and data["decimals"] not in _ENTITY_CHART_DECIMALS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
 
 
 def _get_entity_chart_defaults() -> dict:
@@ -3426,11 +3422,11 @@ def _resolve_entity_chart_options(entity) -> dict:
 # "Linie + Balken" im Template eine Klasse abzuleiten wäre der umgekehrte,
 # brüchige Weg.
 _CHART_TYPE_LABELS = {
-    "zeitstrahl": "Zeitstrahl",
-    "linie": "Linie",
-    "balken": "Balken",
-    "gemischt": "Linie + Balken",
-    "donut": "Donut",
+    "zeitstrahl": N_("Zeitstrahl"),
+    "linie": N_("Linie"),
+    "balken": N_("Balken"),
+    "gemischt": N_("Linie + Balken"),
+    "donut": N_("Donut"),
 }
 
 
@@ -3599,25 +3595,25 @@ def _hidden_for(body: _SaveChartBody) -> list[str]:
 @app.post("/charts")
 def charts_create(body: _SaveChartBody) -> dict:
     if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Bitte einen Namen für das Chart angeben")
+        raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für das Chart angeben"))
     if not body.entity_ids:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Entität auswählen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Entität auswählen"))
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
-        raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Chart-Auflösung"))
     if not set(body.legend_metrics) <= _CHART_LEGEND_METRICS:
-        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
     if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
     if body.average_style not in _CHART_AVERAGE_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Durchschnittslinien-Darstellung"))
     if body.donut_aggregation not in _CHART_DONUT_AGGREGATIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Donut-Aggregation")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Donut-Aggregation"))
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
@@ -3637,34 +3633,34 @@ def charts_create(body: _SaveChartBody) -> dict:
 def charts_view(request: Request, chart_id: int) -> HTMLResponse:
     chart = index.get_saved_chart(chart_id)
     if chart is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(chart))
 
 
 @app.post("/charts/{chart_id}")
 def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
     if index.get_saved_chart(chart_id) is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Bitte einen Namen für das Chart angeben")
+        raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für das Chart angeben"))
     if not body.entity_ids:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Entität auswählen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Entität auswählen"))
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
-        raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Chart-Auflösung"))
     if not set(body.legend_metrics) <= _CHART_LEGEND_METRICS:
-        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
     if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
     if body.average_style not in _CHART_AVERAGE_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Durchschnittslinien-Darstellung"))
     if body.donut_aggregation not in _CHART_DONUT_AGGREGATIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Donut-Aggregation")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Donut-Aggregation"))
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
@@ -3690,7 +3686,7 @@ def charts_delete(chart_id: int) -> dict:
 def charts_favorite_toggle(chart_id: int) -> dict:
     chart = index.get_saved_chart(chart_id)
     if chart is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     new_state = not chart["is_favorite"]
     index.set_chart_favorite(chart_id, new_state)
     return {"is_favorite": new_state}
@@ -3703,7 +3699,7 @@ def charts_duplicate(chart_id: int) -> dict:
     zwei inhaltsgleiche favorisierte Karten."""
     chart = index.get_saved_chart(chart_id)
     if chart is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     new_id = index.create_saved_chart(
         index.copy_name_for("saved_charts", chart["name"]),
         chart["entity_ids"], chart["range_key"], chart["continuous"],
@@ -3734,17 +3730,17 @@ def charts_duplicate(chart_id: int) -> dict:
 # Änderung im Kachelmenü neu, ohne die Seite neu zu laden. Ein Test hält beide
 # Kopien deckungsgleich (test_dashboard_value_tile_settings.py).
 _TILE_RANGE_LABELS = {
-    "hour": ("Std.", "60 Min."),
-    "day": ("Tag", "24 Std."),
-    "week": ("Woche", "7 Tage"),
-    "month": ("Monat", "30 Tage"),
-    "year": ("Jahr", "12 Monate"),
+    "hour": (N_("Std."), N_("60 Min.")),
+    "day": (N_("Tag"), N_("24 Std.")),
+    "week": (N_("Woche"), N_("7 Tage")),
+    "month": (N_("Monat"), N_("30 Tage")),
+    "year": (N_("Jahr"), N_("12 Monate")),
 }
 # Kennzeichen vor der großen Zahl, sobald diese nicht der aktuelle Wert ist —
 # ohne das wäre "16,8 °C" nicht von einem Momentanwert zu unterscheiden.
 # "last" trägt bewusst keins: der aktuelle Wert ist der Normalfall und braucht
 # keine Erklärung.
-_TILE_METRIC_LABELS = {"last": "", "min": "Min", "avg": "Ø", "max": "Max", "sum": "Σ"}
+_TILE_METRIC_LABELS = {"last": "", "min": N_("Min"), "avg": "Ø", "max": N_("Max"), "sum": "Σ"}
 
 
 def _tile_metric_labels(aggregation_type: str | None) -> dict[str, str]:
@@ -4038,13 +4034,13 @@ def _require_dashboard_unlocked(dashboard_id: int) -> None:
     ist berechtigt, ist aber aktiv gesperrt."""
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is not None and dashboard["locked"]:
-        raise HTTPException(status_code=423, detail="Dashboard ist fixiert — Layout-Änderungen sind gesperrt")
+        raise HTTPException(status_code=423, detail=tr("Dashboard ist fixiert — Layout-Änderungen sind gesperrt"))
 
 
 def _get_dashboard_or_404(dashboard_id: int) -> dict:
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is None:
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return dashboard
 
 
@@ -4057,7 +4053,7 @@ def dashboard_section_add(request: Request, dashboard_id: int = Form(1), name: s
     _require_dashboard_unlocked(dashboard_id)
     name = name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        raise HTTPException(status_code=422, detail=tr("Name darf nicht leer sein"))
     index.add_dashboard_section(dashboard_id, name)
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
@@ -4070,9 +4066,9 @@ def dashboard_section_rename(
     _require_dashboard_unlocked(dashboard_id)
     name = name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        raise HTTPException(status_code=422, detail=tr("Name darf nicht leer sein"))
     if not index.rename_dashboard_section(dashboard_id, section_id, name):
-        raise HTTPException(status_code=404, detail="Sektion nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Sektion nicht gefunden"))
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
@@ -4089,7 +4085,7 @@ def dashboard_section_remove(request: Request, section_id: int, dashboard_id: in
 @app.post("/charts/{chart_id}/pin", response_class=HTMLResponse)
 def charts_pin(request: Request, chart_id: int, dashboard_id: int = 1) -> HTMLResponse:
     if index.get_saved_chart(chart_id) is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "chart", chart_id)
@@ -4140,7 +4136,7 @@ def dashboard_reorder(body: _ReorderDashboardBody) -> dict:
 @app.post("/dashboard/size")
 def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     if body.item_type not in {"chart", "table"}:
-        raise HTTPException(status_code=422, detail="Ungültiger Dashboard-Kacheltyp")
+        raise HTTPException(status_code=422, detail=tr("Ungültiger Dashboard-Kacheltyp"))
     _require_dashboard_unlocked(body.dashboard_id)
     dashboard = index.get_dashboard(body.dashboard_id)
     max_size = 6 if dashboard and dashboard["precise_mode"] else 3
@@ -4151,7 +4147,7 @@ def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
 
 
@@ -4165,12 +4161,12 @@ class _LegendDashboardTileBody(BaseModel):
 @app.post("/dashboard/legend")
 def dashboard_legend(body: _LegendDashboardTileBody) -> dict:
     if body.item_type != "chart":
-        raise HTTPException(status_code=422, detail="Legende ist nur für Charts verfügbar")
+        raise HTTPException(status_code=422, detail=tr("Legende ist nur für Charts verfügbar"))
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_pin_legend(
         body.dashboard_id, body.item_type, body.item_id, body.show_legend
     ):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_legend": body.show_legend}
 
 
@@ -4204,7 +4200,7 @@ async def dashboard_entity_change(
     new_entity_id = str(form.get("new_entity_id", "")).strip()
     _require_entity(new_entity_id)
     if not index.set_dashboard_entity_pin_entity(dashboard_id, pin_id, new_entity_id):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return templates.TemplateResponse(
         request, "_dashboard_tiles.html",
         _dashboard_tiles_context(dashboard_id, auto_open_pin_id=pin_id),
@@ -4237,7 +4233,7 @@ def dashboard_entity_size(body: _ResizeDashboardEntityTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
 
 
@@ -4251,7 +4247,7 @@ class _SparklineDashboardTileBody(BaseModel):
 def dashboard_sparkline(body: _SparklineDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_entity_pin_sparkline(body.dashboard_id, body.pin_id, body.show_sparkline):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_sparkline": body.show_sparkline}
 
 
@@ -4271,7 +4267,7 @@ def dashboard_sparkline_resolution(body: _SparklineResolutionDashboardTileBody) 
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "resolution": body.resolution}
 
 
@@ -4285,7 +4281,7 @@ class _ShowAgeDashboardTileBody(BaseModel):
 def dashboard_entity_show_age(body: _ShowAgeDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_entity_pin_show_age(body.dashboard_id, body.pin_id, body.show_age):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_age": body.show_age}
 
 
@@ -4303,7 +4299,7 @@ def dashboard_entity_stale_mode(body: _StaleModeDashboardTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     thresholds = stale_thresholds(body.stale_mode)
     return {
         "ok": True, "stale_mode": body.stale_mode,
@@ -4334,7 +4330,7 @@ def _get_dashboard_entity_pin(dashboard_id: int, pin_id: int) -> dict | None:
 def dashboard_entity_show_period(body: _ShowPeriodDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_entity_pin_show_period(body.dashboard_id, body.pin_id, body.show_period):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     # Voller Kachel-Kontext statt nur {"show_period": ...} zurück: anders als
     # show_age (rein additiv, eigenes <span>) wirkt show_period auf dieselbe
     # Stelle wie Zeitraum/Hauptwert/Kennzahlen-Zeile (Kennzahlen-Zeile ODER
@@ -4343,7 +4339,7 @@ def dashboard_entity_show_period(body: _ShowPeriodDashboardTileBody) -> dict:
     # /dashboard/entity-metrics, statt eine dritte Variante zu bauen.
     pin = _get_dashboard_entity_pin(body.dashboard_id, body.pin_id)
     if pin is None:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     entity = index.get_entity(pin["item_entity_id"])
     return {
         "ok": True,
@@ -4365,7 +4361,7 @@ def dashboard_entity_decimals(body: _DecimalsDashboardTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "decimals": body.decimals}
 
 
@@ -4380,7 +4376,7 @@ def dashboard_entity_title(body: _TitleDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     title = body.title.strip()
     if not index.set_dashboard_entity_pin_title(body.dashboard_id, body.pin_id, title or None):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "title": title}
 
 
@@ -4417,10 +4413,10 @@ def dashboard_entity_metrics(body: _MetricsDashboardTileBody) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not geaendert:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     pin = _get_dashboard_entity_pin(body.dashboard_id, body.pin_id)
     if pin is None:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     entity = index.get_entity(pin["item_entity_id"])
     # Den fertigen Anzeigezustand zurückgeben statt nur "ok": der Browser muss
     # das Zeitraum-Etikett und die um Hauptwert und Entitätstyp bereinigte
@@ -4506,9 +4502,9 @@ def dashboards_edit(request: Request, dashboard_id: int) -> HTMLResponse:
 def dashboards_rename(dashboard_id: int, body: _DashboardRenameBody) -> dict:
     name = body.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        raise HTTPException(status_code=422, detail=tr("Name darf nicht leer sein"))
     if not index.rename_dashboard(dashboard_id, name):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "name": name}
 
 
@@ -4523,7 +4519,7 @@ def dashboards_lock(dashboard_id: int, body: _DashboardLockBody) -> dict:
     Kachel-Layout-Aktionen (Pin/Unpin/Resize/Reorder) werden durch
     _require_dashboard_unlocked() blockiert, nicht diese Route hier."""
     if not index.set_dashboard_locked(dashboard_id, body.locked):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "locked": body.locked}
 
 
@@ -4534,7 +4530,7 @@ class _DashboardPreciseModeBody(BaseModel):
 @app.post("/dashboards/{dashboard_id}/precise-mode")
 def dashboards_precise_mode(dashboard_id: int, body: _DashboardPreciseModeBody) -> dict:
     if not index.set_dashboard_precise_mode(dashboard_id, body.precise_mode):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "precise_mode": body.precise_mode}
 
 
@@ -4545,14 +4541,14 @@ class _DashboardFillGapsBody(BaseModel):
 @app.post("/dashboards/{dashboard_id}/fill-gaps")
 def dashboards_fill_gaps(dashboard_id: int, body: _DashboardFillGapsBody) -> dict:
     if not index.set_dashboard_fill_gaps(dashboard_id, body.fill_gaps):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "fill_gaps": body.fill_gaps}
 
 
 @app.post("/dashboards/{dashboard_id}/delete")
 def dashboards_delete(dashboard_id: int) -> dict:
     if not index.delete_dashboard(dashboard_id):
-        raise HTTPException(status_code=400, detail="Dashboard kann nicht gelöscht werden")
+        raise HTTPException(status_code=400, detail=tr("Dashboard kann nicht gelöscht werden"))
     return {"ok": True}
 
 
@@ -4560,7 +4556,7 @@ def dashboards_delete(dashboard_id: int) -> dict:
 def dashboards_favorite_toggle(dashboard_id: int) -> dict:
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is None:
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     new_state = not dashboard["is_favorite"]
     index.set_dashboard_favorite(dashboard_id, new_state)
     return {"is_favorite": new_state}
@@ -4570,14 +4566,14 @@ def dashboards_favorite_toggle(dashboard_id: int) -> dict:
 def dashboards_duplicate(dashboard_id: int) -> dict:
     new_id = index.duplicate_dashboard(dashboard_id)
     if new_id is None:
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"id": new_id}
 
 
 @app.post("/dashboards/{dashboard_id}/set-default")
 def dashboards_set_default(dashboard_id: int) -> dict:
     if not index.set_default_dashboard(dashboard_id):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True}
 
 
@@ -4758,46 +4754,46 @@ def tables_new(request: Request) -> HTMLResponse:
 
 def _validate_table_body(body: _SaveTableBody) -> None:
     if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Bitte einen Namen für die Tabelle angeben")
+        raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für die Tabelle angeben"))
     if not body.columns:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Spalte anlegen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Spalte anlegen"))
     if not body.rows:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Zeile anlegen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Zeile anlegen"))
     for c in body.columns:
         if c.range_key not in dict(_CHART_RANGE_OPTIONS):
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum in einer Spalte")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum in einer Spalte"))
         if c.decimals not in DECIMALS_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Option in einer Spalte")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Option in einer Spalte"))
         if c.width is not None and not (30 <= c.width <= 800):
-            raise HTTPException(status_code=400, detail="Ungültige Spaltenbreite")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Spaltenbreite"))
     if body.style.label_col_width is not None and not (30 <= body.style.label_col_width <= 800):
-        raise HTTPException(status_code=400, detail="Ungültige Spaltenbreite")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Spaltenbreite"))
     for r in body.rows:
         if r.row_type not in ("entity", "group", "formula", "separator", "summary"):
-            raise HTTPException(status_code=400, detail="Ungültiger Zeilentyp")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeilentyp"))
         if len(r.label) > MAX_TABLE_ROW_LABEL_LENGTH:
             raise HTTPException(
                 status_code=400,
-                detail=f"Eine Zeilenbeschriftung darf höchstens {MAX_TABLE_ROW_LABEL_LENGTH} Zeichen lang sein",
+                detail=tr("Eine Zeilenbeschriftung darf höchstens {MAX_TABLE_ROW_LABEL_LENGTH} Zeichen lang sein", MAX_TABLE_ROW_LABEL_LENGTH=MAX_TABLE_ROW_LABEL_LENGTH),
             )
         if r.row_type in ("entity", "group") and not r.entity_ids:
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht mindestens eine Entität')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht mindestens eine Entität", label=r.label))
         if r.row_type == "formula" and not r.formula.strip():
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht eine Formel')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht eine Formel", label=r.label))
         # summary: dieselben zwei Werte wie die Aggregation von Entität-/
         # Gruppen-Zeilen (Summe/Durchschnitt), nur ohne "auto"/"min"/"max" —
         # eine automatische Summenzeile ist immer eindeutig Summe oder
         # Durchschnitt, nie kontextabhängig wie bei einer einzelnen Entität.
         if r.row_type == "summary" and r.aggregation not in ("sum", "avg"):
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht Summe oder Durchschnitt')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht Summe oder Durchschnitt", label=r.label))
         if r.aggregation not in _TABLE_ROW_AGGREGATIONS:
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" hat eine ungültige Aggregation')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" hat eine ungültige Aggregation", label=r.label))
     if body.style.borders not in _TABLE_BORDER_OPTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Rahmen-Option")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Rahmen-Option"))
     if body.style.density not in _TABLE_DENSITY_OPTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Dichte-Option")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Dichte-Option"))
     if body.style.header_align not in _TABLE_ALIGN_OPTIONS or body.style.value_align not in _TABLE_ALIGN_OPTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Ausrichtungs-Option")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Ausrichtungs-Option"))
 
 
 # Muss VOR "/tables/{table_id}" stehen — dieselbe Begründung wie bei
@@ -4819,14 +4815,14 @@ def tables_create(body: _SaveTableBody) -> dict:
 def tables_view(request: Request, table_id: int) -> HTMLResponse:
     table = index.get_saved_table(table_id)
     if table is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     return templates.TemplateResponse(request, "table_editor.html", _table_editor_context(table))
 
 
 @app.post("/tables/{table_id}")
 def tables_update(table_id: int, body: _SaveTableBody) -> dict:
     if index.get_saved_table(table_id) is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     _validate_table_body(body)
     index.update_saved_table(
         table_id,
@@ -4848,7 +4844,7 @@ def tables_delete(table_id: int) -> dict:
 def tables_favorite_toggle(table_id: int) -> dict:
     table = index.get_saved_table(table_id)
     if table is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     new_state = not table["is_favorite"]
     index.set_table_favorite(table_id, new_state)
     return {"is_favorite": new_state}
@@ -4861,7 +4857,7 @@ def tables_duplicate(table_id: int) -> dict:
     zwei inhaltsgleiche favorisierte Karten."""
     table = index.get_saved_table(table_id)
     if table is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     new_id = index.create_saved_table(
         index.copy_name_for("saved_tables", table["name"]),
         table["columns"], table["rows"], table["style"],
@@ -4872,7 +4868,7 @@ def tables_duplicate(table_id: int) -> dict:
 @app.post("/tables/{table_id}/pin", response_class=HTMLResponse)
 def tables_pin(request: Request, table_id: int, dashboard_id: int = 1) -> HTMLResponse:
     if index.get_saved_table(table_id) is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "table", table_id)
@@ -4999,7 +4995,7 @@ def entity_data_days(entity_id: str, year: int, month: int) -> dict:
     einzugrenzen."""
     _require_entity(entity_id)
     if not (1 <= month <= 12):
-        raise HTTPException(status_code=400, detail="Ungültiger Monat")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Monat"))
     days_in_month = calendar.monthrange(year, month)[1]
     month_start = datetime(year, month, 1, tzinfo=TZ)
     month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=TZ)
@@ -5343,7 +5339,7 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     _require_entity(entity_id)
     now = datetime.now(TZ)
     if body.ts <= 0 or body.ts > now.timestamp() + 3600:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitstempel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitstempel"))
     started_at = time.time()
     cleanup.add_raw_value(DATA_DIR, index, entity_id, body.ts, body.value, TZ, now=now)
     index.log_entity_action(
@@ -5374,7 +5370,7 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
         DATA_DIR, index, entity_id, body.ts, body.old_value, body.new_value, TZ
     )
     if not changed:
-        raise HTTPException(status_code=404, detail="Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)")
+        raise HTTPException(status_code=404, detail=tr("Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)"))
     index.log_entity_action(
         entity_id, "correct", "manual", started_at, time.time(), "success", rows_affected=1
     )
@@ -5389,9 +5385,9 @@ class _CompactValuesBody(BaseModel):
 
 def _validate_compact_body(entity_id: str, body: _CompactValuesBody) -> None:
     if body.target_resolution not in COMPACT_TARGET_LABELS or body.target_resolution == "off":
-        raise HTTPException(status_code=400, detail="Ungültiges Verdichtungsziel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Verdichtungsziel"))
     if body.end_ts <= body.start_ts:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
 
 
 @app.post("/entities/{entity_id}/rows/compact/preview")

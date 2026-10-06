@@ -26,6 +26,8 @@ app.css), nicht den Zustand.
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -255,7 +257,7 @@ class JobProgress:
         Neustart als laufend gilt.
         """
         if not self._besetzen(kind):
-            raise JobBusy(f"{self.name} läuft bereits")
+            raise JobBusy(tr("{name} läuft bereits", name=self.name))
         try:
             yield
         except BaseException:
