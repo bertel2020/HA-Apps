@@ -7,6 +7,8 @@ drin und zählen deshalb nicht mit."""
 
 from __future__ import annotations
 
+import re
+import time
 from zoneinfo import ZoneInfo
 
 from . import purge_auto
@@ -48,15 +50,47 @@ def items(index, tz: ZoneInfo) -> list[dict]:
     ]
 
 
-def build(index, tz: ZoneInfo, pin: dict) -> dict:
-    """Kachel-Daten für _dashboard_tiles.html. ``open_total`` ist die Summe der auffälligen Zeilen
-    (Rückgänge + Duplikate); markierte Werte sind erledigt, nur noch nicht entfernt, und zählen nicht."""
+#: Ab so vielen Tagen ohne neuen Wert gilt eine Entität als inaktiv — die Voreinstellung von Housekeeping →
+#: Inaktive Entitäten (nie empfangene zählen immer mit).
+INACTIVE_AFTER_DAYS = 3
+
+
+def inactive_entities(index, now: float | None = None) -> int:
+    now = time.time() if now is None else now
+    limit = INACTIVE_AFTER_DAYS * 86400
+    return sum(1 for entity in index.list_entities() if entity["last_ts"] is None or now - entity["last_ts"] >= limit)
+
+
+def status(index, tz: ZoneInfo) -> dict:
+    """Vierte Kachel der Übersicht („Status“, entities.html): Hauptwert sind die inaktiven Entitäten, darunter
+    in einer Zeile dieselben drei Zahlen wie in der Dashboard-Kachel. Zahl und erstes Wort verbindet ein
+    geschütztes Leerzeichen, damit ein Zeilenumbruch sie nicht trennt."""
     rows = items(index, tz)
-    open_total = sum(row["count"] for row in rows if row["warn"])
+    decreases, duplicates, marked = (format_int(row["count"]) for row in rows)
+    inactive = inactive_entities(index)
     return {
-        "kind": "cleanup", "pin_id": pin["item_id"], "name": tr("Bereinigung"),
+        "value": (tr("{count} inaktive Entität", count=format_int(inactive)) if inactive == 1
+                  else tr("{count} inaktive Entitäten", count=format_int(inactive))).replace(" ", "\u00a0", 1),
+        # Jede Zahl bleibt mit ihrem Wort zusammen (geschütztes Leerzeichen), umbrochen wird nur an den Punkten.
+        "sub": re.sub(r"(\d) (?=[^\d\s·])", "\\1\u00a0", tr("{decreases} Rückgänge · {duplicates} Duplikate · {marked} markiert", decreases=decreases, duplicates=duplicates, marked=marked)),
+        "link": "housekeeping",
+    }
+
+
+def build(index, tz: ZoneInfo, pin: dict) -> dict:
+    """Kachel-Daten für _dashboard_tiles.html (Kachel „Status“). Hauptwert sind die inaktiven Entitäten
+    (``inactive``), darunter die drei Bereinigungs-Zahlen (``lines``: Rückgänge, Duplikate, markierte Werte)."""
+    rows = items(index, tz)
+    inactive = inactive_entities(index)
+    inactive_line = {
+        "label": tr("Inaktive Entitäten"), "count": inactive, "warn": bool(inactive), "count_label": format_int(inactive),
+        "sub": tr("ab {days} Tagen", days=INACTIVE_AFTER_DAYS) if inactive else "", "link": "housekeeping#entitaeten",
+    }
+    return {
+        "kind": "cleanup", "pin_id": pin["item_id"], "name": tr("Status"),
         "grid_cols": pin["grid_cols"], "grid_rows": pin["grid_rows"],
         "lines": [dict(row, count_label=format_int(row["count"])) for row in rows],
-        "open_total": open_total, "open_label": format_int(open_total),
-        "all_clear": open_total == 0,
+        "inactive": inactive, "inactive_label": format_int(inactive),
+        "inactive_text": tr("inaktive Entität") if inactive == 1 else tr("inaktive Entitäten"),
+        "inactive_line": inactive_line,
     }

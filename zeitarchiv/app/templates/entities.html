@@ -33,6 +33,13 @@
         </svg>
         {% endif %}
       </a>
+      {% if cleanup_status is defined %}{% set status = cleanup_status() %}
+      <a class="stat" href="{{ status.link }}">
+        <div class="label">{{ _("Status") }}</div>
+        <div class="value">{{ status.value }}</div>
+        <div class="sub-value">{{ status.sub }}</div>
+      </a>
+      {% endif %}
     </div>
 
     <div class="dashboard-section">

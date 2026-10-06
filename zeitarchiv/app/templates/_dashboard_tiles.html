@@ -146,7 +146,7 @@
         </a>
       </div>
       {% elif tile.kind == 'cleanup' %}
-      <div class="dtile dtile-cleanup{{ ' is-clear' if tile.all_clear else '' }}" draggable="{{ 'false' if dashboard_locked else 'true' }}"
+      <div class="dtile dtile-cleanup{{ ' is-clear' if not tile.inactive else '' }}" draggable="{{ 'false' if dashboard_locked else 'true' }}"
            data-item-type="cleanup" data-item-id="{{ tile.pin_id }}"
            data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
@@ -174,15 +174,15 @@
           <div class="dtile-title">{{ tile.name }}</div>
           {% if tile.grid_cols * tile.grid_rows == 1 %}
           <a class="dtile-cleanup-compact" href="{{ href_base }}housekeeping" draggable="false">
-            <span class="dtile-cleanup-total">{{ tile.open_label if not tile.all_clear else '✓' }}</span>
-            <span class="dtile-cleanup-sub">{{ _("offen") if not tile.all_clear else _("in Ordnung") }}</span>
+            <span class="dtile-cleanup-total">{{ tile.inactive_label }}</span>
+            <span class="dtile-cleanup-sub">{{ tile.inactive_text }}</span>
             <span class="dtile-cleanup-mini">
               {% for item in tile.lines %}<span class="dtile-cleanup-mini-row{{ ' is-warn' if item.warn else '' }}"><span>{{ item.label }}</span><b>{{ item.count_label }}</b></span>{% endfor %}
             </span>
           </a>
           {% else %}
           <div class="dtile-cleanup-items">
-            {% for item in tile.lines %}
+            {% for item in [tile.inactive_line] + tile.lines %}
             <a class="dtile-cleanup-item{{ ' is-warn' if item.warn else '' }}" href="{{ href_base }}{{ item.link }}" draggable="false">
               <span>{{ item.label }}{% if item.sub %} <span class="dtile-cleanup-sub">{{ item.sub }}</span>{% endif %}</span>
               <b>{{ item.count_label }}</b>
@@ -268,7 +268,7 @@
            Entitäten-Suche. Vierter Reiter "Sektion" legt keinen bestehenden
            Eintrag an, sondern einen neuen Trenner (reines Formular statt
            Objekt-Liste) — siehe dashboard_section_add() in main.py. -->
-      <div class="dtile dtile-add" x-data="{open: false, tab: 'chart', search: ''}" x-cloak>
+      <div class="dtile dtile-add" x-data="{open: false, tab: 'chart', search: '', info: false, infoSection: false}" x-cloak>
         <button type="button" class="dtile-add-btn" @click="open = !open" title="{{ _('Chart, Tabelle, Werte-Kachel, Bereinigung oder Sektion hinzufügen') }}">+</button>
         <div class="dtile-picker-overlay" x-show="open" @pointerdown.stop @click.self="open = false" @keydown.escape.window="open = false">
           <div class="dtile-picker-modal">
@@ -280,10 +280,9 @@
               <button type="button" role="tab" :class="{active: tab === 'chart'}" @click="tab = 'chart'; search = ''">{{ _("Charts") }}</button>
               <button type="button" role="tab" :class="{active: tab === 'table'}" @click="tab = 'table'; search = ''">{{ _("Tabellen") }}</button>
               <button type="button" role="tab" :class="{active: tab === 'entity'}" @click="tab = 'entity'; search = ''">{{ _("Werte") }}</button>
-              <button type="button" role="tab" :class="{active: tab === 'cleanup'}" @click="tab = 'cleanup'; search = ''">{{ _("Bereinigung") }}</button>
-              <button type="button" role="tab" :class="{active: tab === 'section'}" @click="tab = 'section'; search = ''">{{ _("Sektion") }}</button>
+              <button type="button" role="tab" :class="{active: tab === 'more'}" @click="tab = 'more'; search = ''">{{ _("Weitere") }}</button>
             </div>
-            <input type="search" class="dtile-picker-search" placeholder="{{ _('Suchen …') }}" x-show="tab !== 'section' && tab !== 'cleanup'" x-model="search">
+            <input type="search" class="dtile-picker-search" placeholder="{{ _('Suchen …') }}" x-show="tab !== 'more'" x-model="search">
             <div class="dtile-picker-list">
               <div x-show="tab === 'chart'">
                 {% for c in unpinned_charts %}
@@ -318,18 +317,25 @@
                 </button>
                 {% endfor %}
               </div>
-              <div x-show="tab === 'cleanup'">
-                <p class="dtile-picker-hint">{{ _("Zeigt offene Zählerrückgänge, doppelte Zeitstempel und markierte Werte auf einen Blick, mit Link in Housekeeping. Pro Dashboard eine Kachel.") }}</p>
-                <button type="button" class="btn dtile-picker-section-submit"
-                        hx-post="{{ href_base }}dashboard/pin-cleanup?dashboard_id={{ dashboard_id }}"
-                        hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">{{ _("Bereinigungs-Kachel hinzufügen") }}</button>
-              </div>
-              <div x-show="tab === 'section'">
-                <form hx-post="{{ href_base }}dashboard/section/add" hx-target="#dashboard-grid" hx-swap="outerHTML" @submit="open = false" class="dtile-picker-section-form">
-                  <input type="hidden" name="dashboard_id" value="{{ dashboard_id }}">
-                  <input type="text" name="name" class="dtile-picker-section-input" placeholder="{{ _('Name der Sektion, z. B. „Klima“') }}" maxlength="40" required>
-                  <button type="submit" class="btn dtile-picker-section-submit">{{ _("Sektion hinzufügen") }}</button>
-                </form>
+              <div x-show="tab === 'more'">
+                <div class="dtile-picker-block">
+                  <h3 class="dtile-picker-subhead">{{ _("Sektion") }}
+                    <button type="button" class="hint-toggle" :aria-expanded="infoSection.toString()" @click="infoSection = !infoSection" aria-label="{{ _('Hinweis zu {feld}', feld=_('Sektion')) }}">i</button></h3>
+                  <p class="dtile-picker-hint" x-show="infoSection" x-cloak>{{ _("Eine benannte Trennlinie gliedert die Kacheln eines Dashboards in Gruppen, die sich einzeln ein- und ausklappen lassen.") }}</p>
+                  <form hx-post="{{ href_base }}dashboard/section/add" hx-target="#dashboard-grid" hx-swap="outerHTML" @submit="open = false" class="dtile-picker-section-form">
+                    <input type="hidden" name="dashboard_id" value="{{ dashboard_id }}">
+                    <input type="text" name="name" class="dtile-picker-section-input" placeholder="{{ _('Name der Sektion, z. B. „Klima“') }}" maxlength="40" required>
+                    <button type="submit" class="btn dtile-picker-section-submit">{{ _("Sektion hinzufügen") }}</button>
+                  </form>
+                </div>
+                <div class="dtile-picker-block">
+                  <h3 class="dtile-picker-subhead">{{ _("Status") }}
+                    <button type="button" class="hint-toggle" :aria-expanded="info.toString()" @click="info = !info" aria-label="{{ _('Hinweis zu {feld}', feld=_('Status')) }}">i</button></h3>
+                  <p class="dtile-picker-hint" x-show="info" x-cloak>{{ _("Zeigt inaktive Entitäten, offene Zählerrückgänge, doppelte Zeitstempel und markierte Werte auf einen Blick, mit Link in Housekeeping. Pro Dashboard eine Kachel.") }}</p>
+                  <button type="button" class="btn dtile-picker-section-submit"
+                          hx-post="{{ href_base }}dashboard/pin-cleanup?dashboard_id={{ dashboard_id }}"
+                          hx-target="#dashboard-grid" hx-swap="outerHTML" @click="open = false">{{ _("Kachel hinzufügen") }}</button>
+                </div>
               </div>
             </div>
           </div>

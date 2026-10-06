@@ -29,17 +29,27 @@ def test_the_tile_counts_the_open_points_from_the_snapshots(tmp_path) -> None:
     assert rows["Doppelte Zeitstempel"]["count"] == 14
     assert rows["Markierte Werte"]["count"] == 0
     tile = cleanup_tile.build(index, TZ, {"item_id": 7, "grid_cols": 2, "grid_rows": 1})
-    assert tile["open_total"] == 17 and not tile["all_clear"]
+    assert tile["name"] == "Status"
+    assert [line["count"] for line in tile["lines"]] == [3, 14, 0]
     index.close()
 
 
-def test_the_tile_is_calm_when_nothing_is_open_and_marked_values_do_not_count_as_open(tmp_path) -> None:
+def test_the_tile_leads_with_inactive_entities_and_marked_values_are_just_a_count(tmp_path) -> None:
+    import time
+
     index = Index(tmp_path / "index.sqlite")
     index.get_or_create_entity("sensor.a", "sensor", "total_increasing", "kWh")
+    index._conn.execute("UPDATE entities SET last_ts = ? WHERE entity_id = 'sensor.a'", (time.time(),))
+    index._conn.commit()
     index.mark_deleted("sensor.a", [1.0, 2.0])
-    tile = cleanup_tile.build(index, TZ, {"item_id": 7, "grid_cols": 2, "grid_rows": 1})
-    assert tile["all_clear"] and tile["open_total"] == 0
+    tile = cleanup_tile.build(index, TZ, {"item_id": 7, "grid_cols": 1, "grid_rows": 1})
+    assert tile["inactive"] == 0 and tile["inactive_text"] == "inaktive Entitäten"
     assert [row["count"] for row in tile["lines"]][-1] == 2
+
+    index.get_or_create_entity("sensor.never", "sensor", "standard", "°C")  # nie empfangen
+    tile = cleanup_tile.build(index, TZ, {"item_id": 7, "grid_cols": 1, "grid_rows": 1})
+    assert tile["inactive"] == 1 and tile["inactive_text"] == "inaktive Entität"
+    assert tile["inactive_line"]["warn"] and tile["inactive_line"]["link"] == "housekeeping#entitaeten"
     index.close()
 
 
@@ -108,3 +118,32 @@ def test_a_locked_dashboard_refuses_the_size_change(client) -> None:
     finally:
         index.set_dashboard_locked(1, False)
         index.unpin_item_from_dashboard(1, "cleanup", pin["item_id"])
+
+
+def test_the_status_tile_leads_with_inactive_entities_and_keeps_number_and_word_together(tmp_path) -> None:
+    import time
+
+    index = Index(tmp_path / "index.sqlite")
+    calm = cleanup_tile.status(index, TZ)
+    assert calm["value"] == "0\u00a0inaktive Entitäten"
+    assert calm["sub"] == "0\u00a0Rückgänge · 0\u00a0Duplikate · 0\u00a0markiert"
+
+    index.get_or_create_entity("sensor.never", "sensor", "standard", "°C")  # nie empfangen → inaktiv
+    assert cleanup_tile.status(index, TZ)["value"] == "1\u00a0inaktive Entität"
+    index.get_or_create_entity("sensor.fresh", "sensor", "standard", "°C")
+    index._conn.execute("UPDATE entities SET last_ts = ? WHERE entity_id = 'sensor.fresh'", (time.time(),))
+    index._conn.execute("UPDATE entities SET last_ts = ? WHERE entity_id = 'sensor.never'", (time.time() - 4 * 86400,))
+    index._conn.commit()
+    assert cleanup_tile.inactive_entities(index) == 1  # nur die vier Tage alte; die frische zählt nicht
+
+    index.set_counter_decrease_snapshot([_decrease_row("sensor.a", 2)])
+    index.set_duplicate_snapshot([{"entity_id": "sensor.a", "friendly_name": "A", "count": 14}])
+    sub = cleanup_tile.status(index, TZ)["sub"]
+    assert sub == "2\u00a0Rückgänge · 14\u00a0Duplikate · 0\u00a0markiert"  # Zahl und Wort getrennt nicht umbrechbar
+    index.close()
+
+
+def test_the_overview_shows_the_status_tile_as_the_fourth_stat(client) -> None:
+    html = client.get("/").text
+    assert html.count('class="stat"') == 4
+    assert ">Status<" in html or ">Status</div>" in html

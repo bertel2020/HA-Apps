@@ -39,7 +39,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import cleanup_stats
-from . import counter_auto, counter_bulk
+from . import cleanup_tile, counter_auto, counter_bulk
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -319,6 +319,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
     deps.templates.env.globals["counter_decrease_mode"] = _counter_mode
     deps.templates.env.globals["counter_auto_limit"] = counter_auto.MAX_PER_RUN
+    # Kachel „Status“ der Übersicht (entities.html), siehe cleanup_tile.status().
+    deps.templates.env.globals["cleanup_status"] = lambda: cleanup_tile.status(deps.index, deps.tz)
 
     def _counter_auto_state(entity_id: str) -> dict:
         entity = deps.index.get_entity(entity_id)
