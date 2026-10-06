@@ -26,6 +26,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import cleanup_stats
+from . import purge_auto
 from . import ha_integration
 from . import tips as tips_mod
 from . import version_check
@@ -686,7 +687,11 @@ def build_notices(
             })
 
     removable_rows = purge_totals.get("removable_rows", 0)
-    if removable_rows:
+    # Bei eingeschalteter Automatik muss man nichts tun: die Meldung erscheint dann nur, wenn der
+    # tägliche Lauf Markierungen über die Frist hinaus liegen gelassen hat.
+    auto_enabled = purge_auto.settings(index)["enabled"]
+    auto_overdue = auto_enabled and purge_auto.overdue(index)
+    if removable_rows and (not auto_enabled or auto_overdue):
         entities_affected = purge_totals.get("entities_affected", 0)
         # Genau eine betroffene Entität: beim Namen nennen. Mit mehreren bleibt
         # es bei der Sammelmeldung — welche gemeint ist, zeigt dann die
@@ -708,6 +713,8 @@ def build_notices(
         # (bereits gefilterten) Hot Buffer.
         if purge_totals.get("archive_rows", 0):
             detail += " " + tr("Tages-, Monats- und Jahreswerte berücksichtigen die Löschung erst danach.")
+        if auto_overdue:
+            detail += " " + tr("Die automatische Bereinigung hat sie noch nicht entfernt.")
         notices.append({
             "id": "housekeeping.purge_available",
             "severity": "warn",

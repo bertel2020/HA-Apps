@@ -2096,7 +2096,21 @@
     "{previous} → {value}": "{previous} → {value}",
     "{total} Rückgänge bei {entities} Zählern in den letzten 30 Tagen.": "{total} decreases across {entities} meters in the last 30 days.",
     "Zählerrückgang-Erkennung": "Counter decrease detection",
-    "Sucht Rückgänge bei Zählern der letzten 30 Tage · stündlich": "Looks for decreases in meters over the last 30 days · hourly"
+    "Sucht Rückgänge bei Zählern der letzten 30 Tage · stündlich": "Looks for decreases in meters over the last 30 days · hourly",
+    "Automatik einschalten ›": "Turn on automatic cleanup ›",
+    "Automatische Bereinigung an: Die älteste Markierung wird ab dem {date} endgültig entfernt (nach {age}).": "Automatic cleanup is on: the oldest mark will be permanently removed from {date} (after {age}).",
+    "Automatische Bereinigung an: Die älteste Markierung wird beim nächsten täglichen Lauf endgültig entfernt (nach {age}).": "Automatic cleanup is on: the oldest mark will be permanently removed in the next daily run (after {age}).",
+    "Automatische Bereinigung ist aus.": "Automatic cleanup is off.",
+    "Die automatische Bereinigung entfernt Markierungen nach {age}.": "Automatic cleanup removes marks after {age}.",
+    "Die automatische Bereinigung hat sie noch nicht entfernt.": "Automatic cleanup has not removed them yet.",
+    "Die automatische Bereinigung ist aus, markierte Werte bleiben liegen, bis du sie entfernst.": "Automatic cleanup is off, so marked values stay until you remove them.",
+    "Einstellen ›": "Set up ›",
+    "Einstellungen ›": "Settings ›",
+    "in 1 Tag": "in 1 day",
+    "in {count} Tagen": "in {count} days",
+    "wird ab {date} entfernt": "will be removed from {date}",
+    "wird ab {date} entfernt, {in_days}": "will be removed from {date}, {in_days}",
+    "wird beim nächsten Lauf entfernt": "will be removed in the next run"
   },
   "js": {
     "Meldungen": "Notices",

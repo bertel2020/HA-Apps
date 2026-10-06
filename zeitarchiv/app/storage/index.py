@@ -3672,6 +3672,18 @@ class Index:
                 (len(timestamps), entity_id),
             )
 
+    def oldest_deleted_at(self, entity_id: str | None = None) -> float | None:
+        """Zeitpunkt der ältesten noch bestehenden Markierung (einer Entität oder insgesamt) — für die
+        Hinweise zur automatischen Bereinigung, die ab diesem Zeitpunkt zählt."""
+        sql = "SELECT MIN(deleted_at) AS oldest FROM deleted_points"
+        params: tuple = ()
+        if entity_id is not None:
+            sql += " WHERE entity_id = ?"
+            params = (entity_id,)
+        with self._lock, self._conn:
+            row = self._conn.execute(sql, params).fetchone()
+        return row["oldest"] if row and row["oldest"] is not None else None
+
     def undo_last_deleted_batch(self, entity_id: str) -> int:
         """Macht die zuletzt gelöschte Charge (gleicher deleted_at-Zeitstempel) rückgängig."""
         with self._lock, self._conn:

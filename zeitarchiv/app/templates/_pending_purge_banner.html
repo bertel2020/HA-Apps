@@ -20,6 +20,14 @@
       {% if pending_purge.archive %}{{ _("Tages-, Monats- und Jahreswerte berücksichtigen die Löschung erst nach der Bereinigung.") }}{% else %}{{ _("Die endgültige Bereinigung steht noch aus.") }}{% endif %}
       <a href="{{ app_root }}/entities/{{ entity_id }}/cleanup?tab=marked"
          onclick="if (window.setTab) { setTab('marked'); return false; }">{{ _("Zu „Markiert“") }}</a>
+      {# Was die automatische Bereinigung damit vorhat: an (mit Datum der ältesten Markierung) oder aus. #}
+      {% if purge_auto_note is defined %}{% set auto = purge_auto_note(entity_id) %}
+      <span class="purge-auto-note">
+        {% if not auto.enabled %}{{ _("Automatische Bereinigung ist aus.") }} <a href="{{ app_root }}/housekeeping#speicherplatz">{{ _("Einstellen ›") }}</a>
+        {% elif auto.overdue or not auto.due %}{{ _("Automatische Bereinigung an: Die älteste Markierung wird beim nächsten täglichen Lauf endgültig entfernt (nach {age}).", age=auto.age_label) }}
+        {% else %}{{ _("Automatische Bereinigung an: Die älteste Markierung wird ab dem {date} endgültig entfernt (nach {age}).", date=auto.due, age=auto.age_label) }}{% endif %}
+      </span>
+      {% endif %}
     </p>
   </div>
 {% endif %}

@@ -32,7 +32,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.concurrency import run_in_threadpool
 from fastapi.templating import Jinja2Templates
 
-from . import entity_history
+from . import entity_history, purge_auto
 from .formatting import decimals_to_int, format_time, format_timestamp, format_value
 from .housekeeping_routes import purge_progress
 from .i18n import N_, tr
@@ -85,6 +85,13 @@ def _purge_result_text(total_rows: int, months: int) -> str:
 def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
     router = APIRouter()
 
+    # Der Banner (_pending_purge_banner.html) wird von mehreren Seiten eingebunden, deren Routen
+    # in main.py liegen — als Jinja-Funktion bekommt er den Stand der Automatik, ohne dass jede
+    # dieser Routen ihn in den Kontext legen muss.
+    deps.templates.env.globals["purge_auto_note"] = (
+        lambda entity_id: purge_auto.note_for_entity(deps.index, entity_id, deps.tz)
+    )
+
     def entity_or_404(entity_id: str):
         entity = deps.index.get_entity(entity_id)
         if entity is None:
@@ -110,6 +117,7 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
             entity_id, list({row["deleted_at"] for row in result["rows"]})
         )
         decimals_int = decimals_to_int(entity["decimals"])
+        auto = purge_auto.settings(deps.index)
         groups: list[dict] = []
         for row in result["rows"]:
             if not groups or groups[-1]["deleted_at"] != row["deleted_at"]:
@@ -117,6 +125,7 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
                     "deleted_at": row["deleted_at"],
                     "label": f"{format_timestamp(row['deleted_at'], deps.tz)} {format_time(row['deleted_at'], deps.tz)}",
                     "size": batch_sizes.get(row["deleted_at"], 0),
+                    "due": purge_auto.batch_due(row["deleted_at"], auto["min_age_days"], deps.tz) if auto["enabled"] else None,
                     "rows": [],
                 })
             groups[-1]["rows"].append({
@@ -134,6 +143,7 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
                 "pagination": result["pagination"],
                 "page_sizes": PAGE_SIZES,
                 "total": result["pagination"]["total"],
+                "auto": auto,
                 "notice": notice,
                 "notice_is_error": notice_is_error,
                 "pending_purge": pending_purge_for(entity, deps.load_purge_rows()),

@@ -46,6 +46,7 @@
               <span class="marked-chev" :class="{ open: open }" aria-hidden="true">&#9656;</span>
               {% if group.size == 1 %}{{ _("Charge vom {label} · 1 Wert", label=group.label) }}{% else %}{{ _("Charge vom {label} · {count} Werte", label=group.label, count=(group.size | format_int)) }}{% endif %}
             </button>
+            {% if group.due %}<span class="marked-due{{ ' soon' if group.due.soon }}">{{ group.due.label }}</span>{% endif %}
             <button type="button" class="btn btn-sm"
                     hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/confirm" hx-vals='{"mode": "batch", "batch": "{{ group.deleted_at }}"}'>
               {{ _("Charge zurücknehmen") }}
@@ -100,7 +101,9 @@
 {# Eigener Bereich ganz unten, getrennt vom Zurücknehmen: das hier lässt sich nicht
    rückgängig machen. Die Rückfrage mit den Zahlen landet in #marked-purge. #}
 <div class="marked-zone">
-  <p>{{ _("Entfernt alle {total} markierten Werte dieser Entität endgültig und berechnet die betroffenen Monate neu. Das lässt sich nicht rückgängig machen.", total=(total | format_int)) }}</p>
+  <p>{{ _("Entfernt alle {total} markierten Werte dieser Entität endgültig und berechnet die betroffenen Monate neu. Das lässt sich nicht rückgängig machen.", total=(total | format_int)) }}
+    {% if auto.enabled %}{{ _("Die automatische Bereinigung entfernt Markierungen nach {age}.", age=auto.age_label) }} <a href="{{ app_root }}/housekeeping#speicherplatz">{{ _("Einstellungen ›") }}</a>
+    {% else %}{{ _("Die automatische Bereinigung ist aus, markierte Werte bleiben liegen, bis du sie entfernst.") }} <a href="{{ app_root }}/housekeeping#speicherplatz">{{ _("Automatik einschalten ›") }}</a>{% endif %}</p>
   <button type="button" class="btn btn-danger-outline"
           hx-post="{{ app_root }}/entities/{{ entity_id }}/marked/purge-preview" hx-target="#marked-purge" hx-swap="innerHTML">
     {{ _("Endgültig entfernen …") }}
