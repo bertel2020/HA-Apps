@@ -315,12 +315,10 @@ def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None
     bisher" unfair gegen den ganzen "Vortag" statt gegen "Vortag bis zur
     selben Uhrzeit". None, wenn kein fairer Vergleich angefordert wurde
     (kein same_elapsed, offset>=0, oder year_over_year)."""
-    elapsed_seconds = result.get("elapsed_seconds")
-    if elapsed_seconds is None:
+    comparison_points = result.get("comparison_points")
+    if comparison_points is None:
         return None
-    cutoff = result["window_start"] + elapsed_seconds
-    capped_points = [point for point in result["points"] if point["ts"] < cutoff]
-    return _table_aggregates({**result, "points": capped_points})
+    return _table_aggregates({**result, "points": comparison_points})
 
 
 def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:

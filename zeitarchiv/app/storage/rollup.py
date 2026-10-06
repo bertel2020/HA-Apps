@@ -334,6 +334,11 @@ def _aggregate_fine_to_month(rows: list[FineRow], aggregation_type: str, month_s
     return FineRow(bucket_start=month_start_ts, on_seconds=sum(r.on_seconds or 0.0 for r in rows))
 
 
+aggregate_fine_to_month = _aggregate_fine_to_month
+"""Öffentlicher Name für query.py: ein angeschnittener Monat wird dort aus
+feineren Zeilen genauso verdichtet wie die Monatszeile beim Archivieren."""
+
+
 def append_completed_month(
     data_dir: Path,
     entity_id: str,

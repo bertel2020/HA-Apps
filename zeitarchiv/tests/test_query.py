@@ -754,3 +754,129 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+# -- Fenster, das mitten in einem Bucket endet (Vorjahresvergleich, "Gleicher Zeitpunkt") --
+#
+# Ein Rollup kennt nur ganze Buckets. Ein Fenster, das am 6. Oktober um 17:51 Uhr
+# endet, zählte früher den GANZEN Oktober (Jahr) bzw. den ganzen 6. (Monat) mit.
+
+
+def _archive_counter_year(tmp: Path, index, entity_id: str, year: int, per_day: list[tuple[int, float]]) -> None:
+    """Archiviert ``year`` Monat für Monat samt Rollups. ``per_day`` sind
+    (Stunde, Zuwachs) je Tag — der Zählerstand steigt zu diesen Uhrzeiten, der
+    Tageszuwachs ist also die Summe der Zuwächse."""
+    index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+    archive_dir = tmp / "archive" / entity_id
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    value = 0.0
+    day = datetime(year, 1, 1, tzinfo=TZ)
+    end = datetime(year + 1, 1, 1, tzinfo=TZ)
+    months: dict[int, tuple[list[float], list[float]]] = {}
+    while day < end:
+        ts_list, value_list = months.setdefault(day.month, ([], []))
+        for hour, step in per_day:
+            value += step
+            ts_list.append(day.replace(hour=hour).timestamp())
+            value_list.append(value)
+        day += timedelta(days=1)
+    for month, (ts_list, value_list) in months.items():
+        table = pa.table({"ts": ts_list, "value": value_list})
+        pq.write_table(table, archive_dir / f"{year}-{month:02d}.parquet")
+        rollup.append_completed_month(tmp, entity_id, "counter", table, year, month, TZ)
+
+
+def test_year_over_year_year_range_counts_only_up_to_the_cutoff_day_of_the_last_month() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.ertrag"
+        _archive_counter_year(tmp, index, entity_id, 2025, [(8, 3.0), (20, 7.0)])  # 10 je Tag
+
+        now = datetime(2026, 10, 6, 18, 0, 0, tzinfo=TZ)
+        result = query.query_series(tmp, index, entity_id, "year", TZ, now, year_over_year=True)
+
+        total = sum(p["value"] for p in result["points"])
+        # 1.1.: der erste Messwert (08 Uhr) hat keinen Vorgänger, zählt also 0;
+        # nur der 20-Uhr-Zuwachs (7) kommt dazu. 2.1. bis 5.10. sind 277 volle
+        # Tage à 10. Der 6.10. um 18 Uhr hat nur den 08-Uhr-Zuwachs (3), der
+        # 20-Uhr-Zuwachs liegt nach dem Fensterende.
+        expected = 7.0 + 277 * 10.0 + 3.0
+        assert total == expected, (total, expected)
+
+        october = [p for p in result["points"] if datetime.fromtimestamp(p["ts"], TZ).month == 10]
+        assert len(october) == 1
+        assert october[0]["value"] == 5 * 10.0 + 3.0  # 1.-5.10. voll + 6.10. bis 18 Uhr
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_year_over_year_year_range_on_a_month_boundary_still_reads_the_rollup_only() -> None:
+    """Endet das Fenster exakt auf einer Monatsgrenze, gibt es keinen
+    angeschnittenen Bucket — der Weg über die Rohdaten darf dann nicht greifen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.ertrag"
+        _archive_counter_year(tmp, index, entity_id, 2025, [(8, 3.0), (20, 7.0)])
+
+        now = datetime(2026, 10, 1, 0, 0, 0, tzinfo=TZ)
+        result = query.query_series(tmp, index, entity_id, "year", TZ, now, year_over_year=True)
+
+        months = [datetime.fromtimestamp(p["ts"], TZ).month for p in result["points"]]
+        assert months == list(range(1, 10))  # bis einschließlich September, kein Oktober
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_year_over_year_month_range_counts_only_up_to_the_cutoff_time_of_the_last_day() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.ertrag"
+        _archive_counter_year(tmp, index, entity_id, 2025, [(8, 3.0), (20, 7.0)])
+
+        now = datetime(2026, 10, 6, 18, 0, 0, tzinfo=TZ)
+        result = query.query_series(tmp, index, entity_id, "month", TZ, now, year_over_year=True)
+
+        values = {datetime.fromtimestamp(p["ts"], TZ).day: p["value"] for p in result["points"]}
+        assert [values[d] for d in range(1, 6)] == [10.0] * 5
+        assert values[6] == 3.0  # nur der 08-Uhr-Zuwachs, nicht der volle Tag
+        assert max(values) == 6
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_same_elapsed_comparison_for_the_previous_year_stops_at_the_same_point_in_time() -> None:
+    """"Gleicher Zeitpunkt": das Vorjahr (offset -1) wird für den fairen Vergleich
+    nur bis zum selben Abstand vom Jahresanfang gerechnet — nicht bis zum Ende des
+    angeschnittenen Monats. Der Hauptwert bleibt das ganze Vorjahr."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-query-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.ertrag"
+        _archive_counter_year(tmp, index, entity_id, 2025, [(8, 3.0), (20, 7.0)])
+
+        now = datetime(2026, 10, 6, 18, 0, 0, tzinfo=TZ)
+        result = query.query_series(
+            tmp, index, entity_id, "year", TZ, now, offset=-1, same_elapsed=True,
+        )
+
+        full_year = sum(p["value"] for p in result["points"])
+        until_cutoff = sum(p["value"] for p in result["comparison_points"])
+        assert full_year == 7.0 + 364 * 10.0  # ganzes 2025 (erster Messwert ohne Vorgänger)
+        assert until_cutoff == 7.0 + 277 * 10.0 + 3.0  # wie im Jahresvergleich oben
+
+        # Ohne same_elapsed gibt es keinen Vergleichswert.
+        plain = query.query_series(tmp, index, entity_id, "year", TZ, now, offset=-1)
+        assert "comparison_points" not in plain
+
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

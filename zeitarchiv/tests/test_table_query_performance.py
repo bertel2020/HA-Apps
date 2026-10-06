@@ -107,25 +107,31 @@ def test_table_batch_endpoint_returns_columns_in_request_order(tmp_path: Path) -
     index.close()
 
 
-def test_table_comparison_aggregates_uses_elapsed_cutoff_not_full_period() -> None:
-    """_table_comparison_aggregates() liefert den fairen, auf elapsed_seconds
-    gekappten Vergleichswert — unabhängig davon, dass "aggregates"
+def test_table_comparison_aggregates_uses_the_capped_series_not_the_full_period() -> None:
+    """_table_comparison_aggregates() liefert den fairen, nur bis zum selben
+    Abstand vom Periodenanfang ABGEFRAGTEN Vergleichswert (query_series()
+    legt ihn als comparison_points ab) — unabhängig davon, dass "aggregates"
     (_table_aggregates()) für eine same_elapsed-Spalte jetzt immer den
     vollen Zeitraum zeigt (Regressionsschutz für den "Vortag zeigt nur
-    einen Teiltag"-Bug)."""
+    einen Teiltag"-Bug). Gekappt wird nicht mehr hier an fertigen Buckets: ein
+    angeschnittener Bucket zählte sonst komplett mit."""
     result = {
         "aggregation_type": "standard",
         "window_start": 1000.0,
-        "elapsed_seconds": 500.0,  # Cutoff bei ts < 1500
+        "elapsed_seconds": 500.0,
         "points": [
             {"ts": 1100.0, "value": 4.0, "min": None, "max": None},
             {"ts": 1800.0, "value": 6.0, "min": None, "max": None},
         ],
+        "comparison_points": [
+            {"ts": 1100.0, "value": 4.0, "min": None, "max": None},
+        ],
     }
     comparison = _table_comparison_aggregates(result)
-    assert comparison["avg"] == 4.0  # nur der Punkt vor dem Cutoff zählt
+    assert comparison["avg"] == 4.0  # nur die bis zum Stichpunkt abgefragte Serie zählt
 
-    assert _table_comparison_aggregates({**result, "elapsed_seconds": None}) is None
+    without_comparison = {k: v for k, v in result.items() if k != "comparison_points"}
+    assert _table_comparison_aggregates(without_comparison) is None
 
 
 def test_frontend_deviation_uses_fair_comparison_value_not_full_period() -> None:
