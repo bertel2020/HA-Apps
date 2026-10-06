@@ -23,7 +23,7 @@ window.TableCompute = (() => {
   // Unterstützt +, -, *, /, Klammern, Zeilen-Buchstaben (A-Z) und Zahlen.
   function evalFormula(expr, scope) {
     const s = (expr || '').replace(/\s+/g, '').toUpperCase();
-    if (!s) throw new Error('Leere Formel');
+    if (!s) throw new Error(t('Leere Formel'));
     let pos = 0;
     const peek = () => s[pos];
     function parseExpr() {
@@ -49,15 +49,15 @@ window.TableCompute = (() => {
       if (peek() === '(') {
         pos++;
         const v = parseExpr();
-        if (peek() !== ')') throw new Error('Schließende Klammer fehlt');
+        if (peek() !== ')') throw new Error(t('Schließende Klammer fehlt'));
         pos++;
         return v;
       }
       if (peek() && /[A-Z]/.test(peek())) {
         const letter = s[pos++];
-        if (!(letter in scope)) throw new Error(`Zeile ${letter} ist hier nicht verfügbar`);
+        if (!(letter in scope)) throw new Error(t('Zeile {letter} ist hier nicht verfügbar', {letter}));
         const v = scope[letter];
-        if (v == null) throw new Error(`Zeile ${letter} hat keinen Wert`);
+        if (v == null) throw new Error(t('Zeile {letter} hat keinen Wert', {letter}));
         return v;
       }
       const start = pos;
@@ -67,10 +67,10 @@ window.TableCompute = (() => {
       return parseFloat(FORMULA_DECIMAL_SEP === '.' ? numText : numText.replace(FORMULA_DECIMAL_SEP, '.'));
     }
     const result = parseExpr();
-    if (pos < s.length) throw new Error('Unerwarteter Rest in der Formel');
+    if (pos < s.length) throw new Error(t('Unerwarteter Rest in der Formel'));
     // Division durch 0 (auch 0 / 0) ist kein Fehler in der Formel, sondern
     // eine Periode ohne Bezugsgröße (z. B. "km / Einheiten" in einem Monat
-    // ohne Einheit) — deshalb kein Wert ("–") statt "Fehler".
+    // ohne Einheit) — deshalb kein Wert ("–") statt t("Fehler").
     if (!Number.isFinite(result)) return null;
     return result;
   }
@@ -85,9 +85,9 @@ window.TableCompute = (() => {
   // Angabe (ältere, vor dieser Funktion gespeicherte Tabellen) unverändert
   // NumberFormat.fmt()s Default (bis zu 4 signifikante Stellen).
   function cellValueText(cell, decimals, explicitMissing = false) {
-    if (!cell) return explicitMissing ? 'Keine Daten' : '–';
-    if (cell.error) return 'Fehler';
-    if (cell.value == null) return explicitMissing ? 'Keine Daten' : '–';
+    if (!cell) return explicitMissing ? t('Keine Daten') : '–';
+    if (cell.error) return t('Fehler');
+    if (cell.value == null) return explicitMissing ? t('Keine Daten') : '–';
     const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10) : null;
     return fmtNum(cell.value, decimalsInt);
   }
@@ -467,7 +467,7 @@ window.TableCompute = (() => {
   // eigenes Datum identifiziert den Zeitraum bereits eindeutig, "im
   // laufenden Tag" wäre nur Rauschen.
   const CURRENT_PERIOD_PHRASE = {
-    week: 'in der laufenden Kalenderwoche', month: 'im laufenden Monat', year: 'im laufenden Jahr',
+    week: t('in der laufenden Kalenderwoche'), month: t('im laufenden Monat'), year: t('im laufenden Jahr'),
   };
 
   // Erklärender Hinweis für eine Spalte, deren Wert (noch) nicht den ganzen
@@ -492,9 +492,9 @@ window.TableCompute = (() => {
     if (!isCurrentCol) return null;
     const cutoff = shortCutoffText(col.range_key, windowEnd);
     if (!cutoff) return null;
-    if (col.year_over_year) return `bis ${cutoff}`;
+    if (col.year_over_year) return t('bis {cutoff}', {cutoff});
     const phrase = CURRENT_PERIOD_PHRASE[col.range_key];
-    return phrase ? `${phrase} · bis ${cutoff}` : null;
+    return phrase ? t('{phrase} · bis {cutoff}', {phrase, cutoff}) : null;
   }
 
   // Dieselbe Bedingung wie currentPeriodNote() (über deren Rückgabe geprüft,
@@ -502,14 +502,14 @@ window.TableCompute = (() => {
   // Hover (CSV-Export) statt des ausgeschriebenen Tooltips.
   function currentPeriodShortSuffix(col, isCurrentCol, windowEnd) {
     if (!currentPeriodNote(col, isCurrentCol, windowEnd)) return '';
-    return ` (bis ${shortCutoffText(col.range_key, windowEnd)})`;
+    return ' ' + t('(bis {cutoff})', {cutoff: shortCutoffText(col.range_key, windowEnd)});
   }
 
   // Monatsnamen/-kürzel für resolveLabel() unten — dieselbe Wortwahl wie der
   // Rest der Oberfläche (z. B. previousYearPeriodLabel in entity_detail.html),
   // hier nur als Kalender-Vokabular statt Zeitraum-Namen.
-  const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-  const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  const MONTH_NAMES = [t('Januar'), t('Februar'), t('März'), t('April'), t('Mai'), t('Juni'), t('Juli'), t('August'), t('September'), t('Oktober'), t('November'), t('Dezember')];
+  const MONTH_NAMES_SHORT = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
 
   // ISO-8601-Kalenderwoche (Woche 1 = die Woche mit dem ersten Donnerstag des
   // Jahres) — Standardalgorithmus über den nächsten Donnerstag derselben
@@ -570,9 +570,9 @@ window.TableCompute = (() => {
   // Reihenfolge (grob → fein) bewusst anders ist als der Ersetzungs-Code sie
   // bräuchte.
   const LABEL_VARIABLES = [
-    ['jahr', 'Jahr'], ['jahr_kurz', 'Jahr (kurz)'], ['quartal', 'Quartal'],
-    ['monat', 'Monat'], ['monat_kurz', 'Monat (kurz)'], ['monat_nr', 'Monat (Nr.)'],
-    ['woche', 'Woche'], ['tag', 'Tag'], ['dekade', 'Dekade'],
+    ['jahr', t('Jahr')], ['jahr_kurz', t('Jahr (kurz)')], ['quartal', t('Quartal')],
+    ['monat', t('Monat')], ['monat_kurz', t('Monat (kurz)')], ['monat_nr', t('Monat (Nr.)')],
+    ['woche', t('Woche')], ['tag', t('Tag')], ['dekade', t('Dekade')],
   ];
 
   // CSS-Klassen für die Darstellungs-Optionen (Zebra/Rahmen/Dichte/Kopfzeile)

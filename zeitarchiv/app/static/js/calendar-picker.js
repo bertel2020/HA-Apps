@@ -20,8 +20,8 @@
 // gewähltem Zeitraum).
 function calendarPicker(entityId, base, firstDate, lastDate) {
   const MONTH_NAMES = [
-    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+    t('Januar'), t('Februar'), t('März'), t('April'), t('Mai'), t('Juni'),
+    t('Juli'), t('August'), t('September'), t('Oktober'), t('November'), t('Dezember'),
   ];
   const pad2 = n => String(n).padStart(2, '0');
   const parseYm = s => { const [y, m] = s.split('-').map(Number); return {y, m}; };

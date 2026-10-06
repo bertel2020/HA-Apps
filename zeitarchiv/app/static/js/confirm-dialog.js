@@ -27,8 +27,8 @@
     overlay.innerHTML =
       '<p class="confirm-message"></p>' +
       '<div class="confirm-actions">' +
-        '<button type="button" class="btn confirm-cancel">Abbrechen</button>' +
-        '<button type="button" class="btn confirm-ok">Bestätigen</button>' +
+        '<button type="button" class="btn confirm-cancel">' + t('Abbrechen') + '</button>' +
+        '<button type="button" class="btn confirm-ok">' + t('Bestätigen') + '</button>' +
       '</div>';
     document.body.appendChild(overlay);
     return overlay;
@@ -40,7 +40,7 @@
     overlay.querySelector('.confirm-message').textContent = message;
     const okBtn = overlay.querySelector('.confirm-ok');
     const cancelBtn = overlay.querySelector('.confirm-cancel');
-    okBtn.textContent = opts.confirmLabel || 'Bestätigen';
+    okBtn.textContent = opts.confirmLabel || t('Bestätigen');
     okBtn.className = 'btn confirm-ok ' + (opts.danger ? 'btn-danger' : 'primary');
     if (!overlay.open) overlay.showModal();
     // .open separat von showModal() — showModal() zeigt sofort an (nötig für

@@ -54,22 +54,22 @@
 
       async function refreshLogs() {
         const requestId = ++sequence;
-        status.textContent = 'Wird aktualisiert …';
+        status.textContent = t('Wird aktualisiert …');
         try {
           const response = await fetch(`api/logs?${params()}&limit=500`);
           if (!response.ok) throw new Error('HTTP ' + response.status);
           const data = await response.json();
           if (requestId !== sequence) return;
           const wasNearBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 80;
-          output.textContent = data.lines.length ? data.lines.join('\n') : 'Keine passenden Protokolleinträge.';
+          output.textContent = data.lines.length ? data.lines.join('\n') : t('Keine passenden Protokolleinträge.');
           source.textContent = `Quelle: ${data.source}${data.fallback ? ' (Fallback)' : ''}`;
           status.textContent = `${data.count} Zeilen · ${new Date(data.generated_at * 1000).toLocaleTimeString('de-DE')}`;
           download.href = `logs/download?${params()}`;
           if (wasNearBottom) output.scrollTop = output.scrollHeight;
         } catch (error) {
           if (requestId !== sequence) return;
-          status.textContent = 'Aktualisierung fehlgeschlagen';
-          output.textContent = 'Protokoll konnte nicht geladen werden.';
+          status.textContent = t('Aktualisierung fehlgeschlagen');
+          output.textContent = t('Protokoll konnte nicht geladen werden.');
         }
       }
 

@@ -109,8 +109,8 @@
     <div class="edash-quality-row" :class="{'is-warn': !otherChecksOk}">
       <div class="edash-quality-icon" x-text="otherChecksOk ? '✓' : '!'"></div>
       <div>
-        <strong x-text="'Datenqualität ' + (otherChecksOk ? 'einwandfrei' : ': Prüfung fehlgeschlagen')"></strong>
-        <p class="hint hint-status" style="margin:0;" x-show="otherChecksOk" x-text="'Alle ' + otherChecks.length + ' Prüfungen unauffällig.'"></p>
+        <strong x-text="(otherChecksOk ? t('Datenqualität einwandfrei') : t('Datenqualität: Prüfung fehlgeschlagen'))"></strong>
+        <p class="hint hint-status" style="margin:0;" x-show="otherChecksOk" x-text="t('Alle {count} Prüfungen unauffällig.', {count: otherChecks.length})"></p>
       </div>
     </div>
     <ul class="edash-quality-list">
@@ -134,7 +134,7 @@
     <div class="edash-quality-row" :class="{'is-warn': anomalien.length > 0}">
       <div class="edash-quality-icon" x-text="anomalien.length ? '!' : '✓'"></div>
       <div>
-        <strong x-text="anomalien.length ? (anomalien.length + ' Auffälligkeit' + (anomalien.length === 1 ? '' : 'en')) : 'Keine Auffälligkeiten'"></strong>
+        <strong x-text="anomalien.length ? (anomalien.length === 1 ? t('1 Auffälligkeit') : t('{count} Auffälligkeiten', {count: anomalien.length})) : t('Keine Auffälligkeiten')"></strong>
         <p class="hint hint-status" style="margin:0;" x-show="!anomalien.length">{{ _("Kein Verbraucher/keine Gruppe deutlich über dem üblichen Schnitt.") }}</p>
       </div>
     </div>

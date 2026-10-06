@@ -14,7 +14,7 @@
      Bestätigung stößt /system/restart an (Supervisor-Selbst-Neustart);
      "Später" tut nichts, der Restore bleibt trotzdem vorgemerkt. #}
   <script>
-    window.appConfirm({{ backup_message | tojson }}, {confirmLabel: "Jetzt neu starten"}).then((ok) => {
+    window.appConfirm({{ backup_message | tojson }}, {confirmLabel: t("Jetzt neu starten")}).then((ok) => {
       if (ok) htmx.ajax('POST', '{{ app_root }}/system/restart', {target: '#backup-status', swap: 'outerHTML'});
     });
   </script>

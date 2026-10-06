@@ -53,7 +53,7 @@ def test_the_second_function_is_discoverable() -> None:
     """Eine Zweitfunktion ohne Hinweis ist keine. Der title erscheint nur,
     solange es etwas zu tun gibt — an einer Ansicht, die ohnehin auf „jetzt"
     steht, wäre er eine Lüge."""
-    assert "'Zurück zur laufenden Periode' : ''" in ENTITY
+    assert "t('Zurück zur laufenden Periode') : ''" in ENTITY
 
 
 def test_the_energy_dashboard_has_the_same_gesture() -> None:

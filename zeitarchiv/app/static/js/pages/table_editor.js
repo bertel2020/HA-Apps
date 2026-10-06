@@ -22,22 +22,22 @@
     // als JS-Konstante dupliziert, weil die Optionsliste (5 feste Werte) sich
     // praktisch nie ändert und die anderen Picker in dieser Datei (BORDER_
     // OPTIONS, DENSITY_OPTIONS, …) genauso lokal statt aus Jinja befüllt sind.
-    const DECIMALS_LABELS = {auto: 'Automatisch', '0': '0 Nachkommastellen', '1': '1 Nachkommastelle', '2': '2 Nachkommastellen', '3': '3 Nachkommastellen'};
-    const RANGE_LABELS = {hour: 'Stunde', day: 'Tag', week: 'Woche', month: 'Monat', year: 'Jahr', decade: 'Dekade'};
-    const PREVIOUS_LABELS = {hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche', month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade'};
-    const PLURAL_UNITS = {hour: 'Stunden', day: 'Tagen', week: 'Wochen', month: 'Monaten', year: 'Jahren', decade: 'Dekaden'};
+    const DECIMALS_LABELS = {auto: t('Automatisch'), '0': t('0 Nachkommastellen'), '1': t('1 Nachkommastelle'), '2': t('2 Nachkommastellen'), '3': t('3 Nachkommastellen')};
+    const RANGE_LABELS = {hour: t('Stunde'), day: t('Tag'), week: t('Woche'), month: t('Monat'), year: t('Jahr'), decade: t('Dekade')};
+    const PREVIOUS_LABELS = {hour: t('Vorherige Stunde'), day: t('Vortag'), week: t('Vorwoche'), month: t('Vormonat'), year: t('Vorjahr'), decade: t('Vorherige Dekade')};
+    const PLURAL_UNITS = {hour: t('Stunden'), day: t('Tagen'), week: t('Wochen'), month: t('Monaten'), year: t('Jahren'), decade: t('Dekaden')};
     // Einheit für die Versatz-Feldbeschriftung ("Versatz (Wochen)") — Plural
     // ohne Dativ-"n", anders als PLURAL_UNITS oben (für Fließtext wie
     // "Vor 3 Monaten" gedacht). Statisch je Zeitraum-Typ, unabhängig vom
     // aktuellen Zahlenwert — deshalb an der Feldbeschriftung statt im Feld
     // selbst, das bleibt dadurch ein normales, unverändertes Zahlenfeld
     // (Spinner-Pfeile bleiben rechtsbündig wie bei jedem anderen Zahlenfeld).
-    const UNIT_PLURAL_SIMPLE = {hour: 'Stunden', day: 'Tage', week: 'Wochen', month: 'Monate', year: 'Jahre', decade: 'Dekaden'};
+    const UNIT_PLURAL_SIMPLE = {hour: t('Stunden'), day: t('Tage'), week: t('Wochen'), month: t('Monate'), year: t('Jahre'), decade: t('Dekaden')};
     // Dieselbe Wortwahl wie previousYearPeriodLabel() in entity_detail.html
     // (Chart-Vorjahresvergleich) — hier als Vorschlag statt Umschalt-Label,
     // damit "Tag, Versatz 0, Vorjahresvergleich" ohne eigene Beschriftung
-    // "Vorjahrestag" statt nur "Tag" vorschlägt.
-    const YEAR_OVER_YEAR_LABELS = {hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche', month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade'};
+    // t("Vorjahrestag") statt nur t("Tag") vorschlägt.
+    const YEAR_OVER_YEAR_LABELS = {hour: t('Vorjahresstunde'), day: t('Vorjahrestag'), week: t('Vorjahreswoche'), month: t('Vorjahresmonat'), year: t('Vorjahr'), decade: t('Vorjahresdekade')};
     // Einfügehilfe für Beschriftungs-Platzhalter (siehe TableCompute.resolveLabel) —
     // Token + Anzeigename kommen aus table-compute.js, damit Editor und die
     // Ersetzungs-Logik nie auseinanderlaufen können.
@@ -46,16 +46,16 @@
     function suggestColumnLabel(col) {
       const offset = col.offset || 0;
       if (col.year_over_year) {
-        if (offset === 0) return YEAR_OVER_YEAR_LABELS[col.range_key] || 'Vorjahreszeitraum';
-        if (offset === -1) return `${PREVIOUS_LABELS[col.range_key] || 'Vorperiode'} (Vorjahr)`;
-        const unit = PLURAL_UNITS[col.range_key] || 'Perioden';
-        const base = offset < 0 ? `Vor ${Math.abs(offset)} ${unit}` : `In ${offset} ${unit}`;
-        return `${base} (Vorjahr)`;
+        if (offset === 0) return YEAR_OVER_YEAR_LABELS[col.range_key] || t('Vorjahreszeitraum');
+        if (offset === -1) return t('{base} (Vorjahr)', {base: PREVIOUS_LABELS[col.range_key] || t('Vorperiode')});
+        const unit = PLURAL_UNITS[col.range_key] || t('Perioden');
+        const base = offset < 0 ? t('Vor {count} {unit}', {count: Math.abs(offset), unit}) : t('In {count} {unit}', {count: offset, unit});
+        return t('{base} (Vorjahr)', {base});
       }
-      if (offset === 0) return RANGE_LABELS[col.range_key] || 'Zeitraum';
-      if (offset === -1) return PREVIOUS_LABELS[col.range_key] || 'Vorperiode';
-      const unit = PLURAL_UNITS[col.range_key] || 'Perioden';
-      return offset < 0 ? `Vor ${Math.abs(offset)} ${unit}` : `In ${offset} ${unit}`;
+      if (offset === 0) return RANGE_LABELS[col.range_key] || t('Zeitraum');
+      if (offset === -1) return PREVIOUS_LABELS[col.range_key] || t('Vorperiode');
+      const unit = PLURAL_UNITS[col.range_key] || t('Perioden');
+      return offset < 0 ? t('Vor {count} {unit}', {count: Math.abs(offset), unit}) : t('In {count} {unit}', {count: offset, unit});
     }
 
     // Fügt einen Beschriftungs-Platzhalter ("{jahr}" etc.) an der aktuellen
@@ -80,19 +80,19 @@
     }
 
     function versatzUnit(col) {
-      return UNIT_PLURAL_SIMPLE[col.range_key] || 'Perioden';
+      return UNIT_PLURAL_SIMPLE[col.range_key] || t('Perioden');
     }
 
     // Namensvorschlag für eine Entität-Zeile ohne eigene Beschriftung — der
     // friendly_name der gewählten Entität. Gruppen/Formeln haben keine
     // einzelne Entität, die dafür herhalten könnte, deshalb dort kein
     // Vorschlag (leerer String, Aufrufer fällt dann auf "Beschriftung …"
-    // bzw. "(ohne Namen)" zurück).
+    // bzw. t("(ohne Namen)") zurück).
     function suggestRowLabel(row) {
       if (row.row_type === 'entity' && row.entity_ids.length === 1) {
         return ENTITY_LABEL_BY_ID[row.entity_ids[0]] || '';
       }
-      if (row.row_type === 'summary') return row.aggregation === 'avg' ? 'Durchschnitt' : 'Summe';
+      if (row.row_type === 'summary') return row.aggregation === 'avg' ? t('Durchschnitt') : t('Summe');
       return '';
     }
 
@@ -240,28 +240,28 @@
     // Dieselbe Zahl wie main.py MAX_TABLE_ROW_LABEL_LENGTH (dort zusätzlich
     // serverseitig durchgesetzt, ein Request kann das Feld-maxlength umgehen).
     const MAX_ROW_LABEL_LENGTH = 30;
-    const ROW_TYPE_OPTIONS = [['entity', 'Entität'], ['group', 'Gruppe'], ['formula', 'Formel'], ['summary', 'Summenzeile'], ['separator', 'Trennlinie']];
+    const ROW_TYPE_OPTIONS = [['entity', t('Entität')], ['group', t('Gruppe')], ['formula', t('Formel')], ['summary', t('Summenzeile')], ['separator', t('Trennlinie')]];
     const ROW_TYPE_LABELS = Object.fromEntries(ROW_TYPE_OPTIONS);
     // Aggregation je Entität/Gruppen-Zeile — "auto" ist das bisherige,
     // implizite Verhalten (Zähler/Schalter -> Summe, sonst Durchschnitt),
     // siehe TableCompute.computeValues()/memberValueFor(). Kurze
     // Button-Labels (siehe .tbl-agg-picker-Kommentar oben im CSS), volle
     // Bezeichnung im Popover UND als title-Tooltip auf dem Button.
-    const AGG_OPTIONS = [['auto', 'Automatisch'], ['avg', 'Ø Durchschnitt'], ['min', 'Min'], ['max', 'Max'], ['sum', 'Σ Summe']];
-    // Summenzeile kennt nur Summe/Durchschnitt — "Automatisch"/"Min"/"Max"
+    const AGG_OPTIONS = [['auto', t('Automatisch')], ['avg', 'Ø Durchschnitt'], ['min', 'Min'], ['max', 'Max'], ['sum', 'Σ Summe']];
+    // Summenzeile kennt nur Summe/Durchschnitt — t("Automatisch")/"Min"/"Max"
     // ergeben für eine Summenzeile keinen Sinn (die bezieht sich immer auf
     // MEHRERE bereits aggregierte Zeilen, nicht auf einzelne Rohwerte).
     const SUMMARY_AGG_OPTIONS = [['sum', 'Σ Summe'], ['avg', 'Ø Durchschnitt']];
-    const AGG_SHORT_LABELS = {auto: 'Auto', avg: 'Ø', min: 'Min', max: 'Max', sum: 'Σ'};
+    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: 'Min', max: 'Max', sum: 'Σ'};
     const AGG_TITLES = {
-      auto: 'Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)',
-      avg: 'Durchschnitt', min: 'Minimum', max: 'Maximum', sum: 'Summe',
+      auto: t('Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)'),
+      avg: t('Durchschnitt'), min: t('Minimum'), max: t('Maximum'), sum: t('Summe'),
     };
-    const BORDER_OPTIONS = [['horizontal', 'Horizontal'], ['grid', 'Gitter'], ['none', 'Ohne Rahmen']];
+    const BORDER_OPTIONS = [['horizontal', t('Horizontal')], ['grid', t('Gitter')], ['none', t('Ohne Rahmen')]];
     const BORDER_LABELS = Object.fromEntries(BORDER_OPTIONS);
-    const DENSITY_OPTIONS = [['comfortable', 'Komfortabel'], ['compact', 'Kompakt']];
+    const DENSITY_OPTIONS = [['comfortable', t('Komfortabel')], ['compact', t('Kompakt')]];
     const DENSITY_LABELS = Object.fromEntries(DENSITY_OPTIONS);
-    const ALIGN_OPTIONS = [['left', 'Linksbündig'], ['center', 'Zentriert'], ['right', 'Rechtsbündig']];
+    const ALIGN_OPTIONS = [['left', t('Linksbündig')], ['center', t('Zentriert')], ['right', t('Rechtsbündig')]];
     const ALIGN_LABELS = Object.fromEntries(ALIGN_OPTIONS);
 
     function tableEditor() {
@@ -583,7 +583,7 @@
         },
         // Tooltip für die Kopfzelle einer noch laufenden (unvollständigen)
         // Woche/Monat/Jahr-Spalte — z. B. "im laufenden Jahr · bis 21.09."
-        // statt stillschweigend "Jahr" zu zeigen, obwohl erst ein Teil des
+        // statt stillschweigend t("Jahr") zu zeigen, obwohl erst ein Teil des
         // Jahres vorliegt (Konzept "laufendes Jahr"). null (kein Tooltip)
         // bei einer abgeschlossenen Vor-Spalte oder bei Stunde/Tag.
         columnPeriodTooltip(col) {
@@ -606,7 +606,7 @@
         clampOffset(col) { if (col.offset > 0) col.offset = 0; },
         // Tatsächlich angezeigter/gespeicherter Name — eigene Beschriftung,
         // sonst der Vorschlag (friendly_name der Entität), sonst zuletzt
-        // "(ohne Namen)". Eine Methode statt zweier getrennter Stellen, damit
+        // t("(ohne Namen)"). Eine Methode statt zweier getrennter Stellen, damit
         // Vorschau-Tabelle und save() garantiert denselben Namen verwenden.
         // Sowohl die eigene Beschriftung (bei einer VOR MAX_ROW_LABEL_LENGTH
         // gespeicherten Tabelle länger als das jetzige maxlength auf dem
@@ -621,7 +621,7 @@
           const own = row.label.trim();
           if (own) return cap(own);
           const suggested = suggestRowLabel(row);
-          return suggested ? cap(suggested) : '(ohne Namen)';
+          return suggested ? cap(suggested) : t('(ohne Namen)');
         },
 
         // Alle Entität-/Gruppen-Zellen DERSELBEN Spalte im selben Abschnitt
@@ -670,7 +670,7 @@
         // spaltenweise statt zeilenweise: eine Zeile enthält hier oft sehr
         // unterschiedliche Größenordnungen nebeneinander (Tag vs. Jahr
         // desselben Werts), ein Vergleich über die eigene Zeile hinweg wäre
-        // daher irreführend ("Jahr" sticht immer heraus, nur weil es ein
+        // daher irreführend (t("Jahr") sticht immer heraus, nur weil es ein
         // längerer Zeitraum ist). Sinnvoll ist stattdessen der Vergleich
         // MEHRERER Zeilen INNERHALB derselben Spalte (z. B. welches Gerät
         // verbraucht diesen Monat am meisten). Bewusst NUR Entität-/
@@ -740,10 +740,12 @@
           // Zeitpunkt") die tatsächliche Uhrzeit des Vergleichs-Cutoffs
           // (windowStart + elapsedSeconds derselben Spalte).
           const comparisonValueStr = TableCompute.comparisonValueText(comparisonCell, comparisonCol.decimals);
-          if (!comparisonValueStr) return `Gegenüber ${comparisonLabel}`;
+          if (!comparisonValueStr) return t('Gegenüber {label}', {label: comparisonLabel});
           const comparisonTimeStr = TableCompute.comparisonElapsedTimeText(
             this.windowStarts[comparisonCol.uid], this.elapsedSeconds[comparisonCol.uid], comparisonCol.range_key);
-          return `Gegenüber ${comparisonLabel}${comparisonTimeStr ? ` bis ${comparisonTimeStr}` : ''}: ${comparisonValueStr}`;
+          return (comparisonTimeStr
+            ? t('Gegenüber {label} bis {time}: {value}', {label: comparisonLabel, time: comparisonTimeStr, value: comparisonValueStr})
+            : t('Gegenüber {label}: {value}', {label: comparisonLabel, value: comparisonValueStr}));
         },
 
         // Rechenkern in static/js/table-compute.js (TableCompute.computeValues) —
@@ -789,16 +791,16 @@
         },
 
         async save() {
-          if (!this.name.trim()) { appAlert('Bitte einen Namen für die Tabelle angeben.'); return; }
-          if (!this.columns.length) { appAlert('Bitte mindestens eine Spalte anlegen.'); return; }
-          if (!this.rows.length) { appAlert('Bitte mindestens eine Zeile anlegen.'); return; }
+          if (!this.name.trim()) { appAlert(t('Bitte einen Namen für die Tabelle angeben.')); return; }
+          if (!this.columns.length) { appAlert(t('Bitte mindestens eine Spalte anlegen.')); return; }
+          if (!this.rows.length) { appAlert(t('Bitte mindestens eine Zeile anlegen.')); return; }
           for (const row of this.rows) {
             if ((row.row_type === 'entity' || row.row_type === 'group') && !row.entity_ids.length) {
-              appAlert(`Zeile "${this.resolvedRowLabel(row)}" braucht mindestens eine Entität.`);
+              appAlert(t('Zeile "{label}" braucht mindestens eine Entität.', {label: this.resolvedRowLabel(row)}));
               return;
             }
             if (row.row_type === 'formula' && !row.formula.trim()) {
-              appAlert(`Zeile "${this.resolvedRowLabel(row)}" braucht eine Formel.`);
+              appAlert(t('Zeile "{label}" braucht eine Formel.', {label: this.resolvedRowLabel(row)}));
               return;
             }
           }
@@ -836,7 +838,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              appAlert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || t('Speichern fehlgeschlagen.'));
               return;
             }
             const data = await res.json();
@@ -853,7 +855,7 @@
         },
 
         async deleteTable() {
-          if (!await appConfirm('Diese Tabelle wirklich löschen?', {danger: true})) return;
+          if (!await appConfirm(t('Diese Tabelle wirklich löschen?'), {danger: true})) return;
           await fetch(`${BASE}/tables/${TABLE_ID}/delete`, {method: 'POST'});
           window.location.href = `${BASE}/tables`;
         },

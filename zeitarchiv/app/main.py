@@ -385,7 +385,7 @@ def _notices_context(request: Request) -> dict:
     }
 
 
-app = FastAPI(title="Zeitarchiv")
+app = FastAPI(title="Zeitarchiv", dependencies=i18n.dependencies(lambda: index))
 templates = Jinja2Templates(
     directory=str(APP_DIR / "templates"),
     context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context, i18n.make_context_processor(lambda: index)],

@@ -25,7 +25,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import Response
 from jinja2 import pass_context
 from markupsafe import Markup
@@ -93,6 +93,36 @@ def _gettext(context, text: str, **values: Any) -> Markup:
     return translate_html(text, context.get("lang") or current_language.get(), **values)
 
 
+def _language_for(request: Request, index) -> tuple[str, str]:
+    """(Auswahl, Sprache) dieser Anfrage aus Einstellung und Browser-Header."""
+    setting = _selected_setting(index.get_setting(SETTING_KEY, DEFAULT_SETTING))
+    return setting, resolve_language(setting, request.headers.get("accept-language", ""))
+
+
+def tr(text: str, **values: Any) -> str:
+    """Übersetzt Python-Text für die Sprache der laufenden Anfrage (Klartext, kein HTML)."""
+    return translate(text, current_language.get(), **values)
+
+
+def N_(text: str) -> str:
+    """Markiert einen Text als übersetzbar, ohne ihn sofort zu übersetzen (gettext-„noop“).
+
+    Für Konstanten, die beim Import angelegt werden (Beschriftungslisten): die Sprache der Anfrage
+    gibt es dann noch nicht. Angezeigt wird später mit ``tr(label)`` bzw. ``_(label)`` im Template."""
+    return text
+
+
+def dependencies(get_index: Callable[[], Any]) -> list:
+    """App-weite Abhängigkeit: setzt die Sprache für jede Anfrage, BEVOR die Route läuft.
+
+    Eine ``async``-Abhängigkeit, damit der ContextVar-Wert in den Kontext übergeht, den FastAPI
+    für synchrone Routen an den Threadpool weitergibt."""
+    async def set_language(request: Request) -> None:
+        current_language.set(_language_for(request, get_index())[1])
+
+    return [Depends(set_language)]
+
+
 def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], dict]:
     """Kontextprozessor: ``lang``, die Auswahl für die Einstellungen und der JS-Katalog.
 
@@ -100,8 +130,7 @@ def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], 
     Index existiert."""
 
     def context(request: Request) -> dict:
-        setting = _selected_setting(get_index().get_setting(SETTING_KEY, DEFAULT_SETTING))
-        lang = resolve_language(setting, request.headers.get("accept-language", ""))
+        setting, lang = _language_for(request, get_index())
         current_language.set(lang)
         return {
             "lang": lang,

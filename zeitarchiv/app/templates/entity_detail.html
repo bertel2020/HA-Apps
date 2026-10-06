@@ -46,7 +46,7 @@
                "Jetzt"-Knopf. Der title sagt es, solange es etwas zu tun gibt;
                ohne ihn wäre die Zweitfunktion unauffindbar. #}
             <button :class="{active: range === r.key}" @click="setRange(r.key)" x-text="r.label"
-                    :title="range === r.key && offset !== 0 ? 'Zurück zur laufenden Periode' : ''"></button>
+                    :title="range === r.key && offset !== 0 ? t('Zurück zur laufenden Periode') : ''"></button>
           </template>
         </div>
         <div class="nav">
@@ -299,7 +299,7 @@
           <span class="chip-zoom-x" aria-hidden="true">&times;</span>
         </button>
       </div>
-      <div class="empty" x-show="!points.length" x-text="loading ? 'Lädt …' : 'Keine Daten für diesen Zeitraum.'"></div>
+      <div class="empty" x-show="!points.length" x-text="loading ? t('Lädt …') : t('Keine Daten für diesen Zeitraum.')"></div>
       <div class="chart-legend" x-show="points.length && chartStats && legendStyle === 'chips'">
         <span class="chart-legend-item static">
           <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>

@@ -59,7 +59,7 @@
     // Button-Beschriftung spiegelt die aktuelle Typ-Auswahl, damit sie ohne
     // geöffnetes Popover erkennbar bleibt (analog zu "Vergleichen"-Button in
     // chart_editor.html, der ebenfalls den aktiven Modus im Label zeigt).
-    const TYPE_LABELS = {standard: 'Standard', counter: 'Zähler', switch: 'Schalter'};
+    const TYPE_LABELS = {standard: 'Standard', counter: t('Zähler'), switch: t('Schalter')};
     function updateTypeFilterLabel() {
       const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
       const btn = document.getElementById('type-filter-btn');

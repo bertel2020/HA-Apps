@@ -7,16 +7,16 @@
     });
 
     async function deleteChart(id, btn) {
-      if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+      if (!await appConfirm(t('Dieses Chart wirklich löschen?'), {danger: true})) return;
       btn.disabled = true;
       fetch(`charts/${id}/delete`, {method: 'POST'}).then(r => {
         if (r.ok) {
           btn.closest('.chart-card').remove();
         } else {
           btn.disabled = false;
-          appAlert('Löschen fehlgeschlagen.');
+          appAlert(t('Löschen fehlgeschlagen.'));
         }
-      }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
+      }).catch(() => { btn.disabled = false; appAlert(t('Löschen fehlgeschlagen.')); });
     }
 
     // Kopie bleibt auf der Liste sichtbar (kein Sprung in den Editor) — ein
@@ -28,9 +28,9 @@
         if (res.ok) {
           window.location.reload();
         } else {
-          appAlert('Duplizieren fehlgeschlagen.');
+          appAlert(t('Duplizieren fehlgeschlagen.'));
         }
       } catch (e) {
-        appAlert('Duplizieren fehlgeschlagen.');
+        appAlert(t('Duplizieren fehlgeschlagen.'));
       }
     }

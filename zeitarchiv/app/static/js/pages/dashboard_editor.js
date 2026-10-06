@@ -9,7 +9,7 @@
         savedMessage: '',
 
         async save() {
-          if (!this.name.trim()) { appAlert('Bitte einen Namen für das Dashboard angeben.'); return; }
+          if (!this.name.trim()) { appAlert(t('Bitte einen Namen für das Dashboard angeben.')); return; }
           this.saving = true;
           this.savedMessage = '';
           try {
@@ -27,15 +27,15 @@
               const lockRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/lock`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({locked: this.locked}),
               });
-              if (!lockRes.ok) { appAlert('Speichern der Fixierung fehlgeschlagen.'); return; }
+              if (!lockRes.ok) { appAlert(t('Speichern der Fixierung fehlgeschlagen.')); return; }
               const preciseRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/precise-mode`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({precise_mode: this.preciseMode}),
               });
-              if (!preciseRes.ok) { appAlert('Speichern des Präzisen Modus fehlgeschlagen.'); return; }
+              if (!preciseRes.ok) { appAlert(t('Speichern des Präzisen Modus fehlgeschlagen.')); return; }
               const fillGapsRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/fill-gaps`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fill_gaps: this.fillGaps}),
               });
-              if (!fillGapsRes.ok) { appAlert('Speichern von "Lücken auffüllen" fehlgeschlagen.'); return; }
+              if (!fillGapsRes.ok) { appAlert(t('Speichern von "Lücken auffüllen" fehlgeschlagen.')); return; }
             }
             window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
           } finally {
@@ -44,12 +44,12 @@
         },
 
         async deleteDashboard() {
-          if (!await appConfirm('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.', {danger: true})) return;
+          if (!await appConfirm(t('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.'), {danger: true})) return;
           const res = await fetch(`${BASE}/dashboards/${this.dashboardId}/delete`, {method: 'POST'});
           if (res.ok) {
             window.location.href = `${BASE}/dashboards`;
           } else {
-            appAlert('Löschen fehlgeschlagen.');
+            appAlert(t('Löschen fehlgeschlagen.'));
           }
         },
       };

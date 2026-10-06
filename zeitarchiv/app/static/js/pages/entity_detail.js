@@ -29,7 +29,7 @@
     // Legende) wie chart_editor.html, hier nur mit einem einzelnen
     // Legenden-Chip statt einer Serienliste.
     const LEGEND_METRIC_OPTIONS = [
-      {value: 'last', label: 'Aktuell'},
+      {value: 'last', label: t('Aktuell')},
       {value: 'min', label: 'Min'},
       {value: 'max', label: 'Max'},
       // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
@@ -79,8 +79,8 @@
     // Eigenständige Funktion statt Alpine-Getter, damit sie sowohl für die
     // aktuelle Periode (Toolbar-Label) als auch für die Vorperiode (Legenden-
     // Beschriftung des Vergleichs-Serie in render()) genutzt werden kann.
-    // skipRelative unterdrückt "Heute"/"Gestern" — für die Vorjahres-Vergleichslabel
-    // wäre offset===-1 sonst als "Gestern" missverständlich, obwohl der Zeitraum ein
+    // skipRelative unterdrückt t("Heute")/t("Gestern") — für die Vorjahres-Vergleichslabel
+    // wäre offset===-1 sonst als t("Gestern") missverständlich, obwohl der Zeitraum ein
     // ganzes Jahr zurückliegt und nur zufällig denselben rechnerischen offset teilt.
     function formatPeriodLabel(range, continuous, windowStart, windowEnd, offset, isCurrent, skipRelative = false) {
       if (windowStart == null || windowEnd == null) return '';
@@ -97,8 +97,8 @@
           return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
         case 'day':
           if (!continuous) {
-            if (!skipRelative && offset === 0) return 'Heute';
-            if (!skipRelative && offset === -1) return 'Gestern';
+            if (!skipRelative && offset === 0) return t('Heute');
+            if (!skipRelative && offset === -1) return t('Gestern');
             return fmtDay(start);
           }
           return `${fmtDay(start)} – ${fmtDay(end)}`;
@@ -106,10 +106,10 @@
           return `${fmtDayMonth(start)}–${fmtDayMonth(end)} ${end.getFullYear()}`;
         case 'month':
           if (continuous) return `${fmtDay(start)} – ${fmtDay(end)}`;
-          return isCurrent ? `${fmtMonthYear(start)} (bis heute)` : fmtMonthYear(start);
+          return isCurrent ? t('{period} (bis heute)', {period: fmtMonthYear(start)}) : fmtMonthYear(start);
         case 'year':
           if (continuous) return `${fmtMonthYear(start)} – ${fmtMonthYear(end)}`;
-          return isCurrent ? `${start.getFullYear()} (bis heute)` : `${start.getFullYear()}`;
+          return isCurrent ? t('{period} (bis heute)', {period: start.getFullYear()}) : `${start.getFullYear()}`;
         case 'decade':
           return `${start.getFullYear()}–${end.getFullYear()}`;
         default:
@@ -117,45 +117,45 @@
       }
     }
 
-    // Name der "Vorperiode" beim Vergleich compareMode="previous" — welche
-    // Periode genau eine zurückliegt, hängt vom Zeitraum-Typ ab ("Vortag" bei
-    // "Tag", "Vormonat" bei "Monat", …). Genutzt für den Umschalt-Button
-    // (Seg neben "Vorjahr") und die Legenden-Beschriftung der Vergleichs-Serie
+    // Name der t("Vorperiode") beim Vergleich compareMode="previous" — welche
+    // Periode genau eine zurückliegt, hängt vom Zeitraum-Typ ab (t("Vortag") bei
+    // t("Tag"), t("Vormonat") bei t("Monat"), …). Genutzt für den Umschalt-Button
+    // (Seg neben t("Vorjahr")) und die Legenden-Beschriftung der Vergleichs-Serie
     // in render() — beide sollen dasselbe Wort zeigen. Eigenständige Funktion
     // aus demselben Grund wie formatPeriodLabel oben (zwei Aufrufstellen,
     // eine davon außerhalb des Alpine-Objekts).
     function previousPeriodLabel(range) {
       const labels = {
-        hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche',
-        month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade',
+        hour: t('Vorherige Stunde'), day: t('Vortag'), week: t('Vorwoche'),
+        month: t('Vormonat'), year: t('Vorjahr'), decade: t('Vorherige Dekade'),
       };
-      return labels[range] || 'Vorperiode';
+      return labels[range] || t('Vorperiode');
     }
 
     // Gegenstück zu previousPeriodLabel für compareMode="year" — dieselbe
     // Periode, aber genau ein Jahr zurück statt eine Periode zurück (bei
-    // "Jahr" fallen beide Modi auf dasselbe Wort "Vorjahr").
+    // t("Jahr") fallen beide Modi auf dasselbe Wort t("Vorjahr")).
     function previousYearPeriodLabel(range) {
       const labels = {
-        hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche',
-        month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade',
+        hour: t('Vorjahresstunde'), day: t('Vorjahrestag'), week: t('Vorjahreswoche'),
+        month: t('Vorjahresmonat'), year: t('Vorjahr'), decade: t('Vorjahresdekade'),
       };
-      return labels[range] || 'Vorjahreszeitraum';
+      return labels[range] || t('Vorjahreszeitraum');
     }
 
     // Zwei Zeiträume bekommen keine zweite Vergleichszeile, aus zwei
     // verschiedenen Gründen (beide in tests/test_query.py gemessen):
     //
-    //   "Jahr"   — die Vorperiode IST das Vorjahr. Für jedes abgeschlossene
+    //   t("Jahr")   — die Vorperiode IST das Vorjahr. Für jedes abgeschlossene
     //              Jahr liefern beide Modi buchstäblich dasselbe Fenster; im
     //              laufenden Jahr unterscheiden sie sich nur darin, dass der
     //              Vorjahresvergleich am selben TAG des Vorjahres endet statt
     //              am Jahresende. Das ist ein echter Unterschied — aber beide
-    //              Zeilen trugen dafür dasselbe Wort "Vorjahr", und zwei
+    //              Zeilen trugen dafür dasselbe Wort t("Vorjahr"), und zwei
     //              Fenster unter einer Beschriftung kann niemand
     //              auseinanderhalten. Soll der faire Jahresvergleich zurück,
-    //              braucht er ein eigenes Wort, keine zweite "Vorjahr"-Zeile.
-    //   "Dekade" — dort ist der Modus schlicht falsch: er schiebt das
+    //              braucht er ein eigenes Wort, keine zweite t("Vorjahr")-Zeile.
+    //   t("Dekade") — dort ist der Modus schlicht falsch: er schiebt das
     //              Jahrzehnt um EIN Jahr zurück, das Ergebnis überlappt also
     //              genau den Zeitraum, gegen den es verglichen wird.
     const COMPARE_YEAR_RANGES = ['hour', 'day', 'week', 'month'];
@@ -336,8 +336,8 @@ function selectBrush() {
     function entityChart() {
       return {
         ranges: [
-          {key: 'hour', label: 'Stunde'}, {key: 'day', label: 'Tag'}, {key: 'week', label: 'Woche'},
-          {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}, {key: 'decade', label: 'Dekade'},
+          {key: 'hour', label: t('Stunde')}, {key: 'day', label: t('Tag')}, {key: 'week', label: t('Woche')},
+          {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}, {key: 'decade', label: t('Dekade')},
         ],
         range: INITIAL_RANGE || 'day',
         // chart_type "auto" (globaler Default) löst hier zum entitätstyp-
@@ -390,8 +390,8 @@ function selectBrush() {
         _requestId: 0,
         // Bleibt über mehrere reine Auflösungswechsel hinweg erhalten. Ohne
         // diesen separaten Anker würde z. B. der 22. eines laufenden Monats
-        // beim Zwischenschritt "Monat" zu offset=0 werden und beim Zurück-
-        // wechseln auf "Tag" fälschlich auf heute springen.
+        // beim Zwischenschritt t("Monat") zu offset=0 werden und beim Zurück-
+        // wechseln auf t("Tag") fälschlich auf heute springen.
         _rangeAnchorMs: null,
         get total() { return this.points.reduce((sum, p) => sum + (p.value || 0), 0); },
         get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
@@ -455,10 +455,10 @@ function selectBrush() {
           return compareYearAvailable(this.range);
         },
         // Zeigt im Button selbst, WELCHER Vergleich aktiv ist (statt nur
-        // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
+        // t("Vergleichen") + separatem Auswahl-Segment daneben) — passt sich wie
         // die beiden Label-Getter oben automatisch an den Zeitraum an.
         get compareButtonLabel() {
-          if (!this.compare) return 'Vergleichen';
+          if (!this.compare) return t('Vergleichen');
           return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
         get periodLabel() {
@@ -481,27 +481,27 @@ function selectBrush() {
         // Werkzeugleiste unerklärt: dass er nicht anklickbar ist, hat einen
         // Grund, und der steht hier.
         get zoomHint() {
-          const geste = 'mit Strg und Mausrad zoomen, '
-            + 'mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern';
+          const geste = t('mit Strg und Mausrad zoomen, mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern');
           if (this.chartType === 'timeline') {
-            return `Kurze Schaltvorgänge sind schmaler als ein Bildpunkt — ${geste}.`;
+            return t('Kurze Schaltvorgänge sind schmaler als ein Bildpunkt — {geste}.', {geste});
           }
           const einzeln = this.points.length === 1;
           const anzahl = this.points.length.toLocaleString(LOCALE);
-          const punkte = einzeln ? '1 Datenpunkt' : `${anzahl} Datenpunkte`;
-          if (this.zoomAvailable) return `${punkte} — ${geste}.`;
+          const punkte = einzeln ? t('1 Datenpunkt') : t('{count} Datenpunkte', {count: anzahl});
+          if (this.zoomAvailable) return t('{punkte} — {geste}.', {punkte, geste});
           // "alle einzeln sichtbar" passt nicht zu einem einzelnen Punkt, und
           // den gibt es wirklich: eine Stundenansicht einer selten meldenden
           // Entität hat oft genau einen.
-          const sichtbar = einzeln ? '' : ', alle einzeln sichtbar';
-          return `${punkte}${sichtbar} — Hineinzoomen ist hier nicht nötig.`;
+          return einzeln
+            ? t('{punkte} — Hineinzoomen ist hier nicht nötig.', {punkte})
+            : t('{punkte}, alle einzeln sichtbar — Hineinzoomen ist hier nicht nötig.', {punkte});
         },
         // Ohne Zoom ein fester Text statt eines leeren Knopfes: der Chip bleibt
         // wie die Zeitraum-Knöpfe daneben immer im Layout stehen und wird nur
         // deaktiviert (siehe Kommentar zu .toolbars in entity_detail.css) —
         // dann braucht er auch ohne Ausschnitt eine Beschriftung.
         get zoomLabel() {
-          if (!this.zoomRange) return 'Ausschnitt';
+          if (!this.zoomRange) return t('Ausschnitt');
           const from = new Date(this.zoomRange.start);
           const to = new Date(this.zoomRange.end);
           const span = this.zoomRange.end - this.zoomRange.start;
@@ -522,8 +522,8 @@ function selectBrush() {
           return `${from.toLocaleDateString(LOCALE, opts)} – ${to.toLocaleDateString(LOCALE, opts)}`;
         },
         get markedLabel() {
-          if (!this.markedTotal) return 'Keine Markierungen';
-          return this.markedTotal === 1 ? '1 markiert' : `${this.markedTotal} markiert`;
+          if (!this.markedTotal) return t('Keine Markierungen');
+          return this.markedTotal === 1 ? t('1 markiert') : t('{count} markiert', {count: this.markedTotal});
         },
         toggleMarked() {
           this.showMarked = !this.showMarked;
@@ -855,7 +855,7 @@ function selectBrush() {
             },
             // Ohne Deckelung errechnet ECharts die Balkenbreite auf einer
             // Zeit-Achse aus dem Abstand zu benachbarten Punkten — bei nur
-            // einem einzigen Punkt (z. B. "Jahr" einer Entität, die erst
+            // einem einzigen Punkt (z. B. t("Jahr") einer Entität, die erst
             // diesen Monat zu senden begann) fehlt dieser Bezugspunkt völlig,
             // wodurch der Balken einen Großteil der (jetzt bewusst bis zum
             // Fensterende reichenden, siehe xAxis min/max oben) Achse
@@ -895,7 +895,7 @@ function selectBrush() {
             // begonnenen Stunde nur die paar verstrichenen Minuten der Vorstunde
             // statt der vollen Vorstunde. Bei compareMode="year" bleibt der offset
             // gegenüber der Hauptperiode gleich (nur das Fenster ist serverseitig
-            // um ein Jahr verschoben) — offset-1 würde hier fälschlich "Gestern"
+            // um ein Jahr verschoben) — offset-1 würde hier fälschlich t("Gestern")
             // statt des tatsächlichen Datums vor einem Jahr anzeigen, deshalb
             // skipRelative=true für diesen Modus.
             const compareOffset = this.compareMode === 'year' ? this.offset : this.offset - 1;
@@ -1006,7 +1006,7 @@ function selectBrush() {
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
             // letzten tatsächlichen Wert auf, z. B. bei einer Entität, die seit
             // Stunden nichts mehr gemeldet hat, statt konsistent bis zum
-            // Fensterende (bei "Heute" also bis zur aktuellen Uhrzeit) zu reichen.
+            // Fensterende (bei t("Heute") also bis zur aktuellen Uhrzeit) zu reichen.
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
@@ -1019,7 +1019,7 @@ function selectBrush() {
               // "01.09." für einen Monat, der am 31.08. endet).
               max: this.periodEnd != null ? this.periodEnd * 1000 - 1000 : undefined,
               // ECharts polstert eine Zeit-Achse mit Balken-Serie sonst zusätzlich
-              // über min/max hinaus (sichtbar z. B. bei "Jahr"/"Dekade" mit nur
+              // über min/max hinaus (sichtbar z. B. bei t("Jahr")/t("Dekade") mit nur
               // einem Bucket: die Achse reichte weit über das eigentliche Fenster
               // hinaus) — boundaryGap:[0,0] unterbindet dieses Auto-Polster, min/max
               // bleiben dadurch die tatsächlichen Achsengrenzen.
@@ -1029,7 +1029,7 @@ function selectBrush() {
               // ECharts' automatischer "nice tick"-Berechnung, die trotz
               // explizitem max (s. o.) gelegentlich einen zusätzlichen Tick
               // (Gitternetz, nicht nur Label) jenseits der Periodengrenze
-              // erzeugt — sichtbar als 8. statt 7. Einteilung bei "Woche".
+              // erzeugt — sichtbar als 8. statt 7. Einteilung bei t("Woche").
               // Nicht für Jahr/Dekade erzwungen: Monate/Jahre sind
               // unterschiedlich lang, ein fester Millisekunden-Interval
               // würde dort falsch ausgerichtete Ticks erzeugen.
@@ -1047,7 +1047,7 @@ function selectBrush() {
             },
             yAxis: {
               type: 'value',
-              name: DURATION_DISPLAY ? 'Dauer' : (UNIT || undefined),
+              name: DURATION_DISPLAY ? t('Dauer') : (UNIT || undefined),
               nameLocation: 'end',
               nameTextStyle: {align: 'left'},
               // "fest" bindet die Achse an 0, "dynamisch" lässt ECharts frei auf
@@ -1209,7 +1209,7 @@ function selectBrush() {
             // Der Zeitstrahl bekommt den Zoom IMMER, ohne die Punkt-Schwelle
             // der Linien-/Balken-Ansicht. Grund ist kein Komfort, sondern
             // Sichtbarkeit: ein Segment wird als Rechteck von seinem Anfang bis
-            // zu seinem Ende gezeichnet, und bei Zeitraum "Monat" auf rund
+            // zu seinem Ende gezeichnet, und bei Zeitraum t("Monat") auf rund
             // 900 px entspricht ein Pixel etwa 48 Minuten. Jedes kürzere
             // Schaltereignis ist damit schmaler als ein Pixel und praktisch
             // unsichtbar — Hineinzoomen ist die einzige Möglichkeit, überhaupt

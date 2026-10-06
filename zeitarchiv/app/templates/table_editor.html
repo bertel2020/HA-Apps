@@ -145,7 +145,7 @@
                                 :class="{'dd-picker-btn-clearable': entityId}"
                                 @click="toggleOpen($refs.rowEntitySearch)"
                                 @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
-                                x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
+                                x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
                         <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
                                 @click.stop="clearSelection()" data-tooltip="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
                         <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="open" x-cloak>
@@ -171,7 +171,7 @@
 
                       <div class="tbl-group-wrap tbl-value-picker" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
                         <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
-                                x-text="row.entity_ids.length ? row.entity_ids.length + ' Entität' + (row.entity_ids.length !== 1 ? 'en' : '') + ' ausgewählt' : 'Entitäten wählen …'"></button>
+                                x-text="row.entity_ids.length ? (row.entity_ids.length === 1 ? t('1 Entität ausgewählt') : t('{count} Entitäten ausgewählt', {count: row.entity_ids.length})) : t('Entitäten wählen …')"></button>
                         <div class="tbl-group-popover" x-show="row.pickerOpen" x-cloak>
                           <input type="search" placeholder="{{ _('Suchen …') }}" x-model="row.search">
                           {% for opt in entity_options %}
@@ -217,7 +217,7 @@
 
                       <input type="text" class="tbl-formula-input tbl-formula-input-inline" x-show="row.row_type === 'formula'"
                              placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
-                             :data-tooltip="'Formel — verfügbar: ' + (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)')">
+                             :data-tooltip="t('Formel — verfügbar: {rows}', {rows: (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || t('– (keine Zeile oberhalb)'))})">
                       <input type="text" class="tbl-formula-input tbl-formula-unit-inline" x-show="row.row_type === 'formula'"
                              :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" data-tooltip="{{ _('Einheit') }}">
 
@@ -332,7 +332,7 @@
                     </div>
                   </span>
                   <span class="dd-picker-wrap" @click.outside="valueAlignPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="{{ _('Ausrichtung der Werte-Zellen') }}" @click="valueAlignPickerOpen = !valueAlignPickerOpen" x-text="'Werte-Ausrichtung: ' + ALIGN_LABELS[style.value_align] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Ausrichtung der Werte-Zellen') }}" @click="valueAlignPickerOpen = !valueAlignPickerOpen" x-text="t('Werte-Ausrichtung: {value} ▾', {value: ALIGN_LABELS[style.value_align]})"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="valueAlignPickerOpen" x-cloak>
                       <template x-for="[value, label] in ALIGN_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.value_align === value}"

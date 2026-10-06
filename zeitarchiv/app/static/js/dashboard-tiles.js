@@ -195,9 +195,9 @@
   }
 
   // "Ø"/"Σ" statt Text — dieselben Symbole wie chart_editor.js/entity_detail.js
-  // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; "Summe"
+  // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; t("Summe")
   // war bis jetzt der einzige verbliebene Text-Ausreißer.
-  const LEGEND_METRIC_LABELS = {last: 'Aktuell', min: 'Min', max: 'Max', average: 'Ø', sum: 'Σ'};
+  const LEGEND_METRIC_LABELS = {last: t('Aktuell'), min: 'Min', max: 'Max', average: 'Ø', sum: 'Σ'};
 
   function escLegend(s) {
     return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -363,7 +363,7 @@
     const continuous = el.dataset.continuous === 'true';
     const resolutionPreset = el.dataset.resolutionPreset || 'auto';
     // Siehe chart_editor.html (render(), dynamicYAxis-Konstante): bei
-    // Auflösung "Tag" (singleBucket weiter unten) erzwungen aus, unabhängig
+    // Auflösung t("Tag") (singleBucket weiter unten) erzwungen aus, unabhängig
     // vom gespeicherten Chart-Zustand — eine nicht bei 0 startende Y-Achse
     // würde den Summen-Vergleich der wenigen Balken verzerren.
     const dynamicYAxis = el.dataset.dynamicYAxis === 'true' && resolutionPreset !== 'full';
@@ -420,12 +420,12 @@
       const res = await fetch(`${base}/api/query-multi?${params}`);
       data = await res.json();
     } catch (e) {
-      chartEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
+      chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
     const series = data.series || [];
     if (!series.some(s => s.points && s.points.length)) {
-      chartEl.innerHTML = '<div class="dtile-loading">Keine Daten</div>';
+      chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
       return;
     }
     // Dieselbe Farbzuordnung wie echartsSeries weiter unten (PALETTE nach
@@ -1111,7 +1111,7 @@
     if (!previewEl) return;
 
     if (!visibleCols.length || !visibleRows.length) {
-      previewEl.innerHTML = '<div class="dtile-loading">Keine sichtbaren Zeilen/Spalten</div>';
+      previewEl.innerHTML = '<div class="dtile-loading">' + t('Keine sichtbaren Zeilen/Spalten') + '</div>';
       return;
     }
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
@@ -1121,7 +1121,7 @@
       allValues = values;
       values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
-      previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
+      previewEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
 
@@ -1407,17 +1407,17 @@
   // Seite neu zu laden. Ein Test hält beide Kopien deckungsgleich.
   // [kalendarisch, rollierend]
   const TILE_RANGE_LABELS = {
-    hour: ['Std.', '60 Min.'], day: ['Tag', '24 Std.'], week: ['Woche', '7 Tage'],
-    month: ['Monat', '30 Tage'], year: ['Jahr', '12 Monate'],
+    hour: [t('Std.'), t('60 Min.')], day: [t('Tag'), t('24 Std.')], week: [t('Woche'), t('7 Tage')],
+    month: [t('Monat'), t('30 Tage')], year: [t('Jahr'), t('12 Monate')],
   };
   // Dasselbe Fenster ausgeschrieben, für den Tooltip: "Max 23,1" allein sagt
   // nicht, worüber.
   const TILE_RANGE_WINDOW = {
-    hour: ['in der laufenden Stunde', 'in den letzten 60 Minuten'],
-    day: ['heute seit Mitternacht', 'in den letzten 24 Stunden'],
-    week: ['in der laufenden Kalenderwoche', 'in den letzten 7 Tagen'],
-    month: ['im laufenden Monat', 'in den letzten 30 Tagen'],
-    year: ['im laufenden Jahr', 'in den letzten 12 Monaten'],
+    hour: [t('in der laufenden Stunde'), t('in den letzten 60 Minuten')],
+    day: [t('heute seit Mitternacht'), t('in den letzten 24 Stunden')],
+    week: [t('in der laufenden Kalenderwoche'), t('in den letzten 7 Tagen')],
+    month: [t('im laufenden Monat'), t('in den letzten 30 Tagen')],
+    year: [t('im laufenden Jahr'), t('in den letzten 12 Monaten')],
   };
   // Rückfall, falls eine Antwort die Kürzel nicht mitbringt. Maßgeblich ist
   // ctx.metric_labels vom Server: dort hängt genau eines am Entitätstyp — bei
@@ -1432,7 +1432,7 @@
 
   // Erklärt eine Kennzahl im Klartext. Der heikle Fall ist der Zähler: dessen
   // Min/Ø/Max beziehen sich auf Bucket-Deltas, "Max" heißt dort "stärkster
-  // Tag" und nicht "größter Messwert". Die Bucket-Größe kommt vom Server
+  // Tag" und nicht t("größter Messwert"). Die Bucket-Größe kommt vom Server
   // (bucket_label), damit hier keine zweite Tabelle mit den Auflösungen des
   // Speichers entsteht, die still veralten könnte.
   function tileMetricTooltip(el, metric, serie) {
@@ -1442,14 +1442,14 @@
     const bucket = serie && serie.bucket_label;
     if (bucket) {
       const jeBucket = {
-        min: `schwächster ${bucket}`, avg: `Ø je ${bucket}`,
-        max: `stärkster ${bucket}`, sum: 'Zuwachs',
+        min: t('schwächster {bucket}', {bucket: t(bucket)}), avg: t('Ø je {bucket}', {bucket: t(bucket)}),
+        max: t('stärkster {bucket}', {bucket: t(bucket)}), sum: t('Zuwachs'),
       }[metric];
       return `${jeBucket} · ${fenster}`;
     }
     const messwert = {
-      min: 'kleinster Messwert', avg: 'Durchschnitt',
-      max: 'größter Messwert', sum: 'Summe',
+      min: t('kleinster Messwert'), avg: t('Durchschnitt'),
+      max: t('größter Messwert'), sum: t('Summe'),
     }[metric];
     return `${messwert} · ${fenster}`;
   }
@@ -1582,7 +1582,7 @@
     const ageEl = el.querySelector('.dtile-entity-age');
     const secondsAgo = serie.last_ts == null ? null : Date.now() / 1000 - serie.last_ts;
     if (ageEl) {
-      ageEl.textContent = secondsAgo == null ? 'nie' : `vor ${NumberFormat.fmtDuration(secondsAgo)}`;
+      ageEl.textContent = secondsAgo == null ? t('nie') : t('vor {dauer}', {dauer: NumberFormat.fmtDuration(secondsAgo)});
     }
     // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
     // is-stale), der Wert bleibt immer schwarz. Die Schwellen kommen je Kachel
@@ -1789,7 +1789,7 @@
             const chart = instances.get(tile.dataset.itemId);
             requestAnimationFrame(() => chart && chart.resize());
           } catch (e) {
-            trigger.title = 'Größe konnte nicht gespeichert werden';
+            trigger.title = t('Größe konnte nicht gespeichert werden');
           }
         });
       });
@@ -1861,7 +1861,7 @@
 
       const sparklineResolutionHead = control.querySelector('.dtile-sparkline-resolution-row')
         ?.previousElementSibling?.querySelector('strong');
-      const SPARKLINE_RESOLUTION_LABELS = {raw: 'Rohdaten', '5min': '5 Min', '15min': '15 Min', '30min': '30 Min', '1h': '1 Std'};
+      const SPARKLINE_RESOLUTION_LABELS = {raw: t('Rohdaten'), '5min': t('5 Min'), '15min': t('15 Min'), '30min': t('30 Min'), '1h': t('1 Std')};
       sparklineResolutionCells.forEach(cell => {
         cell.addEventListener('click', async () => {
           const resolution = cell.dataset.resolution;
@@ -1882,7 +1882,7 @@
               if (entityBody.dataset.showSparkline === 'true') await renderEntityTile(entityBody);
             }
           } catch (e) {
-            trigger.title = 'Sparkline-Auflösung konnte nicht gespeichert werden';
+            trigger.title = t('Sparkline-Auflösung konnte nicht gespeichert werden');
           }
         });
       });
@@ -1933,7 +1933,7 @@
               if (!ageEl) {
                 ageEl = document.createElement('span');
                 ageEl.className = 'dtile-entity-age';
-                ageEl.title = 'Letzte Aktualisierung';
+                ageEl.title = t('Letzte Aktualisierung');
                 entityBody?.querySelector('.dtile-entity-value')?.appendChild(ageEl);
               }
               if (entityBody) await renderEntityTile(entityBody);
@@ -1967,7 +1967,7 @@
       const resolutionRow = control.querySelector('.dtile-sparkline-resolution-row');
 
       if (rangeCells.length) {
-        // Rohwerte gibt es nur bis "Woche" (MAX_RAW_QUERY_POINTS) — darüber
+        // Rohwerte gibt es nur bis t("Woche") (MAX_RAW_QUERY_POINTS) — darüber
         // kommen die Sparkline-Punkte aus den Buckets der Abfrage und die
         // Auflösungs-Reihe hat keine Wirkung mehr. Ausgrauen statt
         // verschwinden lassen, wie beim Legenden-Schalter der Chart-Kacheln.
@@ -1978,7 +1978,7 @@
           resolutionRow.classList.toggle('is-disabled', aus);
           resolutionRow.querySelectorAll('button').forEach(b => { b.disabled = aus; });
           resolutionRow.title = aus
-            ? 'Bei Monat und Jahr zeichnet die Sparkline die Buckets der Abfrage — eine feinere Auflösung gibt es dort nicht.'
+            ? t('Bei Monat und Jahr zeichnet die Sparkline die Buckets der Abfrage — eine feinere Auflösung gibt es dort nicht.')
             : '';
         };
 
@@ -2063,7 +2063,7 @@
             c.classList.toggle('is-off', gesperrt);
             c.disabled = gesperrt;
             c.title = gesperrt
-              ? (c.dataset.metric === ctx.primary_metric ? 'Steht schon als Hauptwert' : 'Für diese Entität keine sinnvolle Kennzahl')
+              ? (c.dataset.metric === ctx.primary_metric ? t('Steht schon als Hauptwert') : t('Für diese Entität keine sinnvolle Kennzahl'))
               : '';
           });
           if (statsRow) statsRow.hidden = !statsCheckbox?.checked;

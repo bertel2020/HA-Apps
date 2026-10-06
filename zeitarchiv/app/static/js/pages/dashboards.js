@@ -17,25 +17,25 @@
           window.location.reload();
         } else {
           btn.disabled = false;
-          appAlert('Konnte nicht umgeschaltet werden.');
+          appAlert(t('Konnte nicht umgeschaltet werden.'));
         }
       } catch (e) {
         btn.disabled = false;
-        appAlert('Konnte nicht umgeschaltet werden.');
+        appAlert(t('Konnte nicht umgeschaltet werden.'));
       }
     }
 
     async function deleteDashboard(id, btn) {
-      if (!await appConfirm('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.', {danger: true})) return;
+      if (!await appConfirm(t('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.'), {danger: true})) return;
       btn.disabled = true;
       fetch(`dashboards/${id}/delete`, {method: 'POST'}).then(r => {
         if (r.ok) {
           document.getElementById(`dash-card-${id}`).remove();
         } else {
           btn.disabled = false;
-          appAlert('Löschen fehlgeschlagen.');
+          appAlert(t('Löschen fehlgeschlagen.'));
         }
-      }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
+      }).catch(() => { btn.disabled = false; appAlert(t('Löschen fehlgeschlagen.')); });
     }
 
     // Kopie bleibt auf der Liste sichtbar (kein Sprung in den Editor) — ein
@@ -46,10 +46,10 @@
         if (res.ok) {
           window.location.reload();
         } else {
-          appAlert('Duplizieren fehlgeschlagen.');
+          appAlert(t('Duplizieren fehlgeschlagen.'));
         }
       } catch (e) {
-        appAlert('Duplizieren fehlgeschlagen.');
+        appAlert(t('Duplizieren fehlgeschlagen.'));
       }
     }
 
@@ -62,9 +62,9 @@
         if (res.ok) {
           window.location.reload();
         } else {
-          appAlert('Konnte nicht als Standard festgelegt werden.');
+          appAlert(t('Konnte nicht als Standard festgelegt werden.'));
         }
       } catch (e) {
-        appAlert('Konnte nicht als Standard festgelegt werden.');
+        appAlert(t('Konnte nicht als Standard festgelegt werden.'));
       }
     }

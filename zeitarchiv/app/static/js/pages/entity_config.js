@@ -1,9 +1,7 @@
     async function deleteAllValues() {
       const confirmed = await window.appConfirm(
-        `Wirklich ALLE archivierten Werte von ${ENTITY_ID} endgültig löschen? ` +
-        'Hot Buffer, Monatsarchive, Rollups und Löschmarkierungen werden entfernt. ' +
-        'Die Entität und ihre Konfiguration bleiben bestehen. Dies kann nicht rückgängig gemacht werden.',
-        {danger: true, confirmLabel: 'Alle Werte löschen'}
+        t('Wirklich ALLE archivierten Werte von {entity} endgültig löschen? Hot Buffer, Monatsarchive, Rollups und Löschmarkierungen werden entfernt. Die Entität und ihre Konfiguration bleiben bestehen. Dies kann nicht rückgängig gemacht werden.', {entity: ENTITY_ID}),
+        {danger: true, confirmLabel: t('Alle Werte löschen')}
       );
       if (!confirmed) return;
       const button = document.getElementById('delete-all-values-btn');
@@ -14,17 +12,14 @@
         window.location.reload();
       } catch (error) {
         button.disabled = false;
-        appAlert('Die Werte konnten nicht gelöscht werden.');
+        appAlert(t('Die Werte konnten nicht gelöscht werden.'));
       }
     }
 
     async function deleteEntity() {
       const confirmed = await window.appConfirm(
-        `Entität ${ENTITY_ID} vollständig aus Zeitarchiv entfernen? ` +
-        'Alle Werte und ihre individuelle Zeitarchiv-Konfiguration werden endgültig gelöscht. ' +
-        'Wenn die Home-Assistant-Integration diese Entität weiter sendet, wird sie automatisch neu angelegt. ' +
-        'Dies kann nicht rückgängig gemacht werden.',
-        {danger: true, confirmLabel: 'Entität entfernen'}
+        t('Entität {entity} vollständig aus Zeitarchiv entfernen? Alle Werte und ihre individuelle Zeitarchiv-Konfiguration werden endgültig gelöscht. Wenn die Home-Assistant-Integration diese Entität weiter sendet, wird sie automatisch neu angelegt. Dies kann nicht rückgängig gemacht werden.', {entity: ENTITY_ID}),
+        {danger: true, confirmLabel: t('Entität entfernen')}
       );
       if (!confirmed) return;
       const button = document.getElementById('delete-entity-btn');
@@ -35,6 +30,6 @@
         window.location.href = `${BASE}/entities`;
       } catch (error) {
         button.disabled = false;
-        appAlert('Die Entität konnte nicht entfernt werden.');
+        appAlert(t('Die Entität konnte nicht entfernt werden.'));
       }
     }

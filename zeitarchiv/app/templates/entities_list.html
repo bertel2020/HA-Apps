@@ -28,7 +28,7 @@
             <button type="button" class="btn" id="unit-filter-btn" onclick="toggleDDPicker('unit-filter')">{{ _("Einheit: Alle ▾") }}</button>
             <input type="hidden" name="unit" id="unit-filter-input" value="all">
             <div class="dd-picker-popover" id="unit-filter-popover">
-              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', 'Alle'); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
+              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', t('Alle')); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
               {% for opt in unit_options %}
               <div class="dd-picker-row" onclick="selectDDOption('unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetEntitiesPage();">{{ opt.label }}</div>
               {% endfor %}

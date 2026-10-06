@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import sqlite3
 from pathlib import Path
 
@@ -319,6 +321,8 @@ def test_the_label_tables_in_python_and_javascript_agree() -> None:
     script = (
         (APP / "static/js/dashboard-tiles.js")
     ).read_text(encoding="utf-8")
+    # Die Etiketten laufen im Skript durch t('…') (Übersetzung); verglichen wird der deutsche Text.
+    script = re.sub(r"\bt\((['\"])((?:(?!\1).)*)\1\)", r"\1\2\1", script)
     for range_key, (kalendarisch, rollierend) in _TILE_RANGE_LABELS.items():
         assert f"{range_key}: ['{kalendarisch}', '{rollierend}']" in script, range_key
     for metric, label in _TILE_METRIC_LABELS.items():
@@ -448,4 +452,4 @@ def test_the_metric_shorthand_has_a_single_source() -> None:
     skript = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
     assert "ctx.metric_labels" in skript
     # Der Tooltip nennt dieselbe Sache beim selben Namen.
-    assert "sum: 'Zuwachs'" in skript
+    assert "sum: t('Zuwachs')" in skript

@@ -123,7 +123,7 @@
         <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
                 @click="toggleOpen($refs.csvEntitySearch)"
                 @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
-                x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
+                x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
         <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
                 @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
         <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">

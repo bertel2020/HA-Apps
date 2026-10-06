@@ -489,7 +489,7 @@
                 <span class="toolbar-field-label">{{ _("Soll Entität") }}</span>
                 <span class="dd-picker-wrap soll-entity-picker" x-data="entityPicker(ENTITY_OPTIONS, compareSollEntityId, (id) => setSollEntity(id))" @click.outside="open = false">
                   <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}" @click="toggleOpen($refs.sollEntitySearch)">
-                    <span x-text="entityId ? label(entityId) : 'Entität wählen …'"></span>
+                    <span x-text="entityId ? label(entityId) : t('Entität wählen …')"></span>
                   </button>
                   <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
                   <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
@@ -508,7 +508,7 @@
 
         <div class="card">
           <div id="chart" x-show="hasData"></div>
-          <div class="empty" x-show="!hasData" x-text="loading ? 'Lädt …' : (selectedCount === 0 ? 'Bitte mindestens eine Entität auswählen.' : 'Keine Daten für diesen Zeitraum.')"></div>
+          <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : (selectedCount === 0 ? t('Bitte mindestens eine Entität auswählen.') : t('Keine Daten für diesen Zeitraum.'))"></div>
         </div>
         <!-- Ersetzt ECharts' eigene Legende komplett (dort per legend.show:false
              stummgeschaltet, siehe render()) — ein Klick auf einen Chip

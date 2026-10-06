@@ -34,7 +34,7 @@
       const masked = el.dataset.masked === 'true';
       el.textContent = masked ? el.dataset.token : '••••••••••••••••';
       el.dataset.masked = masked ? 'false' : 'true';
-      btn.textContent = masked ? 'Verbergen' : 'Anzeigen';
+      btn.textContent = masked ? t('Verbergen') : t('Anzeigen');
     }
     function copyToken() {
       const el = document.getElementById('token-value');
@@ -53,8 +53,8 @@
       // execCommand('copy') funktioniert auch dort noch.
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text).then(
-          () => showStatus('In Zwischenablage kopiert.'),
-          () => showStatus('Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.')
+          () => showStatus(t('In Zwischenablage kopiert.')),
+          () => showStatus(t('Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.'))
         );
         return;
       }
@@ -68,5 +68,5 @@
       let ok = false;
       try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
       document.body.removeChild(temp);
-      showStatus(ok ? 'In Zwischenablage kopiert.' : 'Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.');
+      showStatus(ok ? t('In Zwischenablage kopiert.') : t('Kopieren fehlgeschlagen — Token bitte manuell markieren und kopieren.'));
     }

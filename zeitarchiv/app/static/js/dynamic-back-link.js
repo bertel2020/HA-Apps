@@ -12,17 +12,17 @@
   // den ersten Treffer. Ergänzen für weitere Herkunftsseiten reicht als
   // neuer Eintrag.
   const ROUTES = [
-    {re: /^\/energiedashboard(\/|$)/, text: 'zum Energiedashboard'},
-    {re: /^\/dashboards\/\d+/, text: 'zum Dashboard'},
-    {re: /^\/dashboards(\/|$)/, text: 'zu den Dashboards'},
-    {re: /^\/entities\/[^/]+/, text: 'zur Entität'},
-    {re: /^\/entities(\/|$)/, text: 'zu den Entitäten'},
-    {re: /^\/charts\/\d+/, text: 'zum Chart'},
-    {re: /^\/charts(\/|$)/, text: 'zu den Charts'},
-    {re: /^\/tables(\/|$)/, text: 'zu den Tabellen'},
-    {re: /^\/statistik(\/|$)/, text: 'zur Statistik'},
-    {re: /^\/housekeeping(\/|$)/, text: 'zum Housekeeping'},
-    {re: /^\/import(\/|$)/, text: 'zum Import'},
+    {re: /^\/energiedashboard(\/|$)/, text: t('zum Energiedashboard')},
+    {re: /^\/dashboards\/\d+/, text: t('zum Dashboard')},
+    {re: /^\/dashboards(\/|$)/, text: t('zu den Dashboards')},
+    {re: /^\/entities\/[^/]+/, text: t('zur Entität')},
+    {re: /^\/entities(\/|$)/, text: t('zu den Entitäten')},
+    {re: /^\/charts\/\d+/, text: t('zum Chart')},
+    {re: /^\/charts(\/|$)/, text: t('zu den Charts')},
+    {re: /^\/tables(\/|$)/, text: t('zu den Tabellen')},
+    {re: /^\/statistik(\/|$)/, text: t('zur Statistik')},
+    {re: /^\/housekeeping(\/|$)/, text: t('zum Housekeeping')},
+    {re: /^\/import(\/|$)/, text: t('zum Import')},
   ];
 
   // Dieselbe app_root-Abzieh-Logik wie _rel in _topnav.html — macht den
@@ -74,7 +74,7 @@
     // Verlauf/bfcache angewiesen zu sein (funktioniert auch in einem neuen
     // Tab oder nach einem harten Reload).
     a.href = document.referrer;
-    a.textContent = '← zurück ' + match.text;
+    a.textContent = t('← zurück {ziel}', {ziel: match.text});
     container.appendChild(a);
   }
 

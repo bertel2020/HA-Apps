@@ -9,13 +9,13 @@
     // Reihenfolge bestimmt sowohl die Checkbox-Liste im Optionen-Menü als auch
     // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
     const LEGEND_METRIC_OPTIONS = [
-      {value: 'last', label: 'Aktuell'},
+      {value: 'last', label: t('Aktuell')},
       {value: 'min', label: 'Min'},
       {value: 'max', label: 'Max'},
       // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
       // Zeichen, mit denen Durchschnitt/Summe schon überall sonst in der App
       // beschriftet sind (Ø in der Legende selbst, s. u.; Ø auch in der
-      // Durchschnittslinie, siehe averageOf()-Verwendung). "Aktuell"/"Min"/
+      // Durchschnittslinie, siehe averageOf()-Verwendung). t("Aktuell")/"Min"/
       // "Max" bleiben Text — dafür gibt es kein vergleichbar etabliertes,
       // eindeutiges Zeichen in dieser App.
       {value: 'average', label: 'Ø'},
@@ -74,10 +74,10 @@
       const end = new Date(windowEnd * 1000 - 1000);
       switch (range) {
         case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
-        case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? 'Heute' : fmtDay(start));
+        case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? t('Heute') : fmtDay(start));
         case 'week': return `${fmtDayMonth(start)}–${fmtDayMonth(end)} ${end.getFullYear()}`;
-        case 'month': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? `${fmtMonthYear(start)} (bis heute)` : fmtMonthYear(start));
-        case 'year': return continuous ? `${fmtMonthYear(start)} – ${fmtMonthYear(end)}` : (isCurrent ? `${start.getFullYear()} (bis heute)` : `${start.getFullYear()}`);
+        case 'month': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? t('{period} (bis heute)', {period: fmtMonthYear(start)}) : fmtMonthYear(start));
+        case 'year': return continuous ? `${fmtMonthYear(start)} – ${fmtMonthYear(end)}` : (isCurrent ? t('{period} (bis heute)', {period: start.getFullYear()}) : `${start.getFullYear()}`);
         case 'decade': return `${start.getFullYear()}–${end.getFullYear()}`;
         default: return '';
       }
@@ -1849,7 +1849,7 @@
         // Achse statt einer Zeitachse, keine Stacking-/Prozent-/gleitender-
         // Durchschnitt-Fälle — für "Jahre" ohnehin nicht erreichbar.
         renderYearsCompare() {
-          const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+          const MONTHS = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
           const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
           const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
           const hasCompare = s => !!s.compare_points;
@@ -2169,8 +2169,8 @@
         },
 
         async save() {
-          if (!this.name.trim()) { appAlert('Bitte einen Namen für das Chart angeben.'); return; }
-          if (this.selectedEntityIds.length === 0) { appAlert('Bitte mindestens eine Entität auswählen.'); return; }
+          if (!this.name.trim()) { appAlert(t('Bitte einen Namen für das Chart angeben.')); return; }
+          if (this.selectedEntityIds.length === 0) { appAlert(t('Bitte mindestens eine Entität auswählen.')); return; }
           this.saving = true;
           this.savedMessage = '';
           // Nur Namen tatsächlich ausgewählter Entitäten mitschicken — eine
@@ -2230,7 +2230,7 @@
         },
 
         async deleteChart() {
-          if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+          if (!await appConfirm(t('Dieses Chart wirklich löschen?'), {danger: true})) return;
           await fetch(`${BASE}/charts/${CHART_ID}/delete`, {method: 'POST'});
           window.location.href = `${BASE}/charts`;
         },

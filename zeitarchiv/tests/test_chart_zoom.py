@@ -115,11 +115,11 @@ def test_the_hint_under_the_chart_says_whether_zooming_is_possible() -> None:
     # "1 Datenpunkt, alle einzeln sichtbar" wäre falsches Deutsch, und den
     # einzelnen Punkt gibt es wirklich (Stundenansicht einer selten meldenden
     # Entität).
-    assert "einzeln ? '' : ', alle einzeln sichtbar'" in ENTITY
+    assert "{punkte}, alle einzeln sichtbar" in ENTITY
     # Der Zeitstrahl darf nicht mit einer Punktzahl argumentieren: dort sind es
     # oft eine Handvoll Segmente, und "3 Datenpunkte — zoomen möglich" würde
     # der Regel widersprechen, die der Text daneben aufstellt.
-    zeitstrahl_satz = ENTITY.split("if (this.chartType === 'timeline') {\n            return `")[1][:120]
+    zeitstrahl_satz = ENTITY.split("if (this.chartType === 'timeline') {\n            return t('")[1][:120]
     assert "Datenpunkt" not in zeitstrahl_satz
 
 

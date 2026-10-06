@@ -22,6 +22,7 @@ def _node(tz: str, body: str):
     global.window = global;
     global.document = {{documentElement: {{dataset: {{tz: 'Europe/Berlin'}}}}}};
     {(JS / "server-time.js").read_text()}
+    {(JS / "i18n.js").read_text()}
     {(JS / "table-compute.js").read_text()}
     console.log(JSON.stringify({body}));
     """

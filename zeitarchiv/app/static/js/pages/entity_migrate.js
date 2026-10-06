@@ -36,7 +36,7 @@ async function _loadPreview(target, factor, overlapResolution) {
 async function migratePreview() {
   const target = document.getElementById('migrate-target-input').value;
   if (!target) {
-    appAlert('Bitte zuerst eine Ziel-Entität wählen.');
+    appAlert(t('Bitte zuerst eine Ziel-Entität wählen.'));
     return;
   }
   const button = document.getElementById('migrate-preview-btn');
@@ -48,7 +48,7 @@ async function migratePreview() {
     await _loadPreview(target, 1, 'target');
     goToStep(2);
   } catch (error) {
-    appAlert('Die Vorschau konnte nicht geladen werden.');
+    appAlert(t('Die Vorschau konnte nicht geladen werden.'));
   } finally {
     button.disabled = false;
   }
@@ -63,7 +63,7 @@ async function migrateRecalculate() {
   try {
     await _loadPreview(target, _currentFactor(), overlapResolution);
   } catch (error) {
-    appAlert('Die Vorschau konnte nicht neu berechnet werden.');
+    appAlert(t('Die Vorschau konnte nicht neu berechnet werden.'));
   } finally {
     // Bei Erfolg hat _loadPreview() den Knopf längst durch ein frisches
     // Fragment ersetzt — dieses disabled=false trifft dann ins Leere,
@@ -74,17 +74,17 @@ async function migrateRecalculate() {
 }
 
 function _migrateConfirmMessage(postAction, overlapResolution, targetEntityId, rowsToTransfer) {
-  const base = `${rowsToTransfer} Datenpunkte werden von ${ENTITY_ID} nach ${targetEntityId} übertragen. `;
+  const base = t('{rows} Datenpunkte werden von {source} nach {target} übertragen.', {rows: rowsToTransfer, source: ENTITY_ID, target: targetEntityId}) + ' ';
   const overlapNote = overlapResolution === 'source'
-    ? 'Bei überschneidenden Zeitstempeln gewinnt dabei die Quelle. '
+    ? t('Bei überschneidenden Zeitstempeln gewinnt dabei die Quelle.') + ' '
     : '';
   if (postAction === 'delete') {
-    return base + overlapNote + `Anschließend wird ${ENTITY_ID} vollständig aus Zeitarchiv entfernt. Dies kann nicht rückgängig gemacht werden.`;
+    return base + overlapNote + t('Anschließend wird {source} vollständig aus Zeitarchiv entfernt. Dies kann nicht rückgängig gemacht werden.', {source: ENTITY_ID});
   }
   if (postAction === 'clear') {
-    return base + overlapNote + `Anschließend werden die Datenpunkte von ${ENTITY_ID} gelöscht (Konfiguration bleibt erhalten). Dies kann nicht rückgängig gemacht werden.`;
+    return base + overlapNote + t('Anschließend werden die Datenpunkte von {source} gelöscht (Konfiguration bleibt erhalten). Dies kann nicht rückgängig gemacht werden.', {source: ENTITY_ID});
   }
-  return base + overlapNote + `${ENTITY_ID} bleibt dabei unverändert erhalten.`;
+  return base + overlapNote + t('{source} bleibt dabei unverändert erhalten.', {source: ENTITY_ID});
 }
 
 async function migrateExecute() {
@@ -103,7 +103,7 @@ async function migrateExecute() {
   goToStep(3);
   const confirmed = await appConfirm(
     _migrateConfirmMessage(postAction, overlapResolution, target, rowsToTransfer),
-    {danger: postAction !== 'keep' || overlapResolution === 'source', confirmLabel: 'Übertragung starten'}
+    {danger: postAction !== 'keep' || overlapResolution === 'source', confirmLabel: t('Übertragung starten')}
   );
   if (!confirmed) {
     goToStep(2);
@@ -128,7 +128,7 @@ async function migrateExecute() {
   } catch (error) {
     button.disabled = false;
     goToStep(2);
-    appAlert('Die Migration konnte nicht ausgeführt werden.');
+    appAlert(t('Die Migration konnte nicht ausgeführt werden.'));
   }
 }
 
@@ -137,7 +137,7 @@ function _escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (c) => map[c]);
 }
 
-const _POST_ACTION_RESULT_LABELS = {delete: 'Quelle entfernt', clear: 'Quelle geleert', keep: 'Quelle erhalten'};
+const _POST_ACTION_RESULT_LABELS = {delete: t('Quelle entfernt'), clear: t('Quelle geleert'), keep: t('Quelle erhalten')};
 
 function showResult(result) {
   document.getElementById('migrate-stepper').hidden = true;
@@ -148,19 +148,19 @@ function showResult(result) {
   // POST_ACTIONS/OVERLAP_RESOLUTIONS in entity_migration.py) — nur die
   // Dashboard-Namen unten sind echte Nutzereingaben und werden deshalb
   // separat escaped, statt hier pauschal alles zu escapen.
-  const overlapLabel = result.overlap_resolution === 'source' ? 'Quelle übernommen' : 'Ziel behalten';
+  const overlapLabel = result.overlap_resolution === 'source' ? t('Quelle übernommen') : t('Ziel behalten');
   document.getElementById('migrate-result-stats').innerHTML = `
-    <div class="stat"><div class="label">Übertragen</div><div class="value">${result.rows_transferred} Datenpunkte</div></div>
-    <div class="stat"><div class="label">Überschneidend</div><div class="value">${result.duplicate_rows} (${overlapLabel})</div></div>
-    <div class="stat"><div class="label">Aktion danach</div><div class="value">${_POST_ACTION_RESULT_LABELS[result.post_action] || result.post_action}</div></div>
+    <div class="stat"><div class="label">${t('Übertragen')}</div><div class="value">${t('{count} Datenpunkte', {count: result.rows_transferred})}</div></div>
+    <div class="stat"><div class="label">${t('Überschneidend')}</div><div class="value">${result.duplicate_rows} (${overlapLabel})</div></div>
+    <div class="stat"><div class="label">${t('Aktion danach')}</div><div class="value">${_POST_ACTION_RESULT_LABELS[result.post_action] || result.post_action}</div></div>
   `;
 
   document.getElementById('migrate-result-summary').textContent =
-    `${result.target_entity_id} hat jetzt den vollständigen Verlauf.`;
+    t('{target} hat jetzt den vollständigen Verlauf.', {target: result.target_entity_id});
 
   const notes = [];
   if (result.repointed_dashboards.length) {
-    notes.push(`<div class="migrate-banner positive">✓ ${result.repointed_dashboards.length} Dashboard-Kachel(n) automatisch auf die neue Entität umgehängt — Titel, Rundung und Sparkline-Einstellungen bleiben dabei erhalten.</div>`);
+    notes.push(`<div class="migrate-banner positive">✓ ${t('{count} Dashboard-Kachel(n) automatisch auf die neue Entität umgehängt — Titel, Rundung und Sparkline-Einstellungen bleiben dabei erhalten.', {count: result.repointed_dashboards.length})}</div>`);
     notes.push('<div class="migrate-result-list">' + result.repointed_dashboards.map((name) =>
       `<div class="migrate-result-row"><span>${_escapeHtml(name)}</span><span class="tag">→ ${_escapeHtml(result.target_entity_id)}</span></div>`
     ).join('') + '</div>');

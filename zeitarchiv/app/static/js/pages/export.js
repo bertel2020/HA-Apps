@@ -13,7 +13,7 @@
 
     // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Typ, Einheit)
     // kommt aus dem gemeinsamen static/js/dd-picker.js.
-    const EXPORT_TYPE_LABELS = {standard: 'Standard', counter: 'Zähler', switch: 'Schalter'};
+    const EXPORT_TYPE_LABELS = {standard: 'Standard', counter: t('Zähler'), switch: t('Schalter')};
     function updateExportTypeFilterLabel() {
       const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
       const btn = document.getElementById('export-type-filter-btn');

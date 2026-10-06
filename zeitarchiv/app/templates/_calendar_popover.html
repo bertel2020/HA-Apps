@@ -72,7 +72,7 @@
           <button type="button" class="calendar-day"
                   :class="{blank: !cell, 'out-of-range': cell && !cell.inRange, 'no-data': cell && cell.inRange && !cell.hasData, 'has-data': cell && cell.inRange && cell.hasData}"
                   :disabled="!cell || !cell.inRange || !cell.hasData"
-                  :title="cell && cell.inRange && !cell.hasData ? 'Keine Daten an diesem Tag' : ''"
+                  :title="cell && cell.inRange && !cell.hasData ? t('Keine Daten an diesem Tag') : ''"
                   x-text="cell ? cell.day : ''"
                   @click="pick(cell)"></button>
         </template>

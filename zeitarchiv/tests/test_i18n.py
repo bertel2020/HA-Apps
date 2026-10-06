@@ -53,7 +53,9 @@ def test_language_setting_resolution() -> None:
 
 def test_every_text_marked_for_translation_has_an_english_entry() -> None:
     fehlend_app = _literals("templates", (".html",), TEMPLATE_CALL) - set(CATALOG["app"])
-    fehlend_js = _literals("static/js", (".js",), SCRIPT_CALL) - set(CATALOG["js"])
+    fehlend_js = (
+        _literals("static/js", (".js",), SCRIPT_CALL) | _literals("templates", (".html",), SCRIPT_CALL)
+    ) - set(CATALOG["js"])
     assert not fehlend_app, f"fehlt in en.json/app: {sorted(fehlend_app)}"
     assert not fehlend_js, f"fehlt in en.json/js: {sorted(fehlend_js)}"
 

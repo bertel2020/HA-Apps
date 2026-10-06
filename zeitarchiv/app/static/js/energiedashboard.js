@@ -71,8 +71,8 @@
     // und unabhängig vom Nutzernamen.
     if (node.kind === 'storage_out') return palette.storageOut;
     if (node.kind === 'storage_in') return palette.storage;
-    if (node.name === 'Netzbezug') return palette.grid;
-    if (node.name === 'Einspeisung') return palette.exportColor;
+    if (node.name === t('Netzbezug')) return palette.grid;
+    if (node.name === t('Einspeisung')) return palette.exportColor;
     if (node.role === 'source') return palette.pv;
     return palette.use;
   }
@@ -189,7 +189,7 @@
       + `<path class="area" d="${paths.area}"/><path class="line" d="${paths.line}"/></svg>`;
   }
 
-  // "Stunde" nach demselben Muster wie formatPeriodLabel() in
+  // t("Stunde") nach demselben Muster wie formatPeriodLabel() in
   // entity_detail.html ("27.08.2026 · 14:00–15:00 Uhr") — windowEnd ist
   // exklusiv, dieselbe Sekunde-zurück-Korrektur wie dort.
   // Woche/Monat/Jahr mit offset 0 sind noch laufende, unvollständige
@@ -216,7 +216,7 @@
     let label = start.toLocaleDateString('de-DE', zone(opts));
     if (data.offset === 0 && CURRENT_PERIOD_SUFFIX_RANGES.has(data.range)) {
       const end = new Date(data.window_end_ts * 1000);
-      label += ` · bis ${end.toLocaleDateString('de-DE', zone({day: '2-digit', month: '2-digit'}))}`;
+      label += ' · ' + t('bis {date}', {date: end.toLocaleDateString('de-DE', zone({day: '2-digit', month: '2-digit'}))});
     }
     return label;
   }
@@ -299,7 +299,7 @@
   window.energieFlow = function energieFlow() {
     const initialPeriod = readInitialRangeOffset();
     return {
-      ranges: [{key: 'hour', label: 'Stunde'}, {key: 'day', label: 'Tag'}, {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}],
+      ranges: [{key: 'hour', label: t('Stunde')}, {key: 'day', label: 'Tag'}, {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}],
       range: initialPeriod.range,
       offset: initialPeriod.offset,
       loading: false,
@@ -349,16 +349,16 @@
       // in zwei Kacheln aufgeteilt, damit ein Umsortieren der Liste nicht
       // versehentlich die falsche Kachel als "Bilanz" ausgibt.
       get bilanzCheck() {
-        return (this.quality.checks || []).find((c) => c.label === 'Grundlast plausibel') || {ok: true, detail: ''};
+        return (this.quality.checks || []).find((c) => c.label === t('Grundlast plausibel')) || {ok: true, detail: ''};
       },
       get otherChecks() {
-        return (this.quality.checks || []).filter((c) => c.label !== 'Grundlast plausibel');
+        return (this.quality.checks || []).filter((c) => c.label !== t('Grundlast plausibel'));
       },
       get otherChecksOk() {
         return this.otherChecks.every((c) => c.ok);
       },
       get grundlastShare() {
-        const g = this.verbraucherBreakdown.find((v) => v.name === 'Grundlast');
+        const g = this.verbraucherBreakdown.find((v) => v.name === t('Grundlast'));
         return g ? g.share : null;
       },
 
@@ -498,7 +498,7 @@
       // CO2-Pendant oben — nur bei negativem Saldo (Einspeisung-Erlös
       // überwiegt die Netzbezug-Kosten).
       costWinText() {
-        return this.kpi.net_cost != null && this.kpi.net_cost < 0 ? '💶 Mehr erlöst als bezahlt!' : '';
+        return this.kpi.net_cost != null && this.kpi.net_cost < 0 ? t('💶 Mehr erlöst als bezahlt!') : '';
       },
 
       // Eine Sparkline je Jahres-Zeile im Wirkungsgrad-Trend-Popup — 12
@@ -532,7 +532,7 @@
           .map((p) => `<circle class="sparkline-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="1.6"/>`)
           .join('');
         const svg = `<svg class="sparkline" viewBox="0 0 300 32" preserveAspectRatio="none" style="width:100%;height:32px;display:block;">${lines}${dots}</svg>`;
-        const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const monthNames = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
         const slotWidth = 100 / 12;
         const slots = months.map((v, i) => {
           if (v == null) return '';
@@ -585,7 +585,7 @@
       // socNowTooltipText() unten. Ohne diesen Satz liest sich "1,0 kWh" wie
       // ein aktueller Füllstand statt eines Perioden-Saldos.
       speicherTooltipText() {
-        const base = 'Ladung minus Entladung im gewählten Zeitraum — nicht der aktuelle Ladezustand (siehe Ring „Speicher SOC" unten).';
+        const base = t('Ladung minus Entladung im gewählten Zeitraum — nicht der aktuelle Ladezustand (siehe Ring „Speicher SOC" unten).');
         const breakdown = this.speicherBreakdownText();
         return breakdown ? base + '\n\n' + breakdown : base;
       },
@@ -606,7 +606,7 @@
       // 89 %" nicht, wie sich das über mehrere Speicher unterschiedlicher
       // Kapazität zusammensetzt.
       socNowTooltipText() {
-        const base = 'Aktueller Ladezustand, unabhängig vom gewählten Zeitraum — der Ring unten zeigt den Ø-Wert über die Periode.';
+        const base = t('Aktueller Ladezustand, unabhängig vom gewählten Zeitraum — der Ring unten zeigt den Ø-Wert über die Periode.');
         const breakdown = this.speicherSocNowBreakdownText();
         return breakdown ? base + '\n\n' + breakdown : base;
       },
@@ -963,32 +963,32 @@
         const nodes = data.nodes || [];
         const hat = (pruef) => nodes.some(pruef);
         const items = [];
-        if (hat(n => n.role === 'source' && n.name !== 'Netzbezug' && n.kind !== 'storage_out')) {
-          items.push({name: 'Erzeugung', color: palette.pv});
+        if (hat(n => n.role === 'source' && n.name !== t('Netzbezug') && n.kind !== 'storage_out')) {
+          items.push({name: t('Erzeugung'), color: palette.pv});
         }
-        const netzbezug = nodes.find(n => n.name === 'Netzbezug');
-        if (netzbezug) items.push({name: netzbezug.label || 'Netzbezug', color: palette.grid});
+        const netzbezug = nodes.find(n => n.name === t('Netzbezug'));
+        if (netzbezug) items.push({name: netzbezug.label || t('Netzbezug'), color: palette.grid});
         if (hat(n => n.kind === 'storage_out')) {
-          items.push({name: 'Speicher-Entladung', color: palette.storageOut});
+          items.push({name: t('Speicher-Entladung'), color: palette.storageOut});
         }
         if (hat(n => n.kind === 'storage_in')) {
-          items.push({name: 'Speicher-Ladung', color: palette.storage});
+          items.push({name: t('Speicher-Ladung'), color: palette.storage});
         }
-        const einspeisung = nodes.find(n => n.name === 'Einspeisung');
-        if (einspeisung) items.push({name: einspeisung.label || 'Einspeisung', color: palette.exportColor});
+        const einspeisung = nodes.find(n => n.name === t('Einspeisung'));
+        if (einspeisung) items.push({name: einspeisung.label || t('Einspeisung'), color: palette.exportColor});
         // Der Verbrauchs-Eintrag trägt den tatsächlichen Mischton der
         // Bus→Verbraucher-Bahnen (siehe green_ratio/blendColors in
         // renderChart) statt einer generischen Verbrauchsfarbe — genau dieser
         // Farbton ist ohne Erklärung sonst am schwersten zu deuten, und der
         // Prozentwert sagt direkt, woher die Mischung kommt.
-        if (hat(n => n.role === 'sink' && n.name !== 'Einspeisung' && n.kind !== 'storage_in')) {
+        if (hat(n => n.role === 'sink' && n.name !== t('Einspeisung') && n.kind !== 'storage_in')) {
           if (data.green_ratio != null) {
             items.push({
-              name: `Verbrauch (${this.fmt(data.green_ratio * 100, 0)} % aus eigener Erzeugung)`,
+              name: t('Verbrauch ({pct} % aus eigener Erzeugung)', {pct: this.fmt(data.green_ratio * 100, 0)}),
               color: blendColors(palette.pv, palette.grid, data.green_ratio),
             });
           } else {
-            items.push({name: 'Verbrauch', color: palette.use});
+            items.push({name: t('Verbrauch'), color: palette.use});
           }
         }
         this.legendItems = items;
@@ -1168,7 +1168,7 @@
           if (!(bezug > 0)) return '';
           const pct = (value / bezug) * 100;
           if (pct >= 99.5) return '';
-          return ` (${this.fmt(pct, 0)} % von ${labelFor(bezugName)})`;
+          return t(' ({pct} % von {name})', {pct: this.fmt(pct, 0), name: labelFor(bezugName)});
         };
         const shareSuffix = (sourceName, targetName, value) => {
           const target = nodeByName[targetName];
@@ -1210,8 +1210,9 @@
                 const head = `${label}: ${fmt(p.value)} kWh${nodeShareSuffix(p.name, p.value)}`;
                 if (node && node.anomaly) {
                   return `${head}<br/>`
-                    + `<span style="color:${palette.warning}">+${node.anomaly_pct} % über dem Schnitt `
-                    + `der letzten Perioden (${fmt(node.anomaly_baseline)} kWh)</span>`;
+                    + `<span style="color:${palette.warning}">`
+                    + t('+{pct} % über dem Schnitt der letzten Perioden ({baseline} kWh)', {pct: node.anomaly_pct, baseline: fmt(node.anomaly_baseline)})
+                    + '</span>';
                 }
                 return head;
               }
