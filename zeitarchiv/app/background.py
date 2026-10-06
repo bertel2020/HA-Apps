@@ -317,7 +317,7 @@ class BackgroundService:
                         skipped_id,
                         status="skipped",
                         finished_at=time.time(),
-                        error="Übersprungen, weil bereits ein Retention-Lauf aktiv ist",
+                        error=tr("Übersprungen, weil bereits ein Retention-Lauf aktiv ist"),
                     )
                 return None
             job_id = self.index.create_retention_job(trigger, scheduled_for)
@@ -633,7 +633,7 @@ class BackgroundService:
                         skipped_id,
                         status="skipped",
                         finished_at=time.time(),
-                        error="Übersprungen, weil bereits ein Backup läuft",
+                        error=tr("Übersprungen, weil bereits ein Backup läuft"),
                     )
                 return False
             job_id = self.index.create_backup_job(trigger, scheduled_for)

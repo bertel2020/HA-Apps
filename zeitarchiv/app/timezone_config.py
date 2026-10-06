@@ -38,8 +38,7 @@ def load_timezone(
         return ZoneInfo(configured)
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         message = (
-            f"Ungültige Zeitzone {configured!r}; "
-            f"verwende {DEFAULT_TIMEZONE_NAME!r} als Fallback"
+            tr("Ungültige Zeitzone {configured!r}; verwende {DEFAULT_TIMEZONE_NAME!r} als Fallback", configured=configured, DEFAULT_TIMEZONE_NAME=DEFAULT_TIMEZONE_NAME)
         )
         if on_invalid is not None:
             on_invalid(message)
@@ -49,6 +48,6 @@ def load_timezone(
     except ZoneInfoNotFoundError:
         if on_invalid is not None:
             on_invalid(
-                f"Zeitzonendaten für {DEFAULT_TIMEZONE_NAME!r} fehlen; verwende UTC"
+                tr("Zeitzonendaten für {DEFAULT_TIMEZONE_NAME!r} fehlen; verwende UTC", DEFAULT_TIMEZONE_NAME=DEFAULT_TIMEZONE_NAME)
             )
         return timezone.utc

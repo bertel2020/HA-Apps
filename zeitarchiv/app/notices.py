@@ -435,12 +435,11 @@ def build_notices(
             "severity": "info" if repaired else "warn",
             "title": tr("Index-Abweichungen automatisch behoben") if repaired else tr("Index-Abweichungen gefunden"),
             "detail": (
-                f"{mismatch_count} Abweichung{'en' if mismatch_count != 1 else ''} zwischen Index und "
-                "gespeicherten Rohdaten beim letzten Abgleich gefunden"
+                (tr("{mismatch_count} Abweichung zwischen Index und gespeicherten Rohdaten beim letzten Abgleich gefunden", mismatch_count=mismatch_count) if mismatch_count == 1 else tr("{mismatch_count} Abweichungen zwischen Index und gespeicherten Rohdaten beim letzten Abgleich gefunden", mismatch_count=mismatch_count))
                 + (
-                    " und automatisch korrigiert — betrifft nur die Index-Metadaten, nicht die Messwerte."
+                    tr(" und automatisch korrigiert — betrifft nur die Index-Metadaten, nicht die Messwerte.")
                     if repaired
-                    else ", aber noch nicht behoben."
+                    else tr(", aber noch nicht behoben.")
                 )
             ),
             "meta": tr("Speicherplatz"),
@@ -475,7 +474,7 @@ def build_notices(
             "id": "backup.job_failed",
             "severity": "error",
             "title": tr("Backup fehlgeschlagen"),
-            "detail": last_backup[0]["error"] or "Die letzte Sicherung konnte nicht abgeschlossen werden.",
+            "detail": last_backup[0]["error"] or tr("Die letzte Sicherung konnte nicht abgeschlossen werden."),
             "meta": tr("Sicherung"),
             "link": "/backup",
         })
@@ -497,7 +496,7 @@ def build_notices(
             "title": tr("Automatische Aufbewahrung fehlgeschlagen"),
             "detail": (
                 last_retention[0]["error"]
-                or "Der letzte geplante Bereinigungslauf ist fehlgeschlagen."
+                or tr("Der letzte geplante Bereinigungslauf ist fehlgeschlagen.")
             ),
             "meta": tr("Aufbewahrung"),
             "link": "/housekeeping#aufbewahrung",
@@ -572,17 +571,16 @@ def build_notices(
         anzahl = len(auffaellige)
         marke = format_value(cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0)
         beispiel = (
-            f"{schlimmster['friendly_name']} mit {schlimmster['percent_label']} %"
+            tr("{friendly_name} mit {percent_label} %", friendly_name=schlimmster['friendly_name'], percent_label=schlimmster['percent_label'])
         )
         notices.append({
             "id": "entities.outlier_rate_high",
             "severity": "info",
             "title": tr("Ausreißer-Erkennung markiert auffällig viel"),
             "detail": (
-                f"Bei {anzahl} Entität{'en' if anzahl != 1 else ''} markiert die eingestellte "
-                f"Schwelle mehr als {marke} % aller Werte"
+                (tr("Bei {anzahl} Entität markiert die eingestellte Schwelle mehr als {marke} % aller Werte", anzahl=anzahl, marke=marke) if anzahl == 1 else tr("Bei {anzahl} Entitäten markiert die eingestellte Schwelle mehr als {marke} % aller Werte", anzahl=anzahl, marke=marke))
                 + (f" — am deutlichsten {beispiel}." if anzahl != 1 else f": {beispiel}.")
-                + " Eine zu enge Schwelle markiert normales Verhalten als verdächtig."
+                + tr(" Eine zu enge Schwelle markiert normales Verhalten als verdächtig.")
             ),
             "meta": tr("Housekeeping"),
             "link": "/housekeeping#ausreisser",
@@ -958,7 +956,7 @@ def retention_activity(retention_progress) -> dict | None:
     with retention_progress.lock:
         if not retention_progress.running:
             return None
-    return {"phase": "Aufbewahrung wird angewendet…", "done": 0, "total": 0,
+    return {"phase": tr("Aufbewahrung wird angewendet…"), "done": 0, "total": 0,
             "unit": "", "detail": "", "percent": 0}
 
 
@@ -969,7 +967,7 @@ def backup_activity(backup_progress) -> dict | None:
             return None
         done, total = backup_progress.done, backup_progress.total
     return {
-        "phase": "Backup wird erstellt…",
+        "phase": tr("Backup wird erstellt…"),
         "done": min(done, total) if total else done,
         "total": total,
         "unit": "Dateien",

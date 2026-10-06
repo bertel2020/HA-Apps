@@ -245,6 +245,30 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   sich den Rest laut Spezifikation zu gleichen Teilen — motorunabhängig,
   anders als Breiten über Zellen der "ersten Zeile" bei fixed layout.
 
+## Mehrsprachigkeit (Deutsch ↔ Englisch)
+
+Deutsch ist der Quelltext, jede weitere Sprache ein Katalog (`app/i18n/en.json`, Abschnitte `app` und `js`).
+**Der deutsche Text selbst ist der Schlüssel** (wie bei gettext): was im Katalog fehlt, erscheint unverändert
+deutsch, die App bleibt in jedem Zwischenstand benutzbar. Die Sprache steht in der Einstellung `language`
+(`auto`/`de`/`en`, Standard `de`; Einstellungen → Darstellung); `auto` folgt `Accept-Language`.
+
+| Wo | Aufruf | Anmerkung |
+|---|---|---|
+| Template | `{{ _("Text {n}", n=wert) }}` | Schlüssel ist HTML-Quelltext (`&hellip;`, `<strong>`), Ergebnis ist `Markup`; eingesetzte Werte werden maskiert. |
+| Skript / Alpine-Ausdruck | `t('Text {n}', {n: wert})` | `static/js/i18n.js`; der JS-Katalog wird nur für Nicht-Deutsch inline als `window.ZA_CATALOG` ausgeliefert. |
+| Python, zur Anfragezeit | `tr("Text {n}", n=wert)` | liest die Sprache der laufenden Anfrage (`i18n.current_language`, gesetzt von einer app-weiten Abhängigkeit vor jeder Route). |
+| Python, Konstante | `N_("Text")` | liefert ein `Lazy`: ein `str` mit dem deutschen Wortlaut, das erst beim Anzeigen (`{{ label }}`) übersetzt wird. Für Beschriftungslisten, die beim Import entstehen. |
+
+Regeln, die sich bewährt haben: ganze Sätze mit Platzhaltern statt zusammengeklebter Teile; Pluralformen als zwei
+vollständige Schlüssel (`… Zeile` / `… Zeilen`) statt `Zeile{{ 'n' if … }}`; Logzeilen bleiben deutsch.
+`tests/test_i18n.py` prüft, dass jeder markierte Text einen Katalogeintrag hat, dass kein Eintrag verwaist ist und
+dass die Platzhalter der Übersetzung zu denen des deutschen Textes passen. Quelltext-Tests, die Templates
+lesen, gehen über `template_text()`/`german()` (`tests/_paths.py`), das die `_()`-Aufrufe wieder in deutschen
+Klartext zurückbaut.
+
+Noch nicht übersetzt: Anleitung/README, Logzeilen, gespeicherte Texte (Import-Reports, Ausführungsverläufe,
+stummgeschaltete Meldungen), die ECharts-Eigenbeschriftungen und das Zahlenformat (`number-format.js`).
+
 ## Theming
 
 CSS-Variablen (`--bg`, `--surface`, `--ink`, `--accent-line`, `--warning`,

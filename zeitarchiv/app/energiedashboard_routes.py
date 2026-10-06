@@ -347,7 +347,7 @@ def process_pending_hourly_backfill(data_dir: Path, index: Index, tz: ZoneInfo, 
         # zeigte die Kopfleiste bei jedem 30s-Takt kurz einen Vorgang an, auch
         # wenn nichts zu tun war oder die Rolle inzwischen wieder weg ist.
         with _backfill_progress.track():
-            _backfill_progress.set_phase("Stunden-Rollup wird nachgebaut")
+            _backfill_progress.set_phase(tr("Stunden-Rollup wird nachgebaut"))
             _backfill_progress.set_detail(entity_id)
             rollup_mod.rebuild_entity_rollups(data_dir, entity_id, "counter", tz, hourly_rollup=True)
 
@@ -1934,7 +1934,7 @@ class EnergieDashboardService:
                     pv_eigenverbrauch_series,
                     kosten.get("preis_eigenverbrauch"),
                     kosten.get("preis_eigenverbrauch_fixed"),
-                    "Vergütung Eigenverbrauch",
+                    tr("Vergütung Eigenverbrauch"),
                 )
                 if eigenverbrauch_verguetung is not None:
                     eigenverbrauch_verguetung = round(eigenverbrauch_verguetung, 2)
@@ -2024,10 +2024,9 @@ class EnergieDashboardService:
         if einspeisung_id:
             balance_sinks.append(config.get("einspeisung_name") or "Einspeisung")
         balance_description = (
-            f"{' + '.join(balance_sources)} entsprechen {' + '.join(balance_sinks)}, innerhalb der Toleranz. "
-            "Nicht einzeln gemessene Lasten erscheinen als „Grundlast“."
+            tr("{join} entsprechen {join2}, innerhalb der Toleranz. Nicht einzeln gemessene Lasten erscheinen als „Grundlast“.", join=' + '.join(balance_sources), join2=' + '.join(balance_sinks))
             if balance_sources else
-            "Verbraucher, Einspeisung und Speicherladung übersteigen nicht den Energiebus."
+            tr("Verbraucher, Einspeisung und Speicherladung übersteigen nicht den Energiebus.")
         )
 
         # Speicher: über einen längeren Zeitraum kann nicht mehr entladen als
@@ -2071,9 +2070,9 @@ class EnergieDashboardService:
                 "label": "Sensorwerte aktuell",
                 "ok": not stale_labels,
                 "detail": (
-                    "Veraltet (>2 Tage ohne neue Werte): " + ", ".join(stale_labels)
+                    tr("Veraltet (>2 Tage ohne neue Werte): ") + ", ".join(stale_labels)
                     if stale_labels
-                    else "Alle zugeordneten Sensoren melden aktuelle Werte."
+                    else tr("Alle zugeordneten Sensoren melden aktuelle Werte.")
                 ),
             },
             {
@@ -2082,24 +2081,23 @@ class EnergieDashboardService:
                 # niedrigen Betrag, ohne das kenntlich zu machen. Jetzt wird
                 # der Rest, der auch durch Fortschreiben nicht abgedeckt ist,
                 # ausgewiesen statt verschwiegen.
-                "label": "Preise und Faktoren vollständig",
+                "label": tr("Preise und Faktoren vollständig"),
                 "ok": not factor_gap_entries,
                 "detail": (
-                    "Ohne gültigen Wert: "
+                    tr("Ohne gültigen Wert: ")
                     + ", ".join(
                         f"{bezeichnung} ({menge} kWh, {anteil} %)"
                         for bezeichnung, menge, anteil in factor_gap_entries
                     )
                     if factor_gap_entries
-                    else "Für die gesamte Energie liegt ein Preis bzw. CO2-Faktor vor."
+                    else tr("Für die gesamte Energie liegt ein Preis bzw. CO2-Faktor vor.")
                 ),
             },
             {
                 "label": "Grundlast plausibel",
                 "ok": not grundlast_negative,
                 "detail": (
-                    f"Grundlast wäre rechnerisch negativ ({round(grundlast, 2)} kWh) — "
-                    "Zuordnung oder Vorzeichen der Rollen prüfen."
+                    tr("Grundlast wäre rechnerisch negativ ({round} kWh) — Zuordnung oder Vorzeichen der Rollen prüfen.", round=round(grundlast, 2))
                     if grundlast_negative
                     else balance_description
                 ),
@@ -2110,38 +2108,37 @@ class EnergieDashboardService:
                 "detail": (
                     "Nicht in kWh: " + ", ".join(metadata["unit_issues"])
                     if metadata["unit_issues"]
-                    else "Alle zugeordneten Rollen sind in kWh."
+                    else tr("Alle zugeordneten Rollen sind in kWh.")
                 ),
             },
             {
-                "label": "Zähler-Typ korrekt",
+                "label": tr("Zähler-Typ korrekt"),
                 "ok": not metadata["type_issues"],
                 "detail": (
-                    "Kein Zähler (Summe ergibt hier keinen Sinn): " + ", ".join(metadata["type_issues"])
+                    tr("Kein Zähler (Summe ergibt hier keinen Sinn): ") + ", ".join(metadata["type_issues"])
                     if metadata["type_issues"]
-                    else "Alle zugeordneten Rollen sind Zähler (steigende Gesamtsumme)."
+                    else tr("Alle zugeordneten Rollen sind Zähler (steigende Gesamtsumme).")
                 ),
             },
             {
-                "label": "Keine doppelt zugeordneten Entitäten",
+                "label": tr("Keine doppelt zugeordneten Entitäten"),
                 "ok": not metadata["duplicate_labels"],
                 "detail": (
                     "Mehrfach zugeordnet: " + "; ".join(metadata["duplicate_labels"])
                     if metadata["duplicate_labels"]
-                    else "Jede Entität ist nur einer Rolle zugeordnet."
+                    else tr("Jede Entität ist nur einer Rolle zugeordnet.")
                 ),
             },
             {
-                "label": "Keine Zählerrücksetzungen",
+                "label": tr("Keine Zählerrücksetzungen"),
                 "ok": not reset_labels,
                 "detail": (
-                    "Abnehmender Zählerstand erkannt (Reset/Tausch?): " + ", ".join(reset_labels)
+                    tr("Abnehmender Zählerstand erkannt (Reset/Tausch?): ") + ", ".join(reset_labels)
                     if reset_labels
                     else (
-                        "Keine abnehmenden Zählerstände im Zeitraum."
+                        tr("Keine abnehmenden Zählerstände im Zeitraum.")
                         if resets_fully_checked
-                        else "Keine abnehmenden Zählerstände in den geprüften Rollen "
-                        "(bei mind. einer Rolle wegen der Datenmenge nicht vollständig geprüft)."
+                        else tr("Keine abnehmenden Zählerstände in den geprüften Rollen (bei mind. einer Rolle wegen der Datenmenge nicht vollständig geprüft).")
                     )
                 ),
             },
@@ -2151,7 +2148,7 @@ class EnergieDashboardService:
                 "label": "Speicher-Wirkungsgrad plausibel",
                 "ok": False,
                 "detail": (
-                    "Entladung übersteigt Ladung — Ladung/Entladung vertauscht? "
+                    tr("Entladung übersteigt Ladung — Ladung/Entladung vertauscht? ")
                     + ", ".join(speicher_entladen_exceeds_names)
                 ),
             })
@@ -3052,7 +3049,7 @@ class EnergieDashboardService:
             # innerhalb der Periode liegt).
             display_end = window_end if offset == 0 else natural_end - timedelta(days=1)
             if range == "year":
-                period_title = f"Jahr {window_start.year}"
+                period_title = tr("Jahr {year}", year=window_start.year)
                 if offset == 0:
                     period_range_text = (
                         f"1. Januar – {display_end.day}. {_MONTH_NAMES_DE[display_end.month - 1]} {display_end.year}"

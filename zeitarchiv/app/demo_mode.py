@@ -17,7 +17,7 @@ aus der offenen Verbindung — siehe Aufrufer in housekeeping_routes.py.
 
 from __future__ import annotations
 
-from .i18n import N_
+from .i18n import N_, tr
 
 import json
 import os
@@ -46,7 +46,7 @@ DEMO_DIR_NAME = "demo"
 #: Lebt hier statt in housekeeping_routes.py, weil auch background.py
 #: (Scheduler, Erststart) darauf zugreifen muss, ohne von den Routen
 #: abhängig zu werden.
-demo_progress = JobProgress("demo-generate", unit="Entitäten", label="Demo-Daten")
+demo_progress = JobProgress("demo-generate", unit=N_("Entitäten"), label=N_("Demo-Daten"))
 
 _DEMO_PHASE_LABELS = {
     "append": N_("Demo-Daten werden ergänzt …"),
@@ -171,6 +171,6 @@ def build_demo_worker(
         index.set_setting("demo_append_last_run", str(time.time()))
         if result.skipped:
             return result.skip_reason
-        return f"{result.rows_written} Werte über {result.entity_count} Entitäten geschrieben."
+        return tr("{rows_written} Werte über {entity_count} Entitäten geschrieben.", rows_written=result.rows_written, entity_count=result.entity_count)
 
     return worker

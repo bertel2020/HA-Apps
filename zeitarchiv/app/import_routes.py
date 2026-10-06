@@ -226,7 +226,7 @@ class ImportService:
         # main.py. Die Phasenbezeichnung entspricht der, die
         # _import_progress.html anzeigt, damit Kopfleiste und Importseite
         # nicht zwei verschiedene Wörter für denselben Schritt benutzen.
-        register_source("symcon-import", "Symcon-Import", self._symcon_activity)
+        register_source("symcon-import", tr("Symcon-Import"), self._symcon_activity)
         self._ha_availability_cache = _HaAvailabilityCache()
 
 
@@ -470,7 +470,7 @@ class ImportService:
             except (OSError, ValueError) as exc:
                 with self._upload_progress.lock:
                     self._upload_progress.phase = "error"
-                    self._upload_progress.error = f"Quelldaten konnten nicht gescannt werden: {exc}"
+                    self._upload_progress.error = tr("Quelldaten konnten nicht gescannt werden: {exc}", exc=exc)
             finally:
                 with self._upload_progress.lock:
                     self._upload_progress.running = False
@@ -522,7 +522,7 @@ class ImportService:
             except (zipfile.BadZipFile, ValueError) as exc:
                 with self._upload_progress.lock:
                     self._upload_progress.phase = "error"
-                    self._upload_progress.error = f"ZIP konnte nicht verarbeitet werden: {exc}"
+                    self._upload_progress.error = tr("ZIP konnte nicht verarbeitet werden: {exc}", exc=exc)
             finally:
                 tmp_zip.unlink(missing_ok=True)
                 with self._upload_progress.lock:
@@ -601,15 +601,15 @@ class ImportService:
             available_range = available_count = available_label = None
             if avail is not None:
                 if not_supported:
-                    available_label = "Führt keine Langzeitstatistik"
+                    available_label = tr("Führt keine Langzeitstatistik")
                 elif avail.has_data and history_source != "full":
                     available_range, available_count = self._ha_availability_range_and_count(avail, history_source)
                 elif not avail.has_data:
                     if history_source == "full":
-                        available_label = "Keine importierbaren Daten im gewählten Zeitraum"
+                        available_label = tr("Keine importierbaren Daten im gewählten Zeitraum")
                     else:
-                        kind = "Statistik" if history_source == "stats" else "Rohhistorie"
-                        available_label = f"Keine {kind} im gewählten Zeitraum"
+                        kind = tr("Statistik") if history_source == "stats" else "Rohhistorie"
+                        available_label = tr("Keine {kind} im gewählten Zeitraum", kind=kind)
             entities.append({
                 "entity_id": entity_id,
                 "friendly_name": entity_display_name(entity_id, row["friendly_name"], row["custom_name"]),
@@ -629,7 +629,7 @@ class ImportService:
             })
         return {
             "ha_available": ha_available,
-            "ha_error": None if ha_available else "Supervisor ist in dieser Umgebung nicht verfügbar",
+            "ha_error": None if ha_available else tr("Supervisor ist in dieser Umgebung nicht verfügbar"),
             "ha_entities": entities,
             "ha_selected_ids": selected_ids or set(),
             "ha_availability_checked": cache_entry is not None,
@@ -757,7 +757,7 @@ class ImportService:
                     )
                     with self._import_progress.lock:
                         self._import_progress.errors.append(
-                            f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden"
+                            tr("{variable_id} → {target_entity_id}: Entität nicht gefunden", variable_id=variable.variable_id, target_entity_id=target_entity_id)
                         )
             return None
 
@@ -773,7 +773,7 @@ class ImportService:
             except Exception as exc:
                 logger.exception("Symcon-Import unerwartet fehlgeschlagen")
                 with self._import_progress.lock:
-                    self._import_progress.errors.append(f"Import abgebrochen: {exc}")
+                    self._import_progress.errors.append(tr("Import abgebrochen: {exc}", exc=exc))
             finally:
                 with self._import_progress.lock:
                     results = [dataclasses.asdict(result) for result in self._import_progress.results]
@@ -849,10 +849,10 @@ class ImportService:
             done = self._import_progress.planned_variables if planung else self._import_progress.done_months
             total = self._import_progress.total_variables if planung else self._import_progress.total_months
             return {
-                "phase": "Schritt 1/2 · Berechne Vorschau…" if planung else "Schritt 2/2 · Import läuft…",
+                "phase": "Schritt 1/2 · Berechne Vorschau…" if planung else tr("Schritt 2/2 · Import läuft…"),
                 "done": min(done, total) if total else done,
                 "total": total,
-                "unit": "Variablen" if planung else "Monate",
+                "unit": "Variablen" if planung else tr("Monate"),
                 "detail": self._import_progress.current_variable,
                 "percent": int(min(done, total) / total * 100) if total else 0,
             }
@@ -940,7 +940,7 @@ class ImportService:
                             )
                         )
                     except ValueError:
-                        errors.append(f"{variable.variable_id} → {target_entity_id}: Entität nicht gefunden")
+                        errors.append(tr("{variable_id} → {target_entity_id}: Entität nicht gefunden", variable_id=variable.variable_id, target_entity_id=target_entity_id))
                 self._dry_run_progress.advance(len(mapped), "")
                 return {"plans": plans, "errors": errors}
 
@@ -1188,12 +1188,11 @@ class ImportService:
             raw = details.get("raw", {})
             stats = details.get("stats", {})
             return (
-                f"{format_int(int(stats.get('used_count', 0)))} Statistik-Werte · "
-                f"{format_int(int(raw.get('used_count', 0)))} Rohwerte"
+                tr("{format_int} Statistik-Werte · {format_int2} Rohwerte", format_int=format_int(int(stats.get('used_count', 0))), format_int2=format_int(int(raw.get('used_count', 0))))
             )
-        noun = "Statistik-Werte" if history_source == "stats" else "Werte"
+        noun = tr("Statistik-Werte") if history_source == "stats" else tr("Werte")
         if not history.rows:
-            return f"Keine {'Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie'} im gewählten Zeitraum gefunden"
+            return tr("Keine {v} im gewählten Zeitraum gefunden", v='Langzeitstatistik' if history_source == 'stats' else 'Rohhistorie')
         first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
         return (
             f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
@@ -1212,7 +1211,7 @@ class ImportService:
             last_ts = part.get("used_last_ts")
             count = int(part.get("used_count", 0))
             if first_ts is None or last_ts is None:
-                return f"Keine {noun} verwendet"
+                return tr("Keine {noun} verwendet", noun=noun)
             return (
                 f"{format_timestamp(float(first_ts), self.deps.tz)} – "
                 f"{format_timestamp(float(last_ts), self.deps.tz)} · "
@@ -1222,9 +1221,9 @@ class ImportService:
         cutover_ts = details.get("cutover_ts")
         stats_enabled = bool(stats.get("enabled", False))
         stats_supported = stats.get("supported")
-        stats_label = range_label(stats, "Statistik-Werte")
+        stats_label = range_label(stats, tr("Statistik-Werte"))
         if stats_enabled and stats_supported is False:
-            stats_label = "Für diese Entität nicht unterstützt"
+            stats_label = tr("Für diese Entität nicht unterstützt")
         elif not stats_enabled:
             stats_label = "Nicht angefordert"
         return {
@@ -1256,7 +1255,7 @@ class ImportService:
         darstellt — nur für avail.has_data == True aufgerufen, den Fall
         "keine Daten"/"nicht unterstützt" behandelt der Aufrufer
         (_ha_import_context()) bereits vorher separat."""
-        noun = "Statistik-Werte" if history_source == "stats" else "Werte"
+        noun = tr("Statistik-Werte") if history_source == "stats" else tr("Werte")
         range_label = f"{format_timestamp(avail.first_ts, self.deps.tz)} – {format_timestamp(avail.last_ts, self.deps.tz)}"
         count_label = f"{format_int(avail.count)} {noun}"
         return range_label, count_label
@@ -1270,7 +1269,7 @@ class ImportService:
             last_ts = raw.get("last_ts")
             supported = bool(raw.get("supported", True))
             if not supported:
-                label = "Nicht unterstützt"
+                label = tr("Nicht unterstützt")
             elif count and first_ts is not None and last_ts is not None:
                 label = (
                     f"{format_timestamp(float(first_ts), self.deps.tz)} – "
@@ -1278,7 +1277,7 @@ class ImportService:
                     f"{format_int(count)} {noun}"
                 )
             else:
-                label = "Keine Daten gefunden"
+                label = tr("Keine Daten gefunden")
             return {"count": count, "supported": supported, "label": label}
 
         return {
@@ -1286,8 +1285,8 @@ class ImportService:
             # "Statistik:" beschriftet. Dort genügt deshalb das neutrale
             # "Werte"; "Roh: … Rohwerte" war unnötig doppelt und benötigte
             # auf schmaleren Ansichten eine zusätzliche Zeile.
-            "raw": source(details.get("raw", {}), "Werte"),
-            "stats": source(details.get("stats", {}), "Werte"),
+            "raw": source(details.get("raw", {}), tr("Werte")),
+            "stats": source(details.get("stats", {}), tr("Werte")),
             "stats_enabled": bool(details.get("stats_enabled", False)),
         }
 
@@ -1431,14 +1430,14 @@ class ImportService:
         used_raw_set = set(used_raw)
         used_stats_set = set(used_stats)
         discarded.extend({
-            "reason": "Rohwert liegt im vollständig durch Statistik abgedeckten Übergangsintervall",
+            "reason": tr("Rohwert liegt im vollständig durch Statistik abgedeckten Übergangsintervall"),
             "source": "raw",
             "timestamp": ts,
             "value": value,
             "cutover_timestamp": cutover_ts,
         } for ts, value in raw_rows if (ts, value) not in used_raw_set)
         discarded.extend({
-            "reason": "Statistik-Bucket überschreitet die Schnittstelle zur Rohhistorie",
+            "reason": tr("Statistik-Bucket überschreitet die Schnittstelle zur Rohhistorie"),
             "source": "stats",
             "timestamp": ts,
             "value": value,
@@ -1634,7 +1633,7 @@ class ImportService:
         HaApiError betrifft hier immer den gesamten Batch (nicht pro Entität
         wie bei _fetch_ha_history), da mehrere Entitäten denselben Request
         teilen."""
-        label = "HA-Statistik-Verfügbarkeitsprüfung" if history_source == "stats" else "HA-Verfügbarkeitsprüfung"
+        label = tr("HA-Statistik-Verfügbarkeitsprüfung") if history_source == "stats" else tr("HA-Verfügbarkeitsprüfung")
         try:
             if history_source == "stats":
                 return ha_statistics.fetch_statistics_availability(entity_ids, start, end, period), None
@@ -1669,7 +1668,7 @@ class ImportService:
         """
         entity = self.deps.index.get_entity(entity_id)
         if entity is None:
-            return {"entity_id": entity_id, "error": "Entität ist nicht mehr in Zeitarchiv bekannt"}
+            return {"entity_id": entity_id, "error": tr("Entität ist nicht mehr in Zeitarchiv bekannt")}
         plan = symcon_import.plan_import_rows(
             self.deps.data_dir,
             self.deps.index,
@@ -2204,18 +2203,18 @@ class ImportService:
             plans: list[symcon_import.ImportPlan] = []
             errors: list[str] = []
             if not entity_id:
-                errors.append("Bitte eine Ziel-Entität auswählen.")
+                errors.append(tr("Bitte eine Ziel-Entität auswählen."))
             else:
                 def plan_csv_locked() -> dict:
                     path = self._csv_uploaded_path()
                     if path is None:
-                        return {"plans": [], "errors": ["Keine CSV-Datei hochgeladen."]}
+                        return {"plans": [], "errors": [tr("Keine CSV-Datei hochgeladen.")]}
                     # Das Lesen und Sortieren der Datei berührt keinen
                     # Speicherbestand und braucht deshalb keine Sperre — siehe
                     # dieselbe Trennung in import_csv_start().
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label="Datei wird gelesen…",
+                        phase_label=tr("Datei wird gelesen…"),
                     )
                     self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
                     with self.deps.coordinator.entity(entity_id):
@@ -2288,7 +2287,7 @@ class ImportService:
                 # sofort beantwortet gehört, nicht ein Lauf, der scheitert.
                 return self.deps.templates.TemplateResponse(
                     request, "_import_result.html",
-                    {"results": [], "errors": ["Bitte eine Ziel-Entität auswählen."]},
+                    {"results": [], "errors": [tr("Bitte eine Ziel-Entität auswählen.")]},
                 )
             logger.info("CSV-Import gestartet · Ziel=%s", entity_id)
 
@@ -2346,7 +2345,7 @@ class ImportService:
                     # ebenfalls davor legt.
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label="Schritt 1/2 · Datei wird gelesen…",
+                        phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
                     )
                     # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
                     # geschrieben werden, entscheidet erst die Klassifizierung
@@ -2393,7 +2392,7 @@ class ImportService:
                     errors.append(str(exc))
                 except Exception as exc:  # noqa: BLE001 — landet als Text im Ergebnis
                     logger.exception("CSV-Import unerwartet fehlgeschlagen")
-                    errors.append(f"Import abgebrochen: {exc}")
+                    errors.append(tr("Import abgebrochen: {exc}", exc=exc))
                 # Der Bericht wird auch nach einem Fehlschlag geschrieben — er ist
                 # die einzige dauerhafte Spur des Versuchs. Er steht bewusst in
                 # einer Geschwisterfunktion statt hier eingerückt:
@@ -2498,7 +2497,7 @@ class ImportService:
                     include_long_term_stats=include_long_term_stats,
                 )
             if not known_ids:
-                context["ha_availability_error"] = "Bitte mindestens eine Entität markieren."
+                context["ha_availability_error"] = tr("Bitte mindestens eine Entität markieren.")
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_section.html", context
             )
@@ -2552,11 +2551,11 @@ class ImportService:
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
-            errors: list[str] = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            errors: list[str] = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
             context = {"history_source": history_source, "period": period}
             if not entity_ids:
                 if not unknown_ids:
-                    errors.append("Bitte mindestens eine Entität auswählen.")
+                    errors.append(tr("Bitte mindestens eine Entität auswählen."))
                 return self.deps.templates.TemplateResponse(
                     request, "_ha_import_dry_run.html", {**context, "items": items, "errors": errors}
                 )
@@ -2649,7 +2648,7 @@ class ImportService:
                 range_preset, date_from, date_to, history_source, stats_range_preset
             )
             fetched: dict[str, ha_import.HistoryFetchResult] = {}
-            errors = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            errors = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
             if entity_ids:
                 if history_source == "full":
                     fetched, fetch_errors = await run_in_threadpool(
@@ -2663,7 +2662,7 @@ class ImportService:
                     )
                 errors.extend(fetch_errors)
             elif not unknown_ids:
-                errors.append("Keine Entität ausgewählt")
+                errors.append(tr("Keine Entität ausgewählt"))
 
             def build_payload() -> dict:
                 with self.deps.coordinator.entities(sorted(fetched)):
@@ -2687,8 +2686,7 @@ class ImportService:
                     "app_version": APP_VERSION,
                     "timezone": str(self.deps.tz),
                     "security_note": (
-                        "Enthält Messwerte und Entitätsmetadaten, aber keine "
-                        "Tokens, Authentifizierungsheader oder HA-Attribute."
+                        tr("Enthält Messwerte und Entitätsmetadaten, aber keine Tokens, Authentifizierungsheader oder HA-Attribute.")
                     ),
                     "request": {
                         "entity_ids": raw_entity_ids,
@@ -2746,12 +2744,12 @@ class ImportService:
             ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
-            vorab_fehler = [f"{entity_id}: nicht in Zeitarchiv bekannt" for entity_id in unknown_ids]
+            vorab_fehler = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
             if not entity_ids:
                 # Nichts zu holen: sofort antworten statt einen Auftrag zu
                 # starten, der nur eine Fehlermeldung zu tragen hätte.
                 if not unknown_ids:
-                    vorab_fehler.append("Bitte mindestens eine Entität auswählen.")
+                    vorab_fehler.append(tr("Bitte mindestens eine Entität auswählen."))
                 return self.deps.templates.TemplateResponse(
                     request, "_ha_import_result.html",
                     {"history_source": history_source, "period": period, "items": [], "errors": vorab_fehler},
@@ -2909,7 +2907,7 @@ class ImportService:
                             )
                     except Exception as exc:  # noqa: BLE001 — landet als Text im Ergebnis
                         logger.exception("Home-Assistant-Import unerwartet fehlgeschlagen")
-                        errors.append(f"Import abgebrochen: {exc}")
+                        errors.append(tr("Import abgebrochen: {exc}", exc=exc))
 
                 try:
                     self._ha_progress.set_phase(N_("Importbericht wird geschrieben…"))

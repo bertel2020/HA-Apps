@@ -73,7 +73,7 @@ def extract_zip(
         # der Konstruktor materialisiert sonst erst das ganze
         # Zentralverzeichnis. Siehe zip_guard.
         zip_guard.ensure_entry_count_allowed(
-            zip_path, max_members, "ZIP enthält zu viele Einträge"
+            zip_path, max_members, tr("ZIP enthält zu viele Einträge")
         )
         with zipfile.ZipFile(zip_path) as zf:
             members = zf.infolist()
@@ -336,7 +336,7 @@ def _analyze_variable(variable_id: str, files: list[Path]) -> SymconVariable:
             return var
     if not all_rows:
         var.readable = False
-        var.error = "keine lesbaren Zeilen gefunden"
+        var.error = tr("keine lesbaren Zeilen gefunden")
         return var
     all_rows.sort()
     var.row_count = len(all_rows)

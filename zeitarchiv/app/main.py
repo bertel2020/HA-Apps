@@ -47,6 +47,7 @@ from starlette.types import Receive, Scope, Send
 
 from .staleness import staleness as staleness_for, stale_thresholds
 from .formatting import (
+    TYPE_LABELS,
     BACKUP_KEEP_COUNT_LABELS,
     BACKUP_SCHEDULE_LABELS,
     COMPACT_TARGET_BLOCKED_REASONS,
@@ -784,7 +785,7 @@ async def _index_busy_handler(_request: Request, exc: IndexBusy) -> JSONResponse
     Anfrage ist, sondern ein "gleich nochmal versuchen"-Zustand."""
     return JSONResponse(
         status_code=503,
-        content={"detail": "Datenbank kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
+        content={"detail": tr("Datenbank kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen.")},
     )
 
 
@@ -794,7 +795,7 @@ async def _coordinator_busy_handler(_request: Request, exc: CoordinatorBusy) -> 
     Index-Locks (siehe CoordinatorBusy/storage_locked() in route_support.py)."""
     return JSONResponse(
         status_code=503,
-        content={"detail": "Speicherzugriff kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
+        content={"detail": tr("Speicherzugriff kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen.")},
     )
 
 
@@ -872,7 +873,7 @@ def entities_view(request: Request) -> HTMLResponse:
     snapshots = index.get_stats_snapshots(time.time() - 24 * 3600)
     type_counts = {row["aggregation_type"]: row["entity_count"] for row in index.get_stats_by_type()}
     type_breakdown = " · ".join(
-        f"{type_counts[key]} {label}" for key, label in (("standard", "Standard"), ("counter", "Zähler"), ("switch", "Schalter")) if type_counts.get(key)
+        f"{type_counts[key]} {tr(TYPE_LABELS[key])}" for key in ("standard", "counter", "switch") if type_counts.get(key)
     )
     context = {
         "entity_count": overview["entity_count"],
@@ -1656,7 +1657,7 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
 # lebt — main.py hat ein Zeilenbudget (test_route_modules.py), und
 # Anzeigelogik ist genau das, was hier nicht mehr dazukommen soll.
 register_source("retention", "Aufbewahrung", lambda: notices_mod.retention_activity(_background.retention_progress))
-register_source("backup", "Backup", lambda: notices_mod.backup_activity(_background.backup_progress))
+register_source("backup", N_("Backup"), lambda: notices_mod.backup_activity(_background.backup_progress))
 
 
 
@@ -1814,7 +1815,7 @@ def _backup_context(
         free_bytes = shutil.disk_usage(DATA_DIR).free
         if source_size and free_bytes < source_size * 2:
             warnings.append(
-                f"Wenig freier Speicher: Für ein Backup werden ungefähr {format_size(source_size * 2)} frei empfohlen."
+                tr("Wenig freier Speicher: Für ein Backup werden ungefähr {format_size} frei empfohlen.", format_size=format_size(source_size * 2))
             )
     except OSError:
         pass
@@ -1826,7 +1827,7 @@ def _backup_context(
         last_success_ts = None
     stale_after = {"daily": 2 * 86400, "weekly": 14 * 86400}.get(schedule_value)
     if stale_after and last_success_ts and time.time() - last_success_ts > stale_after:
-        warnings.append("Das letzte erfolgreiche Backup ist älter als zwei Sicherungsintervalle.")
+        warnings.append(tr("Das letzte erfolgreiche Backup ist älter als zwei Sicherungsintervalle."))
 
     global _restore_startup_result
     if message is None and _restore_startup_result:
@@ -1836,7 +1837,7 @@ def _backup_context(
                 f"Der vorherige Stand liegt in {_restore_startup_result['rollback']}."
             )
         else:
-            message = f"Wiederherstellung fehlgeschlagen: {_restore_startup_result.get('error', 'Unbekannter Fehler')}"
+            message = tr("Wiederherstellung fehlgeschlagen: {get}", get=_restore_startup_result.get('error', 'Unbekannter Fehler'))
         # Einmalige Meldung nach einem Neustart — ohne dieses Löschen würde sie bei
         # JEDER folgenden Aktion ohne eigene message (Backup löschen, Backup starten,
         # Fortschritts-Polling) erneut auftauchen, weil _restore_startup_result für
@@ -1943,13 +1944,13 @@ def backup_verify(request: Request, filename: str) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Prüfung fehlgeschlagen: {exc}"),
+            _backup_context(message=tr("Prüfung fehlgeschlagen: {exc}", exc=exc)),
         )
     version = manifest.get("format_version", 0)
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
-        _backup_context(message=f"Backup erfolgreich geprüft (Formatversion {version})."),
+        _backup_context(message=tr("Backup erfolgreich geprüft (Formatversion {version}).", version=version)),
     )
 
 
@@ -1965,7 +1966,7 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message="Import fehlgeschlagen: Bitte eine ZIP-Datei auswählen."),
+            _backup_context(message=tr("Import fehlgeschlagen: Bitte eine ZIP-Datei auswählen.")),
         )
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
     staging = BACKUPS_DIR / f".backup-upload-{secrets.token_hex(12)}.zip"
@@ -1989,14 +1990,14 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Import fehlgeschlagen: {exc}"),
+            _backup_context(message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
         )
     except (OSError, ValueError) as exc:
         logger.warning("Backup-Import fehlgeschlagen · %s", exc)
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Import fehlgeschlagen: {exc}"),
+            _backup_context(message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
         )
     finally:
         staging.unlink(missing_ok=True)
@@ -2012,7 +2013,7 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         request,
         "_settings_backup_ready.html",
         _backup_context(
-            message=f"Backup importiert und erfolgreich geprüft (Formatversion {version}, {destination.name})."
+            message=tr("Backup importiert und erfolgreich geprüft (Formatversion {version}, {name}).", version=version, name=destination.name)
         ),
     )
 
@@ -2026,14 +2027,13 @@ def backup_restore_prepare(request: Request, filename: str) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Wiederherstellung nicht vorbereitet: {exc}"),
+            _backup_context(message=tr("Wiederherstellung nicht vorbereitet: {exc}", exc=exc)),
         )
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
         _backup_context(
-            message="Wiederherstellung vorbereitet. Das Backup wird beim nächsten Start eingespielt, "
-                    "der aktuelle Stand bleibt als Rollback erhalten.",
+            message=tr("Wiederherstellung vorbereitet. Das Backup wird beim nächsten Start eingespielt, der aktuelle Stand bleibt als Rollback erhalten."),
             offer_restart=True,
         ),
     )
@@ -2051,14 +2051,13 @@ def backup_rollback_restore(request: Request, name: str) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Wiederherstellung nicht vorbereitet: {exc}"),
+            _backup_context(message=tr("Wiederherstellung nicht vorbereitet: {exc}", exc=exc)),
         )
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
         _backup_context(
-            message="Wiederherstellung vorbereitet. Der gewählte Rollback-Stand wird beim nächsten "
-                    "Start eingespielt, der aktuelle Stand bleibt zusätzlich als neuer Rollback erhalten.",
+            message=tr("Wiederherstellung vorbereitet. Der gewählte Rollback-Stand wird beim nächsten Start eingespielt, der aktuelle Stand bleibt zusätzlich als neuer Rollback erhalten."),
             offer_restart=True,
         ),
     )
@@ -2073,7 +2072,7 @@ def backup_rollback_delete(request: Request, name: str) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
-        _backup_context(message="Rollback-Daten wurden gelöscht."),
+        _backup_context(message=tr("Rollback-Daten wurden gelöscht.")),
     )
 
 
@@ -2087,9 +2086,9 @@ def system_restart(request: Request) -> HTMLResponse:
     zurück statt eines stillen Fehlschlags."""
     try:
         supervisor_stats.restart_addon()
-        message = "Neustart angefordert — die Seite lädt in Kürze neu."
+        message = tr("Neustart angefordert — die Seite lädt in Kürze neu.")
     except RuntimeError as exc:
-        message = f"Automatischer Neustart nicht möglich: {exc}. Bitte das Add-on manuell neu starten."
+        message = tr("Automatischer Neustart nicht möglich: {exc}. Bitte das Add-on manuell neu starten.", exc=exc)
     return templates.TemplateResponse(
         request, "_settings_backup_ready.html", _backup_context(message=message),
     )
@@ -2130,7 +2129,7 @@ def backup_delete_all(request: Request) -> HTMLResponse:
     ihre jeweiligen Löschaktionen steuerbar)."""
     with storage_coordinator.exclusive():
         count = backup.delete_all_backups(BACKUPS_DIR)
-    message = f"{count} Backup(s) gelöscht." if count else "Keine Backups zum Löschen vorhanden."
+    message = tr("{count} Backup(s) gelöscht.", count=count) if count else tr("Keine Backups zum Löschen vorhanden.")
     return templates.TemplateResponse(request, "_settings_backup_ready.html", _backup_context(message=message))
 
 
@@ -2191,13 +2190,13 @@ def _storage_breakdown() -> list[dict]:
     return [
         {"key": "archive", "label": "Archiv", "bytes": index.get_overview()["total_size_bytes"]},
         {"key": "rollup", "label": "Rollups", "bytes": dir_size(DATA_DIR / "rollup")},
-        {"key": "hot", "label": "Laufender Monat (Hot Buffer)", "bytes": dir_size(DATA_DIR / "hot")},
-        {"key": "index", "label": "Index", "bytes": index_path.stat().st_size if index_path.exists() else 0},
+        {"key": "hot", "label": tr("Laufender Monat (Hot Buffer)"), "bytes": dir_size(DATA_DIR / "hot")},
+        {"key": "index", "label": tr("Index"), "bytes": index_path.stat().st_size if index_path.exists() else 0},
         {"key": "backups", "label": "Backups", "bytes": dir_size(DATA_DIR / "backups") + rollback_bytes},
-        {"key": "reports", "label": "Import-Reports", "bytes": dir_size(DATA_DIR / "reports")},
+        {"key": "reports", "label": tr("Import-Reports"), "bytes": dir_size(DATA_DIR / "reports")},
         {
             "key": "import",
-            "label": "Import-Zwischendateien",
+            "label": tr("Import-Zwischendateien"),
             "bytes": dir_size(DATA_DIR / "symcon_import") + dir_size(DATA_DIR / "csv_import"),
         },
     ]
@@ -2823,16 +2822,12 @@ def _gap_threshold_auto_adjust_message(
     globalen Standards)."""
     new_label = GAP_THRESHOLD_LABELS.get(new_gap, new_gap)
     cause = (
-        f"Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst "
-        f"nach spätestens {new_label} wieder"
+        tr("Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst nach spätestens {new_label} wieder", new_label=new_label)
         if reason == "value_filter" else
-        f"Die gewählte Auflösung „{RESOLUTION_LABELS.get(resolution, resolution)}“ lässt "
-        f"ohnehin nur alle {new_label} einen neuen Wert zu"
+        tr("Die gewählte Auflösung „{get}“ lässt ohnehin nur alle {new_label} einen neuen Wert zu", get=RESOLUTION_LABELS.get(resolution, resolution), new_label=new_label)
     )
     return (
-        f"{label} automatisch auf {new_label} gesetzt: {cause} — eine kürzere Lücken-Schwelle "
-        "hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit "
-        "wieder manuell verkleinern."
+        tr("{label} automatisch auf {new_label} gesetzt: {cause} — eine kürzere Lücken-Schwelle hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit wieder manuell verkleinern.", label=label, new_label=new_label, cause=cause)
     )
 
 
@@ -3963,7 +3958,7 @@ def _dashboard_tiles_context(
                 "custom_title": p["title"] or "",
                 "value_text": value_text, "unit": "" if is_switch else (e["unit"] or ""),
                 "is_switch": is_switch, "decimals": effective_decimals,
-                "age_text": f"vor {format_uptime(seconds_ago)}" if seconds_ago is not None else "nie",
+                "age_text": tr("vor {format_uptime}", format_uptime=format_uptime(seconds_ago)) if seconds_ago is not None else "nie",
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
                 "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),
@@ -5064,11 +5059,11 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
         return f"{window_start.strftime('%d.%m.')}–{display_end.strftime('%d.%m.')} {display_end.year}"
     if range_key == "month":
         label = f"{_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
-        return f"{label} (bis heute)" if window_end >= now else label
+        return tr("{label} (bis heute)", label=label) if window_end >= now else label
     if range_key == "year":
-        return f"{window_start.year} (bis heute)" if window_end >= now else f"{window_start.year}"
+        return tr("{year} (bis heute)", year=window_start.year) if window_end >= now else f"{window_start.year}"
     if range_key == "all":
-        return f"Gesamter Zeitraum (seit {window_start.strftime('%d.%m.%Y')})"
+        return tr("Gesamter Zeitraum (seit {strftime})", strftime=window_start.strftime('%d.%m.%Y'))
     return ""
 
 
@@ -5195,11 +5190,11 @@ def _rows_fragment(
                 "flags": [
                     {"label": label, "reason": reasons[ts]}
                     for label, reasons in (
-                        ("Ausreißer", outliers),
-                        ("Lücke", gaps),
+                        (tr("Ausreißer"), outliers),
+                        (tr("Lücke"), gaps),
                         ("Duplikat", duplicates),
                         ("Wiederholung", repetitions),
-                        ("Zählerrückgang", counter_decreases),
+                        (tr("Zählerrückgang"), counter_decreases),
                     )
                     if ts in reasons
                 ],
@@ -5223,9 +5218,7 @@ def _rows_fragment(
         marker = index.get_compacted_month(entity_id, window_start.year, window_start.month)
         if marker is not None:
             compacted_month_hint = (
-                f"Dieser Monat wurde am {format_timestamp(marker['compacted_at'], TZ)} auf "
-                f"{format_compact_target(marker['target_resolution'])} verdichtet — angezeigte Zeilen "
-                "sind bereits zusammengefasst, keine Rohwerte mehr."
+                tr("Dieser Monat wurde am {format_timestamp} auf {format_compact_target} verdichtet — angezeigte Zeilen sind bereits zusammengefasst, keine Rohwerte mehr.", format_timestamp=format_timestamp(marker['compacted_at'], TZ), format_compact_target=format_compact_target(marker['target_resolution']))
             )
 
     period_label = _rows_period_label(range_key, offset, window_start, window_end, now)

@@ -197,10 +197,7 @@ class OutlierDetector:
             ueblich = statistics.median(self._steps)
             if ueblich > 0 and zuwachs > self.factor * ueblich:
                 grund = (
-                    f"Zuwachs {_format_val(zuwachs, self.decimals)} ist das "
-                    f"{_format_factor(zuwachs / ueblich)} des üblichen Zuwachses "
-                    f"({_format_val(ueblich, self.decimals)}, Median der letzten "
-                    f"{len(self._steps)}){self._vorwert()}"
+                    tr("Zuwachs {_format_val} ist das {_format_factor} des üblichen Zuwachses ({_format_val2}, Median der letzten {len}){_vorwert}", _format_val=_format_val(zuwachs, self.decimals), _format_factor=_format_factor(zuwachs / ueblich), _format_val2=_format_val(ueblich, self.decimals), len=len(self._steps), _vorwert=self._vorwert())
                 )
         self._steps.append(zuwachs)
         return grund
@@ -213,11 +210,7 @@ class OutlierDetector:
             abstand = abs(value - mitte)
             if streuung > 0 and abstand > self.factor * streuung:
                 grund = (
-                    f"{_format_val(value, self.decimals)} liegt "
-                    f"{_format_factor(abstand / streuung)} weiter vom Median der letzten "
-                    f"{len(self._values)} Werte ({_format_val(mitte, self.decimals)}) "
-                    f"entfernt als üblich (±{_format_val(streuung, self.decimals)})"
-                    f"{self._vorwert()}"
+                    tr("{_format_val} liegt {_format_factor} weiter vom Median der letzten {len} Werte ({_format_val2}) entfernt als üblich (±{_format_val3}){_vorwert}", _format_val=_format_val(value, self.decimals), _format_factor=_format_factor(abstand / streuung), len=len(self._values), _format_val2=_format_val(mitte, self.decimals), _format_val3=_format_val(streuung, self.decimals), _vorwert=self._vorwert())
                 )
         self._values.append(value)
         return grund
@@ -301,7 +294,7 @@ def analyze_raw_rows_page(
             formatted_values = " / ".join(
                 _format_val(row["value"], decimals) for row in group_rows
             )
-            duplicate_reason = f"{len(group_rows)}× derselbe Zeitstempel — Werte: {formatted_values}"
+            duplicate_reason = tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
         if group_outlier is not None:
             counts["outliers"] += 1
         if group_gap is not None:
@@ -331,11 +324,11 @@ def analyze_raw_rows_page(
                 row["flags"] = [
                     {"label": label, "reason": reason}
                     for label, reason in (
-                        ("Ausreißer", group_outlier),
-                        ("Lücke", group_gap),
+                        (tr("Ausreißer"), group_outlier),
+                        (tr("Lücke"), group_gap),
                         ("Duplikat", duplicate_reason),
                         ("Wiederholung", repetition_reason),
-                        ("Zählerrückgang", counter_decrease_reason),
+                        (tr("Zählerrückgang"), counter_decrease_reason),
                     )
                     if reason is not None
                 ]
@@ -354,9 +347,7 @@ def analyze_raw_rows_page(
             delta = ts - previous_ts
             if delta > gap_seconds:
                 group_gap = (
-                    f"{_format_duration(delta)} seit vorherigem Wert "
-                    f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)} "
-                    f"(Schwellwert: {_format_duration(gap_seconds)})"
+                    tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(previous_value, decimals), _format_ts=_format_ts(previous_ts, tz), _format_duration2=_format_duration(gap_seconds))
                 )
         # Immer aufrufen, auch bei ausgeschalteter Erkennung: der Detektor baut
         # dabei seinen Bezug auf. Ein bereits markierter Zeitstempel bleibt
@@ -512,7 +503,7 @@ def _format_duration(seconds: float) -> str:
     if hours < 24:
         return f"{hours} Std. {minutes} Min." if minutes else f"{hours} Std."
     days, hours = divmod(hours, 24)
-    return f"{days} Tage {hours} Std." if hours else f"{days} Tage"
+    return tr("{days} Tage {hours} Std.", days=days, hours=hours) if hours else tr("{days} Tage", days=days)
 
 
 def detect_duplicates(
@@ -527,7 +518,7 @@ def detect_duplicates(
         values_by_ts.setdefault(ts, []).append(value)
     return {
         ts: (
-            f"{len(values)}× derselbe Zeitstempel — Werte: "
+            tr("{len}× derselbe Zeitstempel — Werte: ", len=len(values))
             + " / ".join(_format_val(v, decimals) for v in values)
         )
         for ts, values in values_by_ts.items()
@@ -540,8 +531,7 @@ def _repetition_reason(
 ) -> str:
     precision = "3 (Automatisch)" if decimals == "auto" else decimals
     return (
-        f"Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — "
-        f"wie Vorwert {_format_val(last_kept_value, decimals)} um {_format_ts(last_kept_ts, tz)}"
+        tr("Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — wie Vorwert {_format_val} um {_format_ts}", precision=precision, _format_val=_format_val(last_kept_value, decimals), _format_ts=_format_ts(last_kept_ts, tz))
     )
 
 
@@ -595,12 +585,10 @@ def _counter_decrease_reason(previous_value: float, value: float) -> str:
     if previous_value:
         percentage = difference / abs(previous_value) * 100
         return (
-            f"Vorwert {previous_value:.12g} → {value:.12g}; "
-            f"Rückgang um {difference:.12g} ({percentage:.1f} %)"
+            tr("Vorwert {previous_value:.12g} → {value:.12g}; Rückgang um {difference:.12g} ({percentage:.1f} %)", previous_value=previous_value, value=value, difference=difference, percentage=percentage)
         )
     return (
-        f"Vorwert {previous_value:.12g} → {value:.12g}; "
-        f"Rückgang um {difference:.12g}"
+        tr("Vorwert {previous_value:.12g} → {value:.12g}; Rückgang um {difference:.12g}", previous_value=previous_value, value=value, difference=difference)
     )
 
 
@@ -717,9 +705,7 @@ def detect_gaps(
         delta = rows[i + 1][0] - prev_ts
         if delta > threshold_seconds:
             flagged[rows[i + 1][0]] = (
-                f"{_format_duration(delta)} seit vorherigem Wert "
-                f"{_format_val(prev_value, decimals)} um {_format_ts(prev_ts, tz)} "
-                f"(Schwellwert: {_format_duration(threshold_seconds)})"
+                tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(prev_value, decimals), _format_ts=_format_ts(prev_ts, tz), _format_duration2=_format_duration(threshold_seconds))
             )
     return flagged
 

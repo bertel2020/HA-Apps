@@ -213,7 +213,7 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
             "demo_entity_count_label": format_int(overview["entity_count"]),
             "demo_row_count_label": format_int(overview["total_rows"]),
             "demo_size_label": format_size(overview["total_size_bytes"]),
-            "demo_last_run_label": f"vor {format_uptime(now - last_run)}" if last_run else "Noch nie",
+            "demo_last_run_label": tr("vor {format_uptime}", format_uptime=format_uptime(now - last_run)) if last_run else "Noch nie",
             "demo_next_run_label": next_run_label,
             "demo_append_interval": interval,
             "demo_append_interval_options": list(DEMO_APPEND_INTERVAL_LABELS.items()),
@@ -222,7 +222,7 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
         context.update({
             "demo_entity_count_label": format_int(dir_info["entity_count_approx"]),
             "demo_size_label": format_size(dir_info["size_bytes"]),
-            "demo_newest_label": f"vor {format_uptime(now - dir_info['newest_mtime'])}",
+            "demo_newest_label": tr("vor {format_uptime}", format_uptime=format_uptime(now - dir_info['newest_mtime'])),
         })
     return context
 
@@ -309,13 +309,13 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # (siehe _settings_activity_context) und deshalb kein Modulkonstante.
     _ACTIVITY_ACTION_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_ACTION_LABELS.items())
     _ACTIVITY_STATUS_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_STATUS_LABELS.items())
-    _ACTIVITY_DAYS_FILTER_OPTIONS = [("", "Alle"), ("7", "7 Tage"), ("30", "30 Tage"), ("90", "90 Tage")]
+    _ACTIVITY_DAYS_FILTER_OPTIONS = [("", "Alle"), ("7", tr("7 Tage")), ("30", tr("30 Tage")), ("90", tr("90 Tage"))]
 
     # Nur für die Monatsliste im Verdichten-Detail (unten) — dieselben Namen
     # wie main.py:_MONTH_NAMES_DE, hier lokal statt geteilt, weil sonst nirgends
     # in diesem Modul gebraucht.
     _MONTH_NAMES_DE = (
-        "Januar", "Februar", "März", "April", "Mai", "Juni",
+        "Januar", "Februar", tr("März"), "April", "Mai", "Juni",
         "Juli", "August", "September", "Oktober", "November", "Dezember",
     )
 
@@ -348,16 +348,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         # .confirm-message (app.css) auch als eigene Zeile im Popup.
         if action == "compact":
             months_list = sorted(detail.get("months_compacted") or [])
-            lines = [f"Zielauflösung: {format_compact_target(detail.get('target_resolution', ''))}"]
+            lines = [tr("Zielauflösung: {format_compact_target}", format_compact_target=format_compact_target(detail.get('target_resolution', '')))]
             if months_list:
-                lines.append(f"Zeitraum: {', '.join(_month_year_label(m) for m in months_list)}")
+                lines.append(tr("Zeitraum: {join}", join=', '.join(_month_year_label(m) for m in months_list)))
             rows_before, rows_after = detail.get("rows_before"), detail.get("rows_after")
             if rows_before is not None and rows_after is not None:
-                lines.append(f"Zeilen: {format_int(rows_before)} → {format_int(rows_after)}")
+                lines.append(tr("Zeilen: {format_int} → {format_int2}", format_int=format_int(rows_before), format_int2=format_int(rows_after)))
             stale_markers = detail.get("stale_markers_removed")
             if stale_markers:
                 lines.append(
-                    f"Aufgeräumt: {format_int(stale_markers)} verwaiste Löschmarkierung{'en' if stale_markers != 1 else ''}"
+                    (tr("Aufgeräumt: {count} verwaiste Löschmarkierung", count=format_int(stale_markers)) if stale_markers == 1 else tr("Aufgeräumt: {count} verwaiste Löschmarkierungen", count=format_int(stale_markers)))
                 )
             return "\n".join(lines)
         # action == "purge" — bisher nur vom automatischen Lauf gefüllt (siehe
@@ -365,10 +365,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         min_age_label = PURGE_MIN_AGE_DAYS_LABELS.get(
             str(detail.get("min_age_days", "")), f"{detail.get('min_age_days')} Tage"
         )
-        lines = [f"Mindestalter der Markierung: {min_age_label}"]
+        lines = [tr("Mindestalter der Markierung: {min_age_label}", min_age_label=min_age_label)]
         months_purged = detail.get("months_purged")
         if months_purged:
-            lines.append(f"Neu berechnete Monate: {format_int(months_purged)}")
+            lines.append(tr("Neu berechnete Monate: {format_int}", format_int=format_int(months_purged)))
         return "\n".join(lines)
 
     def _settings_activity_context(
@@ -546,7 +546,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             months_due = int(due.get("months_due", 0) or 0)
             next_expiration_ts = due.get("next_expiration_ts")
             if rows_due or months_due:
-                next_expiration = "Jetzt fällig"
+                next_expiration = tr("Jetzt fällig")
             elif isinstance(next_expiration_ts, (int, float)):
                 next_expiration = (
                     f"{format_timestamp(next_expiration_ts, deps.tz)} "
@@ -629,7 +629,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "result": result,
         }
 
-    _STALE_ENTITIES_DAY_OPTIONS = [("1", "1 Tag"), ("3", "3 Tage"), ("7", "7 Tage"), ("14", "14 Tage"), ("30", "30 Tage")]
+    _STALE_ENTITIES_DAY_OPTIONS = [("1", tr("1 Tag")), ("3", tr("3 Tage")), ("7", tr("7 Tage")), ("14", tr("14 Tage")), ("30", tr("30 Tage"))]
     _STALE_ENTITIES_DEFAULT_DAYS = "3"
 
 
@@ -668,7 +668,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 # sortable-table.js' parseFloat() im Client ein gültiger Wert
                 # ("inf" wird dort zu NaN).
                 "days_ago_raw": days_ago if days_ago is not None else 10**6,
-                "days_ago_label": f"{format_value(days_ago, 1)} Tage" if days_ago is not None else "—",
+                "days_ago_label": tr("{format_value} Tage", format_value=format_value(days_ago, 1)) if days_ago is not None else "—",
                 "row_count": format_int(entity["row_count"]),
                 "row_count_raw": entity["row_count"],
             })
@@ -753,13 +753,13 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         beim Neuanlegen auf diese Standardwerte zu)."""
         form = await request.form()
         fields = {
-            "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, "Ungültige Auflösung"),
-            "default_retention": (form.get("default_retention"), RETENTION_LABELS, "Ungültige Aufbewahrung"),
-            "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, "Ungültige Nachkommastellen"),
-            "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, "Ungültiger Wertänderungsfilter"),
-            "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, "Ungültige Lücken-Erkennung"),
-            "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, "Ungültige Ausreißer-Erkennung"),
-            "default_compact_target": (form.get("default_compact_target"), COMPACT_TARGET_LABELS, "Ungültiges Verdichtungsziel"),
+            "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, tr("Ungültige Auflösung")),
+            "default_retention": (form.get("default_retention"), RETENTION_LABELS, tr("Ungültige Aufbewahrung")),
+            "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, tr("Ungültige Nachkommastellen")),
+            "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, tr("Ungültiger Wertänderungsfilter")),
+            "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, tr("Ungültige Lücken-Erkennung")),
+            "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, tr("Ungültige Ausreißer-Erkennung")),
+            "default_compact_target": (form.get("default_compact_target"), COMPACT_TARGET_LABELS, tr("Ungültiges Verdichtungsziel")),
         }
         for _key, (value, labels, error) in fields.items():
             if value is not None and value not in labels:
@@ -784,7 +784,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 gap_threshold_auto_adjusted = True
                 reason = "value_filter" if current_value_filter == "decimals" else "resolution"
                 gap_threshold_auto_adjusted_message = deps.gap_threshold_auto_adjust_message(
-                    reason, new_gap, current_resolution, label="Standard-Lücken-Erkennung")
+                    reason, new_gap, current_resolution, label=tr("Standard-Lücken-Erkennung"))
         context = deps.settings_archivierung_context(saved=True)
         context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
         context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
@@ -804,7 +804,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                     deps.data_dir, deps.index, deps.tz, on_entity=_rotation_step
                 )
         if rotated == 0:
-            result = "Nichts zu tun — alle Entitäten sind bereits aktuell rotiert."
+            result = tr("Nichts zu tun — alle Entitäten sind bereits aktuell rotiert.")
         else:
             result = f"{rotated} Monatsdatei{'en' if rotated != 1 else ''} archiviert."
         logger.info(
@@ -910,13 +910,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         total_rows = hot_purged + archive_result["rows_purged"]
         months = archive_result["months_purged"]
         if total_rows == 0:
-            result = "Nichts zu bereinigen — aktuell keine entfernbaren Datensätze gefunden."
+            result = tr("Nichts zu bereinigen — aktuell keine entfernbaren Datensätze gefunden.")
         elif months == 0:
-            result = f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt."
+            result = (tr("{total_rows} Zeile physisch entfernt.", total_rows=total_rows) if total_rows == 1 else tr("{total_rows} Zeilen physisch entfernt.", total_rows=total_rows))
         else:
             result = (
-                f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt, "
-                f"davon {months} bereits archivierte{'r' if months == 1 else ''} Monat{'e' if months != 1 else ''} neu berechnet."
+                tr("{rows} physisch entfernt, davon {months} neu berechnet.", rows=(tr("{count} Zeile", count=total_rows) if total_rows == 1 else tr("{count} Zeilen", count=total_rows)), months=(tr("{count} bereits archivierter Monat", count=months) if months == 1 else tr("{count} bereits archivierte Monate", count=months)))
             )
         logger.info(
             "Manuelle Bereinigung abgeschlossen · event=manual_cleanup_completed "
@@ -968,7 +967,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 request, "_job_progress.html", _purge_progress_context()
             )
         if stand["error"]:
-            ergebnis = f"Bereinigung fehlgeschlagen: {stand['error']}"
+            ergebnis = tr("Bereinigung fehlgeschlagen: {error}", error=stand['error'])
         else:
             ergebnis = stand["result"]
         return deps.templates.TemplateResponse(
@@ -1098,18 +1097,15 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     def _retention_result_text(totals: dict, *, preview: bool = False) -> str:
         if totals["rows_deleted"] == 0:
             return (
-                "Vorschau: Aktuell würden keine Werte gelöscht."
+                tr("Vorschau: Aktuell würden keine Werte gelöscht.")
                 if preview else
-                "Nichts zu tun — keine Werte jenseits der konfigurierten Aufbewahrungsfrist gefunden."
+                tr("Nichts zu tun — keine Werte jenseits der konfigurierten Aufbewahrungsfrist gefunden.")
             )
-        action = "würden endgültig gelöscht" if preview else "endgültig gelöscht"
-        storage_action = "würden frei" if preview else "wurden frei"
-        prefix = "Vorschau: " if preview else ""
+        action = tr("würden endgültig gelöscht") if preview else tr("endgültig gelöscht")
+        storage_action = tr("würden frei") if preview else tr("wurden frei")
+        prefix = tr("Vorschau: ") if preview else ""
         return (
-            f"{prefix}{totals['rows_deleted']} Zeile{'n' if totals['rows_deleted'] != 1 else ''} in "
-            f"{totals['months_deleted']} Monatsdatei{'en' if totals['months_deleted'] != 1 else ''} über "
-            f"{totals['entities_affected']} Entität{'en' if totals['entities_affected'] != 1 else ''} {action}; "
-            f"etwa {format_size(totals['bytes_freed'])} Archivspeicher {storage_action}."
+            tr("{prefix}{rows} in {files} über {entities} {action}; etwa {format_size} Archivspeicher {storage_action}.", prefix=prefix, rows=(tr("{count} Zeile", count=totals['rows_deleted']) if totals['rows_deleted'] == 1 else tr("{count} Zeilen", count=totals['rows_deleted'])), files=(tr("{count} Monatsdatei", count=totals['months_deleted']) if totals['months_deleted'] == 1 else tr("{count} Monatsdateien", count=totals['months_deleted'])), entities=(tr("{count} Entität", count=totals['entities_affected']) if totals['entities_affected'] == 1 else tr("{count} Entitäten", count=totals['entities_affected'])), action=action, format_size=format_size(totals['bytes_freed']), storage_action=storage_action)
         )
 
 
@@ -1130,13 +1126,13 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         unabhängig davon ob/wann der tägliche Automatik-Lauf zuletzt lief."""
         job_id = deps.begin_retention_job("manual")
         if job_id is None:
-            result = "Retention läuft bereits — es wurde kein zweiter Lauf gestartet."
+            result = tr("Retention läuft bereits — es wurde kein zweiter Lauf gestartet.")
         else:
             outcome = deps.finish_retention_job(job_id)
             if outcome["status"] == "success":
                 result = _retention_result_text(outcome["totals"])
             else:
-                result = f"Retention fehlgeschlagen: {outcome['error']}"
+                result = tr("Retention fehlgeschlagen: {error}", error=outcome['error'])
         return deps.templates.TemplateResponse(
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
         )

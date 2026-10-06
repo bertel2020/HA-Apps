@@ -57,7 +57,12 @@ def load_catalog(lang: str) -> dict[str, dict[str, str]]:
 def translate(text: str, lang: str, **values: Any) -> str:
     """Übersetzt ``text``; ohne Eintrag bleibt er deutsch. ``values`` füllen ``{name}``."""
     result = load_catalog(lang)["app"].get(text, text)
-    return result.format(**values) if values else result
+    return result.format(**_translated_values(values, lang)) if values else result
+
+
+def _translated_values(values: dict[str, Any], lang: str) -> dict[str, Any]:
+    """Eingesetzte ``Lazy``-Texte (Beschriftungen aus ``N_``) in der Zielsprache einsetzen."""
+    return {key: (translate(str(v), lang) if isinstance(v, Lazy) else v) for key, v in values.items()}
 
 
 def from_accept_language(header: str) -> str:
@@ -84,7 +89,7 @@ def translate_html(text: str, lang: str, **values: Any) -> Markup:
     ``<strong>`` …) und das Ergebnis ein ``Markup`` — Kataloge sind vertrauenswürdig.
     Eingesetzte Werte werden dagegen maskiert, außer sie sind selbst ``Markup``."""
     result = Markup(load_catalog(lang)["app"].get(text, text))
-    return result.format(**values) if values else result
+    return result.format(**_translated_values(values, lang)) if values else result
 
 
 @pass_context
