@@ -1121,6 +1121,7 @@ a.menu-row{text-decoration:none;}
    toggleLegendItem(); dashboard-tiles.js: dieselbe Aktion über
    toggleTileLegendItem()). */
 .chart-legend-table-row{cursor:pointer;}
+.chart-legend-table-row.static{cursor:default;}
 .chart-legend-table-row.inactive{opacity:.4;}
 .chart-legend-table-row[tabindex]:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 /* Vergleichsperiode (Vorjahr/Vorperiode) als gedämpfte Unterzeile je Zelle —

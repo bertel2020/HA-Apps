@@ -562,7 +562,7 @@
              macht (siehe yearsSeriesStats). .static: kein Serien-Umschalter
              in diesem ersten Schritt (siehe Kommentar bei yearsSeriesStats),
              deshalb ohne @click/toggleLegendItem(). -->
-        <div class="chart-legend" x-show="hasData && yearsCompareActive">
+        <div class="chart-legend" x-show="hasData && yearsCompareActive && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in yearsSeriesStats" :key="stat.key">
             <span class="chart-legend-item static">
               <span class="dot" :style="{background: stat.color}"></span>
@@ -585,10 +585,9 @@
              gegenüber den (auch als Serien-Umschalter nutzbaren) Chips. Zeilen
              sind wie die Chips klickbare Serien-Umschalter (dieselbe
              toggleLegendItem()-Action). -->
-        <!-- Der Soll-Balkenvergleich bewusst außen vor (siehe !yearsCompareActive
-             oben bei der Chip-Legende) — die Tabellen-Variante kennt
-             yearsSeriesStats noch nicht, zeigt deshalb immer die Chip-Legende,
-             egal welcher Legenden-Stil eingestellt ist (Folgeschritt). -->
+        <!-- Der Soll-/Laufsummen-Balkenvergleich (yearsCompareActive) hat seine
+             eigene Tabelle direkt darunter (yearsSeriesStats): eine Zeile je
+             Entität und Jahr, nicht klickbar wie die Chips dort. -->
         <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && !yearsCompareActive">
           <table class="dt compact chart-legend-table">
             <thead>
@@ -639,6 +638,38 @@
                     <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare ? (stat.compare.sum ?? '—') : ''"></span>
                     <span class="legend-compare-value compare-cut" x-show="stat.compare?.cut" x-text="stat.compare?.cut ? stat.compare.cut.label + ': ' + stat.compare.cut.sum : ''"></span>
                   </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && yearsCompareActive">
+          <table class="dt compact chart-legend-table">
+            <thead>
+              <tr>
+                <th class="legend-name-col">{{ _("Name") }}</th>
+                <th x-show="legendMetrics.includes('last')">{{ _("Aktuell") }}</th>
+                <th x-show="legendMetrics.includes('min')">{{ _("Min") }}</th>
+                <th x-show="legendMetrics.includes('max')">{{ _("Max") }}</th>
+                <th x-show="legendMetrics.includes('average')">Ø</th>
+                <th x-show="legendMetrics.includes('sum')">Σ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="stat in yearsSeriesStats" :key="stat.key">
+                <tr class="chart-legend-table-row static">
+                  <td class="legend-name-col">
+                    <span class="legend-name-cell">
+                      <span class="dot" :style="{background: stat.color}"></span>
+                      <span x-text="stat.name"></span>
+                    </span>
+                  </td>
+                  <td x-show="legendMetrics.includes('last')" x-text="stat.last"></td>
+                  <td x-show="legendMetrics.includes('min')" x-text="stat.min"></td>
+                  <td x-show="legendMetrics.includes('max')" x-text="stat.max"></td>
+                  <td x-show="legendMetrics.includes('average')" x-text="stat.average"></td>
+                  <td x-show="legendMetrics.includes('sum')" x-text="stat.sum ?? '—'"></td>
                 </tr>
               </template>
             </tbody>
