@@ -18,6 +18,7 @@ des Browsers.
 
 from __future__ import annotations
 
+import contextvars
 import json
 from collections.abc import Callable
 from functools import lru_cache
@@ -37,6 +38,11 @@ SETTING_KEY = "language"
 DEFAULT_SETTING = SOURCE_LANGUAGE
 
 _CATALOG_DIR = Path(__file__).parent
+
+# Sprache der gerade bearbeiteten Anfrage. Der Kontextprozessor setzt sie beim Rendern; Makros,
+# die per `{% from … import … %}` OHNE Kontext geladen werden (z. B. _hints.html), sehen `lang`
+# nicht im Seitenkontext und lesen sie deshalb hier.
+current_language: contextvars.ContextVar[str] = contextvars.ContextVar("zeitarchiv_language", default=SOURCE_LANGUAGE)
 
 
 @lru_cache(maxsize=None)
@@ -84,7 +90,7 @@ def translate_html(text: str, lang: str, **values: Any) -> Markup:
 @pass_context
 def _gettext(context, text: str, **values: Any) -> Markup:
     """Jinja-Funktion ``_()``: Sprache aus dem Seitenkontext (siehe ``make_context_processor``)."""
-    return translate_html(text, context.get("lang", SOURCE_LANGUAGE), **values)
+    return translate_html(text, context.get("lang") or current_language.get(), **values)
 
 
 def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], dict]:
@@ -96,6 +102,7 @@ def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], 
     def context(request: Request) -> dict:
         setting = _selected_setting(get_index().get_setting(SETTING_KEY, DEFAULT_SETTING))
         lang = resolve_language(setting, request.headers.get("accept-language", ""))
+        current_language.set(lang)
         return {
             "lang": lang,
             "language_setting": setting,

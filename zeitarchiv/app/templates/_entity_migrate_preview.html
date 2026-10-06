@@ -12,69 +12,68 @@
   {% set suggested = plan.suggested_factor is not none and plan.factor == 1.0 %}
   {% set display_factor = plan.suggested_factor if suggested else plan.factor %}
   <div class="migrate-banner warning">
-    Einheiten unterscheiden sich: <strong>{{ plan.source_unit or "—" }}</strong> (Quelle) vs.
-    <strong>{{ plan.target_unit or "—" }}</strong> (Ziel).
+    {{ _("Einheiten unterscheiden sich: <strong>{v1}</strong> (Quelle) vs. <strong>{v2}</strong> (Ziel).", v1=(plan.source_unit or "—"), v2=(plan.target_unit or "—")) }}
     <span class="migrate-factor-input">
-      Faktor <input type="text" inputmode="decimal" id="migrate-factor" value="{{ display_factor | format_value }}">
-      <button type="button" class="btn btn-sm" id="migrate-recalculate-btn" onclick="migrateRecalculate()">Neu berechnen</button>
+      {{ _("Faktor") }} <input type="text" inputmode="decimal" id="migrate-factor" value="{{ display_factor | format_value }}">
+      <button type="button" class="btn btn-sm" id="migrate-recalculate-btn" onclick="migrateRecalculate()">{{ _("Neu berechnen") }}</button>
     </span>
     {% if suggested %}
-    <span class="migrate-factor-suggested-hint">automatisch vorgeschlagen — bei Bedarf anpassen</span>
+    <span class="migrate-factor-suggested-hint">{{ _("automatisch vorgeschlagen — bei Bedarf anpassen") }}</span>
     {% endif %}
   </div>
   {% endif %}
 
   <div class="stat-row">
-    <div class="stat"><div class="label">Werden übertragen</div><div class="value">{{ plan.rows_to_transfer | format_int }}</div></div>
-    <div class="stat"><div class="label">Zeitraum danach</div><div class="value">{{ result_first_ts or "—" }} – {{ result_last_ts or "—" }}</div></div>
-    <div class="stat"><div class="label">Überschneidend</div><div class="value">{{ plan.duplicate_rows | format_int }}</div></div>
+    <div class="stat"><div class="label">{{ _("Werden übertragen") }}</div><div class="value">{{ plan.rows_to_transfer | format_int }}</div></div>
+    <div class="stat"><div class="label">{{ _("Zeitraum danach") }}</div><div class="value">{{ result_first_ts or "—" }} – {{ result_last_ts or "—" }}</div></div>
+    <div class="stat"><div class="label">{{ _("Überschneidend") }}</div><div class="value">{{ plan.duplicate_rows | format_int }}</div></div>
   </div>
 
   {% if plan.duplicate_rows %}
   <div class="config-card-header" style="margin-top:20px;">
-    <h2>Überschneidung im Zeitraum</h2>
+    <h2>{{ _("Überschneidung im Zeitraum") }}</h2>
   </div>
-  <p class="hint">{{ plan.duplicate_rows | format_int }} Zeitstempel kommen in Quelle UND Ziel bereits vor.</p>
+  <p class="hint">{{ _("{duplicate_rows} Zeitstempel kommen in Quelle UND Ziel bereits vor.", duplicate_rows=(plan.duplicate_rows | format_int)) }}</p>
   <div class="migrate-post-actions">
     <label class="migrate-radio">
       <input type="radio" name="overlap_resolution" value="target" {% if overlap_resolution != 'source' %}checked{% endif %}>
-      <span><strong>Ziel-Werte behalten (empfohlen)</strong>
-      <span class="migrate-radio-hint">Bei überlappenden Zeitstempeln gewinnt der bereits vorhandene Wert der Ziel-Entität.</span></span>
+      <span><strong>{{ _("Ziel-Werte behalten (empfohlen)") }}</strong>
+      <span class="migrate-radio-hint">{{ _("Bei überlappenden Zeitstempeln gewinnt der bereits vorhandene Wert der Ziel-Entität.") }}</span></span>
     </label>
     <label class="migrate-radio">
       <input type="radio" name="overlap_resolution" value="source" {% if overlap_resolution == 'source' %}checked{% endif %}>
-      <span><strong>Quell-Werte übernehmen</strong>
-      <span class="migrate-radio-hint">Überschreibt an überlappenden Zeitstempeln die Werte der Ziel-Entität mit denen der Quelle.</span></span>
+      <span><strong>{{ _("Quell-Werte übernehmen") }}</strong>
+      <span class="migrate-radio-hint">{{ _("Überschreibt an überlappenden Zeitstempeln die Werte der Ziel-Entität mit denen der Quelle.") }}</span></span>
     </label>
   </div>
   {% else %}
-  <p class="hint" style="margin-top:2px;">Keine überschneidenden Zeitstempel — jeder Datenpunkt der Quelle ist neu für das Ziel.</p>
+  <p class="hint" style="margin-top:2px;">{{ _("Keine überschneidenden Zeitstempel — jeder Datenpunkt der Quelle ist neu für das Ziel.") }}</p>
   {% endif %}
 
   <div class="config-card-header" style="margin-top:20px;">
-    <h2>Nach der Übertragung</h2>
+    <h2>{{ _("Nach der Übertragung") }}</h2>
   </div>
   <div class="migrate-post-actions">
     <label class="migrate-radio">
       <input type="radio" name="post_action" value="delete" checked>
-      <span><strong>Verschieben — Quelle danach entfernen (empfohlen)</strong>
-      <span class="migrate-radio-hint">{{ entity_id }} wird inkl. Konfiguration aus Zeitarchiv entfernt.</span></span>
+      <span><strong>{{ _("Verschieben — Quelle danach entfernen (empfohlen)") }}</strong>
+      <span class="migrate-radio-hint">{{ _("{entity_id} wird inkl. Konfiguration aus Zeitarchiv entfernt.", entity_id=entity_id) }}</span></span>
     </label>
     <label class="migrate-radio">
       <input type="radio" name="post_action" value="clear">
-      <span><strong>Verschieben — nur Datenpunkte leeren</strong>
-      <span class="migrate-radio-hint">Entität und Konfiguration bleiben erhalten, aber leer.</span></span>
+      <span><strong>{{ _("Verschieben — nur Datenpunkte leeren") }}</strong>
+      <span class="migrate-radio-hint">{{ _("Entität und Konfiguration bleiben erhalten, aber leer.") }}</span></span>
     </label>
     <label class="migrate-radio">
       <input type="radio" name="post_action" value="keep">
-      <span><strong>Kopieren — Quelle bleibt unverändert</strong>
-      <span class="migrate-radio-hint">{{ entity_id }} bleibt vollständig erhalten, das Ziel erhält zusätzlich eine Kopie.</span></span>
+      <span><strong>{{ _("Kopieren — Quelle bleibt unverändert") }}</strong>
+      <span class="migrate-radio-hint">{{ _("{entity_id} bleibt vollständig erhalten, das Ziel erhält zusätzlich eine Kopie.", entity_id=entity_id) }}</span></span>
     </label>
   </div>
 
   <div class="migrate-footer-row">
-    <button type="button" class="btn" onclick="goToStep(1)">← Zurück</button>
-    <button type="button" class="btn btn-danger" id="migrate-execute-btn" onclick="migrateExecute()">Übertragung starten</button>
+    <button type="button" class="btn" onclick="goToStep(1)">{{ _("← Zurück") }}</button>
+    <button type="button" class="btn btn-danger" id="migrate-execute-btn" onclick="migrateExecute()">{{ _("Übertragung starten") }}</button>
   </div>
 </div>
 {% endif %}

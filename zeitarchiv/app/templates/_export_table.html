@@ -31,37 +31,37 @@
         {% else %}
         <span class="name mono">{{ row.entity_id }}</span>
         {% endif %}
-        <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or 'Kein Friendly Name' }}</strong><code>{{ row.entity_id }}</code></span>
+        <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
       </td>
       <td class="centered"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>
       <td>{{ row.unit or "—" }}</td>
       <td>{{ row.row_count | format_int }}</td>
       <td class="actions">
-        <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" {% if row.row_count == 0 %}aria-disabled="true" style="pointer-events:none;opacity:.4;"{% endif %}>CSV herunterladen</a>
+        <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" {% if row.row_count == 0 %}aria-disabled="true" style="pointer-events:none;opacity:.4;"{% endif %}>{{ _("CSV herunterladen") }}</a>
       </td>
     </tr>
     {% endfor %}
   </table>
   {% else %}
-  <div class="empty">{% if search or (type and type != ['all']) or (unit and unit != 'all') %}Keine Entität passt zu diesem Filter.{% else %}Noch keine Entitäten vorhanden.{% endif %}</div>
+  <div class="empty">{% if search or (type and type != ['all']) or (unit and unit != 'all') %}{{ _("Keine Entität passt zu diesem Filter.") }}{% else %}{{ _("Noch keine Entitäten vorhanden.") }}{% endif %}</div>
   {% endif %}
 </div>
 
 {% if pagination.page_size and rows %}
 <div class="pager" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
-    <button class="btn navbtn" onclick="setExportPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
+    <button class="btn navbtn" onclick="setExportPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="{{ _('Erste Seite') }}">«</button>
     <button class="btn navbtn" onclick="stepExportPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToExportPage(this)"> / {{ pagination.total_pages }}</span>
+    <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToExportPage(this)"> / {{ pagination.total_pages }}</span>
     <button class="btn navbtn" onclick="stepExportPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
-    <button class="btn navbtn" onclick="setExportPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+    <button class="btn navbtn" onclick="setExportPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="{{ _('Letzte Seite') }}">»</button>
   </div>
-  <select name="page_size" title="Zeilen pro Seite"
+  <select name="page_size" title="{{ _('Zeilen pro Seite') }}"
           hx-get="export-table" hx-include="#controls" hx-target="#export-table" hx-swap="innerHTML"
           onchange="resetExportPage()">
     {% for size in [10, 20, 50, 100, 500, 1000] %}
-    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
     {% endfor %}
   </select>
 </div>

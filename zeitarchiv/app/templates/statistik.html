@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Statistik{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Statistik") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/statistik.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Statistik</h1>
-    <p class="sub">Archiv-weite Kennzahlen — Aufschlüsselung nach Typ, Auflösung und Aufbewahrung, Wachstum über Zeit.</p>
+    <h1>{{ _("Statistik") }}</h1>
+    <p class="sub">{{ _("Archiv-weite Kennzahlen — Aufschlüsselung nach Typ, Auflösung und Aufbewahrung, Wachstum über Zeit.") }}</p>
 
     <div class="settings-panel">
 
@@ -21,43 +21,43 @@
        Zeile darunter; "Ereignisse" ist draußen, weil die App diese Zeilen
        überall sonst Datensätze nennt. #}
     <div class="stat-row">
-      <div class="stat"><div class="label">Entitäten</div><div class="value">{{ entity_count }}</div></div>
-      <div class="stat"><div class="label">Datensätze gesamt</div><div class="value">{{ total_rows }}</div></div>
-      <div class="stat"><div class="label">Größe</div><div class="value">{{ total_size }}</div></div>
+      <div class="stat"><div class="label">{{ _("Entitäten") }}</div><div class="value">{{ entity_count }}</div></div>
+      <div class="stat"><div class="label">{{ _("Datensätze gesamt") }}</div><div class="value">{{ total_rows }}</div></div>
+      <div class="stat"><div class="label">{{ _("Größe") }}</div><div class="value">{{ total_size }}</div></div>
       <div class="stat">
-        <div class="label">Neue Datensätze</div>
+        <div class="label">{{ _("Neue Datensätze") }}</div>
         {% if new_rows_24h is not none %}
         <div class="value">{{ new_rows_24h }}</div>
-        <div class="sub-value">letzte 24 Stunden</div>
+        <div class="sub-value">{{ _("letzte 24 Stunden") }}</div>
         {% else %}
         <div class="value">&mdash;</div>
-        <div class="sub-value">Noch nicht genug Verlaufsdaten</div>
+        <div class="sub-value">{{ _("Noch nicht genug Verlaufsdaten") }}</div>
         {% endif %}
       </div>
       <div class="stat">
         <div class="label">Ø/Stunde</div>
         {% if events_per_hour is not none %}
         <div class="value">{{ events_per_hour }}</div>
-        <div class="sub-value">letzte 24 Stunden</div>
+        <div class="sub-value">{{ _("letzte 24 Stunden") }}</div>
         {% else %}
         <div class="value">&mdash;</div>
-        <div class="sub-value">Noch nicht genug Verlaufsdaten</div>
+        <div class="sub-value">{{ _("Noch nicht genug Verlaufsdaten") }}</div>
         {% endif %}
       </div>
       <div class="stat">
         <div class="label">Ø/Tag</div>
         {% if events_per_day is not none %}
         <div class="value">{{ events_per_day }}</div>
-        <div class="sub-value">letzte 7 Tage</div>
+        <div class="sub-value">{{ _("letzte 7 Tage") }}</div>
         {% else %}
         <div class="value">&mdash;</div>
-        <div class="sub-value">Noch nicht genug Verlaufsdaten</div>
+        <div class="sub-value">{{ _("Noch nicht genug Verlaufsdaten") }}</div>
         {% endif %}
       </div>
     </div>
 
     <div class="section-header">
-      <h2>Wachstum über Zeit</h2>
+      <h2>{{ _("Wachstum über Zeit") }}</h2>
       {% if has_growth_history %}
       <div class="seg" id="growth-range-seg">
         {% for key, label in growth_range_options %}
@@ -70,14 +70,12 @@
       <div id="growth-chart" style="{{ '' if has_growth_history else 'display:none;' }}"></div>
       {% if not has_growth_history %}
       <div class="empty">
-        Noch nicht genug Verlaufsdaten &mdash; Zeitarchiv speichert unabhängig von Seitenaufrufen
-        stündlich einen Schnappschuss (Entitäten, Datensätze, Größe). Sobald mehr als ein
-        Schnappschuss vorliegt, erscheint hier der Wachstumsverlauf.
+        {{ _("Noch nicht genug Verlaufsdaten &mdash; Zeitarchiv speichert unabhängig von Seitenaufrufen stündlich einen Schnappschuss (Entitäten, Datensätze, Größe). Sobald mehr als ein Schnappschuss vorliegt, erscheint hier der Wachstumsverlauf.") }}
       </div>
       {% endif %}
     </div>
 
-    <h2>Speichernutzung</h2>
+    <h2>{{ _("Speichernutzung") }}</h2>
     <div class="card storage-card">
       <div id="storage-pie"></div>
       <div class="tbl-wrap">
@@ -85,27 +83,27 @@
           <colgroup>
             <col class="stats-col-storage-label"><col class="stats-col-storage-size"><col class="stats-col-storage-percent">
           </colgroup>
-          <thead><tr><th>Kategorie</th><th>Größe</th><th>Anteil</th></tr></thead>
+          <thead><tr><th>{{ _("Kategorie") }}</th><th>{{ _("Größe") }}</th><th>{{ _("Anteil") }}</th></tr></thead>
           <tbody>
           {% for row in storage_breakdown %}
           <tr data-storage-label="{{ row.label }}">
-            <td class="label"><span class="storage-dot" data-key="{{ row.key }}"></span>{% if row.href %}<a class="storage-category-link" href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}{% if row.optimization_recommended %}<span class="storage-optimization-chip">Optimierung empfohlen</span>{% endif %}</td>
+            <td class="label"><span class="storage-dot" data-key="{{ row.key }}"></span>{% if row.href %}<a class="storage-category-link" href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}{% if row.optimization_recommended %}<span class="storage-optimization-chip">{{ _("Optimierung empfohlen") }}</span>{% endif %}</td>
             <td data-sort="{{ row.bytes }}">{{ row.size }}</td>
             <td data-sort="{{ row.percent }}">{{ row.percent }} %</td>
           </tr>
           {% endfor %}
           </tbody>
-          <tfoot><tr><td class="label"><strong>Gesamt</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr></tfoot>
+          <tfoot><tr><td class="label"><strong>{{ _("Gesamt") }}</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr></tfoot>
         </table>
       </div>
     </div>
-    <h2>Nach Typ</h2>
+    <h2>{{ _("Nach Typ") }}</h2>
     <div class="tbl-wrap">
       <table class="dt stats-dt" data-sortable>
         <colgroup>
           <col class="stats-col-label"><col class="stats-col-count"><col class="stats-col-rows"><col class="stats-col-size">
         </colgroup>
-        <thead><tr><th>Typ</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr></thead>
+        <thead><tr><th>{{ _("Typ") }}</th><th>{{ _("Entitäten") }}</th><th>{{ _("Datensätze") }}</th><th>{{ _("Größe") }}</th></tr></thead>
         <tbody>
         {% for row in by_type %}
         <tr><td class="label">{{ row.label }}</td><td data-sort="{{ row.entity_count_raw }}">{{ row.entity_count }}</td><td data-sort="{{ row.total_rows_raw }}">{{ row.total_rows }}</td><td data-sort="{{ row.total_size_raw }}">{{ row.total_size }}</td></tr>
@@ -114,13 +112,13 @@
       </table>
     </div>
 
-    <h2>Nach Auflösung</h2>
+    <h2>{{ _("Nach Auflösung") }}</h2>
     <div class="tbl-wrap">
       <table class="dt stats-dt" data-sortable>
         <colgroup>
           <col class="stats-col-label"><col class="stats-col-count"><col class="stats-col-rows"><col class="stats-col-size">
         </colgroup>
-        <thead><tr><th>Auflösung</th><th>Entitäten</th><th>Datensätze</th><th>Größe</th></tr></thead>
+        <thead><tr><th>{{ _("Auflösung") }}</th><th>{{ _("Entitäten") }}</th><th>{{ _("Datensätze") }}</th><th>{{ _("Größe") }}</th></tr></thead>
         <tbody>
         {% for row in by_resolution %}
         <tr><td class="label">{{ row.label }}</td><td data-sort="{{ row.entity_count_raw }}">{{ row.entity_count }}</td><td data-sort="{{ row.total_rows_raw }}">{{ row.total_rows }}</td><td data-sort="{{ row.total_size_raw }}">{{ row.total_size }}</td></tr>
@@ -129,20 +127,20 @@
       </table>
     </div>
 
-    <h2>Inhalte</h2>
+    <h2>{{ _("Inhalte") }}</h2>
     <div class="stat-row">
       <a class="stat" href="charts">
-        <div class="label">Charts</div>
+        <div class="label">{{ _("Charts") }}</div>
         <div class="value">{{ chart_count }}</div>
       </a>
       <a class="stat" href="tables">
-        <div class="label">Tabellen</div>
+        <div class="label">{{ _("Tabellen") }}</div>
         <div class="value">{{ table_count }}</div>
       </a>
       <a class="stat" href="{{ app_root }}/dashboards">
-        <div class="label">Dashboards</div>
+        <div class="label">{{ _("Dashboards") }}</div>
         <div class="value">{{ dashboard_count }}</div>
-        <div class="sub-value">{{ dashboard_pin_count }} Kachel{{ 'n' if dashboard_pin_count != 1 else '' }} insgesamt angepinnt</div>
+        <div class="sub-value">{% if dashboard_pin_count == 1 %}{{ _("{count} Kachel insgesamt angepinnt", count=dashboard_pin_count) }}{% else %}{{ _("{count} Kacheln insgesamt angepinnt", count=dashboard_pin_count) }}{% endif %}</div>
       </a>
     </div>
 

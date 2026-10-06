@@ -1,14 +1,14 @@
 """Regressionstests für die kompakte und bedienbare Symcon-Importtabelle."""
 
 
-from _paths import APP, page_text
+from _paths import APP, page_text, template_text
 
 
 
 IMPORT = page_text("import.html")
-CSV_SECTION = (APP / "templates/_csv_import_section.html").read_text(encoding="utf-8")
-REPORTS_PANEL = (APP / "templates/_reports_panel.html").read_text(encoding="utf-8")
-NAV = (APP / "templates/_settings_nav.html").read_text(encoding="utf-8")
+CSV_SECTION = template_text("_csv_import_section.html")
+REPORTS_PANEL = template_text("_reports_panel.html")
+NAV = template_text("_settings_nav.html")
 MAIN = (APP / "import_routes.py").read_text(encoding="utf-8")
 CSS = (APP / "static/css/app.css").read_text(encoding="utf-8")
 

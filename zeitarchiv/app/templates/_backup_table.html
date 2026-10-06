@@ -24,20 +24,20 @@
             <button type="button" class="btn"
                     hx-post="backup/verify/{{ b.filename }}"
                     hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
-              Prüfen
+              {{ _("Prüfen") }}
             </button>
             <button type="button" class="btn btn-danger"
                     hx-post="backup/restore/{{ b.filename }}"
                     hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this"
-                    hx-confirm="Backup {{ b.created_at }} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.">
-              Wiederherstellen
+                    hx-confirm="{{ _('Backup {created_at} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.', created_at=b.created_at) }}">
+              {{ _("Wiederherstellen") }}
             </button>
-            <a class="btn" href="backup/download/{{ b.filename }}">Herunterladen</a>
+            <a class="btn" href="backup/download/{{ b.filename }}">{{ _("Herunterladen") }}</a>
             <button type="button" class="btn btn-danger"
                     hx-post="backup/delete/{{ b.filename }}"
                     hx-target="#backup-status" hx-swap="outerHTML"
-                    hx-confirm="Backup {{ b.created_at }} endgültig löschen?">
-              Löschen
+                    hx-confirm="{{ _('Backup {created_at} endgültig löschen?', created_at=b.created_at) }}">
+              {{ _("Löschen") }}
             </button>
           </span>
         </td>
@@ -47,16 +47,16 @@
   </div>
   <div class="pager" style="justify-content:space-between;margin-top:10px;">
     <div style="display:flex;align-items:center;gap:10px;">
-      <span class="pager-range">{{ backup_pagination.start }}&ndash;{{ backup_pagination.end }} von {{ backup_pagination.total }}</span>
+      <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=backup_pagination.start, end=backup_pagination.end, total=backup_pagination.total) }}</span>
       <button class="btn navbtn"
               hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=1&page_size={{ backup_pagination.page_size }}"
               hx-target="#backup-table-wrap" hx-swap="outerHTML"
-              {% if backup_pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+              {% if backup_pagination.page <= 1 %}disabled{% endif %} title="{{ _('Erste Seite') }}">«</button>
       <button class="btn navbtn"
               hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.page - 1 }}&page_size={{ backup_pagination.page_size }}"
               hx-target="#backup-table-wrap" hx-swap="outerHTML"
               {% if backup_pagination.page <= 1 %}disabled{% endif %}>‹</button>
-      <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ backup_pagination.total_pages }}" value="{{ backup_pagination.page }}"
+      <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" min="1" max="{{ backup_pagination.total_pages }}" value="{{ backup_pagination.page }}"
         onchange="htmx.ajax('GET', 'backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=' + Math.min(Math.max(1, parseInt(this.value, 10) || 1), {{ backup_pagination.total_pages }}) + '&page_size={{ backup_pagination.page_size }}', {target: '#backup-table-wrap', swap: 'outerHTML'})"> / {{ backup_pagination.total_pages }}</span>
       <button class="btn navbtn"
               hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.page + 1 }}&page_size={{ backup_pagination.page_size }}"
@@ -65,20 +65,20 @@
       <button class="btn navbtn"
               hx-get="backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page={{ backup_pagination.total_pages }}&page_size={{ backup_pagination.page_size }}"
               hx-target="#backup-table-wrap" hx-swap="outerHTML"
-              {% if backup_pagination.page >= backup_pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+              {% if backup_pagination.page >= backup_pagination.total_pages %}disabled{% endif %} title="{{ _('Letzte Seite') }}">»</button>
     </div>
-    <select onchange="htmx.ajax('GET', 'backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=1&page_size=' + this.value, {target: '#backup-table-wrap', swap: 'outerHTML'})" title="Zeilen pro Seite">
+    <select onchange="htmx.ajax('GET', 'backup/list?sort={{ backup_sort }}&dir={{ backup_dir }}&page=1&page_size=' + this.value, {target: '#backup-table-wrap', swap: 'outerHTML'})" title="{{ _('Zeilen pro Seite') }}">
       {% for size in [10, 20, 50, 100] %}
-      <option value="{{ size }}" {% if backup_pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+      <option value="{{ size }}" {% if backup_pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
       {% endfor %}
     </select>
   </div>
   <button type="button" class="btn btn-danger" style="margin-top:14px;"
           hx-post="backup/delete-all" hx-target="#backup-status" hx-swap="outerHTML"
-          hx-confirm="Alle {{ backup_total }} Backups endgültig löschen?">
-    Alle Backups löschen
+          hx-confirm="{{ _('Alle {backup_total} Backups endgültig löschen?', backup_total=backup_total) }}">
+    {{ _("Alle Backups löschen") }}
   </button>
   {% else %}
-  <p class="hint hint-status" style="margin-top:10px;">Noch kein Backup erstellt.</p>
+  <p class="hint hint-status" style="margin-top:10px;">{{ _("Noch kein Backup erstellt.") }}</p>
   {% endif %}
 </div>

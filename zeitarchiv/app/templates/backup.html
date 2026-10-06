@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Backup / Restore{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Backup / Restore") }}{% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Backup / Restore</h1>
-    <p class="sub">Kompletten Datenbestand als ZIP-Datei sichern &mdash; manuell oder nach Zeitplan.</p>
+    <h1>{{ _("Backup / Restore") }}</h1>
+    <p class="sub">{{ _("Kompletten Datenbestand als ZIP-Datei sichern &mdash; manuell oder nach Zeitplan.") }}</p>
 
     <div class="settings-panel">
       {% include "_settings_backup_form.html" %}

@@ -83,7 +83,7 @@
 <div class="topnav" x-data="{ systemOpen: false, dashboardsOpen: false, noticesOpen: false, drawerOpen: false, drawerSystemOpen: {{ 'true' if nav_system else 'false' }}, drawerDashboardsOpen: {{ 'true' if nav_dashboards else 'false' }} }">
   <div class="topnav-bar">
     <a class="topnav-brand" href="{{ app_root }}/">
-      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{{ _('Zeitarchiv-Logo') }}">
         <rect width="64" height="64" rx="14" fill="#13211C"/>
         <rect x="13" y="44" width="6" height="7" rx="1.5" fill="#E79A5B"/>
         <rect x="23.8" y="35.87" width="6" height="15.13" rx="1.5" fill="#E79A5B"/>
@@ -94,7 +94,7 @@
         <circle cx="37.6" cy="23.73" r="1.4" fill="#57C9BB"/>
         <circle cx="48.4" cy="15.6" r="2.6" fill="#57C9BB"/>
       </svg>
-      <span>Zeitarchiv</span>
+      <span>{{ _("Zeitarchiv") }}</span>
     </a>
 
     <nav class="topnav-links">
@@ -297,7 +297,7 @@
   <div class="topnav-drawer-backdrop" :class="{ 'is-open': drawerOpen }" @click="drawerOpen = false" x-cloak></div>
   <div class="topnav-drawer" :class="{ 'is-open': drawerOpen }" x-cloak>
     <div class="topnav-drawer-head">
-      <span>Zeitarchiv</span>
+      <span>{{ _("Zeitarchiv") }}</span>
       <button type="button" class="topnav-drawer-close" @click="drawerOpen = false" aria-label="{{ _('Menü schließen') }}">{{ nav_icon('x') }}</button>
     </div>
     <nav>

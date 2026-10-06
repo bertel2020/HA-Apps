@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Import{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Import") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/import.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Import</h1>
-    <p class="sub">Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als CSV-Datei mit freier Spalten-/Format-Zuordnung.</p>
+    <h1>{{ _("Import") }}</h1>
+    <p class="sub">{{ _("Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als CSV-Datei mit freier Spalten-/Format-Zuordnung.") }}</p>
 
     <div class="settings-panel">
 
     <div class="import-tabs">
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">Symcon</button>
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">CSV-Datei</button>
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'ha' %} active{% endif %}" id="tab-btn-ha" onclick="showImportTab('ha')">Home Assistant</button>
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">Reports</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">{{ _("Symcon") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">{{ _("CSV-Datei") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'ha' %} active{% endif %}" id="tab-btn-ha" onclick="showImportTab('ha')">{{ _("Home Assistant") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">{{ _("Reports") }}</button>
     </div>
 
     <!-- Gemeinsame Datalist für beide Reiter (Konzept Abschnitt 04/10, "Dropdown
@@ -23,7 +23,7 @@
          beiden Formulare verschachtelt, damit sie auch verfügbar ist, wenn der
          jeweils andere Reiter gerade den leeren Upload-/Dropzone-Zustand zeigt. -->
     <datalist id="entity-datalist">
-      <option value="__ignore__">Ignorieren</option>
+      <option value="__ignore__">{{ _("Ignorieren") }}</option>
       {% for entity_id, label, unit in entity_options %}
       <option value="{{ entity_id }}" data-unit="{{ unit }}">{{ label }}</option>
       {% endfor %}
@@ -31,29 +31,24 @@
 
     <div id="tab-symcon" class="import-tab"{% if active_import_tab != 'symcon' %} style="display:none;"{% endif %}>
     <div class="callout" data-collapsible>
-      <strong class="callout-title">So funktioniert die einmalige Migration aus Symcon:</strong>
+      <strong class="callout-title">{{ _("So funktioniert die einmalige Migration aus Symcon:") }}</strong>
       <ol class="import-steps">
-        <li>Den Symcon-<code>db</code>-Ordner als ZIP-Datei hochladen. Zeitarchiv entpackt und scannt den Inhalt automatisch.</li>
-        <li>Optional die aus Symcon exportierte <code>settings.json</code> ergänzen. Sie liefert Klarnamen, übergeordnete Räume/Kategorien und Einheiten; der <code>db</code>-Ordner selbst enthält nur numerische Variablen-IDs.</li>
-        <li>Variablen markieren und Home-Assistant-Entitäten zuordnen. Bei abweichenden Einheiten den Hinweis prüfen und bei Bedarf einen Umrechnungsfaktor angeben, danach Vorschau und Import starten.</li>
+        <li>{{ _("Den Symcon-<code>db</code>-Ordner als ZIP-Datei hochladen. Zeitarchiv entpackt und scannt den Inhalt automatisch.") }}</li>
+        <li>{{ _("Optional die aus Symcon exportierte <code>settings.json</code> ergänzen. Sie liefert Klarnamen, übergeordnete Räume/Kategorien und Einheiten; der <code>db</code>-Ordner selbst enthält nur numerische Variablen-IDs.") }}</li>
+        <li>{{ _("Variablen markieren und Home-Assistant-Entitäten zuordnen. Bei abweichenden Einheiten den Hinweis prüfen und bei Bedarf einen Umrechnungsfaktor angeben, danach Vorschau und Import starten.") }}</li>
       </ol>
       <p class="symcon-import-note">
-        Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import
-        nur noch nicht vorhandene Zeitstempel. Danach berechnet Zeitarchiv die Rollups automatisch
-        neu. Unlesbare Dateien werden gekennzeichnet, Bool-Werte auf 1/0 normalisiert und reine
-        Textvariablen nicht importiert. Die hochgeladenen Quelldaten bleiben bis „Quelldaten löschen“
-        gespeichert; ein neuer ZIP-Upload ersetzt sie vollständig.
+        {{ _("Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import nur noch nicht vorhandene Zeitstempel. Danach berechnet Zeitarchiv die Rollups automatisch neu. Unlesbare Dateien werden gekennzeichnet, Bool-Werte auf 1/0 normalisiert und reine Textvariablen nicht importiert. Die hochgeladenen Quelldaten bleiben bis „Quelldaten löschen“ gespeichert; ein neuer ZIP-Upload ersetzt sie vollständig.") }}
       </p>
     </div>
 
     {% if not settings_imported %}
     <div class="callout" id="settings-hint" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <span style="flex:1;min-width:220px;">
-        Noch keine <code>settings.json</code> importiert &mdash; optional, liefert Klarnamen und
-        Einheiten je Symcon-ID aus Symcons Objektbaum für die Liste unten.
+        {{ _("Noch keine <code>settings.json</code> importiert &mdash; optional, liefert Klarnamen und Einheiten je Symcon-ID aus Symcons Objektbaum für die Liste unten.") }}
       </span>
       <label class="btn" style="cursor:pointer;">
-        settings.json importieren
+        {{ _("settings.json importieren") }}
         <input type="file" id="settings-json-input" accept=".json" style="display:none;"
                onchange="if(this.files.length) uploadSettingsJson(this.files[0]);">
       </label>
@@ -63,18 +58,17 @@
     {% if scanning %}
     <div id="upload-area">
       <div class="upload-progress">
-        <div class="label"><span>Schritt 2/2 &middot; Scanne Variablen&hellip;</span><strong id="upload-percent"></strong></div>
+        <div class="label"><span>{{ _("Schritt 2/2 &middot; Scanne Variablen&hellip;") }}</span><strong id="upload-percent"></strong></div>
         <div class="bar"><div class="bar-fill" id="upload-bar" style="opacity:.4;width:100%;"></div></div>
-        <p class="filename">Bereits entpackte Daten werden eingelesen &mdash; bei vielen Variablen kann das dauern.</p>
+        <p class="filename">{{ _("Bereits entpackte Daten werden eingelesen &mdash; bei vielen Variablen kann das dauern.") }}</p>
       </div>
     </div>
     {% elif not source_exists %}
     <div id="upload-area">
       <label class="dropzone" id="dropzone" for="zip-input" role="button" tabindex="0">
-        <p>ZIP-Datei mit dem Symcon-<code>db</code>-Ordner hierher ziehen oder klicken zum Auswählen</p>
+        <p>{{ _("ZIP-Datei mit dem Symcon-<code>db</code>-Ordner hierher ziehen oder klicken zum Auswählen") }}</p>
         <p class="hint2">
-          Max. {{ import_limits.zip_upload_gib }} GiB Upload, {{ import_limits.zip_uncompressed_gib }} GiB entpackt
-          und {{ import_limits.zip_members }} Einträge. Bleibt gespeichert, bis du die Daten wieder löschst.
+          {{ _("Max. {zip_upload_gib} GiB Upload, {zip_uncompressed_gib} GiB entpackt und {zip_members} Einträge. Bleibt gespeichert, bis du die Daten wieder löschst.", zip_upload_gib=import_limits.zip_upload_gib, zip_uncompressed_gib=import_limits.zip_uncompressed_gib, zip_members=import_limits.zip_members) }}
         </p>
         <input type="file" name="file" id="zip-input" accept=".zip" style="display:none;">
       </label>
@@ -82,25 +76,25 @@
     {% else %}
     <form method="post" action="import/delete" class="import-delete-row"
           onsubmit="confirmSymconDelete(event, this)">
-      <button type="submit" class="btn btn-danger import-delete-button">Quelldaten löschen</button>
+      <button type="submit" class="btn btn-danger import-delete-button">{{ _("Quelldaten löschen") }}</button>
     </form>
     <form method="post" action="import/start" id="import-form">
       <div class="toolbar import-filter-toolbar">
-        <input type="search" class="search" placeholder="Symcon-ID oder Name suchen …" oninput="onImportSearch(this.value)">
-        <span class="count-chip">{{ rows | selectattr('readable') | list | length }} Variablen erkannt</span>
+        <input type="search" class="search" placeholder="{{ _('Symcon-ID oder Name suchen …') }}" oninput="onImportSearch(this.value)">
+        <span class="count-chip">{{ _("{rows} Variablen erkannt", rows=(rows | selectattr('readable') | list | length)) }}</span>
         {% set unreadable_count = rows | rejectattr('readable') | list | length %}
         {% if unreadable_count %}
         <button type="button" class="count-chip warn active" id="hide-unreadable-btn" onclick="toggleHideUnreadable(this)"
-                title="Nicht lesbare Zeilen ein-/ausblenden">{{ unreadable_count }} nicht lesbar</button>
+                title="{{ _('Nicht lesbare Zeilen ein-/ausblenden') }}">{{ _("{unreadable_count} nicht lesbar", unreadable_count=unreadable_count) }}</button>
         {% endif %}
-        <span class="count-chip" id="marked-count">0 markiert</span>
+        <span class="count-chip" id="marked-count">{{ _("0 markiert") }}</span>
         {# Rechtsbündige Gruppe am Ende der Toolbar, wie beim HA-Import
            (.toolbar-right in app.css, siehe auch entity_detail.html/
            chart_editor.html) — beide Knöpfe in EINEM Behälter, nicht
            margin-left:auto auf dem ersten. #}
         <div class="toolbar-right">
-          <button type="button" class="btn" hx-post="import/dry-run" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">Vorschau (Dry Run)</button>
-          <button type="button" class="btn primary" hx-post="import/start" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">Import starten</button>
+          <button type="button" class="btn" hx-post="import/dry-run" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Vorschau (Dry Run)") }}</button>
+          <button type="button" class="btn primary" hx-post="import/start" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Import starten") }}</button>
         </div>
       </div>
 
@@ -112,7 +106,7 @@
             {% if settings_imported %}<col class="symcon-col-name">{% endif %}
             <col class="symcon-col-period"><col class="symcon-col-rows"><col class="symcon-col-unit"><col class="symcon-col-entity">
           </colgroup>
-          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="Alle auf dieser Seite markieren"></th><th>Symcon-ID</th>{% if settings_imported %}<th>Symcon-Name</th>{% endif %}<th>Zeitraum</th><th>Datensätze</th><th>Einheit</th><th>→ HA-Entität</th></tr>
+          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th><th>{{ _("Symcon-ID") }}</th>{% if settings_imported %}<th>{{ _("Symcon-Name") }}</th>{% endif %}<th>{{ _("Zeitraum") }}</th><th>{{ _("Datensätze") }}</th><th>{{ _("Einheit") }}</th><th>{{ _("→ HA-Entität") }}</th></tr>
           {% for row in rows %}
           <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}" data-symcon-unit="{{ row.symcon_unit or '' }}"
               data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}">
@@ -126,34 +120,34 @@
                 {% if row.symcon_parent %}<span class="symcon-parent-wrap"><span class="symcon-parent">{{ row.symcon_parent }}</span></span>{% endif %}
                 <span class="entity-tooltip symcon-name-tooltip" role="tooltip">
                   <strong>{{ row.symcon_name }}</strong>
-                  <span class="symcon-tooltip-parent">{{ row.symcon_parent or "Keine übergeordnete Kategorie" }}</span>
+                  <span class="symcon-tooltip-parent">{{ row.symcon_parent or _("Keine übergeordnete Kategorie") }}</span>
                 </span>
               </span>
               {% else %}—{% endif %}
             </td>
             {% endif %}
             <td class="period-cell">{% if row.period_start %}{{ row.period_start }} &ndash; {{ row.period_end }}{% else %}—{% endif %}</td>
-            <td{% if row.preview != "—" %} data-tooltip="Min · Max: {{ row.preview }}"{% endif %}>{{ row.row_count | format_int }}</td>
+            <td{% if row.preview != "—" %} data-tooltip="{{ _('Min · Max: {preview}', preview=row.preview) }}"{% endif %}>{{ row.row_count | format_int }}</td>
             <td>{{ row.symcon_unit or "—" }}</td>
             <td>
               {% if row.readable %}
               <span class="map-picker entity-tooltip-host">
                 <input type="text" class="map-input" name="map_{{ row.variable_id }}"
-                       placeholder="— bitte auswählen —" autocomplete="off" onfocus="selectMappingValue(this)"
+                       placeholder="{{ _('— bitte auswählen —') }}" autocomplete="off" onfocus="selectMappingValue(this)"
                        oninput="updateUnitCheck(this)">
-                <button type="button" class="map-clear" title="Auswahl ändern" aria-label="Ausgewählte HA-Entität entfernen" onclick="clearMapping(this)">×</button>
+                <button type="button" class="map-clear" title="{{ _('Auswahl ändern') }}" aria-label="{{ _('Ausgewählte HA-Entität entfernen') }}" onclick="clearMapping(this)">×</button>
                 <span class="entity-tooltip" role="tooltip"></span>
               </span>
               <div class="unit-conversion" hidden>
                 <div class="unit-warning"></div>
-                <label class="factor-row">Faktor
+                <label class="factor-row">{{ _("Faktor") }}
                   <input class="factor-input" type="number" step="any" name="factor_{{ row.variable_id }}" value="1"
                          oninput="this.dataset.userEdited='true'">
                 </label>
-                <span class="factor-help">Importwert = Symcon-Wert × Faktor</span>
+                <span class="factor-help">{{ _("Importwert = Symcon-Wert × Faktor") }}</span>
               </div>
               {% else %}
-              <span class="unreadable-note">nicht lesbar{% if row.error %}: {{ row.error }}{% endif %}</span>
+              <span class="unreadable-note">{{ _("nicht lesbar") }}{% if row.error %}: {{ row.error }}{% endif %}</span>
               {% endif %}
             </td>
           </tr>
@@ -173,12 +167,12 @@
           <span class="pager-page" id="import-pager-page"></span>
           <button type="button" class="btn navbtn" id="import-pager-next" onclick="stepImportPage(1)">›</button>
         </div>
-        <select id="import-page-size" onchange="setImportPageSize(this.value)" title="Zeilen pro Seite">
-          <option value="10">10 / Seite</option>
-          <option value="50" selected>50 / Seite</option>
-          <option value="100">100 / Seite</option>
-          <option value="500">500 / Seite</option>
-          <option value="1000">1000 / Seite</option>
+        <select id="import-page-size" onchange="setImportPageSize(this.value)" title="{{ _('Zeilen pro Seite') }}">
+          <option value="10">{{ _("10 / Seite") }}</option>
+          <option value="50" selected>{{ _("50 / Seite") }}</option>
+          <option value="100">{{ _("100 / Seite") }}</option>
+          <option value="500">{{ _("500 / Seite") }}</option>
+          <option value="1000">{{ _("1000 / Seite") }}</option>
         </select>
       </div>
 
@@ -188,7 +182,7 @@
 
       <div id="import-output" hx-get="import/progress" hx-trigger="load" hx-swap="innerHTML"></div>
       {% else %}
-      <div class="empty">Keine Symcon-Variablen im hochgeladenen Archiv gefunden.</div>
+      <div class="empty">{{ _("Keine Symcon-Variablen im hochgeladenen Archiv gefunden.") }}</div>
       {% endif %}
     </form>
     {% endif %}
@@ -196,28 +190,28 @@
 
     <div id="tab-csv" class="import-tab"{% if active_import_tab != 'csv' %} style="display:none;"{% endif %}>
     <div class="callout" data-collapsible>
-      <strong class="callout-title">So funktioniert der Import einer CSV-Datei:</strong>
+      <strong class="callout-title">{{ _("So funktioniert der Import einer CSV-Datei:") }}</strong>
       <ol class="import-steps">
-        <li>Eine CSV-Datei hochladen und Trennzeichen sowie vorhandene Kopfzeile festlegen.</li>
-        <li>Zeitstempel- und Wertspalte auswählen und das Zeitformat angeben: Unix-Sekunden, Unix-Millisekunden, ISO 8601 oder ein eigenes Muster.</li>
-        <li>Eine vorhandene Home-Assistant-Entität als Ziel wählen, die Vorschau prüfen und den Import starten.</li>
+        <li>{{ _("Eine CSV-Datei hochladen und Trennzeichen sowie vorhandene Kopfzeile festlegen.") }}</li>
+        <li>{{ _("Zeitstempel- und Wertspalte auswählen und das Zeitformat angeben: Unix-Sekunden, Unix-Millisekunden, ISO 8601 oder ein eigenes Muster.") }}</li>
+        <li>{{ _("Eine vorhandene Home-Assistant-Entität als Ziel wählen, die Vorschau prüfen und den Import starten.") }}</li>
       </ol>
-      <p class="symcon-import-note">Bestehende Monatsarchive bleiben unverändert; im laufenden Hot Buffer werden nur fehlende Zeitstempel ergänzt. Die hochgeladene CSV-Datei bleibt bis „Quelldaten löschen“ gespeichert.</p>
+      <p class="symcon-import-note">{{ _("Bestehende Monatsarchive bleiben unverändert; im laufenden Hot Buffer werden nur fehlende Zeitstempel ergänzt. Die hochgeladene CSV-Datei bleibt bis „Quelldaten löschen“ gespeichert.") }}</p>
     </div>
     {% include "_csv_import_section.html" %}
     </div>
 
     <div id="tab-ha" class="import-tab"{% if active_import_tab != 'ha' %} style="display:none;"{% endif %}>
     <div class="callout" data-collapsible>
-      <strong class="callout-title">So funktioniert der Import aus Home Assistant:</strong>
+      <strong class="callout-title">{{ _("So funktioniert der Import aus Home Assistant:") }}</strong>
       <ol class="import-steps">
-        <li>Importmodus wählen: Der empfohlene Vollimport verbindet ältere Langzeitstatistik automatisch mit der jüngeren Rohhistorie. Beide Quellen können auch einzeln importiert werden.</li>
-        <li>Gewünschte Zeiträume festlegen und bei Bedarf die Verfügbarkeit prüfen. Zur Auswahl stehen Entitäten, die bereits mindestens einen Live-Wert an Zeitarchiv übertragen haben.</li>
-        <li>Entitäten markieren und den Dry Run starten. Die Vorschau zeigt verfügbare Werte, die berechnete Schnittstelle sowie neue oder zu ergänzende Monate.</li>
-        <li>Import starten. Vorhandene Zeitstempel und Werte werden niemals ersetzt; der laufende Monat wird im Hot Buffer ergänzt.</li>
+        <li>{{ _("Importmodus wählen: Der empfohlene Vollimport verbindet ältere Langzeitstatistik automatisch mit der jüngeren Rohhistorie. Beide Quellen können auch einzeln importiert werden.") }}</li>
+        <li>{{ _("Gewünschte Zeiträume festlegen und bei Bedarf die Verfügbarkeit prüfen. Zur Auswahl stehen Entitäten, die bereits mindestens einen Live-Wert an Zeitarchiv übertragen haben.") }}</li>
+        <li>{{ _("Entitäten markieren und den Dry Run starten. Die Vorschau zeigt verfügbare Werte, die berechnete Schnittstelle sowie neue oder zu ergänzende Monate.") }}</li>
+        <li>{{ _("Import starten. Vorhandene Zeitstempel und Werte werden niemals ersetzt; der laufende Monat wird im Hot Buffer ergänzt.") }}</li>
       </ol>
-      <p class="symcon-import-note">Beim Vollimport endet die ältere Stundenstatistik an einer eindeutigen Schnittstelle, an der die Rohhistorie beginnt. Dadurch entstehen durch die Zusammenführung weder zeitliche Lücken noch Überschneidungen.</p>
-      <p class="symcon-import-note">Bereits archivierte Monate werden nur ergänzt, wenn &bdquo;Archivlücken füllen&ldquo; aktiviert ist.</p>
+      <p class="symcon-import-note">{{ _("Beim Vollimport endet die ältere Stundenstatistik an einer eindeutigen Schnittstelle, an der die Rohhistorie beginnt. Dadurch entstehen durch die Zusammenführung weder zeitliche Lücken noch Überschneidungen.") }}</p>
+      <p class="symcon-import-note">{{ _("Bereits archivierte Monate werden nur ergänzt, wenn &bdquo;Archivlücken füllen&ldquo; aktiviert ist.") }}</p>
     </div>
     {% include "_ha_import_section.html" %}
     </div>

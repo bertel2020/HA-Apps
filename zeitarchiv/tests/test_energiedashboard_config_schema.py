@@ -19,7 +19,7 @@ from app.energiedashboard_routes import (
 )
 from app.storage.index import Index
 
-from _paths import APP
+from _paths import APP, template_text
 
 
 def _with_index(fn) -> None:
@@ -162,9 +162,7 @@ def test_view_blendet_die_legende_nur_bei_eingeschaltetem_schalter_ein() -> None
     """Serverseitig gegated, nicht per x-show: bei ausgeschalteter Legende soll
     das Markup gar nicht erst ausgeliefert werden. Der x-ref dient buildLegend()
     zusätzlich als Signal, die Einträge dann auch nicht zu berechnen."""
-    view = (APP / "templates/_energiedashboard_view.html").read_text(
-        encoding="utf-8"
-    )
+    view = template_text("_energiedashboard_view.html")
     start = view.index("{% if config.show_sankey_legende %}")
     ende = view.index("{% endif %}", start)
     block = view[start:ende]

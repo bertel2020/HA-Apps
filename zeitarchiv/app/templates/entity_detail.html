@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — {{ entity_id }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — {entity_id}", entity_id=entity_id) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/entity_detail.css') }}">
 {% endblock %}
@@ -9,13 +9,13 @@
   {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page" x-data="entityChart()">
     <div class="h1-row">
-      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
+      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
-              title="Favorit" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
+              title="{{ _('Favorit') }}" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ app_root }}/entities">&larr; zurück zu Entitäten</a>
+      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ app_root }}/entities">{{ _("&larr; zurück zu Entitäten") }}</a>
       {% if used_in_energiedashboard %}
       {# Statisch statt referrer-basiert (dynamic-back-link.js unten deckt
          die übrigen Herkunftsseiten ab) — unter Home-Assistant-Ingress fehlt
@@ -25,7 +25,7 @@
          dem diese Seite aufgerufen wurde (siehe main.py) — ohne
          Query-Parameter (Direktaufruf) fällt das auf 'day'/0 zurück, denselben
          Standardwert wie das Energiedashboard selbst. #}
-      &middot; <a href="{{ app_root }}/energiedashboard?range={{ initial_range or 'day' }}&amp;offset={{ initial_offset }}">&larr; zurück zum Energiedashboard</a>
+      &middot; <a href="{{ app_root }}/energiedashboard?range={{ initial_range or 'day' }}&amp;offset={{ initial_offset }}">{{ _("&larr; zurück zum Energiedashboard") }}</a>
       {% endif %}
     </p>
 
@@ -50,7 +50,7 @@
           </template>
         </div>
         <div class="nav">
-          <button class="btn navbtn" @click="goBack()" aria-label="Vorheriger Zeitraum">‹</button>
+          <button class="btn navbtn" @click="goBack()" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
           <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ app_root | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
             <!-- Bei Zeitraum "Dekade" gibt es keinen sinnvollen Sprungziel-
                  Kalender (siehe pickerMode in calendar-picker.js, dort auch
@@ -60,7 +60,7 @@
             <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : 'Zu einem bestimmten Zeitpunkt springen'" x-text="periodLabel"></button>
             {% include "_calendar_popover.html" %}
           </div>
-          <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="Nächster Zeitraum">›</button>
+          <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
         </div>
         {# Markierungs-Chip. Nur wenn die Anzeige läuft und es im Zeitraum
            tatsächlich Markierungen gibt — sonst stünde dort dauerhaft ein
@@ -87,8 +87,8 @@
             </button>
             <div class="menu-popover menu-popover-narrow" x-show="markedMenuOpen" x-cloak
                  x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-              <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup">Zur Bereinigung <span class="menu-row-arrow">&rarr;</span></a>
-              <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup?undo=1">Letzte Löschung rückgängig <span class="menu-row-arrow">&rarr;</span></a>
+              <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup">{{ _("Zur Bereinigung") }} <span class="menu-row-arrow">&rarr;</span></a>
+              <a class="menu-row" href="{{ app_root }}/entities/{{ entity_id }}/cleanup?undo=1">{{ _("Letzte Löschung rückgängig") }} <span class="menu-row-arrow">&rarr;</span></a>
             </div>
           </div>
         </template>
@@ -109,18 +109,18 @@
           </button>
           <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
                x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-            <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
+            <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">{{ _("Aus") }}</button>
             <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
             <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-show="compareYearAvailable" x-text="compareYearLabel"></button>
           </div>
         </div>
         <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
           <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
-            Optionen <span class="chevron">▾</span>
+            {{ _("Optionen") }} <span class="chevron">▾</span>
           </button>
           <div class="menu-popover menu-popover-wide" x-show="optionsMenuOpen" x-cloak
                x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-            <div class="menu-section-label">Daten</div>
+            <div class="menu-section-label">{{ _("Daten") }}</div>
             <label class="menu-row">
               {# "Rollierend", nicht "Kontinuierlich": der Schalter ändert das
                  abgefragte ZEITFENSTER (siehe _window() in storage/query.py),
@@ -129,7 +129,7 @@
                  ein falscher Hilfetext geworden. Feldname und API-Parameter
                  heißen weiterhin "continuous", das ist der dokumentierte
                  Vertrag (docs/api-reference.md). #}
-              <span class="menu-row-label">Rollierend</span>
+              <span class="menu-row-label">{{ _("Rollierend") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="continuous" @change="toggleContinuous()">
                 <span class="track"><span class="thumb"></span></span>
@@ -142,7 +142,7 @@
                  Aussage. Das :disabled bleibt für die Zeitraum-Grenze: Rohwerte
                  gibt es nur bis Woche (MAX_RAW_QUERY_POINTS). -->
             <label class="menu-row" x-show="chartType === 'line'">
-              <span class="menu-row-label">Rohwerte</span>
+              <span class="menu-row-label">{{ _("Rohwerte") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="raw" :disabled="!['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
                 <span class="track"><span class="thumb"></span></span>
@@ -154,19 +154,19 @@
                verfügbar: ein senkrechtes Band braucht nur die Zeitachse und
                trifft keine Aussage über den Wert. #}
             <label class="menu-row">
-              <span class="menu-row-label">Markierte Werte</span>
+              <span class="menu-row-label">{{ _("Markierte Werte") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="showMarked" @change="toggleMarked()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
             <div class="menu-divider"></div>
-            <div class="menu-section-label">Darstellung</div>
+            <div class="menu-section-label">{{ _("Darstellung") }}</div>
             <div class="menu-row menu-row-stack">
-              <span class="menu-row-label">Diagrammtyp</span>
+              <span class="menu-row-label">{{ _("Diagrammtyp") }}</span>
               <div class="seg">
-                <button :class="{active: chartType === 'line'}" @click="setChartType('line')">Linie</button>
-                <button :class="{active: chartType === 'bar'}" @click="setChartType('bar')">Balken</button>
+                <button :class="{active: chartType === 'line'}" @click="setChartType('line')">{{ _("Linie") }}</button>
+                <button :class="{active: chartType === 'bar'}" @click="setChartType('bar')">{{ _("Balken") }}</button>
                 <!-- Serverseitig statt x-show: bei ausgeblendetem Button würde
                      .seg button:last-child (Rahmen-Regel) sonst weiter auf diesem
                      unsichtbaren letzten Button statt auf "Balken" greifen, sichtbar
@@ -179,7 +179,7 @@
                      Label sonst auf schmalen Bildschirmen auf wenige Pixel und
                      bricht buchstabenweise um. -->
                 {% if aggregation_type == 'switch' %}
-                <button :class="{active: chartType === 'timeline'}" @click="setChartType('timeline')">Zeitstrahl</button>
+                <button :class="{active: chartType === 'timeline'}" @click="setChartType('timeline')">{{ _("Zeitstrahl") }}</button>
                 {% endif %}
               </div>
             </div>
@@ -190,23 +190,23 @@
                  sinnvolle der beiden Zeilen — früher waren beide immer
                  sichtbar und nur wechselseitig deaktiviert. -->
             <label class="menu-row" x-show="chartType === 'line'">
-              <span class="menu-row-label">Punkte</span>
+              <span class="menu-row-label">{{ _("Punkte") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
             <label class="menu-row" x-show="chartType === 'bar'">
-              <span class="menu-row-label">Werte anzeigen</span>
+              <span class="menu-row-label">{{ _("Werte anzeigen") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
             <div class="menu-row menu-row-stack">
-              <span class="menu-row-label">Nachkommastellen</span>
+              <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
               <div class="seg">
-                <button :class="{active: decimals === 'auto'}" @click="setDecimals('auto')">Auto</button>
+                <button :class="{active: decimals === 'auto'}" @click="setDecimals('auto')">{{ _("Auto") }}</button>
                 <button :class="{active: decimals === '0'}" @click="setDecimals('0')">0</button>
                 <button :class="{active: decimals === '1'}" @click="setDecimals('1')">1</button>
                 <button :class="{active: decimals === '2'}" @click="setDecimals('2')">2</button>
@@ -214,7 +214,7 @@
               </div>
             </div>
             <label class="menu-row">
-              <span class="menu-row-label">Dynamische Y-Achse</span>
+              <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="dynamicYAxis" @change="dynamicYAxis = !dynamicYAxis; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
@@ -226,14 +226,14 @@
                Zeile, die nur zusammen mit einer anderen Option erscheint, wäre
                ohne sie unauffindbar. #}
             <label class="menu-row">
-              <span class="menu-row-label">Durchschnittslinie</span>
+              <span class="menu-row-label">{{ _("Durchschnittslinie") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="averageLine" @change="averageLine = !averageLine; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
             <label class="menu-row">
-              <span class="menu-row-label">Statistik in Legende</span>
+              <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
@@ -252,21 +252,21 @@
               </template>
             </div>
             <div class="menu-row" x-show="chartStats">
-              <span class="menu-row-label">Legenden-Stil</span>
+              <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
               <div class="seg">
-                <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'; saveChartOptions()">Chips</button>
-                <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">Tabelle</button>
+                <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'; saveChartOptions()">{{ _("Chips") }}</button>
+                <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">{{ _("Tabelle") }}</button>
               </div>
             </div>
             <div class="menu-divider"></div>
-            <div class="menu-section-label">Aktionen</div>
+            <div class="menu-section-label">{{ _("Aktionen") }}</div>
             {# "Werte bearbeiten" und "Konfiguration" standen hier einmal daneben.
                Beide sind Seiten, keine Aktionen — sie liegen jetzt in der
                Reiterzeile unter dem Titel (siehe _entity_tabs.html), die
                zugleich zeigt, auf welcher der drei Seiten man gerade ist.
                "Als Chart speichern" bleibt: das tut etwas auf DIESER Seite. #}
-            <a class="menu-row" :href="saveAsChartUrl">Als Chart speichern <span class="menu-row-arrow">→</span></a>
-            <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">Optionen auf Standard zurücksetzen</button>
+            <a class="menu-row" :href="saveAsChartUrl">{{ _("Als Chart speichern") }} <span class="menu-row-arrow">→</span></a>
+            <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">{{ _("Optionen auf Standard zurücksetzen") }}</button>
           </div>
         </div>
         </div>
@@ -294,7 +294,7 @@
            Grund keine feste Mindestbreite mehr: die wechselnde Beschriftung
            kann hier niemanden mehr verschieben. #}
         <button type="button" class="chip chip-zoom active" x-show="zoomRange" x-cloak
-                @click="resetZoom()" title="Gezeigten Ausschnitt zurücksetzen">
+                @click="resetZoom()" title="{{ _('Gezeigten Ausschnitt zurücksetzen') }}">
           <span x-text="zoomLabel"></span>
           <span class="chip-zoom-x" aria-hidden="true">&times;</span>
         </button>
@@ -305,9 +305,9 @@
           <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
           <span class="name">{{ display_name }}</span>
           <span class="values">
-            <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="entityStat.last"></strong></span>
-            <span x-show="legendMetrics.includes('min')">Min <strong x-text="entityStat.min"></strong></span>
-            <span x-show="legendMetrics.includes('max')">Max <strong x-text="entityStat.max"></strong></span>
+            <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="entityStat.last"></strong>') }}</span>
+            <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="entityStat.min"></strong>') }}</span>
+            <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="entityStat.max"></strong>') }}</span>
             <span x-show="legendMetrics.includes('average')">Ø <strong x-text="entityStat.average"></strong></span>
             <span x-show="legendMetrics.includes('sum') && entityStat.sum !== null">Σ <strong x-text="entityStat.sum"></strong></span>
           </span>
@@ -317,10 +317,10 @@
         <table class="dt compact chart-legend-table">
           <thead>
             <tr>
-              <th class="legend-name-col">Name</th>
-              <th x-show="legendMetrics.includes('last')">Aktuell</th>
-              <th x-show="legendMetrics.includes('min')">Min</th>
-              <th x-show="legendMetrics.includes('max')">Max</th>
+              <th class="legend-name-col">{{ _("Name") }}</th>
+              <th x-show="legendMetrics.includes('last')">{{ _("Aktuell") }}</th>
+              <th x-show="legendMetrics.includes('min')">{{ _("Min") }}</th>
+              <th x-show="legendMetrics.includes('max')">{{ _("Max") }}</th>
               <th x-show="legendMetrics.includes('average')">Ø</th>
               <th x-show="legendMetrics.includes('sum')">Σ</th>
             </tr>

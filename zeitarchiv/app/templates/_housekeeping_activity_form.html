@@ -54,7 +54,7 @@
 {% if activity_rows %}
 <div class="tbl-wrap">
   <table class="dt" data-sortable data-paginate data-page-size="10">
-    <thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Entität</th><th>Auslöser</th><th>Zeilen</th><th>Status</th></tr></thead>
+    <thead><tr><th>{{ _("Zeitpunkt") }}</th><th>{{ _("Aktion") }}</th><th>{{ _("Entität") }}</th><th>{{ _("Auslöser") }}</th><th>{{ _("Zeilen") }}</th><th>{{ _("Status") }}</th></tr></thead>
     <tbody>
     {% for row in activity_rows %}
     {# Fehlergrund UND Verdichten-/Bereinigen-Detail teilen sich dasselbe
@@ -62,7 +62,7 @@
        siehe showJobError()/showActivityDetail() in confirm-dialog.js. Nie
        beides gleichzeitig: detail_label füllt nur ein erfolgreicher Lauf,
        error nur ein fehlgeschlagener. #}
-    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="Fehlergrund anzeigen"{% elif row.detail_label %} class="job-row-detail" data-detail="{{ row.detail_label }}" onclick="showActivityDetail(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showActivityDetail(this);}" tabindex="0" role="button" aria-label="Detail anzeigen"{% endif %}>
+    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="{{ _('Fehlergrund anzeigen') }}"{% elif row.detail_label %} class="job-row-detail" data-detail="{{ row.detail_label }}" onclick="showActivityDetail(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showActivityDetail(this);}" tabindex="0" role="button" aria-label="{{ _('Detail anzeigen') }}"{% endif %}>
       <td data-sort="{{ row.created_at_ts }}">{{ row.created_at }}</td>
       <td>{{ row.action }}</td>
       <td>{{ row.entity_label }}</td>
@@ -75,5 +75,5 @@
   </table>
 </div>
 {% else %}
-<p class="hint hint-status">Noch keine Aktivität aufgezeichnet.</p>
+<p class="hint hint-status">{{ _("Noch keine Aktivität aufgezeichnet.") }}</p>
 {% endif %}

@@ -26,15 +26,15 @@
   <p class="job-progress-line" aria-live="polite">
     {% if detail %}<span class="job-progress-id">{{ detail }}</span> &middot; {% endif %}
     {% if total %}
-      <strong>{{ done | format_int }}</strong> von <strong>{{ total | format_int }}</strong>{% if unit %} {{ unit }}{% endif %}
+      {{ _("<strong>{done}</strong> von <strong>{total}</strong>", done=(done | format_int), total=(total | format_int)) }}{% if unit %} {{ unit }}{% endif %}
     {% elif done %}
       {# Zählbar, aber ohne bekannte Gesamtzahl — z. B. die Schreibphase des
          CSV-Imports, deren Monatszahl erst im Schreiben feststeht. Dann eine
          wachsende Zahl statt eines Balkens, der eine Gesamtzahl behauptet,
          die niemand kennt; der Balken darunter bleibt leer. #}
-      <strong>{{ done | format_int }}</strong>{% if unit %} {{ unit }}{% endif %} bisher
+      <strong>{{ done | format_int }}</strong>{% if unit %} {{ unit }}{% endif %} {{ _("bisher") }}
     {% else %}
-      läuft&hellip;
+      {{ _("läuft&hellip;") }}
     {% endif %}
   </p>
   <div class="job-progress-track">

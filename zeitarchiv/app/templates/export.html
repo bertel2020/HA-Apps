@@ -1,33 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — CSV-Export{% endblock %}
+{% block title %}{{ _("Zeitarchiv — CSV-Export") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/export.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>CSV-Export</h1>
-    <p class="sub">Lädt die komplette Rohdaten-Historie einer Entität als CSV herunter &mdash; Hot Buffer und Archiv zusammengeführt, zur Löschung markierte Datensätze ausgeschlossen.</p>
+    <h1>{{ _("CSV-Export") }}</h1>
+    <p class="sub">{{ _("Lädt die komplette Rohdaten-Historie einer Entität als CSV herunter &mdash; Hot Buffer und Archiv zusammengeführt, zur Löschung markierte Datensätze ausgeschlossen.") }}</p>
 
     <div class="settings-panel">
 
         <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="export-table" hx-include="#controls, [name=page_size]" hx-target="#export-table" hx-swap="innerHTML">
-          <input type="search" name="search" placeholder="Entität suchen …" onchange="resetExportPage()">
+          <input type="search" name="search" placeholder="{{ _('Entität suchen …') }}" onchange="resetExportPage()">
           <span class="dd-picker-wrap">
-            <button type="button" class="btn" id="export-type-filter-btn" onclick="toggleDDPicker('export-type-filter')">Typ: Alle ▾</button>
+            <button type="button" class="btn" id="export-type-filter-btn" onclick="toggleDDPicker('export-type-filter')">{{ _("Typ: Alle ▾") }}</button>
             <div class="dd-picker-popover" id="export-type-filter-popover">
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="all" checked onchange="onExportTypeAllChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Alle</span></label>
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Standard</span></label>
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Zähler</span></label>
-              <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>Schalter</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="all" checked onchange="onExportTypeAllChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>{{ _("Alle") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>{{ _("Standard") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>{{ _("Zähler") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onExportTypeSpecificChange(this); resetExportPage(); updateExportTypeFilterLabel();"><span>{{ _("Schalter") }}</span></label>
             </div>
           </span>
           <span class="dd-picker-wrap">
-            <button type="button" class="btn" id="export-unit-filter-btn" onclick="toggleDDPicker('export-unit-filter')">Einheit: Alle ▾</button>
+            <button type="button" class="btn" id="export-unit-filter-btn" onclick="toggleDDPicker('export-unit-filter')">{{ _("Einheit: Alle ▾") }}</button>
             <input type="hidden" name="unit" id="export-unit-filter-input" value="all">
             <div class="dd-picker-popover" id="export-unit-filter-popover">
-              <div class="dd-picker-row" onclick="selectDDOption('export-unit-filter', 'all', 'Alle'); resetExportPage();">Alle Einheiten</div>
+              <div class="dd-picker-row" onclick="selectDDOption('export-unit-filter', 'all', 'Alle'); resetExportPage();">{{ _("Alle Einheiten") }}</div>
               {% for opt in unit_options %}
               <div class="dd-picker-row" onclick="selectDDOption('export-unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetExportPage();">{{ opt.label }}</div>
               {% endfor %}

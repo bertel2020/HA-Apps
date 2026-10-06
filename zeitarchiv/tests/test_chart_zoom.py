@@ -13,7 +13,7 @@ zurückdreht, merkt es an keinem Test, der nur prüft, dass irgendein
 dataZoom existiert.
 """
 
-from _paths import APP, page_text
+from _paths import APP, page_text, template_text
 
 ENTITY = page_text("entity_detail.html")
 EDITOR = page_text("chart_editor.html")
@@ -233,7 +233,7 @@ def test_the_reset_chip_sits_in_the_chart_not_in_the_toolbar() -> None:
     Im Chart überdeckt er keine Daten: ECharts beginnt erst bei grid.top
     (36 px) zu zeichnen, und dieser Streifen ist rechts leer.
     """
-    template = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+    template = template_text("entity_detail.html")
     leiste = template.split('<div class="toolbar">')[1].split('<div class="card">')[0]
     assert "chip-zoom" not in leiste, "der Chip gehört nicht mehr in die Werkzeugleiste"
     assert 'class="chip chip-zoom active"' in template

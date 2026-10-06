@@ -11,7 +11,7 @@ import pytest
 from app.staleness import STALE_MODES, stale_thresholds, staleness
 from app.storage.index import Index
 
-from _paths import APP
+from _paths import APP, template_text
 
 MINUTE, HOUR, DAY = 60, 3600, 86400
 
@@ -119,7 +119,7 @@ def test_old_database_without_the_column_keeps_the_previous_behaviour(tmp_path: 
 
 
 def test_the_tile_menu_offers_every_mode_the_setter_accepts() -> None:
-    menu = (APP / "templates/_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    menu = template_text("_dashboard_tile_menu.html")
     for mode in STALE_MODES:
         assert f"('{mode}', " in menu, mode
 
@@ -127,7 +127,7 @@ def test_the_tile_menu_offers_every_mode_the_setter_accepts() -> None:
 def test_the_client_reads_the_thresholds_the_server_renders() -> None:
     """Die Schwellen stehen nur in staleness.py: der Server rendert sie als
     data-Attribute, der Client liest sie — keine zweite Kopie der Zahlen."""
-    tiles = (APP / "templates/_dashboard_tiles.html").read_text(encoding="utf-8")
+    tiles = template_text("_dashboard_tiles.html")
     script = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
     assert "data-stale-warn-after" in tiles and "data-stale-stale-after" in tiles
     assert "dataset.staleWarnAfter" in script and "dataset.staleStaleAfter" in script

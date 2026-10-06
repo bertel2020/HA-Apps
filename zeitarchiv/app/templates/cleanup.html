@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Bearbeitungsbereich — {{ entity_id }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Bearbeitungsbereich — {entity_id}", entity_id=entity_id) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/cleanup.css') }}">
 {% endblock %}
@@ -17,9 +17,9 @@
   {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page" x-data="{ range: 'day', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
     <div class="h1-row">
-      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
+      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
-              title="Favorit" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
+              title="{{ _('Favorit') }}" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
@@ -28,56 +28,56 @@
          An seiner Stelle der Weg eine Ebene HÖHER, den die Reiter nicht
          anbieten — und den die Verlaufsseite an derselben Stelle schon hat,
          wodurch die drei Köpfe jetzt gleich aufgebaut sind. #}
-      <a href="{{ app_root }}/entities">← zurück zu Entitäten</a>
+      <a href="{{ app_root }}/entities">{{ _("← zurück zu Entitäten") }}</a>
     </p>
 
     {% with active = 'werte' %}{% include "_entity_tabs.html" %}{% endwith %}
 
     <div class="entity-stats-groups" id="rows-summary" aria-live="polite">
-      <span class="entity-stats-loading">Kennzahlen werden geladen …</span>
+      <span class="entity-stats-loading">{{ _("Kennzahlen werden geladen …") }}</span>
     </div>
 
     <div class="edit-tabs">
-      <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">Bereinigen</button>
-      <button type="button" :class="{active: tab === 'correct'}" @click="setTab('correct')">Korrigieren</button>
-      <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">Hinzufügen</button>
+      <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">{{ _("Bereinigen") }}</button>
+      <button type="button" :class="{active: tab === 'correct'}" @click="setTab('correct')">{{ _("Korrigieren") }}</button>
+      <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">{{ _("Hinzufügen") }}</button>
       {% if aggregation_type != 'switch' %}
-      <button type="button" :class="{active: tab === 'compact'}" @click="setTab('compact')">Verdichten</button>
+      <button type="button" :class="{active: tab === 'compact'}" @click="setTab('compact')">{{ _("Verdichten") }}</button>
       {% endif %}
     </div>
 
     <div x-show="tab === 'add'" x-cloak class="add-value-card">
-      <p class="sub" style="margin-top:12px;">Fügt einen einzelnen Rohwert nachträglich ein — z. B. um eine Lücke zu schließen, die ein Sensor-Aussetzer hinterlassen hat.</p>
+      <p class="sub" style="margin-top:12px;">{{ _("Fügt einen einzelnen Rohwert nachträglich ein — z. B. um eine Lücke zu schließen, die ein Sensor-Aussetzer hinterlassen hat.") }}</p>
       <div class="add-value-row">
-        <label>Datum &amp; Uhrzeit
+        <label>{{ _("Datum &amp; Uhrzeit") }}
           <input type="datetime-local" id="add-datetime" step="1">
         </label>
-        <label>Wert
+        <label>{{ _("Wert") }}
           <input type="text" inputmode="decimal" id="add-value" placeholder="0,0">
         </label>
-        <button type="button" class="btn primary" onclick="submitAddValue()">Hinzufügen</button>
+        <button type="button" class="btn primary" onclick="submitAddValue()">{{ _("Hinzufügen") }}</button>
       </div>
       <p class="add-value-status" id="add-value-status"></p>
     </div>
 
     {% if aggregation_type != 'switch' %}
     <div x-show="tab === 'compact'" x-cloak class="add-value-card">
-      <p class="sub" style="margin-top:12px;">Verdichtet bereits archivierte Monate rückwirkend auf ein gröberes Zeitraster — unabhängig von der laufenden Auflösung. Nicht umkehrbar.</p>
+      <p class="sub" style="margin-top:12px;">{{ _("Verdichtet bereits archivierte Monate rückwirkend auf ein gröberes Zeitraster — unabhängig von der laufenden Auflösung. Nicht umkehrbar.") }}</p>
       <div class="add-value-row">
-        <label>Von
+        <label>{{ _("Von") }}
           <input type="month" id="compact-start">
         </label>
-        <label>Bis
+        <label>{{ _("Bis") }}
           <input type="month" id="compact-end">
         </label>
-        <label>Ziel-Auflösung
+        <label>{{ _("Ziel-Auflösung") }}
           <select id="compact-target">
             {% for key, label in compact_target_options %}
             {% if key != 'off' %}<option value="{{ key }}">{{ label }}</option>{% endif %}
             {% endfor %}
           </select>
         </label>
-        <button type="button" class="btn" onclick="previewCompact()">Vorschau</button>
+        <button type="button" class="btn" onclick="previewCompact()">{{ _("Vorschau") }}</button>
       </div>
       <div id="compact-preview"></div>
       <p class="add-value-status" id="compact-value-status"></p>
@@ -89,12 +89,12 @@
          hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML">
       <div class="toolbar">
         <div class="seg" id="range-seg">
-          <button type="button" data-range="hour" onclick="setRange('hour')">Stunde</button>
-          <button type="button" class="active" data-range="day" onclick="setRange('day')">Tag</button>
-          <button type="button" data-range="week" onclick="setRange('week')">Woche</button>
-          <button type="button" data-range="month" onclick="setRange('month')">Monat</button>
-          <button type="button" data-range="year" onclick="setRange('year')">Jahr</button>
-          <button type="button" data-range="all" onclick="setRange('all')">Gesamt</button>
+          <button type="button" data-range="hour" onclick="setRange('hour')">{{ _("Stunde") }}</button>
+          <button type="button" class="active" data-range="day" onclick="setRange('day')">{{ _("Tag") }}</button>
+          <button type="button" data-range="week" onclick="setRange('week')">{{ _("Woche") }}</button>
+          <button type="button" data-range="month" onclick="setRange('month')">{{ _("Monat") }}</button>
+          <button type="button" data-range="year" onclick="setRange('year')">{{ _("Jahr") }}</button>
+          <button type="button" data-range="all" onclick="setRange('all')">{{ _("Gesamt") }}</button>
         </div>
         <!-- Leer bis zum ersten hx-trigger="load"-Roundtrip — _rows_table.html
              füllt dieses Element per hx-swap-oob (gleiche id), obwohl es

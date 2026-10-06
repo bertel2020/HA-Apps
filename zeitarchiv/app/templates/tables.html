@@ -60,7 +60,7 @@
               </div>
             </div>
             <h3><a href="tables/{{ row.id }}">{{ row.name }}</a></h3>
-            <div class="meta">{{ row.row_count }} Zeile{{ 'n' if row.row_count != 1 else '' }} &middot; {{ row.column_count }} Spalte{{ 'n' if row.column_count != 1 else '' }}</div>
+            <div class="meta">{% if row.row_count == 1 %}{{ _("{count} Zeile", count=row.row_count) }}{% else %}{{ _("{count} Zeilen", count=row.row_count) }}{% endif %} &middot; {% if row.column_count == 1 %}{{ _("{count} Spalte", count=row.column_count) }}{% else %}{{ _("{count} Spalten", count=row.column_count) }}{% endif %}</div>
           </div>
           {% endfor %}
           <a class="card chart-grid-add card-browser-add" href="tables/new" title="{{ _('Neue Tabelle') }}">

@@ -6,14 +6,14 @@ Breadcrumb mehr — die Navigation übernimmt vollständig die Kopfzeile."""
 from __future__ import annotations
 
 
-from _paths import TEMPLATES
+from _paths import TEMPLATES, template_text
 
 
 TEMPLATES_DIR = TEMPLATES
 
 
 def _source(name: str) -> str:
-    return (TEMPLATES_DIR / name).read_text(encoding="utf-8")
+    return template_text(name)
 
 
 def test_import_has_no_redundant_settings_link_or_breadcrumb() -> None:

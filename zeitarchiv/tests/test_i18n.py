@@ -97,6 +97,9 @@ def test_setting_english_translates_pages_and_ships_the_script_catalog(client, g
     assert "</svg>Overview</a>" in html and "</svg>Entities</a>" in html
     assert "</svg>Entitäten</a>" not in html and "</svg>Einstellungen</a>" not in html
     assert "window.ZA_CATALOG" in html and "tasks running" in html
+    # Makros ohne Seitenkontext (hint_button aus _hints.html) übersetzen über die Anfrage-Sprache.
+    settings = client.get("/settings").text
+    assert "Hint about" in settings and "Hinweis zu" not in settings
 
 
 def test_automatic_language_follows_the_browser(client, german_again) -> None:

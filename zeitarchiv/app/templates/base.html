@@ -37,7 +37,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Zeitarchiv{% endblock %}</title>
+<title>{% block title %}{{ _("Zeitarchiv") }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 <script src="{{ asset('js/server-time.js') }}"></script>
 {% if lang | default('de') != 'de' %}<script>window.ZA_CATALOG = {{ js_catalog | tojson }};</script>{% endif %}
@@ -49,7 +49,7 @@
 <div class="page-sticky-header">
 {% block topnav %}
 {% if demo_mode_active %}
-<div class="demo-banner">🧪 Demo-Modus aktiv — synthetische Vorführdaten, keine echten Werte</div>
+<div class="demo-banner">{{ _("🧪 Demo-Modus aktiv — synthetische Vorführdaten, keine echten Werte") }}</div>
 {% endif %}
 {% include "_topnav.html" %}
 {% endblock %}

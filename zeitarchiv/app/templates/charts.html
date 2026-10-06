@@ -60,7 +60,7 @@
               </div>
             </div>
             <h3><a href="charts/{{ row.id }}">{{ row.name }}</a></h3>
-            <div class="meta">{% if row.type_label %}{{ row.type_label }} &middot; {% endif %}{{ row.entity_count }} Entität{{ 'en' if row.entity_count != 1 else '' }} &middot; {{ row.range_label }}</div>
+            <div class="meta">{% if row.type_label %}{{ row.type_label }} &middot; {% endif %}{% if row.entity_count == 1 %}{{ _("{count} Entität", count=row.entity_count) }}{% else %}{{ _("{count} Entitäten", count=row.entity_count) }}{% endif %} &middot; {{ row.range_label }}</div>
           </div>
           {% endfor %}
           <a class="card chart-grid-add card-browser-add" href="charts/new" title="{{ _('Neuer Chart') }}">

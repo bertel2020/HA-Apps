@@ -1,26 +1,26 @@
 <div style="border-top:1px solid var(--border);padding-top:16px;">
-  <h3 class="eyebrow">Import abgeschlossen</h3>
+  <h3 class="eyebrow">{{ _("Import abgeschlossen") }}</h3>
 
   {% for result in results %}
   <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px;">
     <p style="margin:0 0 4px;font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));">{{ result.variable_id }} → {{ result.entity_id }}</p>
-    {% if result.factor != 1.0 %}<p style="margin:0 0 4px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">Angewendeter Umrechnungsfaktor: × {{ result.factor | format_value }}</p>{% endif %}
+    {% if result.factor != 1.0 %}<p style="margin:0 0 4px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("Angewendeter Umrechnungsfaktor: × {factor}", factor=(result.factor | format_value)) }}</p>{% endif %}
     <p style="margin:0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
-      <strong style="color:var(--ink);">{{ result.rows_imported | format_int }}</strong> Datensätze importiert{% if result.imported_months %} ({{ result.imported_months | join(', ') }}){% endif %}
+      {{ _('<strong style="color:var(--ink);">{rows_imported}</strong> Datensätze importiert', rows_imported=(result.rows_imported | format_int)) }}{% if result.imported_months %} ({{ result.imported_months | join(', ') }}){% endif %}
     </p>
     {% if result.merged_months %}
     <p style="margin:4px 0 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);">
-      <strong style="color:var(--ink);">{{ result.rows_merged | format_int }}</strong> Datensätze in den laufenden Monat zusammengeführt ({{ result.merged_months | join(', ') }}), bereits vorhandene Zeitstempel dabei übersprungen
+      {{ _('<strong style="color:var(--ink);">{rows_merged}</strong> Datensätze in den laufenden Monat zusammengeführt ({merged_months}), bereits vorhandene Zeitstempel dabei übersprungen', rows_merged=(result.rows_merged | format_int), merged_months=(result.merged_months | join(', '))) }}
     </p>
     {% endif %}
     {% if result.skipped_months %}
-    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">Übersprungen (Archivdatei existiert bereits): {{ result.skipped_months | join(', ') }}</p>
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("Übersprungen (Archivdatei existiert bereits): {skipped_months}", skipped_months=(result.skipped_months | join(', '))) }}</p>
     {% endif %}
     {% if result.skipped_rows %}
-    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ result.skipped_rows | format_int }} Zeile(n) beim Einlesen übersprungen (nicht als Zeitstempel/Wert lesbar)</p>
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("{skipped_rows} Zeile(n) beim Einlesen übersprungen (nicht als Zeitstempel/Wert lesbar)", skipped_rows=(result.skipped_rows | format_int)) }}</p>
     {% endif %}
     {% if result.duplicate_rows %}
-    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ result.duplicate_rows | format_int }} Datensatz/Datensätze wegen bereits vorhandener Zeitstempel übersprungen</p>
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("{duplicate_rows} Datensatz/Datensätze wegen bereits vorhandener Zeitstempel übersprungen", duplicate_rows=(result.duplicate_rows | format_int)) }}</p>
     {% endif %}
   </div>
   {% endfor %}
@@ -30,6 +30,6 @@
   {% endfor %}
 
   {% if not results and not errors %}
-  <p style="font-size:calc(13px * var(--font-scale, 1));color:var(--ink-faint);">Keine Zuordnungen ausgefüllt — nichts importiert.</p>
+  <p style="font-size:calc(13px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("Keine Zuordnungen ausgefüllt — nichts importiert.") }}</p>
   {% endif %}
 </div>

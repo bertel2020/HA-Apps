@@ -1,30 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — {{ chart_name or "Neuer Chart" }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — {v1}", v1=(chart_name or _("Neuer Chart"))) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/chart_editor.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page" x-data="chartEditor()">
-    <h1>Charts</h1>
-    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot; <a href="{{ app_root }}/charts">&larr; zurück zu Charts</a></p>
+    <h1>{{ _("Charts") }}</h1>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot;") }} <a href="{{ app_root }}/charts">{{ _("&larr; zurück zu Charts") }}</a></p>
 
     <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (chartId ? 'Chart bearbeiten' : 'Neuer Chart') : (name || 'Neuer Chart')"></h2>
           <div style="display:flex;gap:8px;">
-            <button type="button" class="btn" x-show="hasData" data-tooltip="Aktuell angezeigte Chart-Daten als CSV herunterladen" @click="exportCsv()">CSV</button>
+            <button type="button" class="btn" x-show="hasData" data-tooltip="{{ _('Aktuell angezeigte Chart-Daten als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if chart_id %}
-            <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
+            <button type="button" class="btn" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
             {% endif %}
           </div>
         </div>
         {% if chart_id %}{% include "_dashboard_usage.html" %}{% endif %}
-        <p class="sub" x-show="editing">Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.</p>
+        <p class="sub" x-show="editing">{{ _("Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.") }}</p>
 
         <div class="entity-picker-field" x-show="editing">
-          <label>Entitäten</label>
-          <input type="search" class="search" placeholder="Entität oder Name suchen …" style="width:100%;" oninput="filterEntityPicker(this.value)">
+          <label>{{ _("Entitäten") }}</label>
+          <input type="search" class="search" placeholder="{{ _('Entität oder Name suchen …') }}" style="width:100%;" oninput="filterEntityPicker(this.value)">
           <div class="entity-picker" id="entity-picker">
             {% for opt in entity_options %}
             <!-- Name und ID sind hier auf je eine Zeile gekürzt (text-overflow),
@@ -54,8 +54,8 @@
         </div>
 
         <div class="entity-names-field" x-show="editing && orderableEntityIds.length > 0">
-          <label>Angezeigte Namen &amp; Reihenfolge (optional)</label>
-          <p class="sub" style="margin:4px 0 0;">Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.</p>
+          <label>{{ _("Angezeigte Namen &amp; Reihenfolge (optional)") }}</label>
+          <p class="sub" style="margin:4px 0 0;">{{ _("Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.") }}</p>
           <div class="entity-names-list" id="entity-names-list">
             <!-- orderableEntityIds statt selectedEntityIds: die Soll-Entität
                  (falls gewählt) hat keine eigene Legendenzeile/Reihenfolge —
@@ -71,7 +71,7 @@
             <template x-for="(id, idx) in orderableEntityIds" :key="id">
               <div class="entity-name-row" draggable="true" :data-entity-id="id"
                    :class="{'entity-name-row-hidden': hiddenEntityIds.includes(id)}">
-                <span class="drag-handle" title="Ziehen zum Verschieben" aria-hidden="true"></span>
+                <span class="drag-handle" title="{{ _('Ziehen zum Verschieben') }}" aria-hidden="true"></span>
                 <!-- Farbpunkt statt des Buchstabens der Zeilenkarte im Tabellen-Editor:
                      die Palette ist fest über die Position vergeben (siehe PALETTE in
                      chart_editor.js), der Punkt verbindet den Eintrag damit sichtbar mit
@@ -88,8 +88,8 @@
                     <svg x-show="hiddenEntityIds.includes(id)" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                   </button>
                   <span class="entity-name-move">
-                    <button type="button" title="Nach oben" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
-                    <button type="button" title="Nach unten" :disabled="idx === orderableEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
+                    <button type="button" title="{{ _('Nach oben') }}" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
+                    <button type="button" title="{{ _('Nach unten') }}" :disabled="idx === orderableEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
                   </span>
                 </span>
               </div>
@@ -118,18 +118,18 @@
               </button>
               <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
                    x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-                <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">Aus</button>
+                <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">{{ _("Aus") }}</button>
                 <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
                 <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-show="compareYearAvailable" x-text="compareYearLabel"></button>
               </div>
             </div>
             <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
               <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
-                Optionen <span class="chevron">▾</span>
+                {{ _("Optionen") }} <span class="chevron">▾</span>
               </button>
               <div class="menu-popover menu-popover-wide" x-show="optionsMenuOpen" x-cloak
                    x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
-                <div class="menu-section-label">Daten</div>
+                <div class="menu-section-label">{{ _("Daten") }}</div>
                 <!-- Auflösung/Rohwerte betreffen die Feinheit INNERHALB des
                      Abfragefensters (Bucket-Verfeinerung, roh statt gebuckelt)
                      — der Donut hat keine Zeitachse mehr, sondern genau einen
@@ -140,7 +140,7 @@
                      kalendarisch), nicht seine Feinheit — bleibt für den Donut
                      genauso eine echte Wahl wie im Zeitverlauf. -->
                 <div class="menu-row" x-show="!donut">
-                  <span class="menu-row-label">Auflösung
+                  <span class="menu-row-label">{{ _("Auflösung") }}
                     <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
                   </span>
                   <!-- query_raw_series() (server) kennt gar kein resolution_preset
@@ -170,7 +170,7 @@
                      dort, entity_detail.html) — hier bislang übersehen, siehe
                      test_the_chart_options_menu_uses_the_same_word_as_the_settings_page. -->
                 <label class="menu-row">
-                  <span class="menu-row-label">Rollierend</span>
+                  <span class="menu-row-label">{{ _("Rollierend") }}</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) ohne
                          Wirkung auf die Balken selbst, macht das Umschalten
@@ -195,8 +195,8 @@
                      wer Rohwerte will, muss Vergleich erst ausschalten, statt
                      dass ein Klick hier ihn stillschweigend abschaltet. -->
                 <label class="menu-row" x-show="!timeline && !donut && hasLineSeries">
-                  <span class="menu-row-label">Rohwerte
-                    <span class="menu-note" x-show="compare">nicht bei aktivem Vergleich</span>
+                  <span class="menu-row-label">{{ _("Rohwerte") }}
+                    <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="raw" :disabled="compare || !['hour', 'day', 'week'].includes(range)" @change="toggleRaw()">
@@ -204,7 +204,7 @@
                   </span>
                 </label>
                 <div class="menu-divider"></div>
-                <div class="menu-section-label">Darstellung</div>
+                <div class="menu-section-label">{{ _("Darstellung") }}</div>
                 <!-- Chart-weite Darstellungsart, oberste Zeile dieses
                      Abschnitts: "Zeitverlauf" ist alles bisherige (Linie/
                      Balken/Zeitstrahl, siehe die Zeile darunter), "Donut"
@@ -215,12 +215,12 @@
                      Knöpfe erklären sich selbst, ein Toggle bräuchte einen
                      dritten Satz dafür, wogegen er wirkt. -->
                 <div class="menu-row menu-row-stack">
-                  <span class="menu-row-label">Darstellungsart
-                    <span class="menu-note" x-show="compare">Donut nicht bei aktivem Vergleich</span>
+                  <span class="menu-row-label">{{ _("Darstellungsart") }}
+                    <span class="menu-note" x-show="compare">{{ _("Donut nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <div class="seg">
-                    <button :class="{active: !donut}" @click="setDisplayMode('timeseries')">Zeitverlauf</button>
-                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">Donut (Anteile)</button>
+                    <button :class="{active: !donut}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
+                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">{{ _("Donut (Anteile)") }}</button>
                   </div>
                 </div>
                 <!-- Nur bei aktivem Donut sichtbar — bestimmt, welcher
@@ -231,16 +231,16 @@
                      Zeile bestimmt nur, welche davon den Donut selbst
                      zeichnet. -->
                 <div class="menu-row menu-row-stack" x-show="donut">
-                  <span class="menu-row-label">Aggregation</span>
+                  <span class="menu-row-label">{{ _("Aggregation") }}</span>
                   <div class="seg">
-                    <button :class="{active: donutAggregation === 'sum'}" @click="donutAggregation = 'sum'; render()">Summe</button>
-                    <button :class="{active: donutAggregation === 'average'}" @click="donutAggregation = 'average'; render()">Durchschnitt</button>
-                    <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">Letzter Wert</button>
+                    <button :class="{active: donutAggregation === 'sum'}" @click="donutAggregation = 'sum'; render()">{{ _("Summe") }}</button>
+                    <button :class="{active: donutAggregation === 'average'}" @click="donutAggregation = 'average'; render()">{{ _("Durchschnitt") }}</button>
+                    <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">{{ _("Letzter Wert") }}</button>
                   </div>
                 </div>
                 <label class="menu-row" x-show="allSwitch && !donut">
-                  <span class="menu-row-label">Zeitstrahl
-                    <span class="menu-note" x-show="compare">nicht bei aktivem Vergleich</span>
+                  <span class="menu-row-label">{{ _("Zeitstrahl") }}
+                    <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="timeline" :disabled="compare" @change="toggleTimeline()">
@@ -248,7 +248,7 @@
                   </span>
                 </label>
                 <label class="menu-row" x-show="hasLineSeries && !donut">
-                  <span class="menu-row-label">Punkte</span>
+                  <span class="menu-row-label">{{ _("Punkte") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render()">
                     <span class="track"><span class="thumb"></span></span>
@@ -259,7 +259,7 @@
                      erstmals abschaltbar — Default an, damit ein Chart hier
                      nicht anders aussieht als angeheftet auf einem Dashboard. -->
                 <label class="menu-row" x-show="hasLineSeries && !donut">
-                  <span class="menu-row-label">Fläche</span>
+                  <span class="menu-row-label">{{ _("Fläche") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="areaFill" @change="areaFill = !areaFill; render()">
                     <span class="track"><span class="thumb"></span></span>
@@ -275,8 +275,8 @@
                      gar nicht, es gibt also nichts zu erklären, was ein
                      deaktivierter Schalter noch anzeigen müsste. -->
                 <label class="menu-row" x-show="canStack && !donut">
-                  <span class="menu-row-label">Gestapelt
-                    <span class="menu-note" x-show="compare">nicht bei aktivem Vergleich</span>
+                  <span class="menu-row-label">{{ _("Gestapelt") }}
+                    <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="stacked" :disabled="compare" @change="toggleStacked()">
@@ -295,10 +295,10 @@
                      Chart kann auch °C- oder Dauer-Serien stapeln, nicht nur
                      kWh. -->
                 <div class="menu-row menu-row-stack" x-show="canStack && stacked && !donut">
-                  <span class="menu-row-label">Anteile (%)</span>
+                  <span class="menu-row-label">{{ _("Anteile (%)") }}</span>
                   <div class="seg">
-                    <button :class="{active: !normalize}" @click="normalize = false; render()">Absolut</button>
-                    <button :class="{active: normalize}" @click="normalize = true; render()">Anteile (%)</button>
+                    <button :class="{active: !normalize}" @click="normalize = false; render()">{{ _("Absolut") }}</button>
+                    <button :class="{active: normalize}" @click="normalize = true; render()">{{ _("Anteile (%)") }}</button>
                   </div>
                 </div>
                 <!-- "Horizontal" ergibt nur im Ranking-Vergleich Sinn (Auflösung
@@ -330,23 +330,23 @@
                      ausgeblendet, obwohl der Chart längst im Ranking-
                      Vergleich steht, für den sie gedacht ist. -->
                 <div class="menu-row menu-row-stack" x-show="!donut && !(stacked && canStack)">
-                  <span class="menu-row-label">Ausrichtung
-                    <span class="menu-note" x-show="compare">Horizontal nicht bei aktivem Vergleich</span>
+                  <span class="menu-row-label">{{ _("Ausrichtung") }}
+                    <span class="menu-note" x-show="compare">{{ _("Horizontal nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <div class="seg">
-                    <button :class="{active: !horizontal}" @click="setHorizontal(false)">Vertikal</button>
-                    <button :class="{active: horizontal}" :disabled="compare" @click="setHorizontal(true)">Horizontal</button>
+                    <button :class="{active: !horizontal}" @click="setHorizontal(false)">{{ _("Vertikal") }}</button>
+                    <button :class="{active: horizontal}" :disabled="compare" @click="setHorizontal(true)">{{ _("Horizontal") }}</button>
                   </div>
                 </div>
                 <label class="menu-row" x-show="hasBarSeries && !donut">
-                  <span class="menu-row-label">Werte anzeigen</span>
+                  <span class="menu-row-label">{{ _("Werte anzeigen") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="showValues" @change="showValues = !showValues; render()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
                 <label class="menu-row" x-show="!donut">
-                  <span class="menu-row-label">Dynamische Y-Achse</span>
+                  <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
                          und irreführend: die wenigen Balken sollen als
@@ -359,9 +359,9 @@
                   </span>
                 </label>
                 <div class="menu-row menu-row-stack">
-                  <span class="menu-row-label">Nachkommastellen</span>
+                  <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
                   <div class="seg">
-                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">Auto</button>
+                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
                     <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
                     <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
                     <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
@@ -382,8 +382,8 @@
                      missverstanden. Dieselbe Konvention wie "Rollierend"
                      bei Auflösung "Tag" weiter oben. -->
                 <label class="menu-row" x-show="!donut">
-                  <span class="menu-row-label">Durchschnittslinie
-                    <span class="menu-note" x-show="stacked && canStack">nicht im gestapelten Modus</span>
+                  <span class="menu-row-label">{{ _("Durchschnittslinie") }}
+                    <span class="menu-note" x-show="stacked && canStack">{{ _("nicht im gestapelten Modus") }}</span>
                   </span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="averageLine" :disabled="stacked && canStack" @change="averageLine = !averageLine; render()">
@@ -401,14 +401,14 @@
                      bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
                      Linien-Serien. -->
                 <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries && !donut">
-                  <span class="menu-row-label">Darstellung</span>
+                  <span class="menu-row-label">{{ _("Darstellung") }}</span>
                   <div class="seg">
-                    <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">Flach</button>
-                    <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">Gleitend</button>
+                    <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">{{ _("Flach") }}</button>
+                    <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">{{ _("Gleitend") }}</button>
                   </div>
                 </div>
                 <label class="menu-row">
-                  <span class="menu-row-label">Statistik in Legende</span>
+                  <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
                     <span class="track"><span class="thumb"></span></span>
@@ -425,10 +425,10 @@
                   </template>
                 </div>
                 <div class="menu-row" x-show="chartStats">
-                  <span class="menu-row-label">Legenden-Stil</span>
+                  <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
                   <div class="seg">
-                    <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">Chips</button>
-                    <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'">Tabelle</button>
+                    <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">{{ _("Chips") }}</button>
+                    <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'">{{ _("Tabelle") }}</button>
                   </div>
                 </div>
               </div>
@@ -468,10 +468,10 @@
                    load(). Wirkt jetzt auch ohne Soll-Entität (siehe
                    yearsCompareActive). -->
               <span class="toolbar-field">
-                <span class="toolbar-field-label">Laufsumme</span>
+                <span class="toolbar-field-label">{{ _("Laufsumme") }}</span>
                 <div class="seg">
-                  <button type="button" :class="{active: !compareCumsum}" @click="compareCumsum = false; render()">Aus</button>
-                  <button type="button" :class="{active: compareCumsum}" @click="compareCumsum = true; render()">Ein</button>
+                  <button type="button" :class="{active: !compareCumsum}" @click="compareCumsum = false; render()">{{ _("Aus") }}</button>
+                  <button type="button" :class="{active: compareCumsum}" @click="compareCumsum = true; render()">{{ _("Ein") }}</button>
                 </div>
               </span>
               <!-- Soll Entität ist keine Sonderfunktion, sondern schlicht eine
@@ -486,14 +486,14 @@
                    Knopftexts, die sonst mit jeder Auswahl neu ausgemessen
                    würde. -->
               <span class="toolbar-field">
-                <span class="toolbar-field-label">Soll Entität</span>
+                <span class="toolbar-field-label">{{ _("Soll Entität") }}</span>
                 <span class="dd-picker-wrap soll-entity-picker" x-data="entityPicker(ENTITY_OPTIONS, compareSollEntityId, (id) => setSollEntity(id))" @click.outside="open = false">
                   <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}" @click="toggleOpen($refs.sollEntitySearch)">
                     <span x-text="entityId ? label(entityId) : 'Entität wählen …'"></span>
                   </button>
-                  <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+                  <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
                   <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
-                    <input type="search" class="dd-picker-popover-search" x-ref="sollEntitySearch" x-model="search" placeholder="Suchen …">
+                    <input type="search" class="dd-picker-popover-search" x-ref="sollEntitySearch" x-model="search" placeholder="{{ _('Suchen …') }}">
                     <template x-for="opt in filtered()" :key="opt.entity_id">
                       <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
                         <span x-text="opt.label"></span>
@@ -531,9 +531,9 @@
               <span class="dot" :style="{background: stat.color}"></span>
               <span class="name" x-text="stat.name"></span>
               <span class="values" x-show="chartStats">
-                <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="stat.last"></strong></span>
-                <span x-show="legendMetrics.includes('min')">Min <strong x-text="stat.min"></strong></span>
-                <span x-show="legendMetrics.includes('max')">Max <strong x-text="stat.max"></strong></span>
+                <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
                 <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
                 <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
               </span>
@@ -545,9 +545,9 @@
                 <span class="dot" :style="{background: stat.color}"></span>
                 <span class="compare-label" x-text="stat.compare ? stat.compare.seriesLabel + (stat.compare.period ? ' ' + stat.compare.period : '') : ''"></span>
                 <span class="values">
-                  <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="stat.compare?.last"></strong></span>
-                  <span x-show="legendMetrics.includes('min')">Min <strong x-text="stat.compare?.min"></strong></span>
-                  <span x-show="legendMetrics.includes('max')">Max <strong x-text="stat.compare?.max"></strong></span>
+                  <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.compare?.last"></strong>') }}</span>
+                  <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.compare?.min"></strong>') }}</span>
+                  <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.compare?.max"></strong>') }}</span>
                   <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.compare?.average"></strong></span>
                   <span x-show="legendMetrics.includes('sum') && stat.compare?.sum !== null">Σ <strong x-text="stat.compare?.sum"></strong></span>
                 </span>
@@ -567,9 +567,9 @@
               <span class="dot" :style="{background: stat.color}"></span>
               <span class="name" x-text="stat.name"></span>
               <span class="values" x-show="chartStats">
-                <span x-show="legendMetrics.includes('last')">Aktuell <strong x-text="stat.last"></strong></span>
-                <span x-show="legendMetrics.includes('min')">Min <strong x-text="stat.min"></strong></span>
-                <span x-show="legendMetrics.includes('max')">Max <strong x-text="stat.max"></strong></span>
+                <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
                 <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
                 <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
               </span>
@@ -592,10 +592,10 @@
           <table class="dt compact chart-legend-table">
             <thead>
               <tr>
-                <th class="legend-name-col">Name</th>
-                <th x-show="legendMetrics.includes('last')">Aktuell</th>
-                <th x-show="legendMetrics.includes('min')">Min</th>
-                <th x-show="legendMetrics.includes('max')">Max</th>
+                <th class="legend-name-col">{{ _("Name") }}</th>
+                <th x-show="legendMetrics.includes('last')">{{ _("Aktuell") }}</th>
+                <th x-show="legendMetrics.includes('min')">{{ _("Min") }}</th>
+                <th x-show="legendMetrics.includes('max')">{{ _("Max") }}</th>
                 <th x-show="legendMetrics.includes('average')">Ø</th>
                 <th x-show="legendMetrics.includes('sum')">Σ</th>
               </tr>
@@ -644,12 +644,12 @@
         </div>
 
         <div class="save-row" x-show="editing">
-          <input type="text" placeholder="Name des Charts …" maxlength="{{ max_name_length }}" x-model="name">
+          <input type="text" placeholder="{{ _('Name des Charts …') }}" maxlength="{{ max_name_length }}" x-model="name">
           {% if chart_id %}
-          <button type="button" class="btn btn-danger" @click="deleteChart()">Löschen</button>
+          <button type="button" class="btn btn-danger" @click="deleteChart()">{{ _("Löschen") }}</button>
           {% endif %}
-          <button type="button" class="btn" @click="cancelEdit()">Abbrechen</button>
-          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if chart_id else "Chart erstellen" }}</button>
+          <button type="button" class="btn" @click="cancelEdit()">{{ _("Abbrechen") }}</button>
+          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ _("Speichern") if chart_id else _("Chart erstellen") }}</button>
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
     </div>

@@ -19,8 +19,8 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Startseite {{ hint_button('Startseite') }}</div>
-      {% call hint_body('settings-compact-hint') %}Erste Seite beim Öffnen, z. B. über die HA-Sidebar{% endcall %}
+      <div class="settings-compact-label">{{ _("Startseite") }} {{ hint_button(_('Startseite')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Erste Seite beim Öffnen, z. B. über die HA-Sidebar") }}{% endcall %}
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="startseite-btn" onclick="toggleDDPicker('startseite')">{% for k, l in startseite_options %}{% if k == startseite %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -35,8 +35,8 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Farbschema {{ hint_button('Farbschema') }}</div>
-      {% call hint_body('settings-compact-hint') %}Petrol/Kupfer, HA-Blau oder Cobalt/Teal{% endcall %}
+      <div class="settings-compact-label">{{ _("Farbschema") }} {{ hint_button(_('Farbschema')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Petrol/Kupfer, HA-Blau oder Cobalt/Teal") }}{% endcall %}
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="color-scheme-btn" onclick="toggleDDPicker('color-scheme')">{% for k, l in color_scheme_options %}{% if k == color_scheme %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -51,8 +51,8 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Darstellungsmodus {{ hint_button('Darstellungsmodus') }}</div>
-      {% call hint_body('settings-compact-hint') %}Hell/Dunkel vom System oder fest gewählt{% endcall %}
+      <div class="settings-compact-label">{{ _("Darstellungsmodus") }} {{ hint_button(_('Darstellungsmodus')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Hell/Dunkel vom System oder fest gewählt") }}{% endcall %}
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="color-mode-btn" onclick="toggleDDPicker('color-mode')">{% for k, l in color_mode_options %}{% if k == color_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -67,8 +67,8 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Schriftgröße {{ hint_button('Schriftgröße') }}</div>
-      {% call hint_body('settings-compact-hint') %}Hier sofort, andere Seiten beim Neuladen{% endcall %}
+      <div class="settings-compact-label">{{ _("Schriftgröße") }} {{ hint_button(_('Schriftgröße')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Hier sofort, andere Seiten beim Neuladen") }}{% endcall %}
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="font-scale-btn" onclick="toggleDDPicker('font-scale')">{% for k, l in font_scale_options %}{% if k == font_scale %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -83,8 +83,8 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Dashboard-Animation {{ hint_button('Dashboard-Animation') }}</div>
-      {% call hint_body('settings-compact-hint') %}Charts auf den Kacheln animiert aufbauen{% endcall %}
+      <div class="settings-compact-label">{{ _("Dashboard-Animation") }} {{ hint_button(_('Dashboard-Animation')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Charts auf den Kacheln animiert aufbauen") }}{% endcall %}
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="dashboard-animation-btn" onclick="toggleDDPicker('dashboard-animation')">{% for k, l in dashboard_animation_options %}{% if k == dashboard_animation %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -100,18 +100,18 @@
 </div>
 
 <div class="settings-minor-section">
-  <h4 class="settings-minor-title">Chart-Optionen (Standardwerte) {{ hint_button('Chart-Optionen') }}</h4>
-  {% call hint_body() %}Startwerte für das Optionen-Menü der Chart-Seite. Wird dort etwas geändert, gilt das dauerhaft für diese eine Entität — bis „Auf Standard zurücksetzen“.{% endcall %}
+  <h4 class="settings-minor-title">{{ _("Chart-Optionen (Standardwerte)") }} {{ hint_button(_('Chart-Optionen')) }}</h4>
+  {% call hint_body() %}{{ _("Startwerte für das Optionen-Menü der Chart-Seite. Wird dort etwas geändert, gilt das dauerhaft für diese eine Entität — bis „Auf Standard zurücksetzen“.") }}{% endcall %}
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Rollierend {{ hint_button('Rollierend') }}</div>
+        <div class="settings-compact-label">{{ _("Rollierend") }} {{ hint_button(_('Rollierend')) }}</div>
         {# Der Hinweis lautete "Linie statt Treppenstufen zwischen Punkten"
            und beschrieb damit etwas, das es in dieser App gar nicht gibt:
            einen Treppenstufen-Modus (test_line_chart_hold.py wacht sogar
            darüber, dass keiner existiert). Der Schalter setzt in Wahrheit
            den Zeitraum der Abfrage. #}
-        {% call hint_body('settings-compact-hint') %}Zeitraum relativ zu jetzt statt ab Kalendergrenze: „Tag“ = letzte 24 Stunden{% endcall %}
+        {% call hint_body('settings-compact-hint') %}{{ _("Zeitraum relativ zu jetzt statt ab Kalendergrenze: „Tag“ = letzte 24 Stunden") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-continuous-btn" onclick="toggleDDPicker('entity-continuous')">{% for k, l in on_off_options %}{% if k == entity_continuous %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -126,8 +126,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Rohwerte {{ hint_button('Rohwerte') }}</div>
-        {% call hint_body('settings-compact-hint') %}Ungeglättete Einzelwerte statt Aggregation{% endcall %}
+        <div class="settings-compact-label">{{ _("Rohwerte") }} {{ hint_button(_('Rohwerte')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Ungeglättete Einzelwerte statt Aggregation") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-raw-btn" onclick="toggleDDPicker('entity-raw')">{% for k, l in on_off_options %}{% if k == entity_raw %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -142,8 +142,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Punkte {{ hint_button('Punkte') }}</div>
-        {% call hint_body('settings-compact-hint') %}Datenpunkte auf der Linie markieren{% endcall %}
+        <div class="settings-compact-label">{{ _("Punkte") }} {{ hint_button(_('Punkte')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Datenpunkte auf der Linie markieren") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-show-points-btn" onclick="toggleDDPicker('entity-show-points')">{% for k, l in on_off_options %}{% if k == entity_show_points %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -158,8 +158,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Werte anzeigen {{ hint_button('Werte anzeigen') }}</div>
-        {% call hint_body('settings-compact-hint') %}Zahlenwerte direkt am Punkt einblenden{% endcall %}
+        <div class="settings-compact-label">{{ _("Werte anzeigen") }} {{ hint_button(_('Werte anzeigen')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Zahlenwerte direkt am Punkt einblenden") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-show-values-btn" onclick="toggleDDPicker('entity-show-values')">{% for k, l in on_off_options %}{% if k == entity_show_values %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -174,8 +174,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Dynamische Y-Achse {{ hint_button('Dynamische Y-Achse') }}</div>
-        {% call hint_body('settings-compact-hint') %}Skala passt sich dem sichtbaren Bereich an{% endcall %}
+        <div class="settings-compact-label">{{ _("Dynamische Y-Achse") }} {{ hint_button(_('Dynamische Y-Achse')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Skala passt sich dem sichtbaren Bereich an") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-dynamic-y-axis-btn" onclick="toggleDDPicker('entity-dynamic-y-axis')">{% for k, l in on_off_options %}{% if k == entity_dynamic_y_axis %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -190,8 +190,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Statistik in Legende {{ hint_button('Statistik in Legende') }}</div>
-        {% call hint_body('settings-compact-hint') %}Min/Max/Ø direkt in der Legende zeigen{% endcall %}
+        <div class="settings-compact-label">{{ _("Statistik in Legende") }} {{ hint_button(_('Statistik in Legende')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Min/Max/Ø direkt in der Legende zeigen") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-chart-stats-btn" onclick="toggleDDPicker('entity-chart-stats')">{% for k, l in on_off_options %}{% if k == entity_chart_stats %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -206,8 +206,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Legenden-Kennzahlen {{ hint_button('Legenden-Kennzahlen') }}</div>
-        {% call hint_body('settings-compact-hint') %}Welche Kennzahlen die Legende zeigt{% endcall %}
+        <div class="settings-compact-label">{{ _("Legenden-Kennzahlen") }} {{ hint_button(_('Legenden-Kennzahlen')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Welche Kennzahlen die Legende zeigt") }}{% endcall %}
       </div>
       <div class="legend-metrics-row" style="padding:0;justify-content:flex-end;"
            hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML"
@@ -224,8 +224,8 @@
     </div>
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
-        <div class="settings-compact-label">Legenden-Stil {{ hint_button('Legenden-Stil') }}</div>
-        {% call hint_body('settings-compact-hint') %}Darstellung der Legendeneinträge{% endcall %}
+        <div class="settings-compact-label">{{ _("Legenden-Stil") }} {{ hint_button(_('Legenden-Stil')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Darstellung der Legendeneinträge") }}{% endcall %}
       </div>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="entity-legend-style-btn" onclick="toggleDDPicker('entity-legend-style')">{% for k, l in entity_legend_style_options %}{% if k == entity_legend_style %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -240,4 +240,4 @@
     </div>
   </div>
 </div>
-{% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+{% if saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}

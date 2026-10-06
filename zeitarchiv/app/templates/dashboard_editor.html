@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_hints.html" import hint_button, hint_body %}
-{% block title %}Zeitarchiv — {{ dashboard.name if dashboard else "Neues Dashboard" }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — {v1}", v1=(dashboard.name if dashboard else _("Neues Dashboard"))) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/dashboard_editor.css') }}">
 {% endblock %}
@@ -12,7 +12,7 @@
 
     <div class="settings-panel">
       <div class="dash-editor-title-row">
-        <h2>{{ "Dashboard bearbeiten" if dashboard else "Neues Dashboard" }}</h2>
+        <h2>{{ _("Dashboard bearbeiten") if dashboard else _("Neues Dashboard") }}</h2>
       </div>
       <p class="sub">{{ _("Name und Fixierung dieses Dashboards.") }}</p>
 
@@ -28,7 +28,7 @@
             <input type="checkbox" id="dash-locked" x-model="locked">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-locked">Fixiert {{ hint_button('Fixiert') }}</label>
+          <label for="dash-locked">{{ _("Fixiert") }} {{ hint_button(_('Fixiert')) }}</label>
         </div>
         {% call hint_body() %}{{ _("Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.") }}{% endcall %}
       </div>
@@ -39,7 +39,7 @@
             <input type="checkbox" id="dash-precise" x-model="preciseMode">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-precise">Präziser Modus {{ hint_button('Präziser Modus') }}</label>
+          <label for="dash-precise">{{ _("Präziser Modus") }} {{ hint_button(_('Präziser Modus')) }}</label>
         </div>
         {% call hint_body() %}{{ _("Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.") }}{% endcall %}
       </div>
@@ -50,7 +50,7 @@
             <input type="checkbox" id="dash-fill-gaps" x-model="fillGaps">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-fill-gaps">Lücken auffüllen {{ hint_button('Lücken auffüllen') }}</label>
+          <label for="dash-fill-gaps">{{ _("Lücken auffüllen") }} {{ hint_button(_('Lücken auffüllen')) }}</label>
         </div>
         {% call hint_body() %}{{ _("Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.") }}{% endcall %}
       </div>
@@ -61,7 +61,7 @@
         <button type="button" class="btn btn-danger" @click="deleteDashboard()">{{ _("Löschen") }}</button>
         {% endif %}
         <a class="btn" href="{{ app_root }}/dashboards{{ ('/' ~ dashboard.id) if dashboard else '' }}">{{ _("Abbrechen") }}</a>
-        <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if dashboard else "Dashboard erstellen" }}</button>
+        <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ _("Speichern") if dashboard else _("Dashboard erstellen") }}</button>
         <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
       </div>
     </div>

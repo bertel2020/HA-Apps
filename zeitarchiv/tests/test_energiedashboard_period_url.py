@@ -10,7 +10,7 @@ liest sie beim Laden wieder ein."""
 from __future__ import annotations
 
 
-from _paths import APP
+from _paths import APP, template_text
 
 
 JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
@@ -48,7 +48,7 @@ def test_set_range_go_back_and_go_forward_all_sync_the_url() -> None:
     assert "syncUrlWithPeriod(this.range, this.offset);" in go_forward
 
 
-REPORT_TEMPLATE = (APP / "templates/_energiedashboard_report.html").read_text(encoding="utf-8")
+REPORT_TEMPLATE = template_text("_energiedashboard_report.html")
 ROUTES_SOURCE = (APP / "energiedashboard_routes.py").read_text(encoding="utf-8")
 
 

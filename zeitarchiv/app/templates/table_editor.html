@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_hints.html" import hint_button, hint_body %}
-{% block title %}Zeitarchiv — {{ table_name or "Neue Tabelle" }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — {v1}", v1=(table_name or _("Neue Tabelle"))) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/table_editor.css') }}">
 {% endblock %}
@@ -8,47 +8,47 @@
   {% from "_icons.html" import custom_name_icon %}
   
   <div class="page" x-data="tableEditor()">
-    <h1>Tabellen</h1>
-    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen. &middot; <a href="{{ app_root }}/tables">&larr; zurück zu Tabellen</a></p>
+    <h1>{{ _("Tabellen") }}</h1>
+    <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen. &middot;") }} <a href="{{ app_root }}/tables">{{ _("&larr; zurück zu Tabellen") }}</a></p>
 
     <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (tableId ? 'Tabelle bearbeiten' : 'Neue Tabelle') : (name || 'Neue Tabelle')"></h2>
           <div style="display:flex;gap:8px;">
-            <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="Aktuell berechnete Tabelle als CSV herunterladen" @click="exportCsv()">CSV</button>
+            <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="{{ _('Aktuell berechnete Tabelle als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if table_id %}
-            <button type="button" class="btn" x-show="!editing" @click="editing = true">Anpassen</button>
+            <button type="button" class="btn" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
             {% endif %}
           </div>
         </div>
         {% if table_id %}{% include "_dashboard_usage.html" %}{% endif %}
-        <p class="sub" x-show="editing">Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum) — dieselbe Perioden-Logik wie bei Charts, nur tabellarisch statt grafisch. Zeigt beim Ansehen immer aktuelle Werte, kein eingefrorener Schnappschuss.</p>
+        <p class="sub" x-show="editing">{{ _("Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum) — dieselbe Perioden-Logik wie bei Charts, nur tabellarisch statt grafisch. Zeigt beim Ansehen immer aktuelle Werte, kein eingefrorener Schnappschuss.") }}</p>
 
         <template x-if="editing">
           <div>
-            <h3 class="tbl-h">Spalten (Zeiträume) {{ hint_button('Spalten') }}</h3>
-            {% call hint_body('tbl-hint') %}Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ „Monat“ also -12. Reihenfolge per Ziehen oder über die Pfeile.{% endcall %}
+            <h3 class="tbl-h">{{ _("Spalten (Zeiträume)") }} {{ hint_button(_('Spalten')) }}</h3>
+            {% call hint_body('tbl-hint') %}{{ _("Jede Spalte ist ein frei benannter Zeitraum — Bezeichnung und Berechnung sind getrennt; ohne eigene Beschriftung gilt der graue Vorschlag. Der Versatz zählt Perioden zurück: 0 = aktuell, -1 = eine zurück (nie positiv), für den Vorjahresmonat bei Typ „Monat“ also -12. Reihenfolge per Ziehen oder über die Pfeile.") }}{% endcall %}
             <div class="tbl-columns">
               <template x-for="(col, idx) in columns" :key="col.uid">
                 <div class="tbl-col-card" draggable="true" :data-col-uid="col.uid" :class="{'tbl-col-card-hidden': col.hidden}">
                   <div class="tbl-col-top">
                     <span class="tbl-col-top-left">
-                      <span class="drag-handle" data-tooltip="Ziehen zum Verschieben" aria-hidden="true"></span>
+                      <span class="drag-handle" data-tooltip="{{ _('Ziehen zum Verschieben') }}" aria-hidden="true"></span>
                       <span class="tbl-col-number" x-text="idx + 1"></span>
                     </span>
                     <span class="tbl-col-move">
-                      <button type="button" data-tooltip="Spalte nach links" :disabled="idx === 0" @click="moveColumn(col.uid, -1)">←</button>
-                      <button type="button" data-tooltip="Spalte nach rechts" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
+                      <button type="button" data-tooltip="{{ _('Spalte nach links') }}" :disabled="idx === 0" @click="moveColumn(col.uid, -1)">←</button>
+                      <button type="button" data-tooltip="{{ _('Spalte nach rechts') }}" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
                     </span>
                     <button type="button" class="tbl-col-hide" :class="{active: col.hidden}"
                             :data-tooltip="col.hidden ? 'Spalte einblenden' : 'Spalte ausblenden'" @click="col.hidden = !col.hidden">
                       <svg x-show="!col.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       <svg x-show="col.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </button>
-                    <button type="button" class="tbl-duplicate-btn" data-tooltip="Spalte duplizieren" @click="duplicateColumn(col.uid)">⧉</button>
-                    <button type="button" class="tbl-col-remove" data-tooltip="Spalte entfernen" @click="removeColumn(col.uid)">×</button>
+                    <button type="button" class="tbl-duplicate-btn" data-tooltip="{{ _('Spalte duplizieren') }}" @click="duplicateColumn(col.uid)">⧉</button>
+                    <button type="button" class="tbl-col-remove" data-tooltip="{{ _('Spalte entfernen') }}" @click="removeColumn(col.uid)">×</button>
                   </div>
-                  <span class="tbl-field-label">Beschriftung</span>
+                  <span class="tbl-field-label">{{ _("Beschriftung") }}</span>
                   <!-- position:fixed aus demselben Grund wie die beiden
                        Picker unten (.tbl-columns scrollt horizontal). Der
                        Button sitzt im Feld selbst (padding-right auf dem
@@ -56,7 +56,7 @@
                        .tbl-label-wrap oben im CSS. -->
                   <span class="tbl-label-wrap" x-data="{ open: false, top: 0, left: 0 }" @click.outside="open = false">
                     <input type="text" x-ref="input" :placeholder="suggestColumnLabel(col)" x-model="col.label">
-                    <button type="button" class="tbl-label-var-btn" data-tooltip="Variable einfügen" aria-label="Variable einfügen"
+                    <button type="button" class="tbl-label-var-btn" data-tooltip="{{ _('Variable einfügen') }}" aria-label="{{ _('Variable einfügen') }}"
                             @click="open = !open; if (open) { const r = $el.getBoundingClientRect(); top = r.bottom + 6; left = r.left; }">{}</button>
                     <div class="dd-picker-popover dd-picker-popover-alpine tbl-var-popover" x-show="open" x-cloak
                          :style="`position:fixed;top:${top}px;left:${left}px;`">
@@ -68,9 +68,9 @@
                       </template>
                     </div>
                   </span>
-                  <span class="tbl-field-label">Gruppen-Beschriftung (optional)</span>
-                  <input type="text" placeholder="z. B. „2025“ — überspannt mehrere Spalten" maxlength="30" x-model="col.group_label">
-                  <span class="tbl-field-label">Zeitraum-Typ</span>
+                  <span class="tbl-field-label">{{ _("Gruppen-Beschriftung (optional)") }}</span>
+                  <input type="text" placeholder="{{ _('z. B. „2025“ — überspannt mehrere Spalten') }}" maxlength="30" x-model="col.group_label">
+                  <span class="tbl-field-label">{{ _("Zeitraum-Typ") }}</span>
                   <!-- x-data lokal statt col.xxx: .tbl-columns scrollt horizontal
                        (overflow-x:auto), was rechnerisch auch overflow-y:auto
                        erzwingt (CSS-Spec) — ein normal positioniertes Popover
@@ -93,12 +93,12 @@
                   <span class="tbl-field-label" x-text="`Versatz (${versatzUnit(col)})`"></span>
                   <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
                   <label class="cbx">
-                    <input type="checkbox" x-model="col.year_over_year" @change="load()"> Vorjahresvergleich
+                    <input type="checkbox" x-model="col.year_over_year" @change="load()"> {{ _("Vorjahresvergleich") }}
                   </label>
-                  <label class="cbx" data-tooltip="Färbt die Zellen dieser Spalte nach ihrem Wert ein — z. B. welche Entität diesen Zeitraum am meisten verbraucht">
-                    <input type="checkbox" x-model="col.heatmap"> Farbskala
+                  <label class="cbx" data-tooltip="{{ _('Färbt die Zellen dieser Spalte nach ihrem Wert ein — z. B. welche Entität diesen Zeitraum am meisten verbraucht') }}">
+                    <input type="checkbox" x-model="col.heatmap"> {{ _("Farbskala") }}
                   </label>
-                  <span class="tbl-field-label">Nachkommastellen</span>
+                  <span class="tbl-field-label">{{ _("Nachkommastellen") }}</span>
                   <!-- position:fixed aus demselben Grund wie beim Zeitraum-Typ-
                        Picker oben (.tbl-columns scrollt horizontal, ein normal
                        positioniertes Popover würde unten abgeschnitten). -->
@@ -116,15 +116,15 @@
                   </span>
                 </div>
               </template>
-              <button type="button" class="tbl-col-add" @click="addColumn()" data-tooltip="Spalte hinzufügen">+</button>
+              <button type="button" class="tbl-col-add" @click="addColumn()" data-tooltip="{{ _('Spalte hinzufügen') }}">+</button>
             </div>
 
-            <h3 class="tbl-h">Zeilen (Größen) {{ hint_button('Zeilen') }}</h3>
-            {% call hint_body('tbl-hint') %}<strong>Entität</strong>: genau eine. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet mit den Kürzeln links — nur mit Zeilen darüber, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.{% endcall %}
+            <h3 class="tbl-h">{{ _("Zeilen (Größen)") }} {{ hint_button(_('Zeilen')) }}</h3>
+            {% call hint_body('tbl-hint') %}{{ _("<strong>Entität</strong>: genau eine. <strong>Gruppe</strong>: mehrere als Summen-Zeile. <strong>Formel</strong>: rechnet mit den Kürzeln links — nur mit Zeilen darüber, z. B. <code>A / B * 100</code>. <strong>Trennlinie</strong>: rein optisch, ohne Daten. Reihenfolge per Ziehen oder über die Pfeile.") }}{% endcall %}
             <div class="tbl-rows" id="tbl-rows">
               <template x-for="(row, idx) in rows" :key="row.uid">
                 <div class="tbl-row-card" draggable="true" :data-row-uid="row.uid" :class="{'tbl-row-card-hidden': row.hidden}">
-                  <span class="drag-handle" data-tooltip="Ziehen zum Verschieben" aria-hidden="true" style="margin-top:5px;"></span>
+                  <span class="drag-handle" data-tooltip="{{ _('Ziehen zum Verschieben') }}" aria-hidden="true" style="margin-top:5px;"></span>
                   <div class="tbl-row-letter" x-text="row.row_type === 'separator' ? '—' : rowLetters[row.uid]"></div>
                   <div class="tbl-row-main">
                     <div class="tbl-row-top">
@@ -147,16 +147,16 @@
                                 @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
                                 x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
                         <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
-                                @click.stop="clearSelection()" data-tooltip="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+                                @click.stop="clearSelection()" data-tooltip="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
                         <div class="dd-picker-popover dd-picker-popover-alpine tbl-group-popover" x-show="open" x-cloak>
-                          <input type="search" x-ref="rowEntitySearch" x-model="search" placeholder="Suchen …">
+                          <input type="search" x-ref="rowEntitySearch" x-model="search" placeholder="{{ _('Suchen …') }}">
                           <template x-for="opt in filtered()" :key="opt.entity_id">
                             <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
                                  @click="select(opt.entity_id)"
                                  @mouseenter="scheduleHover(opt, $event.currentTarget)"
                                  @mouseleave="clearHover()">
                               <span x-text="opt.label"></span>
-                              <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+                              <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="{{ _('App-eigener Anzeigename') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
                             </div>
                           </template>
                         </div>
@@ -173,7 +173,7 @@
                         <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
                                 x-text="row.entity_ids.length ? row.entity_ids.length + ' Entität' + (row.entity_ids.length !== 1 ? 'en' : '') + ' ausgewählt' : 'Entitäten wählen …'"></button>
                         <div class="tbl-group-popover" x-show="row.pickerOpen" x-cloak>
-                          <input type="search" placeholder="Suchen …" x-model="row.search">
+                          <input type="search" placeholder="{{ _('Suchen …') }}" x-model="row.search">
                           {% for opt in entity_options %}
                           <label class="tbl-group-row" x-show='!row.search || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.search.toLowerCase())'>
                             <input type="checkbox" value="{{ opt.entity_id }}"
@@ -206,7 +206,7 @@
 
                       <span class="dd-picker-wrap tbl-agg-picker" x-show="row.row_type === 'summary'" @click.outside="row.aggPickerOpen = false">
                         <button type="button" class="btn" @click="row.aggPickerOpen = !row.aggPickerOpen"
-                                data-tooltip="Summe oder Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
+                                data-tooltip="{{ _('Summe oder Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie') }}" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
                         <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.aggPickerOpen" x-cloak>
                           <template x-for="[value, label] in SUMMARY_AGG_OPTIONS" :key="value">
                             <div class="dd-picker-row" :class="{active: row.aggregation === value}"
@@ -219,7 +219,7 @@
                              placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
                              :data-tooltip="'Formel — verfügbar: ' + (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || '– (keine Zeile oberhalb)')">
                       <input type="text" class="tbl-formula-input tbl-formula-unit-inline" x-show="row.row_type === 'formula'"
-                             :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" data-tooltip="Einheit">
+                             :placeholder="suggestFormulaUnit(row) || 'Auto'" x-model="row.formula_unit" @change="load()" data-tooltip="{{ _('Einheit') }}">
 
                       <span class="tbl-row-gap tbl-row-gap-agg" aria-hidden="true"
                             x-show="row.row_type === 'separator'"></span>
@@ -236,26 +236,26 @@
                              ist, damit man den aktiven Zustand nicht erst im
                              Menü nachsehen muss. -->
                         <span class="dd-picker-wrap" @click.outside="row.optsPickerOpen = false">
-                          <button type="button" class="chip tbl-row-chip" :class="{active: rowOptionsActive(row)}" @click="row.optsPickerOpen = !row.optsPickerOpen">Optionen ▾</button>
+                          <button type="button" class="chip tbl-row-chip" :class="{active: rowOptionsActive(row)}" @click="row.optsPickerOpen = !row.optsPickerOpen">{{ _("Optionen ▾") }}</button>
                           <div class="dd-picker-popover dd-picker-popover-alpine tbl-row-opts-popover" x-show="row.optsPickerOpen" x-cloak>
-                            <label class="dd-picker-row"><input type="checkbox" x-model="row.bold"><span>Fett</span></label>
-                            <label class="dd-picker-row" x-show="row.row_type === 'separator'"><input type="checkbox" x-model="row.show_label"><span>Als Überschrift zeigen</span></label>
-                            <label class="dd-picker-row" x-show="row.row_type === 'formula'"><input type="checkbox" x-model="row.accent"><span>Hervorheben</span></label>
-                            <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.percent_of_total"><span>% Anteil</span></label>
-                            <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.hide_if_empty"><span>Bei 0 ausblenden</span></label>
+                            <label class="dd-picker-row"><input type="checkbox" x-model="row.bold"><span>{{ _("Fett") }}</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'separator'"><input type="checkbox" x-model="row.show_label"><span>{{ _("Als Überschrift zeigen") }}</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'formula'"><input type="checkbox" x-model="row.accent"><span>{{ _("Hervorheben") }}</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.percent_of_total"><span>{{ _("% Anteil") }}</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.hide_if_empty"><span>{{ _("Bei 0 ausblenden") }}</span></label>
                           </div>
                         </span>
                         <div class="tbl-row-move">
-                          <button type="button" data-tooltip="Zeile nach oben" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
-                          <button type="button" data-tooltip="Zeile nach unten" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
+                          <button type="button" data-tooltip="{{ _('Zeile nach oben') }}" :disabled="idx === 0" @click="moveRow(row.uid, -1)">↑</button>
+                          <button type="button" data-tooltip="{{ _('Zeile nach unten') }}" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
                         </div>
                         <button type="button" class="tbl-row-hide" :class="{active: row.hidden}"
                                 :data-tooltip="row.hidden ? 'Zeile einblenden' : 'Zeile ausblenden'" @click="row.hidden = !row.hidden">
                           <svg x-show="!row.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           <svg x-show="row.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </button>
-                        <button type="button" class="tbl-duplicate-btn" data-tooltip="Zeile duplizieren" @click="duplicateRow(row.uid)">⧉</button>
-                        <button type="button" class="tbl-row-remove" data-tooltip="Zeile entfernen" @click="removeRow(row.uid)">×</button>
+                        <button type="button" class="tbl-duplicate-btn" data-tooltip="{{ _('Zeile duplizieren') }}" @click="duplicateRow(row.uid)">⧉</button>
+                        <button type="button" class="tbl-row-remove" data-tooltip="{{ _('Zeile entfernen') }}" @click="removeRow(row.uid)">×</button>
                       </div>
                     </div>
                   </div>
@@ -263,49 +263,49 @@
               </template>
             </div>
             <div class="tbl-add-row-bar">
-              <button type="button" class="btn" @click="addRow('entity')">+ Entität</button>
-              <button type="button" class="btn" @click="addRow('group')">+ Gruppe</button>
-              <button type="button" class="btn" @click="addRow('formula')">+ Formel</button>
-              <button type="button" class="btn" data-tooltip="Summe/Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie — aktualisiert sich automatisch, wenn darüber Zeilen hinzukommen oder wegfallen" @click="addRow('summary')">+ Summenzeile</button>
-              <button type="button" class="btn" @click="addRow('separator')">+ Trennlinie</button>
+              <button type="button" class="btn" @click="addRow('entity')">{{ _("+ Entität") }}</button>
+              <button type="button" class="btn" @click="addRow('group')">{{ _("+ Gruppe") }}</button>
+              <button type="button" class="btn" @click="addRow('formula')">{{ _("+ Formel") }}</button>
+              <button type="button" class="btn" data-tooltip="{{ _('Summe/Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie — aktualisiert sich automatisch, wenn darüber Zeilen hinzukommen oder wegfallen') }}" @click="addRow('summary')">{{ _("+ Summenzeile") }}</button>
+              <button type="button" class="btn" @click="addRow('separator')">{{ _("+ Trennlinie") }}</button>
             </div>
 
-            <h3 class="tbl-h">Darstellung {{ hint_button('Darstellung') }}</h3>
-            {% call hint_body('tbl-hint') %}Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).{% endcall %}
+            <h3 class="tbl-h">{{ _("Darstellung") }} {{ hint_button(_('Darstellung')) }}</h3>
+            {% call hint_body('tbl-hint') %}{{ _("Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).") }}{% endcall %}
             <div class="tbl-style-groups">
               <div>
-                <p class="tbl-style-group-label">Hervorhebung</p>
+                <p class="tbl-style-group-label">{{ _("Hervorhebung") }}</p>
                 <div class="tbl-style-group-chips">
-                  <button type="button" class="chip" :class="{active: style.zebra}" data-tooltip="Abwechselnder Zeilenhintergrund, erleichtert das zeilenweise Lesen" @click="style.zebra = !style.zebra">Zebra-Streifen</button>
-                  <button type="button" class="chip" :class="{active: style.first_col_accent}" data-tooltip="Erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt — berücksichtigt aktives Zebra-Muster" @click="style.first_col_accent = !style.first_col_accent">Erste Spalte hervorheben</button>
-                  <button type="button" class="chip" :class="{active: style.header_accent}" data-tooltip="Kopfzeile (Zeiträume) in der Akzentfarbe" @click="style.header_accent = !style.header_accent">Header hervorheben</button>
-                  <button type="button" class="chip" :class="{active: style.first_col_bold}" data-tooltip="Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung" @click="style.first_col_bold = !style.first_col_bold">Beschriftung fett</button>
+                  <button type="button" class="chip" :class="{active: style.zebra}" data-tooltip="{{ _('Abwechselnder Zeilenhintergrund, erleichtert das zeilenweise Lesen') }}" @click="style.zebra = !style.zebra">{{ _("Zebra-Streifen") }}</button>
+                  <button type="button" class="chip" :class="{active: style.first_col_accent}" data-tooltip="{{ _('Erste Spalte (Beschriftung) dezent in der Akzentfarbe eingefärbt — berücksichtigt aktives Zebra-Muster') }}" @click="style.first_col_accent = !style.first_col_accent">{{ _("Erste Spalte hervorheben") }}</button>
+                  <button type="button" class="chip" :class="{active: style.header_accent}" data-tooltip="{{ _('Kopfzeile (Zeiträume) in der Akzentfarbe') }}" @click="style.header_accent = !style.header_accent">{{ _("Header hervorheben") }}</button>
+                  <button type="button" class="chip" :class="{active: style.first_col_bold}" data-tooltip="{{ _('Text der ersten Spalte fett, unabhängig von der Farb-Hervorhebung') }}" @click="style.first_col_bold = !style.first_col_bold">{{ _("Beschriftung fett") }}</button>
                 </div>
               </div>
               <div>
-                <p class="tbl-style-group-label">Vergleich</p>
+                <p class="tbl-style-group-label">{{ _("Vergleich") }}</p>
                 <div class="tbl-style-group-chips">
-                  <button type="button" class="chip" :class="{active: style.comparison_columns}" data-tooltip="Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen" @click="style.comparison_columns = !style.comparison_columns">Vergleichsspalten absetzen</button>
-                  <button type="button" class="chip" :class="{active: style.show_deviation}" data-tooltip="Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte" @click="style.show_deviation = !style.show_deviation">Abweichung zum Vergleich</button>
+                  <button type="button" class="chip" :class="{active: style.comparison_columns}" data-tooltip="{{ _('Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen') }}" @click="style.comparison_columns = !style.comparison_columns">{{ _("Vergleichsspalten absetzen") }}</button>
+                  <button type="button" class="chip" :class="{active: style.show_deviation}" data-tooltip="{{ _('Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte') }}" @click="style.show_deviation = !style.show_deviation">{{ _("Abweichung zum Vergleich") }}</button>
                 </div>
               </div>
               <div>
-                <p class="tbl-style-group-label">Zahlen / Einheiten</p>
+                <p class="tbl-style-group-label">{{ _("Zahlen / Einheiten") }}</p>
                 <div class="tbl-style-group-chips">
-                  <button type="button" class="chip" :class="{active: style.show_units}" data-tooltip="Einheiten wie kWh oder °C in Tabellenzellen ein- oder ausblenden" @click="style.show_units = !style.show_units">Einheiten anzeigen</button>
-                  <button type="button" class="chip" :class="{active: style.align_units}" data-tooltip="Einheiten innerhalb der Zahlenzellen in einer festen Spalte ausrichten" @click="style.align_units = !style.align_units">Einheiten ausrichten</button>
-                  <button type="button" class="chip" :class="{active: style.small_units}" data-tooltip="Einheiten kleiner und optisch zurückhaltender als den Zahlenwert darstellen" @click="style.small_units = !style.small_units">Einheiten kleiner</button>
-                  <button type="button" class="chip" :class="{active: style.align_numbers}" data-tooltip="Dezimaltrennzeichen und Nachkommastellen innerhalb jeder Spalte ausrichten" @click="style.align_numbers = !style.align_numbers">Dezimalstellen ausrichten</button>
-                  <button type="button" class="chip" :class="{active: style.explicit_missing}" data-tooltip="Fehlende Werte als „Keine Daten“ statt als Gedankenstrich anzeigen" @click="style.explicit_missing = !style.explicit_missing">Fehlende Werte ausschreiben</button>
+                  <button type="button" class="chip" :class="{active: style.show_units}" data-tooltip="{{ _('Einheiten wie kWh oder °C in Tabellenzellen ein- oder ausblenden') }}" @click="style.show_units = !style.show_units">{{ _("Einheiten anzeigen") }}</button>
+                  <button type="button" class="chip" :class="{active: style.align_units}" data-tooltip="{{ _('Einheiten innerhalb der Zahlenzellen in einer festen Spalte ausrichten') }}" @click="style.align_units = !style.align_units">{{ _("Einheiten ausrichten") }}</button>
+                  <button type="button" class="chip" :class="{active: style.small_units}" data-tooltip="{{ _('Einheiten kleiner und optisch zurückhaltender als den Zahlenwert darstellen') }}" @click="style.small_units = !style.small_units">{{ _("Einheiten kleiner") }}</button>
+                  <button type="button" class="chip" :class="{active: style.align_numbers}" data-tooltip="{{ _('Dezimaltrennzeichen und Nachkommastellen innerhalb jeder Spalte ausrichten') }}" @click="style.align_numbers = !style.align_numbers">{{ _("Dezimalstellen ausrichten") }}</button>
+                  <button type="button" class="chip" :class="{active: style.explicit_missing}" data-tooltip="{{ _('Fehlende Werte als „Keine Daten“ statt als Gedankenstrich anzeigen') }}" @click="style.explicit_missing = !style.explicit_missing">{{ _("Fehlende Werte ausschreiben") }}</button>
                 </div>
               </div>
               <div>
-                <p class="tbl-style-group-label">Layout</p>
+                <p class="tbl-style-group-label">{{ _("Layout") }}</p>
                 <div class="tbl-style-group-chips">
-                  <button type="button" class="chip" :class="{active: style.sticky_first_col}" data-tooltip="Beschriftungsspalte beim horizontalen Scrollen sichtbar halten" @click="style.sticky_first_col = !style.sticky_first_col">Erste Spalte fixieren</button>
-                  <button type="button" class="chip" :class="{active: style.sticky_header}" data-tooltip="Kopfzeile beim vertikalen Scrollen sichtbar halten — begrenzt die Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken" @click="style.sticky_header = !style.sticky_header">Header fixieren</button>
+                  <button type="button" class="chip" :class="{active: style.sticky_first_col}" data-tooltip="{{ _('Beschriftungsspalte beim horizontalen Scrollen sichtbar halten') }}" @click="style.sticky_first_col = !style.sticky_first_col">{{ _("Erste Spalte fixieren") }}</button>
+                  <button type="button" class="chip" :class="{active: style.sticky_header}" data-tooltip="{{ _('Kopfzeile beim vertikalen Scrollen sichtbar halten — begrenzt die Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken') }}" @click="style.sticky_header = !style.sticky_header">{{ _("Header fixieren") }}</button>
                   <span class="dd-picker-wrap" @click.outside="bordersPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="Rahmen" @click="bordersPickerOpen = !bordersPickerOpen" x-text="'Rahmen: ' + BORDER_LABELS[style.borders] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Rahmen') }}" @click="bordersPickerOpen = !bordersPickerOpen" x-text="'Rahmen: ' + BORDER_LABELS[style.borders] + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="bordersPickerOpen" x-cloak>
                       <template x-for="[value, label] in BORDER_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.borders === value}"
@@ -314,7 +314,7 @@
                     </div>
                   </span>
                   <span class="dd-picker-wrap" @click.outside="densityPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="Zeilenabstand" @click="densityPickerOpen = !densityPickerOpen" x-text="'Dichte: ' + DENSITY_LABELS[style.density] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Zeilenabstand') }}" @click="densityPickerOpen = !densityPickerOpen" x-text="'Dichte: ' + DENSITY_LABELS[style.density] + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="densityPickerOpen" x-cloak>
                       <template x-for="[value, label] in DENSITY_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.density === value}"
@@ -323,7 +323,7 @@
                     </div>
                   </span>
                   <span class="dd-picker-wrap" @click.outside="headerAlignPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="Ausrichtung der Kopfzeile (Zeiträume)" @click="headerAlignPickerOpen = !headerAlignPickerOpen" x-text="'Header-Ausrichtung: ' + ALIGN_LABELS[style.header_align] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Ausrichtung der Kopfzeile (Zeiträume)') }}" @click="headerAlignPickerOpen = !headerAlignPickerOpen" x-text="'Header-Ausrichtung: ' + ALIGN_LABELS[style.header_align] + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="headerAlignPickerOpen" x-cloak>
                       <template x-for="[value, label] in ALIGN_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.header_align === value}"
@@ -332,7 +332,7 @@
                     </div>
                   </span>
                   <span class="dd-picker-wrap" @click.outside="valueAlignPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="Ausrichtung der Werte-Zellen" @click="valueAlignPickerOpen = !valueAlignPickerOpen" x-text="'Werte-Ausrichtung: ' + ALIGN_LABELS[style.value_align] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Ausrichtung der Werte-Zellen') }}" @click="valueAlignPickerOpen = !valueAlignPickerOpen" x-text="'Werte-Ausrichtung: ' + ALIGN_LABELS[style.value_align] + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="valueAlignPickerOpen" x-cloak>
                       <template x-for="[value, label] in ALIGN_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.value_align === value}"
@@ -340,12 +340,12 @@
                       </template>
                     </div>
                   </span>
-                  <button type="button" class="chip" :class="{active: style.equal_value_cols}" data-tooltip="Alle Werte-Spalten gleich breit (Beschriftungsspalte bleibt unverändert)" @click="toggleEqualValueCols()">Spalten gleichmäßig</button>
+                  <button type="button" class="chip" :class="{active: style.equal_value_cols}" data-tooltip="{{ _('Alle Werte-Spalten gleich breit (Beschriftungsspalte bleibt unverändert)') }}" @click="toggleEqualValueCols()">{{ _("Spalten gleichmäßig") }}</button>
                 </div>
               </div>
             </div>
 
-            <h3 class="tbl-h">Vorschau</h3>
+            <h3 class="tbl-h">{{ _("Vorschau") }}</h3>
           </div>
         </template>
 
@@ -417,13 +417,13 @@
               <tr class="tbl-header-row">
                 <th class="tbl-label-col" :style="labelColStyle()">
                   &nbsp;
-                  <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startLabelColResize($event)" @dblclick.stop.prevent="style.label_col_width = null" data-tooltip="Ziehen zum Verändern der Breite, Doppelklick für automatische Breite"></span>
+                  <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startLabelColResize($event)" @dblclick.stop.prevent="style.label_col_width = null" data-tooltip="{{ _('Ziehen zum Verändern der Breite, Doppelklick für automatische Breite') }}"></span>
                 </th>
                 <template x-for="col in columns" :key="col.uid">
                   <th x-show="!col.hidden" :class="{'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col)" :data-tooltip-fixed="columnPeriodTooltip(col)" :data-col-uid="col.uid">
                     <span x-text="renderedColumnLabel(col)"></span>
                     <span class="tbl-period-hint" x-show="columnPeriodTooltip(col)">i</span>
-                    <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startColResize($event, col)" @dblclick.stop.prevent="col.width = null" data-tooltip="Ziehen zum Verändern der Breite, Doppelklick für automatische Breite"></span>
+                    <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startColResize($event, col)" @dblclick.stop.prevent="col.width = null" data-tooltip="{{ _('Ziehen zum Verändern der Breite, Doppelklick für automatische Breite') }}"></span>
                   </th>
                 </template>
               </tr>
@@ -446,21 +446,21 @@
                   </td>
                 </tr>
               </template>
-              <tr x-show="!rows.length || !columns.length || !visibleColumnCount || !hasVisibleDataRow"><td :colspan="visibleColumnCount + 1" style="text-align:center;color:var(--ink-faint);">Bitte mindestens eine Spalte und eine Zeile anlegen.</td></tr>
+              <tr x-show="!rows.length || !columns.length || !visibleColumnCount || !hasVisibleDataRow"><td :colspan="visibleColumnCount + 1" style="text-align:center;color:var(--ink-faint);">{{ _("Bitte mindestens eine Spalte und eine Zeile anlegen.") }}</td></tr>
               </tbody>
             </table>
           </div>
         </div>
         </div>
-        <p class="tbl-hint hint-status" x-show="loading" style="margin-top:8px;">Lädt …</p>
+        <p class="tbl-hint hint-status" x-show="loading" style="margin-top:8px;">{{ _("Lädt …") }}</p>
 
         <div class="save-row" x-show="editing">
-          <input type="text" placeholder="Name der Tabelle …" maxlength="{{ max_name_length }}" x-model="name">
+          <input type="text" placeholder="{{ _('Name der Tabelle …') }}" maxlength="{{ max_name_length }}" x-model="name">
           {% if table_id %}
-          <button type="button" class="btn btn-danger" @click="deleteTable()">Löschen</button>
+          <button type="button" class="btn btn-danger" @click="deleteTable()">{{ _("Löschen") }}</button>
           {% endif %}
-          <button type="button" class="btn" @click="cancelEdit()">Abbrechen</button>
-          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ "Speichern" if table_id else "Tabelle erstellen" }}</button>
+          <button type="button" class="btn" @click="cancelEdit()">{{ _("Abbrechen") }}</button>
+          <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ _("Speichern") if table_id else _("Tabelle erstellen") }}</button>
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
     </div>

@@ -2,10 +2,9 @@
 {% if not csv_uploaded %}
 <div id="csv-upload-area">
   <label class="dropzone" id="csv-dropzone" for="csv-file-input" role="button" tabindex="0">
-    <p>CSV-Datei hierher ziehen oder klicken zum Auswählen</p>
+    <p>{{ _("CSV-Datei hierher ziehen oder klicken zum Auswählen") }}</p>
     <p class="hint2">
-      Max. {{ import_limits.csv_upload_mib }} MiB. Wird gespeichert, bis du sie wieder löschst
-      &mdash; Spalten/Format wählst du im nächsten Schritt.
+      {{ _("Max. {csv_upload_mib} MiB. Wird gespeichert, bis du sie wieder löschst &mdash; Spalten/Format wählst du im nächsten Schritt.", csv_upload_mib=import_limits.csv_upload_mib) }}
     </p>
     {# Kein hx-post mehr am Feld: Der Upload läuft seit 0.85.0 über
        XMLHttpRequest (js/pages/import.js, uploadCsv), weil nur XHR
@@ -22,8 +21,8 @@
     <code class="csv-filename">{{ csv_filename }}</code>
     <button type="button" class="btn btn-danger import-delete-button"
             hx-post="import/csv/delete" hx-target="#csv-section" hx-swap="outerHTML"
-            hx-confirm="Hochgeladene CSV-Datei und ihre aktuelle Importkonfiguration wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten."
-            data-confirm-label="Quelldaten löschen">Quelldaten löschen</button>
+            hx-confirm="{{ _('Hochgeladene CSV-Datei und ihre aktuelle Importkonfiguration wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten.') }}"
+            data-confirm-label="{{ _('Quelldaten löschen') }}">{{ _("Quelldaten löschen") }}</button>
   </div>
 
   {# Trennzeichen/Kopfzeile UND die Spalten-Zuordnung (nur sobald Spalten
@@ -32,7 +31,7 @@
      Vorschautabelle. #}
   <div class="csv-config">
     <div class="field">
-      <label>Trennzeichen</label>
+      <label>{{ _("Trennzeichen") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="delimiter-btn" onclick="toggleDDPicker('delimiter')">{% for v, l in delimiter_options %}{% if v == delimiter %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="delimiter" id="delimiter-input" value="{{ delimiter }}"
@@ -45,20 +44,20 @@
       </span>
     </div>
     <div class="field">
-      <label>Kopfzeile</label>
+      <label>{{ _("Kopfzeile") }}</label>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="header-btn" onclick="toggleDDPicker('header')">{{ "Ja" if has_header else "Nein" }} ▾</button>
+        <button type="button" class="btn" id="header-btn" onclick="toggleDDPicker('header')">{{ "Ja" if has_header else _("Nein") }} ▾</button>
         <input type="hidden" name="has_header" id="header-input" value="{{ "on" if has_header else "" }}"
                hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
         <div class="dd-picker-popover" id="header-popover">
-          <div class="dd-picker-row" onclick="selectDDOption('header', 'on', 'Ja')">Ja</div>
-          <div class="dd-picker-row" onclick="selectDDOption('header', '', 'Nein')">Nein</div>
+          <div class="dd-picker-row" onclick="selectDDOption('header', 'on', 'Ja')">{{ _("Ja") }}</div>
+          <div class="dd-picker-row" onclick="selectDDOption('header', '', 'Nein')">{{ _("Nein") }}</div>
         </div>
       </span>
     </div>
     {% if columns %}
     <div class="field">
-      <label>Zeitstempel-Spalte</label>
+      <label>{{ _("Zeitstempel-Spalte") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="ts-col-btn" onclick="toggleDDPicker('ts-col')">{% for col in columns %}{% if loop.index0 == ts_col %}{{ col }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="ts_col" id="ts-col-input" value="{{ ts_col }}">
@@ -70,7 +69,7 @@
       </span>
     </div>
     <div class="field">
-      <label>Wert-Spalte</label>
+      <label>{{ _("Wert-Spalte") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="value-col-btn" onclick="toggleDDPicker('value-col')">{% for col in columns %}{% if loop.index0 == value_col %}{{ col }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="value_col" id="value-col-input" value="{{ value_col }}">
@@ -82,7 +81,7 @@
       </span>
     </div>
     <div class="field">
-      <label>Zeitstempel-Format</label>
+      <label>{{ _("Zeitstempel-Format") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="ts-format-btn" onclick="toggleDDPicker('ts-format')">{% for v, l in ts_format_options %}{% if v == ts_format %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="ts_format" id="ts-format-input" value="{{ ts_format }}">
@@ -94,7 +93,7 @@
       </span>
     </div>
     <div class="field" id="custom-ts-pattern-field" style="{{ '' if ts_format == 'custom' else 'display:none;' }}">
-      <label>Eigenes Format (strptime, z. B. %d.%m.%Y %H:%M:%S)</label>
+      <label>{{ _("Eigenes Format (strptime, z. B. %d.%m.%Y %H:%M:%S)") }}</label>
       <input type="text" name="custom_pattern" class="map-input" value="{{ custom_pattern }}" placeholder="%d.%m.%Y %H:%M:%S">
     </div>
     {% endif %}
@@ -107,7 +106,7 @@
      der reinen Dateiformat-/Spalten-Zuordnung darüber. #}
   <div class="csv-action-row">
     <div class="field">
-      <label>Entität</label>
+      <label>{{ _("Entität") }}</label>
       {# App-Standard-Picker wie table_editor.html/entity_migrate.html
          (entityPicker(), siehe entity-picker.js) statt des freien
          Text+datalist-Felds (.map-picker) — dieselbe Options-Form
@@ -126,16 +125,16 @@
                 @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
                 x-text="entityId ? label(entityId) : 'Entität wählen …'"></button>
         <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
-                @click.stop="clearSelection()" title="Auswahl leeren" aria-label="Auswahl leeren">✕</button>
+                @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
         <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
-          <input type="search" class="dd-picker-popover-search" x-ref="csvEntitySearch" x-model="search" placeholder="Suchen …">
+          <input type="search" class="dd-picker-popover-search" x-ref="csvEntitySearch" x-model="search" placeholder="{{ _('Suchen …') }}">
           <template x-for="opt in filtered()" :key="opt.entity_id">
             <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}"
                  @click="select(opt.entity_id)"
                  @mouseenter="scheduleHover(opt, $event.currentTarget)"
                  @mouseleave="clearHover()">
               <span x-text="opt.label"></span>
-              <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+              <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="{{ _('App-eigener Anzeigename') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
             </div>
           </template>
         </div>
@@ -150,8 +149,8 @@
       </span>
     </div>
     <div class="toolbar-right">
-      <button type="button" class="btn" hx-post="import/csv/dry-run" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML" hx-disabled-elt="this">Vorschau (Dry Run)</button>
-      <button type="button" class="btn primary" hx-post="import/csv/start" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML" hx-disabled-elt="this">Import starten</button>
+      <button type="button" class="btn" hx-post="import/csv/dry-run" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Vorschau (Dry Run)") }}</button>
+      <button type="button" class="btn primary" hx-post="import/csv/start" hx-include="#csv-form" hx-target="#csv-import-output" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Import starten") }}</button>
     </div>
   </div>
 
@@ -163,7 +162,7 @@
       {% endfor %}
     </table>
   </div>
-  <p class="hint hint-status" style="margin:0 0 14px;">{{ total_lines }} Datenzeile(n) in der Datei &mdash; Vorschau zeigt die ersten {{ sample_rows | length }}.</p>
+  <p class="hint hint-status" style="margin:0 0 14px;">{{ _("{total_lines} Datenzeile(n) in der Datei &mdash; Vorschau zeigt die ersten {sample_rows}.", total_lines=total_lines, sample_rows=(sample_rows | length)) }}</p>
 
   {# hx-trigger="load" wie beim Symcon-Import: Wird die Seite neu geladen,
      während ein CSV-Auftrag noch läuft, zieht die Fortschrittsanzeige von
@@ -171,7 +170,7 @@
      Reload eine leere Fläche, obwohl im Hintergrund geschrieben wird. #}
   <div id="csv-import-output" hx-get="import/csv/progress" hx-trigger="load" hx-swap="innerHTML"></div>
   {% else %}
-  <div class="empty">Datei enthält keine Zeilen.</div>
+  <div class="empty">{{ _("Datei enthält keine Zeilen.") }}</div>
   {% endif %}
 </form>
 {% endif %}

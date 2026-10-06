@@ -16,11 +16,11 @@ from pathlib import Path
 from app.energiedashboard_routes import _empty_config, _save_config, entity_has_energiedashboard_role
 from app.storage.index import Index
 
-from _paths import APP
+from _paths import APP, template_text
 
 
 MAIN_SOURCE = (APP / "main.py").read_text(encoding="utf-8")
-TEMPLATE = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+TEMPLATE = template_text("entity_detail.html")
 
 
 def _with_index(fn) -> None:

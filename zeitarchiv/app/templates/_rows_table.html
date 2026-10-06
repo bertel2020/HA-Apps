@@ -5,12 +5,12 @@
      cleanup.html. htmx erkennt "id" hier und swappt gegen das gleichnamige
      Element im Rest der Seite, statt es in #rows-table einzufügen. -->
 <div class="nav" id="rows-nav" hx-swap-oob="true">
-  <button class="btn navbtn" {% if range == 'all' %}disabled{% endif %} onclick="stepOffset(-1)" aria-label="Vorheriger Zeitraum">‹</button>
+  <button class="btn navbtn" {% if range == 'all' %}disabled{% endif %} onclick="stepOffset(-1)" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
   <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ app_root | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
     <button type="button" class="period-label" :disabled="range === 'all'" @click="toggle()" :title="range === 'all' ? '' : 'Zu einem bestimmten Zeitpunkt springen'">{{ period_label }}</button>
     {% include "_calendar_popover.html" %}
   </div>
-  <button class="btn navbtn" {% if range == 'all' or offset >= 0 %}disabled{% endif %} onclick="stepOffset(1)" aria-label="Nächster Zeitraum">›</button>
+  <button class="btn navbtn" {% if range == 'all' or offset >= 0 %}disabled{% endif %} onclick="stepOffset(1)" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
   <script>
     // Das komplette serverseitig berechnete Fenster im .page-Scope nachziehen.
     // Es steuert sowohl calendarPicker() als auch den stabilen Zoom-Anker beim
@@ -50,18 +50,18 @@
       </colgroup>
       <thead>
         <tr>
-          <th>Zeitraum</th>
-          <th class="num">Werte</th>
-          {% if outlier_detection_enabled %}<th class="num">Ausreißer</th>{% endif %}
-          {% if gap_detection_enabled %}<th class="num">Lücken</th>{% endif %}
-          <th class="num">Duplikate</th>
-          <th class="num">Wiederholungen</th>
-          {% if counter_decrease_enabled %}<th class="num">Zählerrückgänge</th>{% endif %}
+          <th>{{ _("Zeitraum") }}</th>
+          <th class="num">{{ _("Werte") }}</th>
+          {% if outlier_detection_enabled %}<th class="num">{{ _("Ausreißer") }}</th>{% endif %}
+          {% if gap_detection_enabled %}<th class="num">{{ _("Lücken") }}</th>{% endif %}
+          <th class="num">{{ _("Duplikate") }}</th>
+          <th class="num">{{ _("Wiederholungen") }}</th>
+          {% if counter_decrease_enabled %}<th class="num">{{ _("Zählerrückgänge") }}</th>{% endif %}
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td class="label">Gesamter Zeitraum</td>
+          <td class="label">{{ _("Gesamter Zeitraum") }}</td>
           <td class="num val">{{ total_row_count_label }}</td>
           {% if outlier_detection_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.outliers else '' }}">{{ alltime_counts.outliers | format_int }}</td>{% endif %}
           {% if gap_detection_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.gaps else '' }}">{{ alltime_counts.gaps | format_int }}</td>{% endif %}
@@ -91,7 +91,7 @@
    passiert war. Lebt hier statt in #rows-summary (oob), weil sie nur bei
    EINEM Request gesetzt ist (deleted_count kommt aus _rows_fragment()) und
    beim nächsten normalen Neuladen automatisch wieder verschwindet. #}
-<p class="rows-flash" role="status">✓ {{ deleted_count | format_int }} Zeile(n) gelöscht.</p>
+<p class="rows-flash" role="status">{{ _("✓ {deleted_count} Zeile(n) gelöscht.", deleted_count=(deleted_count | format_int)) }}</p>
 {% endif %}
 
 {# Aktionszeile als KOPF der Tabelle statt als Zeile darunter. Gemessen bei
@@ -118,15 +118,15 @@
 {% endif %}
 <div class="rows-actionbar">
   {% if mode == 'correct' %}
-  ✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.
+  {{ _("✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.") }}
   {% else %}
-  <strong><span id="selected-count">0</span> ausgewählt</strong>
+  <strong><span id="selected-count">0</span> {{ _("ausgewählt") }}</strong>
   <button class="btn btn-danger needs-selection" disabled
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
           hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
           hx-disabled-elt="this"
-          hx-confirm="Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.">
-    Löschen
+          hx-confirm="{{ _('Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Rückgängig (letzte Löschung)“ wiederhergestellt werden.') }}">
+    {{ _("Löschen") }}
   </button>
   {# Rechts steht, was NICHT an der Auswahl hängt: "Rückgängig" gilt für die
      ganze Tabelle, die Sammelaktionen für den gerade gewählten Filter.
@@ -135,27 +135,27 @@
   <span class="rows-actionbar-right">
     {% if filter == 'duplicates' %}
     <button class="btn btn-danger-outline"
-            {% if counts.duplicates == 0 %}disabled title="Keine Duplikate im aktuellen Zeitraum"{% endif %}
+            {% if counts.duplicates == 0 %}disabled title="{{ _('Keine Duplikate im aktuellen Zeitraum') }}"{% endif %}
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/duplicates-preview"
             hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-      Duplikate automatisch entfernen
+      {{ _("Duplikate automatisch entfernen") }}
     </button>
     {% endif %}
     {% if filter == 'repetitions' %}
     <button class="btn btn-danger-outline"
-            {% if counts.repetitions == 0 %}disabled title="Keine gerundet gleichen Folgewerte im aktuellen Zeitraum"{% endif %}
+            {% if counts.repetitions == 0 %}disabled title="{{ _('Keine gerundet gleichen Folgewerte im aktuellen Zeitraum') }}"{% endif %}
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/repetitions-preview"
             hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-      Wiederholungen verdichten
+      {{ _("Wiederholungen verdichten") }}
     </button>
     {% endif %}
     {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
        (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
        über seinen Beschriftungstext suchen. #}
-    <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="Keine Löschung zum Rückgängigmachen vorhanden"{% endif %}
+    <button class="btn" id="undo-preview-btn" {% if not undo_available %}disabled title="{{ _('Keine Löschung zum Rückgängigmachen vorhanden') }}"{% endif %}
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
             hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
-      Rückgängig (letzte Löschung)
+      {{ _("Rückgängig (letzte Löschung)") }}
     </button>
   </span>
   {% endif %}
@@ -183,14 +183,14 @@
       {% if mode == 'correct' %}
       <th></th>
       {% else %}
-      <th><input type="checkbox" onchange="toggleAllRows(this)" title="Alle auf dieser Seite auswählen"></th>
+      <th><input type="checkbox" onchange="toggleAllRows(this)" title="{{ _('Alle auf dieser Seite auswählen') }}"></th>
       {% endif %}
-      <th>Zeitstempel</th><th>Wert</th><th>Status</th>
+      <th>{{ _("Zeitstempel") }}</th><th>{{ _("Wert") }}</th><th>{{ _("Status") }}</th>
     </tr>
     {% for row in rows %}
     <tr class="{{ 'flag' if row.flags else '' }}">
       {% if mode == 'correct' %}
-      <td><button type="button" class="correct-edit-btn" title="Wert korrigieren" onclick="startCorrect(this)">✎</button></td>
+      <td><button type="button" class="correct-edit-btn" title="{{ _('Wert korrigieren') }}" onclick="startCorrect(this)">✎</button></td>
       {% else %}
       <td><input type="checkbox" name="ts" value="{{ row.ts }}"></td>
       {% endif %}
@@ -209,24 +209,24 @@
   </table>
 </div>
 {% else %}
-<div class="tbl-wrap"><div class="empty">Keine Werte in diesem Zeitraum/Filter.</div></div>
+<div class="tbl-wrap"><div class="empty">{{ _("Keine Werte in diesem Zeitraum/Filter.") }}</div></div>
 {% endif %}
 
 {% if pagination.page_size %}
 <div class="pager" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
-    <span class="pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} von {{ pagination.total }}</span>
-    <button class="btn navbtn" onclick="setPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="Erste Seite">«</button>
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
+    <button class="btn navbtn" onclick="setPage(1)" {% if pagination.page <= 1 %}disabled{% endif %} title="{{ _('Erste Seite') }}">«</button>
     <button class="btn navbtn" onclick="stepPage(-1)" {% if pagination.page <= 1 %}disabled{% endif %}>‹</button>
-    <span class="pager-page">Seite <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToPage(this)"> / {{ pagination.total_pages }}</span>
+    <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="goToPage(this)"> / {{ pagination.total_pages }}</span>
     <button class="btn navbtn" onclick="stepPage(1)" {% if pagination.page >= pagination.total_pages %}disabled{% endif %}>›</button>
-    <button class="btn navbtn" onclick="setPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="Letzte Seite">»</button>
+    <button class="btn navbtn" onclick="setPage({{ pagination.total_pages }})" {% if pagination.page >= pagination.total_pages %}disabled{% endif %} title="{{ _('Letzte Seite') }}">»</button>
   </div>
-  <select name="page_size" title="Zeilen pro Seite"
+  <select name="page_size" title="{{ _('Zeilen pro Seite') }}"
           hx-get="{{ app_root }}/entities/{{ entity_id }}/rows" hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML"
           onchange="resetPage()">
     {% for size in [10, 20, 50, 100, 500, 1000] %}
-    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / Seite</option>
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
     {% endfor %}
   </select>
 </div>

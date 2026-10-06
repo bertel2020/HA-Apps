@@ -76,7 +76,7 @@
               {% if not nav_energiedashboard_enabled %}
               {{ _("Deaktiviert — Sankey-Energiefluss aus PV, Netz &amp; Speicher, einmal einrichten") }}
               {% elif energiedashboard_configured %}
-              {{ energiedashboard_role_count }} Roll{{ 'e' if energiedashboard_role_count == 1 else 'en' }} zugeordnet
+              {% if energiedashboard_role_count == 1 %}{{ _("{count} Rolle zugeordnet", count=energiedashboard_role_count) }}{% else %}{{ _("{count} Rollen zugeordnet", count=energiedashboard_role_count) }}{% endif %}
               {% else %}
               {{ _("Noch nicht eingerichtet") }}
               {% endif %}
@@ -116,7 +116,7 @@
             </div>
           </div>
           <h3><a href="dashboards/{{ d.id }}">{{ d.name }}</a></h3>
-          <div class="meta">{{ pin_counts.get(d.id, 0) }} Kachel{{ 'n' if pin_counts.get(d.id, 0) != 1 else '' }}{{ ' · Standard' if d.is_default else '' }}{{ ' · 🔒 Fixiert' if d.locked else '' }}</div>
+          <div class="meta">{% if pin_counts.get(d.id, 0) == 1 %}{{ _("{count} Kachel", count=1) }}{% else %}{{ _("{count} Kacheln", count=pin_counts.get(d.id, 0)) }}{% endif %}{% if d.is_default %} · {{ _("Standard") }}{% endif %}{% if d.locked %} · 🔒 {{ _("Fixiert") }}{% endif %}</div>
         </div>
         {% endfor %}
         <a class="card dash-grid-add card-browser-add" href="dashboards/new" title="{{ _('Neues Dashboard') }}">

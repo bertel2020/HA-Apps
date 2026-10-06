@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Konfiguration — {{ entity_id }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Konfiguration — {entity_id}", entity_id=entity_id) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/entity_config.css') }}">
 {% endblock %}
@@ -14,70 +14,70 @@
        beiden Schwesterseiten, was beim Wechseln über die Reiter als Sprung
        sichtbar war. #}
     <div class="h1-row">
-      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon('App-eigener Anzeigename — HA: ' ~ (friendly_name or entity_id)) }}{% endif %}</h1>
+      <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
-              title="Favorit" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
+              title="{{ _('Favorit') }}" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       Typ: <strong>{{ type_label }}</strong> &middot;
       {# Siehe cleanup.html: der Verlauf ist jetzt ein Reiter, hier steht
          stattdessen der Weg eine Ebene höher. #}
-      <a href="{{ app_root }}/entities">← zurück zu Entitäten</a>
+      <a href="{{ app_root }}/entities">{{ _("← zurück zu Entitäten") }}</a>
     </p>
 
     {% with active = 'konfig' %}{% include "_entity_tabs.html" %}{% endwith %}
 
     <div class="stat-row">
-      <div class="stat"><div class="label">Typ</div><div class="value">{{ type_label }}</div></div>
-      <div class="stat"><div class="label">Einheit</div><div class="value">{{ unit }}</div></div>
-      <div class="stat"><div class="label">Datensätze</div><div class="value">{{ row_count }}</div></div>
+      <div class="stat"><div class="label">{{ _("Typ") }}</div><div class="value">{{ type_label }}</div></div>
+      <div class="stat"><div class="label">{{ _("Einheit") }}</div><div class="value">{{ unit }}</div></div>
+      <div class="stat"><div class="label">{{ _("Datensätze") }}</div><div class="value">{{ row_count }}</div></div>
     </div>
     <div class="stat-row">
-      <div class="stat"><div class="label">Erster Wert</div><div class="value">{{ first_ts }}{% if first_ts_time %}<span class="ts-time">{{ first_ts_time }}</span>{% endif %}</div></div>
-      <div class="stat"><div class="label">Letzter Wert</div><div class="value">{{ last_ts }}{% if last_ts_time %}<span class="ts-time">{{ last_ts_time }}</span>{% endif %}</div></div>
-      <div class="stat"><div class="label">Größe</div><div class="value">{{ size }}</div></div>
+      <div class="stat"><div class="label">{{ _("Erster Wert") }}</div><div class="value">{{ first_ts }}{% if first_ts_time %}<span class="ts-time">{{ first_ts_time }}</span>{% endif %}</div></div>
+      <div class="stat"><div class="label">{{ _("Letzter Wert") }}</div><div class="value">{{ last_ts }}{% if last_ts_time %}<span class="ts-time">{{ last_ts_time }}</span>{% endif %}</div></div>
+      <div class="stat"><div class="label">{{ _("Größe") }}</div><div class="value">{{ size }}</div></div>
     </div>
 
     <div class="config-card">
       <div class="config-card-header">
-        <h2>Konfiguration</h2>
-        <p class="hint">Individuelle Archivierungs-, Darstellungs- und Prüfregeln für diese Entität.</p>
+        <h2>{{ _("Konfiguration") }}</h2>
+        <p class="hint">{{ _("Individuelle Archivierungs-, Darstellungs- und Prüfregeln für diese Entität.") }}</p>
       </div>
       <div id="config-form">
         {% include "_entity_config_form.html" %}
       </div>
 
       <section class="entity-data-management" aria-labelledby="data-management-title">
-        <h2 id="data-management-title" style="margin:0 0 4px;">Datenverwaltung</h2>
-        <p class="hint">Endgültige Aktionen für die archivierten Daten dieser Entität.</p>
+        <h2 id="data-management-title" style="margin:0 0 4px;">{{ _("Datenverwaltung") }}</h2>
+        <p class="hint">{{ _("Endgültige Aktionen für die archivierten Daten dieser Entität.") }}</p>
 
         <div class="entity-data-actions">
           <div class="entity-data-action">
             <div>
-              <strong>Datensätze in andere Entität übertragen</strong>
-              <p>Verschiebt oder kopiert den gesamten Verlauf dieser Entität vollständig in eine andere — z. B. wenn Home Assistant sie ersetzt oder umbenannt hat.</p>
+              <strong>{{ _("Datensätze in andere Entität übertragen") }}</strong>
+              <p>{{ _("Verschiebt oder kopiert den gesamten Verlauf dieser Entität vollständig in eine andere — z. B. wenn Home Assistant sie ersetzt oder umbenannt hat.") }}</p>
             </div>
-            <a class="btn" href="{{ app_root }}/entities/{{ entity_id }}/migrate">Migrieren …</a>
+            <a class="btn" href="{{ app_root }}/entities/{{ entity_id }}/migrate">{{ _("Migrieren …") }}</a>
           </div>
 
           <div class="entity-data-action">
             <div>
-              <strong>Archivierte Werte löschen</strong>
-              <p>Entfernt alle Werte, Archive und Aggregationen. Die Entität und ihre Konfiguration bleiben erhalten.</p>
+              <strong>{{ _("Archivierte Werte löschen") }}</strong>
+              <p>{{ _("Entfernt alle Werte, Archive und Aggregationen. Die Entität und ihre Konfiguration bleiben erhalten.") }}</p>
             </div>
             <button type="button" class="btn btn-danger-outline" id="delete-all-values-btn" onclick="deleteAllValues()">
-              Alle Werte löschen
+              {{ _("Alle Werte löschen") }}
             </button>
           </div>
 
           <div class="entity-data-action danger">
             <div>
-              <strong>Entität aus Zeitarchiv entfernen</strong>
-              <p>Löscht alle archivierten Werte und die individuelle Zeitarchiv-Konfiguration dieser Entität.</p>
+              <strong>{{ _("Entität aus Zeitarchiv entfernen") }}</strong>
+              <p>{{ _("Löscht alle archivierten Werte und die individuelle Zeitarchiv-Konfiguration dieser Entität.") }}</p>
             </div>
             <button type="button" class="btn btn-danger" id="delete-entity-btn" onclick="deleteEntity()">
-              Entität entfernen
+              {{ _("Entität entfernen") }}
             </button>
           </div>
         </div>

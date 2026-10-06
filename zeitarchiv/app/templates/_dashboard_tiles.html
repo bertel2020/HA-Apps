@@ -79,7 +79,7 @@
         <button type="submit" class="dsection-rename-submit" title="{{ _('Speichern') }}" aria-label="{{ _('Umbenennen speichern') }}">✓</button>
       </form>
       {% endif %}
-      <span class="dsection-count">{{ group.tiles | length }} Kachel{{ '' if group.tiles | length == 1 else 'n' }}</span>
+      <span class="dsection-count">{% if group.tiles | length == 1 %}{{ _("{count} Kachel", count=1) }}{% else %}{{ _("{count} Kacheln", count=(group.tiles | length)) }}{% endif %}</span>
       <span class="dsection-hidden-count" hidden></span>
       {% if not dashboard_locked %}
       <div class="dsection-menu" @click.outside="menuOpen = false">

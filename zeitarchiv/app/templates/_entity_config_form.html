@@ -1,19 +1,19 @@
 {% from "_hints.html" import hint_button, hint_body %}
 <div class="field">
-  <label>App-Anzeigename {{ hint_button('App-Anzeigename') }}</label>
+  <label>{{ _("App-Anzeigename") }} {{ hint_button(_('App-Anzeigename')) }}</label>
   <input type="text" name="custom_name" value="{{ custom_name }}" maxlength="{{ custom_name_max_length }}"
          placeholder="{{ friendly_name or entity_id }}"
          hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
-  {% call hint_body() %}Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {{ custom_name_max_length }} Zeichen.{% endcall %}
+  {% call hint_body() %}{{ _("Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {custom_name_max_length} Zeichen.", custom_name_max_length=custom_name_max_length) }}{% endcall %}
 </div>
 <div class="field">
-  <label>Auflösung {{ hint_button('Auflösung') }}</label>
+  <label>{{ _("Auflösung") }} {{ hint_button(_('Auflösung')) }}</label>
   {# Switch: fest gesperrt, siehe RESOLUTION_BLOCKED_REASONS-Kommentar
      (formatting.py) — dasselbe Muster wie outlier_blocked_reason oben im
      Formular. #}
   {% if resolution_blocked_reason %}
   <span class="dd-picker-wrap">
-    <button type="button" class="btn" disabled>Rohdaten (immer) ▾</button>
+    <button type="button" class="btn" disabled>{{ _("Rohdaten (immer) ▾") }}</button>
   </span>
   <p class="hint hint-status">{{ resolution_blocked_reason }}</p>
   {% else %}
@@ -28,19 +28,19 @@
     </div>
   </span>
   {% if resolution_averages_standard %}
-  <p class="hint hint-status">Es wird der Durchschnitt je Zeitfenster gespeichert (inkl. Min/Max), einzelne Messwerte innerhalb des Fensters gehen verloren.</p>
+  <p class="hint hint-status">{{ _("Es wird der Durchschnitt je Zeitfenster gespeichert (inkl. Min/Max), einzelne Messwerte innerhalb des Fensters gehen verloren.") }}</p>
   {% else %}
-  {% call hint_body() %}Zähler: höchstens ein Wert je Zeitfenster. Standard: Durchschnitt inkl. Min/Max je Zeitfenster. „Rohdaten“ speichert jeden Wert. Gilt nur für neue Werte, vorhandene bleiben.{% endcall %}
+  {% call hint_body() %}{{ _("Zähler: höchstens ein Wert je Zeitfenster. Standard: Durchschnitt inkl. Min/Max je Zeitfenster. „Rohdaten“ speichert jeden Wert. Gilt nur für neue Werte, vorhandene bleiben.") }}{% endcall %}
   {% endif %}
   {% endif %}
 </div>
 <div class="field">
-  <label>Verdichtungsziel {{ hint_button('Verdichtungsziel') }}</label>
+  <label>{{ _("Verdichtungsziel") }} {{ hint_button(_('Verdichtungsziel')) }}</label>
   {# Switch: fest gesperrt, dieselbe Begründung wie bei der Auflösung oben
      (COMPACT_TARGET_BLOCKED_REASONS, formatting.py). #}
   {% if compact_target_blocked_reason %}
   <span class="dd-picker-wrap">
-    <button type="button" class="btn" disabled>Aus (immer) ▾</button>
+    <button type="button" class="btn" disabled>{{ _("Aus (immer) ▾") }}</button>
   </span>
   <p class="hint hint-status">{{ compact_target_blocked_reason }}</p>
   {% else %}
@@ -54,11 +54,11 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}Ziel-Zeitraster für die (manuelle oder automatische) Verdichtung bereits archivierter Daten — unabhängig von der Live-Auflösung. Automatische Verdichtung siehe Housekeeping → Verdichten.{% endcall %}
+  {% call hint_body() %}{{ _("Ziel-Zeitraster für die (manuelle oder automatische) Verdichtung bereits archivierter Daten — unabhängig von der Live-Auflösung. Automatische Verdichtung siehe Housekeeping → Verdichten.") }}{% endcall %}
   {% endif %}
 </div>
 <div class="field">
-  <label>Aufbewahrung {{ hint_button('Aufbewahrung') }}</label>
+  <label>{{ _("Aufbewahrung") }} {{ hint_button(_('Aufbewahrung')) }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="retention-btn" onclick="toggleDDPicker('retention')">{% for k, l in retention_options %}{% if k == retention %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="retention" id="retention-input" value="{{ retention }}"
@@ -69,10 +69,10 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}Überschreibt den globalen Standard. Wann tatsächlich gelöscht wird, steuert Einstellungen → Aufbewahrung.{% endcall %}
+  {% call hint_body() %}{{ _("Überschreibt den globalen Standard. Wann tatsächlich gelöscht wird, steuert Einstellungen → Aufbewahrung.") }}{% endcall %}
 </div>
 <div class="field">
-  <label>Nachkommastellen {{ hint_button('Nachkommastellen') }}</label>
+  <label>{{ _("Nachkommastellen") }} {{ hint_button(_('Nachkommastellen')) }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="decimals-btn" onclick="toggleDDPicker('decimals')">{% for k, l in decimals_options %}{% if k == decimals %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="decimals" id="decimals-input" value="{{ decimals }}"
@@ -83,10 +83,10 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}„Automatisch“ zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt 4,000). Eine feste Auswahl rundet und füllt auf (4,00 bei 2 Stellen).{% endcall %}
+  {% call hint_body() %}{{ _("„Automatisch“ zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt 4,000). Eine feste Auswahl rundet und füllt auf (4,00 bei 2 Stellen).") }}{% endcall %}
 </div>
 <div class="field">
-  <label>Wertänderungsfilter {{ hint_button('Wertänderungsfilter') }}</label>
+  <label>{{ _("Wertänderungsfilter") }} {{ hint_button(_('Wertänderungsfilter')) }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="value-filter-btn" onclick="toggleDDPicker('value-filter')">{% for k, l in value_filter_options %}{% if k == value_filter %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="value_filter" id="value-filter-input" value="{{ value_filter }}"
@@ -97,10 +97,10 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.{% endcall %}
+  {% call hint_body() %}{{ _("Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.") }}{% endcall %}
 </div>
 <div class="field">
-  <label>Lücken-Erkennung {{ hint_button('Lücken-Erkennung') }}</label>
+  <label>{{ _("Lücken-Erkennung") }} {{ hint_button(_('Lücken-Erkennung')) }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="gap-threshold-btn" onclick="toggleDDPicker('gap-threshold')">{% for k, l in gap_threshold_options %}{% if k == gap_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="gap_threshold" id="gap-threshold-input" value="{{ gap_threshold }}"
@@ -111,10 +111,10 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. „Aus“ blendet den Filter dort aus.{% endcall %}
+  {% call hint_body() %}{{ _("Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. „Aus“ blendet den Filter dort aus.") }}{% endcall %}
 </div>
 <div class="field">
-  <label>Ausreißer-Erkennung {{ hint_button('Ausreißer-Erkennung') }}</label>
+  <label>{{ _("Ausreißer-Erkennung") }} {{ hint_button(_('Ausreißer-Erkennung')) }}</label>
   {# Für Schalter deaktiviert, weil die Regel dort strukturell nie anschlägt:
      sie misst Vielfache der üblichen Streuung, und die ist bei 0/1-Werten
      immer null (siehe outlier_detection_applies() in storage/index.py). Ein
@@ -122,7 +122,7 @@
      steht der Grund anstelle des Hilfetexts. #}
   {% if outlier_blocked_reason %}
   <span class="dd-picker-wrap">
-    <button type="button" class="btn" disabled>Aus ▾</button>
+    <button type="button" class="btn" disabled>{{ _("Aus ▾") }}</button>
   </span>
   {# hint-status statt hint: bleibt sichtbar, der Info-Knopf klappt es
      nicht weg (siehe HINWEIS-Selektor in hint-toggle.js). #}
@@ -151,29 +151,29 @@
       <span class="usage-bar-fill {{ 'warning' if outlier_rate.percent >= 10 else 'positive' }}"
             style="width: {{ [outlier_rate.percent, 100] | min }}%"></span>
     </span>
-    <span class="outlier-rate-sub">{{ outlier_rate.marked_label }} von {{ outlier_rate.total_label }} Werten</span>
+    <span class="outlier-rate-sub">{{ _("{marked_label} von {total_label} Werten", marked_label=outlier_rate.marked_label, total_label=outlier_rate.total_label) }}</span>
   </div>
   {# Auch bei vorhandener Quote nachrechenbar: sie altert mit jedem neuen
      Messwert, und ohne Knopf gäbe es keinen Weg dorthin außer die Schwelle
      kurz zu verstellen und zurückzustellen. #}
   <p class="hint hint-status">
-    Über die komplette Historie, am {{ outlier_rate.computed_label }} berechnet.
+    {{ _("Über die komplette Historie, am {computed_label} berechnet.", computed_label=outlier_rate.computed_label) }}
     <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/outlier-rate"
-            hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">Neu berechnen</button>
+            hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Neu berechnen") }}</button>
   </p>
   {% else %}
   <p class="hint hint-status">
-    Quote noch nicht berechnet.
+    {{ _("Quote noch nicht berechnet.") }}
     <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/outlier-rate"
-            hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">Jetzt prüfen</button>
+            hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Jetzt prüfen") }}</button>
   </p>
   {% endif %}
   {% endif %}
-  {% call hint_body() %}Ab welchem Vielfachen des für diese Entität Üblichen ein Wert als Ausreißer markiert wird — bei Zählern bezogen auf den üblichen Zuwachs, bei allen anderen Sensoren auf die übliche Schwankung der letzten 15 Werte. Kleinere Zahl = empfindlicher, „Aus“ schaltet die Erkennung ab. Mehr dazu im Handbuch.{% endcall %}
+  {% call hint_body() %}{{ _("Ab welchem Vielfachen des für diese Entität Üblichen ein Wert als Ausreißer markiert wird — bei Zählern bezogen auf den üblichen Zuwachs, bei allen anderen Sensoren auf die übliche Schwankung der letzten 15 Werte. Kleinere Zahl = empfindlicher, „Aus“ schaltet die Erkennung ab. Mehr dazu im Handbuch.") }}{% endcall %}
 </div>
 {% if aggregation_type == 'switch' %}
 <div class="field">
-  <label>Anzeigemodus {{ hint_button('Anzeigemodus') }}</label>
+  <label>{{ _("Anzeigemodus") }} {{ hint_button(_('Anzeigemodus')) }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="display-mode-btn" onclick="toggleDDPicker('display-mode')">{% for k, l in display_mode_options %}{% if k == display_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="display_mode" id="display-mode-input" value="{{ display_mode }}"
@@ -184,10 +184,10 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „AN/AUS“ zeigt den Rohwert.{% endcall %}
+  {% call hint_body() %}{{ _("„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „AN/AUS“ zeigt den Rohwert.") }}{% endcall %}
 </div>
 {% endif %}
-{% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+{% if saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}
 {% if gap_threshold_auto_adjusted %}
 <script>
   appAlert({{ gap_threshold_auto_adjusted_message | tojson }});
@@ -195,17 +195,17 @@
 {% endif %}
 
 <div class="preview">
-  <h3 class="eyebrow">Vorschau: letzte 10 Werte</h3>
+  <h3 class="eyebrow">{{ _("Vorschau: letzte 10 Werte") }}</h3>
   {% if preview_rows %}
   <div class="tbl-wrap">
     <table class="dt compact">
-      <tr><th>Zeitstempel</th><th>Wert</th></tr>
+      <tr><th>{{ _("Zeitstempel") }}</th><th>{{ _("Wert") }}</th></tr>
       {% for row in preview_rows %}
       <tr><td>{{ row.formatted_ts }}</td><td>{{ row.formatted_value }}{% if unit and unit != "—" %} {{ unit }}{% endif %}</td></tr>
       {% endfor %}
     </table>
   </div>
   {% else %}
-  <p class="hint hint-status" style="margin:0;">Noch keine Werte für diese Entität vorhanden.</p>
+  <p class="hint hint-status" style="margin:0;">{{ _("Noch keine Werte für diese Entität vorhanden.") }}</p>
   {% endif %}
 </div>

@@ -1,8 +1,8 @@
 <div class="settings-compact-list">
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Automatische Verdichtung</div>
-      <div class="settings-compact-hint">Läuft im Hintergrund, wie die automatische Aufbewahrung</div>
+      <div class="settings-compact-label">{{ _("Automatische Verdichtung") }}</div>
+      <div class="settings-compact-hint">{{ _("Läuft im Hintergrund, wie die automatische Aufbewahrung") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="compact-auto-enabled-btn" onclick="toggleDDPicker('compact-auto-enabled')">{% for k, l in compact_auto_options %}{% if k == compact_auto_enabled %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -17,8 +17,8 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Mindestalter</div>
-      <div class="settings-compact-hint">Wie lange ein archivierter Monat unangetastet bleibt, bevor er verdichtet wird</div>
+      <div class="settings-compact-label">{{ _("Mindestalter") }}</div>
+      <div class="settings-compact-hint">{{ _("Wie lange ein archivierter Monat unangetastet bleibt, bevor er verdichtet wird") }}</div>
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="compact-min-age-months-btn" onclick="toggleDDPicker('compact-min-age-months')">{% for k, l in compact_min_age_options %}{% if k == compact_min_age_months %}{{ l }}{% endif %}{% endfor %} ▾</button>
@@ -32,4 +32,4 @@
     </span>
   </div>
 </div>
-{% if saved %}<p class="save-status">✓ Gespeichert</p>{% endif %}
+{% if saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}
