@@ -1,5 +1,101 @@
 # Changelog
 
+## 1.2.0 - 2026-10-06
+
+### Neu
+
+- Englische Oberfläche: Die gesamte App gibt es jetzt auch auf Englisch.
+  Die Sprache wählst du in den Einstellungen („Automatisch“, Deutsch oder
+  Englisch); Standard bleibt Deutsch. Die Dokumentation liegt ebenfalls auf
+  Englisch vor.
+- Zählerrückgänge: Fällt ein Zählerstand, meldet die App das und ordnet es
+  ein („kehrt zurück“ = wahrscheinlich Fehlwert, „bleibt niedrig“ =
+  wahrscheinlich Zählerwechsel). Housekeeping hat dazu einen eigenen
+  Abschnitt, und die Bereinigungsseite zeigt die Einordnung am Wert. Fehlwerte
+  lassen sich in Housekeeping gesammelt zur Löschung markieren und wieder
+  zurücknehmen.
+- Zähler, die sich planmäßig zurücksetzen (z. B. täglich), lassen sich in der
+  Konfiguration auf „Erlauben“ stellen: Ihre Rückgänge werden dann nicht mehr
+  beanstandet. Bei „Melden“ gibt es zusätzlich die Regel „Fehlwerte
+  automatisch markieren“ (standardmäßig aus), die zurückkehrende Rückgänge
+  stündlich selbst markiert. Wiederholen sich Fehlwerte über mehrere Tage,
+  weist die Glocke auf ein Problem an der Quelle hin.
+- Reiter „Markiert“: Alle zur Löschung markierten Werte einer Entität lassen
+  sich ansehen, einzeln oder als Charge zurücknehmen und endgültig entfernen.
+  Jede Charge zeigt ihre Herkunft (manuell, Duplikate, Wiederholungen,
+  Sammelaktion, Regel) und, wenn die automatische Bereinigung an ist, wann
+  sie entfernt wird. Ausstehende Bereinigungen stehen auch in der Glocke, im
+  Banner und in der Entitätenliste.
+- Reiter „Verlauf“: Zeigt je Entität, was geändert wurde (markiert,
+  zurückgenommen, korrigiert mit altem und neuem Wert, hinzugefügt,
+  entfernt, verdichtet), nach Tagen und filterbar.
+- Charts: Beim Vergleich mit dem Vorjahr oder der Vorperiode zeigt die
+  Legende zusätzlich die Summe „bis zum gleichen Tag“. Der Legenden-Stil
+  „Tabelle“ funktioniert jetzt auch beim Jahresvergleich mit Laufsumme, und
+  die Tabelle bricht auf dem Smartphone nicht mehr mitten in Zahl und Einheit.
+- Kachel „Status“: Neue Kachel in der Zahlenreihe der Übersicht und als
+  Dashboard-Kachel (Größe 2×2 oder 1×1). Sie zeigt die inaktiven Entitäten
+  sowie offene Zählerrückgänge, doppelte Zeitstempel und markierte Werte, mit
+  Link nach Housekeeping. Das „+“-Popup zum Hinzufügen von Kacheln ist
+  breiter, hat eine feste Höhe und einen Reiter „Weitere“.
+- Import: VictoriaMetrics als vierter Importreiter für einen einmaligen
+  Backfill.
+- Tipps: Neue Tipps zu Verlauf, automatischer Bereinigung und Legenden-Tabelle;
+  der Tipp zu Zählerrückgängen beschreibt jetzt die Meldung.
+
+### Behoben
+
+- Vorjahresvergleich und „Gleicher Zeitpunkt“ zählten angeschnittene
+  Zeiträume komplett mit (z. B. enthielt „2025 bis 06.10.“ den ganzen
+  Oktober). Die Werte enden jetzt am gewählten Tag.
+
+---
+
+### English
+
+#### New
+
+- English interface: The whole app is now also available in English. Choose
+  the language in the settings (“Automatic”, German or English); the default
+  stays German. The documentation is available in English as well.
+- Counter decreases: When a counter reading drops, the app reports it and
+  classifies it (“returns” = probably a bad value, “stays low” = probably a
+  meter replacement). Housekeeping has its own section for it, and the
+  cleanup page shows the classification on the value. Bad values can be
+  marked for deletion in bulk in Housekeeping and undone again.
+- Counters that reset on a schedule (e.g. daily) can be set to “Allow” in the
+  configuration, so their decreases are no longer flagged. With “Report”
+  there is also the rule “Mark bad values automatically” (off by default),
+  which marks returning decreases itself every hour. If bad values repeat
+  over several days, the notification bell points to a problem at the
+  source.
+- “Marked” tab: All values marked for deletion for an entity can be viewed,
+  undone individually or as a batch, and removed permanently. Each batch
+  shows its origin (manual, duplicates, repetitions, bulk action, rule) and,
+  if automatic cleanup is on, when it will be removed. Pending cleanups also
+  appear in the bell, the banner and the entity list.
+- “History” tab: Shows per entity what was changed (marked, undone,
+  corrected with old and new value, added, removed, compacted), grouped by
+  day and filterable.
+- Charts: When comparing with the previous year or period, the legend now
+  also shows the total “up to the same day”. The legend style “Table” now
+  also works for the year comparison with running total, and the table no
+  longer breaks between number and unit on a smartphone.
+- “Status” tile: A new tile in the overview’s row of figures and as a
+  dashboard tile (size 2×2 or 1×1). It shows the inactive entities as well
+  as open counter decreases, duplicate timestamps and marked values, linking
+  to Housekeeping. The “+” popup for adding tiles is wider, has a fixed
+  height and a “More” tab.
+- Import: VictoriaMetrics as a fourth import tab for a one-off backfill.
+- Tips: New tips on history, automatic cleanup and the legend table; the tip
+  on counter decreases now describes the notification.
+
+#### Fixed
+
+- The previous-year comparison and “Same point in time” counted partial
+  periods in full (e.g. “2025 up to 06.10.” included the whole of October).
+  The values now end on the chosen day.
+
 ## 1.1.0 - 2026-10-06
 
 ### Neu
