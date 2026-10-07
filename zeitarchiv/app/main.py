@@ -3323,7 +3323,7 @@ _CHART_LEGEND_STYLES = {"chips", "table"}
 # _ENTITY_CHART_TYPES oben. "donut" ist die dritte, chart-weite
 # Darstellungsart (Optionen-Menü, "Darstellungsart") — ein Anteil je Serie
 # statt eines Zeitverlaufs, siehe chart_editor.js renderDonut().
-_CHART_EDITOR_CHART_TYPES = {"auto", "timeline", "donut"}
+_CHART_EDITOR_CHART_TYPES = {"auto", "bar", "timeline", "donut"}
 # "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
 # Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
 # siehe chart_editor.js render()/movingAverage().
@@ -3433,6 +3433,24 @@ _CHART_TYPE_LABELS = {
 }
 
 
+def _aggregation_types() -> dict[str, str]:
+    return {row["entity_id"]: row["aggregation_type"] for row in index.list_entities()}
+
+
+def _effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
+    """Löst "auto" zum tatsächlich gezeichneten Typ auf: Besteht das Chart nur
+    aus Schaltern, ist der Zeitstrahl der Standard. "bar" ist die gespeicherte
+    ausdrückliche Wahl "kein Zeitstrahl" (der Editor schreibt es, sobald ein
+    reines Schalter-Chart den Zeitstrahl abwählt) und bleibt hier unverändert —
+    sonst würde "auto" diese Wahl beim nächsten Laden wieder überstimmen."""
+    stored = chart["chart_type"]
+    if stored == "auto" and chart["entity_ids"] and all(
+        aggregation_types.get(e) == "switch" for e in chart["entity_ids"]
+    ):
+        return "timeline"
+    return stored
+
+
 def _chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
     """Wie das Chart tatsächlich gezeichnet wird, für die Übersichtskachel.
 
@@ -3441,9 +3459,10 @@ def _chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
     Linie, dieselbe Regel wie _resolved_chart_type() in storage/query.py).
     Ein Chart kann deshalb beides zugleich enthalten. Ein Chart ohne
     Entitäten hat keinen Typ — leere Kennung, Kachel ohne Streifen."""
-    if chart["chart_type"] == "timeline":
+    chart_type = _effective_chart_type(chart, aggregation_types)
+    if chart_type == "timeline":
         return "zeitstrahl"
-    if chart["chart_type"] == "donut":
+    if chart_type == "donut":
         return "donut"
     vorhanden = {
         "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
@@ -3460,9 +3479,7 @@ def _chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
 def charts_list(request: Request) -> HTMLResponse:
     charts = index.list_saved_charts()
     # Einmal alle Entitätstypen holen statt je Chart einzeln nachzuschlagen.
-    aggregation_types = {
-        row["entity_id"]: row["aggregation_type"] for row in index.list_entities()
-    }
+    aggregation_types = _aggregation_types()
     rows = [
         {
             "id": c["id"],
@@ -3507,7 +3524,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_stats": chart["chart_stats"] if chart else True,
         "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
         "legend_style": chart["legend_style"] if chart else "chips",
-        "chart_type": chart["chart_type"] if chart else "auto",
+        "chart_type": _effective_chart_type(chart, _aggregation_types()) if chart else "auto",
         "decimals": chart["decimals"] if chart else "auto",
         "show_values": chart["show_values"] if chart else False,
         "average_line": chart["average_line"] if chart else False,
@@ -3857,6 +3874,7 @@ def _dashboard_tiles_context(
     reiste der Wert sogar als Query-Parameter durch die URL. Mit app_root
     entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
+    aggregation_types = _aggregation_types()
     tiles = []
     # Sektionen (item_type='section') gruppieren die Kacheln rein über ihre
     # Position in derselben Liste — keine Kachel trägt eine section_id. Die
@@ -3896,7 +3914,8 @@ def _dashboard_tiles_context(
                 # gezeigt werden, und Chips vs. Tabelle sind dort konfiguriert,
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
-                "legend_style": c["legend_style"], "chart_type": c["chart_type"],
+                "legend_style": c["legend_style"],
+                "chart_type": _effective_chart_type(c, aggregation_types),
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],

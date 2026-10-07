@@ -564,6 +564,10 @@
         // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
         // Chart gespeicherte Wahl verwerfen.
         timeline: CHART_TYPE === 'timeline',
+        // Ob die Darstellungsart schon feststeht (gespeichert oder per Klick
+        // gewählt). Solange nicht, wird ein reines Schalter-Chart nach dem
+        // Laden automatisch zum Zeitstrahl (Standard) — siehe load().
+        typeChosen: CHART_TYPE !== 'auto',
         // Donut statt Zeitverlauf — ein Anteil je Serie (Summe/Durchschnitt/
         // Letzter Wert, siehe donutAggregation) statt einer Zeitachse.
         // Eigenes Feld statt eines dritten timeline-artigen Strings, weil
@@ -1085,6 +1089,7 @@
         // eine Fläche) — sichtbar als plötzliche Linie statt der eigentlich
         // erwarteten automatischen Balken für Zähler/Schalter.
         toggleTimeline() {
+          this.typeChosen = true;
           this.timeline = !this.timeline;
           if (this.timeline) { this.raw = true; }
           else { this.raw = false; }
@@ -1102,6 +1107,7 @@
         setDisplayMode(mode) {
           const wantDonut = mode === 'donut';
           if (wantDonut === this.donut) return;
+          this.typeChosen = true;
           this.donut = wantDonut;
           if (wantDonut) {
             // render() prüft this.timeline VOR this.donut (s. o.) — ein noch
@@ -1152,6 +1158,15 @@
           // dann fällt die Ansicht automatisch auf Linie/Balken zurück statt
           // einen inzwischen unpassenden Zeitstrahl weiterzuzeigen.
           if (this.timeline && !this.allSwitch) this.timeline = false;
+          // Standard für reine Schalter-Charts: Zeitstrahl. Die Serien kamen
+          // ohne Rohwerte, deshalb einmal neu laden.
+          if (!this.typeChosen && !this.timeline && !this.donut && this.allSwitch) {
+            this.typeChosen = true;
+            this.timeline = true;
+            this.raw = true;
+            this.loading = false;
+            return this.load();
+          }
           this.autoResolutionLabel = this.computeAutoResolutionLabel();
           this.windowStart = data.window_start ?? null;
           this.windowEnd = data.window_end ?? null;
@@ -2208,7 +2223,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : 'auto'),
+            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : (this.allSwitch ? 'bar' : 'auto')),
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
