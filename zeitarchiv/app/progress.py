@@ -97,7 +97,7 @@ def activity_snapshot() -> list[dict]:
         except Exception:  # noqa: BLE001 — siehe Docstring
             continue
         if stand:
-            laufend.append({"id": quelle.kennung, "label": quelle.label, **stand})
+            laufend.append({"id": quelle.kennung, "label": tr(quelle.label), **stand})
     return laufend
 
 

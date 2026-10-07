@@ -230,8 +230,8 @@ def _unassigned_group(rows: list[dict]) -> dict:
     index_bytes = sum(int(row["index_bytes"] or 0) for row in tables)
     row_count = sum(row["rows"] for row in tables)
     return {
-        "label": "Weitere Fachtabellen",
-        "description": "Noch keiner fachlichen Gruppe zugeordnete Tabellen.",
+        "label": tr("Weitere Fachtabellen"),
+        "description": tr("Noch keiner fachlichen Gruppe zugeordnete Tabellen."),
         "tables": tables,
         "rows": row_count,
         "rows_label": format_int(row_count),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..i18n import tr
+from ..i18n import N_, tr
 
 import hashlib
 import json
@@ -98,7 +98,7 @@ _PENDING_WARNING_SECONDS = 5 * 60
 #: also keinen Aufrufer, dem die Anzeige gehören könnte. progress.py hängt
 #: seinerseits an nichts außer der Standardbibliothek — dieselbe Ebene wie
 #: ..limits und ..logging_setup, die dieses Modul bereits benutzt.
-_rollup_rebuild_progress = JobProgress("rollup-rebuild", label="Rollup-Neuaufbau")
+_rollup_rebuild_progress = JobProgress("rollup-rebuild", label=N_("Rollup-Neuaufbau"))
 
 
 def _rebuild_after_type_change(

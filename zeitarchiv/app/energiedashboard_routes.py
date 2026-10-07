@@ -59,7 +59,7 @@ SETTING_HOURLY_BACKFILL_PENDING = "energiedashboard_hourly_backfill_pending"
 #: Entität warten — sichtbar nur hier, denn ausgelöst hat ihn niemand
 #: absichtlich: er hängt am Speichern der Energiedashboard-Konfiguration und
 #: läuft erst Minuten später im Wartungsplaner an.
-_backfill_progress = JobProgress("hourly-backfill", label="Stunden-Rollup")
+_backfill_progress = JobProgress("hourly-backfill", label=N_("Stunden-Rollup"))
 # Kurzlebiger Cache für den Speicher-Wirkungsgrad (siehe _speicher_efficiency).
 # Sechs Stunden: der Wert wird über die gesamte Historie gebildet und bewegt
 # sich innerhalb eines Tages nicht sichtbar, ein Nutzer soll eine korrigierte
@@ -2067,7 +2067,7 @@ class EnergieDashboardService:
         # wurde, nicht nur schweigen, wenn nichts auffällt.
         quality_checks = [
             {
-                "label": "Sensorwerte aktuell",
+                "label": tr("Sensorwerte aktuell"),
                 "ok": not stale_labels,
                 "detail": (
                     tr("Veraltet (>2 Tage ohne neue Werte): ") + ", ".join(stale_labels)
@@ -2094,7 +2094,7 @@ class EnergieDashboardService:
                 ),
             },
             {
-                "label": "Grundlast plausibel",
+                "label": tr("Grundlast plausibel"),
                 "ok": not grundlast_negative,
                 "detail": (
                     tr("Grundlast wäre rechnerisch negativ ({round} kWh) — Zuordnung oder Vorzeichen der Rollen prüfen.", round=round(grundlast, 2))
@@ -2145,7 +2145,7 @@ class EnergieDashboardService:
         ]
         if speicher_entladen_exceeds_names:
             quality_checks.append({
-                "label": "Speicher-Wirkungsgrad plausibel",
+                "label": tr("Speicher-Wirkungsgrad plausibel"),
                 "ok": False,
                 "detail": (
                     tr("Entladung übersteigt Ladung — Ladung/Entladung vertauscht? ")

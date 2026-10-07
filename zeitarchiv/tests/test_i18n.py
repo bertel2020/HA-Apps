@@ -151,6 +151,88 @@ def test_no_german_text_is_left_outside_t_in_template_attributes() -> None:
     assert not gefunden, "deutscher Text ohne t() in Template-Attributen: " + "; ".join(gefunden)
 
 
+FABRIK = re.compile(r"^(create_\w*router|register\w*)$")
+PYTHON_TEXT_KEYS = {"label", "title", "message", "detail", "error", "msg", "text", "description", "hint"}
+# Bewusst unübersetzte Python-Texte (Datei -> Texte); Produktname oder in beiden Sprachen gleich.
+UNTRANSLATED_PYTHON_TEXT_OK: dict[str, set[str]] = {
+    "main.py": {"Zeitarchiv", "Rollups", "Backups"},
+}
+
+
+def _python_modules():
+    for path in sorted(APP.rglob("*.py")):
+        if "i18n" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for knoten in ast.walk(tree):
+            for kind in ast.iter_child_nodes(knoten):
+                kind.parent = knoten  # type: ignore[attr-defined]
+        yield path, tree
+
+
+def _enclosing_function(knoten: ast.AST):
+    while hasattr(knoten, "parent"):
+        knoten = knoten.parent  # type: ignore[attr-defined]
+        if isinstance(knoten, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            return knoten
+    return None
+
+
+def test_tr_is_not_called_when_the_module_is_loaded() -> None:
+    """tr() liefert den Text in der Sprache der laufenden Anfrage — beim Laden des Moduls oder beim
+    Aufbau des Routers gibt es keine, es käme immer Deutsch heraus und bliebe so stehen (so erschienen
+    die Housekeeping-Filter in der englischen Oberfläche deutsch). Dort gehört N_() hin."""
+    gefunden: list[str] = []
+    for path, tree in _python_modules():
+        for knoten in ast.walk(tree):
+            if not (isinstance(knoten, ast.Call) and isinstance(knoten.func, ast.Name) and knoten.func.id == "tr"):
+                continue
+            funktion = _enclosing_function(knoten)
+            beim_laden = funktion is None
+            if isinstance(funktion, (ast.FunctionDef, ast.AsyncFunctionDef)) and FABRIK.match(funktion.name):
+                beim_laden = isinstance(getattr(funktion, "parent", None), ast.Module)
+            if beim_laden:
+                gefunden.append(f"{path.name}:{knoten.lineno}")
+    assert not gefunden, "tr() beim Laden/Router-Aufbau (stattdessen N_()): " + ", ".join(gefunden)
+
+
+def _text_of(wert: ast.AST) -> str | None:
+    if isinstance(wert, ast.Constant) and isinstance(wert.value, str):
+        return wert.value
+    if isinstance(wert, ast.JoinedStr):
+        return "".join(t.value if isinstance(t, ast.Constant) else "{}" for t in wert.values)
+    return None
+
+
+def test_python_texts_for_the_page_go_through_tr() -> None:
+    """Ein Literal als label=/title=/message=/detail=/... ohne tr()/N_() bleibt in jeder Sprache deutsch.
+
+    Gemeldet wird derselbe Verdacht wie bei Skripten und Template-Attributen: mehrwortig, mit Großbuchstaben
+    am Anfang oder gleich einem Katalogschlüssel. Zeichenketten in tr()/N_() zählen nicht, weil sie als
+    Aufruf keine Konstante sind.
+    """
+    schluessel = set(CATALOG["js"]) | set(CATALOG["app"])
+    gefunden: list[str] = []
+    for path, tree in _python_modules():
+        erlaubt = UNTRANSLATED_PYTHON_TEXT_OK.get(path.name, set())
+        for knoten in ast.walk(tree):
+            kandidaten: list[tuple[ast.AST, str]] = []
+            if isinstance(knoten, ast.keyword) and knoten.arg in PYTHON_TEXT_KEYS:
+                kandidaten.append((knoten.value, knoten.arg))
+            if isinstance(knoten, ast.Dict):
+                kandidaten += [
+                    (wert, schl.value) for schl, wert in zip(knoten.keys, knoten.values)
+                    if isinstance(schl, ast.Constant) and schl.value in PYTHON_TEXT_KEYS
+                ]
+            for wert, name in kandidaten:
+                text = _text_of(wert)
+                if text is None or len(re.findall("[A-Za-zäöüÄÖÜ]", text)) < 3 or text in erlaubt:
+                    continue
+                if text in schluessel or " " in text.strip() or text[:1].isupper():
+                    gefunden.append(f"{path.name}:{wert.lineno}: {name}={text[:50]!r}")
+    assert not gefunden, "Python-Text ohne tr()/N_(): " + "; ".join(gefunden)
+
+
 def test_catalog_has_no_dead_entries() -> None:
     quellen = "\n".join(
         path.read_text(encoding="utf-8").replace('\\"', '"').replace("\\'", "'")

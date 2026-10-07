@@ -2185,7 +2185,14 @@
     "Ø/Tag": "Ø/day",
     "Noch nie": "Never",
     "Wird berechnet …": "Calculating …",
-    " — am deutlichsten {beispiel}.": " — most notably {beispiel}."
+    " — am deutlichsten {beispiel}.": " — most notably {beispiel}.",
+    "Sensorwerte aktuell": "Sensor values current",
+    "Grundlast plausibel": "Base load plausible",
+    "Speicher-Wirkungsgrad plausibel": "Storage efficiency plausible",
+    "Stunden-Rollup": "Hourly rollup",
+    "Rollup-Neuaufbau": "Rollup rebuild",
+    "Weitere Fachtabellen": "Other domain tables",
+    "Noch keiner fachlichen Gruppe zugeordnete Tabellen.": "Tables not yet assigned to a domain group."
   },
   "js": {
     "Meldungen": "Notices",
