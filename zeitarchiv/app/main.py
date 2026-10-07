@@ -3971,7 +3971,7 @@ def _dashboard_tiles_context(
     ]
     return {
         "dashboard_id": dashboard_id,
-        "dashboard_name": dashboard["name"] if dashboard else "Dashboard",
+        "dashboard_name": (i18n.retranslate(dashboard["name"]) if dashboard["is_default"] else dashboard["name"]) if dashboard else "Dashboard",
         "dashboard_locked": dashboard_locked,
         # Präziser Modus: Gitter/Zeilenhöhe halbiert (.dashboard-grid.is-precise),
         # Größen-Picker geht dann bis 6x6 statt 3x3 (siehe _dashboard_tile_menu.html).

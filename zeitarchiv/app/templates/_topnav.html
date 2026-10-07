@@ -112,7 +112,7 @@
           <div class="topnav-menu-divider"></div>
           {% for d in nav_dashboards_list %}
           {% set d_path = '/dashboards/' ~ d.id|string %}
-          <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ d.name }}</a>
+          <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ (d.name | retranslate) if d.is_default else d.name }}</a>
           {% endfor %}
           {% endif %}
         </div>
@@ -313,7 +313,7 @@
         {% endif %}
         {% for d in nav_dashboards_list %}
         {% set d_path = '/dashboards/' ~ d.id|string %}
-        <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ d.name }}</a>
+        <a class="{{ 'is-active' if (_rel == d_path or _rel.startswith(d_path ~ '/')) }}" href="{{ app_root }}/dashboards/{{ d.id }}">{{ (d.name | retranslate) if d.is_default else d.name }}</a>
         {% endfor %}
       </div>
       <a class="{{ 'is-active' if nav_entities }}" href="{{ app_root }}/entities">{{ nav_icon('entities') }}{{ _("Entitäten") }}</a>

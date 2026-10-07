@@ -17,8 +17,10 @@ umgekehrt, ein Import in die andere Richtung wäre der falsche Weg gewesen.
 
 from __future__ import annotations
 
+import contextvars
 import math
 import random
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -27,8 +29,9 @@ from zoneinfo import ZoneInfo
 
 import pyarrow.parquet as pq
 
+from .i18n import LANGUAGES, SOURCE_LANGUAGE, translate
 from .storage import hotbuffer, reconcile
-from .storage.entity_removal import delete_all_values
+from .storage.entity_removal import delete_all_values, delete_entity
 from .storage.index import Index
 from .storage.paths import entity_dir, storage_area_dir
 from .storage.symcon_import import import_rows
@@ -1217,10 +1220,28 @@ def inject_data_quality_issues(
     return result
 
 
-def write_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity, rows: list[Row]) -> None:
+# Sprache der laufenden Erzeugung für die Lesehelfer unten (sie bekommen nur die deutschen IDs).
+_run_language: contextvars.ContextVar[str] = contextvars.ContextVar("demo_language", default=SOURCE_LANGUAGE)
+
+
+def localized_id(entity_id: str, language: str = SOURCE_LANGUAGE) -> str:
+    """entity_id in der Sprache des Demo-Datensatzes: Deutsch wie im Code, sonst der Slug des übersetzten
+    Namens (``sensor.demo_living_room_temperature``) — die Domain bleibt."""
+    if language == SOURCE_LANGUAGE:
+        return entity_id
+    domain = entity_id.split(".", 1)[0]
+    name = next(e.friendly_name for e in DEMO_ENTITIES if e.entity_id == entity_id)
+    slug = re.sub(r"[^a-z0-9]+", "_", translate(name, language).lower()).strip("_")
+    return f"{domain}.{slug}"
+
+
+def write_entity(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity, rows: list[Row], language: str = SOURCE_LANGUAGE,
+) -> None:
+    entity_id = localized_id(entity.entity_id, language)
     index.get_or_create_entity(
-        entity.entity_id, entity.domain, entity.state_class, entity.unit,
-        friendly_name=entity.friendly_name,
+        entity_id, entity.domain, entity.state_class, entity.unit,
+        friendly_name=translate(entity.friendly_name, language),
     )
     current_month_start = month_start(datetime.now(tz)).timestamp()
     past_rows = [r for r in rows if r[0] < current_month_start]
@@ -1233,9 +1254,9 @@ def write_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity,
     # erst NACH dem ersten Aufruf — deshalb erst die abgeschlossenen Monate,
     # dann getrennt der laufende.
     if past_rows:
-        import_rows(data_dir, index, past_rows, entity.entity_id, tz, source_label="demo")
+        import_rows(data_dir, index, past_rows, entity_id, tz, source_label="demo")
     if current_rows:
-        import_rows(data_dir, index, current_rows, entity.entity_id, tz, source_label="demo")
+        import_rows(data_dir, index, current_rows, entity_id, tz, source_label="demo")
 
 
 # Entity-ID -> Schlüssel in simulate_household()s counter_seed-Dict (siehe
@@ -1277,6 +1298,7 @@ def _last_actual_point(data_dir: Path, entity_id: str) -> Row | None:
     _dashboard_tiles_context() (main.py)/dashboard-tiles.js. Dieselbe Datei-
     Fundlogik wie reconcile._entity_storage_stats(), hier zusätzlich mit dem
     Wert statt nur dem Zeitstempel."""
+    entity_id = localized_id(entity_id, _run_language.get())
     best: Row | None = None
     hot_dir = storage_area_dir(data_dir, "hot")
     for path in sorted(hot_dir.glob(f"{entity_id}-*.csv")) if hot_dir.exists() else []:
@@ -1418,6 +1440,7 @@ def run_generation(
     clean: bool = False,
     on_entity: Callable[[int, str, int], None] | None = None,
     on_status: Callable[[str], None] | None = None,
+    language: str = SOURCE_LANGUAGE,
 ) -> GenerationResult:
     """Erzeugt (volle Historie), ergänzt (append=True) oder bereinigt+erzeugt
     neu (clean=True) die komplette Demo-Historie — der gemeinsame Kern von
@@ -1435,13 +1458,18 @@ def run_generation(
     bisher VOR der (ggf. langen) Haupterzeugung eine Statuszeile ausgab
     (Bereinigung abgeschlossen, Ergänzungszeitraum) — als Rückgabewert allein
     kämen diese Meldungen bei main() erst NACH allen Entitäten-Zeilen an,
-    stünden in der Konsole also am falschen Ende."""
+    stünden in der Konsole also am falschen Ende.
+
+    language bestimmt die Sprache der friendly_names und der entity_ids (Katalog
+    ``app/i18n/en.json``; die ID ist der Slug des übersetzten Namens). Ein Lauf in der anderen
+    Sprache ersetzt den vorhandenen Datensatz (Entitäten der anderen Sprache werden entfernt,
+    Dashboards darauf zeigen dann ins Leere)."""
     now = datetime.now(tz)
     cleaned_count = 0
 
     if clean:
         existing = {e["entity_id"] for e in index.list_entities()}
-        wanted = {e.entity_id for e in DEMO_ENTITIES}
+        wanted = {localized_id(e.entity_id, language) for e in DEMO_ENTITIES}
         # delete_all_values() statt delete_entity(): entfernt nur die Werte,
         # behält die Entität (Konfiguration, first_ts=NULL für den
         # anschließenden Neuaufbau) durchgehend im Index — Dashboards/Charts/
@@ -1453,6 +1481,7 @@ def run_generation(
         if on_status is not None:
             on_status(f"{cleaned_count} vorhandene Demo-Entität(en) bereinigt.")
 
+    _run_language.set(language)
     counter_seed: dict[str, float] = {}
     appliance_seed: dict[str, float] = {}
     rain_seed = 0.0
@@ -1468,7 +1497,7 @@ def run_generation(
 
     fell_back_to_full_history = False
     if append:
-        anchor = index.get_entity(APPEND_ANCHOR_ENTITY_ID)
+        anchor = index.get_entity(localized_id(APPEND_ANCHOR_ENTITY_ID, language))
         if anchor is None or anchor["last_ts"] is None:
             fell_back_to_full_history = True
             start = now - timedelta(days=months * 30)
@@ -1521,7 +1550,7 @@ def run_generation(
     # wiederholt gegen ein bereits befülltes Verzeichnis (dafür gibt es
     # --append bzw. --clean), ein Reset ist dort also nicht nötig.
     if append:
-        for entity_id in MIGRATION_TEST_ENTITY_IDS:
+        for entity_id in (localized_id(i, language) for i in MIGRATION_TEST_ENTITY_IDS):
             if index.get_entity(entity_id) is not None:
                 delete_all_values(data_dir, index, entity_id)
     migration_start = now - timedelta(days=MIGRATION_BACKFILL_DAYS) if append else start
@@ -1616,18 +1645,28 @@ def run_generation(
         "sensor.demo_migration2_stromverbrauch": gen_migration2_new_counter(migration_start, now, rng),
     }
 
+    if not append or fell_back_to_full_history:
+        # Ein Sprachwechsel soll den Datensatz ersetzen, nicht verdoppeln: IDs der anderen Sprache entfernen.
+        for other in LANGUAGES:
+            if other == language:
+                continue
+            for entity in DEMO_ENTITIES:
+                other_id = localized_id(entity.entity_id, other)
+                if index.get_entity(other_id) is not None:
+                    delete_entity(data_dir, index, other_id)
+
     month_boundary_ts = month_start(now).timestamp()
     total_rows = 0
     for index_in_list, entity in enumerate(DEMO_ENTITIES, start=1):
         rows = inject_data_quality_issues(entity, rows_by_key[entity.entity_id], rng, month_boundary_ts)
-        write_entity(data_dir, index, tz, entity, rows)
+        write_entity(data_dir, index, tz, entity, rows, language)
         total_rows += len(rows)
         if on_entity is not None:
-            on_entity(index_in_list, entity.entity_id, len(rows))
+            on_entity(index_in_list, localized_id(entity.entity_id, language), len(rows))
 
     report = reconcile.audit_storage_metadata(
         data_dir, index, tz,
-        entity_ids=[e.entity_id for e in DEMO_ENTITIES],
+        entity_ids=[localized_id(e.entity_id, language) for e in DEMO_ENTITIES],
         repair=True,
     )
 

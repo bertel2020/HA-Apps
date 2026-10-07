@@ -29,7 +29,9 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 ## Was wird erzeugt
 
-53 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+Die Tabellen unten nennen die deutschen `entity_id`s; mit `--language en` heißen sie wie der englische Name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
+
+69 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
 eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
 Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
@@ -219,7 +221,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 53 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 69 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -243,6 +245,7 @@ Weitere Beispiele:
 | `--seed` | `42` | Zufalls-Seed — gleicher Seed erzeugt reproduzierbar dieselben Werte |
 | `--clean` | *(aus)* | Vorhandene `demo_*`-Entitäten im Zielverzeichnis vor dem Erzeugen sauber entfernen (für wiederholte Läufe) |
 | `--append` | *(aus)* | Statt der kompletten Historie nur die Werte seit dem letzten Lauf ergänzen (`--months` wird dabei ignoriert) — siehe [Lebende Demo-Instanz](#lebende-demo-instanz-append). Schließt sich mit `--clean` gegenseitig aus |
+| `--language {de,en}` | `de` | Sprache der Demo-Entitäten — Namen **und** `entity_id`s (`en`: `sensor.demo_living_room_temperature` statt `sensor.demo_wohnzimmer_temperatur`). Ein Lauf in der anderen Sprache ersetzt den vorhandenen Datensatz (Entitäten der anderen Sprache werden entfernt, Dashboards darauf zeigen ins Leere). Im Demo-Modus der App gilt die Sprache der Oberfläche. Die Namen stehen im Übersetzungskatalog (`app/i18n/en.json`) |
 | `--clear {values,entities}` | *(aus)* | Eigenständige Aktion statt Erzeugen — siehe [Demo-Daten löschen](#demo-daten-löschen---clear) |
 
 Am Ende zeigt das Skript eine kurze Zusammenfassung (Anzahl geschriebener
@@ -290,7 +293,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 53 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 69 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben

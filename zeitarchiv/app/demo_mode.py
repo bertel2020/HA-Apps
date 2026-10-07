@@ -17,7 +17,7 @@ aus der offenen Verbindung — siehe Aufrufer in housekeeping_routes.py.
 
 from __future__ import annotations
 
-from .i18n import N_, tr
+from .i18n import N_, active_language, tr
 
 import json
 import os
@@ -160,6 +160,9 @@ def build_demo_worker(
     gegenseitig aus, deshalb ein gemeinsamer Worker statt dreier. Läuft über
     demo_progress.start(), egal wer aufruft."""
 
+    # Sprache jetzt festhalten: der Worker läuft in einem Thread ohne Anfrage.
+    language = active_language()
+
     def worker() -> str:
         demo_progress.set_phase(_DEMO_PHASE_LABELS[mode], len(DEMO_ENTITIES))
         with coordinator.exclusive():
@@ -167,6 +170,7 @@ def build_demo_worker(
                 data_dir, index, tz, random.Random(),
                 append=(mode == "append"), clean=(mode == "regenerate"),
                 on_entity=lambda i, entity_id, _n: demo_progress.advance(i, entity_id),
+                language=language,
             )
         index.set_setting("demo_append_last_run", str(time.time()))
         if result.skipped:
