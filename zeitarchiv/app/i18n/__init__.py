@@ -11,9 +11,8 @@ Katalog ``<sprache>.json`` hat zwei Abschnitte:
 - ``"js"``: Texte der Skripte. Sie werden nur für Nicht-Deutsch inline in die Seite
   geschrieben (``window.ZA_CATALOG``, siehe ``static/js/i18n.js``).
 
-Sprachwahl: Einstellung ``language`` (``auto``/``de``/``en``, Standard ``de`` —
-bestehende Installationen bleiben deutsch). ``auto`` folgt dem ``Accept-Language``
-des Browsers.
+Sprachwahl: Einstellung ``language`` (``auto``/``de``/``en``, Standard ``auto``).
+``auto`` folgt dem ``Accept-Language`` des Browsers; ohne passende Sprache bleibt es Deutsch.
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ LANGUAGES = {"de": "Deutsch", "en": "English"}
 # Reihenfolge der Auswahl; "auto" ist keine Sprache, sondern die Regel.
 LANGUAGE_CHOICES = {"auto": "Automatisch (Browser)", **LANGUAGES}
 SETTING_KEY = "language"
-DEFAULT_SETTING = SOURCE_LANGUAGE
+DEFAULT_SETTING = "auto"
 
 _CATALOG_DIR = Path(__file__).parent
 
