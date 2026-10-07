@@ -213,7 +213,7 @@
   priceLabel(entityId, fixedVal, unit) {
     if (entityId) return this.nameFor(entityId);
     if (fixedVal !== null && fixedVal !== undefined) return NumberFormat.fmt(fixedVal) + " " + unit + " (fest)";
-    return "Nicht konfiguriert";
+    return t("Nicht konfiguriert");
   },
   // Liest den per oninput gespiegelten Festwert (siehe number_field) beim
   // Klick auf "Übernehmen" aus dem DOM aus — der Kachel-Anzeigewert
@@ -244,7 +244,7 @@
       return this.nameFor(row.capacity_entity_id);
     }
     if (row.capacity_kwh) return row.capacity_kwh + " kWh";
-    return "Nicht konfiguriert";
+    return t("Nicht konfiguriert");
   },
   groupUsage(name) {
     return this.verbraucher.filter(v => v.gruppe === name).length;
@@ -415,7 +415,7 @@
               <span class="edash-item-req">{{ _("Pflicht") }}</span>
             </div>
             <div class="edash-item-bottom">
-              <span class="edash-item-meta" :class="{'is-empty': !netzbezug}" x-text="netzbezug ? nameFor(netzbezug) : 'Nicht zugeordnet'"></span>
+              <span class="edash-item-meta" :class="{'is-empty': !netzbezug}" x-text="netzbezug ? nameFor(netzbezug) : t('Nicht zugeordnet')"></span>
             </div>
           </div>
         </button>
@@ -428,7 +428,7 @@
               <span class="edash-item-name" x-text="einspeisungName || t('Einspeisung')"></span>
             </div>
             <div class="edash-item-bottom">
-              <span class="edash-item-meta" :class="{'is-empty': !einspeisung}" x-text="einspeisung ? nameFor(einspeisung) : 'Nicht zugeordnet'"></span>
+              <span class="edash-item-meta" :class="{'is-empty': !einspeisung}" x-text="einspeisung ? nameFor(einspeisung) : t('Nicht zugeordnet')"></span>
             </div>
           </div>
         </button>
@@ -509,7 +509,7 @@
                   <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Erzeuger'))"></span>
                 </div>
                 <div class="edash-item-bottom">
-                  <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : 'Nicht zugeordnet'"></span>
+                  <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
                 </div>
               </div>
             </button>
@@ -529,7 +529,7 @@
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
-                    <button type="button" class="btn btn-danger" @click="removeRow(erzeuger, idx, row, 'Erzeuger')">{{ _("Erzeuger entfernen") }}</button>
+                    <button type="button" class="btn btn-danger" @click="removeRow(erzeuger, idx, row, t('Erzeuger'))">{{ _("Erzeuger entfernen") }}</button>
                     <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
@@ -616,7 +616,7 @@
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
-                    <button type="button" class="btn btn-danger" @click="removeRow(speicher, idx, row, 'Speicher')">{{ _("Speicher entfernen") }}</button>
+                    <button type="button" class="btn btn-danger" @click="removeRow(speicher, idx, row, t('Speicher'))">{{ _("Speicher entfernen") }}</button>
                     <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
@@ -667,7 +667,7 @@
                 <div class="edash-item-bottom">
                   <span class="edash-item-chip" x-show="row.gruppe" x-text="row.gruppe"></span>
                   <span class="edash-item-chip edash-item-chip-empty" x-show="!row.gruppe">{{ _("Keine Gruppe") }}</span>
-                  <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : 'Nicht zugeordnet'"></span>
+                  <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
                 </div>
               </div>
             </button>
@@ -692,7 +692,7 @@
                     </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
-                    <button type="button" class="btn btn-danger" @click="removeRow(verbraucher, idx, row, 'Verbraucher')">{{ _("Verbraucher entfernen") }}</button>
+                    <button type="button" class="btn btn-danger" @click="removeRow(verbraucher, idx, row, t('Verbraucher'))">{{ _("Verbraucher entfernen") }}</button>
                     <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
@@ -888,7 +888,7 @@
               <span class="edash-item-name">{{ _("Rest heute") }}</span>
             </div>
             <div class="edash-item-bottom">
-              <span class="edash-item-meta" :class="{'is-empty': !prognoseHeute}" x-text="prognoseHeute ? nameFor(prognoseHeute) : 'Nicht konfiguriert'"></span>
+              <span class="edash-item-meta" :class="{'is-empty': !prognoseHeute}" x-text="prognoseHeute ? nameFor(prognoseHeute) : t('Nicht konfiguriert')"></span>
             </div>
           </div>
         </button>
@@ -900,7 +900,7 @@
               <span class="edash-item-name">{{ _("Morgen") }}</span>
             </div>
             <div class="edash-item-bottom">
-              <span class="edash-item-meta" :class="{'is-empty': !prognoseMorgen}" x-text="prognoseMorgen ? nameFor(prognoseMorgen) : 'Nicht konfiguriert'"></span>
+              <span class="edash-item-meta" :class="{'is-empty': !prognoseMorgen}" x-text="prognoseMorgen ? nameFor(prognoseMorgen) : t('Nicht konfiguriert')"></span>
             </div>
           </div>
         </button>

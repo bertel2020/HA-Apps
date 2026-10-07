@@ -221,7 +221,7 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
             "demo_entity_count_label": format_int(overview["entity_count"]),
             "demo_row_count_label": format_int(overview["total_rows"]),
             "demo_size_label": format_size(overview["total_size_bytes"]),
-            "demo_last_run_label": tr("vor {format_uptime}", format_uptime=format_uptime(now - last_run)) if last_run else "Noch nie",
+            "demo_last_run_label": tr("vor {format_uptime}", format_uptime=format_uptime(now - last_run)) if last_run else tr("Noch nie"),
             "demo_next_run_label": next_run_label,
             "demo_append_interval": interval,
             "demo_append_interval_options": list(DEMO_APPEND_INTERVAL_LABELS.items()),
@@ -428,9 +428,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # leere Wert = "kein Filter", genau wie bei den bestehenden dd-picker-
     # Filtern (siehe _rows_filter_menu.html). Die Entität-Liste ist dynamisch
     # (siehe _settings_activity_context) und deshalb kein Modulkonstante.
-    _ACTIVITY_ACTION_FILTER_OPTIONS = [("", tr("Alle"))] + list(_ACTIVITY_ACTION_LABELS.items())
-    _ACTIVITY_STATUS_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_STATUS_LABELS.items())
-    _ACTIVITY_DAYS_FILTER_OPTIONS = [("", "Alle"), ("7", tr("7 Tage")), ("30", tr("30 Tage")), ("90", tr("90 Tage"))]
+    _ACTIVITY_ACTION_FILTER_OPTIONS = [("", N_("Alle"))] + list(_ACTIVITY_ACTION_LABELS.items())
+    _ACTIVITY_STATUS_FILTER_OPTIONS = [("", N_("Alle"))] + list(_ACTIVITY_STATUS_LABELS.items())
+    _ACTIVITY_DAYS_FILTER_OPTIONS = [("", N_("Alle")), ("7", N_("7 Tage")), ("30", N_("30 Tage")), ("90", N_("90 Tage"))]
 
     # Nur für die Monatsliste im Verdichten-Detail (unten) — dieselben Namen
     # wie main.py:_MONTH_NAMES_DE, hier lokal statt geteilt, weil sonst nirgends
@@ -745,12 +745,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 f"{format_timestamp(retention_overview['generated_at'], deps.tz)} "
                 f"{format_time(retention_overview['generated_at'], deps.tz)}"
                 if isinstance(retention_overview.get("generated_at"), (int, float))
-                else "Wird berechnet …"
+                else tr("Wird berechnet …")
             ),
             "result": result,
         }
 
-    _STALE_ENTITIES_DAY_OPTIONS = [("1", tr("1 Tag")), ("3", tr("3 Tage")), ("7", tr("7 Tage")), ("14", tr("14 Tage")), ("30", tr("30 Tage"))]
+    _STALE_ENTITIES_DAY_OPTIONS = [("1", N_("1 Tag")), ("3", N_("3 Tage")), ("7", N_("7 Tage")), ("14", N_("14 Tage")), ("30", N_("30 Tage"))]
     _STALE_ENTITIES_DEFAULT_DAYS = "3"
 
 

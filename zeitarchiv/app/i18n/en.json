@@ -2180,7 +2180,12 @@
     "in {count} Tagen": "in {count} days",
     "wird ab {date} entfernt": "will be removed from {date}",
     "wird ab {date} entfernt, {in_days}": "will be removed from {date}, {in_days}",
-    "wird beim nächsten Lauf entfernt": "will be removed in the next run"
+    "wird beim nächsten Lauf entfernt": "will be removed in the next run",
+    "Ø/Stunde": "Ø/hour",
+    "Ø/Tag": "Ø/day",
+    "Noch nie": "Never",
+    "Wird berechnet …": "Calculating …",
+    " — am deutlichsten {beispiel}.": " — most notably {beispiel}."
   },
   "js": {
     "Meldungen": "Notices",
@@ -2563,6 +2568,25 @@
     "Neuer Chart": "New chart",
     "Tabelle bearbeiten": "Edit table",
     "Neue Tabelle": "New table",
-    "bis {cut}": "until {cut}"
+    "bis {cut}": "until {cut}",
+    "Nicht zugeordnet": "Not assigned",
+    "Nicht konfiguriert": "Not configured",
+    "Weniger anzeigen": "Show less",
+    "+ {count} weitere anzeigen": "+ {count} more",
+    "Bilanz plausibel": "Balance plausible",
+    "Bilanz unsicher": "Balance uncertain",
+    "Zu einem bestimmten Zeitpunkt springen": "Jump to a specific point in time",
+    "Serie einblenden": "Show series",
+    "Serie ausblenden": "Hide series",
+    "Versatz ({unit})": "Offset ({unit})",
+    "Spalte einblenden": "Show column",
+    "Spalte ausblenden": "Hide column",
+    "Zeile einblenden": "Show row",
+    "Zeile ausblenden": "Hide row",
+    "Abschnittsname (optional) …": "Section name (optional) …",
+    "Beschriftung …": "Label …",
+    "Rahmen: {value}": "Borders: {value}",
+    "Dichte: {value}": "Density: {value}",
+    "Header-Ausrichtung: {value}": "Header alignment: {value}"
   }
 }

@@ -8,7 +8,7 @@
 <div class="nav" id="rows-nav" hx-swap-oob="true">
   <button class="btn navbtn" {% if range == 'all' %}disabled{% endif %} onclick="stepOffset(-1)" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
   <div class="cal-wrap" x-data='calendarPicker({{ entity_id | tojson }}, {{ app_root | tojson }}, {{ first_date | tojson }}, {{ last_date | tojson }})'>
-    <button type="button" class="period-label" :disabled="range === 'all'" @click="toggle()" :title="range === 'all' ? '' : 'Zu einem bestimmten Zeitpunkt springen'">{{ period_label }}</button>
+    <button type="button" class="period-label" :disabled="range === 'all'" @click="toggle()" :title="range === 'all' ? '' : t('Zu einem bestimmten Zeitpunkt springen')">{{ period_label }}</button>
     {% include "_calendar_popover.html" %}
   </div>
   <button class="btn navbtn" {% if range == 'all' or offset >= 0 %}disabled{% endif %} onclick="stepOffset(1)" aria-label="{{ _('Nächster Zeitraum') }}">›</button>

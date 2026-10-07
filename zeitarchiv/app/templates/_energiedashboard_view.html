@@ -92,7 +92,7 @@
     <div class="edash-quality-row" :class="{'is-warn': !bilanzCheck.ok}">
       <div class="edash-quality-icon" x-text="bilanzCheck.ok ? '✓' : '!'"></div>
       <div>
-        <strong x-text="'Bilanz ' + (bilanzCheck.ok ? 'plausibel' : 'unsicher')"></strong>
+        <strong x-text="bilanzCheck.ok ? t('Bilanz plausibel') : t('Bilanz unsicher')"></strong>
         <p class="hint hint-status" style="margin:0;" x-text="bilanzCheck.detail"></p>
       </div>
     </div>
@@ -623,7 +623,7 @@
                 <tr class="edash-share-more-row" x-show="verbraucherBreakdown.length > 8">
                   <td colspan="4">
                     <button type="button" class="edash-share-more-btn" @click="verbraucherExpanded = !verbraucherExpanded"
-                            x-text="verbraucherExpanded ? 'Weniger anzeigen' : ('+ ' + (verbraucherBreakdown.length - 8) + ' weitere anzeigen')"></button>
+                            x-text="verbraucherExpanded ? t('Weniger anzeigen') : t('+ {count} weitere anzeigen', {count: verbraucherBreakdown.length - 8})"></button>
                   </td>
                 </tr>
               </tbody>

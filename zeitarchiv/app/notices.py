@@ -584,7 +584,7 @@ def build_notices(
             "title": tr("Ausreißer-Erkennung markiert auffällig viel"),
             "detail": (
                 (tr("Bei {anzahl} Entität markiert die eingestellte Schwelle mehr als {marke} % aller Werte", anzahl=anzahl, marke=marke) if anzahl == 1 else tr("Bei {anzahl} Entitäten markiert die eingestellte Schwelle mehr als {marke} % aller Werte", anzahl=anzahl, marke=marke))
-                + (f" — am deutlichsten {beispiel}." if anzahl != 1 else f": {beispiel}.")
+                + (tr(" — am deutlichsten {beispiel}.", beispiel=beispiel) if anzahl != 1 else f": {beispiel}.")
                 + tr(" Eine zu enge Schwelle markiert normales Verhalten als verdächtig.")
             ),
             "meta": tr("Housekeeping"),

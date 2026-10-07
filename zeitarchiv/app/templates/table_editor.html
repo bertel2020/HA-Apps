@@ -41,7 +41,7 @@
                       <button type="button" data-tooltip="{{ _('Spalte nach rechts') }}" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
                     </span>
                     <button type="button" class="tbl-col-hide" :class="{active: col.hidden}"
-                            :data-tooltip="col.hidden ? 'Spalte einblenden' : 'Spalte ausblenden'" @click="col.hidden = !col.hidden">
+                            :data-tooltip="col.hidden ? t('Spalte einblenden') : t('Spalte ausblenden')" @click="col.hidden = !col.hidden">
                       <svg x-show="!col.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       <svg x-show="col.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </button>
@@ -90,7 +90,7 @@
                       </template>
                     </div>
                   </span>
-                  <span class="tbl-field-label" x-text="`Versatz (${versatzUnit(col)})`"></span>
+                  <span class="tbl-field-label" x-text="t('Versatz ({unit})', {unit: versatzUnit(col)})"></span>
                   <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
                   <label class="cbx">
                     <input type="checkbox" x-model="col.year_over_year" @change="load()"> {{ _("Vorjahresvergleich") }}
@@ -225,7 +225,7 @@
                             x-show="row.row_type === 'separator'"></span>
 
                       <input type="text" :maxlength="MAX_ROW_LABEL_LENGTH"
-                             :placeholder="row.row_type === 'separator' ? 'Abschnittsname (optional) …' : (suggestRowLabel(row) || 'Beschriftung …')" x-model="row.label">
+                             :placeholder="row.row_type === 'separator' ? t('Abschnittsname (optional) …') : (suggestRowLabel(row) || t('Beschriftung …'))" x-model="row.label">
 
                       <div class="tbl-row-right">
                         <!-- Ein Menü statt vieler einzelner Chips (Fett/Text/
@@ -250,7 +250,7 @@
                           <button type="button" data-tooltip="{{ _('Zeile nach unten') }}" :disabled="idx === rows.length - 1" @click="moveRow(row.uid, 1)">↓</button>
                         </div>
                         <button type="button" class="tbl-row-hide" :class="{active: row.hidden}"
-                                :data-tooltip="row.hidden ? 'Zeile einblenden' : 'Zeile ausblenden'" @click="row.hidden = !row.hidden">
+                                :data-tooltip="row.hidden ? t('Zeile einblenden') : t('Zeile ausblenden')" @click="row.hidden = !row.hidden">
                           <svg x-show="!row.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                           <svg x-show="row.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         </button>
@@ -305,7 +305,7 @@
                   <button type="button" class="chip" :class="{active: style.sticky_first_col}" data-tooltip="{{ _('Beschriftungsspalte beim horizontalen Scrollen sichtbar halten') }}" @click="style.sticky_first_col = !style.sticky_first_col">{{ _("Erste Spalte fixieren") }}</button>
                   <button type="button" class="chip" :class="{active: style.sticky_header}" data-tooltip="{{ _('Kopfzeile beim vertikalen Scrollen sichtbar halten — begrenzt die Vorschau/Kachel dafür auf eine feste Höhe mit eigenem Scrollbalken') }}" @click="style.sticky_header = !style.sticky_header">{{ _("Header fixieren") }}</button>
                   <span class="dd-picker-wrap" @click.outside="bordersPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="{{ _('Rahmen') }}" @click="bordersPickerOpen = !bordersPickerOpen" x-text="'Rahmen: ' + BORDER_LABELS[style.borders] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Rahmen') }}" @click="bordersPickerOpen = !bordersPickerOpen" x-text="t('Rahmen: {value}', {value: BORDER_LABELS[style.borders]}) + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="bordersPickerOpen" x-cloak>
                       <template x-for="[value, label] in BORDER_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.borders === value}"
@@ -314,7 +314,7 @@
                     </div>
                   </span>
                   <span class="dd-picker-wrap" @click.outside="densityPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="{{ _('Zeilenabstand') }}" @click="densityPickerOpen = !densityPickerOpen" x-text="'Dichte: ' + DENSITY_LABELS[style.density] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Zeilenabstand') }}" @click="densityPickerOpen = !densityPickerOpen" x-text="t('Dichte: {value}', {value: DENSITY_LABELS[style.density]}) + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="densityPickerOpen" x-cloak>
                       <template x-for="[value, label] in DENSITY_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.density === value}"
@@ -323,7 +323,7 @@
                     </div>
                   </span>
                   <span class="dd-picker-wrap" @click.outside="headerAlignPickerOpen = false">
-                    <button type="button" class="btn" data-tooltip="{{ _('Ausrichtung der Kopfzeile (Zeiträume)') }}" @click="headerAlignPickerOpen = !headerAlignPickerOpen" x-text="'Header-Ausrichtung: ' + ALIGN_LABELS[style.header_align] + ' ▾'"></button>
+                    <button type="button" class="btn" data-tooltip="{{ _('Ausrichtung der Kopfzeile (Zeiträume)') }}" @click="headerAlignPickerOpen = !headerAlignPickerOpen" x-text="t('Header-Ausrichtung: {value}', {value: ALIGN_LABELS[style.header_align]}) + ' ▾'"></button>
                     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="headerAlignPickerOpen" x-cloak>
                       <template x-for="[value, label] in ALIGN_OPTIONS" :key="value">
                         <div class="dd-picker-row" :class="{active: style.header_align === value}"

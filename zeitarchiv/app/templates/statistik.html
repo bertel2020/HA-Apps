@@ -35,7 +35,7 @@
         {% endif %}
       </div>
       <div class="stat">
-        <div class="label">Ø/Stunde</div>
+        <div class="label">{{ _("Ø/Stunde") }}</div>
         {% if events_per_hour is not none %}
         <div class="value">{{ events_per_hour }}</div>
         <div class="sub-value">{{ _("letzte 24 Stunden") }}</div>
@@ -45,7 +45,7 @@
         {% endif %}
       </div>
       <div class="stat">
-        <div class="label">Ø/Tag</div>
+        <div class="label">{{ _("Ø/Tag") }}</div>
         {% if events_per_day is not none %}
         <div class="value">{{ events_per_day }}</div>
         <div class="sub-value">{{ _("letzte 7 Tage") }}</div>

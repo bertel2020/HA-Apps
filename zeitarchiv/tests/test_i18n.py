@@ -112,6 +112,45 @@ def test_no_german_script_text_is_left_outside_t() -> None:
     assert not gefunden, "deutscher Text ohne t(): " + "; ".join(gefunden)
 
 
+ALPINE_ATTRIBUTE = re.compile(r"""(?<![\w-])(?:x-[\w:.-]+|@[\w:.-]+|:[\w-]+)\s*=\s*(?:"(?P<d>[^"]*)"|'(?P<s>[^']*)')""", re.S)
+WRAPPED_TEXT = re.compile(r"""(?<![A-Za-z0-9])[t_]\(\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)""")
+# Bewusst deutsch gelassene Literale in Template-Attributen (Datei -> Texte), mit Begründung.
+UNTRANSLATED_ATTRIBUTE_TEXT_OK: dict[str, set[str]] = {
+    # Einheit in einer Zahlenklammer, "(12,3 kWh)" — nichts zu übersetzen; der Schlüssel stammt aus einem anderen Satz.
+    "_energiedashboard_view.html": {" kWh)"},
+}
+
+
+def test_no_german_text_is_left_outside_t_in_template_attributes() -> None:
+    """Alpine-Ausdrücke in x-text/@click/:title/... sehen weder der Katalogtest noch der Skripttest.
+
+    Gemeldet wird derselbe Verdacht wie bei den Skripten: ein Literal, das einem Katalogschlüssel
+    gleicht, oder ein mehrwortiges mit deutschem Wort/Umlaut — nach Abzug von t(...)/_(...).
+    """
+    schluessel = set(CATALOG["js"]) | set(CATALOG["app"])
+    gefunden: list[str] = []
+    for path in sorted((APP / "templates").rglob("*.html")):
+        # Kommentare und Jinja-Blöcke fallen weg, ihre Zeilenumbrüche bleiben (Zeilennummern).
+        quelltext = re.sub(
+            r"<!--.*?-->|\{#.*?#\}|\{\{.*?\}\}|\{%.*?%\}",
+            lambda m: "\n" * m.group().count("\n"),
+            path.read_text(encoding="utf-8"), flags=re.S,
+        )
+        erlaubt = UNTRANSLATED_ATTRIBUTE_TEXT_OK.get(path.name, set())
+        for attribut in ALPINE_ATTRIBUTE.finditer(quelltext):
+            wert = attribut.group("d") if attribut.group("d") is not None else attribut.group("s")
+            wert = re.sub(r"(?m)^\s*//.*$", "", wert)
+            wert = WRAPPED_TEXT.sub("", wert)
+            for treffer in SCRIPT_LITERAL.finditer(wert):
+                text = treffer.group("text")
+                if len(text) < 3 or not re.search("[A-Za-zäöü]{3}", text) or text in erlaubt:
+                    continue
+                if text in schluessel or (GERMAN_HINT.search(text) and " " in text):
+                    nummer = quelltext.count("\n", 0, attribut.start()) + 1
+                    gefunden.append(f"{path.name}:{nummer}: {text[:60]!r}")
+    assert not gefunden, "deutscher Text ohne t() in Template-Attributen: " + "; ".join(gefunden)
+
+
 def test_catalog_has_no_dead_entries() -> None:
     quellen = "\n".join(
         path.read_text(encoding="utf-8").replace('\\"', '"').replace("\\'", "'")

@@ -59,7 +59,7 @@
                  "none") — der Button bleibt bestehen (für Layout-Konsistenz
                  in der Toolbar), aber deaktiviert statt den Klick einfach
                  ins Leere laufen zu lassen. -->
-            <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : 'Zu einem bestimmten Zeitpunkt springen'" x-text="periodLabel"></button>
+            <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : t('Zu einem bestimmten Zeitpunkt springen')" x-text="periodLabel"></button>
             {% include "_calendar_popover.html" %}
           </div>
           <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
