@@ -239,20 +239,28 @@ an entity can be exported as CSV.
 ## Screenshots
 
 <p align="center">
-  <a href="docs/img/en/overview.png"><img src="docs/img/en/overview.png" alt="Home page with key figures and default dashboard" width="270"></a>
-  <a href="docs/img/en/energy-dashboard.png"><img src="docs/img/en/energy-dashboard.png" alt="Energy dashboard: Sankey energy flow over one day" width="270"></a>
+  <a href="docs/img/en/overview.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/overview-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/overview.png">
+    <img src="docs/img/en/overview.png" alt="Home page with key figures and default dashboard" width="270">
+  </picture></a>
+  <a href="docs/img/en/energy-dashboard.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/energy-dashboard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/energy-dashboard.png">
+    <img src="docs/img/en/energy-dashboard.png" alt="Energy dashboard: Sankey energy flow over one day" width="270">
+  </picture></a>
   <a href="docs/img/en/entities.png"><img src="docs/img/en/entities.png" alt="Entity overview with search and filters" width="270"></a>
   <br><sub>Home page &nbsp;·&nbsp; Energy dashboard &nbsp;·&nbsp; Entity overview</sub>
 </p>
 
 <p align="center">
   <a href="docs/img/en/table-2.png"><img src="docs/img/en/table-2.png" alt="Comparison table across several periods" width="270"></a>
-  <a href="docs/img/en/chart-24.png"><img src="docs/img/en/chart-24.png" alt="Chart with bars, line and second axis" width="270"></a>
-  <a href="docs/img/en/statistics.png"><img src="docs/img/en/statistics.png" alt="Statistics" width="270"></a>
-  <br><sub>Comparison table &nbsp;·&nbsp; Chart &nbsp;·&nbsp; Statistics</sub>
+  <a href="docs/img/en/notices.png"><img src="docs/img/en/notices.png" alt="Notice center in the header" width="270"></a>
+  <a href="docs/img/en/energy-dashboard-scheme-ha.png"><img src="docs/img/en/energy-dashboard-scheme-ha.png" alt="Home Assistant color scheme" width="270"></a>
+  <br><sub>Comparison table &nbsp;·&nbsp; Notice center &nbsp;·&nbsp; "Home Assistant" color scheme</sub>
 </p>
 
-<p align="center"><sub>More views: <a href="docs/img/en">docs/img/en</a>.</sub></p>
+<p align="center"><sub>Adapts automatically to light/dark (see home page/energy dashboard above); besides "Zeitarchiv" (default) and "Home Assistant" also selectable as "Modern". More views: <a href="docs/img/en">docs/img/en</a>.</sub></p>
 
 ## Storage and retention
 
