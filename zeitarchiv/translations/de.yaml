@@ -1,0 +1,14 @@
+configuration:
+  timezone:
+    name: Zeitzone
+    description: >-
+      IANA-Zeitzone (z. B. Europe/Berlin) für Navigation, Zeitpläne und
+      Darstellung. Nach einer Änderung ist ein Neustart der App nötig.
+  demo_mode:
+    name: Demo-Modus
+    description: >-
+      Schaltet auf eine eigene, von den echten Daten getrennte Instanz mit
+      synthetischen Vorführdaten um. Nach einer Änderung ist ein Neustart der
+      App nötig.
+network:
+  8127/tcp: Zeitarchiv REST-API
