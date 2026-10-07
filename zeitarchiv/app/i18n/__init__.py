@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import re
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
@@ -42,8 +43,59 @@ _CATALOG_DIR = Path(__file__).parent
 
 # Sprache der gerade bearbeiteten Anfrage. Der Kontextprozessor setzt sie beim Rendern; Makros,
 # die per `{% from … import … %}` OHNE Kontext geladen werden (z. B. _hints.html), sehen `lang`
-# nicht im Seitenkontext und lesen sie deshalb hier.
-current_language: contextvars.ContextVar[str] = contextvars.ContextVar("zeitarchiv_language", default=SOURCE_LANGUAGE)
+# nicht im Seitenkontext und lesen sie deshalb hier. Ohne Anfrage (Hintergrundaufgaben, Scheduler)
+# ist sie nicht gesetzt; active_language() fragt dann die Hintergrundsprache (siehe unten).
+current_language: contextvars.ContextVar[str | None] = contextvars.ContextVar("zeitarchiv_language", default=None)
+
+LAST_SEEN_KEY = "language_last_seen"
+_background_provider: Callable[[], str] | None = None
+_last_seen: str | None = None
+
+
+def active_language() -> str:
+    """Sprache der laufenden Anfrage; ohne Anfrage die Hintergrundsprache, sonst Deutsch."""
+    language = current_language.get()
+    if language:
+        return language
+    if _background_provider is not None:
+        try:
+            return _background_provider()
+        except Exception:  # eine Anzeigesprache darf nie einen Hintergrundlauf abbrechen
+            pass
+    return SOURCE_LANGUAGE
+
+
+def set_background_language(get_index: Callable[[], Any]) -> None:
+    """Legt fest, in welcher Sprache Hintergrundaufgaben Texte schreiben (Fehlermeldungen von
+    Backup-/Retention-Läufen u. Ä.): bei fester Spracheinstellung diese; bei „Automatisch“ die
+    Sprache, die ein Browser zuletzt angefragt hat (es gibt dort keinen ``Accept-Language``),
+    ohne bisherige Anfrage Deutsch."""
+
+    def provider() -> str:
+        index = get_index()
+        setting = _selected_setting(index.get_setting(SETTING_KEY, DEFAULT_SETTING))
+        if setting in LANGUAGES:
+            return setting
+        remembered = _last_seen or index.get_setting(LAST_SEEN_KEY, "")
+        return remembered if remembered in LANGUAGES else SOURCE_LANGUAGE
+
+    global _background_provider
+    _background_provider = provider
+
+
+def _remember_language(index, setting: str, accept_language: str) -> None:
+    """Merkt sich bei „Automatisch“ die vom Browser gewünschte Sprache für Hintergrundaufgaben.
+
+    Nur eine tatsächlich passende Browsersprache zählt — ein Skript ohne Header würde sonst die
+    Sprache überschreiben, die jemand im Browser gewählt hat. Geschrieben wird nur bei Änderung."""
+    global _last_seen
+    if setting != "auto":
+        return
+    language = matched_language(accept_language)
+    if language and language != _last_seen:
+        _last_seen = language
+        if index.get_setting(LAST_SEEN_KEY, "") != language:
+            index.set_setting(LAST_SEEN_KEY, language)
 
 
 @lru_cache(maxsize=None)
@@ -66,13 +118,18 @@ def _translated_values(values: dict[str, Any], lang: str) -> dict[str, Any]:
     return {key: (translate(str(v), lang) if isinstance(v, Lazy) else v) for key, v in values.items()}
 
 
-def from_accept_language(header: str) -> str:
-    """Erste unterstützte Sprache des ``Accept-Language``-Headers, sonst Deutsch."""
+def matched_language(header: str) -> str | None:
+    """Erste unterstützte Sprache des ``Accept-Language``-Headers, ohne Treffer ``None``."""
     for part in header.split(","):
         code = part.split(";")[0].strip().lower().split("-")[0]
         if code in LANGUAGES:
             return code
-    return SOURCE_LANGUAGE
+    return None
+
+
+def from_accept_language(header: str) -> str:
+    """Erste unterstützte Sprache des ``Accept-Language``-Headers, sonst Deutsch."""
+    return matched_language(header) or SOURCE_LANGUAGE
 
 
 def resolve_language(setting: str | None, accept_language: str = "") -> str:
@@ -96,7 +153,7 @@ def translate_html(text: str, lang: str, **values: Any) -> Markup:
 @pass_context
 def _gettext(context, text: str, **values: Any) -> Markup:
     """Jinja-Funktion ``_()``: Sprache aus dem Seitenkontext (siehe ``make_context_processor``)."""
-    return translate_html(text, context.get("lang") or current_language.get(), **values)
+    return translate_html(text, context.get("lang") or active_language(), **values)
 
 
 def _language_for(request: Request, index) -> tuple[str, str]:
@@ -107,7 +164,64 @@ def _language_for(request: Request, index) -> tuple[str, str]:
 
 def tr(text: str, **values: Any) -> str:
     """Übersetzt Python-Text für die Sprache der laufenden Anfrage (Klartext, kein HTML)."""
-    return translate(text, current_language.get(), **values)
+    return translate(text, active_language(), **values)
+
+
+@lru_cache(maxsize=1)
+def _stored_text_index() -> tuple[dict[str, str], list[tuple[re.Pattern[str], str]]]:
+    """Rückwärts-Index für ``retranslate``: fertige Texte (deutscher Schlüssel oder Übersetzung jeder
+    Sprache) → deutscher Schlüssel, bei Platzhaltern als Muster, das die Werte wieder herausholt."""
+    exact: dict[str, str] = {}
+    patterns: list[tuple[int, re.Pattern[str], str]] = []
+    for lang in LANGUAGES:
+        for key, value in load_catalog(lang)["app"].items():
+            for text in {key, value}:
+                if "{" not in text:
+                    exact.setdefault(text, key)
+                    continue
+                parts = re.split(r"\{(\w+)\}", text)
+                seen: set[str] = set()
+                regex = ""
+                for position, part in enumerate(parts):
+                    if position % 2 == 0:
+                        regex += re.escape(part)
+                    elif part in seen:
+                        regex += f"(?P={part})"
+                    else:
+                        seen.add(part)
+                        regex += f"(?P<{part}>.+?)"
+                literal = sum(len(part) for part in parts[::2])
+                if literal >= 3:  # reine Platzhalter-Muster ("{a}: {b}") würden jeden Text verschlucken
+                    patterns.append((literal, re.compile(regex, re.S), key))
+    # Genaueste zuerst: ein Text mit viel festem Wortlaut gehört zum spezifischeren Eintrag.
+    patterns.sort(key=lambda item: -item[0])
+    return exact, [(pattern, key) for _, pattern, key in patterns]
+
+
+@lru_cache(maxsize=2048)
+def _retranslate(text: str, lang: str) -> str:
+    exact, patterns = _stored_text_index()
+    key = exact.get(text)
+    if key is not None:
+        return translate(key, lang)
+    for pattern, key in patterns:
+        match = pattern.fullmatch(text)
+        if match:
+            return translate(key, lang, **match.groupdict())
+    return text
+
+
+def retranslate(text: str | None) -> str | None:
+    """Gespeicherten Freitext in der Sprache der Anfrage anzeigen.
+
+    Fehlermeldungen von Läufen, Import-Reports und Stummschaltungen liegen als fertiger Text vor, in der
+    Sprache, die beim Schreiben galt. Hier wird ein Text, der einem Katalogeintrag entspricht (deutsch
+    oder übersetzt, ggf. mit Platzhalterwerten), über den deutschen Schlüssel in die Anzeigesprache
+    gebracht — ohne das gespeicherte Format zu ändern und auch für ältere Einträge. Alles andere
+    (rohe Ausnahmetexte, eigene Namen) bleibt unverändert."""
+    if not text:
+        return text
+    return _retranslate(text, active_language())
 
 
 class Lazy(str):
@@ -120,7 +234,7 @@ class Lazy(str):
     __slots__ = ()
 
     def __html__(self) -> Markup:
-        return translate_html(str(self), current_language.get())
+        return translate_html(str(self), active_language())
 
 
 def N_(text: str) -> Lazy:
@@ -139,8 +253,9 @@ def dependencies(get_index: Callable[[], Any]) -> list:
     für synchrone Routen an den Threadpool weitergibt."""
     async def set_language(request: Request) -> None:
         index = get_index()
-        language = _language_for(request, index)[1]
+        setting, language = _language_for(request, index)
         current_language.set(language)
+        _remember_language(index, setting, request.headers.get("accept-language", ""))
         formats.set_for_request(request, index, language)
         currency.set_for_request(index)
 

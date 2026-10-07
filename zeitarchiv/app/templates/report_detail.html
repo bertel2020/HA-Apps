@@ -27,7 +27,7 @@
       <p>{{ _("Archivlücken füllen: {v1}", v1=('Ja' if report.configuration.include_existing_months else _('Nein'))) }}</p>
       <p>{{ _("Entitäten: {entity_ids}", entity_ids=(report.configuration.entity_ids | join(', '))) }}</p>
     </div></section>{% endif %}
-    {% if report.errors %}<section><h2>{{ _("Fehler") }}</h2>{% for error in report.errors %}<div class="detail-block error">{{ error }}</div>{% endfor %}</section>{% endif %}
+    {% if report.errors %}<section><h2>{{ _("Fehler") }}</h2>{% for error in report.errors %}<div class="detail-block error">{{ error | retranslate }}</div>{% endfor %}</section>{% endif %}
   </div>
 </div><script src="{{ asset('js/resizable-tables.js') }}"></script><script src="{{ asset('js/sortable-table.js') }}"></script><script src="{{ asset('js/dynamic-back-link.js') }}"></script><script src="{{ asset('js/table-cards.js') }}"></script>
 {% endblock %}

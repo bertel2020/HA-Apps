@@ -397,6 +397,8 @@ templates = Jinja2Templates(
     context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context, i18n.make_context_processor(lambda: index)],
 )
 i18n.install(templates)
+i18n.set_background_language(lambda: index)
+templates.env.filters["retranslate"] = i18n.retranslate
 app.include_router(i18n.make_router(lambda: index))
 
 
@@ -1226,6 +1228,9 @@ def _settings_notices_context() -> dict:
     muted = [
         {
             **entry,
+            "title": i18n.retranslate(entry["title"]),
+            "detail": i18n.retranslate(entry["detail"]),
+            "meta": i18n.retranslate(entry["meta"]),
             "muted_at_text": (
                 f"{format_timestamp(entry['muted_at'], TZ)} {format_time(entry['muted_at'], TZ)}"
                 if entry["muted_at"] else "—"

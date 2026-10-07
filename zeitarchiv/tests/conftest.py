@@ -50,3 +50,12 @@ def client():
 
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _no_background_language(monkeypatch):
+    """Templates, die ein Test ohne Anfrage rendert, sind deutsch. Die Hintergrundsprache der App
+    (zuletzt gesehene Browsersprache aus der Datenbank) darf aus einem früheren Test nicht hineinwirken;
+    Tests dazu setzen sie selbst."""
+    monkeypatch.setattr(i18n, "_background_provider", None)
+    monkeypatch.setattr(i18n, "_last_seen", None)

@@ -250,7 +250,7 @@ the setting `language` (`auto`/`de`/`en`, default `de`; Settings → Appearance)
 |---|---|---|
 | Template | `{{ _("Text {n}", n=value) }}` | The key is HTML source text (`&hellip;`, `<strong>`), the result is `Markup`; inserted values are escaped. |
 | Script / Alpine expression | `t('Text {n}', {n: value})` | `static/js/i18n.js`; the JS catalog is delivered inline as `window.ZA_CATALOG` only for non-German. |
-| Python, at request time | `tr("Text {n}", n=value)` | reads the language of the running request (`i18n.current_language`, set by an app-wide dependency before every route). |
+| Python, at request time | `tr("Text {n}", n=value)` | reads the language of the running request (`i18n.current_language`, set by an app-wide dependency before every route); without a request the background language (see below). |
 | Python, constant | `N_("Text")` | returns a `Lazy`: a `str` with the German wording that is translated only on display (`{{ label }}`). For label lists created at import. |
 
 Rules that have proven themselves: whole sentences with placeholders instead of
@@ -262,9 +262,30 @@ the German text. Source text tests that read templates go via
 `template_text()`/`german()` (`tests/_paths.py`), which rebuilds the `_()` calls
 back into plain German text.
 
-Not yet translated: log lines, stored texts (import reports, run histories,
-muted notices) and the ECharts' own labels. The guide and the READMEs are
-available in English under `docs/en/`.
+Not yet translated: log lines and the ECharts' own labels. The guide and the
+READMEs are available in English under `docs/en/`.
+
+### Background tasks and stored texts
+
+**Without a request** (the schedulers for backup, retention, automatic
+cleanup) `current_language` is not set; `tr()` and `_()` then ask
+`i18n.active_language()`. The background language is the fixed language
+setting, with "Automatic" the language a browser asked for last (setting
+`language_last_seen`, written only on a change and only for a matching
+`Accept-Language` — a script without a header does not overwrite it), and
+German if there has been no request yet. `i18n.set_background_language()`
+registers this at startup.
+
+**Stored free texts** (errors in activity and job tables, the `errors` of the
+import reports, title/detail/meta of a mute) exist as finished text, in the
+language that applied when they were written. The stored format stays
+unchanged; on display `i18n.retranslate()` (Jinja filter `retranslate`) brings
+them into the language of the request: a text that matches a catalog entry —
+German or translated, also with placeholder values — is rebuilt via the German
+key. This also covers older entries. Raw exception texts (`{exc}`) and own
+names match no entry and stay as they are. With several matching patterns the
+one with the most fixed wording wins; pure placeholder patterns (`{a}: {b}`)
+do not count. A new display place for stored text: apply the filter.
 
 ### Number, date and currency format
 

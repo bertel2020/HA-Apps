@@ -59,7 +59,7 @@
       <thead><tr><th>{{ _("Zeitpunkt") }}</th><th>{{ _("Auslöser") }}</th><th>{{ _("Status") }}</th><th>{{ _("Dauer") }}</th><th>{{ _("Größe") }}</th></tr></thead>
       <tbody>
       {% for job in backup_jobs %}
-      <tr{% if job.error %} class="job-row-error" data-error="{{ job.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="{{ _('Fehlergrund anzeigen') }}"{% endif %}>
+      <tr{% if job.error %} class="job-row-error" data-error="{{ job.error | retranslate }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="{{ _('Fehlergrund anzeigen') }}"{% endif %}>
         <td data-sort="{{ job.created_at_ts }}">{{ job.created_at }}</td>
         <td>{{ job.trigger }}</td>
         <td{% if job.status_key in ['failed', 'interrupted'] %} style="color:var(--danger);"{% endif %}>{{ job.status }}</td>

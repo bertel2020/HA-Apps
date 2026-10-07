@@ -258,7 +258,7 @@ deutsch, die App bleibt in jedem Zwischenstand benutzbar. Die Sprache steht in d
 |---|---|---|
 | Template | `{{ _("Text {n}", n=wert) }}` | Schlüssel ist HTML-Quelltext (`&hellip;`, `<strong>`), Ergebnis ist `Markup`; eingesetzte Werte werden maskiert. |
 | Skript / Alpine-Ausdruck | `t('Text {n}', {n: wert})` | `static/js/i18n.js`; der JS-Katalog wird nur für Nicht-Deutsch inline als `window.ZA_CATALOG` ausgeliefert. |
-| Python, zur Anfragezeit | `tr("Text {n}", n=wert)` | liest die Sprache der laufenden Anfrage (`i18n.current_language`, gesetzt von einer app-weiten Abhängigkeit vor jeder Route). |
+| Python, zur Anfragezeit | `tr("Text {n}", n=wert)` | liest die Sprache der laufenden Anfrage (`i18n.current_language`, gesetzt von einer app-weiten Abhängigkeit vor jeder Route); ohne Anfrage die Hintergrundsprache (siehe unten). |
 | Python, Konstante | `N_("Text")` | liefert ein `Lazy`: ein `str` mit dem deutschen Wortlaut, das erst beim Anzeigen (`{{ label }}`) übersetzt wird. Für Beschriftungslisten, die beim Import entstehen. |
 
 Regeln, die sich bewährt haben: ganze Sätze mit Platzhaltern statt zusammengeklebter Teile; Pluralformen als zwei
@@ -268,8 +268,25 @@ dass die Platzhalter der Übersetzung zu denen des deutschen Textes passen. Quel
 lesen, gehen über `template_text()`/`german()` (`tests/_paths.py`), das die `_()`-Aufrufe wieder in deutschen
 Klartext zurückbaut.
 
-Noch nicht übersetzt: Logzeilen, gespeicherte Texte (Import-Reports, Ausführungsverläufe, stummgeschaltete
-Meldungen) und die ECharts-Eigenbeschriftungen. Anleitung und READMEs gibt es auf Englisch unter `docs/en/`.
+Noch nicht übersetzt: Logzeilen und die ECharts-Eigenbeschriftungen. Anleitung und READMEs gibt es auf Englisch
+unter `docs/en/`.
+
+### Hintergrundaufgaben und gespeicherte Texte
+
+**Ohne Anfrage** (Scheduler für Backup, Retention, automatische Bereinigung) ist `current_language` nicht gesetzt;
+`tr()` und `_()` fragen dann `i18n.active_language()`. Die Hintergrundsprache ist die feste Spracheinstellung,
+bei „Automatisch“ die Sprache, die ein Browser zuletzt angefragt hat (Einstellung `language_last_seen`, wird nur
+bei einer Änderung und nur bei einem passenden `Accept-Language` geschrieben — ein Skript ohne Header überschreibt
+sie nicht), ohne bisherige Anfrage Deutsch. `i18n.set_background_language()` registriert das beim Start.
+
+**Gespeicherte Freitexte** (Fehler in Aktivität und Job-Tabellen, `errors` der Import-Reports, Titel/Detail/Meta
+einer Stummschaltung) liegen als fertiger Text vor, in der Sprache, die beim Schreiben galt. Das gespeicherte Format
+bleibt unverändert; beim Anzeigen bringt `i18n.retranslate()` (Jinja-Filter `retranslate`) sie in die Sprache der
+Anfrage: Ein Text, der einem Katalogeintrag entspricht — deutsch oder übersetzt, auch mit Platzhalterwerten —,
+wird über den deutschen Schlüssel neu gebaut. Das gilt auch für ältere Einträge. Rohe Ausnahmetexte (`{exc}`) und
+eigene Namen passen zu keinem Eintrag und bleiben, wie sie sind. Bei mehreren passenden Mustern gewinnt das mit
+dem meisten festen Wortlaut; reine Platzhaltermuster (`{a}: {b}`) zählen nicht. Neue Anzeigestelle für
+gespeicherten Text: Filter anwenden.
 
 ### Zahlen-, Datums- und Währungsformat
 

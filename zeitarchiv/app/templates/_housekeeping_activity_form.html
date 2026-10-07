@@ -62,7 +62,7 @@
        siehe showJobError()/showActivityDetail() in confirm-dialog.js. Nie
        beides gleichzeitig: detail_label füllt nur ein erfolgreicher Lauf,
        error nur ein fehlgeschlagener. #}
-    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="{{ _('Fehlergrund anzeigen') }}"{% elif row.detail_label %} class="job-row-detail" data-detail="{{ row.detail_label }}" onclick="showActivityDetail(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showActivityDetail(this);}" tabindex="0" role="button" aria-label="{{ _('Detail anzeigen') }}"{% endif %}>
+    <tr{% if row.error %} class="job-row-error" data-error="{{ row.error | retranslate }}" onclick="showJobError(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showJobError(this);}" tabindex="0" role="button" aria-label="{{ _('Fehlergrund anzeigen') }}"{% elif row.detail_label %} class="job-row-detail" data-detail="{{ row.detail_label }}" onclick="showActivityDetail(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showActivityDetail(this);}" tabindex="0" role="button" aria-label="{{ _('Detail anzeigen') }}"{% endif %}>
       <td data-sort="{{ row.created_at_ts }}">{{ row.created_at }}</td>
       <td>{{ row.action }}</td>
       <td>{{ row.entity_label }}</td>
