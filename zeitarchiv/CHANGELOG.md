@@ -1,5 +1,81 @@
 # Changelog
 
+## 1.3.0 - 2026-10-07
+
+### Neu
+
+- Zahlen- und Datumsformat als eigene Einstellung (Darstellung): Deutsch,
+  English UK oder English US, Standard „Automatisch“ nach dem Browser.
+  Das Format ist von der Sprache getrennt und gilt für Zahlen, Daten und
+  Uhrzeiten (en-US mit 12-Stunden-Uhr) in Oberfläche, Charts und Tabellen.
+- Währung als eigene Einstellung (Darstellung): Automatisch aus Home
+  Assistant, Euro, Pfund, US-Dollar oder Schweizer Franken. Sie bestimmt
+  Symbol, Stellung und Untereinheit (Cent, Pence, Rappen) im Energie-
+  dashboard. Es wird nichts umgerechnet — bei einem Wechsel trägst du deine
+  Preise neu ein.
+- Gespeicherte Meldungen (z. B. Hinweise, Bereinigungs- und Backup-Texte)
+  erscheinen in der aktuellen Anzeigesprache. Hintergrundaufgaben nutzen die
+  eingestellte bzw. zuletzt gesehene Sprache.
+- Demo-Daten auf Englisch: Das Skript (`--language en`) und der Demo-Modus
+  erzeugen englische Namen und Entity-IDs. Das Standard-Dashboard „Übersicht“
+  erscheint bei englischer Oberfläche als „Overview“.
+- Add-on-Konfiguration und Port-Beschreibung sind auf Deutsch und Englisch
+  übersetzt. Der Home-Assistant-Integration wird die HA-Sprache an die API
+  mitgegeben, sodass Fehlertexte in dieser Sprache kommen.
+- Laufzeit- und Altersangaben („3 Tage, 4 Std.“) sind übersetzt.
+
+### Geändert
+
+- Die Sprache steht standardmäßig auf „Automatisch (Browser)“, Rückfall
+  Deutsch. Auch bestehende Installationen ohne gespeicherte Auswahl folgen
+  damit dem Browser.
+- Fehlertexte der Einstellungsrouten sind einheitlich und folgen der Sprache.
+- Charts, die nur aus Schaltern bestehen, öffnen standardmäßig als Zeitstrahl;
+  beim Zeitraumwechsel bleiben die Rohwerte erhalten.
+
+### Behoben
+
+- Zeitzone: „Wert hinzufügen“ und „Verdichten“ rechnen in der Zeitzone des
+  Servers.
+- Sankey-Legende stürzte bei gleichnamigen Einträgen ab.
+
+---
+
+### English
+
+#### New
+
+- Number and date format as a separate setting (Appearance): German,
+  English UK or English US, default “Automatic” following the browser.
+  The format is independent of the language and applies to numbers, dates
+  and times (en-US with a 12-hour clock) in the interface, charts and tables.
+- Currency as a separate setting (Appearance): automatic from Home
+  Assistant, euro, pound, US dollar or Swiss franc. It determines symbol,
+  position and subunit (cent, pence, rappen) in the energy dashboard. Nothing
+  is converted — when you switch, you enter your prices again.
+- Stored notices (e.g. hints, cleanup and backup texts) appear in the current
+  display language. Background tasks use the configured or last seen language.
+- Demo data in English: the script (`--language en`) and demo mode generate
+  English names and entity IDs. The default dashboard “Übersicht” shows as
+  “Overview” in the English interface.
+- Add-on configuration and port descriptions are translated into German and
+  English. The Home Assistant integration passes the HA language to the API,
+  so error messages come in that language.
+- Uptime and age values (“3 days, 4 h”) are translated.
+
+#### Changed
+
+- The language now defaults to “Automatic (browser)”, falling back to German.
+  Existing installations without a stored choice follow the browser as well.
+- Error texts of the settings routes are consistent and follow the language.
+- Charts consisting only of switches open as a timeline by default; raw values
+  are kept when changing the time range.
+
+#### Fixed
+
+- Time zone: “Add value” and “Compact” calculate in the server’s time zone.
+- The Sankey legend crashed on entries with identical names.
+
 ## 1.2.0 - 2026-10-06
 
 ### Neu
