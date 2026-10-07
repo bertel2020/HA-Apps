@@ -29,6 +29,8 @@ from fastapi.responses import Response
 from jinja2 import pass_context
 from markupsafe import Markup
 
+from .. import formats
+
 SOURCE_LANGUAGE = "de"
 LANGUAGES = {"de": "Deutsch", "en": "English"}
 # Reihenfolge der Auswahl; "auto" ist keine Sprache, sondern die Regel.
@@ -136,7 +138,10 @@ def dependencies(get_index: Callable[[], Any]) -> list:
     Eine ``async``-Abhängigkeit, damit der ContextVar-Wert in den Kontext übergeht, den FastAPI
     für synchrone Routen an den Threadpool weitergibt."""
     async def set_language(request: Request) -> None:
-        current_language.set(_language_for(request, get_index())[1])
+        index = get_index()
+        language = _language_for(request, index)[1]
+        current_language.set(language)
+        formats.set_for_request(request, index, language)
 
     return [Depends(set_language)]
 
@@ -148,9 +153,11 @@ def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], 
     Index existiert."""
 
     def context(request: Request) -> dict:
-        setting, lang = _language_for(request, get_index())
+        index = get_index()
+        setting, lang = _language_for(request, index)
         current_language.set(lang)
         return {
+            **formats.context_values(request, index, lang, translate),
             "lang": lang,
             "language_setting": setting,
             "language_options": [(key, translate(label, lang)) for key, label in LANGUAGE_CHOICES.items()],
@@ -162,6 +169,7 @@ def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], 
 
 def make_router(get_index: Callable[[], Any]) -> APIRouter:
     router = APIRouter()
+    router.include_router(formats.make_router(get_index))
 
     @router.post("/settings/language")
     def set_language(language: str = Form(...)) -> Response:

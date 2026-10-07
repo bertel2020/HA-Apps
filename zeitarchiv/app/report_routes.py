@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from . import formats
 from .formatting import format_int, format_size, format_value
 from .storage import import_reports
 from .storage.coordinator import StorageCoordinator
@@ -53,7 +54,7 @@ class ReportService:
         try:
             finished = datetime.fromisoformat(report["finished_at"]).astimezone(self.deps.tz)
             finished_label, finished_date = (
-                finished.strftime("%d.%m.%Y %H:%M:%S"), finished.date().isoformat()
+                formats.format_datetime(finished), finished.date().isoformat()
             )
         except (KeyError, TypeError, ValueError):
             finished_label, finished_date = "—", ""

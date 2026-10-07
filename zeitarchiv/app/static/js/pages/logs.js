@@ -63,7 +63,7 @@
           const wasNearBottom = output.scrollHeight - output.scrollTop - output.clientHeight < 80;
           output.textContent = data.lines.length ? data.lines.join('\n') : t('Keine passenden Protokolleinträge.');
           source.textContent = t('Quelle: {source}',{source: data.source}) + (data.fallback ? t(' (Fallback)') : '');
-          status.textContent = `${data.count} Zeilen · ${new Date(data.generated_at * 1000).toLocaleTimeString('de-DE')}`;
+          status.textContent = `${data.count} Zeilen · ${new Date(data.generated_at * 1000).toLocaleTimeString(window.ZA_FORMAT)}`;
           download.href = `logs/download?${params()}`;
           if (wasNearBottom) output.scrollTop = output.scrollHeight;
         } catch (error) {

@@ -19,6 +19,23 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _('Zahlen- und Datumsformat') }} {{ hint_button(_('Zahlen- und Datumsformat')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _('Dezimal- und Tausendertrennzeichen, Datum und Uhrzeit. „Automatisch“ folgt dem Browser; CSV-Exporte und Dateinamen bleiben davon unberührt.') }}{% endcall %}
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="regional-format-btn" onclick="toggleDDPicker('regional-format')">{% for k, l in format_options %}{% if k == format_setting %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      {# Eigene Route wie bei der Sprache: lädt die Seite neu (HX-Refresh), weil sich alle Zahlen und Daten ändern. #}
+      <input type="hidden" name="regional_format" id="regional-format-input" value="{{ format_setting }}"
+             hx-post="settings/regional-format" hx-trigger="change" hx-swap="none">
+      <div class="dd-picker-popover" id="regional-format-popover">
+        {% for key, label in format_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('regional-format', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Startseite") }} {{ hint_button(_('Startseite')) }}</div>
       {% call hint_body('settings-compact-hint') %}{{ _("Erste Seite beim Öffnen, z. B. über die HA-Sidebar") }}{% endcall %}
     </div>

@@ -33,6 +33,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import formats
 from .formatting import entity_display_name
 from .progress import JobProgress
 from .storage import cleanup as cleanup_mod
@@ -909,7 +910,7 @@ class EnergieDashboardService:
             local = datetime.fromtimestamp(ts, tz)
             delta = (v - avg) if as_points else ((v - avg) / avg * 100 if avg else None)
             return {
-                "date_label": f"{local.day}. {tr(_MONTH_NAMES_DE[local.month - 1])[:3]}",
+                "date_label": formats.day_month_label(local.day, tr(_MONTH_NAMES_DE[local.month - 1])[:3]),
                 "value": v,
                 "delta": round(delta, 1) if delta is not None else None,
             }

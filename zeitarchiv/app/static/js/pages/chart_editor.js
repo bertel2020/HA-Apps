@@ -1,8 +1,6 @@
-    // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
-    // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
-    // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
-    // Sprach-Setting nur hier greifen muss.
-    const LOCALE = 'de-DE';
+    // Jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen Konstante;
+    // das Format kommt aus der Einstellung (window.ZA_FORMAT, siehe i18n.js).
+    const LOCALE = window.ZA_FORMAT;
     const ENTITY_LABELS = Object.fromEntries(
       ENTITY_OPTIONS.map(opt => [opt.entity_id, opt.label])
     );

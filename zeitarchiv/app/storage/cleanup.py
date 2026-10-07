@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .. import formats
 from ..formatting import decimals_to_int, format_value
 from . import hotbuffer, rollup
 from . import resolution as resolution_mod
@@ -40,7 +41,7 @@ def _format_val(value: float, decimals: str) -> str:
 
 
 def _format_ts(ts: float, tz: ZoneInfo) -> str:
-    return datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y %H:%M:%S")
+    return formats.format_datetime(datetime.fromtimestamp(ts, tz))
 
 
 def _months_between(start_ts: float, end_ts: float, tz: ZoneInfo) -> list[tuple[int, int]]:

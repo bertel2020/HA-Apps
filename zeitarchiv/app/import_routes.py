@@ -34,6 +34,7 @@ from starlette.background import BackgroundTask
 
 import pyarrow.parquet as pq
 
+from . import formats
 from .formatting import (
     entity_display_name,
     format_int,
@@ -338,8 +339,8 @@ class ImportService:
         rows = []
         for v in variables:
             if v.first_ts and v.last_ts:
-                period_start = datetime.fromtimestamp(v.first_ts, self.deps.tz).strftime("%d.%m.%Y")
-                period_end = datetime.fromtimestamp(v.last_ts, self.deps.tz).strftime("%d.%m.%Y")
+                period_start = formats.format_date(datetime.fromtimestamp(v.first_ts, self.deps.tz))
+                period_end = formats.format_date(datetime.fromtimestamp(v.last_ts, self.deps.tz))
             else:
                 period_start = period_end = None
             preview = (

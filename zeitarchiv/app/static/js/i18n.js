@@ -1,3 +1,7 @@
+// Format der Oberfläche (de-DE / en-GB / en-US): der Server löst es pro Anfrage auf (Einstellung
+// "Zahlen- und Datumsformat", sonst Browser) und trägt es als <html data-format> ein — dadurch
+// formatieren Server und Skripte immer gleich. Siehe app/formats.py.
+window.ZA_FORMAT = document.documentElement.dataset.format || 'de-DE';
 // Übersetzung für Skripte: der deutsche Text ist der Schlüssel, wie bei _() in den
 // Templates (siehe app/i18n/__init__.py). Der Katalog (window.ZA_CATALOG) wird nur für
 // Nicht-Deutsch inline in die Seite geschrieben; ohne Eintrag bleibt der Text deutsch.

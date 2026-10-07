@@ -70,8 +70,8 @@ def test_mapping_can_be_cleared_and_reselected_in_both_importers() -> None:
     assert "@click.stop=\"clearSelection()\"" in CSV_SECTION
 
 
-def test_period_uses_german_date_and_regular_table_font() -> None:
-    assert 'strftime("%d.%m.%Y")' in MAIN
+def test_period_uses_the_configured_date_format_and_regular_table_font() -> None:
+    assert "formats.format_date(" in MAIN
     assert 'class="period-cell"' in IMPORT
     assert 'class="mono nowrap"' not in IMPORT
     assert "table.dt{width:100%;border-collapse:collapse;font-family:var(--font-display)" in CSS

@@ -2194,7 +2194,13 @@
     "Weitere Fachtabellen": "Other domain tables",
     "Noch keiner fachlichen Gruppe zugeordnete Tabellen.": "Tables not yet assigned to a domain group.",
     "{n} offen": "{n} open",
-    "Prognose:": "Forecast:"
+    "Prognose:": "Forecast:",
+    "Zahlen- und Datumsformat": "Number and date format",
+    "Dezimal- und Tausendertrennzeichen, Datum und Uhrzeit. „Automatisch“ folgt dem Browser; CSV-Exporte und Dateinamen bleiben davon unberührt.": "Decimal and thousands separators, date and time. “Automatic” follows the browser; CSV exports and file names are not affected.",
+    "Deutsch (1.234,5 · 07.10.2026)": "German (1.234,5 · 07.10.2026)",
+    "English UK (1,234.5 · 07/10/2026)": "English UK (1,234.5 · 07/10/2026)",
+    "English US (1,234.5 · 10/07/2026)": "English US (1,234.5 · 10/07/2026)",
+    "{range} Uhr": "{range}"
   },
   "js": {
     "Meldungen": "Notices",

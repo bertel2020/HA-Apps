@@ -11,7 +11,7 @@
 // richtige Dezimal-/Tausendertrennzeichen, ohne dass die einzelnen
 // Chart-/Tabellen-Dateien selbst etwas über das Format wissen müssen.
 window.NumberFormat = (() => {
-  const LOCALE = 'de-DE';
+  const LOCALE = window.ZA_FORMAT;
 
   // Wie fmtValue()/fmtNum() bisher pro Datei: mit explizitem decimals immer
   // exakt auf diese Stellenzahl (auch mit anhängenden Nullen), sonst bis zu

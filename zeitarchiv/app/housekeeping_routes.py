@@ -38,6 +38,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import formats
 from . import cleanup_stats
 from . import cleanup_tile, counter_auto, counter_bulk
 from . import demo_mode
@@ -782,7 +783,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
                 "has_name": has_name,
                 "last_value_label": (
-                    datetime.fromtimestamp(last_ts, deps.tz).strftime("%d.%m.%Y, %H:%M") if last_ts is not None else "Nie empfangen"
+                    formats.format_datetime(datetime.fromtimestamp(last_ts, deps.tz), seconds=False, comma=True) if last_ts is not None else "Nie empfangen"
                 ),
                 # 10**6 Tage statt float('inf') — sortiert serverseitig genauso
                 # zuverlässig an die Spitze, ist aber über data-sort auch für

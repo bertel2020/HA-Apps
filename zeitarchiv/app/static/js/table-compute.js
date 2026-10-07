@@ -429,9 +429,9 @@ window.TableCompute = (() => {
   function comparisonElapsedTimeText(windowStart, elapsedSeconds, rangeKey) {
     if (windowStart == null || elapsedSeconds == null) return null;
     const cutoff = new Date((windowStart + elapsedSeconds) * 1000);
-    const timeText = `${cutoff.toLocaleTimeString('de-DE', zoned({hour: '2-digit', minute: '2-digit'}))} Uhr`;
+    const timeText = t('{range} Uhr', {range: cutoff.toLocaleTimeString(window.ZA_FORMAT, zoned({hour: '2-digit', minute: '2-digit'}))});
     if (rangeKey === 'hour' || rangeKey === 'day') return timeText;
-    const dateText = cutoff.toLocaleDateString('de-DE', zoned({day: '2-digit', month: '2-digit'}));
+    const dateText = cutoff.toLocaleDateString(window.ZA_FORMAT, zoned({day: '2-digit', month: '2-digit'}));
     return `${dateText}, ${timeText}`;
   }
 
@@ -440,7 +440,7 @@ window.TableCompute = (() => {
   // Spalte, siehe shortCutoffText()/currentPeriodNote() unten.
   function shortDateText(epochSeconds) {
     if (epochSeconds == null) return null;
-    return new Date(epochSeconds * 1000).toLocaleDateString('de-DE', zoned({day: '2-digit', month: '2-digit'}));
+    return new Date(epochSeconds * 1000).toLocaleDateString(window.ZA_FORMAT, zoned({day: '2-digit', month: '2-digit'}));
   }
 
   // "HH:MM Uhr" für eine noch laufende Stunde/Tag-Spalte — ein Datum wäre
@@ -449,7 +449,7 @@ window.TableCompute = (() => {
   // nicht, WIE weit der Tag/die Stunde bereits gelaufen ist.
   function shortTimeText(epochSeconds) {
     if (epochSeconds == null) return null;
-    return `${new Date(epochSeconds * 1000).toLocaleTimeString('de-DE', zoned({hour: '2-digit', minute: '2-digit'}))} Uhr`;
+    return t('{range} Uhr', {range: new Date(epochSeconds * 1000).toLocaleTimeString(window.ZA_FORMAT, zoned({hour: '2-digit', minute: '2-digit'}))});
   }
 
   // Cutoff-Text passend zum Zeitraumtyp — Uhrzeit bei Stunde/Tag, sonst

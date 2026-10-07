@@ -206,17 +206,17 @@
     const start = new Date(data.window_start_ts * 1000);
     if (data.range === 'hour') {
       const end = new Date(data.window_end_ts * 1000 - 1000);
-      const fmtTime = (d) => d.toLocaleTimeString('de-DE', zone({hour: '2-digit', minute: '2-digit'}));
-      const day = start.toLocaleDateString('de-DE', zone({day: '2-digit', month: '2-digit', year: 'numeric'}));
-      return `${day} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
+      const fmtTime = (d) => d.toLocaleTimeString(window.ZA_FORMAT, zone({hour: '2-digit', minute: '2-digit'}));
+      const day = start.toLocaleDateString(window.ZA_FORMAT, zone({day: '2-digit', month: '2-digit', year: 'numeric'}));
+      return t('{range} Uhr', {range: `${day} · ${fmtTime(start)}–${fmtTime(end)}`});
     }
     let opts = {weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric'};
     if (data.range === 'month') opts = {month: 'long', year: 'numeric'};
     if (data.range === 'year') opts = {year: 'numeric'};
-    let label = start.toLocaleDateString('de-DE', zone(opts));
+    let label = start.toLocaleDateString(window.ZA_FORMAT, zone(opts));
     if (data.offset === 0 && CURRENT_PERIOD_SUFFIX_RANGES.has(data.range)) {
       const end = new Date(data.window_end_ts * 1000);
-      label += ' · ' + t('bis {date}', {date: end.toLocaleDateString('de-DE', zone({day: '2-digit', month: '2-digit'}))});
+      label += ' · ' + t('bis {date}', {date: end.toLocaleDateString(window.ZA_FORMAT, zone({day: '2-digit', month: '2-digit'}))});
     }
     return label;
   }

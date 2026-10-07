@@ -84,7 +84,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
-from . import demo_mode, i18n
+from . import demo_mode, formats, i18n
 from .i18n import N_, tr
 from . import supervisor_stats
 from .logging_setup import (
@@ -2858,7 +2858,7 @@ def _entity_config_context(entity) -> dict:
         last_rows.append((ts, value))
     preview_rows = [
         {
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
             "formatted_value": format_value(value, decimals_int),
         }
         for ts, value in reversed(last_rows)
@@ -5037,22 +5037,25 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
     Alpine-Reaktivität berechnet."""
     display_end = window_end - timedelta(seconds=1)  # window_end ist exklusiv
     if range_key == "hour":
-        return f"{window_start.strftime('%d.%m.%Y')} · {window_start.strftime('%H:%M')}–{display_end.strftime('%H:%M')} Uhr"
+        span = f"{formats.format_clock(window_start)}–{formats.format_clock(display_end)}"
+        return f"{formats.format_date(window_start)} · {tr('{range} Uhr', range=span)}"
     if range_key == "day":
         if offset == 0:
             return tr("Heute")
         if offset == -1:
             return tr("Gestern")
-        return window_start.strftime("%d.%m.%Y")
+        return formats.format_date(window_start)
     if range_key == "week":
-        return f"{window_start.strftime('%d.%m.')}–{display_end.strftime('%d.%m.')} {display_end.year}"
+        if formats.current_format.get() != "de-DE":
+            return f"{formats.format_date(window_start)}–{formats.format_date(display_end)}"
+        return f"{formats.format_day_month(window_start)}–{formats.format_day_month(display_end)} {display_end.year}"
     if range_key == "month":
         label = f"{tr(_MONTH_NAMES_DE[window_start.month - 1])} {window_start.year}"
         return tr("{label} (bis heute)", label=label) if window_end >= now else label
     if range_key == "year":
         return tr("{year} (bis heute)", year=window_start.year) if window_end >= now else f"{window_start.year}"
     if range_key == "all":
-        return tr("Gesamter Zeitraum (seit {strftime})", strftime=window_start.strftime('%d.%m.%Y'))
+        return tr("Gesamter Zeitraum (seit {strftime})", strftime=formats.format_date(window_start))
     return ""
 
 
@@ -5115,9 +5118,7 @@ def _rows_fragment(
             {
                 **row,
                 "formatted_value": format_value(row["value"], decimals_int),
-                "formatted_ts": datetime.fromtimestamp(row["ts"], TZ).strftime(
-                    "%d.%m.%Y %H:%M:%S"
-                ),
+                "formatted_ts": formats.format_datetime(datetime.fromtimestamp(row["ts"], TZ)),
             }
             for row in analysis["rows"]
         ]
@@ -5173,9 +5174,7 @@ def _rows_fragment(
                 "ts": ts,
                 "value": value,
                 "formatted_value": format_value(value, decimals_int),
-                "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime(
-                    "%d.%m.%Y %H:%M:%S"
-                ),
+                "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
                 "flags": [
                     {"label": label, "reason": reasons[ts]}
                     for label, reasons in (
@@ -5469,7 +5468,7 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
         }
         for ts, value in list(reversed(values))[:_UNDO_PREVIEW_LIMIT]
     ]
@@ -5535,7 +5534,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
         {
             "ts": ts,
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
         }
         for ts, value in list(reversed(to_delete))[:_DUPLICATES_PREVIEW_LIMIT]
     ]
@@ -5589,7 +5588,7 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
         }
         for ts, value in newest_rows
     ]
