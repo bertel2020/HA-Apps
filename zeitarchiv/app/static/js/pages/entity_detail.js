@@ -562,7 +562,10 @@ function selectBrush() {
           // ihn gar nicht mehr anbietet — sichtbar würde das erst indirekt,
           // etwa in der Vorbelegung von saveAsChartUrl.
           if (!compareYearAvailable(key)) this.compareMode = 'previous';
-          this.raw = false;
+          // Der Zeitstrahl zeichnet AN/AUS-Übergänge und braucht Rohwerte in
+          // jedem Zeitraum — sonst kämen gebucketete Daten, bis man auf
+          // Balken und zurück schaltet.
+          this.raw = this.chartType === 'timeline';
           this.offset = nextOffset;
           this.continuous = false;
           this.load();
@@ -619,7 +622,7 @@ function selectBrush() {
           const defaultChartType = CHART_DEFAULTS.chart_type === 'auto' ? DEFAULT_CHART_TYPE : CHART_DEFAULTS.chart_type;
           return (
             this.continuous !== CHART_DEFAULTS.continuous ||
-            this.raw !== CHART_DEFAULTS.raw ||
+            this.raw !== (defaultChartType === 'timeline' && this.chartType === 'timeline' ? true : CHART_DEFAULTS.raw) ||
             this.chartType !== defaultChartType ||
             this.showPoints !== CHART_DEFAULTS.show_points ||
             this.showValues !== CHART_DEFAULTS.show_values ||
@@ -1232,6 +1235,8 @@ function selectBrush() {
           // gesetzt) — dieselbe Vorrangregel wie toggleRaw()/setChartType()
           // schon zur Laufzeit durchsetzen: Rohwerte schließt Balken aus.
           if (this.raw && this.chartType === 'bar') this.chartType = 'line';
+          // Der Zeitstrahl (Standard für Schalter) braucht immer Rohwerte.
+          if (this.chartType === 'timeline') this.raw = true;
           this.load();
           window.addEventListener('resize', () => chartInstance && chartInstance.resize());
           // ResizeObserver zusätzlich zu window-resize: die Kartenbreite kann sich

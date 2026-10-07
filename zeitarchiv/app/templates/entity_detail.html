@@ -399,7 +399,7 @@
     // zurücksetzen" (Aktionen) nur zeigt, wenn es dafür tatsächlich etwas zu
     // tun gibt.
     const CHART_DEFAULTS = {{ entity_chart_defaults | tojson }};
-    const DEFAULT_CHART_TYPE = {{ ('bar' if aggregation_type in ('counter', 'switch') else 'line') | tojson }};
+    const DEFAULT_CHART_TYPE = {{ ('timeline' if aggregation_type == 'switch' else 'bar' if aggregation_type == 'counter' else 'line') | tojson }};
     // Nur bei Schalter-Entitäten (binary_sensor/switch/input_boolean) im
     // Konfigurationsbereich umschaltbar (Konzept: Anzeigemodus) — steuert, ob
     // die Bucket-Werte (on_seconds) als Dauer (h/m) statt als Rohsekunden
