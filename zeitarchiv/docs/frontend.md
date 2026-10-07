@@ -268,8 +268,42 @@ dass die Platzhalter der Übersetzung zu denen des deutschen Textes passen. Quel
 lesen, gehen über `template_text()`/`german()` (`tests/_paths.py`), das die `_()`-Aufrufe wieder in deutschen
 Klartext zurückbaut.
 
-Noch nicht übersetzt: Anleitung/README, Logzeilen, gespeicherte Texte (Import-Reports, Ausführungsverläufe,
-stummgeschaltete Meldungen), die ECharts-Eigenbeschriftungen und das Zahlenformat (`number-format.js`).
+Noch nicht übersetzt: Logzeilen, gespeicherte Texte (Import-Reports, Ausführungsverläufe, stummgeschaltete
+Meldungen) und die ECharts-Eigenbeschriftungen. Anleitung und READMEs gibt es auf Englisch unter `docs/en/`.
+
+### Zahlen-, Datums- und Währungsformat
+
+Format und Währung hängen **nicht** an der Sprache — ein deutscher Nutzer mit englischer Oberfläche zahlt trotzdem in
+Euro, und `en-GB` und `en-US` schreiben Datum und Uhr verschieden. Zwei eigene Einstellungen (Einstellungen →
+Darstellung), beide mit Wert `auto`:
+
+| Einstellung | Werte | `auto` |
+|---|---|---|
+| `regional_format` (`app/formats.py`) | `de-DE`, `en-GB`, `en-US` | Region aus `Accept-Language` (`en-GB`/`en-AU` → britisch, `en-US`/`en-CA` → amerikanisch, `de-*` → deutsch); ohne Treffer nach der Oberflächensprache (`en` → `en-GB`) |
+| `currency` (`app/currency.py`) | `EUR`, `GBP`, `USD`, `CHF` | `currency` aus `http://supervisor/core/api/config`, 3 s Timeout, Treffer 1 h und Fehlschlag 5 min gecacht; ohne Supervisor, ohne Antwort oder bei einer anderen Währung `EUR` |
+
+Der Server löst beides **einmal pro Anfrage** auf und gibt es an beide Seiten weiter, damit Kachel und Diagramm
+nebeneinander nie verschieden schreiben:
+
+- **Python:** ContextVars `formats.current_format` und `currency.current_currency`, gesetzt von derselben app-weiten
+  Abhängigkeit wie die Sprache (`i18n.dependencies`). `format_int`/`format_value`/`format_size` (`formatting.py`),
+  `formats.format_date`/`format_datetime`/`format_clock`/`format_day_month` und der Jinja-Filter `format_money`
+  lesen sie. `strftime("%d.%m.%Y")` und ein festes „ €" gehören nicht in Anzeigecode.
+- **Browser:** `<html data-format="en-GB" data-currency='{…}'>` (JSON mit Symbol, Stellung, Untereinheit) →
+  `window.ZA_FORMAT` und `window.ZA_CURRENCY` (`static/js/i18n.js`). Alle `Intl`-/`toLocale…`-Aufrufe und
+  `NumberFormat` nehmen `ZA_FORMAT`; Beträge schreibt `fmtCurrency()` aus `ZA_CURRENCY`. Bewusst kein
+  `Intl`-Währungsformat: `en-GB` schriebe USD als „US$", Server und Browser wichen ab.
+- **Schreibweise:** deutsch Symbol hinter dem Betrag (`2,52 €`), englisch davor (`€2.52`, `CHF 2.52`); `en-US` mit
+  12-Stunden-Uhr, sonst 24 Stunden. Negative Beträge: Minus vor dem Ganzen (`-£1,234.50`).
+- **Unberührt:** Maschinenformate (ISO-Daten, CSV-Export, Dateinamen, `strptime`-Muster im CSV-Import).
+- **Währung rechnet nichts um:** Preise liegen ohne Währung als „Einheit je kWh" vor; die Einstellung ändert nur
+  Symbol, Stellung und die Untereinheit in Eingabefeld und Hinweisen (Ct/p/¢/Rp, im Text Cent/Pence/Rappen).
+
+Beide Einstellungen haben eine eigene Route (`POST /settings/regional-format`, `POST /settings/currency`, Antwort
+`204` mit `HX-Refresh`, ungültiger Wert `400`), weil sich beim Wechsel die ganze Seite ändert. Neues Format oder neue
+Währung: Eintrag in `FORMATS` bzw. `CURRENCIES` samt Label in `FORMAT_CHOICES`/`CURRENCY_CHOICES` und im Katalog.
+`tests/test_formats.py` und `tests/test_currency.py` decken Auflösung, Schreibweise und Seiten ab; ein Test fängt
+feste `'de-DE'` in Skripten und ein festes „€" in Skripten und Bericht ab.
 
 ## Theming
 
@@ -848,10 +882,10 @@ die Liste im Panel sagt ohnehin, was.
   Chart- und Tabellenansichten. Sie nutzt die bestehenden Chip-, Menü- und
   Popover-Bausteine; bei mehreren Zuordnungen steht das Standard-Dashboard
   zuerst, danach folgen die Namen alphabetisch.
-- **`number-format.js`**: einzige Stelle, die ein Zahlenformat kennt
-  (aktuell deutsch, Komma als Dezimaltrennzeichen); eine künftige
-  Sprachumschaltung ändert nur diese eine Datei, nicht jede einzelne
-  Tabellen-/Chart-Seite.
+- **`number-format.js`**: einzige Stelle, die ein Zahlenformat kennt; das Format
+  kommt aus `window.ZA_FORMAT` (Einstellung „Zahlen- und Datumsformat", siehe
+  [Zahlen-, Datums- und Währungsformat](#zahlen--datums--und-währungsformat)),
+  nicht mehr fest aus `de-DE`.
 - **`server-time.js`**: Kalenderangaben in der Zeitzone des SERVERS statt des
   Browsers. Der Server rechnet Zeiträume in seiner Zeitzone (Option `timezone`)
   und liefert Zeitstempel; wer daraus mit `getFullYear()`/`getMonth()` oder

@@ -5,9 +5,9 @@
 // zwar nach derselben "4 signifikante Stellen, überflüssige Nullen weg"-Regel,
 // gab das Ergebnis aber unterschiedlich aus.
 //
-// LOCALE ist bewusst die einzige Stelle, die eine Sprache kennt: eine künftige
-// Sprachumschaltung (z. B. Englisch, "en-US" mit Punkt-Dezimal) ändert nur
-// diese eine Konstante — toLocaleString() liefert dafür automatisch das
+// LOCALE ist bewusst die einzige Stelle, die ein Format kennt: es kommt aus
+// window.ZA_FORMAT (de-DE / en-GB / en-US, Einstellung "Zahlen- und Datumsformat",
+// siehe i18n.js und app/formats.py) — toLocaleString() liefert dafür automatisch das
 // richtige Dezimal-/Tausendertrennzeichen, ohne dass die einzelnen
 // Chart-/Tabellen-Dateien selbst etwas über das Format wissen müssen.
 window.NumberFormat = (() => {
@@ -27,8 +27,8 @@ window.NumberFormat = (() => {
 
   // Gegenstück zu fmt() für Freitext-Zahleneingaben im Oberflächenformat (z. B.
   // Formel-Konstanten in Vergleichstabellen) — Dezimal-/Tausendertrennzeichen
-  // werden aus LOCALE abgeleitet statt hart auf "," / "." zu setzen, damit eine
-  // künftige Sprachumschaltung automatisch mitzieht.
+  // werden aus LOCALE abgeleitet statt hart auf "," / "." zu setzen, damit ein
+  // Formatwechsel automatisch mitzieht.
   const DECIMAL_SEP = (1.1).toLocaleString(LOCALE).replace(/\d/g, '');
   const THOUSANDS_SEP = (1000).toLocaleString(LOCALE).replace(/\d/g, '');
 
