@@ -121,10 +121,7 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Zweig in _dashboard_tiles_context() und die Routen pin-cleanup/unpin-cleanup, die wie die
     # übrigen Kachel-Routen das Raster-Fragment aus main.py zurückgeben müssen. Die Daten der Kachel
     # stehen in cleanup_tile.py, nicht hier (main.py wuchs von 5.739 auf 5.757).
-    # Am 7. Oktober 2026 auf 5.800 angehoben — Zeitstrahl als Standard für reine
-    # Schalter-Charts: _effective_chart_type() löst "auto" für Editor, Kacheln und
-    # Übersichtsliste auf (main.py wuchs von 5.757 auf 5.777).
-    assert len(main.splitlines()) < 5_800
+    assert len(main.splitlines()) < 5_760
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

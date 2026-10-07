@@ -158,6 +158,7 @@ from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, s
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
+from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -3317,13 +3318,6 @@ _CHART_RANGE_OPTIONS = [
 _CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse", "full"}
 _CHART_LEGEND_METRICS = {"last", "min", "max", "average", "sum"}
 _CHART_LEGEND_STYLES = {"chips", "table"}
-# "timeline" nur clientseitig erzwingbar, wenn tatsächlich alle Serien
-# Schalter sind (siehe allSwitch-Getter in chart_editor.html) — hier nur
-# generell als gültiger Wert zugelassen, dieselbe Konvention wie
-# _ENTITY_CHART_TYPES oben. "donut" ist die dritte, chart-weite
-# Darstellungsart (Optionen-Menü, "Darstellungsart") — ein Anteil je Serie
-# statt eines Zeitverlaufs, siehe chart_editor.js renderDonut().
-_CHART_EDITOR_CHART_TYPES = {"auto", "bar", "timeline", "donut"}
 # "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
 # Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
 # siehe chart_editor.js render()/movingAverage().
@@ -3338,7 +3332,6 @@ _CHART_DONUT_AGGREGATIONS = {"sum", "average", "last"}
 # ein globaler Default (Setting "entity_chart_defaults", Einstellungen →
 # Darstellung) plus eine optionale, vollständige Übersteuerung pro Entität
 # (entities.chart_options), siehe _resolve_entity_chart_options() unten.
-_ENTITY_CHART_TYPES = {"auto", "line", "bar", "timeline"}
 _ENTITY_CHART_OPTION_DEFAULTS = {
     "continuous": False,
     "raw": False,
@@ -3372,7 +3365,7 @@ _ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": 
 
 
 def _validate_entity_chart_options(data: dict) -> None:
-    if "chart_type" in data and data["chart_type"] not in _ENTITY_CHART_TYPES:
+    if "chart_type" in data and data["chart_type"] not in ENTITY_CHART_TYPES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if "legend_metrics" in data and not set(data["legend_metrics"]) <= _CHART_LEGEND_METRICS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
@@ -3419,60 +3412,8 @@ def _resolve_entity_chart_options(entity) -> dict:
     return options
 
 
-# Kennung -> Beschriftung. Die Kennung ist die Grundform, nicht das Label: sie
-# trägt auf /charts zusätzlich die Kachel-Klasse für den Kopfstreifen je Typ
-# (siehe .is-typ-* in pages/charts.css). Aus dem zusammengesetzten Label
-# "Linie + Balken" im Template eine Klasse abzuleiten wäre der umgekehrte,
-# brüchige Weg.
-_CHART_TYPE_LABELS = {
-    "zeitstrahl": N_("Zeitstrahl"),
-    "linie": N_("Linie"),
-    "balken": N_("Balken"),
-    "gemischt": N_("Linie + Balken"),
-    "donut": N_("Donut"),
-}
-
-
 def _aggregation_types() -> dict[str, str]:
     return {row["entity_id"]: row["aggregation_type"] for row in index.list_entities()}
-
-
-def _effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
-    """Löst "auto" zum tatsächlich gezeichneten Typ auf: Besteht das Chart nur
-    aus Schaltern, ist der Zeitstrahl der Standard. "bar" ist die gespeicherte
-    ausdrückliche Wahl "kein Zeitstrahl" (der Editor schreibt es, sobald ein
-    reines Schalter-Chart den Zeitstrahl abwählt) und bleibt hier unverändert —
-    sonst würde "auto" diese Wahl beim nächsten Laden wieder überstimmen."""
-    stored = chart["chart_type"]
-    if stored == "auto" and chart["entity_ids"] and all(
-        aggregation_types.get(e) == "switch" for e in chart["entity_ids"]
-    ):
-        return "timeline"
-    return stored
-
-
-def _chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
-    """Wie das Chart tatsächlich gezeichnet wird, für die Übersichtskachel.
-
-    Gespeichert ist "auto", "timeline" oder "donut" — bei "auto" entscheidet
-    der Aggregationstyp JEDER Entität einzeln (Zähler/Schalter → Balken, sonst
-    Linie, dieselbe Regel wie _resolved_chart_type() in storage/query.py).
-    Ein Chart kann deshalb beides zugleich enthalten. Ein Chart ohne
-    Entitäten hat keinen Typ — leere Kennung, Kachel ohne Streifen."""
-    chart_type = _effective_chart_type(chart, aggregation_types)
-    if chart_type == "timeline":
-        return "zeitstrahl"
-    if chart_type == "donut":
-        return "donut"
-    vorhanden = {
-        "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
-        for entity_id in chart["entity_ids"]
-    }
-    return "gemischt" if len(vorhanden) > 1 else next(iter(vorhanden), "")
-
-
-def _chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
-    return _CHART_TYPE_LABELS.get(_chart_type_key(chart, aggregation_types), "")
 
 
 @app.get("/charts", response_class=HTMLResponse)
@@ -3486,8 +3427,8 @@ def charts_list(request: Request) -> HTMLResponse:
             "name": c["name"],
             "entity_count": len(c["entity_ids"]),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
-            "type_label": _chart_type_label(c, aggregation_types),
-            "type_key": _chart_type_key(c, aggregation_types),
+            "type_label": chart_type_label(c, aggregation_types),
+            "type_key": chart_type_key(c, aggregation_types),
             # Nur für "Neueste/Älteste zuerst" im Browser (card-browser.js),
             # nicht zum Anzeigen — deshalb roh statt formatiert.
             "created_at": c["created_at"],
@@ -3524,7 +3465,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_stats": chart["chart_stats"] if chart else True,
         "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
         "legend_style": chart["legend_style"] if chart else "chips",
-        "chart_type": _effective_chart_type(chart, _aggregation_types()) if chart else "auto",
+        "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else "auto",
         "decimals": chart["decimals"] if chart else "auto",
         "show_values": chart["show_values"] if chart else False,
         "average_line": chart["average_line"] if chart else False,
@@ -3626,7 +3567,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
-    if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
+    if body.chart_type not in CHART_EDITOR_CHART_TYPES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
@@ -3673,7 +3614,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
-    if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
+    if body.chart_type not in CHART_EDITOR_CHART_TYPES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
@@ -3915,7 +3856,7 @@ def _dashboard_tiles_context(
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
                 "legend_style": c["legend_style"],
-                "chart_type": _effective_chart_type(c, aggregation_types),
+                "chart_type": effective_chart_type(c, aggregation_types),
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
@@ -5766,7 +5707,7 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     run_storage_reconciliation=_background.run_storage_reconciliation,
     gap_threshold_auto_adjust_message=_gap_threshold_auto_adjust_message,
     set_next_retention_run=_background.set_next_retention_run,
-    chart_type_label=_chart_type_label,
+    chart_type_label=chart_type_label,
     count_stale_entities=_count_stale_entities,
     load_purge_preview=_background.load_purge_preview,
     load_retention_overview=_background.load_retention_overview,
