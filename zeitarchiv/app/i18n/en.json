@@ -2200,7 +2200,14 @@
     "Deutsch (1.234,5 · 07.10.2026)": "German (1.234,5 · 07.10.2026)",
     "English UK (1,234.5 · 07/10/2026)": "English UK (1,234.5 · 07/10/2026)",
     "English US (1,234.5 · 10/07/2026)": "English US (1,234.5 · 10/07/2026)",
-    "{range} Uhr": "{range}"
+    "{range} Uhr": "{range}",
+    "{n} Tag": "{n} day",
+    "{n} Tage": "{n} days",
+    "{n} Std.": "{n} hr",
+    "{n} Min.": "{n} min",
+    "{n} Sek.": "{n} sec",
+    "in {dauer}": "in {dauer}",
+    "nie": "never"
   },
   "js": {
     "Meldungen": "Notices",

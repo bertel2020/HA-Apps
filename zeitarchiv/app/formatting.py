@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from . import formats
-from .i18n import N_
+from .i18n import N_, tr
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -62,14 +62,13 @@ def format_uptime(seconds: float) -> str:
     hours, rem = divmod(rem, 3600)
     minutes, secs = divmod(rem, 60)
     if days:
-        suffix = f" {hours} Std." if hours else ""
-        return f"{days} Tag{'e' if days != 1 else ''}{suffix}"
+        day_text = tr("{n} Tag", n=days) if days == 1 else tr("{n} Tage", n=days)
+        return f"{day_text} {tr('{n} Std.', n=hours)}" if hours else day_text
     if hours:
-        suffix = f" {minutes} Min." if minutes else ""
-        return f"{hours} Std.{suffix}"
+        return f"{tr('{n} Std.', n=hours)} {tr('{n} Min.', n=minutes)}" if minutes else tr("{n} Std.", n=hours)
     if minutes:
-        return f"{minutes} Min."
-    return f"{secs} Sek."
+        return tr("{n} Min.", n=minutes)
+    return tr("{n} Sek.", n=secs)
 
 
 # Zahlenformat der Oberfläche: Trennzeichen kommen aus formats.FORMATS, das Format aus der

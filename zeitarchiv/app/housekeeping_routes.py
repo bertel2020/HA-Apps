@@ -215,7 +215,7 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
             interval = "off"
         interval_seconds = demo_mode.DEMO_APPEND_INTERVAL_SECONDS.get(interval)
         next_run_label = (
-            f"in {format_uptime((last_run if last_run is not None else now) + interval_seconds - now)}"
+            tr("in {dauer}", dauer=format_uptime((last_run if last_run is not None else now) + interval_seconds - now))
             if interval_seconds is not None else "—"
         )
         context.update({

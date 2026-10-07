@@ -3929,7 +3929,7 @@ def _dashboard_tiles_context(
                 "custom_title": p["title"] or "",
                 "value_text": value_text, "unit": "" if is_switch else (e["unit"] or ""),
                 "is_switch": is_switch, "decimals": effective_decimals,
-                "age_text": tr("vor {format_uptime}", format_uptime=format_uptime(seconds_ago)) if seconds_ago is not None else "nie",
+                "age_text": tr("vor {format_uptime}", format_uptime=format_uptime(seconds_ago)) if seconds_ago is not None else tr("nie"),
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
                 "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),

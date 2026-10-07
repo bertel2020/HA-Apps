@@ -151,3 +151,26 @@ def test_scripts_read_the_format_instead_of_a_fixed_locale() -> None:
         if path.name in {"i18n.js", "import.js"}:
             continue
         assert "'de-DE'" not in text, f"{path.name} formatiert mit festem de-DE"
+
+
+@pytest.mark.parametrize(
+    ("seconds", "german", "english"),
+    [
+        (12, "12 Sek.", "12 sec"),
+        (45 * 60, "45 Min.", "45 min"),
+        (3600, "1 Std.", "1 hr"),
+        (3600 + 5 * 60, "1 Std. 5 Min.", "1 hr 5 min"),
+        (86400, "1 Tag", "1 day"),
+        (2 * 86400 + 3 * 3600, "2 Tage 3 Std.", "2 days 3 hr"),
+    ],
+)
+def test_durations_are_translated(seconds, german, english) -> None:
+    from app import i18n
+    from app.formatting import format_uptime
+
+    for language, expected in (("de", german), ("en", english)):
+        token = i18n.current_language.set(language)
+        try:
+            assert format_uptime(seconds) == expected
+        finally:
+            i18n.current_language.reset(token)
