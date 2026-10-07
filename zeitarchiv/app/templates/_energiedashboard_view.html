@@ -558,7 +558,7 @@
        berechnet. #}
     {% if config.show_sankey_legende %}
     <div class="chart-legend edash-sankey-legend" x-ref="legendEl" x-show="hasFlow && legendItems.length">
-      <template x-for="item in legendItems" :key="item.name">
+      <template x-for="(item, index) in legendItems" :key="index">
         <span class="chart-legend-item static">
           <span class="dot" :style="{background: item.color}"></span>
           <span class="name" x-text="item.name"></span>
