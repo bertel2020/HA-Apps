@@ -178,7 +178,7 @@ def make_router(get_index: Callable[[], Any]) -> APIRouter:
     def set_language(language: str = Form(...)) -> Response:
         """Speichert die Sprache und lädt die Seite neu (alle Texte ändern sich)."""
         if language not in LANGUAGE_CHOICES:
-            raise HTTPException(status_code=400, detail="Invalid language")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Sprache"))
         get_index().set_setting(SETTING_KEY, language)
         return Response(status_code=204, headers={"HX-Refresh": "true"})
 

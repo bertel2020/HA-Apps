@@ -2217,7 +2217,10 @@
     "Schweizer Franken (CHF)": "Swiss franc (CHF)",
     "Cent": "cents",
     "Pence": "pence",
-    "Rappen": "rappen"
+    "Rappen": "rappen",
+    "Ungültiges Format": "Invalid format",
+    "Ungültige Währung": "Invalid currency",
+    "Ungültige Sprache": "Invalid language"
   },
   "js": {
     "Meldungen": "Notices",

@@ -166,7 +166,9 @@ def make_router(get_index: Callable[[], Any]) -> APIRouter:
     def set_currency(currency: str = Form(...)) -> Response:
         """Speichert die Währung und lädt die Seite neu (alle Beträge ändern sich)."""
         if currency not in CURRENCY_CHOICES:
-            raise HTTPException(status_code=400, detail="unknown_currency")
+            from .i18n import tr  # erst hier: i18n importiert dieses Modul
+
+            raise HTTPException(status_code=400, detail=tr("Ungültige Währung"))
         get_index().set_setting(SETTING_KEY, currency)
         return Response(status_code=204, headers={"HX-Refresh": "true"})
 

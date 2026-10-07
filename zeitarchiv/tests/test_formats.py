@@ -174,3 +174,13 @@ def test_durations_are_translated(seconds, german, english) -> None:
             assert format_uptime(seconds) == expected
         finally:
             i18n.current_language.reset(token)
+
+
+def test_the_error_text_of_the_setting_routes_follows_the_request_language(client) -> None:
+    for route, field, german, english in (
+        ("/settings/regional-format", "regional_format", "Ungültiges Format", "Invalid format"),
+        ("/settings/currency", "currency", "Ungültige Währung", "Invalid currency"),
+        ("/settings/language", "language", "Ungültige Sprache", "Invalid language"),
+    ):
+        assert client.post(route, data={field: "xx"}, headers={"Accept-Language": "de"}).json()["detail"] == german
+        assert client.post(route, data={field: "xx"}, headers={"Accept-Language": "en"}).json()["detail"] == english

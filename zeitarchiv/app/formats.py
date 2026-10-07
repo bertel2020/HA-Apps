@@ -150,7 +150,9 @@ def make_router(get_index: Callable[[], Any]) -> APIRouter:
     def set_regional_format(regional_format: str = Form(...)) -> Response:
         """Speichert das Format und lädt die Seite neu (alle Zahlen und Daten ändern sich)."""
         if regional_format not in FORMAT_CHOICES:
-            raise HTTPException(status_code=400, detail="unknown_format")
+            from .i18n import tr  # erst hier: i18n importiert dieses Modul
+
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Format"))
         get_index().set_setting(SETTING_KEY, regional_format)
         return Response(status_code=204, headers={"HX-Refresh": "true"})
 
