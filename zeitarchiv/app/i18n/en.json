@@ -2192,7 +2192,9 @@
     "Stunden-Rollup": "Hourly rollup",
     "Rollup-Neuaufbau": "Rollup rebuild",
     "Weitere Fachtabellen": "Other domain tables",
-    "Noch keiner fachlichen Gruppe zugeordnete Tabellen.": "Tables not yet assigned to a domain group."
+    "Noch keiner fachlichen Gruppe zugeordnete Tabellen.": "Tables not yet assigned to a domain group.",
+    "{n} offen": "{n} open",
+    "Prognose:": "Forecast:"
   },
   "js": {
     "Meldungen": "Notices",
@@ -2594,6 +2596,8 @@
     "Beschriftung …": "Label …",
     "Rahmen: {value}": "Borders: {value}",
     "Dichte: {value}": "Density: {value}",
-    "Header-Ausrichtung: {value}": "Header alignment: {value}"
+    "Header-Ausrichtung: {value}": "Header alignment: {value}",
+    "{value} % vs. {label}": "{value} % vs. {label}",
+    "{value} kWh vs. {label}": "{value} kWh vs. {label}"
   }
 }

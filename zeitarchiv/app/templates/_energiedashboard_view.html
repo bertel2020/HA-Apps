@@ -427,7 +427,7 @@
            stehen, wenn nur ein Morgen-Wert zugeordnet ist (vorher verschwand
            sie mit dem heute-Span), und die beiden Werte bilden einen eigenen
            Block, der mobil sauber untereinander bricht. #}
-        <span>Prognose:</span>
+        <span>{{ _("Prognose:") }}</span>
         <span class="edash-hero-prognose-werte">
           <span x-show="kpi.prognose_rest_heute != null">{{ _("noch <strong x-text=\"fmt(kpi.prognose_rest_heute, 1) + ' kWh'\"></strong> heute") }}</span>
           {# Der Trennpunkt sitzt in einem eigenen Element, weil er nur in der

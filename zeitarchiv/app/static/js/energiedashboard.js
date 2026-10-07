@@ -674,13 +674,13 @@
         if (!entry || !this.compareLabel) return '';
         if (entry.pct != null) {
           const sign = entry.pct > 0 ? '+' : '';
-          return `${sign}${this.fmt(entry.pct, 1)} % vs. ${this.compareLabel}`;
+          return `${sign}` + t('{value} % vs. {label}', {value: this.fmt(entry.pct, 1), label: t(this.compareLabel)});
         }
         // Fallback für eine Vorperiode von exakt 0 (% wäre Division durch 0,
         // siehe _compare_kpi) — absolute kWh-Differenz statt gar nichts.
         if (entry.abs != null) {
           const sign = entry.abs > 0 ? '+' : '';
-          return `${sign}${this.fmt(entry.abs, 1)} kWh vs. ${this.compareLabel}`;
+          return `${sign}` + t('{value} kWh vs. {label}', {value: this.fmt(entry.abs, 1), label: t(this.compareLabel)});
         }
         return '';
       },

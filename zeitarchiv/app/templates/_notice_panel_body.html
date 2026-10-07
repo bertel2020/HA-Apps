@@ -6,7 +6,7 @@
    pflegen. #}
 <div class="notice-panel-head">
   <h3><a class="notice-panel-title-link" href="{{ app_root }}/settings#meldungen">{{ _("Meldungen") }}</a></h3>
-  <span>{{ notices | length ~ ' offen' if notices else _('Alles erledigt') }}</span>
+  <span>{{ _('{n} offen', n=notices | length) if notices else _('Alles erledigt') }}</span>
 </div>
 <ul class="notice-list"{% if not notices %} hidden{% endif %}>
   {% for notice in notices %}
