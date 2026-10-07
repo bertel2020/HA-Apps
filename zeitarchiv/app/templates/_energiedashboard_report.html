@@ -219,21 +219,21 @@
       <div class="stat-card">
         <div class="stat-title">{{ _("Kosten") }}</div>
         {% if current.kpi.netzbezug_cost is not none %}
-        <div class="stat-line"><span>{{ config.netzbezug_name or _("Netzbezug") }}</span><strong>{{ current.kpi.netzbezug_cost | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ config.netzbezug_name or _("Netzbezug") }}</span><strong>{{ current.kpi.netzbezug_cost | format_money }}</strong></div>
         {% endif %}
         {% if current.kpi.einspeisung_revenue is not none %}
-        <div class="stat-line"><span>{{ config.einspeisung_name or _("Einspeisung") }}</span><strong>{{ current.kpi.einspeisung_revenue | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ config.einspeisung_name or _("Einspeisung") }}</span><strong>{{ current.kpi.einspeisung_revenue | format_money }}</strong></div>
         {% endif %}
         {% if current.kpi.eigenverbrauch_verguetung is not none %}
-        <div class="stat-line"><span>{{ _("Eigenverbrauchsvergütung") }}</span><strong>{{ current.kpi.eigenverbrauch_verguetung | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ _("Eigenverbrauchsvergütung") }}</span><strong>{{ current.kpi.eigenverbrauch_verguetung | format_money }}</strong></div>
         {% endif %}
         {% if current.kpi.vermiedene_kosten is not none %}
-        <div class="stat-line"><span>{{ _("Vermiedene Kosten (Eigenverbrauch)") }}</span><strong>{{ current.kpi.vermiedene_kosten | format_value(2) }} €</strong></div>
+        <div class="stat-line"><span>{{ _("Vermiedene Kosten (Eigenverbrauch)") }}</span><strong>{{ current.kpi.vermiedene_kosten | format_money }}</strong></div>
         {% endif %}
         {% if current.kpi.net_cost is not none %}
         <div class="stat-total {{ 'is-surplus' if current.kpi.net_cost < 0 else 'is-cost' }}">
           <span>{{ _("Saldo &#8213; {v1}", v1=(_("gespart") if current.kpi.net_cost < 0 else _("Kosten"))) }}</span>
-          <span class="mono">{{ '+' if current.kpi.net_cost < 0 else '' }}{{ (current.kpi.net_cost * -1) | format_value(2) if current.kpi.net_cost < 0 else current.kpi.net_cost | format_value(2) }} €</span>
+          <span class="mono">{{ '+' if current.kpi.net_cost < 0 else '' }}{{ (current.kpi.net_cost * -1) | format_money if current.kpi.net_cost < 0 else current.kpi.net_cost | format_money }}</span>
         </div>
         {% endif %}
       </div>
@@ -317,7 +317,7 @@
           <td>{{ item.name }}</td>
           <td>{{ item.value | format_value(1) }}</td>
           <td>{{ item.share | format_value(0) if item.share is not none else "–" }} %</td>
-          {% if show_kosten_col %}<td>{{ item.kosten | format_value(2) ~ " €" if item.kosten is not none else "–" }}</td>{% endif %}
+          {% if show_kosten_col %}<td>{{ item.kosten | format_money if item.kosten is not none else "–" }}</td>{% endif %}
         </tr>
         {% set total_kwh.v = total_kwh.v + item.value %}
         {% if item.kosten is not none %}{% set total_kosten.v = total_kosten.v + item.kosten %}{% endif %}
@@ -326,7 +326,7 @@
           <td>{{ _("Gesamt") }}</td>
           <td>{{ total_kwh.v | format_value(1) }}</td>
           <td>100 %</td>
-          {% if show_kosten_col %}<td>{{ total_kosten.v | format_value(2) }} €</td>{% endif %}
+          {% if show_kosten_col %}<td>{{ total_kosten.v | format_money }}</td>{% endif %}
         </tr>
       </tbody>
     </table>

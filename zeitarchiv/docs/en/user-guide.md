@@ -410,7 +410,7 @@ does not already arrive in Zeitarchiv anyway.
 | Storage: state of charge (SOC) | no | Instantaneous value in percent, not a counter — with several storage units averaged capacity-weighted |
 | Storage: capacity | no | Total capacity in kWh (entity or fixed value; Wh entities are converted automatically) — only needed so that the state of charge is additionally shown in kWh and weighted correctly with several storage units |
 | Consumers (any number) | no | One consumption counter each (kWh, ascending) with its own name and optionally a freely named group — everything not assigned individually automatically remains visible as "base load" |
-| Electricity price (import/feed-in) | no | €/kWh entity; without a suitable entity, a fixed cent amount as a substitute |
+| Electricity price (import/feed-in) | no | Currency/kWh entity (currency: see Settings → Appearance); without a suitable entity, a fixed amount in the subunit (cents, pence, rappen) as a substitute |
 | CO₂ intensity | no | g/kWh entity; without a suitable entity, a fixed value as a substitute |
 | PV yield forecast | no | kWh for "rest of today" and "tomorrow", e.g. from a Forecast.Solar integration |
 
@@ -1931,7 +1931,7 @@ long as necessary.
 
 | Area | Contains |
 | --- | --- |
-| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), start page (overview/energy dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, starting values for the chart options of the entity history view |
+| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, starting values for the chart options of the entity history view |
 | **Archiving** | Default values for newly detected entities (never act retroactively on existing entities): resolution, retention, decimal places, value change filter, gap/outlier detection |
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |

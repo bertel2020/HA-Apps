@@ -84,7 +84,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
-from . import demo_mode, formats, i18n
+from . import currency, demo_mode, formats, i18n
 from .i18n import N_, tr
 from . import supervisor_stats
 from .logging_setup import (
@@ -601,6 +601,7 @@ def asset(kontext, pfad: str) -> str:
 # *_label-Kopien übersetzen) hier mehr Code für denselben Zweck wäre.
 templates.env.filters["format_int"] = format_int
 templates.env.filters["format_value"] = format_value
+templates.env.filters["format_money"] = currency.format_money
 # Eine Funktion statt der drei Zahlen css_v/js_v/vendor_v (ZG-05). Ein
 # Template schreibt {{ asset('js/pages/statistik.js') }} und bekommt Präfix und
 # Cache-Buster mitgeliefert; welcher der drei Ordner gemeint ist, muss es nicht

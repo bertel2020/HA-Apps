@@ -29,7 +29,7 @@ from fastapi.responses import Response
 from jinja2 import pass_context
 from markupsafe import Markup
 
-from .. import formats
+from .. import currency, formats
 
 SOURCE_LANGUAGE = "de"
 LANGUAGES = {"de": "Deutsch", "en": "English"}
@@ -142,6 +142,7 @@ def dependencies(get_index: Callable[[], Any]) -> list:
         language = _language_for(request, index)[1]
         current_language.set(language)
         formats.set_for_request(request, index, language)
+        currency.set_for_request(index)
 
     return [Depends(set_language)]
 
@@ -158,6 +159,7 @@ def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], 
         current_language.set(lang)
         return {
             **formats.context_values(request, index, lang, translate),
+            **currency.context_values(index, lang, translate),
             "lang": lang,
             "language_setting": setting,
             "language_options": [(key, translate(label, lang)) for key, label in LANGUAGE_CHOICES.items()],
@@ -170,6 +172,7 @@ def make_context_processor(get_index: Callable[[], Any]) -> Callable[[Request], 
 def make_router(get_index: Callable[[], Any]) -> APIRouter:
     router = APIRouter()
     router.include_router(formats.make_router(get_index))
+    router.include_router(currency.make_router(get_index))
 
     @router.post("/settings/language")
     def set_language(language: str = Form(...)) -> Response:

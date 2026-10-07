@@ -469,10 +469,16 @@
         return value == null ? '—' : this.fmt(value, 0) + ' %';
       },
 
-      // Preis-Sensoren werden als €/kWh vorausgesetzt (siehe Hinweistext im
-      // Setup) — kein Einheiten-/Währungs-Handling darüber hinaus für v1.
+      // Preis-Sensoren werden als Währung/kWh vorausgesetzt (siehe Hinweistext im
+      // Setup); die Währung kommt aus der Einstellung (window.ZA_CURRENCY, siehe
+      // i18n.js) — es wird nichts umgerechnet, nur Symbol und Stellung ändern sich.
       fmtCurrency(value) {
-        return value == null ? '—' : this.fmt(value, 2) + ' €';
+        if (value == null) return '—';
+        const c = window.ZA_CURRENCY;
+        const sign = Math.round(value * 100) < 0 ? '-' : '';
+        const number = this.fmt(Math.abs(value), 2);
+        if (c.position === 'after') return `${sign}${number} ${c.symbol}`;
+        return `${sign}${c.symbol}${c.spaced ? ' ' : ''}${number}`;
       },
 
       // Alltags-Vergleich für "Vermiedenes CO2" — bewusst nur eine grobe

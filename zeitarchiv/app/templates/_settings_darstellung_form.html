@@ -36,6 +36,23 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _('Währung') }} {{ hint_button(_('Währung')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _('Währung der Kosten im Energiedashboard. „Automatisch“ übernimmt sie aus Home Assistant. Beträge werden nicht umgerechnet — nach einem Wechsel die Preise neu eintragen.') }}{% endcall %}
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="currency-btn" onclick="toggleDDPicker('currency')">{% for k, l in currency_options %}{% if k == currency_setting %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      {# Eigene Route wie bei Sprache und Format: lädt die Seite neu (HX-Refresh), weil sich alle Beträge ändern. #}
+      <input type="hidden" name="currency" id="currency-input" value="{{ currency_setting }}"
+             hx-post="settings/currency" hx-trigger="change" hx-swap="none">
+      <div class="dd-picker-popover" id="currency-popover">
+        {% for key, label in currency_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('currency', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Startseite") }} {{ hint_button(_('Startseite')) }}</div>
       {% call hint_body('settings-compact-hint') %}{{ _("Erste Seite beim Öffnen, z. B. über die HA-Sidebar") }}{% endcall %}
     </div>

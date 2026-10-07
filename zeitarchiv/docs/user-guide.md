@@ -447,7 +447,7 @@ eingerichtet werden, was nicht ohnehin schon in Zeitarchiv ankommt.
 | Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler — bei mehreren Speichern kapazitätsgewichtet gemittelt |
 | Speicher: Kapazität | nein | Gesamtkapazität in kWh (Entität oder fester Wert; Wh-Entitäten werden automatisch umgerechnet) — nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt und bei mehreren Speichern richtig gewichtet wird |
 | Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
-| Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
+| Strompreis (Bezug/Einspeisung) | nein | Währung/kWh-Entität (Währung siehe Einstellungen → Darstellung); ohne passende Entität ersatzweise ein fester Betrag in der Untereinheit (Cent, Pence, Rappen) |
 | CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
 | PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |
 
@@ -2086,7 +2086,7 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |

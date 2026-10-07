@@ -33,7 +33,7 @@
    Kein <body> im Bestand trägt Attribute — geprüft über alle 23 —, deshalb
    steht es hier ohne Block. #}
 <!doctype html>
-<html lang="{{ lang | default('de') }}" data-format="{{ format_locale | default('de-DE') }}" data-tz="{{ server_tz }}" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<html lang="{{ lang | default('de') }}" data-format="{{ format_locale | default('de-DE') }}" data-currency='{{ currency_info | default({"code": "EUR", "symbol": "€", "spaced": false, "position": "after", "short": "Ct"}) | tojson }}' data-tz="{{ server_tz }}" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
