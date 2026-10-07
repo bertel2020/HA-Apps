@@ -91,3 +91,21 @@ def test_kalenderauswahl_zerlegt_keine_serverzeitstempel_in_der_browserzone():
     quelle = (JS / "calendar-picker.js").read_text()
     for muster in ("new Date().getFullYear", "today.getFullYear", "d.getFullYear"):
         assert muster not in quelle, muster
+
+
+@pytest.mark.parametrize("browser_tz", ["Europe/Berlin", "Europe/Lisbon", "America/New_York", "Asia/Tokyo"])
+def test_to_epoch_liest_die_uhrzeit_in_der_serverzone(browser_tz):
+    # 01.10.2026 00:00 Berlin (Sommerzeit), 01.01.2026 00:00 Berlin (Winterzeit)
+    werte = _node(browser_tz, "[ServerTime.toEpoch(2026, 10, 1), ServerTime.toEpoch(2026, 1, 1, 0, 0, 0)]")
+    assert werte == [OKT_BERLIN, JAN_BERLIN]
+    # Monatsende per Überlauf: 31.10.2026 23:59:59 Berlin, Winterzeit ab 25.10.
+    assert _node(browser_tz, "ServerTime.toEpoch(2026, 11, 0, 23, 59, 59)") == 1793487599
+    # Mitten im Sommer: Hin- und Rückweg über parts() ergeben dieselbe Uhrzeit
+    p = _node(browser_tz, "ServerTime.parts(ServerTime.toEpoch(2026, 7, 15, 13, 45, 10))")
+    assert (p["year"], p["month"], p["day"], p["hour"], p["minute"]) == (2026, 7, 15, 13, 45)
+
+
+def test_cleanup_rechnet_eingaben_nicht_mit_browserzeit():
+    quelle = (JS / "pages" / "cleanup.js").read_text()
+    assert "new Date(dtStr)" not in quelle
+    assert "new Date(startYear" not in quelle and "new Date(endYear" not in quelle

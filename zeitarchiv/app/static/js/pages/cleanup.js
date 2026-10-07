@@ -47,7 +47,9 @@
         statusEl.textContent = t('Bitte Datum/Uhrzeit und Wert angeben.');
         return;
       }
-      const ts = new Date(dtStr).getTime() / 1000;
+      // Die Uhrzeit des Feldes gilt in der Zeitzone des Servers, nicht des Browsers.
+      const [, y, mo, d, h, mi, sec] = dtStr.match(/^(\d+)-(\d+)-(\d+)T(\d+):(\d+)(?::(\d+))?/).map(Number);
+      const ts = ServerTime.toEpoch(y, mo, d, h, mi, sec || 0);
       const value = NumberFormat.parse(valueStr);
       if (Number.isNaN(value)) {
         statusEl.className = 'add-value-status err';
@@ -99,8 +101,9 @@
       // verdichtet werden.
       const [startYear, startMonth] = startStr.split('-').map(Number);
       const [endYear, endMonth] = endStr.split('-').map(Number);
-      const startTs = new Date(startYear, startMonth - 1, 1).getTime() / 1000;
-      const endTs = new Date(endYear, endMonth, 0, 23, 59, 59).getTime() / 1000;
+      // Monatsgrenzen in der Serverzone — dort liegen auch die Monatsarchive.
+      const startTs = ServerTime.toEpoch(startYear, startMonth, 1);
+      const endTs = ServerTime.toEpoch(endYear, endMonth + 1, 0, 23, 59, 59);
       if (endTs <= startTs) {
         statusEl.className = 'add-value-status err';
         statusEl.textContent = t('"Bis" muss nach "Von" liegen.');

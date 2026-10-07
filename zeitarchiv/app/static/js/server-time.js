@@ -40,5 +40,28 @@ window.ServerTime = (() => {
     };
   }
 
-  return {zone: zoneName, withZone, parts};
+  const wallFormat = new Intl.DateTimeFormat('en-US', withZone({
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23',
+  }));
+
+  // Umkehrung von parts(): Die Uhrzeit "year-month-day hour:minute:second" in der
+  // Serverzone als Zeitstempel (Sekunden). Ein Eingabefeld (datetime-local,
+  // month) liefert nur Uhrzeit-Ziffern ohne Zone; new Date(…) läse sie in der
+  // BROWSER-Zone und verschöbe den Wert um den Unterschied zum Server. month
+  // 1–12; Überläufe (day 0 = letzter Tag des Vormonats) rechnet Date.UTC. Zwei
+  // Durchgänge, damit der Versatz an einer Sommerzeitgrenze stimmt.
+  function toEpoch(year, month, day, hour = 0, minute = 0, second = 0) {
+    const wall = Date.UTC(year, month - 1, day, hour, minute, second) / 1000;
+    let ts = wall;
+    for (let i = 0; i < 2; i++) {
+      const p = {};
+      for (const {type, value} of wallFormat.formatToParts(new Date(ts * 1000))) p[type] = value;
+      const shown = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) / 1000;
+      ts += wall - shown;
+    }
+    return ts;
+  }
+
+  return {zone: zoneName, withZone, parts, toEpoch};
 })();
