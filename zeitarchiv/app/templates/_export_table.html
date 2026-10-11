@@ -3,6 +3,7 @@
   {% if rows %}
   <table class="dt export-dt">
     <colgroup>
+      <col class="col-select">
       <col class="col-entity">
       <col class="col-type">
       <col class="col-unit">
@@ -10,6 +11,7 @@
       <col class="col-actions">
     </colgroup>
     <tr>
+      <th class="select"><input type="checkbox" id="export-page-all" aria-label="{{ _('Alle auf dieser Seite wählen') }}"></th>
       {% for col in columns %}
       <th class="{{ 'centered' if col.key == 'type' else '' }}">
         <a href="export-table?sort={{ col.key }}&dir={{ col.next_dir }}&search={{ search | urlencode }}&unit={{ unit | urlencode }}{% for t in type %}&type={{ t }}{% endfor %}"
@@ -24,6 +26,7 @@
     </tr>
     {% for row in rows %}
     <tr>
+      <td class="select"><input type="checkbox" data-export-select value="{{ row.entity_id }}" aria-label="{{ _('{name} auswählen', name=row.display_name) }}"></td>
       <td class="entity entity-tooltip-host" tabindex="0">
         {% if row.display_name != row.entity_id %}
         <span class="name"><span class="name-text">{{ row.display_name }}</span>{% if row.has_custom_name %}{{ custom_name_icon() }}{% endif %}</span>
@@ -37,7 +40,13 @@
       <td>{{ row.unit or "—" }}</td>
       <td>{{ row.row_count | format_int }}</td>
       <td class="actions">
-        <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" {% if row.row_count == 0 %}aria-disabled="true" style="pointer-events:none;opacity:.4;"{% endif %}>{{ _("CSV herunterladen") }}</a>
+        {% if row.row_count == 0 %}
+        <span class="btn" aria-disabled="true" style="pointer-events:none;opacity:.4;">{{ _("CSV herunterladen") }}</span>
+        {% elif row.row_count > max_rows %}
+        <span class="btn" aria-disabled="true" style="pointer-events:none;opacity:.4;" title="{{ _('Mehr als {max_rows} Zeilen. Im Assistenten einen Zeitraum wählen.', max_rows=max_rows|format_int) }}">{{ _("CSV herunterladen") }}</span>
+        {% else %}
+        <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" title="{{ _('Komplette Historie, Rohwerte') }}">{{ _("CSV herunterladen") }}</a>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}

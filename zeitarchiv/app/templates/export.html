@@ -7,9 +7,15 @@
   
   <div class="page">
     <h1>{{ _("CSV-Export") }}</h1>
-    <p class="sub">{{ _("Lädt die komplette Rohdaten-Historie einer Entität als CSV herunter &mdash; Hot Buffer und Archiv zusammengeführt, zur Löschung markierte Datensätze ausgeschlossen.") }}</p>
+    <p class="sub">{{ _("In vier Schritten zur Datei: Entitäten wählen, Zeitraum, Auflösung, prüfen und herunterladen. Eine Entität ergibt eine CSV, mehrere ergeben automatisch ein ZIP mit je einer CSV.") }}</p>
 
-    <div class="settings-panel">
+    <ol class="export-steps" id="export-steps" aria-label="{{ _('Schritte') }}"></ol>
+
+    <div class="settings-panel export-wizard" id="export-wizard" data-max-rows="{{ max_rows }}">
+
+      <section class="export-step" id="export-step-1">
+        <h2>{{ _("Welche Entitäten?") }}</h2>
+        <p class="export-lead">{{ _("Ankreuzen, was exportiert werden soll. „CSV herunterladen“ in einer Zeile lädt sofort die komplette Historie dieser Entität als Rohwerte.") }}</p>
 
         <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="export-table" hx-include="#controls, [name=page_size]" hx-target="#export-table" hx-swap="innerHTML">
@@ -39,8 +45,63 @@
           <input type="hidden" name="page" id="export-page-field" value="1">
         </div>
 
+        <div class="export-selbar">
+          <span id="export-selcount">{{ _("0 ausgewählt") }}</span>
+          <button type="button" class="btn" id="export-select-all">{{ _("Alle Entitäten wählen") }}</button>
+          <button type="button" class="btn" id="export-select-none">{{ _("Auswahl leeren") }}</button>
+        </div>
         <div id="export-table"></div>
+      </section>
+
+      <section class="export-step" id="export-step-2" hidden>
+        <h2>{{ _("Welcher Zeitraum?") }}</h2>
+        <p class="export-lead">{{ _("Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen einzelnen Monat.") }}</p>
+        <div class="export-seg" id="export-mode" role="group" aria-label="{{ _('Zeitraum') }}">
+          <button type="button" data-mode="all">{{ _("Alles") }}</button>
+          <button type="button" data-mode="year">{{ _("Jahr") }}</button>
+          <button type="button" data-mode="month">{{ _("Monat") }}</button>
+          <button type="button" data-mode="free">{{ _("Frei") }}</button>
+        </div>
+        <div class="export-pick">
+          <div class="export-yearstep" id="export-yearstep">
+            <button type="button" class="btn" id="export-year-prev" aria-label="{{ _('Vorheriges Jahr') }}">‹</button>
+            <b id="export-year-label"></b>
+            <button type="button" class="btn" id="export-year-next" aria-label="{{ _('Nächstes Jahr') }}">›</button>
+          </div>
+          <div class="export-months" id="export-months"></div>
+          <div class="export-free" id="export-free">
+            <label>{{ _("Von") }}<input type="date" id="export-from"></label>
+            <label>{{ _("Bis") }}<input type="date" id="export-to"></label>
+          </div>
+          <div class="export-period-text" id="export-period-text"></div>
+        </div>
+      </section>
+
+      <section class="export-step" id="export-step-3" hidden>
+        <h2>{{ _("Wie fein?") }}</h2>
+        <p class="export-lead">{{ _("Gröbere Auflösung macht die Dateien kleiner. Die Zeilenzahl zeigt die größte Datei im gewählten Zeitraum.") }}</p>
+        <div class="export-resolutions" id="export-resolutions"></div>
+        <p class="export-hint" id="export-res-hint"></p>
+      </section>
+
+      <section class="export-step" id="export-step-4" hidden>
+        <h2>{{ _("Prüfen und herunterladen") }}</h2>
+        <p class="export-lead" id="export-review-lead"></p>
+        <div class="export-error" id="export-error" role="alert" hidden></div>
+        <dl class="export-summary" id="export-summary"></dl>
+        <p class="export-hint">{{ _("Spalten: timestamp (lokale Zeit), unix_ts, value. Bei gröberer Auflösung steht der Beginn des Intervalls im Zeitstempel.") }}</p>
+      </section>
+
+      <div class="export-foot">
+        <div class="export-live" id="export-live" aria-live="polite"></div>
+        <div class="export-nav">
+          <button type="button" class="btn" id="export-back" hidden>{{ _("Zurück") }}</button>
+          <button type="button" class="btn primary" id="export-next">{{ _("Weiter") }}</button>
+        </div>
+      </div>
     </div>
+
+    <form id="export-form" method="post" action="export/download" hidden></form>
   </div>
 
   <script src="{{ asset('vendor/htmx.min.js') }}"></script>

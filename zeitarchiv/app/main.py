@@ -77,7 +77,6 @@ from .formatting import (
 )
 from .limits import (
     MAX_CSV_UPLOAD_BYTES,
-    MAX_EXPORT_ROWS,
     MAX_UI_ANALYSIS_ROWS,
     MAX_ZIP_MEMBERS,
     MAX_ZIP_UNCOMPRESSED_BYTES,
@@ -143,6 +142,7 @@ from .housekeeping_routes import (
     create_housekeeping_router,
     demo_data_context,
 )
+from .export_routes import ExportDependencies, create_export_router
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -2495,140 +2495,10 @@ def statistik_index_optimize(request: Request) -> HTMLResponse:
     )
 
 
-@app.get("/export", response_class=HTMLResponse)
-def export_page(request: Request) -> HTMLResponse:
-    """CSV-Export (Einstellungen-Bereich, analog zum Import): pro Entität die
-    komplette Rohdaten-Historie (Hot Buffer + Archiv, ohne zur Löschung
-    markierte Datensätze) als CSV herunterladbar — nutzt dieselbe list_raw_rows() wie die
-    Bereinigungs-Seite, also garantiert dieselbe Sicht auf die Daten. Die eigentliche
-    Liste lädt wie bei der Entitäten-Übersicht per htmx aus /export-table, damit
-    Suche/Filter/Sortierung ohne Reload greifen."""
-    units = index.list_distinct_units()
-    unit_options = [{"value": "__none__" if u is None else u, "label": tr("Ohne Einheit") if u is None else u} for u in units]
-    return templates.TemplateResponse(request, "export.html", {"unit_options": unit_options})
-
-
 def _visible_row_count(entity) -> int:
     """Logische Rohwerte: physischer Indexzähler abzüglich Soft-Deletes."""
     deleted_count = int(entity["deleted_count"] or 0)
     return max(0, int(entity["row_count"] or 0) - deleted_count)
-
-
-def _export_table_response(
-    request: Request,
-    search: str,
-    type_filter: list[str],
-    unit_filter: str,
-    sort: str,
-    direction: str,
-    page: int = 1,
-    page_size: int = 20,
-) -> HTMLResponse:
-    total = index.count_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter)
-    pagination = _paginate_meta(total, page, page_size)
-    page_matched = index.list_entities(
-        search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction,
-        limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
-    )
-    rows = [
-        {
-            "entity_id": row["entity_id"],
-            "friendly_name": row["friendly_name"],
-            "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
-            "has_custom_name": bool(row["custom_name"]),
-            "aggregation_type": row["aggregation_type"],
-            "type_label": format_type(row["aggregation_type"]),
-            "unit": row["unit"],
-            "row_count": _visible_row_count(row),
-        }
-        for row in page_matched
-    ]
-
-    def _next_dir(column: str) -> str:
-        return "desc" if sort == column and direction == "asc" else "asc"
-
-    columns = [
-        ("entity_id", N_("Entität")),
-        ("type", N_("Typ")),
-        ("unit", N_("Einheit")),
-        ("rows", N_("Datensätze")),
-    ]
-    header_links = [
-        {
-            "key": key,
-            "label": label,
-            "next_dir": _next_dir(key),
-            "active": sort == key,
-            "arrow": ("↓" if direction == "asc" else "↑") if sort == key else "",
-        }
-        for key, label in columns
-    ]
-
-    return templates.TemplateResponse(
-        request,
-        "_export_table.html",
-        {
-            "rows": rows,
-            "search": search,
-            "type": type_filter,
-            "unit": unit_filter,
-            "columns": header_links,
-            "pagination": pagination,
-        },
-    )
-
-
-@app.get("/export-table", response_class=HTMLResponse)
-def export_table(
-    request: Request,
-    search: str = "",
-    type: list[str] = Query(["all"]),
-    unit: str = "all",
-    sort: str = "entity_id",
-    dir: str = "asc",
-    page: int = 1,
-    page_size: int = 20,
-) -> HTMLResponse:
-    return _export_table_response(request, search, type, unit, sort, dir, page, page_size)
-
-
-@app.get("/export/download")
-def export_download(entity_id: str) -> StreamingResponse:
-    entity = _require_entity(entity_id)
-
-    if _visible_row_count(entity) > MAX_EXPORT_ROWS:
-        raise HTTPException(
-            status_code=413,
-            detail=tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=MAX_EXPORT_ROWS),
-        )
-
-    first_ts = entity["first_ts"]
-    last_ts = entity["last_ts"]
-
-    def generate():
-        with storage_coordinator.entity(entity_id):
-            yield "timestamp,unix_ts,value\r\n"
-            if first_ts is None or last_ts is None:
-                return
-            rows = cleanup.iter_raw_rows(
-                DATA_DIR,
-                index,
-                entity_id,
-                first_ts,
-                last_ts + 1,
-                TZ,
-                max_rows=MAX_EXPORT_ROWS,
-            )
-            for ts, value in rows:
-                timestamp = datetime.fromtimestamp(ts, TZ).strftime("%Y-%m-%d %H:%M:%S")
-                yield f"{timestamp},{ts:.3f},{value}\r\n"
-
-    filename = f"{entity_id}.csv"
-    return StreamingResponse(
-        generate(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
 
 
 # Spalten der Entitäten-Tabelle jenseits von Favorit-Stern und Entität
@@ -5684,6 +5554,10 @@ app.include_router(_import_service.router())
 # hereingereichten Funktionen bleiben bewusst hier: sie werden auch vom
 # Hintergrund-Scheduler und von der Einstellungsseite gebraucht (siehe
 # Modul-Docstring in housekeeping_routes.py).
+app.include_router(create_export_router(ExportDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
+    visible_row_count=_visible_row_count, paginate_meta=_paginate_meta,
+)))
 app.include_router(create_marked_values_router(MarkedValuesDependencies(
     index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
     invalidate_purge_preview=_background.invalidate_purge_preview,
