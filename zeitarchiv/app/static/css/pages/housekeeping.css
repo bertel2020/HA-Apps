@@ -207,7 +207,7 @@
 .hk-col-cd-last{width:168px;}
 .hk-col-cd-verdict{width:196px;}
 .hk-col-cd-action{width:172px;}
-#zaehlerrueckgaenge .cd-num,#zaehlerrueckgaenge .cd-action{text-align:right;}
+#zaehlerrueckgaenge .cd-num{text-align:right;}
 /* Sammelaktion „Fehlwerte markieren“ über der Tabelle und der Hinweis danach. */
 .counter-bulk,.counter-result{
   display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;
