@@ -28,6 +28,7 @@ internals for developers are in the other documents of this folder (see
   - [Costs, standing charge and missing prices](#costs-standing-charge-and-missing-prices)
   - [Setting retention correctly](#setting-retention-correctly)
   - [Energy flow and consumer groups](#energy-flow-and-consumer-groups)
+  - [Devices behind a sub-meter](#devices-behind-a-sub-meter)
   - [Key figures, rings and badges](#key-figures-rings-and-badges)
   - [Status, data quality and anomalies](#status-data-quality-and-anomalies)
   - [Daily load profile](#daily-load-profile)
@@ -521,6 +522,30 @@ groups, you can additionally switch in the role assignment under **"Consumer
 shares" → "Show by group"** whether the table shows each consumer
 individually or grouped (one row per group, ungrouped devices stay
 individual).
+
+### Devices behind a sub-meter
+
+If several devices hang behind a **sub-meter** (e.g. a distribution board for
+the workshop), add the sub-meter like any other consumer and assign the devices
+to it in the respective consumer under **“Behind sub-meter”**. The sub-meter
+already counts its devices, so the balance (baseload, consumption,
+self-sufficiency, daily load profile) only counts the sub-meter itself, never
+its devices on top.
+
+- **Energy flow:** central node → sub-meter → its devices and the **rest**
+  (“Workshop, other consumers” = meter minus devices, never negative).
+- **Consumer shares:** the sub-meter is a row with its devices and the rest
+  indented below it; shares refer to the total consumption, the total and the
+  costs only count the top level. The donut shows the individual devices, not
+  the sub-meter on top.
+- **One level only:** a consumer that has devices itself cannot hang behind
+  another. A device has either a group or a sub-meter; the sub-meter itself may
+  be in a group.
+- **Removing:** if you remove a sub-meter, its devices stay as separate
+  consumers.
+- **Check:** if the devices add up to more than the sub-meter (measurement
+  error or wrong assignment), the status reports **“Sub-meter plausible”** with
+  the values; the node then shows the sum of the devices.
 
 ### Key figures, rings and badges
 

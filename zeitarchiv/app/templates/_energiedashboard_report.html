@@ -319,14 +319,17 @@
         {% set total_kwh = namespace(v=0) %}
         {% set total_kosten = namespace(v=0) %}
         {% for item in current.verbraucher_breakdown %}
-        <tr>
-          <td>{{ item.name }}</td>
+        {# Geräte hinter einem Zwischenzähler (item.parent) stehen eingerückt unter ihm und zählen nicht in die Summe: sein Wert enthält sie schon. #}
+        <tr{% if item.parent %} class="report-child"{% endif %}>
+          <td{% if item.parent %} style="padding-left:22px;"{% endif %}>{{ item.name }}</td>
           <td>{{ item.value | format_value(1) }}</td>
           <td>{{ item.share | format_value(0) if item.share is not none else "–" }} %</td>
           {% if show_kosten_col %}<td>{{ item.kosten | format_money if item.kosten is not none else "–" }}</td>{% endif %}
         </tr>
+        {% if not item.parent %}
         {% set total_kwh.v = total_kwh.v + item.value %}
         {% if item.kosten is not none %}{% set total_kosten.v = total_kosten.v + item.kosten %}{% endif %}
+        {% endif %}
         {% endfor %}
         <tr class="total">
           <td>{{ _("Gesamt") }}</td>

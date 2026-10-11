@@ -571,6 +571,12 @@
      fett — Verbraucher mit Entität sind anklickbar (öffnet entities/…),
      Grundlast bleibt reiner Text ohne Link. */
   .edash-share-link{font-weight:600;color:inherit;}
+  /* Zwischenzähler: Geräte und Rest eingerückt unter ihm. Der Rest ist schwächer und kursiv, weil er kein
+     gemessenes Gerät ist, sondern Zähler minus Geräte. */
+  .edash-share-table tr.edash-share-child td.label{padding-left:30px;}
+  .edash-share-table tr.edash-share-child td:not(.label){color:var(--ink-muted);}
+  .edash-share-table tr.edash-share-rest td.label{font-style:italic;color:var(--ink-muted);}
+  .edash-share-table tr.edash-share-meter td.label .edash-share-link,.edash-share-table tr.edash-share-meter td.label span{font-weight:600;}
   /* white-space:nowrap zusätzlich zum bestehenden text-align:right — ohne
      das brach "100 %"/Währungswerte bei schmalerer Kartenbreite (z. B. mit
      der neuen Kosten-Spalte) mitten im Wert auf zwei Zeilen um, während die
@@ -604,6 +610,8 @@
        und bricht erst um, wenn er wirklich zu lang ist. */
     table.edash-share-table td.label{position:relative;padding-left:20px;}
     .edash-share-table .edash-share-dot{position:absolute;left:6px;top:0;bottom:0;margin:auto 0;width:8px;height:8px;}
+    .edash-share-table tr.edash-share-child td.label{padding-left:30px;}
+    .edash-share-table tr.edash-share-child .edash-share-dot{left:16px;}
   }
   /* Mobil: flex-basis (220px) ausschalten, sonst gewinnt sie gegen
      width:100% und der Donut hängt 220px breit links in der Kachel. Als
@@ -1106,3 +1114,6 @@
      Eingabefeld wird dadurch breiter als die Namensfelder darüber statt mit
      ihnen bündig abzuschließen. */
   .edash-gruppen-add .edash-setup-add{flex:none;width:128px;justify-content:center;}
+
+  /* Setup: Geräte hinter einem Zwischenzähler wirken etwas zurückgenommen. */
+  .edash-item-tile.is-child .edash-item-accent{opacity:.5;}

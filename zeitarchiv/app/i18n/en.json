@@ -488,7 +488,6 @@
     "Nutzbare Gesamtkapazität, nur nötig für die kWh-Anzeige. Entität hat Vorrang, Wh wird automatisch umgerechnet.": "Usable total capacity, only needed for the kWh display. An entity takes precedence; Wh is converted automatically.",
     "Speicher entfernen": "Remove storage",
     "Gruppen": "Groups",
-    "Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität\") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen.": "Any number of individually recorded consumers, e.g. wallbox or heat pump. Via a group (e.g. “Mobility”) several of them can be combined into one node in the energy flow.",
     "Keine Gruppe": "No group",
     "Verbraucher-Entität": "Consumer entity",
     "Zähler „von diesem Verbraucher verbrauchte Energie\" (kWh, steigend).": "Counter “energy consumed by this consumer” (kWh, increasing).",
@@ -2410,7 +2409,18 @@
     "Häufige Ursache: Die Preis-Entität hat zu lange keinen Wert gemeldet. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen.": "Common cause: the price entity has not reported a value for too long. For a helper that rarely changes, set gap detection to “Off” in the entity’s settings.",
     "Details im Status": "Details in the status",
     "{label}: Für {menge} {einheit} ({anteil} %) liegt kein Preis vor, die Kosten sind deshalb zu niedrig.": "{label}: no price for {menge} {einheit} ({anteil} %), so the costs are too low.",
-    "{symbol}/Monat": "{symbol}/month"
+    "{symbol}/Monat": "{symbol}/month",
+    "Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität\") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen. Hängen Geräte hinter einem Zwischenzähler, ordnest du sie ihm im jeweiligen Verbraucher zu.": "Any number of individually recorded consumers, e.g. wallbox or heat pump. Via a group (e.g. “Mobility”) several of them can be combined into one node in the energy flow. If devices hang behind a sub-meter, assign them to it in the respective consumer.",
+    "Hängt hinter Zwischenzähler": "Behind sub-meter",
+    "Zwischenzähler": "Sub-meter",
+    "Noch kein anderer Verbraucher mit Entität — zuerst den Zwischenzähler als Verbraucher anlegen.": "No other consumer with an entity yet — first add the sub-meter as a consumer.",
+    "Optional — für Geräte, die an einem Zwischenzähler hängen. Der Zwischenzähler ist selbst ein Verbraucher und zählt seine Geräte schon mit; sie erscheinen im Energiefluss dahinter, zusammen mit dem Rest (Zähler minus Geräte). Nur eine Ebene.": "Optional — for devices connected to a sub-meter. The sub-meter is itself a consumer and already counts its devices; they appear behind it in the energy flow, together with the rest (meter minus devices). One level only.",
+    "{name}, übrige Verbraucher": "{name}, other consumers",
+    "Zwischenzähler plausibel": "Sub-meter plausible",
+    "{name}: Die Geräte ({kinder} kWh) liegen über dem Zwischenzähler ({zaehler} kWh). Zähler oder Zuordnung prüfen.": "{name}: The devices ({kinder} kWh) are above the sub-meter ({zaehler} kWh). Check the meter or the assignment.",
+    "Ein Verbraucher kann nicht hinter sich selbst hängen.": "A consumer cannot hang behind itself.",
+    "Der Zwischenzähler „{name}“ ist kein Verbraucher in dieser Liste.": "The sub-meter “{name}” is not a consumer in this list.",
+    "„{name}“ hängt selbst hinter einem Zwischenzähler und kann keiner sein. Es ist nur eine Ebene möglich.": "“{name}” itself hangs behind a sub-meter and cannot be one. Only one level is possible."
   },
   "js": {
     "Meldungen": "Notices",
@@ -2854,6 +2864,13 @@
     "{monat} / Monat, {tage} Tage": "{monat} / month, {tage} days",
     "nicht vollständig": "incomplete",
     "{label}: Für {menge} {einheit} ({anteil} %) liegt kein Preis vor, die Kosten sind deshalb zu niedrig.": "{label}: no price for {menge} {einheit} ({anteil} %), so the costs are too low.",
-    "Preis fehlt für einen Teil der Energie, die Kosten sind zu niedrig.": "Price missing for part of the energy, so the costs are too low."
+    "Preis fehlt für einen Teil der Energie, die Kosten sind zu niedrig.": "Price missing for part of the energy, so the costs are too low.",
+    "Zwischenzähler · 1 Gerät": "Sub-meter · 1 device",
+    "Zwischenzähler · {count} Geräte": "Sub-meter · {count} devices",
+    "hinter {name}": "behind {name}",
+    "Kein Zwischenzähler": "No sub-meter",
+    "Dieser Verbraucher ist selbst Zwischenzähler (1 Gerät) und kann nirgends dahinterhängen.": "This consumer is itself a sub-meter (1 device) and cannot hang behind another.",
+    "Dieser Verbraucher ist selbst Zwischenzähler ({count} Geräte) und kann nirgends dahinterhängen.": "This consumer is itself a sub-meter ({count} devices) and cannot hang behind another.",
+    "Die {count} Geräte dahinter bleiben als eigene Verbraucher erhalten.": "The {count} devices behind it stay as separate consumers."
   }
 }

@@ -28,6 +28,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Kosten, Grundpreis und fehlende Preise](#kosten-grundpreis-und-fehlende-preise)
   - [Aufbewahrung richtig einstellen](#aufbewahrung-richtig-einstellen)
   - [Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
+  - [Geräte hinter einem Zwischenzähler](#geräte-hinter-einem-zwischenzähler)
   - [Kennzahlen, Ringe und Badges](#kennzahlen-ringe-und-badges)
   - [Status, Datenqualität und Auffälligkeiten](#status-datenqualität-und-auffälligkeiten)
   - [Tageslastprofil](#tageslastprofil)
@@ -563,6 +564,30 @@ angelegt hat, kann zusätzlich in der Rollenzuordnung unter
 **„Verbraucheranteile" → „Nach Gruppe anzeigen"** umschalten, ob die Tabelle
 jeden Verbraucher einzeln oder gruppiert (eine Zeile je Gruppe, ungruppierte
 Geräte bleiben einzeln) zeigt.
+
+### Geräte hinter einem Zwischenzähler
+
+Hängen mehrere Geräte hinter einem **Zwischenzähler** (z. B. einer Unterverteilung
+für die Werkstatt), legst du den Zwischenzähler wie jeden anderen Verbraucher an
+und ordnest die Geräte ihm im jeweiligen Verbraucher unter **„Hängt hinter
+Zwischenzähler“** zu. Der Zwischenzähler zählt seine Geräte schon mit — deshalb
+zählt in der Bilanz (Grundlast, Verbrauch, Autarkie, Tageslastprofil) nur er
+selbst, nie zusätzlich seine Geräte.
+
+- **Energiefluss:** Zentraler Knoten → Zwischenzähler → seine Geräte und der
+  **Rest** („Werkstatt, übrige Verbraucher“ = Zähler minus Geräte, nie negativ).
+- **Verbraucheranteile:** Der Zwischenzähler steht als Zeile mit seinen Geräten
+  und dem Rest eingerückt darunter; Anteile beziehen sich auf den gesamten
+  Verbrauch, Summe und Kosten zählen nur die oberste Ebene. Der Donut zeigt die
+  einzelnen Geräte, nicht den Zwischenzähler zusätzlich.
+- **Nur eine Ebene:** Ein Verbraucher, der selbst Geräte hat, kann nirgends
+  dahinterhängen. Ein Gerät hat entweder eine Gruppe oder einen Zwischenzähler;
+  der Zwischenzähler selbst darf in einer Gruppe sein.
+- **Entfernen:** Entfernst du einen Zwischenzähler, bleiben seine Geräte als
+  eigene Verbraucher erhalten.
+- **Prüfung:** Zählen die Geräte zusammen mehr als der Zwischenzähler
+  (Messfehler oder falsche Zuordnung), meldet der Status **„Zwischenzähler
+  plausibel“** mit den Werten; der Knoten zeigt dann die Summe der Geräte.
 
 ### Kennzahlen, Ringe und Badges
 

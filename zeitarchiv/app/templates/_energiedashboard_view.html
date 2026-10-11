@@ -632,9 +632,10 @@
               <thead><tr><th>{{ _("Verbraucher") }}</th><th>{{ _("kWh") }}</th><th>{{ _("Anteil") }}</th><th x-show="verbraucherHasKosten">{{ _("Kosten") }}</th></tr></thead>
               <tbody>
                 <template x-for="(item, idx) in visibleVerbraucherBreakdown()" :key="item.name">
-                  <tr @mouseenter="highlightShare(item.name)" @mouseleave="unhighlightShare(item.name)">
+                  <tr :class="{'edash-share-child': item.parent, 'edash-share-rest': item.rest, 'edash-share-meter': item.kind === 'meter'}"
+                      @mouseenter="item.kind !== 'meter' && highlightShare(item.name)" @mouseleave="item.kind !== 'meter' && unhighlightShare(item.name)">
                     <td class="label">
-                      <span class="edash-share-dot" :style="{background: shareColor(idx)}"></span>
+                      <span class="edash-share-dot" x-show="item.kind !== 'meter'" :style="{background: leafColor(item)}"></span>
                       <a x-show="item.entity_id" class="edash-share-link" :href="'entities/' + encodeURIComponent(item.entity_id || '')" x-text="item.name"></a>
                       <span x-show="!item.entity_id" x-text="item.name"></span>
                     </td>

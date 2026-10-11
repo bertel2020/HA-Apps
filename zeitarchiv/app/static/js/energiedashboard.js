@@ -648,6 +648,17 @@
         return cssVar(SHARE_COLORS[idx % SHARE_COLORS.length]);
       },
 
+      // Zwischenzähler (kind 'meter') haben in der Tabelle eine Zeile mit eingerückten Geräten, der Donut zeigt
+      // dagegen nur die Blätter: sonst stünde der Zähler neben seinen eigenen Geräten, und die Segmente
+      // ergäben mehr als den Verbrauch. Farbe und Hover hängen deshalb am Index unter den Blättern.
+      get verbraucherLeaves() {
+        return this.verbraucherBreakdown.filter((i) => i.kind !== 'meter');
+      },
+      leafColor(item) {
+        const idx = this.verbraucherLeaves.findIndex((i) => i.name === item.name);
+        return idx === -1 ? 'transparent' : this.shareColor(idx);
+      },
+
       // Kosten-Spalte in der Verbraucheranteile-Tabelle nur einblenden, wenn
       // ein Netzbezug-Preis konfiguriert ist (siehe kosten in compute_flow) —
       // sonst ist item.kosten bei jeder Zeile null.
@@ -656,7 +667,8 @@
       },
       verbraucherKostenTotal() {
         if (!this.verbraucherHasKosten) return null;
-        return this.verbraucherBreakdown.reduce((sum, i) => sum + (i.kosten || 0), 0);
+        // Nur die oberste Ebene: die Geräte hinter einem Zwischenzähler sind in dessen Kosten schon enthalten.
+        return this.verbraucherBreakdown.filter((i) => !i.parent).reduce((sum, i) => sum + (i.kosten || 0), 0);
       },
 
       // Nur die Tabelle deckelt sich (siehe verbraucherExpanded oben) — der
@@ -740,7 +752,7 @@
           this.speicherSocNowBreakdown = data.speicher_soc_now_breakdown || [];
           this.anomalien = data.anomalien || [];
           this.renderChart(data);
-          this.renderShareChart(this.verbraucherBreakdown);
+          this.renderShareChart(this.verbraucherLeaves);
           this.renderVersorgungChart(this.versorgungBreakdown);
           this.renderSparklines(data.kpi_series || {});
         } catch (e) {

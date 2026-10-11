@@ -377,6 +377,47 @@ def _is_enabled(index: Index) -> bool:
     return index.get_setting(SETTING_ENABLED, "0") == "1"
 
 
+def _check_cascade(rows: list[dict]) -> None:
+    """Ablehnen, was die Oberfläche gar nicht anbietet: Zeiger auf sich selbst, auf einen
+    unbekannten Verbraucher oder auf ein Gerät, das selbst hinter einem Zwischenzähler hängt."""
+    ids = {row["entity_id"] for row in rows}
+    parent_of = {row["entity_id"]: row["parent"] for row in rows if row.get("parent")}
+    for entity_id, parent in parent_of.items():
+        if parent == entity_id:
+            raise HTTPException(status_code=422, detail=tr("Ein Verbraucher kann nicht hinter sich selbst hängen."))
+        if parent not in ids:
+            raise HTTPException(status_code=422, detail=tr("Der Zwischenzähler „{name}“ ist kein Verbraucher in dieser Liste.", name=parent))
+        if parent in parent_of:
+            raise HTTPException(
+                status_code=422,
+                detail=tr("„{name}“ hängt selbst hinter einem Zwischenzähler und kann keiner sein. Es ist nur eine Ebene möglich.", name=parent),
+            )
+
+
+def cascade_structure(rows: list[dict]) -> tuple[dict[str, list[dict]], set[str]]:
+    """Zwischenzähler-Kaskade der Verbraucher: (Kinder je Zwischenzähler, Entity-IDs der Kinder).
+
+    Ein Verbraucher kann über ``parent`` (Entity-ID eines anderen Verbrauchers) hinter einem
+    Zwischenzähler hängen. Es gilt genau EINE Ebene: Ein Verbraucher, der selbst Kinder hat,
+    gilt nie als Kind. Ein unbekannter Zeiger oder einer auf sich selbst wird ignoriert, der
+    Verbraucher bleibt dann eigenständig. Die Reihenfolge der Kinder ist die der Konfiguration."""
+    ids = {row["entity_id"] for row in rows if row.get("entity_id")}
+    parent_of: dict[str, str] = {}
+    for row in rows:
+        entity_id = row.get("entity_id")
+        parent = (row.get("parent") or "").strip()
+        if entity_id and parent and parent != entity_id and parent in ids:
+            parent_of[entity_id] = parent
+    parents = set(parent_of.values())
+    child_ids = {entity_id for entity_id in parent_of if entity_id not in parents}
+    children: dict[str, list[dict]] = {}
+    for row in rows:
+        entity_id = row.get("entity_id")
+        if entity_id in child_ids:
+            children.setdefault(parent_of[entity_id], []).append(row)
+    return children, child_ids
+
+
 def _is_configured(config: dict) -> bool:
     return bool(config.get("netzbezug"))
 
@@ -1623,14 +1664,13 @@ class EnergieDashboardService:
             gruppe_name_cfg = (verbraucher.get("gruppe") or "").strip()
             if gruppe_name_cfg:
                 gruppen_mitglieder[gruppe_name_cfg] = gruppen_mitglieder.get(gruppe_name_cfg, 0) + 1
-        for verbraucher in config.get("verbraucher") or []:
-            entity_id = verbraucher.get("entity_id")
-            if not entity_id:
-                continue
-            name = self._display_name(entity_id, verbraucher.get("name", ""))
-            gruppe = (verbraucher.get("gruppe") or "").strip() or None
-            if gruppe and gruppen_mitglieder.get(gruppe, 0) < 2:
-                gruppe = None
+        verbraucher_rows = config.get("verbraucher") or []
+        kinder_je_zaehler, kind_ids = cascade_structure(verbraucher_rows)
+        zaehler_ueberschreitung: list[tuple[str, float, float]] = []
+
+        def build_row(verbraucher: dict, name: str, gruppe: str | None, blend: bool) -> tuple:
+            """Serie, Wert und Sankey-Knoten EINES Verbrauchers samt Auffälligkeits-Prüfung."""
+            entity_id = verbraucher["entity_id"]
             series, stale = entity_series(entity_id)
             val = self._series_total(series)
             display_val = max(val, 0.0)
@@ -1646,10 +1686,10 @@ class EnergieDashboardService:
                 # wenig wie für eine Gruppe. Ohne dieses Flag hing die Farbe
                 # eines Geräts davon ab, ob es zufällig gruppiert ist — eine
                 # reine Darstellungsfrage hätte damit die Bedeutung der Farbe
-                # bestimmt. Innerhalb einer Gruppe (Gruppe -> Gerät) bleibt es
-                # beim normalen Verlaufs-Farbton, dort trägt bereits die Bahn
-                # Bus -> Gruppe den Mischton.
-                **({"blend": True} if gruppe is None else {}),
+                # bestimmt. Innerhalb einer Gruppe (Gruppe -> Gerät) oder hinter
+                # einem Zwischenzähler bleibt es beim normalen Verlaufs-Farbton,
+                # dort trägt bereits die Bahn davor den Mischton.
+                **({"blend": True} if blend else {}),
             }
             if anomalie_active:
                 # Baseline == 0 (Gerät lief in keiner der Vergleichsperioden)
@@ -1669,6 +1709,59 @@ class EnergieDashboardService:
                             "name": name, "value": round(display_val, 3),
                             "baseline": round(baseline, 3), "pct": pct,
                         })
+            add_stale_issue(name, stale)
+            return series, val, display_val, node
+
+        for verbraucher in verbraucher_rows:
+            entity_id = verbraucher.get("entity_id")
+            if not entity_id or entity_id in kind_ids:
+                continue  # Kinder entstehen unten, innerhalb ihres Zwischenzählers
+            name = self._display_name(entity_id, verbraucher.get("name", ""))
+            gruppe = (verbraucher.get("gruppe") or "").strip() or None
+            if gruppe and gruppen_mitglieder.get(gruppe, 0) < 2:
+                gruppe = None
+            series, val, display_val, node = build_row(verbraucher, name, gruppe, blend=gruppe is None)
+            kinder = kinder_je_zaehler.get(entity_id, [])
+            kind_eintraege: list[dict] = []
+            if kinder:
+                # Zwischenzähler: sein Wert enthält die Geräte dahinter bereits. Für die Bilanz zählt
+                # nur er selbst (unten verbraucher_sum += val), die Kinder sind Aufschlüsselung.
+                # Der Rest ist Zähler minus Geräte, je Bucket auf 0 gekappt wie die Grundlast.
+                kinder_summe = 0.0
+                kinder_serien: list[dict[float, float]] = []
+                for kind in kinder:
+                    kind_name = self._display_name(kind["entity_id"], kind.get("name", ""))
+                    kind_series, kind_val, kind_display, kind_node = build_row(kind, kind_name, None, blend=False)
+                    links.append({"source": name, "target": kind_name, "value": kind_display})
+                    kind_eintraege.append({
+                        "name": kind_name, "value": round(kind_display, 3), "entity_id": kind["entity_id"],
+                        "parent": name,
+                    })
+                    nodes.append(kind_node)
+                    verbraucher_series_by_name[kind_name] = kind_series
+                    kinder_summe += kind_display
+                    kinder_serien.append(kind_series)
+                if kinder_summe > display_val + 0.05:
+                    zaehler_ueberschreitung.append((name, round(kinder_summe, 2), round(display_val, 2)))
+                    display_val = kinder_summe
+                    node["value"] = display_val
+                rest = max(display_val - kinder_summe, 0.0)
+                rest_name = tr("{name}, übrige Verbraucher", name=name)
+                rest_series = {
+                    ts: max(value, 0.0)
+                    for ts, value in self._series_merge(
+                        series, *kinder_serien, factors=[1.0] + [-1.0] * len(kinder_serien)
+                    ).items()
+                }
+                if rest > 0:
+                    nodes.append({"name": rest_name, "role": "sink", "value": round(rest, 3)})
+                    links.append({"source": name, "target": rest_name, "value": round(rest, 3)})
+                kind_eintraege.sort(key=lambda item: item["value"], reverse=True)
+                if rest > 0:
+                    kind_eintraege.append({
+                        "name": rest_name, "value": round(rest, 3), "parent": name, "rest": True,
+                    })
+                verbraucher_series_by_name[rest_name] = rest_series
             nodes.append(node)
             if gruppe:
                 links.append({"source": gruppe, "target": name, "value": display_val})
@@ -1680,9 +1773,10 @@ class EnergieDashboardService:
             verbraucher_series_list.append(series)
             verbraucher_breakdown.append({
                 "name": name, "value": round(display_val, 3), "entity_id": entity_id, "gruppe": gruppe,
+                **({"kind": "meter"} if kinder else {}),
             })
+            verbraucher_breakdown.extend(kind_eintraege)
             verbraucher_series_by_name[name] = series
-            add_stale_issue(name, stale)
         if config.get("verbraucheranteile_gruppieren"):
             # Verbraucheranteile-Tabelle/-Donut optional nach Gruppe statt je
             # Einzelgerät — dieselbe (bereits auf >=2 Mitglieder gefilterte)
@@ -1695,7 +1789,14 @@ class EnergieDashboardService:
             grouped_series: dict[str, list[dict[float, float]]] = {}
             grouped_order: list[str] = []
             ungrouped_breakdown: list[dict] = []
+            # Ein Zwischenzähler in einer Gruppe geht samt Wert in die Gruppenzeile ein; seine Geräte
+            # und der Rest würden daneben als verwaiste Zeilen stehen und doppelt zählen.
+            gruppierte_zaehler = {
+                item["name"] for item in verbraucher_breakdown if item.get("kind") == "meter" and item.get("gruppe")
+            }
             for item in verbraucher_breakdown:
+                if item.get("parent") in gruppierte_zaehler:
+                    continue
                 gruppe_name = item.get("gruppe")
                 if not gruppe_name:
                     ungrouped_breakdown.append(item)
@@ -1806,7 +1907,17 @@ class EnergieDashboardService:
         verbraucher_breakdown.append({"name": "Grundlast", "value": round(grundlast_display, 3)})
         for item in verbraucher_breakdown:
             item["share"] = round(item["value"] / verbrauch_total * 100, 1) if verbrauch_total > 0 else None
-        verbraucher_breakdown.sort(key=lambda item: item["value"], reverse=True)
+        # Oberste Ebene nach Wert; hinter einem Zwischenzähler stehen seine Geräte (Wert absteigend) und
+        # zuletzt der Rest, genau in der Reihenfolge, in der sie berechnet wurden.
+        all_breakdown_children = [item for item in verbraucher_breakdown if item.get("parent")]
+        oberste = [item for item in verbraucher_breakdown if not item.get("parent")]
+        oberste.sort(key=lambda item: item["value"], reverse=True)
+        verbraucher_breakdown = []
+        for item in oberste:
+            verbraucher_breakdown.append(item)
+            verbraucher_breakdown.extend(
+                kind for kind in all_breakdown_children if kind.get("parent") == item["name"]
+            )
 
         # Versorgungsanteile: Pendant zu Verbraucheranteile für die
         # Angebotsseite — Erzeuger bleiben mit ihrem VOLLEN Ertrag stehen
@@ -2282,6 +2393,18 @@ class EnergieDashboardService:
                     + ", ".join(speicher_entladen_exceeds_names)
                 ),
             })
+        if zaehler_ueberschreitung:
+            quality_checks.append({
+                "label": tr("Zwischenzähler plausibel"),
+                "ok": False,
+                "detail": " ".join(
+                    tr(
+                        "{name}: Die Geräte ({kinder} kWh) liegen über dem Zwischenzähler ({zaehler} kWh). Zähler oder Zuordnung prüfen.",
+                        name=name, kinder=kinder, zaehler=zaehler,
+                    )
+                    for name, kinder, zaehler in zaehler_ueberschreitung
+                ),
+            })
         quality_plausible = all(check["ok"] for check in quality_checks)
 
         return {
@@ -2720,10 +2843,12 @@ class EnergieDashboardService:
             self._series_merge(*speicher_entladen_series_list) if speicher_entladen_series_list else {}
         )
         speicher_laden_series = self._series_merge(*speicher_laden_series_list) if speicher_laden_series_list else {}
+        # Nur die oberste Ebene: Geräte hinter einem Zwischenzähler sind in dessen Wert schon enthalten.
+        _kinder, kind_ids = cascade_structure(config.get("verbraucher") or [])
         verbraucher_series_list = [
             hourly(verbraucher.get("entity_id"))
             for verbraucher in (config.get("verbraucher") or [])
-            if verbraucher.get("entity_id")
+            if verbraucher.get("entity_id") and verbraucher["entity_id"] not in kind_ids
         ]
         einspeisung_series = hourly(config.get("einspeisung"))
 
@@ -2924,6 +3049,7 @@ class EnergieDashboardService:
             verbraucher_entity_id: list[str] = Form([]),
             verbraucher_name: list[str] = Form([]),
             verbraucher_gruppe: list[str] = Form([]),
+            verbraucher_parent: list[str] = Form([]),
             verbraucher_gruppen: list[str] = Form([]),
             preis_netzbezug: str = Form(""),
             preis_einspeisung: str = Form(""),
@@ -2953,7 +3079,10 @@ class EnergieDashboardService:
             if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
                 raise HTTPException(status_code=422, detail=tr("Ungültige Auffälligkeiten-Schwelle"))
 
-            def pairs(entity_ids: list[str], names: list[str], gruppen: list[str] | None = None) -> list[dict]:
+            def pairs(
+                entity_ids: list[str], names: list[str], gruppen: list[str] | None = None,
+                parents: list[str] | None = None,
+            ) -> list[dict]:
                 # Reihen ohne gewählte Entität (z. B. eine per "+ hinzufügen"
                 # angelegte, dann leer gelassene Zeile) werden stillschweigend
                 # übersprungen statt einer leeren Rolle gespeichert zu werden.
@@ -2971,6 +3100,13 @@ class EnergieDashboardService:
                     }
                     if gruppen is not None:
                         row["gruppe"] = (gruppen[idx] if idx < len(gruppen) else "").strip() or None
+                    if parents is not None:
+                        # Zwischenzähler (Entity-ID eines anderen Verbrauchers); ein Gerät hat ENTWEDER
+                        # eine Gruppe oder einen Zwischenzähler, damit der Energiefluss eindeutig bleibt.
+                        parent = (parents[idx] if idx < len(parents) else "").strip()
+                        if parent:
+                            row["parent"] = parent
+                            row["gruppe"] = None
                     rows.append(row)
                 return rows
 
@@ -3069,6 +3205,8 @@ class EnergieDashboardService:
                     "morgen_entity_id": prognose_morgen_entity_id.strip() or None,
                 }
 
+            verbraucher_rows = pairs(verbraucher_entity_id, verbraucher_name, verbraucher_gruppe, verbraucher_parent)
+            _check_cascade(verbraucher_rows)
             config = {
                 "hub_name": hub_name.strip() or None,
                 "netzbezug": netzbezug.strip(),
@@ -3077,7 +3215,7 @@ class EnergieDashboardService:
                 "einspeisung_name": einspeisung_name.strip() or None,
                 "erzeuger": pairs(erzeuger_entity_id, erzeuger_name),
                 "speicher": speicher,
-                "verbraucher": pairs(verbraucher_entity_id, verbraucher_name, verbraucher_gruppe),
+                "verbraucher": verbraucher_rows,
                 # dict.fromkeys() statt set() — entfernt Duplikate (z. B. wenn
                 # eine Gruppe angelegt, aber nie einem Verbraucher zugewiesen
                 # wurde und trotzdem zusätzlich noch im Verwalten-Popup

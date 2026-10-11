@@ -260,9 +260,13 @@
   async removeRow(list, idx, row, kind) {
     const name = row && row.name;
     const label = t(kind);
-    const message = name ? t("{kind} „{name}“ wirklich entfernen?", {kind: label, name}) : t("{kind} wirklich entfernen?", {kind: label});
+    let message = name ? t("{kind} „{name}“ wirklich entfernen?", {kind: label, name}) : t("{kind} wirklich entfernen?", {kind: label});
+    const kinder = list === this.verbraucher ? this.childCount(row) : 0;
+    if (kinder) message += " " + t("Die {count} Geräte dahinter bleiben als eigene Verbraucher erhalten.", {count: kinder});
     const ok = await window.appConfirm(message, {danger: true, confirmLabel: t("Entfernen")});
-    if (ok) list.splice(idx, 1);
+    if (!ok) return;
+    if (kinder) this.verbraucher.forEach(v => { if (v.parent === row.entity_id) v.parent = ""; });
+    list.splice(idx, 1);
   },
   // +-Kachel legt eine neue (leere) Zeile an, befüllt draftRow direkt damit
   // und öffnet ihr Popup — Felder darin gehen wie bei jeder Zeile zunächst
@@ -285,9 +289,39 @@
     this.activePopup = key;
     this.$nextTick(() => openEdashDialog("edash-dlg-sp-" + key));
   },
+  // Zwischenzähler: Ein Verbraucher kann hinter einem anderen hängen (row.parent = Entity-ID des Zählers).
+  // Es gibt genau eine Ebene: wer selbst Geräte hat, hängt nirgends, und ein Gerät hat Gruppe ODER Zähler.
+  childCount(row) {
+    return row.entity_id ? this.verbraucher.filter(v => v.parent && v.parent === row.entity_id).length : 0;
+  },
+  parentCandidates(row) {
+    return this.verbraucher.filter(v => v._key !== row._key && v.entity_id && v.entity_id !== row.entity_id && !v.parent);
+  },
+  parentLabel(entityId) {
+    const hit = this.verbraucher.find(v => v.entity_id === entityId);
+    return hit ? (hit.name || this.nameFor(entityId)) : this.nameFor(entityId);
+  },
+  // Übernehmen im Verbraucher-Popup: schreibt den Entwurf zurück, zieht die Geräte mit, wenn sich die Entität eines
+  // Zwischenzählers ändert, und stellt ein Gerät in der Liste direkt hinter seinen Zähler.
+  applyVerbraucher(row, draft) {
+    const oldId = row.entity_id;
+    Object.assign(row, draft);
+    if (oldId && oldId !== row.entity_id) this.verbraucher.forEach(v => { if (v.parent === oldId) v.parent = row.entity_id; });
+    if (row.parent) {
+      row.gruppe = "";
+      const from = this.verbraucher.findIndex(v => v._key === row._key);
+      if (from !== -1) {
+        this.verbraucher.splice(from, 1);
+        let at = this.verbraucher.findIndex(v => v.entity_id === row.parent);
+        if (at === -1) { this.verbraucher.splice(from, 0, row); return; }
+        while (at + 1 < this.verbraucher.length && this.verbraucher[at + 1].parent === row.parent) at++;
+        this.verbraucher.splice(at + 1, 0, row);
+      }
+    }
+  },
   addVerbraucher() {
     const key = "v" + Date.now() + Math.random();
-    const row = {entity_id: "", name: "", gruppe: "", _key: key};
+    const row = {entity_id: "", name: "", gruppe: "", parent: "", _key: key};
     this.verbraucher.push(row);
     this.draftRow = {...row};
     this.activePopup = key;
@@ -653,11 +687,11 @@
         <h2 class="settings-section-title">{{ _("Verbraucher") }}</h2>
         <button type="button" class="btn edash-manage-groups-btn" @click="openEdashDialog($refs.gruppenDialog)">{{ _("Gruppen") }}</button>
       </div>
-      <p class="settings-section-description">{{ _('Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen.') }}</p>
+      <p class="settings-section-description">{{ _('Beliebig viele einzeln erfasste Verbraucher, z. B. Wallbox oder Wärmepumpe. Über eine Gruppe (z. B. „Mobilität") lassen sich mehrere davon im Energiefluss zu einem gemeinsamen Knoten zusammenfassen. Hängen Geräte hinter einem Zwischenzähler, ordnest du sie ihm im jeweiligen Verbraucher zu.') }}</p>
       <div class="edash-item-grid">
         <template x-for="(row, idx) in verbraucher" :key="row._key">
           <div style="display:contents">
-            <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === verbraucher && dragOverIdx === idx && dragIdx !== idx}"
+            <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === verbraucher && dragOverIdx === idx && dragIdx !== idx, 'is-child': row.parent}"
                     @dragover.prevent="dragOver(verbraucher, idx)" @drop.prevent="dragDrop(verbraucher, idx)"
                     @click="draftRow = {...row}; activePopup = row._key; openEdashDialog('edash-dlg-vb-' + row._key)">
               <div class="edash-item-accent" style="background:var(--chart-7);"></div>
@@ -670,7 +704,9 @@
                 </div>
                 <div class="edash-item-bottom">
                   <span class="edash-item-chip" x-show="row.gruppe" x-text="row.gruppe"></span>
-                  <span class="edash-item-chip edash-item-chip-empty" x-show="!row.gruppe">{{ _("Keine Gruppe") }}</span>
+                  <span class="edash-item-chip" x-show="childCount(row) > 0" x-text="childCount(row) === 1 ? t('Zwischenzähler · 1 Gerät') : t('Zwischenzähler · {count} Geräte', {count: childCount(row)})"></span>
+                  <span class="edash-item-chip" x-show="row.parent" x-text="t('hinter {name}', {name: parentLabel(row.parent)})"></span>
+                  <span class="edash-item-chip edash-item-chip-empty" x-show="!row.gruppe && !row.parent && childCount(row) === 0">{{ _("Keine Gruppe") }}</span>
                   <span class="edash-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
                 </div>
               </div>
@@ -689,7 +725,26 @@
                       {{ entity_field('verbraucher_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
                       {% call hint_body() %}{{ _('Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
-                    <div class="field">
+                    <div class="field" x-data="{open: false}" @click.outside="open = false">
+                      <label>{{ _("Hängt hinter Zwischenzähler") }} {{ hint_button(_('Zwischenzähler')) }}</label>
+                      <p class="hint hint-status" x-show="childCount(row) > 0" x-text="childCount(row) === 1 ? t('Dieser Verbraucher ist selbst Zwischenzähler (1 Gerät) und kann nirgends dahinterhängen.') : t('Dieser Verbraucher ist selbst Zwischenzähler ({count} Geräte) und kann nirgends dahinterhängen.', {count: childCount(row)})"></p>
+                      <span class="dd-picker-wrap" x-show="childCount(row) === 0">
+                        <button type="button" class="btn" :class="{'dd-picker-btn-clearable': draftRow.parent}"
+                                @click="open = !open" x-text="draftRow.parent ? parentLabel(draftRow.parent) : t('Kein Zwischenzähler')"></button>
+                        <button type="button" class="dd-picker-clear" x-show="draftRow.parent" x-cloak
+                                @click.stop="draftRow.parent = ''" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
+                        <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:220px;overflow-y:auto;">
+                          <template x-for="c in parentCandidates(row)" :key="c._key">
+                            <div class="dd-picker-row" :class="{active: draftRow.parent === c.entity_id}" @click="draftRow.parent = c.entity_id; draftRow.gruppe = ''; open = false">
+                              <span x-text="c.name || nameFor(c.entity_id)"></span>
+                            </div>
+                          </template>
+                          <p class="hint hint-status" x-show="!parentCandidates(row).length" style="padding:5px 4px;margin:0;">{{ _("Noch kein anderer Verbraucher mit Entität — zuerst den Zwischenzähler als Verbraucher anlegen.") }}</p>
+                        </div>
+                      </span>
+                      {% call hint_body() %}{{ _("Optional — für Geräte, die an einem Zwischenzähler hängen. Der Zwischenzähler ist selbst ein Verbraucher und zählt seine Geräte schon mit; sie erscheinen im Energiefluss dahinter, zusammen mit dem Rest (Zähler minus Geräte). Nur eine Ebene.") }}{% endcall %}
+                    </div>
+                    <div class="field" x-show="!draftRow.parent">
                       <label>{{ _("Gruppe") }} {{ hint_button(_('Gruppe')) }}</label>
                       {{ group_field('verbraucher_gruppe_draft', 'draftRow.gruppe', "(name) => { draftRow.gruppe = name; }") }}
                       {% call hint_body() %}{{ _("Optional — fasst mehrere Verbraucher im Energiefluss zu einem gemeinsamen Knoten zusammen.") }}{% endcall %}
@@ -697,7 +752,7 @@
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
                     <button type="button" class="btn btn-danger" @click="removeRow(verbraucher, idx, row, t('Verbraucher'))">{{ _("Verbraucher entfernen") }}</button>
-                    <button type="button" class="btn primary" @click="Object.assign(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
+                    <button type="button" class="btn primary" @click="applyVerbraucher(row, draftRow); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
                   </div>
                 </div>
               </template>
@@ -714,6 +769,7 @@
           <input type="hidden" name="verbraucher_name" :value="row.name">
           <input type="hidden" name="verbraucher_entity_id" :value="row.entity_id">
           <input type="hidden" name="verbraucher_gruppe" :value="row.gruppe">
+          <input type="hidden" name="verbraucher_parent" :value="row.parent || ''">
         </span>
       </template>
       <template x-for="g in gruppen" :key="'hidden-' + g">
