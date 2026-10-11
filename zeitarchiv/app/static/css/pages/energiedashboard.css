@@ -89,8 +89,8 @@
   .edash-cost-gap-note p{margin:0;}
   .edash-cost-gap-note p + p{margin-top:4px;}
   .edash-cost-gap-note a{color:inherit;text-decoration:underline;white-space:nowrap;}
-  .edash-price-advice{
-    margin:10px 0 0;padding:9px 12px;border-radius:8px;border-left:3px solid var(--accent-line);
+  .settings-panel .edash-price-advice{
+    margin:14px 0 0;padding:9px 12px;border-radius:8px;border-left:3px solid var(--accent-line);
     background:var(--accent-line-soft);color:var(--ink);line-height:1.5;
   }
 
