@@ -2420,7 +2420,11 @@
     "{name}: Die Geräte ({kinder} kWh) liegen über dem Zwischenzähler ({zaehler} kWh). Zähler oder Zuordnung prüfen.": "{name}: The devices ({kinder} kWh) are above the sub-meter ({zaehler} kWh). Check the meter or the assignment.",
     "Ein Verbraucher kann nicht hinter sich selbst hängen.": "A consumer cannot hang behind itself.",
     "Der Zwischenzähler „{name}“ ist kein Verbraucher in dieser Liste.": "The sub-meter “{name}” is not a consumer in this list.",
-    "„{name}“ hängt selbst hinter einem Zwischenzähler und kann keiner sein. Es ist nur eine Ebene möglich.": "“{name}” itself hangs behind a sub-meter and cannot be one. Only one level is possible."
+    "„{name}“ hängt selbst hinter einem Zwischenzähler und kann keiner sein. Es ist nur eine Ebene möglich.": "“{name}” itself hangs behind a sub-meter and cannot be one. Only one level is possible.",
+    "Demo Werkstatt Zwischenzähler": "Demo Workshop Sub-meter",
+    "Demo Werkstatt Kompressor Energie": "Demo Workshop Compressor Energy",
+    "Demo Werkstatt Licht Energie": "Demo Workshop Lighting Energy",
+    "Demo Werkstatt Ladestation Energie": "Demo Workshop Charging Station Energy"
   },
   "js": {
     "Meldungen": "Notices",

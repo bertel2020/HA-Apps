@@ -1,5 +1,82 @@
 # Changelog
 
+## 1.5.0 - 2026-10-11
+
+### Neu
+
+- **Energiedashboard: Geräte hinter einem Zwischenzähler**. Ein Verbraucher
+  kann jetzt hinter einem anderen Verbraucher hängen (Dialog „Hängt hinter
+  Zwischenzähler“, eine Ebene). Nichts wird doppelt gezählt: Verbrauch,
+  Grundlast und Autarkie rechnen mit dem Zwischenzähler, die Geräte
+  schlüsseln ihn auf. Was der Zähler mehr misst als seine Geräte, erscheint als
+  „… übrige Verbraucher“. Sankey, Verbraucheranteile, Diagramm und
+  Energiebericht zeigen die Geräte unter ihrem Zähler; zählen die Geräte mehr
+  als der Zähler, meldet der Status das. Entfernst du einen Zwischenzähler,
+  bleiben seine Geräte als eigene Verbraucher erhalten.
+- **Energiedashboard: Grundpreis** in Euro pro Monat, als Entität oder fester
+  Wert. Er wird tageweise anteilig berechnet, fließt ins Saldo ein und hat eine
+  eigene Kachel in der Kostenanalyse und im Bericht.
+- **Fehlende Preise sind sichtbar**: Fehlt für einen Teil des Zeitraums ein
+  Preis (Arbeitspreis, Einspeisevergütung, Grundpreis), zeigt die Kostenkachel
+  ein Warnsymbol, die betroffenen Kacheln sind gelb markiert, und ein Hinweis
+  nennt den Anteil. Der Bericht enthält eine entsprechende Zeile.
+- Beim Einrichten der Preise empfiehlt ein Hinweis eine Entität oder einen
+  Helfer: So bleiben frühere Monate bei einem Tarifwechsel richtig, ein fester
+  Wert gilt rückwirkend.
+
+### Geändert
+
+- Die Liste der Netzwerkspeicher beim externen Backup-Ziel ist einklappbar;
+  nicht eingebundene Ordner stehen getrennt darunter.
+- Preis-Entitäten, deren Lückenerkennung auf „Aus“ steht, gelten nicht mehr als
+  veraltet, weil sie sich nur bei Änderungen melden.
+
+### Behoben
+
+- Ein selten geänderter Preis-Helfer (z. B. „Zahl“) galt im laufenden Monat nur
+  ab heute; der Rest des Monats stand ohne Preis da. Der zuletzt gesetzte Preis
+  gilt jetzt auch für den Monatsanfang.
+
+---
+
+### English
+
+#### New
+
+- **Energy dashboard: devices behind a sub-meter**. A consumer can now be
+  attached behind another consumer (“Behind sub-meter” in the dialog,
+  one level). Nothing is counted twice: consumption, base load and
+  self-sufficiency use the sub-meter, and the devices break it down. Whatever
+  the meter measures beyond its devices appears as “… other consumers”. Sankey,
+  consumer shares, chart and energy report show the devices under their
+  meter; if the devices count more than the meter, the status says so. If you
+  remove a sub-meter, its devices are kept as separate consumers.
+- **Energy dashboard: standing charge** in euros per month, as an entity or a
+  fixed value. It is calculated pro rata per day, is part of the balance and has
+  its own tile in the cost analysis and in the report.
+- **Missing prices are visible**: If a price (energy price, feed-in tariff,
+  standing charge) is missing for part of the period, the cost tile shows a
+  warning symbol, the affected tiles are outlined in yellow, and a note gives
+  the share. The report has a matching line.
+- When setting up prices, a note recommends an entity or helper: earlier
+  months stay correct after a tariff change, while a fixed value applies
+  retroactively.
+
+#### Changed
+
+- The list of network shares for the external backup target can be collapsed;
+  shares that are not mounted are shown separately below.
+- Price entities whose gap detection is set to “Off” are no longer considered
+  stale, since they only report changes.
+
+#### Fixed
+
+- A rarely changing price helper (e.g. “Number”) only applied from today in the
+  current month; the rest of the month had no price. The last set price now
+  also applies to the start of the month.
+
+---
+
 ## 1.4.0 - 2026-10-11
 
 ### Neu
