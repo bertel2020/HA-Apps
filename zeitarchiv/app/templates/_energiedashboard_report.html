@@ -209,7 +209,7 @@
   </div>
   {% endif %}
 
-  {% if config.show_kostenanalyse and (current.kpi.netzbezug_cost is not none or current.kpi.co2_ausstoss is not none) %}
+  {% if config.show_kostenanalyse and (current.kpi.netzbezug_cost is not none or current.kpi.grundpreis_cost is not none or current.kpi.co2_ausstoss is not none) %}
   <div class="section">
     <div class="section-title">
       <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2"/><path d="M14.5 9 a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2" fill="none" stroke-linecap="round"/><line x1="12" y1="6" x2="12" y2="18" stroke="var(--accent-bar)" stroke-width="1.4" stroke-linecap="round" opacity=".6"/></svg></span>
@@ -221,6 +221,9 @@
         {% if current.kpi.netzbezug_cost is not none %}
         <div class="stat-line"><span>{{ config.netzbezug_name or _("Netzbezug") }}</span><strong>{{ current.kpi.netzbezug_cost | format_money }}</strong></div>
         {% endif %}
+        {% if current.kpi.grundpreis_cost is not none %}
+        <div class="stat-line"><span>{{ _("Grundpreis") }}</span><strong>{{ current.kpi.grundpreis_cost | format_money }}</strong></div>
+        {% endif %}
         {% if current.kpi.einspeisung_revenue is not none %}
         <div class="stat-line"><span>{{ config.einspeisung_name or _("Einspeisung") }}</span><strong>{{ current.kpi.einspeisung_revenue | format_money }}</strong></div>
         {% endif %}
@@ -230,6 +233,9 @@
         {% if current.kpi.vermiedene_kosten is not none %}
         <div class="stat-line"><span>{{ _("Vermiedene Kosten (Eigenverbrauch)") }}</span><strong>{{ current.kpi.vermiedene_kosten | format_money }}</strong></div>
         {% endif %}
+        {% for gap in current.kpi.kosten_luecke %}
+        <div class="stat-subnote">{{ _("{label}: Für {menge} {einheit} ({anteil} %) liegt kein Preis vor, die Kosten sind deshalb zu niedrig.", label=gap.label, menge=(gap.menge | format_value(1)), einheit=gap.einheit, anteil=gap.anteil) }}</div>
+        {% endfor %}
         {% if current.kpi.net_cost is not none %}
         <div class="stat-total {{ 'is-surplus' if current.kpi.net_cost < 0 else 'is-cost' }}">
           <span>{{ _("Saldo &#8213; {v1}", v1=(_("gespart") if current.kpi.net_cost < 0 else _("Kosten"))) }}</span>

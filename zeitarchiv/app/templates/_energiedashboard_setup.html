@@ -135,6 +135,7 @@
      Undefined|tojson wirft eine TypeError (500 auf der ganzen Setup-Seite,
      ausgerechnet für Bestandskonfigurationen ohne dieses neue Feld). #}
   kostenEigenverbrauchEntity: {{ (config.kosten.get('preis_eigenverbrauch') if config.kosten else '') | tojson }},
+  kostenGrundpreisEntity: {{ (config.kosten.get('grundpreis') if config.kosten else '') | tojson }},
   prognoseHeute: {{ (config.prognose.rest_heute_entity_id if config.prognose else '') | tojson }},
   prognoseMorgen: {{ (config.prognose.morgen_entity_id if config.prognose else '') | tojson }},
   co2Entity: {{ (config.co2.faktor_netzbezug_entity if config.co2 else '') | tojson }},
@@ -144,6 +145,9 @@
   kostenEinspeisungFixed: {{ ((ke * 100) if ke is not none else none) | tojson }},
   {% set kev = config.kosten.get('preis_eigenverbrauch_fixed') if config.kosten else none %}
   kostenEigenverbrauchFixed: {{ ((kev * 100) if kev is not none else none) | tojson }},
+  {# Der Grundpreis steht in der Währung selbst (je Monat), nicht in Cent: kein ×100. #}
+  {% set kg = config.kosten.get('grundpreis_fixed') if config.kosten else none %}
+  kostenGrundpreisFixed: {{ kg | tojson }},
   co2Fixed: {{ (config.co2.faktor_netzbezug_fixed if config.co2 and config.co2.faktor_netzbezug_fixed is not none else none) | tojson }},
   // Entwurf für die Einzelrollen-Popups (Netz/Kosten/Prognose/CO2): beim
   // Öffnen einer Kachel wird der AKTUELLE Stand hierher kopiert, alle
@@ -745,6 +749,18 @@
             </div>
           </div>
         </button>
+        <button type="button" class="edash-item-tile" @click="draft.kostenGrundpreisEntity = kostenGrundpreisEntity; activePopup = 'kosten-grundpreis'; openEdashDialog('edash-dlg-kosten-grundpreis')">
+          <div class="edash-item-accent edash-item-accent-neutral"></div>
+          <div class="edash-item-body">
+            <div class="edash-item-head">
+              <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="var(--ink-faint)" stroke-width="2"/><line x1="4" y1="10" x2="20" y2="10" stroke="var(--ink-faint)" stroke-width="2"/><line x1="9" y1="3" x2="9" y2="7" stroke="var(--ink-faint)" stroke-width="2" stroke-linecap="round"/><line x1="15" y1="3" x2="15" y2="7" stroke="var(--ink-faint)" stroke-width="2" stroke-linecap="round"/></svg></span>
+              <span class="edash-item-name">{{ _("Grundpreis") }}</span>
+            </div>
+            <div class="edash-item-bottom">
+              <span class="edash-item-meta" :class="{'is-empty': !kostenGrundpreisEntity && kostenGrundpreisFixed === null}" x-text="priceLabel(kostenGrundpreisEntity, kostenGrundpreisFixed, '{{ _("{symbol}/Monat", symbol=currency_info.symbol) }}')"></span>
+            </div>
+          </div>
+        </button>
         {# Eigenverbrauchsvergütung: nur für den seltenen Fall einer echten
            Zahlung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — anders
            als die beiden Pflicht-/Standardfelder oben deshalb als eigens zu
@@ -808,6 +824,7 @@
                 {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', currency_subunit_short ~ '/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
               {% call hint_body() %}{{ _("Preis in {subunit}/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten.", subunit=currency_subunit) }}{% endcall %}
+              <p class="hint edash-price-advice">{{ _("Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Jeder Wert gilt ab seinem Zeitpunkt, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen — sonst fehlt der Preis, sobald der letzte Wert länger zurückliegt.") }}</p>
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="kostenBezugEntity = draft.kostenBezugEntity; kostenBezugFixed = readFixedInput('preis_netzbezug_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
@@ -831,6 +848,7 @@
                 {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', currency_subunit_short ~ '/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
               {% call hint_body() %}{{ _("Vergütung in {subunit}/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös.", subunit=currency_subunit) }}{% endcall %}
+              <p class="hint edash-price-advice">{{ _("Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Jeder Wert gilt ab seinem Zeitpunkt, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen — sonst fehlt der Preis, sobald der letzte Wert länger zurückliegt.") }}</p>
             </div>
             <div class="edash-dialog-footer">
               <button type="button" class="btn primary" @click="kostenEinspeisungEntity = draft.kostenEinspeisungEntity; kostenEinspeisungFixed = readFixedInput('preis_einspeisung_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
@@ -839,6 +857,32 @@
         </template>
         <input type="hidden" name="preis_einspeisung" :value="kostenEinspeisungEntity">
         <input type="hidden" id="preis_einspeisung_fixed_real" name="preis_einspeisung_fixed" value="{{ (ke_fixed * 100) if ke_fixed is not none else '' }}">
+      </dialog>
+      <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-grundpreis" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+        <div class="detail-dialog-header">
+          <h2>{{ _("Grundpreis") }}</h2>
+          <button type="button" class="btn" onclick="document.getElementById('edash-dlg-kosten-grundpreis').close()" aria-label="{{ _('Schließen') }}">✕</button>
+        </div>
+        {% set kg_fixed = config.kosten.get('grundpreis_fixed') if config.kosten else none %}
+        <template x-if="activePopup === 'kosten-grundpreis'">
+          <div>
+            <div class="field">
+              <label>{{ _("Grundpreis") }} {{ hint_button(_('Grundpreis')) }}</label>
+              {% call entity_field('grundpreis_draft', 'draft.kostenGrundpreisEntity', "(id) => { draft.kostenGrundpreisEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
+                {{ number_field('grundpreis_fixed_draft', kg_fixed, '', 'x-show="!entityId" oninput="document.getElementById(\'grundpreis_fixed_real\').value = event.target.value"', _("{symbol}/Monat", symbol=currency_info.symbol), 'edash-price-fixed-input') }}
+              {% endcall %}
+              {% call hint_body() %}{{ _("Fester Betrag für den Stromanschluss in {symbol} pro Monat. Das Dashboard rechnet ihn tageweise auf den gewählten Zeitraum um (Monatswert × 12 ÷ 365 je Tag) und weist ihn getrennt vom Arbeitspreis aus.", symbol=currency_info.symbol) }}{% endcall %}
+              <p class="hint edash-price-advice">{{ _("Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Der Wert gilt bis zur nächsten Änderung, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume.") }}</p>
+            </div>
+            <div class="edash-dialog-footer" style="justify-content:space-between;">
+              <button type="button" class="btn btn-danger" x-show="kostenGrundpreisEntity || kostenGrundpreisFixed !== null"
+                      @click="kostenGrundpreisEntity = ''; kostenGrundpreisFixed = null; document.getElementById('grundpreis_fixed_real').value = ''; $el.closest('dialog').close();">{{ _("Feld deaktivieren") }}</button>
+              <button type="button" class="btn primary" @click="kostenGrundpreisEntity = draft.kostenGrundpreisEntity; kostenGrundpreisFixed = readFixedInput('grundpreis_fixed_real'); $el.closest('dialog').close();">{{ _("Übernehmen") }}</button>
+            </div>
+          </div>
+        </template>
+        <input type="hidden" name="grundpreis" :value="kostenGrundpreisEntity">
+        <input type="hidden" id="grundpreis_fixed_real" name="grundpreis_fixed" value="{{ kg_fixed if kg_fixed is not none else '' }}">
       </dialog>
       <dialog class="detail-dialog edash-item-dialog" id="edash-dlg-kosten-eigenverbrauch" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">

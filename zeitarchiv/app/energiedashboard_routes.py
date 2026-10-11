@@ -35,6 +35,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import formats
 from .formatting import entity_display_name
+from .limits import MAX_RAW_QUERY_POINTS
 from .progress import JobProgress
 from .storage import cleanup as cleanup_mod
 from .storage import query as query_mod
@@ -545,11 +546,16 @@ class EnergieDashboardService:
         if not continuous and offset == 0 and finer_range and series:
             # Letzten (noch laufenden) Bucket durch die feinere Aufschlüsselung
             # desselben Zeitraums ersetzen (siehe _FINER_RANGE oben).
-            del series[max(series)]
             finer_result = query_mod.query_series(
                 self.deps.data_dir, self.deps.index, entity_id, finer_range,
                 self.deps.tz, now, offset=0, read_cache=read_cache,
             )
+            # Nur ersetzen, was die feinere Abfrage auch abdeckt. Ein Wert, der sich nur
+            # selten ändert (Tarif-Helfer), hat im Monat nur den Randpunkt am Fensteranfang;
+            # ihn zu löschen ließe den Preis erst ab heute gelten, und der ganze Rest des
+            # Monats stünde ohne Preis da.
+            if max(series) >= finer_result["window_start"]:
+                del series[max(series)]
             for point in finer_result["points"]:
                 series[point["ts"]] = point["value"] or 0.0
         entity = self.deps.index.get_entity(entity_id)
@@ -1138,6 +1144,51 @@ class EnergieDashboardService:
                 previous_value = value
         return reset_labels, fully_checked
 
+    def _grundpreis_zustand(
+        self, entity_id: str, window_start: datetime, window_end: datetime, now: datetime,
+        read_cache: query_mod.QueryReadCache, fallback: Callable[[], dict[float, float]],
+    ) -> dict[float, float]:
+        """Zeitpunkt -> Wert der Grundpreis-Entität: der letzte Rohwert vor dem Fenster plus
+        alle Rohwerte darin. Die Bucket-Serie von _entity_series() taugt dafür nicht: Ein
+        Helfer, der sich nur bei Änderungen meldet, hätte im Monat nur einen Randpunkt, und
+        der laufende Bucket wird dort durch die feinere Auflösung ersetzt (Randpunkt weg).
+        Meldet die Entität so oft, dass die Rohwerte das Abfragelimit sprengen (kein Helfer,
+        sondern ein Sensor), bleibt die Bucket-Serie als Ersatz."""
+        tz = self.deps.tz
+        start_ts = window_start.timestamp()
+        zustand: dict[float, float] = {}
+        vorher = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
+            self.deps.data_dir, entity_id, start_ts, tz, read_cache
+        )
+        if vorher is not None:
+            zustand[start_ts] = vorher
+        try:
+            for ts, value in cleanup_mod.iter_raw_rows(
+                self.deps.data_dir, self.deps.index, entity_id, start_ts, min(window_end, now).timestamp(), tz,
+                now=now, max_rows=MAX_RAW_QUERY_POINTS, hot_rows_loader=read_cache.read_hot_rows,
+            ):
+                zustand[ts] = value
+        except cleanup_mod.ResultLimitExceeded:
+            return fallback()
+        return zustand
+
+    def _grundpreis_tage(self, window_start: datetime, window_end: datetime, now: datetime) -> list[tuple[float, float, float]]:
+        """(Beginn, Ende des Abschnitts, Anteil an einem Tag) je lokalem Kalendertag im Zeitraum,
+        bis höchstens `now`. Ein angebrochener Tag zählt anteilig nach Sekunden (Tage mit
+        Zeitumstellung sind 23 bzw. 25 Stunden lang und zählen trotzdem als ein ganzer Tag)."""
+        tz = self.deps.tz
+        ende = min(window_end, now)
+        result: list[tuple[float, float, float]] = []
+        tag = window_start.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        while tag < ende:
+            naechster = (tag + timedelta(days=1, hours=3)).replace(hour=0, minute=0, second=0, microsecond=0)
+            start = max(tag, window_start)
+            stop = min(naechster, ende)
+            if stop > start:
+                result.append((start.timestamp(), stop.timestamp(), (stop - start).total_seconds() / (naechster - tag).total_seconds()))
+            tag = naechster
+        return result
+
     def compute_flow(
         self, config: dict, range_key: str, offset: int, continuous: bool = False, skip_quality: bool = False,
         read_cache: query_mod.QueryReadCache | None = None,
@@ -1168,7 +1219,7 @@ class EnergieDashboardService:
         nodes: list[dict] = []
         links: list[dict] = []
         stale_labels: list[str] = []
-        factor_gap_entries: list[tuple[str, float, int]] = []
+        factor_gap_entries: list[tuple[str, float, int, str]] = []
 
         def _carry_limit(entity_id: str, stuetzstellen: list[float]) -> float | None:
             """Wie lange ein Faktorwert fortgeschrieben werden darf, in Sekunden.
@@ -1200,8 +1251,12 @@ class EnergieDashboardService:
             minuten = int(schwelle) if str(schwelle).isdigit() else 15
             return max(float(minuten) * 60.0, takt)
 
-        def add_factor_gap(label: str, ohne_faktor: float, gesamt: float) -> None:
-            """Merkt sich Energie, für die kein Preis/Faktor gilt.
+        def _gap_detection_off(entity_id: str) -> bool:
+            entity = self.deps.index.get_entity(entity_id)
+            return bool(entity) and entity["gap_threshold"] == "off"
+
+        def add_factor_gap(label: str, ohne_faktor: float, gesamt: float, unit: str = "kWh") -> None:
+            """Merkt sich Energie (beim Grundpreis: Tage), für die kein Preis/Faktor gilt.
 
             Vorher verschwand sie stillschweigend aus der Summe. Gemeldet wird
             erst ab einem Prozent, damit ein einzelner Bucket am
@@ -1213,7 +1268,7 @@ class EnergieDashboardService:
             anteil = ohne_faktor / gesamt
             if anteil < 0.01:
                 return
-            eintrag = (label, round(ohne_faktor, 2), round(anteil * 100))
+            eintrag = (label, round(ohne_faktor, 2), round(anteil * 100), unit)
             if eintrag not in factor_gap_entries:
                 factor_gap_entries.append(eintrag)
 
@@ -1823,6 +1878,8 @@ class EnergieDashboardService:
         einspeisung_revenue = None
         vermiedene_kosten = None
         eigenverbrauch_verguetung = None
+        grundpreis_cost = None
+        grundpreis_info = None
         co2_ausstoss = None
         co2_vermieden = None
         if not (continuous or skip_quality):
@@ -1842,7 +1899,10 @@ class EnergieDashboardService:
                 # in g/kWh — hier keine weitere Umrechnung nötig.
                 if factor_entity_id:
                     factor_series, stale = entity_series(factor_entity_id)
-                    add_stale_issue(label, stale)
+                    # Lückenerkennung "Aus" heißt: die Entität meldet sich nur bei
+                    # Änderungen (typisch: ein Helfer mit dem Tarif). Dass sie seit
+                    # Tagen nichts gesendet hat, ist dann kein Zeichen für einen Ausfall.
+                    add_stale_issue(label, stale and not _gap_detection_off(factor_entity_id))
                     if not factor_series:
                         return None
                     # Der Faktor wird als ZUSTAND ausgewertet, nicht über
@@ -1940,6 +2000,49 @@ class EnergieDashboardService:
                 if eigenverbrauch_verguetung is not None:
                     eigenverbrauch_verguetung = round(eigenverbrauch_verguetung, 2)
 
+            # Grundpreis: €/Monat, tageweise anteilig (Monatswert × 12 / 365 je Tag).
+            # Im laufenden Zeitraum zählt nur die bisher verstrichene Zeit. Eine
+            # Entität gilt als Zustand: der zuletzt bekannte Wert zu Beginn des
+            # Tagesabschnitts (genauer: bis zu dessen Ende), OHNE Fortschreib-Grenze — ein Grundpreis gilt bis
+            # zur nächsten Änderung, ein Helfer meldet sich nur dann. Fehlt der
+            # Wert (noch kein Eintrag vor dem Abschnitt), wird der Abschnitt nicht
+            # angesetzt und als Lücke in Tagen gemeldet.
+            if kosten.get("grundpreis") or kosten.get("grundpreis_fixed") is not None:
+                tage = self._grundpreis_tage(window_start, window_end, now)
+                gesamt_tage = sum(weight for _start, _ende, weight in tage)
+                entity_id_gp = kosten.get("grundpreis")
+                stuetzstellen_gp: list[float] = []
+                werte_gp: dict[float, float] = {}
+                if entity_id_gp:
+                    werte_gp = self._grundpreis_zustand(
+                        entity_id_gp, window_start, window_end, now, read_cache, lambda: entity_series(entity_id_gp)[0]
+                    )
+                    stuetzstellen_gp = sorted(werte_gp)
+                summe_gp = 0.0
+                ohne_wert = 0.0
+                monatswerte: list[float] = []
+                for _start_ts, ende_ts, weight in tage:
+                    if entity_id_gp:
+                        # Der letzte VOR dem Ende des Abschnitts bekannte Wert: ein Wert, der im
+                        # Lauf des Tages gesetzt wurde, gilt für diesen Tag (sonst wäre schon
+                        # der erste Tag nach der Einrichtung eine Lücke).
+                        stelle = bisect.bisect_left(stuetzstellen_gp, ende_ts) - 1
+                        if stelle < 0:
+                            ohne_wert += weight
+                            continue
+                        monat = werte_gp[stuetzstellen_gp[stelle]]
+                    else:
+                        monat = kosten["grundpreis_fixed"]
+                    monatswerte.append(monat)
+                    summe_gp += weight * monat * 12.0 / 365.0
+                add_factor_gap(tr("Grundpreis"), ohne_wert, gesamt_tage, tr("Tage"))
+                if monatswerte or not entity_id_gp:
+                    grundpreis_cost = round(summe_gp, 2)
+                grundpreis_info = {
+                    "tage": round(gesamt_tage - ohne_wert, 1),
+                    "monat": round(monatswerte[-1], 2) if monatswerte else None,
+                }
+
             # CO2-Bilanz: dieselbe Faktor×Energie-Logik wie Kosten, aber ein
             # einziger Faktor (g CO2/kWh) für den bezogenen Netzstrom — PV und
             # Speicher gelten als emissionsfrei, brauchen also keinen eigenen
@@ -1978,10 +2081,36 @@ class EnergieDashboardService:
         # Einspeisung Erlös) — "Einsparung"/vermiedene_kosten bewusst nicht
         # (rein rechnerischer Vergleichswert, siehe Kommentar dort).
         net_cost = (
-            round((netzbezug_cost or 0.0) - (einspeisung_revenue or 0.0) - (eigenverbrauch_verguetung or 0.0), 2)
-            if netzbezug_cost is not None or einspeisung_revenue is not None or eigenverbrauch_verguetung is not None
+            round(
+                (netzbezug_cost or 0.0) + (grundpreis_cost or 0.0)
+                - (einspeisung_revenue or 0.0) - (eigenverbrauch_verguetung or 0.0),
+                2,
+            )
+            if netzbezug_cost is not None or einspeisung_revenue is not None
+            or eigenverbrauch_verguetung is not None or grundpreis_cost is not None
             else None
         )
+        # Lücken, die die KOSTEN betreffen (nicht den CO2-Faktor): Chip, Hero-Zeile und
+        # Kostenanalyse zeigen daran, dass der Betrag zu niedrig ist.
+        # Derselbe Preis wird mehrfach verrechnet (Netzbezug, Einsparung, je Verbraucher);
+        # ein Eintrag je Preis genügt, und der erste ist der des eigentlichen Betrags.
+        # "key" ordnet die Lücke der betroffenen Kachel zu (Kostenanalyse im Dashboard).
+        kosten_luecke: list[dict] = []
+        kosten_schluessel = {
+            "Preis Netzbezug": ("netzbezug", tr("Netzbezug-Preis")),
+            "Preis Einspeisung": ("einspeisung", tr("Einspeisevergütung")),
+            tr("Vergütung Eigenverbrauch"): ("eigenverbrauch", tr("Vergütung Eigenverbrauch")),
+            tr("Grundpreis"): ("grundpreis", tr("Grundpreis")),
+        }
+        for label, menge, anteil, einheit in factor_gap_entries:
+            if label not in kosten_schluessel:
+                continue  # CO2-Faktor: betrifft nicht die Kosten
+            schluessel, anzeige = kosten_schluessel[label]
+            if any(eintrag["key"] == schluessel for eintrag in kosten_luecke):
+                continue
+            kosten_luecke.append(
+                {"key": schluessel, "label": anzeige, "menge": menge, "anteil": anteil, "einheit": einheit}
+            )
 
         # Metadaten-/Zählerrückgang-Prüfungen nur für die tatsächlich
         # angezeigte Periode — energiedashboard_data ruft compute_flow()
@@ -2087,8 +2216,8 @@ class EnergieDashboardService:
                 "detail": (
                     tr("Ohne gültigen Wert: ")
                     + ", ".join(
-                        f"{bezeichnung} ({menge} kWh, {anteil} %)"
-                        for bezeichnung, menge, anteil in factor_gap_entries
+                        f"{bezeichnung} ({menge} {einheit}, {anteil} %)"
+                        for bezeichnung, menge, anteil, einheit in factor_gap_entries
                     )
                     if factor_gap_entries
                     else tr("Für die gesamte Energie liegt ein Preis bzw. CO2-Faktor vor.")
@@ -2204,6 +2333,9 @@ class EnergieDashboardService:
                 "einspeisung_revenue": einspeisung_revenue,
                 "vermiedene_kosten": vermiedene_kosten,
                 "eigenverbrauch_verguetung": eigenverbrauch_verguetung,
+                "grundpreis_cost": grundpreis_cost,
+                "grundpreis_info": grundpreis_info,
+                "kosten_luecke": kosten_luecke,
                 "net_cost": net_cost,
                 "co2_ausstoss": co2_ausstoss,
                 "co2_vermieden": co2_vermieden,
@@ -2799,6 +2931,8 @@ class EnergieDashboardService:
             preis_netzbezug_fixed: str = Form(""),
             preis_einspeisung_fixed: str = Form(""),
             preis_eigenverbrauch_fixed: str = Form(""),
+            grundpreis: str = Form(""),
+            grundpreis_fixed: str = Form(""),
             co2_faktor_netzbezug_entity: str = Form(""),
             co2_faktor_netzbezug_fixed: str = Form(""),
             prognose_rest_heute_entity_id: str = Form(""),
@@ -2895,8 +3029,11 @@ class EnergieDashboardService:
             preis_netzbezug_fixed_val = _cent_to_euro(preis_netzbezug_fixed)
             preis_einspeisung_fixed_val = _cent_to_euro(preis_einspeisung_fixed)
             preis_eigenverbrauch_fixed_val = _cent_to_euro(preis_eigenverbrauch_fixed)
+            # Der Grundpreis steht dagegen in der Währung selbst (€ je Monat), nicht in Cent.
+            grundpreis_fixed_val = _parse_float(grundpreis_fixed)
             if (
                 preis_netzbezug.strip() or preis_einspeisung.strip() or preis_eigenverbrauch.strip()
+                or grundpreis.strip() or grundpreis_fixed_val is not None
                 or preis_netzbezug_fixed_val is not None
                 or preis_einspeisung_fixed_val is not None
                 or preis_eigenverbrauch_fixed_val is not None
@@ -2908,6 +3045,8 @@ class EnergieDashboardService:
                     "preis_netzbezug_fixed": preis_netzbezug_fixed_val,
                     "preis_einspeisung_fixed": preis_einspeisung_fixed_val,
                     "preis_eigenverbrauch_fixed": preis_eigenverbrauch_fixed_val,
+                    "grundpreis": grundpreis.strip() or None,
+                    "grundpreis_fixed": grundpreis_fixed_val,
                 }
 
             # CO2-Faktor wird — anders als der Preis — direkt in g/kWh

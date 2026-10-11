@@ -503,6 +503,18 @@
       // Erfolgstext für die Saldo-Kachel im Kostenanalyse-Dialog, analog zum
       // CO2-Pendant oben — nur bei negativem Saldo (Einspeisung-Erlös
       // überwiegt die Netzbezug-Kosten).
+      // Kosten ohne Preis für einen Teil der Energie (bzw. Tage beim Grundpreis): der Betrag
+      // ist dann zu niedrig. Chip, Hero-Zeile und Kostenanalyse zeigen das an (siehe
+      // kosten_luecke in compute_flow).
+      costGaps() {
+        return this.kpi.kosten_luecke || [];
+      },
+      costGap(key) {
+        return this.costGaps().find(g => g.key === key) || null;
+      },
+      costGapHint() {
+        return t('Preis fehlt für einen Teil der Energie, die Kosten sind zu niedrig.');
+      },
       costWinText() {
         return this.kpi.net_cost != null && this.kpi.net_cost < 0 ? t('💶 Mehr erlöst als bezahlt!') : '';
       },

@@ -75,6 +75,24 @@
     color:var(--positive);
   }
   .edash-cost-badge.is-surplus:hover{border-color:var(--positive);}
+  /* Warndreieck hinter dem Betrag, wenn für einen Teil der Energie kein Preis vorliegt. */
+  .edash-cost-warn-wrap{display:inline-flex;align-items:center;color:var(--warning);}
+  .edash-cost-warn{flex:none;}
+  .edash-kpi.is-gap{border-color:var(--warning);}
+  .edash-kpi-gap{font-size:calc(11.5px * var(--font-scale, 1));color:var(--warning);margin-top:2px;line-height:1.35;}
+  .edash-cost-gap-note{
+    display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:8px;
+    background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning);
+    font-size:calc(13px * var(--font-scale, 1));line-height:1.5;
+  }
+  .edash-cost-gap-note svg{flex:none;margin-top:2px;}
+  .edash-cost-gap-note p{margin:0;}
+  .edash-cost-gap-note p + p{margin-top:4px;}
+  .edash-cost-gap-note a{color:inherit;text-decoration:underline;white-space:nowrap;}
+  .edash-price-advice{
+    margin:10px 0 0;padding:9px 12px;border-radius:8px;border-left:3px solid var(--accent-line);
+    background:var(--accent-line-soft);color:var(--ink);line-height:1.5;
+  }
 
   .edash-setup-cta{
     border:1px dashed var(--border-strong);border-radius:14px;background:var(--surface);

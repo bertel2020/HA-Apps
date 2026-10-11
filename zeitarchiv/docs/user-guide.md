@@ -25,6 +25,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Energiedashboard](#energiedashboard)
   - [Einrichtung](#einrichtung)
   - [Benötigte und sinnvolle Entitäten](#benötigte-und-sinnvolle-entitäten)
+  - [Kosten, Grundpreis und fehlende Preise](#kosten-grundpreis-und-fehlende-preise)
   - [Aufbewahrung richtig einstellen](#aufbewahrung-richtig-einstellen)
   - [Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
   - [Kennzahlen, Ringe und Badges](#kennzahlen-ringe-und-badges)
@@ -448,6 +449,7 @@ eingerichtet werden, was nicht ohnehin schon in Zeitarchiv ankommt.
 | Speicher: Kapazität | nein | Gesamtkapazität in kWh (Entität oder fester Wert; Wh-Entitäten werden automatisch umgerechnet) — nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt und bei mehreren Speichern richtig gewichtet wird |
 | Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
 | Strompreis (Bezug/Einspeisung) | nein | Währung/kWh-Entität (Währung siehe Einstellungen → Darstellung); ohne passende Entität ersatzweise ein fester Betrag in der Untereinheit (Cent, Pence, Rappen) |
+| Grundpreis | nein | Betrag pro Monat in der Währung (Entität oder fester Betrag); wird tageweise auf den Zeitraum umgerechnet und getrennt vom Arbeitspreis ausgewiesen |
 | CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
 | PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |
 
@@ -465,6 +467,48 @@ kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität
 Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst
 Momentan-/Messwerte (`measurement`), keine Zähler.
 
+### Kosten, Grundpreis und fehlende Preise
+
+Die Kosten setzen sich aus bis zu vier Teilen zusammen, die in der
+Kostenanalyse (💰) getrennt stehen: **Netzbezug** (Arbeitspreis × bezogene
+kWh), **Grundpreis**, **Einspeisung Erlös** und, falls aktiviert,
+**Eigenverbrauchsvergütung**. Der **Saldo** ist Netzbezug plus Grundpreis
+minus Erlöse.
+
+**Arbeitspreis und Grundpreis eingeben.** Beide gibt es als *Entität* oder als
+*fester Wert*; ist eine Entität gewählt, hat sie Vorrang. Am besten ist eine
+**Entität oder ein Helfer** (z. B. ein Helfer vom Typ „Zahl“): Jeder Wert gilt
+ab seinem Zeitpunkt, und nach einem Tarifwechsel bleiben frühere Monate
+richtig. Ein **fester Wert gilt rückwirkend für alle Zeiträume** — ändert sich
+der Tarif, rechnet das Dashboard auch die Vergangenheit mit dem neuen Wert.
+Der Arbeitspreis wird in Cent (bzw. Pence, Rappen) je kWh eingegeben, der
+Grundpreis in der Währung selbst **pro Monat**.
+
+**Grundpreis.** Das Dashboard rechnet den Monatsbetrag tageweise auf den
+gewählten Zeitraum um (Monatswert × 12 ÷ 365 je Tag; ein laufender Zeitraum
+zählt nur die bisher vergangene Zeit). Bei einem Helfer gilt sein letzter Wert
+bis zur nächsten Änderung, auch wenn er sich lange nicht gemeldet hat.
+
+**Helfer, die sich nur selten ändern.** Meldet eine Preis-Entität sich nur bei
+Änderungen (typisch bei einem Helfer mit dem Tarif), in den Einstellungen der
+Entität die **Lückenerkennung auf „Aus“** stellen. Sonst gilt der letzte
+Arbeitspreis nur kurz nach seiner Meldung, danach fehlt der Preis, und die
+Entität erscheint im Status als veraltet.
+
+**Wenn ein Preis fehlt.** Gibt es für einen Teil der Energie (beim Grundpreis:
+der Tage) keinen gültigen Preis, rechnet das Dashboard diesen Teil nicht mit —
+der Betrag ist dann zu niedrig. Das steht nicht still im Status, sondern
+direkt bei den Kosten:
+
+- hinter dem Kosten-Betrag im Kopfbereich und in der Kennzahlen-Leiste
+  erscheint ein **Warndreieck** (der Hinweistext steht im Tooltip),
+- die Kostenanalyse umrandet die betroffenen Kacheln gelb, nennt den Anteil
+  (z. B. „Preis fehlt für 4 % der Energie“) und erklärt darunter die Ursache,
+- der Energiebericht führt dieselbe Zeile unter den Kosten.
+
+Eine Lücke wird erst ab einem Prozent der Energie gemeldet, damit ein einzelner
+Zeitabschnitt am Periodenanfang, vor dem ersten bekannten Preis, nicht warnt.
+
 ### Aufbewahrung richtig einstellen
 
 Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
@@ -481,8 +525,9 @@ Rolle braucht dieselbe Frist:
   festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
   eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
   inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
-  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
-  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
+  vergangenen Zeitraum kleiner aus — die Kosten zeigen das dann mit einem
+  Warnsymbol an (siehe [Kosten, Grundpreis und fehlende
+  Preise](#kosten-grundpreis-und-fehlende-preise)). Wer hauptsächlich aktuelle bis wenige Monate
   alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
   aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
   aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.

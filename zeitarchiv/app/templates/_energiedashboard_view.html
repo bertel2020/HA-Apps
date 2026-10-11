@@ -58,6 +58,7 @@
               @click="$refs.costDialog.showModal()">
         <span>💰</span>
         <span x-text="fmtCurrency(kpi.net_cost)"></span>
+        <span class="edash-cost-warn-wrap" x-show="costGaps().length" :title="costGapHint()" role="img" :aria-label="costGapHint()"><svg class="edash-cost-warn" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="10" x2="12" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/></svg></span>
       </button>
       {% endif %}
       {% if config.show_bilanz_datenqualitaet %}
@@ -209,13 +210,22 @@
       <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
     <div class="edash-kpi-row">
-      <div class="edash-kpi" x-show="kpi.netzbezug_cost != null">
+      <div class="edash-kpi" :class="{'is-gap': costGap('netzbezug')}" x-show="kpi.netzbezug_cost != null">
         <div class="edash-kpi-label">{{ _("Netzbezug Kosten") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.netzbezug_cost)"></div>
+        <div class="edash-kpi-gap" x-show="costGap('netzbezug')" x-text="t('Preis fehlt für {anteil} % der Energie', {anteil: costGap('netzbezug')?.anteil})"></div>
       </div>
-      <div class="edash-kpi" x-show="kpi.einspeisung_revenue != null">
+      {# Der Grundpreis steht als eigene Kachel neben dem Arbeitspreis: Er hängt an der Zeit, nicht an der Energie, und würde den Preis je kWh sonst verfälschen. #}
+      <div class="edash-kpi" :class="{'is-gap': costGap('grundpreis')}" x-show="kpi.grundpreis_cost != null || costGap('grundpreis')">
+        <div class="edash-kpi-label">{{ _("Grundpreis") }}</div>
+        <div class="edash-kpi-val" x-text="kpi.grundpreis_cost != null ? fmtCurrency(kpi.grundpreis_cost) : '–'"></div>
+        <div class="edash-kpi-gap" x-show="costGap('grundpreis')" x-text="t('Wert fehlt für {anteil} % des Zeitraums', {anteil: costGap('grundpreis')?.anteil})"></div>
+        <div class="edash-kpi-sub" x-show="!costGap('grundpreis') && kpi.grundpreis_info && kpi.grundpreis_info.monat != null" x-text="t('{monat} / Monat, {tage} Tage', {monat: fmtCurrency(kpi.grundpreis_info?.monat), tage: fmt(kpi.grundpreis_info?.tage, 1)})"></div>
+      </div>
+      <div class="edash-kpi" :class="{'is-gap': costGap('einspeisung')}" x-show="kpi.einspeisung_revenue != null">
         <div class="edash-kpi-label">{{ _("Einspeisung Erlös") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.einspeisung_revenue)"></div>
+        <div class="edash-kpi-gap" x-show="costGap('einspeisung')" x-text="t('Preis fehlt für {anteil} % der Energie', {anteil: costGap('einspeisung')?.anteil})"></div>
       </div>
       {# Eigene Kachel statt Einrechnen in "Einspeisung Erlös" — beide sind
          reale Zahlungen, aber an unterschiedliche Energiemengen gekoppelt
@@ -223,9 +233,10 @@
          die das Feld im Setup aktiviert haben (kpi.eigenverbrauch_verguetung
          bleibt sonst null). Anders als "Einsparung" direkt darunter (rein
          rechnerischer Vergleichswert, kein Geldfluss) zählt sie zum Saldo. #}
-      <div class="edash-kpi" x-show="kpi.eigenverbrauch_verguetung != null">
+      <div class="edash-kpi" :class="{'is-gap': costGap('eigenverbrauch')}" x-show="kpi.eigenverbrauch_verguetung != null">
         <div class="edash-kpi-label">{{ _("EV-Vergütung") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.eigenverbrauch_verguetung)"></div>
+        <div class="edash-kpi-gap" x-show="costGap('eigenverbrauch')" x-text="t('Preis fehlt für {anteil} % der Energie', {anteil: costGap('eigenverbrauch')?.anteil})"></div>
       </div>
       <div class="edash-kpi" x-show="kpi.vermiedene_kosten != null">
         <div class="edash-kpi-label">{{ _("Einsparung") }}</div>
@@ -237,10 +248,21 @@
          --danger-Ton. Der Kosten-Chip in der Titelzeile hat diese
          Rot/Grün-Logik schon länger — hier zieht die Kachel im Dialog nach. #}
       <div class="edash-kpi" x-show="kpi.net_cost != null"
-           :class="{'is-bilanz-win': kpi.net_cost < 0, 'is-cost': kpi.net_cost >= 0}">
+           :class="{'is-bilanz-win': kpi.net_cost < 0, 'is-cost': kpi.net_cost >= 0, 'is-gap': costGaps().length}">
         <div class="edash-kpi-sparkle" x-show="kpi.net_cost < 0">★</div>
         <div class="edash-kpi-label">{{ _("Saldo") }}</div>
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.net_cost)"></div>
+        <div class="edash-kpi-gap" x-show="costGaps().length" x-text="t('nicht vollständig')"></div>
+      </div>
+    </div>
+    <div class="edash-cost-gap-note" role="alert" x-show="costGaps().length">
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="10" x2="12" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/></svg>
+      <div>
+        <template x-for="gap in costGaps()" :key="gap.key">
+          <p x-text="t('{label}: Für {menge} {einheit} ({anteil} %) liegt kein Preis vor, die Kosten sind deshalb zu niedrig.', {label: gap.label, menge: fmt(gap.menge, 1), einheit: gap.einheit, anteil: gap.anteil})"></p>
+        </template>
+        <p class="edash-cost-gap-why">{{ _("Häufige Ursache: Die Preis-Entität hat zu lange keinen Wert gemeldet. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen.") }}
+          {% if config.show_bilanz_datenqualitaet %}<a href="#" @click.prevent="$refs.costDialog.close(); $refs.qualityDialog.showModal()">{{ _("Details im Status") }}</a>{% endif %}</p>
       </div>
     </div>
     {# Außerhalb des Grids — Begründung siehe derselbe Stelle im CO2-Dialog
@@ -419,6 +441,7 @@
       <div class="edash-hero-item" x-show="kpi.net_cost != null">
         <svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-bar)" stroke-width="2.2"/><path d="M14.5 9a4 4 0 1 0 0 6" stroke="var(--accent-bar)" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>
         <strong x-text="fmtCurrency(kpi.net_cost)"></strong><span x-text="kpi.net_cost < 0 ? t('gespart') : t('Kosten')"></span>
+        <span class="edash-cost-warn-wrap" x-show="costGaps().length" :title="costGapHint()" role="img" :aria-label="costGapHint()"><svg class="edash-cost-warn" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="10" x2="12" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/></svg></span>
       </div>
       <div class="edash-hero-item edash-hero-prognose" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
         <svg width="16" height="13" viewBox="0 0 26 20"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--chart-3)" opacity=".8"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface)" stroke="var(--chart-3)" stroke-width="1.6"/></svg>

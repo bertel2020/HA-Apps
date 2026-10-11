@@ -25,6 +25,7 @@ internals for developers are in the other documents of this folder (see
 - [Energy dashboard](#energy-dashboard)
   - [Setup](#setup)
   - [Required and useful entities](#required-and-useful-entities)
+  - [Costs, standing charge and missing prices](#costs-standing-charge-and-missing-prices)
   - [Setting retention correctly](#setting-retention-correctly)
   - [Energy flow and consumer groups](#energy-flow-and-consumer-groups)
   - [Key figures, rings and badges](#key-figures-rings-and-badges)
@@ -411,6 +412,7 @@ does not already arrive in Zeitarchiv anyway.
 | Storage: capacity | no | Total capacity in kWh (entity or fixed value; Wh entities are converted automatically) — only needed so that the state of charge is additionally shown in kWh and weighted correctly with several storage units |
 | Consumers (any number) | no | One consumption counter each (kWh, ascending) with its own name and optionally a freely named group — everything not assigned individually automatically remains visible as "base load" |
 | Electricity price (import/feed-in) | no | Currency/kWh entity (currency: see Settings → Appearance); without a suitable entity, a fixed amount in the subunit (cents, pence, rappen) as a substitute |
+| Standing charge | no | Amount per month in the currency (entity or fixed amount); converted to the period day by day and shown separately from the energy price |
 | CO₂ intensity | no | g/kWh entity; without a suitable entity, a fixed value as a substitute |
 | PV yield forecast | no | kWh for "rest of today" and "tomorrow", e.g. from a Forecast.Solar integration |
 
@@ -428,6 +430,47 @@ the watt entity. Storage SOC, storage capacity, electricity price, CO₂
 intensity and PV forecast, on the other hand, are deliberately instantaneous/
 measured values (`measurement`), not counters.
 
+### Costs, standing charge and missing prices
+
+The costs consist of up to four parts, shown separately in the cost analysis
+(💰): **grid import** (energy price × imported kWh), **standing charge**,
+**feed-in revenue** and, if enabled, the **self-consumption payment**. The
+**balance** is import plus standing charge minus revenues.
+
+**Entering the energy price and the standing charge.** Both can be an *entity*
+or a *fixed value*; if an entity is chosen, it takes precedence. Best use an
+**entity or a helper** (e.g. a helper of type “Number”): each value applies
+from its point in time, and earlier months stay correct after a tariff
+change. A **fixed value applies retroactively to all periods** — if the tariff
+changes, the dashboard recalculates the past with the new value too. The
+energy price is entered in cents (or pence, rappen) per kWh, the standing
+charge in the currency itself **per month**.
+
+**Standing charge.** The dashboard converts the monthly amount to the selected
+period day by day (monthly value × 12 ÷ 365 per day; a running period only
+counts the time elapsed so far). With a helper, its last value applies until
+the next change, even if it has not reported for a long time.
+
+**Helpers that rarely change.** If a price entity only reports when it changes
+(typical for a helper holding the tariff), set **gap detection to “Off”** in
+the entity’s settings. Otherwise the last energy price only applies shortly
+after it was reported, then the price is missing and the entity shows up as
+stale in the status.
+
+**When a price is missing.** If there is no valid price for part of the energy
+(for the standing charge: of the days), the dashboard leaves that part out —
+the amount is then too low. This does not sit quietly in the status but
+directly at the costs:
+
+- a **warning triangle** appears after the cost amount in the header and in
+  the key figures bar (the explanation is in the tooltip),
+- the cost analysis outlines the affected tiles in yellow, names the share
+  (e.g. “Price missing for 4 % of the energy”) and explains the cause below,
+- the energy report lists the same line under the costs.
+
+A gap is only reported from one percent of the energy, so that a single time
+slice at the start of the period, before the first known price, does not warn.
+
 ### Setting retention correctly
 
 The [retention period](#retention-enforcement) set per entity affects the
@@ -442,8 +485,9 @@ energy dashboard to different degrees — not every role needs the same period:
 - **Electricity price and CO₂ entities** (if connected via an entity instead
   of a fixed value) are factored in per displayed period bucket. If values are
   missing because the retention period has since removed them, the cost/CO₂
-  balance for that past period just turns out smaller — not an error, merely
-  an incomplete analysis. If you mainly need current to a few months old
+  balance for that past period turns out smaller — the costs then show this
+  with a warning symbol (see [Costs, standing charge and missing
+  prices](#costs-standing-charge-and-missing-prices)). If you mainly need current to a few months old
   analyses, **90 days** or **365 days** suffice here and save storage: dynamic
   tariffs and CO₂ signals often update every minute and grow correspondingly
   fast.
