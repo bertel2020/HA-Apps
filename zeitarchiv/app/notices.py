@@ -496,7 +496,7 @@ def build_notices(
     # Externes Backup-Ziel (BACKUP_EXTERN_KONZEPT.md): das lokale Backup ist in
     # Ordnung, aber nicht übertragen — ein stilles Scheitern wäre schlimmer als
     # gar kein externes Ziel, weil man sich sicher fühlt.
-    if index.get_setting("backup_external_type", "off") == "dir":
+    if index.get_setting("backup_external_type", "off") in ("dir", "webdav"):
         external_jobs = [
             row for row in index.list_backup_jobs(5) if row["external_status"] is not None
         ]

@@ -786,18 +786,23 @@ class BackgroundService:
         source = self.backups_dir / filename
         self.index.update_backup_job(
             job_id, external_status=backup_external.STATUS_RUNNING,
-            external_target=config.mount, external_error=None,
+            external_target=config.target_label, external_error=None,
         )
         keep_count, keep_days = self._backup_keep_rules()
 
         def work(beat: Callable[[], None]) -> str:
-            target = backup_external.resolve_target(config.mount, config.subfolder)
-            backup_external.cleanup_stale_parts(target)
-
             def on_beat() -> None:
                 beat()
                 self.last_backup_worker_tick = time.time()
 
+            if config.type == "webdav":
+                client = backup_external.webdav_client(config, self.base_dir)
+                backup_external.transfer_webdav(client, source, on_beat)
+                if config.keep == "same":
+                    backup_external.prune_webdav(client, keep_count, keep_days, time.time(), self.tz)
+                return client.display_url
+            target = backup_external.resolve_target(config.mount, config.subfolder)
+            backup_external.cleanup_stale_parts(target)
             backup_external.transfer(source, target, on_beat)
             if config.keep == "same":
                 backup_external.prune_external(target, keep_count, keep_days, time.time())

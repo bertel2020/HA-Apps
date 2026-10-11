@@ -10,5 +10,9 @@ configuration:
       Schaltet auf eine eigene, von den echten Daten getrennte Instanz mit
       synthetischen Vorführdaten um. Nach einer Änderung ist ein Neustart der
       App nötig.
+  webdav_password:
+    name: WebDAV-Passwort
+    description: >-
+      Passwort für das externe Backup-Ziel per WebDAV (System → Backup / Restore → Externes Ziel). Es steht bewusst nicht in der App-Datenbank, damit es nicht in den Backups landet. Nach einer Änderung ist ein Neustart der App nötig.
 network:
   8127/tcp: Zeitarchiv REST-API

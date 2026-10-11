@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -18,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 from .background import BackgroundService
 from .formatting import format_size, format_time, format_timestamp
 from .i18n import tr
-from .storage import backup_external
+from .storage import backup_external, webdav
 from .storage.index import Index
 
 TEST_STALL_SECONDS = 15.0
@@ -31,6 +32,7 @@ class BackupExternalDependencies:
     templates: Jinja2Templates
     background: BackgroundService
     tz: object
+    base_dir: Path
     backup_table_context: Callable[[], dict]
 
 
@@ -74,7 +76,11 @@ def create_backup_external_router(deps: BackupExternalDependencies) -> APIRouter
         mounts = mount_rows(config.mount)
         return {
             "ext": {
-                "type": config.type if config.type in ("off", "dir") else "off",
+                "type": config.type if config.type in ("off", "dir", "webdav") else "off",
+                "webdav_url": config.webdav_url,
+                "webdav_user": config.webdav_user,
+                "webdav_verify_tls": config.webdav_verify_tls,
+                "webdav_password_set": bool(backup_external.load_webdav_password(deps.base_dir)),
                 "mount": config.mount,
                 "subfolder": config.subfolder,
                 "keep": config.keep if config.keep in EXTERNAL_KEEP_OPTIONS else "same",
@@ -93,6 +99,15 @@ def create_backup_external_router(deps: BackupExternalDependencies) -> APIRouter
     def external_card(request: Request) -> HTMLResponse:
         return card(request)
 
+    def webdav_settings(url: str, user: str, insecure: str) -> backup_external.ExternalConfig:
+        try:
+            normalized = webdav.validate_url(url)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        return backup_external.ExternalConfig(
+            type="webdav", webdav_url=normalized, webdav_user=user.strip(), webdav_verify_tls=insecure != "1",
+        )
+
     @router.post("/backup/external", response_class=HTMLResponse)
     def external_save(
         request: Request,
@@ -100,8 +115,11 @@ def create_backup_external_router(deps: BackupExternalDependencies) -> APIRouter
         external_mount: str = Form(""),
         external_subfolder: str = Form(""),
         external_keep: str = Form("same"),
+        external_url: str = Form(""),
+        external_user: str = Form(""),
+        external_insecure: str = Form(""),
     ) -> HTMLResponse:
-        if external_type not in ("off", "dir"):
+        if external_type not in ("off", "dir", "webdav"):
             raise HTTPException(status_code=400, detail=tr("Ungültiges Ziel"))
         if external_keep not in EXTERNAL_KEEP_OPTIONS:
             raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
@@ -113,25 +131,43 @@ def create_backup_external_router(deps: BackupExternalDependencies) -> APIRouter
                 return card(request, error=str(exc))
             index.set_setting("backup_external_mount", external_mount)
             index.set_setting("backup_external_subfolder", subfolder)
+        elif external_type == "webdav":
+            try:
+                config = webdav_settings(external_url, external_user, external_insecure)
+            except ValueError as exc:
+                return card(request, error=str(exc))
+            index.set_setting("backup_external_webdav_url", config.webdav_url)
+            index.set_setting("backup_external_webdav_user", config.webdav_user)
+            index.set_setting("backup_external_webdav_verify_tls", "1" if config.webdav_verify_tls else "0")
         index.set_setting("backup_external_type", external_type)
         index.set_setting("backup_external_keep", external_keep)
         return card(request, message=tr("Gespeichert."))
 
     @router.post("/backup/external/test", response_class=HTMLResponse)
     def external_test(
+        external_type: str = Form("dir"),
         external_mount: str = Form(""),
         external_subfolder: str = Form(""),
+        external_url: str = Form(""),
+        external_user: str = Form(""),
+        external_insecure: str = Form(""),
     ) -> HTMLResponse:
         """Schreibt, liest und löscht eine Testdatei auf dem gewählten Ziel."""
         try:
-            subfolder = backup_external.validate_subfolder(external_subfolder)
+            if external_type == "webdav":
+                config = webdav_settings(external_url, external_user, external_insecure)
 
-            def work(beat):
-                target = backup_external.resolve_target(external_mount, subfolder)
-                return backup_external.check_target(target, beat)
+                def work(beat):
+                    return backup_external.webdav_client(config, deps.base_dir).check(beat)
+            else:
+                subfolder = backup_external.validate_subfolder(external_subfolder)
+
+                def work(beat):
+                    target = backup_external.resolve_target(external_mount, subfolder)
+                    return backup_external.check_target(target, beat)
 
             result = backup_external.run_with_watchdog(work, stall_seconds=TEST_STALL_SECONDS, poll_seconds=0.1)
-        except (ValueError, backup_external.ExternalTargetError, OSError) as exc:
+        except (ValueError, backup_external.ExternalTargetError, webdav.WebDavError, OSError) as exc:
             return HTMLResponse(
                 f'<div class="ext-result bad" role="alert">{_escape(str(exc))}</div>'
             )

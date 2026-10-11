@@ -1947,6 +1947,20 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   Fehler: bei NFS verweigert der Export des NAS den Zugriff (`root_squash`
   oder fehlende Freigabe für die Home-Assistant-Adresse), bei CIFS stimmen
   Benutzer oder Freigabe-Rechte nicht.
+- **WebDAV als externes Ziel:** statt eines Netzwerkspeichers lädt die App die
+  Backups per WebDAV hoch (z. B. Nextcloud, ownCloud, ein NAS). In der Karte
+  **Externes Ziel** die Adresse des Zielordners eintragen (bei Nextcloud
+  `https://…/remote.php/dav/files/<Benutzer>/<Ordner>/`) und den Benutzer. Das
+  **Passwort** steht nur in den Add-on-Optionen (Einstellungen → Add-ons →
+  Zeitarchiv → Konfiguration → WebDAV-Passwort), damit es nicht in den Backups
+  selbst landet; nach einer Änderung das Add-on neu starten. Ein selbst
+  signiertes Zertifikat lässt sich mit „Zertifikat nicht prüfen“ zulassen;
+  bei einer Adresse mit `http://` werden Zugangsdaten unverschlüsselt gesendet.
+  Die Datei wird zunächst unter einem `.part`-Namen hochgeladen, geprüft und
+  erst dann umbenannt. Lehnt der Server große Dateien ab (Fehler 413), die
+  Upload-Grenze am Server anheben. Am Ziel werden nur Dateien nach dem Muster
+  `zeitarchiv-backup-*.zip` gelöscht, die Reihenfolge ergibt sich aus dem
+  Zeitpunkt im Dateinamen.
 - **Zeitplan:** automatisch nach Zeitplan (Intervall, Uhrzeit, ggf.
   Wochentag), mit automatischer Aufräumung älterer Backups nach Anzahl
   und/oder Alter, damit der Speicherplatz nicht unbegrenzt wächst.

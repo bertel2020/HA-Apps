@@ -12,7 +12,14 @@
 .ext-seg input:checked + span{background:var(--accent-line);color:var(--accent-contrast)}
 .ext-seg input:focus-visible + span{outline:2px solid var(--accent-line);outline-offset:-2px}
 .ext-form:has(input[name=external_type][value=off]:checked) .ext-body{display:none}
-.ext-form:has(input[name=external_type][value=dir]:checked) .ext-off-actions{display:none}
+.ext-form:not(:has(input[name=external_type][value=off]:checked)) .ext-off-actions{display:none}
+.ext-form:not(:has(input[name=external_type][value=dir]:checked)) .ext-dir{display:none}
+.ext-form:not(:has(input[name=external_type][value=webdav]:checked)) .ext-webdav{display:none}
+.ext-field-wide input{width:min(100%,460px)}
+.ext-pw{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin:0 0 12px}
+.ext-note-inline{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);max-width:60ch}
+.ext-check{display:flex;gap:8px;align-items:center;font-size:calc(13px * var(--font-scale, 1));margin:0 0 14px}
+.ext-check input{accent-color:var(--accent-line)}
 .ext-mounts{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);padding:6px 8px;margin:0 0 14px;min-width:0}
 .ext-mounts legend{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);padding:0 4px}
 .ext-mount{display:flex;gap:12px;align-items:flex-start;padding:10px 6px;border-top:1px solid var(--border);cursor:pointer;border-radius:6px}

@@ -5568,7 +5568,7 @@ app.include_router(_import_service.router())
 # Hintergrund-Scheduler und von der Einstellungsseite gebraucht (siehe
 # Modul-Docstring in housekeeping_routes.py).
 app.include_router(create_backup_external_router(BackupExternalDependencies(
-    index=index, templates=templates, background=_background, tz=TZ,
+    index=index, templates=templates, background=_background, tz=TZ, base_dir=BASE_DIR,
     backup_table_context=lambda: _backup_list_context(),
 )))
 app.include_router(create_export_router(ExportDependencies(

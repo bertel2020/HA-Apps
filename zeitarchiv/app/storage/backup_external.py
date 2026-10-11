@@ -16,6 +16,7 @@ Lebenszeichen aufgibt, statt selbst daran zu hängen.
 from __future__ import annotations
 
 import errno
+import json
 import logging
 import os
 import re
@@ -23,11 +24,14 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TypeVar
+from zoneinfo import ZoneInfo
 
 from ..i18n import tr
 from . import backup as backup_mod
+from . import webdav
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +92,22 @@ class ExternalConfig:
     mount: str = ""
     subfolder: str = ""
     keep: str = "same"
+    webdav_url: str = ""
+    webdav_user: str = ""
+    webdav_verify_tls: bool = True
 
     @property
     def enabled(self) -> bool:
-        return self.type == "dir" and bool(self.mount)
+        if self.type == "dir":
+            return bool(self.mount)
+        if self.type == "webdav":
+            return bool(self.webdav_url)
+        return False
+
+    @property
+    def target_label(self) -> str:
+        """Anzeigetext des Ziels für den Job (ohne Zugangsdaten)."""
+        return self.webdav_url if self.type == "webdav" else self.mount
 
 
 def load_config(index) -> ExternalConfig:
@@ -100,7 +116,35 @@ def load_config(index) -> ExternalConfig:
         mount=index.get_setting("backup_external_mount", ""),
         subfolder=index.get_setting("backup_external_subfolder", ""),
         keep=index.get_setting("backup_external_keep", "same"),
+        webdav_url=index.get_setting("backup_external_webdav_url", ""),
+        webdav_user=index.get_setting("backup_external_webdav_user", ""),
+        webdav_verify_tls=index.get_setting("backup_external_webdav_verify_tls", "1") != "0",
     )
+
+
+def load_webdav_password(base_dir: Path) -> str:
+    """Passwort aus den Add-on-Optionen (base_dir/options.json), nie aus der
+    Datenbank: der Index steckt im Backup, ein dort gespeichertes Passwort läge
+    sonst auf dem externen Ziel. options.json gehört nicht zu BACKUP_ENTRIES.
+    Fallback für Betrieb ohne Supervisor: Umgebungsvariable."""
+    try:
+        options = json.loads((base_dir / "options.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        options = {}
+    password = options.get("webdav_password") if isinstance(options, dict) else None
+    return str(password) if password else os.environ.get("ZEITARCHIV_WEBDAV_PASSWORD", "")
+
+
+def webdav_client(config: ExternalConfig, base_dir: Path) -> webdav.WebDavClient:
+    password = load_webdav_password(base_dir)
+    if config.webdav_user and not password:
+        raise ExternalTargetError(
+            tr("Kein WebDAV-Passwort hinterlegt. Es gehört in die Add-on-Optionen (Einstellungen → Add-ons → Zeitarchiv → Konfiguration); danach das Add-on neu starten.")
+        )
+    try:
+        return webdav.WebDavClient(config.webdav_url, config.webdav_user, password, config.webdav_verify_tls)
+    except ValueError as exc:
+        raise ExternalTargetError(str(exc)) from exc
 
 
 def run_with_watchdog(
@@ -359,3 +403,65 @@ def prune_external(target_dir: Path, keep_count: int | None, keep_days: int | No
     except OSError as exc:
         raise _explain(exc) from exc
 
+
+
+_NAME_TIME_RE = re.compile(r"^zeitarchiv-backup-(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})(\d{2})\.zip$")
+
+
+def backup_name_time(name: str, tz: ZoneInfo) -> float | None:
+    """Zeitpunkt aus dem Dateinamen — am WebDAV-Ziel gibt es keine verlässliche
+    Änderungszeit. None für Namen, die nicht von dieser App stammen."""
+    match = _NAME_TIME_RE.match(name)
+    if match is None:
+        return None
+    try:
+        return datetime(*(int(g) for g in match.groups()), tzinfo=tz).timestamp()
+    except ValueError:
+        return None
+
+
+def transfer_webdav(
+    client: webdav.WebDavClient,
+    source: Path,
+    beat: Callable[[], None] = lambda: None,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> int:
+    try:
+        client.ensure_folder()
+        beat()
+        for leftover in client.list_files():  # abgebrochene Uploads dieser App
+            if leftover.name.startswith(".zeitarchiv-backup-") and leftover.name.endswith(".part"):
+                client.delete(leftover.name, missing_ok=True)
+        return client.upload(source, source.name, beat, on_progress)
+    except webdav.WebDavError as exc:
+        raise ExternalTargetError(str(exc)) from exc
+
+
+def prune_webdav(
+    client: webdav.WebDavClient,
+    keep_count: int | None,
+    keep_days: int | None,
+    now: float,
+    tz: ZoneInfo,
+) -> int:
+    """Wie lokal, aber nach dem Zeitpunkt im Dateinamen, und nur für Dateien nach
+    dem Backup-Muster — alles andere am Ziel bleibt unberührt."""
+    if keep_count is None and keep_days is None:
+        return 0
+    try:
+        entries = []
+        for remote in client.list_files():
+            stamp = backup_name_time(remote.name, tz)
+            if stamp is not None:
+                entries.append((stamp, remote.name))
+        entries.sort(reverse=True)
+        removed = 0
+        for position, (stamp, name) in enumerate(entries):
+            too_many = keep_count is not None and position >= keep_count
+            too_old = keep_days is not None and (now - stamp) / 86400 > keep_days
+            if too_many or too_old:
+                client.delete(name)
+                removed += 1
+        return removed
+    except webdav.WebDavError as exc:
+        raise ExternalTargetError(str(exc)) from exc

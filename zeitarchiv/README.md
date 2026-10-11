@@ -306,8 +306,9 @@ Als **externes Ziel** kopiert die App jedes erfolgreiche Backup zusätzlich auf
 einen Netzwerkspeicher (NFS oder SMB/CIFS), den Home Assistant unter
 *Einstellungen → System → Speicher → Netzwerkspeicher* mit der Verwendung
 „Medien“ oder „Share“ einbindet. Zeitarchiv bindet nichts selbst ein, die
-Zugangsdaten bleiben bei Home Assistant. Für andere Ziele (S3, Cloud, WebDAV)
-meldet die App das letzte erfolgreiche Backup an die Home-Assistant-Integration,
+Zugangsdaten bleiben bei Home Assistant. Alternativ lädt die App Backups per
+**WebDAV** hoch (z. B. Nextcloud oder ein NAS); das Passwort steht dafür nur in
+den Add-on-Optionen. Für andere Ziele (S3, Cloud) meldet die App das letzte erfolgreiche Backup an die Home-Assistant-Integration,
 die daraus eine Sensor-Entity und ein Automations-Blueprint macht (siehe
 Integrations-README); die Übertragung übernimmt dann eine eigene Automation,
 z. B. mit `rclone`.

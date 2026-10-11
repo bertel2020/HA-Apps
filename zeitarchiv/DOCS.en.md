@@ -51,7 +51,10 @@ and stored persistently in the app data directory.
 
 The app option `demo_mode` switches the app to a separate instance, completely
 isolated from the real data, with synthetic showcase/test data — see
-[User guide → Demo mode](docs/en/user-guide.md#demo-mode). Both options require
+[User guide → Demo mode](docs/en/user-guide.md#demo-mode). The app option
+`webdav_password` is the password for a WebDAV backup target (**External
+target** card under System → Backup / Restore); it is deliberately not stored in
+the app database so that it does not end up in the backups. All options require
 an add-on restart after a change.
 
 The optional energy dashboard (energy flow as a Sankey diagram, plus

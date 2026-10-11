@@ -55,7 +55,10 @@ dauerhaft gespeichert.
 Die App-Option `demo_mode` schaltet die App auf eine eigene, komplett von
 den echten Daten getrennte Instanz mit synthetischen Vorführ-/Testdaten um
 — siehe [Benutzerhandbuch → Demo-Modus](docs/user-guide.md#demo-modus).
-Beide Optionen brauchen nach einer Änderung einen Add-on-Neustart.
+Die App-Option `webdav_password` ist das Passwort für ein WebDAV-Ziel der
+Backups (Karte **Externes Ziel** unter System → Backup / Restore); sie steht
+bewusst nicht in der App-Datenbank, damit sie nicht in den Backups landet.
+Alle Optionen brauchen nach einer Änderung einen Add-on-Neustart.
 
 Das optionale Energiedashboard (Energiefluss als Sankey-Diagramm, dazu
 Autarkie-, Kosten- und CO₂-Auswertung) lässt sich über eine Kachel auf der

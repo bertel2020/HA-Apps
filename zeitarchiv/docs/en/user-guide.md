@@ -1803,6 +1803,19 @@ Menu item of its own **System → Backup / Restore** (not under Settings):
   `zeitarchiv-backup-*.zip` are deleted. Typical errors: with NFS the NAS export
   refuses access (`root_squash`, or the Home Assistant address is not allowed),
   with CIFS the user or share permissions are wrong.
+- **WebDAV as external target:** instead of a network storage the app uploads
+  backups via WebDAV (e.g. Nextcloud, ownCloud, a NAS). In the **External
+  target** card enter the address of the target folder (for Nextcloud
+  `https://…/remote.php/dav/files/<user>/<folder>/`) and the user. The
+  **password** is stored only in the add-on options (Settings → Add-ons →
+  Zeitarchiv → Configuration → WebDAV password) so that it does not end up in
+  the backups themselves; restart the add-on after a change. A self-signed
+  certificate can be allowed with “Do not check certificate”; with an `http://`
+  address the credentials are sent unencrypted. The file is first uploaded under
+  a `.part` name, checked and only then renamed. If the server rejects large
+  files (error 413), raise the upload limit on the server. At the target only
+  files matching `zeitarchiv-backup-*.zip` are deleted, ordered by the time in
+  the file name.
 - **Schedule:** automatically on a schedule (interval, time, weekday if
   applicable), with automatic cleanup of older backups by count and/or age so
   that storage does not grow without limit.

@@ -3,7 +3,7 @@
    backup_external.list_mounts(); es gibt bewusst kein freies Pfadfeld. #}
 <div id="backup-external-card">
   <h3 style="margin:0 0 4px;">{{ _("Externes Ziel") }}</h3>
-  <p class="ext-hint">{{ _("Kopiert jedes erfolgreiche Backup zusätzlich auf einen Netzwerkspeicher. Das lokale Backup bleibt erhalten.") }}</p>
+  <p class="ext-hint">{{ _("Kopiert jedes erfolgreiche Backup zusätzlich auf einen Netzwerkspeicher oder einen WebDAV-Server. Das lokale Backup bleibt erhalten.") }}</p>
 
   {% if ext.message %}<p class="ext-result ok" role="status">{{ ext.message }}</p>{% endif %}
   {% if ext.error %}<p class="ext-result bad" role="alert">{{ ext.error }}</p>{% endif %}
@@ -13,9 +13,11 @@
     <div class="ext-seg" role="radiogroup" aria-label="{{ _('Ziel') }}">
       <label><input type="radio" name="external_type" value="off" {% if ext.type != 'dir' %}checked{% endif %}><span>{{ _("Aus") }}</span></label>
       <label><input type="radio" name="external_type" value="dir" {% if ext.type == 'dir' %}checked{% endif %}><span>{{ _("Netzwerkspeicher") }}</span></label>
+      <label><input type="radio" name="external_type" value="webdav" {% if ext.type == 'webdav' %}checked{% endif %}><span>{{ _("WebDAV") }}</span></label>
     </div>
 
     <div class="ext-body">
+      <div class="ext-dir">
       {% if ext.mounts %}
       <fieldset class="ext-mounts">
         <legend>{{ _("Netzwerkspeicher aus Home Assistant") }}</legend>
@@ -47,6 +49,30 @@
           <input type="text" name="external_subfolder" value="{{ ext.subfolder }}" maxlength="64"
                  placeholder="{{ _('z. B. zeitarchiv') }}" autocomplete="off">
         </label>
+      </div>
+      </div>
+
+      <div class="ext-webdav">
+        <div class="ext-row">
+          <label class="ext-field ext-field-wide">{{ _("Adresse des Zielordners") }}
+            <input type="text" name="external_url" value="{{ ext.webdav_url }}" maxlength="500"
+                   placeholder="https://cloud.example.de/remote.php/dav/files/benutzer/Zeitarchiv/" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="ext-field">{{ _("Benutzer") }}
+            <input type="text" name="external_user" value="{{ ext.webdav_user }}" maxlength="200" autocomplete="off">
+          </label>
+        </div>
+        <p class="ext-pw">
+          {% if ext.webdav_password_set %}<span class="ext-pill-state ok">{{ _("Passwort hinterlegt") }}</span>
+          {% else %}<span class="ext-pill-state failed">{{ _("Kein Passwort hinterlegt") }}</span>{% endif %}
+          <span class="ext-note-inline">{{ _("Das Passwort steht nur in den Add-on-Optionen (Einstellungen → Add-ons → Zeitarchiv → Konfiguration), damit es nicht in den Backups selbst landet. Nach einer Änderung das Add-on neu starten.") }}</span>
+        </p>
+        <label class="ext-check"><input type="checkbox" name="external_insecure" value="1" {% if not ext.webdav_verify_tls %}checked{% endif %}>
+          {{ _("Zertifikat nicht prüfen (selbst signiert)") }}</label>
+        {% if ext.webdav_url.startswith('http://') %}<p class="ext-result bad" role="note">{{ _("Die Adresse beginnt mit http://. Benutzer und Passwort würden unverschlüsselt übertragen.") }}</p>{% endif %}
+      </div>
+
+      <div class="ext-row">
         <label class="ext-field">{{ _("Aufbewahrung am Ziel") }}
           <select name="external_keep">
             <option value="same" {% if ext.keep == 'same' %}selected{% endif %}>{{ _("wie lokal (Anzahl und Alter)") }}</option>
@@ -58,13 +84,12 @@
 
       <div class="ext-actions">
         <button type="button" class="btn" hx-post="backup/external/test" hx-include="#backup-external-form"
-                hx-target="#backup-external-result" hx-swap="innerHTML" hx-disabled-elt="this"
-                {% if not ext.usable %}disabled{% endif %}>{{ _("Verbindung testen") }}</button>
-        <button type="submit" class="btn btn-primary" {% if not ext.usable %}disabled{% endif %}>{{ _("Speichern") }}</button>
+                hx-target="#backup-external-result" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Verbindung testen") }}</button>
+        <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
       </div>
       <div id="backup-external-result" aria-live="polite"></div>
     </div>
-    {# Beim Ausschalten genügt Speichern, auch ohne gefundene Freigaben. #}
+    {# Beim Ausschalten genügt Speichern. #}
     <div class="ext-actions ext-off-actions">
       <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
     </div>
