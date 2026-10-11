@@ -26,6 +26,9 @@ Detail, Einstellungen-Referenz, typische Aufgaben.
 4. Die Zeitarchiv-Integration installieren (über HACS oder manuell von
    [github.com/bertel2020/HA-Zeitarchiv](https://github.com/bertel2020/HA-Zeitarchiv))
    und mit Host `localhost`, Port `8127` und diesem Token einrichten.
+   Meldet die Einrichtung „Verbindung fehlgeschlagen“, obwohl die App läuft,
+   stattdessen Host `127.0.0.1` eintragen: Auf manchen Systemen löst `localhost`
+   zuerst zu IPv6 (`::1`) auf, und darüber ist die App nicht erreichbar.
 5. Auf der Integrationskachel unter **Konfigurieren → Archivfilter
    bearbeiten** die zu archivierenden Domains, Entitäten, Bereiche oder
    Geräte auswählen. Ohne Filter kommen keine Daten an — ohne Fehlermeldung.

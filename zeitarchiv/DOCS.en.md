@@ -26,6 +26,9 @@ settings reference, typical tasks.
 4. Install the Zeitarchiv integration (via HACS or manually from
    [github.com/bertel2020/HA-Zeitarchiv](https://github.com/bertel2020/HA-Zeitarchiv))
    and set it up with host `localhost`, port `8127` and this token.
+   If setup reports a failed connection although the app is running, enter
+   host `127.0.0.1` instead: on some systems `localhost` resolves to IPv6
+   (`::1`) first, over which the app is not reachable.
 5. On the integration tile, under **Configure → Edit archive filters**, select
    the domains, entities, areas or devices to archive. Without filters no data
    arrives — and no error message is shown.
