@@ -2158,7 +2158,6 @@
     "bleibt niedrig": "stays low",
     "kehrt zurück": "returns",
     "kein Wiederanstieg auf den Vorwert in den folgenden 30 Minuten": "no rise back to the previous value within the following 30 minutes",
-    "nach {minutes} Min. wieder auf {value}": "back to {value} after {minutes} min",
     "noch offen": "still open",
     "noch zu wenige Folgewerte": "too few following values yet",
     "{previous} → {value}": "{previous} → {value}",
@@ -2384,7 +2383,9 @@
     "Zertifikat nicht prüfen (selbst signiert)": "Do not check certificate (self-signed)",
     "Zugriff verweigert (403). Fehlt dem Benutzer das Schreibrecht auf diesen Ordner?": "Access denied (403). Does the user lack write permission for this folder?",
     "Passwort": "Password",
-    "Nur in den Add-on-Optionen einstellbar": "Only configurable in the add-on options"
+    "Nur in den Add-on-Optionen einstellbar": "Only configurable in the add-on options",
+    "nach {minutes} Min. wieder bei {value}": "back at {value} after {minutes} min",
+    "Als normal erlauben": "Allow as normal"
   },
   "js": {
     "Meldungen": "Notices",

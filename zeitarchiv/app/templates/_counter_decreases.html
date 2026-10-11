@@ -20,7 +20,8 @@
         <div class="tbl-wrap">
           {% if counter_decreases %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-            <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th><th></th></tr></thead>
+            <colgroup><col><col class="hk-col-cd-count"><col class="hk-col-cd-last"><col class="hk-col-cd-verdict"><col class="hk-col-cd-action"></colgroup>
+            <thead><tr><th>{{ _("Entität") }}</th><th class="cd-num">{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th><th class="cd-action">{{ _("Aktion") }}</th></tr></thead>
             <tbody>
             {% for row in counter_decreases %}
             <tr>
@@ -38,11 +39,12 @@
                 <div class="counter-note">{{ _("{count} automatisch markiert (7 Tage)", count=row.rule.marked) }}</div>
                 {% endif %}
               </td>
-              <td data-sort="{{ row.count }}">{{ row.count_label }}</td>
+              <td class="cd-num" data-sort="{{ row.count }}">{{ row.count_label }}</td>
               <td data-sort="{{ row.last_ts }}">{{ row.last_label }}{% if row.change %}<div class="counter-note">{{ row.change }}</div>{% endif %}</td>
-              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}">{% if row.verdict == 'returns' %}{{ _("kehrt zurück") }}{% elif row.verdict == 'stays' %}{{ _("bleibt niedrig") }}{% else %}{{ _("noch offen") }}{% endif %}</span>{% endif %}<div class="counter-note">{{ row.note }}</div></td>
-              <td>{% if row.verdict == 'stays' %}<button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
-                      hx-target="#counter-decreases" hx-swap="innerHTML" title="{{ _('Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden') }}">{{ _("Erlauben") }}</button>{% endif %}</td>
+              {# Bei „bleibt niedrig“ steht die Begründung in der Einleitung (Info-Symbol) und hier nur als Tooltip; bei den übrigen trägt sie die Zeile (Zeitpunkt und Wert der Rückkehr). #}
+              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}"{% if row.verdict == 'stays' %} title="{{ row.note }}"{% endif %}>{% if row.verdict == 'returns' %}{{ _("kehrt zurück") }}{% elif row.verdict == 'stays' %}{{ _("bleibt niedrig") }}{% else %}{{ _("noch offen") }}{% endif %}</span>{% endif %}{% if row.verdict != 'stays' %}<div class="counter-note">{{ row.note }}</div>{% endif %}</td>
+              <td class="cd-action">{% if row.verdict == 'stays' %}<button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
+                      hx-target="#counter-decreases" hx-swap="innerHTML" title="{{ _('Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden') }}">{{ _("Als normal erlauben") }}</button>{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>

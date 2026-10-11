@@ -258,6 +258,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
         return duplicate_rows, duplicates_by_entity, duplicates_total
 
+    def _keep_together(label: str) -> str:
+        """Wert und Einheit nicht trennen: sonst steht „kWh“ allein in der nächsten Zeile."""
+        return label.replace(" ", "\u00a0")
+
     def _counter_decreases_for_display() -> list[dict]:
         """Housekeeping → Zählerrückgänge: der gecachte Schnappschuss (stündlich, oder sofort
         neu nach dem Markieren), je Zähler mit dem letzten Rückgang und seiner Einordnung."""
@@ -267,9 +271,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             if last["returns"]:
                 verdict = "returns"
                 note = tr(
-                    "nach {minutes} Min. wieder auf {value}",
+                    "nach {minutes} Min. wieder bei {value}",
                     minutes=max(1, round((last["recovered_after"] or 0) / 60)),
-                    value=notices_mod.counter_value_label(last["recovered_value"], row),
+                    value=_keep_together(notices_mod.counter_value_label(last["recovered_value"], row)),
                 )
             elif last["returns"] is False:
                 verdict = "stays"
@@ -288,8 +292,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "last_label": f"{format_timestamp(last['ts'], deps.tz)[:6]} {format_time(last['ts'], deps.tz)[:5]}",
                 "change": tr(
                     "{previous} → {value}",
-                    previous=notices_mod.counter_value_label(last["previous"], row),
-                    value=notices_mod.counter_value_label(last["value"], row),
+                    previous=_keep_together(notices_mod.counter_value_label(last["previous"], row)),
+                    value=_keep_together(notices_mod.counter_value_label(last["value"], row)),
                 ),
                 "verdict": verdict,
                 "note": note,
