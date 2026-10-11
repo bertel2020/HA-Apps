@@ -33,6 +33,63 @@ Both backup and restore run under `StorageCoordinator.exclusive()` (see
 [architecture.md](architecture.md)) — no concurrent write traffic
 during the operation.
 
+### External target
+
+Implementation: `storage/backup_external.py` (network share),
+`storage/webdav.py` (WebDAV), flow in `background.py` (`external_transfer`),
+UI in `backup_external_routes.py`. Concept and rationale:
+`BACKUP_EXTERN_KONZEPT.md` (dev document).
+
+**Flow.** The backup worker creates the backup locally and then copies it to
+the target; only then does it clean up locally. The job stays `success` even if
+only the transfer fails — status, target, time and error text are stored in
+`backup_jobs.external_status` (`NULL`, `ok`, `failed`, `running`),
+`external_target`, `external_finished_at`, `external_error`. Backups from before
+the feature have `NULL` and are cleaned up as before.
+
+**Network share.** The app mounts nothing: it only sees shares that Home
+Assistant has mounted under `/media` or `/share` (`map` in `config.yaml`),
+discovered via `/proc/self/mountinfo`. A systemd automount (`autofs`) counts as
+mounted and is activated on first access. Because NFS can block indefinitely,
+test and transfer run behind a watchdog (`run_with_watchdog`): if the transfer
+makes no progress for 120 s, the app gives up and reports an error. The thread
+is left behind as a daemon, so a hanging mount occupies a thread but not the
+worker.
+
+**Transfer.** The file is written as `.zeitarchiv-backup-*.part` and renamed
+with `os.replace`, so a half-written file never exists under the final name.
+The modification time is preserved so retention ordering stays correct.
+Leftover `.part` files (abort, crash) are removed from the target after 24 h.
+With WebDAV the intermediate file is `.<name>.part`, completed via `PUT`,
+`PROPFIND` (size comparison) and `MOVE`; the client does not follow redirects
+but names the destination address in the error text.
+
+**Retention.** Locally the same count/age rule applies as before, with one
+exception: backups with `external_status` `failed` or `running` are not deleted
+until they have been transferred (`prune_backups(..., protected)`). At the
+target there is only "as local" or "never delete", and only files matching
+`zeitarchiv-backup-*.zip` are deleted. WebDAV has no reliable modification
+time; the order comes from the timestamp in the file name.
+
+**Troubleshooting a failed transfer.**
+
+1. The `backup.external_failed` notice and the "External" column on the Backup
+   page show the error text. It is deliberately worded for the UI ("Access
+   denied", "Login rejected (401)", certificate, timeout …).
+2. "Test connection" creates a test file and deletes it again, so the target
+   can be checked without waiting for a backup.
+3. "Transfer" or "Transfer again" in the backup table repeats the transfer of a single backup.
+   Independently, after every successful transfer the app tries to deliver
+   earlier pending backups.
+4. A transfer still running at restart is marked `failed`
+   (`recover_interrupted_backup_jobs`).
+
+**Password (WebDAV).** Only as the add-on option `webdav_password` in
+`options.json` (fallback: environment variable `ZEITARCHIV_WEBDAV_PASSWORD`),
+never in the index: the index is part of every backup, and the password would
+otherwise be copied to the target along with it. A change takes effect after
+restarting the add-on.
+
 ## Retention enforcement
 
 `storage/retention.py`, executed manually (preview + click) or scheduled (daily
