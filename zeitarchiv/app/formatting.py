@@ -286,6 +286,7 @@ DEMO_APPEND_INTERVAL_LABELS = {
 }
 BACKUP_KEEP_COUNT_LABELS = {
     "unlimited": N_("Unbegrenzt"),
+    "1": "1",
     "3": "3",
     "5": "5",
     "10": "10",

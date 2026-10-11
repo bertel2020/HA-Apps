@@ -685,13 +685,24 @@ def list_backups(backups_dir: Path) -> list[dict]:
     return [{"filename": p.name, "size_bytes": p.stat().st_size, "created_at": p.stat().st_mtime} for p in files]
 
 
-def prune_backups(backups_dir: Path, keep_count: int | None, keep_days: int | None, now: float) -> int:
+def prune_backups(
+    backups_dir: Path,
+    keep_count: int | None,
+    keep_days: int | None,
+    now: float,
+    protected: set[str] | None = None,
+) -> int:
     """Entfernt ältere Backups nach den beiden unabhängig wirksamen Regeln
     (None = die jeweilige Regel ist aus): die neuesten keep_count Backups
     bleiben unabhängig vom Alter erhalten, zusätzlich fällt jedes Backup weg,
     das älter als keep_days ist — ein Backup verschwindet also, sobald
     IRGENDEINE der beiden aktiven Regeln zutrifft. Gibt die Anzahl der
-    gelöschten Dateien zurück."""
+    gelöschten Dateien zurück.
+
+    protected: Dateinamen, die nie gelöscht werden (noch nicht auf das externe
+    Ziel übertragene Backups, siehe BACKUP_EXTERN_KONZEPT.md). Sie zählen für
+    keep_count mit, damit „Anzahl behalten“ die Zahl der übrigen Backups nicht
+    stillschweigend um die geschützten erhöht."""
     if keep_count is None and keep_days is None:
         return 0
     files = sorted(
@@ -703,7 +714,7 @@ def prune_backups(backups_dir: Path, keep_count: int | None, keep_days: int | No
     for i, path in enumerate(files):
         exceeds_count = keep_count is not None and i >= keep_count
         exceeds_age = keep_days is not None and (now - path.stat().st_mtime) / 86400 > keep_days
-        if exceeds_count or exceeds_age:
+        if (exceeds_count or exceeds_age) and path.name not in (protected or ()):
             path.unlink()
             removed += 1
     return removed

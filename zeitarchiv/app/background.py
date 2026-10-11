@@ -65,7 +65,7 @@ from .energiedashboard_routes import (
 )
 from .progress import JobBusy, JobProgress
 from .route_support import dir_size
-from .storage import backup, cleanup, hotbuffer, reconcile
+from .storage import backup, backup_external, cleanup, hotbuffer, reconcile
 from .storage import resolution as resolution_mod
 from .storage import retention as retention_mod
 from .storage.coordinator import StorageCoordinator
@@ -264,6 +264,7 @@ class BackgroundService:
         # Scheduler-Heartbeat unentdeckt. Nur relevant, während
         # backup_progress.running True ist (siehe notices.py).
         self.last_backup_worker_tick = time.time()
+        self._external_retry_lock = threading.Lock()
 
     def run_storage_reconciliation(self,
         *, entity_ids: list[str] | None = None, repair: bool
@@ -688,13 +689,23 @@ class BackgroundService:
                         "snapshot_mode": "entity-consistent",
                     },
                 )
-                keep_count_raw = self.index.get_setting("backup_keep_count", "unlimited")
-                keep_days_raw = self.index.get_setting("backup_keep_days", "unlimited")
-                keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
-                keep_days = retention_mod.RETENTION_DAYS.get(keep_days_raw)
+                keep_count, keep_days = self._backup_keep_rules()
+                protected = None
+                if backup_external.load_config(self.index).enabled:
+                    # Externes Ziel: erst übertragen, dann lokal aufräumen. Nicht
+                    # übertragene Backups bleiben lokal liegen (Konzept).
+                    self.index.update_backup_job(
+                        job_id, filename=dest_path.name, size_bytes=dest_path.stat().st_size,
+                    )
+                    current_ok = self.external_transfer(dest_path.name, job_id)
+                    if current_ok:
+                        self._retry_pending_external(exclude=dest_path.name)
+                    protected = self._unsent_backup_names()
+                    if not current_ok:
+                        protected.add(dest_path.name)
                 cleanup_error = None
                 try:
-                    backup.prune_backups(self.backups_dir, keep_count, keep_days, time.time())
+                    backup.prune_backups(self.backups_dir, keep_count, keep_days, time.time(), protected)
                 except OSError as exc:
                     cleanup_error = f"Backup gültig; alte Sicherungen konnten nicht bereinigt werden: {exc}"[:2000]
                     logger.exception(
@@ -741,6 +752,112 @@ class BackgroundService:
                 with self.backup_progress.lock:
                     self.backup_progress.running = False
                     self.backup_progress.job_id = None
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def _backup_keep_rules(self) -> tuple[int | None, int | None]:
+        keep_count_raw = self.index.get_setting("backup_keep_count", "unlimited")
+        keep_days_raw = self.index.get_setting("backup_keep_days", "unlimited")
+        keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
+        return keep_count, retention_mod.RETENTION_DAYS.get(keep_days_raw)
+
+    def _unsent_backup_names(self) -> set[str]:
+        """Backups, die lokal bleiben müssen: Übertragung fehlgeschlagen oder
+        noch im Gange. Alte Backups ohne Status (von vor der Einrichtung des
+        Ziels) gehören nicht dazu und werden wie bisher aufgeräumt."""
+        return {
+            filename
+            for filename, row in self.index.list_backup_external_states().items()
+            if row["external_status"] in (backup_external.STATUS_FAILED, backup_external.STATUS_RUNNING)
+        }
+
+    def external_transfer(self, filename: str, job_id: int | None = None) -> bool:
+        """Überträgt ein lokales Backup auf das externe Ziel und hält das Ergebnis
+        im Job fest. Wirft nie; True nur bei erfolgreicher Übertragung samt
+        Aufräumen am Ziel. Läuft über den Watchdog, damit ein hängender
+        Netzwerkspeicher den Worker nicht festhält."""
+        config = backup_external.load_config(self.index)
+        if job_id is None:
+            row = self.index.get_backup_job_by_filename(filename)
+            if row is None:
+                return False
+            job_id = int(row["id"])
+        source = self.backups_dir / filename
+        self.index.update_backup_job(
+            job_id, external_status=backup_external.STATUS_RUNNING,
+            external_target=config.mount, external_error=None,
+        )
+        keep_count, keep_days = self._backup_keep_rules()
+
+        def work(beat: Callable[[], None]) -> str:
+            target = backup_external.resolve_target(config.mount, config.subfolder)
+            backup_external.cleanup_stale_parts(target)
+
+            def on_beat() -> None:
+                beat()
+                self.last_backup_worker_tick = time.time()
+
+            backup_external.transfer(source, target, on_beat)
+            if config.keep == "same":
+                backup_external.prune_external(target, keep_count, keep_days, time.time())
+            return str(target)
+
+        try:
+            target = backup_external.run_with_watchdog(work)
+        except (backup_external.ExternalTargetError, OSError, ValueError) as exc:
+            logger.warning(
+                "Externes Backup fehlgeschlagen · event=backup_external_failed job_id=%s file=%s error=%s",
+                job_id, filename, exc,
+            )
+            self.index.update_backup_job(
+                job_id, external_status=backup_external.STATUS_FAILED,
+                external_finished_at=time.time(), external_error=str(exc)[:2000],
+            )
+            return False
+        logger.info(
+            "Externes Backup übertragen · event=backup_external_completed job_id=%s file=%s target=%s",
+            job_id, filename, target,
+        )
+        self.index.update_backup_job(
+            job_id, external_status=backup_external.STATUS_OK, external_target=target,
+            external_finished_at=time.time(), external_error=None,
+        )
+        return True
+
+    def _retry_pending_external(self, exclude: str | None = None) -> None:
+        """Nach einer gelungenen Übertragung die zuvor fehlgeschlagenen
+        nachholen, älteste zuerst; beim ersten Fehler Schluss (Ziel ist dann
+        offenbar wieder weg)."""
+        for filename, row in self.index.list_backup_external_states().items():
+            if filename == exclude or row["external_status"] != backup_external.STATUS_FAILED:
+                continue
+            if not (self.backups_dir / filename).is_file():
+                continue
+            if not self.external_transfer(filename, int(row["id"])):
+                return
+
+    def retry_external(self, filename: str) -> bool:
+        """„Erneut übertragen“: im Hintergrund, nie parallel zu einem Backup oder
+        einer anderen Übertragung. False, wenn nichts gestartet wurde."""
+        if self.backup_progress.running or not (self.backups_dir / filename).is_file():
+            return False
+        if not backup_external.load_config(self.index).enabled:
+            return False
+        if self.index.get_backup_job_by_filename(filename) is None:
+            return False
+        if not self._external_retry_lock.acquire(blocking=False):
+            return False
+        # Sofort sichtbar machen, bevor der Thread anläuft (sonst zeigt die
+        # sofort zurückgegebene Tabelle noch „fehlgeschlagen“).
+        row = self.index.get_backup_job_by_filename(filename)
+        self.index.update_backup_job(int(row["id"]), external_status=backup_external.STATUS_RUNNING)
+
+        def worker() -> None:
+            try:
+                self.external_transfer(filename)
+            finally:
+                self._external_retry_lock.release()
 
         threading.Thread(target=worker, daemon=True).start()
         return True

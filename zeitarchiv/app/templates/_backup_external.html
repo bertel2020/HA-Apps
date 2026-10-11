@@ -1,0 +1,82 @@
+{# Karte „Externes Ziel“ (BACKUP_EXTERN_KONZEPT.md). Per htmx von backup.html
+   nachgeladen und beim Speichern ersetzt. Die Auswahl der Freigabe kommt aus
+   backup_external.list_mounts(); es gibt bewusst kein freies Pfadfeld. #}
+<div id="backup-external-card">
+  <h3 style="margin:0 0 4px;">{{ _("Externes Ziel") }}</h3>
+  <p class="ext-hint">{{ _("Kopiert jedes erfolgreiche Backup zusätzlich auf einen Netzwerkspeicher. Das lokale Backup bleibt erhalten.") }}</p>
+
+  {% if ext.message %}<p class="ext-result ok" role="status">{{ ext.message }}</p>{% endif %}
+  {% if ext.error %}<p class="ext-result bad" role="alert">{{ ext.error }}</p>{% endif %}
+
+  <form id="backup-external-form" class="ext-form"
+        hx-post="backup/external" hx-target="#backup-external-card" hx-swap="outerHTML">
+    <div class="ext-seg" role="radiogroup" aria-label="{{ _('Ziel') }}">
+      <label><input type="radio" name="external_type" value="off" {% if ext.type != 'dir' %}checked{% endif %}><span>{{ _("Aus") }}</span></label>
+      <label><input type="radio" name="external_type" value="dir" {% if ext.type == 'dir' %}checked{% endif %}><span>{{ _("Netzwerkspeicher") }}</span></label>
+    </div>
+
+    <div class="ext-body">
+      {% if ext.mounts %}
+      <fieldset class="ext-mounts">
+        <legend>{{ _("Netzwerkspeicher aus Home Assistant") }}</legend>
+        {% for m in ext.mounts %}
+        <label class="ext-mount{% if not m.mounted %} disabled{% endif %}">
+          <input type="radio" name="external_mount" value="{{ m.path }}"
+                 {% if m.selected %}checked{% endif %}{% if not m.mounted %} disabled{% endif %}>
+          <span class="ext-mount-main">
+            <span><span class="ext-mono">{{ m.path }}</span> <span class="ext-pill{% if not m.mounted %} bad{% endif %}">{% if m.mounted %}{{ m.kind }}{% else %}{{ _("nicht eingebunden") }}{% endif %}</span></span>
+            {% if m.mounted %}
+            <span class="ext-sub">{% if m.source %}{{ m.source }}{% endif %}{% if m.free %} · {{ _("{free} frei von {total}", free=m.free, total=m.total) }}{% endif %}</span>
+            {% if m.used_percent is not none %}<span class="ext-bar" aria-hidden="true"><i style="width:{{ m.used_percent }}%"></i></span>{% endif %}
+            {% else %}
+            <span class="ext-sub">{{ _("Der Ordner existiert, ist aber keine Freigabe. Backups würden auf dem lokalen Datenträger landen.") }}</span>
+            {% endif %}
+          </span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      {% else %}
+      <div class="ext-none">
+        <strong>{{ _("Kein Netzwerkspeicher gefunden") }}</strong>
+        <p>{{ _("Zeitarchiv sieht nur Freigaben, die Home Assistant mit der Verwendung „Medien“ oder „Share“ eingebunden hat. Richte eine ein unter Einstellungen → System → Speicher → Netzwerkspeicher (NFS oder SMB/CIFS) und lade diese Seite neu. Die Verwendung „Backup“ ist nur für Home Assistants eigene Backups.") }}</p>
+      </div>
+      {% endif %}
+
+      <div class="ext-row">
+        <label class="ext-field">{{ _("Unterordner (optional)") }}
+          <input type="text" name="external_subfolder" value="{{ ext.subfolder }}" maxlength="64"
+                 placeholder="{{ _('z. B. zeitarchiv') }}" autocomplete="off">
+        </label>
+        <label class="ext-field">{{ _("Aufbewahrung am Ziel") }}
+          <select name="external_keep">
+            <option value="same" {% if ext.keep == 'same' %}selected{% endif %}>{{ _("wie lokal (Anzahl und Alter)") }}</option>
+            <option value="never" {% if ext.keep == 'never' %}selected{% endif %}>{{ _("Nie löschen") }}</option>
+          </select>
+        </label>
+      </div>
+      <p class="ext-note">{{ _("Gelöscht werden am Ziel nur Dateien nach dem Muster zeitarchiv-backup-*.zip. Backups, die noch nicht übertragen wurden, bleiben lokal erhalten.") }}</p>
+
+      <div class="ext-actions">
+        <button type="button" class="btn" hx-post="backup/external/test" hx-include="#backup-external-form"
+                hx-target="#backup-external-result" hx-swap="innerHTML" hx-disabled-elt="this"
+                {% if not ext.usable %}disabled{% endif %}>{{ _("Verbindung testen") }}</button>
+        <button type="submit" class="btn btn-primary" {% if not ext.usable %}disabled{% endif %}>{{ _("Speichern") }}</button>
+      </div>
+      <div id="backup-external-result" aria-live="polite"></div>
+    </div>
+    {# Beim Ausschalten genügt Speichern, auch ohne gefundene Freigaben. #}
+    <div class="ext-actions ext-off-actions">
+      <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
+    </div>
+  </form>
+
+  {% if ext.last %}
+  <p class="ext-last {{ 'bad' if ext.last.status == 'failed' else '' }}">
+    {% if ext.last.status == 'ok' %}
+      {{ _("Letzte Übertragung: {when}, {size} nach {target}", when=ext.last.when, size=ext.last.size, target=ext.last.target) }}
+    {% else %}
+      {{ _("Letzte Übertragung fehlgeschlagen ({when}): {error}", when=ext.last.when, error=ext.last.error | retranslate) }}
+    {% endif %}
+  </p>
+  {% endif %}
+</div>

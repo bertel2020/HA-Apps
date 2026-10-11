@@ -302,11 +302,15 @@ importieren. Eine Wiederherstellung wird vor der Anwendung geprüft
 bisherige Datenbestand wird vor dem Überschreiben verschoben, nicht
 gelöscht.
 
-Zeitarchiv spricht selbst kein S3/WebDAV/SMB — für ein Offsite-Ziel meldet
-die App stattdessen das letzte erfolgreiche Backup an die
-Home-Assistant-Integration, die daraus eine Sensor-Entity und ein
-Automations-Blueprint macht (siehe Integrations-README). Die eigentliche
-Übertragung übernimmt dann eine eigene Automation, z. B. mit `rclone`.
+Als **externes Ziel** kopiert die App jedes erfolgreiche Backup zusätzlich auf
+einen Netzwerkspeicher (NFS oder SMB/CIFS), den Home Assistant unter
+*Einstellungen → System → Speicher → Netzwerkspeicher* mit der Verwendung
+„Medien“ oder „Share“ einbindet. Zeitarchiv bindet nichts selbst ein, die
+Zugangsdaten bleiben bei Home Assistant. Für andere Ziele (S3, Cloud, WebDAV)
+meldet die App das letzte erfolgreiche Backup an die Home-Assistant-Integration,
+die daraus eine Sensor-Entity und ein Automations-Blueprint macht (siehe
+Integrations-README); die Übertragung übernimmt dann eine eigene Automation,
+z. B. mit `rclone`.
 
 ## Sicherheit und Netzwerk
 

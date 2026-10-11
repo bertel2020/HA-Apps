@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ _("Zeitarchiv — Backup / Restore") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/backup.css') }}">
+{% endblock %}
 {% block content %}
   
   <div class="page">
@@ -8,6 +11,7 @@
 
     <div class="settings-panel">
       {% include "_settings_backup_form.html" %}
+      <div id="backup-external-slot" hx-get="backup/external" hx-trigger="load" hx-swap="outerHTML"></div>
     </div>
   </div>
   <script src="{{ asset('vendor/htmx.min.js') }}"></script>

@@ -834,6 +834,17 @@ class Index:
         """Fügt Spalten nach, die es in einer schon laufenden Datenbank noch nicht gibt
         (z. B. friendly_name, nachträglich in Phase 2 ergänzt) — CREATE TABLE IF NOT EXISTS
         allein reicht dafür nicht, das legt nur neue Tabellen an."""
+        # Externes Backup-Ziel (BACKUP_EXTERN_KONZEPT.md): Übertragungsstatus je
+        # Backup-Lauf. NULL = nie übertragen (Backups von vor der Einrichtung).
+        bj_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(backup_jobs)")}
+        for column, ddl in (
+            ("external_status", "TEXT"),
+            ("external_target", "TEXT"),
+            ("external_finished_at", "REAL"),
+            ("external_error", "TEXT"),
+        ):
+            if column not in bj_columns:
+                self._conn.execute(f"ALTER TABLE backup_jobs ADD COLUMN {column} {ddl}")
         columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(entities)")}
         if "friendly_name" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN friendly_name TEXT")
@@ -1912,7 +1923,10 @@ class Index:
             return int(cur.lastrowid)
 
     def update_backup_job(self, job_id: int, **values) -> None:
-        allowed = {"started_at", "finished_at", "status", "filename", "size_bytes", "error"}
+        allowed = {
+            "started_at", "finished_at", "status", "filename", "size_bytes", "error",
+            "external_status", "external_target", "external_finished_at", "external_error",
+        }
         updates = {key: value for key, value in values.items() if key in allowed}
         if not updates:
             return
@@ -1943,6 +1957,25 @@ class Index:
                 "ORDER BY created_at DESC, id DESC LIMIT 1",
             ).fetchone()
 
+    def get_backup_job_by_filename(self, filename: str) -> sqlite3.Row | None:
+        """Jüngster erfolgreicher Lauf zu einer Backup-Datei (Übertragungsstatus)."""
+        with self._lock, self._conn:
+            return self._conn.execute(
+                "SELECT * FROM backup_jobs WHERE filename = ? AND status = 'success' "
+                "ORDER BY created_at DESC, id DESC LIMIT 1",
+                (filename,),
+            ).fetchone()
+
+    def list_backup_external_states(self) -> dict[str, sqlite3.Row]:
+        """Dateiname → Job-Zeile (jüngste je Datei) für die Spalte „Extern“ und
+        die Aufbewahrung. Nur erfolgreiche Läufe haben einen Dateinamen."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT * FROM backup_jobs WHERE status = 'success' AND filename IS NOT NULL "
+                "ORDER BY created_at ASC, id ASC"
+            ).fetchall()
+        return {row["filename"]: row for row in rows}
+
     def recover_interrupted_backup_jobs(self, now: float | None = None) -> int:
         finished_at = time.time() if now is None else now
         with self._lock, self._conn:
@@ -1952,7 +1985,16 @@ class Index:
                 "WHERE status IN ('queued', 'running')",
                 (finished_at,),
             )
-            return cur.rowcount
+            count = cur.rowcount
+            # Eine beim Beenden laufende Übertragung auf das externe Ziel gilt
+            # als fehlgeschlagen, sonst bliebe sie ewig „wird übertragen“.
+            self._conn.execute(
+                "UPDATE backup_jobs SET external_status = 'failed', external_finished_at = ?, "
+                "external_error = COALESCE(external_error, 'App wurde während der Übertragung beendet') "
+                "WHERE external_status = 'running'",
+                (finished_at,),
+            )
+            return count
 
     def create_retention_job(self, trigger: str, scheduled_for: float | None = None) -> int:
         now = time.time()

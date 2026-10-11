@@ -109,7 +109,10 @@ wie im Glocken-Icon der Zeitarchiv-UI (siehe `notices.py`,
 wenn noch keines gelungen ist (siehe `notices.latest_backup_info()`,
 `Index.get_last_successful_backup_job()`). Bewusst nur der letzte
 erfolgreiche Lauf, nicht der letzte Lauf überhaupt: ein fehlgeschlagener
-oder noch laufender Job hat keine reale, kopierbare Datei.
+oder noch laufender Job hat keine reale, kopierbare Datei. Ist ein externes
+Ziel eingerichtet, enthält es zusätzlich `external` (`status`: `ok`, `failed`
+oder `running`; `target`; `finished_at`) — rein additiv, ältere Integrationen
+ignorieren das Feld.
 
 `demo_mode` spiegelt die Add-on-Option gleichen Namens (siehe
 [Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) — `true`, solange

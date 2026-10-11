@@ -286,11 +286,14 @@ imported via drag &amp; drop. A restore is verified before being applied
 (checksums, ZIP structure, index integrity) and is rollback-capable: the
 existing data is moved aside before being overwritten, not deleted.
 
-Zeitarchiv itself does not speak S3/WebDAV/SMB — for an offsite target, the
-app instead reports the last successful backup to the Home Assistant
-integration, which turns it into a sensor entity and an automation blueprint
-(see the integration README). The actual transfer is then handled by an
-automation of your own, e.g. using `rclone`.
+As an **external target** the app additionally copies every successful backup
+to a network storage (NFS or SMB/CIFS) that Home Assistant mounts under
+*Settings → System → Storage → Network storage* with the usage “Media” or
+“Share”. Zeitarchiv mounts nothing itself, and the credentials stay with Home
+Assistant. For other targets (S3, cloud, WebDAV) the app reports the last
+successful backup to the Home Assistant integration, which turns it into a
+sensor entity and an automation blueprint (see the integration README); the
+transfer is then handled by an automation of your own, e.g. using `rclone`.
 
 ## Security and network
 

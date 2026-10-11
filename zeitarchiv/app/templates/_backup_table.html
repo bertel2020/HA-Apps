@@ -13,14 +13,29 @@
           </a>
         </th>
         {% endfor %}
+        {% if backup_show_external %}<th>{{ _("Extern") }}</th>{% endif %}
         <th></th>
       </tr>
       {% for b in backups %}
       <tr>
         <td>{{ b.created_at }}</td>
         <td>{{ b.size }}</td>
+        {% if backup_show_external %}
+        <td>
+          <span class="ext-pill-state {{ b.external_status }}"{% if b.external_error %} title="{{ b.external_error | retranslate }}"{% endif %}>
+            {% if b.external_status == 'ok' %}{{ _("übertragen") }}{% elif b.external_status == 'failed' %}{{ _("fehlgeschlagen") }}{% elif b.external_status == 'running' %}{{ _("wird übertragen") }}{% else %}{{ _("nicht übertragen") }}{% endif %}
+          </span>
+        </td>
+        {% endif %}
         <td style="text-align:right;">
           <span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;">
+            {% if b.external_can_retry %}
+            <button type="button" class="btn"
+                    hx-post="backup/external/retry/{{ b.filename }}"
+                    hx-target="#backup-table-wrap" hx-swap="outerHTML" hx-disabled-elt="this">
+              {% if b.external_status == 'failed' %}{{ _("Erneut übertragen") }}{% else %}{{ _("Übertragen") }}{% endif %}
+            </button>
+            {% endif %}
             <button type="button" class="btn"
                     hx-post="backup/verify/{{ b.filename }}"
                     hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">

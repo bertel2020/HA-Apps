@@ -1931,6 +1931,22 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   wiederherstellbares Backup in der Liste erscheint — bei einer zu großen
   oder beschädigten Datei bleibt der bisherige Datenbestand unangetastet.
   Obergrenzen: 2 GiB Upload, 5 GiB entpackt.
+- **Externes Ziel:** kopiert jedes erfolgreiche Backup zusätzlich auf einen
+  Netzwerkspeicher (NFS oder SMB/CIFS). Der Speicher wird in Home Assistant
+  eingerichtet (Einstellungen → System → Speicher → Netzwerkspeicher, Verwendung
+  „Medien“ oder „Share“, nicht „Backup“) und erscheint dann in der Karte
+  **Externes Ziel** zur Auswahl — mit freiem Platz; ein Ordner, der keine
+  eingebundene Freigabe ist, ist gesperrt, damit Backups nicht unbemerkt auf dem
+  lokalen Datenträger landen. Optional ein Unterordner. **Verbindung testen**
+  schreibt, liest und löscht eine Testdatei. Die Spalte **Extern** der Liste
+  zeigt je Backup „übertragen“, „fehlgeschlagen“ oder „nicht übertragen“, bei
+  einem Fehler gibt es **Erneut übertragen** und eine Meldung. Lokale Backups
+  bleiben, bis sie übertragen sind; danach greift die Aufbewahrung.
+  Bei „Anzahl behalten“ = 1 bleibt lokal nur das neueste Backup. Am Ziel werden
+  nur Dateien nach dem Muster `zeitarchiv-backup-*.zip` gelöscht. Typische
+  Fehler: bei NFS verweigert der Export des NAS den Zugriff (`root_squash`
+  oder fehlende Freigabe für die Home-Assistant-Adresse), bei CIFS stimmen
+  Benutzer oder Freigabe-Rechte nicht.
 - **Zeitplan:** automatisch nach Zeitplan (Intervall, Uhrzeit, ggf.
   Wochentag), mit automatischer Aufräumung älterer Backups nach Anzahl
   und/oder Alter, damit der Speicherplatz nicht unbegrenzt wächst.

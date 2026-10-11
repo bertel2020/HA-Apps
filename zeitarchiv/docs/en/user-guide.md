@@ -1789,6 +1789,20 @@ Menu item of its own **System → Backup / Restore** (not under Settings):
   appears in the list as a restorable backup — with a file that is too large or
   damaged, the existing inventory remains untouched. Upper limits: 2 GiB
   upload, 5 GiB unpacked.
+- **External target:** additionally copies every successful backup to a network
+  storage (NFS or SMB/CIFS). The storage is set up in Home Assistant (Settings →
+  System → Storage → Network storage, usage “Media” or “Share”, not “Backup”) and
+  then appears for selection in the **External target** card — with free space;
+  a folder that is not a mounted share is disabled so backups do not end up on
+  the local disk unnoticed. Optionally a subfolder. **Test connection** writes,
+  reads and deletes a test file. The **External** column of the list shows
+  “transferred”, “failed” or “not transferred” per backup; on failure there is
+  **Transfer again** and a notice. Local backups are kept until they have been
+  transferred; only then does retention apply. With “Keep count” = 1 only the
+  newest backup stays local. At the target only files matching
+  `zeitarchiv-backup-*.zip` are deleted. Typical errors: with NFS the NAS export
+  refuses access (`root_squash`, or the Home Assistant address is not allowed),
+  with CIFS the user or share permissions are wrong.
 - **Schedule:** automatically on a schedule (interval, time, weekday if
   applicable), with automatic cleanup of older backups by count and/or age so
   that storage does not grow without limit.

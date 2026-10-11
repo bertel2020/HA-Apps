@@ -493,6 +493,24 @@ def build_notices(
             "link": "/backup",
         })
 
+    # Externes Backup-Ziel (BACKUP_EXTERN_KONZEPT.md): das lokale Backup ist in
+    # Ordnung, aber nicht übertragen — ein stilles Scheitern wäre schlimmer als
+    # gar kein externes Ziel, weil man sich sicher fühlt.
+    if index.get_setting("backup_external_type", "off") == "dir":
+        external_jobs = [
+            row for row in index.list_backup_jobs(5) if row["external_status"] is not None
+        ]
+        if external_jobs and external_jobs[0]["external_status"] == "failed":
+            notices.append({
+                "id": "backup.external_failed",
+                "severity": "warn",
+                "title": tr("Externes Backup nicht übertragen"),
+                "detail": external_jobs[0]["external_error"]
+                or tr("Das letzte Backup konnte nicht auf das externe Ziel übertragen werden."),
+                "meta": tr("Sicherung"),
+                "link": "/backup",
+            })
+
     last_retention = index.list_retention_jobs(1)
     if last_retention and last_retention[0]["status"] == "failed":
         notices.append({
@@ -1153,11 +1171,19 @@ def latest_backup_info(index) -> dict | None:
     job = index.get_last_successful_backup_job()
     if job is None:
         return None
-    return {
+    info = {
         "filename": job["filename"],
         "size_bytes": job["size_bytes"],
         "finished_at": job["finished_at"],
     }
+    if job["external_status"] is not None:
+        # Rein additiv: ältere Integrationen ignorieren das Feld.
+        info["external"] = {
+            "status": job["external_status"],
+            "target": job["external_target"],
+            "finished_at": job["external_finished_at"],
+        }
+    return info
 
 
 def mute_notice(index, notice_id: str, title: str, detail: str, meta: str, until: float | None = None) -> None:

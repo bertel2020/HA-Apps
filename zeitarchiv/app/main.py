@@ -105,6 +105,7 @@ from .storage import (
     hotbuffer,
     import_reports,
 )
+from .storage import backup_external
 from .storage import query as query_mod
 from .storage.index import (
     DEFAULT_COMPACT_TARGET,
@@ -142,6 +143,7 @@ from .housekeeping_routes import (
     create_housekeeping_router,
     demo_data_context,
 )
+from .backup_external_routes import BackupExternalDependencies, create_backup_external_router
 from .export_routes import ExportDependencies, create_export_router
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
@@ -1722,14 +1724,23 @@ def _backup_list_context(sort: str = "created_at", direction: str = "desc", page
     raw = backup.list_backups(BACKUPS_DIR)
     raw.sort(key=lambda b: b[sort], reverse=(direction == "desc"))
     page_raw, pagination = _paginate(raw, page, page_size)
-    backups = [
-        {
+    external_states = index.list_backup_external_states()
+    external_enabled = backup_external.load_config(index).enabled
+    backups = []
+    for b in page_raw:
+        job = external_states.get(b["filename"])
+        status = job["external_status"] if job is not None else None
+        backups.append({
             "filename": b["filename"],
             "size": format_size(b["size_bytes"]),
             "created_at": f"{format_timestamp(b['created_at'], TZ)} {format_time(b['created_at'], TZ)}",
-        }
-        for b in page_raw
-    ]
+            "external_status": status or "none",
+            "external_error": (job["external_error"] if job is not None else None) or "",
+            "external_can_retry": external_enabled and job is not None and status in (None, "failed"),
+        })
+    show_external = external_enabled or any(
+        row["external_status"] for row in external_states.values()
+    )
 
     def _next_dir(column: str) -> str:
         return "asc" if sort == column and direction == "desc" else "desc"
@@ -1746,6 +1757,7 @@ def _backup_list_context(sort: str = "created_at", direction: str = "desc", page
     ]
     return {
         "backups": backups,
+        "backup_show_external": show_external,
         "backup_columns": columns,
         "backup_sort": sort,
         "backup_dir": direction,
@@ -1875,6 +1887,7 @@ def _backup_context(
         "backup_next_run": display_ts(str(next_ts) if next_ts is not None else None),
         "backup_last_success": display_ts(last_success_raw),
         "backup_last_failure": display_ts(index.get_setting("backup_last_failure", "")),
+        "backup_external_enabled": backup_external.load_config(index).enabled,
         "backup_keep_count": index.get_setting("backup_keep_count", "unlimited"),
         "backup_keep_count_options": list(BACKUP_KEEP_COUNT_LABELS.items()),
         "backup_keep_days": index.get_setting("backup_keep_days", "unlimited"),
@@ -5554,6 +5567,10 @@ app.include_router(_import_service.router())
 # hereingereichten Funktionen bleiben bewusst hier: sie werden auch vom
 # Hintergrund-Scheduler und von der Einstellungsseite gebraucht (siehe
 # Modul-Docstring in housekeeping_routes.py).
+app.include_router(create_backup_external_router(BackupExternalDependencies(
+    index=index, templates=templates, background=_background, tz=TZ,
+    backup_table_context=lambda: _backup_list_context(),
+)))
 app.include_router(create_export_router(ExportDependencies(
     index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
     visible_row_count=_visible_row_count, paginate_meta=_paginate_meta,

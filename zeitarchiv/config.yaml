@@ -11,6 +11,15 @@ arch:
   - amd64
   - aarch64
 init: false
+# Nur für das externe Backup-Ziel: Netzwerkspeicher, die Home Assistant mit der
+# Verwendung „Medien“ oder „Share“ einbindet, erscheinen so unter /media bzw.
+# /share (storage/backup_external.py). Geschrieben wird nur in den gewählten
+# Ordner.
+map:
+  - type: media
+    read_only: false
+  - type: share
+    read_only: false
 startup: application
 boot: auto
 stage: stable

@@ -105,7 +105,9 @@ the Zeitarchiv UI (see `notices.py`, `collect_notices()`). Each notice: `id`,
 yet (see `notices.latest_backup_info()`,
 `Index.get_last_successful_backup_job()`). Deliberately only the last
 successful run, not the last run at all: a failed or still running job has no
-real, copyable file.
+real, copyable file. If an external target is set up it additionally contains
+`external` (`status`: `ok`, `failed` or `running`; `target`; `finished_at`) —
+purely additive, older integrations ignore the field.
 
 `demo_mode` mirrors the add-on option of the same name (see [User guide → Demo
 mode](user-guide.md#demo-mode)) — `true` as long as this app instance runs with

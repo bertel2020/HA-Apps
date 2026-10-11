@@ -99,5 +99,15 @@
     </span>
   </label>
   </div>
-  <p class="hint hint-warn hint-warn-strong" style="margin:12px 0 0;">{{ _("Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen.") }}</p>
+  {% if backup_external_enabled %}
+  <p class="hint" style="margin:12px 0 0;">
+    {% if backup_keep_count == '1' %}{{ _("Lokal bleibt nur das neueste Backup (schneller Restore), ältere liegen nur auf dem externen Ziel. Ein Backup wird lokal erst gelöscht, wenn es erfolgreich übertragen wurde.") }}
+    {% else %}{{ _("Lokale Backups bleiben erhalten, bis sie erfolgreich auf das externe Ziel übertragen wurden. Erst dann greift die Aufbewahrung.") }}{% endif %}
+  </p>
+  {% else %}
+  <p class="hint hint-warn hint-warn-strong" style="margin:12px 0 0;">
+    {% if backup_keep_count == '1' %}{{ _("Ohne externes Ziel existiert dann nur noch ein einziges Backup. Fällt der Datenträger aus, ist es mit den Daten weg.") }}
+    {% else %}{{ _("Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen, oder unten ein externes Ziel einrichten.") }}{% endif %}
+  </p>
+  {% endif %}
 </form>
