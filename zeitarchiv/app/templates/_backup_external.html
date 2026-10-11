@@ -19,12 +19,21 @@
     <div class="ext-body">
       <div class="ext-dir">
       {% if ext.mounts %}
-      <fieldset class="ext-mounts">
+      {% set ready = ext.mounts | selectattr('mounted') | list %}
+      {% set idle = ext.mounts | rejectattr('mounted') | list %}
+      {# Eingeklappt bleibt nur die gewählte Freigabe sichtbar; ohne Auswahl startet die Karte aufgeklappt. #}
+      <fieldset class="ext-mounts{% if ext.mounts | selectattr('selected') | list %} collapsed{% endif %}">
         <legend>{{ _("Netzwerkspeicher aus Home Assistant") }}</legend>
-        {% for m in ext.mounts %}
+        <button type="button" class="ext-mounts-toggle" aria-expanded="{{ 'false' if ext.mounts | selectattr('selected') | list else 'true' }}"
+                onclick="toggleExtMounts(this)">
+          <span class="ext-mounts-arrow" aria-hidden="true">▸</span>
+          <span class="ext-mounts-hint ext-when-collapsed">{{ _("Ändern") }}</span>
+          <span class="ext-mounts-hint ext-when-open">{{ _("Einklappen") }}</span>
+        </button>
+        {% macro mount_row(m) %}
         <label class="ext-mount{% if not m.mounted %} disabled{% endif %}">
           <input type="radio" name="external_mount" value="{{ m.path }}"
-                 {% if m.selected %}checked{% endif %}{% if not m.mounted %} disabled{% endif %}>
+                 {% if m.selected %}checked{% endif %}{% if not m.mounted %} disabled{% else %} onchange="collapseExtMounts(this)"{% endif %}>
           <span class="ext-mount-main">
             <span><span class="ext-mono">{{ m.path }}</span> <span class="ext-pill{% if not m.mounted %} bad{% endif %}">{% if m.mounted %}{{ m.kind }}{% else %}{{ _("nicht eingebunden") }}{% endif %}</span></span>
             {% if m.mounted %}
@@ -35,7 +44,15 @@
             {% endif %}
           </span>
         </label>
-        {% endfor %}
+        {% endmacro %}
+        {% for m in ready %}{{ mount_row(m) }}{% endfor %}
+        {% if idle %}
+        {# Nicht wählbar, nur zur Information: bleibt immer zugeklappt, auch wenn die Karte neu geladen wird. #}
+        <details class="ext-idle">
+          <summary>{% if idle | length == 1 %}{{ _("1 weiterer Ordner (nicht eingebunden)") }}{% else %}{{ _("{n} weitere Ordner (nicht eingebunden)", n=idle | length) }}{% endif %}</summary>
+          {% for m in idle %}{{ mount_row(m) }}{% endfor %}
+        </details>
+        {% endif %}
       </fieldset>
       {% else %}
       <div class="ext-none">

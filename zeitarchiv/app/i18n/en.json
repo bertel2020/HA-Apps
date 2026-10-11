@@ -2345,6 +2345,10 @@
     "Zu wenig Platz am Ziel.": "Not enough space at the target.",
     "Zugriff verweigert. Das Ziel ist eingebunden, aber nicht beschreibbar. Bei NFS den Export des NAS prüfen (root_squash), bei CIFS Benutzer und Freigabe-Rechte.": "Access denied. The target is mounted but not writable. For NFS check the NAS export (root_squash), for CIFS the user and share permissions.",
     "nicht eingebunden": "not mounted",
+    "Ändern": "Change",
+    "Einklappen": "Collapse",
+    "1 weiterer Ordner (nicht eingebunden)": "1 more folder (not mounted)",
+    "{n} weitere Ordner (nicht eingebunden)": "{n} more folders (not mounted)",
     "nicht übertragen": "not transferred",
     "wie lokal (Anzahl und Alter)": "same as local (count and age)",
     "wird übertragen": "transferring",
@@ -2400,13 +2404,13 @@
     "Zur Übersicht ›": "Show overview ›",
     "Grundpreis": "Standing charge",
     "Tage": "days",
-    "{symbol}/Monat": "{symbol}/month",
     "Fester Betrag für den Stromanschluss in {symbol} pro Monat. Das Dashboard rechnet ihn tageweise auf den gewählten Zeitraum um (Monatswert × 12 ÷ 365 je Tag) und weist ihn getrennt vom Arbeitspreis aus.": "Fixed amount for the electricity connection in {symbol} per month. The dashboard converts it to the selected period day by day (monthly value × 12 ÷ 365 per day) and shows it separately from the energy price.",
     "Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Der Wert gilt bis zur nächsten Änderung, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume.": "Best use an entity or a helper (e.g. “Number”): the value applies until the next change, and earlier months stay correct after a tariff change. A fixed value applies retroactively to all periods.",
     "Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Jeder Wert gilt ab seinem Zeitpunkt, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen — sonst fehlt der Preis, sobald der letzte Wert länger zurückliegt.": "Best use an entity or a helper (e.g. “Number”): each value applies from its point in time, and earlier months stay correct after a tariff change. A fixed value applies retroactively to all periods. For a helper that rarely changes, set gap detection to “Off” in the entity’s settings — otherwise the price is missing as soon as its last value is older.",
     "Häufige Ursache: Die Preis-Entität hat zu lange keinen Wert gemeldet. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen.": "Common cause: the price entity has not reported a value for too long. For a helper that rarely changes, set gap detection to “Off” in the entity’s settings.",
     "Details im Status": "Details in the status",
-    "{label}: Für {menge} {einheit} ({anteil} %) liegt kein Preis vor, die Kosten sind deshalb zu niedrig.": "{label}: no price for {menge} {einheit} ({anteil} %), so the costs are too low."
+    "{label}: Für {menge} {einheit} ({anteil} %) liegt kein Preis vor, die Kosten sind deshalb zu niedrig.": "{label}: no price for {menge} {einheit} ({anteil} %), so the costs are too low.",
+    "{symbol}/Monat": "{symbol}/month"
   },
   "js": {
     "Meldungen": "Notices",

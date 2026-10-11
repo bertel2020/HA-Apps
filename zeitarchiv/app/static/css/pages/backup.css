@@ -30,6 +30,15 @@
 .ext-mount:has(input:checked){background:var(--accent-line-soft)}
 .ext-mount.disabled{cursor:not-allowed;opacity:.75}
 .ext-mount input{margin-top:4px;accent-color:var(--accent-line)}
+.ext-mounts{position:relative}
+.ext-mounts-toggle{position:absolute;top:-2px;right:8px;display:flex;gap:6px;align-items:center;background:var(--surface-alt);border:0;padding:0 4px;font:inherit;font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);cursor:pointer}
+.ext-mounts-arrow{display:inline-block;transition:transform .15s}
+.ext-mounts-toggle[aria-expanded="true"] .ext-mounts-arrow{transform:rotate(90deg)}
+.ext-mounts:not(.collapsed) .ext-when-collapsed,.ext-mounts.collapsed .ext-when-open{display:none}
+.ext-mounts.collapsed .ext-mount:not(:has(input:checked)),.ext-mounts.collapsed .ext-idle{display:none}
+.ext-mounts.collapsed .ext-mount:has(input:checked){border-top:0}
+.ext-idle{border-top:1px solid var(--border);margin-top:4px}
+.ext-idle summary{padding:10px 6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer}
 .ext-mount-main{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ext-sub{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);overflow-wrap:anywhere}
 .ext-bar{height:6px;width:140px;max-width:100%;border-radius:3px;background:var(--border);overflow:hidden;margin-top:4px}
