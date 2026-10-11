@@ -44,42 +44,41 @@
       </div>
       {% endif %}
 
-      <div class="ext-row">
-        <label class="ext-field">{{ _("Unterordner (optional)") }}
-          <input type="text" name="external_subfolder" value="{{ ext.subfolder }}" maxlength="64"
-                 placeholder="{{ _('z. B. zeitarchiv') }}" autocomplete="off">
-        </label>
-      </div>
+      <label class="ext-field ext-field-narrow">{{ _("Unterordner (optional)") }}
+        <input type="text" name="external_subfolder" value="{{ ext.subfolder }}" maxlength="64"
+               placeholder="{{ _('z. B. zeitarchiv') }}" autocomplete="off">
+      </label>
       </div>
 
       <div class="ext-webdav">
-        <div class="ext-row">
-          <label class="ext-field ext-field-wide">{{ _("Adresse des Zielordners") }}
-            <input type="text" name="external_url" value="{{ ext.webdav_url }}" maxlength="500"
-                   placeholder="https://cloud.example.de/remote.php/dav/files/benutzer/Zeitarchiv/" autocomplete="off" spellcheck="false">
-          </label>
+        <label class="ext-field">{{ _("Adresse des Zielordners") }}
+          <input type="text" name="external_url" value="{{ ext.webdav_url }}" maxlength="500"
+                 placeholder="https://cloud.example.de/remote.php/dav/files/benutzer/Zeitarchiv/" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="ext-pair">
           <label class="ext-field">{{ _("Benutzer") }}
             <input type="text" name="external_user" value="{{ ext.webdav_user }}" maxlength="200" autocomplete="off">
           </label>
+          <div class="ext-field">{{ _("Passwort") }}
+            <span class="ext-pw">
+              {% if ext.webdav_password_set %}<span class="ext-pill-state ok">{{ _("Passwort hinterlegt") }}</span>
+              {% else %}<span class="ext-pill-state failed">{{ _("Kein Passwort hinterlegt") }}</span>{% endif %}
+              <span class="ext-pw-short">{{ _("Nur in den Add-on-Optionen einstellbar") }}</span>
+            </span>
+          </div>
         </div>
-        <p class="ext-pw">
-          {% if ext.webdav_password_set %}<span class="ext-pill-state ok">{{ _("Passwort hinterlegt") }}</span>
-          {% else %}<span class="ext-pill-state failed">{{ _("Kein Passwort hinterlegt") }}</span>{% endif %}
-          <span class="ext-note-inline">{{ _("Das Passwort steht nur in den Add-on-Optionen (Einstellungen → Add-ons → Zeitarchiv → Konfiguration), damit es nicht in den Backups selbst landet. Nach einer Änderung das Add-on neu starten.") }}</span>
-        </p>
+        <p class="ext-note">{{ _("Das Passwort steht nur in den Add-on-Optionen (Einstellungen → Add-ons → Zeitarchiv → Konfiguration), damit es nicht in den Backups selbst landet. Nach einer Änderung das Add-on neu starten.") }}</p>
         <label class="ext-check"><input type="checkbox" name="external_insecure" value="1" {% if not ext.webdav_verify_tls %}checked{% endif %}>
           {{ _("Zertifikat nicht prüfen (selbst signiert)") }}</label>
         {% if ext.webdav_url.startswith('http://') %}<p class="ext-result bad" role="note">{{ _("Die Adresse beginnt mit http://. Benutzer und Passwort würden unverschlüsselt übertragen.") }}</p>{% endif %}
       </div>
 
-      <div class="ext-row">
-        <label class="ext-field">{{ _("Aufbewahrung am Ziel") }}
-          <select name="external_keep">
-            <option value="same" {% if ext.keep == 'same' %}selected{% endif %}>{{ _("wie lokal (Anzahl und Alter)") }}</option>
-            <option value="never" {% if ext.keep == 'never' %}selected{% endif %}>{{ _("Nie löschen") }}</option>
-          </select>
-        </label>
-      </div>
+      <label class="ext-field ext-field-narrow">{{ _("Aufbewahrung am Ziel") }}
+        <select name="external_keep">
+          <option value="same" {% if ext.keep == 'same' %}selected{% endif %}>{{ _("wie lokal (Anzahl und Alter)") }}</option>
+          <option value="never" {% if ext.keep == 'never' %}selected{% endif %}>{{ _("Nie löschen") }}</option>
+        </select>
+      </label>
       <p class="ext-note">{{ _("Gelöscht werden am Ziel nur Dateien nach dem Muster zeitarchiv-backup-*.zip. Backups, die noch nicht übertragen wurden, bleiben lokal erhalten.") }}</p>
 
       <div class="ext-actions">

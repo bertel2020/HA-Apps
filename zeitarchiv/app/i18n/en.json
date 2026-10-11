@@ -2382,7 +2382,9 @@
     "Ungültige Adresse. Erwartet wird eine vollständige Adresse mit http:// oder https://.": "Invalid address. A complete address starting with http:// or https:// is expected.",
     "WebDAV": "WebDAV",
     "Zertifikat nicht prüfen (selbst signiert)": "Do not check certificate (self-signed)",
-    "Zugriff verweigert (403). Fehlt dem Benutzer das Schreibrecht auf diesen Ordner?": "Access denied (403). Does the user lack write permission for this folder?"
+    "Zugriff verweigert (403). Fehlt dem Benutzer das Schreibrecht auf diesen Ordner?": "Access denied (403). Does the user lack write permission for this folder?",
+    "Passwort": "Password",
+    "Nur in den Add-on-Optionen einstellbar": "Only configurable in the add-on options"
   },
   "js": {
     "Meldungen": "Notices",
