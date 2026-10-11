@@ -111,6 +111,7 @@ def test_the_routes_mark_show_the_undo_hint_and_take_it_back(client) -> None:
         assert "counter-result" in marked.text and ">OK<" in marked.text  # schließbar
         assert index.get_deleted_counts("sensor.pytest_bulk", base, base + 3600) == {base + 2 * 300: 1}
         assert "counter-bulk" not in marked.text  # nichts Offenes mehr
+        assert "Aktuell ist 1 Wert zur Löschung markiert." in marked.text  # zentraler Hinweis samt Gesamtzahl
 
         vals = re.search(r"hx-vals='([^']+)'", marked.text).group(1).replace("&#34;", '"').replace("&quot;", '"')
         undone = client.post("/housekeeping/counter-decreases/undo", data=json.loads(vals))

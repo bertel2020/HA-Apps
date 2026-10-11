@@ -388,6 +388,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             ],
             "counter_bulk": bulk,
             "counter_result": result,
+            "marked_total": deps.index.count_marked_values(),
         }
 
     def _values_label(count: int) -> str:

@@ -2394,7 +2394,10 @@
     "vorher {previous}": "previously {previous}",
     "Nichts wird gelöscht, die Werte werden nur markiert.": "Nothing is deleted, the values are only marked.",
     "Markierte Werte zählen in Charts, Tabellen und Statistik nicht mehr mit.": "Marked values no longer count in charts, tables and statistics.",
-    "Du kannst sie jederzeit im Reiter „Markiert“ der Entität zurückholen. Gelöscht werden sie erst bei der endgültigen Bereinigung.": "You can bring them back at any time in the entity’s “Marked” tab. They are only deleted by the final cleanup."
+    "Du kannst sie jederzeit im Reiter „Markiert“ der Entität zurückholen. Gelöscht werden sie erst bei der endgültigen Bereinigung.": "You can bring them back at any time in the entity’s “Marked” tab. They are only deleted by the final cleanup.",
+    "Aktuell ist 1 Wert zur Löschung markiert.": "Currently 1 value is marked for deletion.",
+    "Aktuell sind {count} Werte zur Löschung markiert.": "Currently {count} values are marked for deletion.",
+    "Zur Übersicht ›": "Show overview ›"
   },
   "js": {
     "Meldungen": "Notices",

@@ -112,3 +112,6 @@
   </ul>
 </details>
 {% endif %}
+{% if marked_total %}
+<p class="counter-marked-total">{% if marked_total == 1 %}{{ _("Aktuell ist 1 Wert zur Löschung markiert.") }}{% else %}{{ _("Aktuell sind {count} Werte zur Löschung markiert.", count=(marked_total | format_int)) }}{% endif %} <a href="#speicherplatz">{{ _("Zur Übersicht ›") }}</a></p>
+{% endif %}
