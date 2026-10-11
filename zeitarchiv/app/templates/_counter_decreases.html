@@ -67,12 +67,19 @@
         </div>
 {% if counter_allowed %}
 <details class="counter-allowed">
-  <summary>{{ _("{count} Zähler mit erlaubten Rückgängen", count=counter_allowed | length) }}</summary>
-  <ul>
+  <summary>
+    <span class="counter-allowed-count">{{ _("{count} Zähler mit erlaubten Rückgängen", count=counter_allowed | length) }}</span>
+    <span class="counter-allowed-hint">{{ _("Für diese Zähler werden Rückgänge nicht gemeldet, weil sie sich planmäßig zurücksetzen.") }}</span>
+  </summary>
+  <ul class="counter-allowed-list">
     {% for row in counter_allowed %}
-    <li><a href="entities/{{ row.entity_id }}/config">{{ row.name }}</a>
-      <button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "report", "from": "housekeeping"}'
-              hx-target="#counter-decreases" hx-swap="innerHTML">{{ _("Wieder melden") }}</button></li>
+    <li>
+      <a href="entities/{{ row.entity_id }}/config" class="counter-allowed-entity">
+        <span class="name">{{ row.name }}</span>{% if row.name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
+      </a>
+      <span class="counter-allowed-action"><button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "report", "from": "housekeeping"}'
+              hx-target="#counter-decreases" hx-swap="innerHTML">{{ _("Wieder melden") }}</button></span>
+    </li>
     {% endfor %}
   </ul>
 </details>

@@ -2390,7 +2390,8 @@
     "1 Fehlwert markieren": "Mark 1 bad value",
     "{returning} Fehlwerte markieren": "Mark {returning} bad values",
     "Sie zählen in Charts, Tabellen und Statistik nicht mehr mit und werden erst bei der endgültigen Bereinigung gelöscht.": "They no longer count in charts, tables and statistics and are only deleted by the final cleanup.",
-    "OK": "OK"
+    "OK": "OK",
+    "Für diese Zähler werden Rückgänge nicht gemeldet, weil sie sich planmäßig zurücksetzen.": "Decreases are not reported for these counters because they reset on schedule."
   },
   "js": {
     "Meldungen": "Notices",
