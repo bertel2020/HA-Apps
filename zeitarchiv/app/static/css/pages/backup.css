@@ -39,10 +39,9 @@
 .ext-none{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);padding:12px;margin:0}
 .ext-none p{margin:6px 0 0;color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));max-width:70ch}
 .ext-field{display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);min-width:0}
-.ext-field input,.ext-field select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:7px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);min-width:0;max-width:100%}
+.ext-field input{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:7px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);min-width:0;max-width:100%}
 .ext-field input{width:100%}
 .ext-field-narrow{max-width:360px}
-.ext-field select{width:auto;max-width:100%}
 .ext-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 .ext-result{display:block;margin:10px 0 0;padding:10px 12px;border-radius:8px;font-size:calc(13px * var(--font-scale, 1))}
 .ext-result.ok{background:var(--accent-line-soft);border:1px solid var(--accent-line)}
@@ -56,3 +55,4 @@
 
 /* Aktionsknöpfe der Backup-Seite rechtsbündig */
 .backup-action{display:flex;justify-content:flex-end;}
+.ext-group{display:grid;gap:8px;min-width:0}

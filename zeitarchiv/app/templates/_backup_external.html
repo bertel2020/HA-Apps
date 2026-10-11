@@ -51,10 +51,15 @@
       </div>
 
       <div class="ext-webdav">
-        <label class="ext-field">{{ _("Adresse des Zielordners") }}
-          <input type="text" name="external_url" value="{{ ext.webdav_url }}" maxlength="500"
-                 placeholder="https://cloud.example.de/remote.php/dav/files/benutzer/Zeitarchiv/" autocomplete="off" spellcheck="false">
-        </label>
+        <div class="ext-group">
+          <label class="ext-field">{{ _("Adresse des Zielordners") }}
+            <input type="text" name="external_url" value="{{ ext.webdav_url }}" maxlength="500"
+                   placeholder="https://cloud.example.de/remote.php/dav/files/benutzer/Zeitarchiv/" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="ext-check"><input type="checkbox" name="external_insecure" value="1" {% if not ext.webdav_verify_tls %}checked{% endif %}>
+            {{ _("Zertifikat nicht prüfen (selbst signiert)") }}</label>
+          {% if ext.webdav_url.startswith('http://') %}<p class="ext-result bad" role="note">{{ _("Die Adresse beginnt mit http://. Benutzer und Passwort würden unverschlüsselt übertragen.") }}</p>{% endif %}
+        </div>
         <div class="ext-pair">
           <label class="ext-field">{{ _("Benutzer") }}
             <input type="text" name="external_user" value="{{ ext.webdav_user }}" maxlength="200" autocomplete="off">
@@ -68,17 +73,21 @@
           </div>
         </div>
         <p class="ext-note">{{ _("Das Passwort steht nur in den Add-on-Optionen (Einstellungen → Add-ons → Zeitarchiv → Konfiguration), damit es nicht in den Backups selbst landet. Nach einer Änderung das Add-on neu starten.") }}</p>
-        <label class="ext-check"><input type="checkbox" name="external_insecure" value="1" {% if not ext.webdav_verify_tls %}checked{% endif %}>
-          {{ _("Zertifikat nicht prüfen (selbst signiert)") }}</label>
-        {% if ext.webdav_url.startswith('http://') %}<p class="ext-result bad" role="note">{{ _("Die Adresse beginnt mit http://. Benutzer und Passwort würden unverschlüsselt übertragen.") }}</p>{% endif %}
       </div>
 
-      <label class="ext-field ext-field-narrow">{{ _("Aufbewahrung am Ziel") }}
-        <select name="external_keep">
-          <option value="same" {% if ext.keep == 'same' %}selected{% endif %}>{{ _("wie lokal (Anzahl und Alter)") }}</option>
-          <option value="never" {% if ext.keep == 'never' %}selected{% endif %}>{{ _("Nie löschen") }}</option>
-        </select>
-      </label>
+      {% set keep_options = [('same', _("wie lokal (Anzahl und Alter)")), ('never', _("Nie löschen"))] %}
+      {# <div> statt <label>: Ein Label leitet den Klick auf eine Zeile an den Auslöser weiter und öffnet das Popover sofort wieder. #}
+      <div class="ext-field ext-field-narrow">{{ _("Aufbewahrung am Ziel") }}
+        <span class="dd-picker-wrap">
+          <button type="button" class="btn" id="backup-external-keep-btn" onclick="toggleDDPicker('backup-external-keep')">{% for v, l in keep_options %}{% if v == ext.keep %}{{ l }}{% endif %}{% endfor %} ▾</button>
+          <input type="hidden" name="external_keep" id="backup-external-keep-input" value="{{ ext.keep }}">
+          <div class="dd-picker-popover" id="backup-external-keep-popover">
+            {% for value, label in keep_options %}
+            <div class="dd-picker-row{% if value == ext.keep %} active{% endif %}" onclick="selectDDOption('backup-external-keep', '{{ value }}', '{{ label }}')">{{ label }}</div>
+            {% endfor %}
+          </div>
+        </span>
+      </div>
       <p class="ext-note">{{ _("Gelöscht werden am Ziel nur Dateien nach dem Muster zeitarchiv-backup-*.zip. Backups, die noch nicht übertragen wurden, bleiben lokal erhalten.") }}</p>
 
       <div class="ext-actions">
