@@ -1770,8 +1770,32 @@ nor does a repeated Home Assistant import over the same period.
 
 ### CSV export
 
-From an entity's history view: download the complete raw data history of this
-one entity up to the export limit as CSV.
+Under **System → Export**, a wizard leads to the file in four steps:
+
+1. **Entities:** tick what should be exported — filtered by type, unit or
+   search term, or all at once.
+2. **Period:** everything, one year, one month, or a free from/to range. Pick a
+   year for an annual backup, a single month for an analysis.
+3. **Resolution:** raw values, minute, hour or day. A coarser resolution makes
+   the files much smaller; the timestamp then shows the start of the interval.
+   Ordinary sensors are averaged, counters and switches use the last value of
+   the interval (in local time).
+4. **Review and download:** shows the row count of the largest file in the
+   chosen period and blocks the download if it exceeds the limit.
+
+One entity produces one CSV, several automatically produce a ZIP with one CSV
+each. Several entities in one shared file are deliberately not offered: raw
+values have their own timestamps per entity, so the file would consist mostly of
+empty cells. The columns are `timestamp` (local time), `unix_ts` and `value`.
+
+The export limit of 5 million rows applies per file. For per-second values
+(about 2 million rows per year), one year is still possible, several years raw
+are not — adjust the period or the resolution. The row count shown beforehand
+is an estimate: values marked for deletion are not subtracted, and a partially
+covered month is calculated proportionally by time.
+
+The **Download CSV** button in a row of the list still downloads the complete
+history of that entity as raw values immediately.
 
 ## Backup / Restore
 

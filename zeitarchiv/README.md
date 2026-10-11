@@ -246,8 +246,9 @@ Jeder Import bleibt als Report nachvollziehbar; bereits vorhandene
 Zeitstempel werden dabei nie dupliziert. Der laufende Monat wird automatisch
 im Hot Buffer ergänzt; historische Lücken in abgeschlossenen Archiven lassen
 sich optional schließen. Der Dry Run stellt zusätzlich eine ausführliche
-Debug-Datei zur Diagnose bereit. Die vollständige Rohdatenhistorie einer
-Entität lässt sich als CSV exportieren.
+Debug-Datei zur Diagnose bereit. Unter System → Export führt ein
+Assistent zur CSV-Datei (mehrere Entitäten als ZIP): mit Zeitraum und wahlweise
+gröberer Auflösung (Minute, Stunde, Tag) statt der kompletten Rohwerte.
 
 ## Screenshots
 

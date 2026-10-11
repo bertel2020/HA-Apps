@@ -1909,9 +1909,32 @@ dupliziert also nichts, ebenso wenig ein wiederholter Home-Assistant-Import
 
 ### CSV-Export
 
-Von der Verlaufsansicht einer Entität aus: die vollständige
-Rohdatenhistorie dieser einen Entität bis zum Exportlimit als CSV
-herunterladen.
+Unter **System → Export** führt ein Assistent in vier Schritten zur Datei:
+
+1. **Entitäten:** ankreuzen, was exportiert werden soll — gefiltert nach Typ,
+   Einheit oder Suchbegriff, auch alle auf einmal.
+2. **Zeitraum:** Alles, ein Jahr, ein Monat oder frei von/bis. Für ein
+   Jahres-Backup ein Jahr wählen, für eine Auswertung einen einzelnen Monat.
+3. **Auflösung:** Rohwerte, Minute, Stunde oder Tag. Gröbere Auflösung macht
+   die Dateien deutlich kleiner; im Zeitstempel steht dann der Beginn des
+   Intervalls. Gemittelt wird bei normalen Sensoren, bei Zählern und Schaltern
+   gilt der letzte Wert des Intervalls (in lokaler Zeit).
+4. **Prüfen und herunterladen:** zeigt die Zeilenzahl der größten Datei im
+   gewählten Zeitraum und sperrt den Download, wenn sie über dem Limit liegt.
+
+Eine Entität ergibt eine CSV, mehrere ergeben automatisch ein ZIP mit je einer
+CSV. Mehrere Entitäten in einer gemeinsamen Datei gibt es bewusst nicht: Rohwerte
+haben je Entität eigene Zeitstempel, die Datei bestünde größtenteils aus leeren
+Zellen. Die Spalten sind `timestamp` (lokale Zeit), `unix_ts` und `value`.
+
+Das Exportlimit von 5 Millionen Zeilen gilt je Datei. Bei Sekundenwerten
+(rund 2 Millionen Zeilen pro Jahr) ist ein Jahr also noch möglich, mehrere Jahre
+roh nicht mehr — dafür Zeitraum oder Auflösung anpassen. Die Zeilenzahl vorab
+ist eine Schätzung: zur Löschung markierte Werte sind nicht abgezogen, ein
+angeschnittener Monat wird anteilig nach Zeit gerechnet.
+
+Der Button **CSV herunterladen** in einer Zeile der Liste lädt weiterhin sofort
+die komplette Historie dieser Entität als Rohwerte.
 
 ## Backup / Restore
 

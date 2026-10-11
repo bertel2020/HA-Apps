@@ -233,8 +233,9 @@ sources can also still be imported individually. Every import remains
 traceable as a report; timestamps that already exist are never duplicated. The
 current month is automatically supplemented in the hot buffer; historical gaps
 in completed archives can optionally be closed. The dry run additionally
-provides a detailed debug file for diagnosis. The complete raw data history of
-an entity can be exported as CSV.
+provides a detailed debug file for diagnosis. Under System → Export, a wizard
+leads to the CSV file (several entities as a ZIP): with a period and optionally
+a coarser resolution (minute, hour, day) instead of the complete raw values.
 
 ## Screenshots
 
