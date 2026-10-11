@@ -26,8 +26,36 @@
 <div class="counter-bulk">
   <p><strong>{{ counter_bulk.lead }}</strong> {{ counter_bulk.rest }}</p>
   <button type="button" class="btn primary" hx-post="housekeeping/counter-decreases/mark-returning" hx-target="#counter-decreases" hx-swap="innerHTML"
-          hx-confirm="{{ counter_bulk.confirm }}" data-confirm-label="{{ counter_bulk.confirm_label }}">{{ counter_bulk.button }}</button>
+          hx-confirm="{{ counter_bulk.confirm }}" data-confirm-label="{{ counter_bulk.confirm_label }}" data-confirm-template="#counter-bulk-confirm">{{ counter_bulk.button }}</button>
 </div>
+{# Inhalt des Bestätigungsdialogs (confirm-dialog.js zeigt ihn statt des reinen Fragetexts an). #}
+<template id="counter-bulk-confirm">
+  <div class="cbc">
+    <p class="cbc-title">{{ counter_bulk.title }}</p>
+    <p class="cbc-lead">{{ _("Der Zählerstand fiel kurz ab und stieg sofort wieder auf den alten Wert. Das sieht nach Messfehlern aus.") }}</p>
+    <div class="cbc-list">
+      <div class="cbc-head">{{ _("Betroffene Werte") }}</div>
+      {% for entry in counter_bulk.entries %}
+      <div class="cbc-row">
+        <div class="cbc-entity"><span class="cbc-name">{{ entry.name }}</span>{% if entry.entity_id %}<span class="cbc-id">{{ entry.entity_id }}</span>{% endif %}</div>
+        <div class="cbc-values">
+          {% for d in entry.details %}
+          <div><span>{{ d.when }} · <strong>{{ d.value }}</strong></span><span class="cbc-sub">{{ _("vorher {previous}", previous=d.previous) }}</span></div>
+          {% else %}
+          <div>{{ entry.count_label }}</div>
+          {% endfor %}
+          {% if entry.more %}<div class="cbc-sub">{{ _("… und {count} weitere", count=entry.more) }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <ul class="cbc-effects">
+      <li>{{ _("Nichts wird gelöscht, die Werte werden nur markiert.") }}</li>
+      <li>{{ _("Markierte Werte zählen in Charts, Tabellen und Statistik nicht mehr mit.") }}</li>
+      <li>{{ _("Du kannst sie jederzeit im Reiter „Markiert“ der Entität zurückholen. Gelöscht werden sie erst bei der endgültigen Bereinigung.") }}</li>
+    </ul>
+  </div>
+</template>
 {% endif %}
         <div class="tbl-wrap">
           {% if counter_decreases %}

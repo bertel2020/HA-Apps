@@ -2190,6 +2190,8 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
   transform:translateY(4px) scale(.98);transition:transform .12s ease;
 }
 .confirm-overlay.open{transform:translateY(0) scale(1);}
+/* Gegliederter Inhalt (opts.template): breiter, damit Tabellenzeilen nicht umbrechen. */
+.confirm-overlay:has(.confirm-rich:not([hidden])){width:min(540px, calc(100vw - 32px));}
 .confirm-overlay::backdrop{background:rgba(0,0,0,.4);}
 .confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);white-space:pre-line;}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}

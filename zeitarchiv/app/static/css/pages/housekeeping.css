@@ -249,3 +249,25 @@
   .counter-allowed-list li{grid-template-columns:minmax(0,1fr);padding:10px 14px;}
   .counter-allowed-action{padding-left:0;}
 }
+
+/* Bestätigungsdialog „Fehlwerte markieren“ (<template id="counter-bulk-confirm">, gezeigt von confirm-dialog.js):
+   Frage, ein Satz, Tabelle der betroffenen Werte, drei Folgen. */
+.cbc-title{margin:0 0 6px;font-size:calc(17px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+.cbc-lead{margin:0 0 14px;font-size:calc(13.5px * var(--font-scale, 1));line-height:1.5;color:var(--ink-muted);}
+.cbc-list{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:0 0 14px;}
+.cbc-head{padding:8px 14px;background:var(--surface-alt);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.cbc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:6px 14px;padding:10px 14px;border-top:1px solid var(--border);}
+.cbc-entity{min-width:0;}
+.cbc-name{display:block;font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);overflow-wrap:anywhere;}
+.cbc-id{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);overflow-wrap:anywhere;}
+.cbc-values{text-align:right;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);display:grid;gap:6px;flex:none;}
+.cbc-values strong{font-weight:600;}
+.cbc-values > div{display:grid;}
+.cbc-sub{color:var(--ink-muted);}
+.cbc-effects{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:calc(13.5px * var(--font-scale, 1));line-height:1.45;color:var(--ink);}
+.cbc-effects li{display:flex;gap:10px;}
+.cbc-effects li::before{content:"✓";flex:none;color:var(--positive);font-weight:700;}
+@media (max-width:480px){
+  .cbc-row{flex-direction:column;}
+  .cbc-values{text-align:left;}
+}

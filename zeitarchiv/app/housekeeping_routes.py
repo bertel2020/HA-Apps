@@ -297,13 +297,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 ),
                 "verdict": verdict,
                 "note": note,
-                "returning_lines": [
-                    tr(
-                        "{when}: {value} (vorher {previous})",
-                        when=f"{format_timestamp(item['ts'], deps.tz)[:6]} {format_time(item['ts'], deps.tz)[:5]}",
-                        value=_keep_together(notices_mod.counter_value_label(item["value"], row)),
-                        previous=_keep_together(notices_mod.counter_value_label(item["previous"], row)),
-                    )
+                "returning_detail": [
+                    {
+                        "when": f"{format_timestamp(item['ts'], deps.tz)[:6]} {format_time(item['ts'], deps.tz)[:5]}",
+                        "value": _keep_together(notices_mod.counter_value_label(item["value"], row)),
+                        "previous": _keep_together(notices_mod.counter_value_label(item["previous"], row)),
+                    }
                     for item in reversed(row.get("returning_items") or [])
                 ],
             })
@@ -354,32 +353,32 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         bulk = None
         if returning:
             total = sum(row["count"] for row in rows)
-            lines = []
+            entries = []
             for row in rows:
                 if not row["returning"]:
                     continue
-                lines.append(f"• {row['friendly_name'] or row['entity_id']}")
-                shown = row["returning_lines"][:3]
-                if shown:
-                    lines.extend(f"– {line}" for line in shown)
-                    if row["returning"] > len(shown):
-                        lines.append("– " + tr("… und {count} weitere", count=row["returning"] - len(shown)))
-                else:  # Schnappschuss aus einer älteren Version: nur die Anzahl bekannt
-                    lines.append("– " + _values_label(row["returning"]))
+                shown = row["returning_detail"][:3]
+                name = row["friendly_name"] or row["entity_id"]
+                entries.append({
+                    "name": name,
+                    "entity_id": row["entity_id"] if name != row["entity_id"] else "",
+                    "details": shown,
+                    "more": max(0, row["returning"] - len(shown)) if shown else 0,
+                    # Schnappschuss aus einer älteren Version: nur die Anzahl bekannt
+                    "count_label": _values_label(row["returning"]),
+                })
             what = tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)
+            title = tr("{what} markieren?", what=what)
             bulk = {
                 "lead": tr("{returning} von {total} Rückgängen kehren sofort zurück", returning=returning, total=total),
                 "rest": tr("und sehen nach Fehlwerten aus."),
                 "button": tr("1 Fehlwert markieren …") if returning == 1 else tr("{returning} Fehlwerte markieren …", returning=returning),
                 "confirm_label": tr("1 Fehlwert markieren") if returning == 1 else tr("{returning} Fehlwerte markieren", returning=returning),
-                "confirm": "\n".join((
-                    tr("{what} markieren?", what=what),
-                    "",
-                    tr("Bei diesen Zählern ist der Stand kurz abgefallen und gleich wieder auf den alten Wert gestiegen. Das sieht nach Messfehlern aus:"),
-                    *lines,
-                    "",
-                    tr("Die Werte werden nur markiert, nicht gelöscht. In Charts, Tabellen und Statistik zählen sie dann nicht mehr. Im Reiter „Markiert“ der Entität lassen sie sich jederzeit zurückholen; gelöscht werden sie erst bei der endgültigen Bereinigung."),
-                )),
+                # Die Frage für htmx (hx-confirm braucht einen Text); angezeigt wird der gegliederte Inhalt
+                # aus dem <template> in _counter_decreases.html.
+                "confirm": title,
+                "title": title,
+                "entries": entries,
             }
         return {
             "counter_decreases": rows,

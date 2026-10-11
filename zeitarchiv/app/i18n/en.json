@@ -2383,15 +2383,18 @@
     "Nur in den Add-on-Optionen einstellbar": "Only configurable in the add-on options",
     "nach {minutes} Min. wieder bei {value}": "back at {value} after {minutes} min",
     "Als normal erlauben": "Allow as normal",
-    "Bei diesen Zählern ist der Stand kurz abgefallen und gleich wieder auf den alten Wert gestiegen. Das sieht nach Messfehlern aus:": "For these counters the reading dropped briefly and rose straight back to the previous value. That looks like measurement errors:",
-    "{when}: {value} (vorher {previous})": "{when}: {value} (previously {previous})",
     "… und {count} weitere": "… and {count} more",
-    "Die Werte werden nur markiert, nicht gelöscht. In Charts, Tabellen und Statistik zählen sie dann nicht mehr. Im Reiter „Markiert“ der Entität lassen sie sich jederzeit zurückholen; gelöscht werden sie erst bei der endgültigen Bereinigung.": "The values are only marked, not deleted. They no longer count in charts, tables and statistics. You can bring them back at any time in the entity’s “Marked” tab; they are only deleted by the final cleanup.",
     "1 Fehlwert markieren": "Mark 1 bad value",
     "{returning} Fehlwerte markieren": "Mark {returning} bad values",
     "Sie zählen in Charts, Tabellen und Statistik nicht mehr mit und werden erst bei der endgültigen Bereinigung gelöscht.": "They no longer count in charts, tables and statistics and are only deleted by the final cleanup.",
     "OK": "OK",
-    "Für diese Zähler werden Rückgänge nicht gemeldet, weil sie sich planmäßig zurücksetzen.": "Decreases are not reported for these counters because they reset on schedule."
+    "Für diese Zähler werden Rückgänge nicht gemeldet, weil sie sich planmäßig zurücksetzen.": "Decreases are not reported for these counters because they reset on schedule.",
+    "Der Zählerstand fiel kurz ab und stieg sofort wieder auf den alten Wert. Das sieht nach Messfehlern aus.": "The counter reading dropped briefly and rose straight back to the previous value. That looks like measurement errors.",
+    "Betroffene Werte": "Affected values",
+    "vorher {previous}": "previously {previous}",
+    "Nichts wird gelöscht, die Werte werden nur markiert.": "Nothing is deleted, the values are only marked.",
+    "Markierte Werte zählen in Charts, Tabellen und Statistik nicht mehr mit.": "Marked values no longer count in charts, tables and statistics.",
+    "Du kannst sie jederzeit im Reiter „Markiert“ der Entität zurückholen. Gelöscht werden sie erst bei der endgültigen Bereinigung.": "You can bring them back at any time in the entity’s “Marked” tab. They are only deleted by the final cleanup."
   },
   "js": {
     "Meldungen": "Notices",
