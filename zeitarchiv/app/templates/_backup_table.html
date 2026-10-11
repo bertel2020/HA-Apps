@@ -88,11 +88,13 @@
       {% endfor %}
     </select>
   </div>
-  <button type="button" class="btn btn-danger" style="margin-top:14px;"
-          hx-post="backup/delete-all" hx-target="#backup-status" hx-swap="outerHTML"
-          hx-confirm="{{ _('Alle {backup_total} Backups endgültig löschen?', backup_total=backup_total) }}">
-    {{ _("Alle Backups löschen") }}
-  </button>
+  <div class="backup-action" style="margin-top:14px;">
+    <button type="button" class="btn btn-danger"
+            hx-post="backup/delete-all" hx-target="#backup-status" hx-swap="outerHTML"
+            hx-confirm="{{ _('Alle {backup_total} Backups endgültig löschen?', backup_total=backup_total) }}">
+      {{ _("Alle Backups löschen") }}
+    </button>
+  </div>
   {% else %}
   <p class="hint hint-status" style="margin-top:10px;">{{ _("Noch kein Backup erstellt.") }}</p>
   {% endif %}

@@ -48,9 +48,11 @@
       </p>
     </form>
   </div>
-  <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
-    {{ _("Backup jetzt erstellen") }}
-  </button>
+  <div class="backup-action">
+    <button type="button" class="btn primary" hx-post="backup/start" hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
+      {{ _("Backup jetzt erstellen") }}
+    </button>
+  </div>
   {% include "_backup_table.html" %}
   {% if backup_jobs %}
   <h3 style="margin:24px 0 10px;">{{ _("Ausführungsverlauf") }}</h3>
