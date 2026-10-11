@@ -2,19 +2,31 @@
    (counter_bulk.py) tauscht dieses Partial per hx-target="#counter-decreases" aus. #}
 {% if counter_result %}
 <div class="counter-result" role="status">
-  <span>{{ counter_result.message }}</span>
-  {% if counter_result.undo_vals %}
-  <button type="button" class="btn btn-sm" hx-post="housekeeping/counter-decreases/undo" hx-target="#counter-decreases" hx-swap="innerHTML"
-          hx-vals='{{ counter_result.undo_vals }}'>{{ _("Rückgängig") }}</button>
-  <a href="{{ counter_result.link }}">{{ _("Markierte Werte ansehen ›") }}</a>
-  {% endif %}
+  <div class="counter-result-main">
+    <strong>{{ counter_result.message }}</strong>
+    {% if counter_result.entries %}
+    <ul class="counter-result-list">
+      {% for item in counter_result.entries %}
+      <li><span>{{ item.name }} · {{ item.count_label }}</span> <a href="{{ item.link }}">{{ _("Markierte Werte ansehen ›") }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if counter_result.note %}<p class="counter-result-note">{{ counter_result.note }}</p>{% endif %}
+  </div>
+  <div class="counter-result-actions">
+    {% if counter_result.undo_vals %}
+    <button type="button" class="btn btn-sm" hx-post="housekeeping/counter-decreases/undo" hx-target="#counter-decreases" hx-swap="innerHTML"
+            hx-vals='{{ counter_result.undo_vals }}'>{{ _("Rückgängig") }}</button>
+    {% endif %}
+    <button type="button" class="btn btn-sm" onclick="this.closest('.counter-result').remove()">{{ _("OK") }}</button>
+  </div>
 </div>
 {% endif %}
 {% if counter_bulk %}
 <div class="counter-bulk">
   <p><strong>{{ counter_bulk.lead }}</strong> {{ counter_bulk.rest }}</p>
   <button type="button" class="btn primary" hx-post="housekeeping/counter-decreases/mark-returning" hx-target="#counter-decreases" hx-swap="innerHTML"
-          hx-confirm="{{ counter_bulk.confirm }}">{{ counter_bulk.button }}</button>
+          hx-confirm="{{ counter_bulk.confirm }}" data-confirm-label="{{ counter_bulk.confirm_label }}">{{ counter_bulk.button }}</button>
 </div>
 {% endif %}
         <div class="tbl-wrap">

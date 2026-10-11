@@ -297,6 +297,15 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 ),
                 "verdict": verdict,
                 "note": note,
+                "returning_lines": [
+                    tr(
+                        "{when}: {value} (vorher {previous})",
+                        when=f"{format_timestamp(item['ts'], deps.tz)[:6]} {format_time(item['ts'], deps.tz)[:5]}",
+                        value=_keep_together(notices_mod.counter_value_label(item["value"], row)),
+                        previous=_keep_together(notices_mod.counter_value_label(item["previous"], row)),
+                    )
+                    for item in reversed(row.get("returning_items") or [])
+                ],
             })
         # Zähler mit der Regel „Fehlwerte automatisch markieren“: ihr Stand neben den offenen Rückgängen,
         # auch wenn nichts mehr offen ist (die Regel hat es ja schon erledigt).
@@ -345,20 +354,31 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         bulk = None
         if returning:
             total = sum(row["count"] for row in rows)
-            lines = [
-                tr("{name}: {count}", name=row["friendly_name"] or row["entity_id"], count=_values_label(row["returning"]))
-                for row in rows if row["returning"]
-            ]
+            lines = []
+            for row in rows:
+                if not row["returning"]:
+                    continue
+                lines.append(f"• {row['friendly_name'] or row['entity_id']}")
+                shown = row["returning_lines"][:3]
+                if shown:
+                    lines.extend(f"– {line}" for line in shown)
+                    if row["returning"] > len(shown):
+                        lines.append("– " + tr("… und {count} weitere", count=row["returning"] - len(shown)))
+                else:  # Schnappschuss aus einer älteren Version: nur die Anzahl bekannt
+                    lines.append("– " + _values_label(row["returning"]))
+            what = tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)
             bulk = {
                 "lead": tr("{returning} von {total} Rückgängen kehren sofort zurück", returning=returning, total=total),
                 "rest": tr("und sehen nach Fehlwerten aus."),
                 "button": tr("1 Fehlwert markieren …") if returning == 1 else tr("{returning} Fehlwerte markieren …", returning=returning),
+                "confirm_label": tr("1 Fehlwert markieren") if returning == 1 else tr("{returning} Fehlwerte markieren", returning=returning),
                 "confirm": "\n".join((
-                    tr("{what} markieren?", what=tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)),
-                    tr("Markiert werden die Werte, auf die der Zähler kurz fiel und von denen er sofort zurückkehrte:"),
-                    *(f"• {line}" for line in lines),
+                    tr("{what} markieren?", what=what),
                     "",
-                    tr("Sie bleiben im Reiter „Markiert“ und lassen sich zurücknehmen. Endgültig entfernt wird nichts."),
+                    tr("Bei diesen Zählern ist der Stand kurz abgefallen und gleich wieder auf den alten Wert gestiegen. Das sieht nach Messfehlern aus:"),
+                    *lines,
+                    "",
+                    tr("Die Werte werden nur markiert, nicht gelöscht. In Charts, Tabellen und Statistik zählen sie dann nicht mehr. Im Reiter „Markiert“ der Entität lassen sie sich jederzeit zurückholen; gelöscht werden sie erst bei der endgültigen Bereinigung."),
                 )),
             }
         return {
@@ -1315,14 +1335,23 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             if not entity_ids:
                 return {"message": tr("Nichts zu markieren: es kehrt kein Rückgang mehr zurück.")}
             one = len(entity_ids) == 1
+            items = []
+            for entity_id in entity_ids:
+                entity = deps.index.get_entity(entity_id)
+                items.append({
+                    "name": (entity is not None and (entity["custom_name"] or entity["friendly_name"])) or entity_id,
+                    "count_label": _values_label(outcome["entities"][entity_id]),
+                    "link": f"entities/{entity_id}/cleanup?tab=marked",
+                })
             return {
                 "message": (
                     tr("{values} markiert.", values=_values_label(outcome["values"]))
                     if one else
                     tr("{values} bei {entities} Entitäten markiert.", values=_values_label(outcome["values"]), entities=len(entity_ids))
                 ),
+                "entries": items,
+                "note": tr("Sie zählen in Charts, Tabellen und Statistik nicht mehr mit und werden erst bei der endgültigen Bereinigung gelöscht."),
                 "undo_vals": json.dumps({"batch_at": repr(outcome["batch_at"]), "entity_ids": ",".join(entity_ids)}),
-                "link": f"entities/{entity_ids[0]}/cleanup?tab=marked" if one else "housekeeping#speicherplatz",
             }
 
         result = await run_in_threadpool(run)

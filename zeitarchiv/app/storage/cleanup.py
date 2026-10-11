@@ -795,6 +795,11 @@ def scan_counter_decreases(
                 for item in decreases
                 if item["returns"] and item["ts"] >= now.timestamp() - COUNTER_PATTERN_DAYS * 86400
             }),
+            # Die jüngsten zurückkehrenden Rückgänge im Einzelnen, damit die Sammelaktion vor dem Markieren
+            # zeigen kann, welche Werte genau betroffen sind (der Schnappschuss wird sonst nur gezählt).
+            "returning_items": [
+                {key: item[key] for key in ("ts", "previous", "value")} for item in decreases if item["returns"]
+            ][-5:],
             "last": {key: last[key] for key in ("ts", "previous", "value", "returns", "recovered_value", "recovered_after")},
         })
     results.sort(key=lambda r: r["last"]["ts"], reverse=True)

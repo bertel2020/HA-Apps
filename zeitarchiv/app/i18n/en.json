@@ -1456,7 +1456,6 @@
     "Nichts zu markieren: es kehrt kein Rückgang mehr zurück.": "Nothing to mark: no decrease returns any more.",
     "und sehen nach Fehlwerten aus.": "and look like bad values.",
     "{count} Werte": "{count} values",
-    "{name}: {count}": "{name}: {count}",
     "{returning} Fehlwerte": "{returning} bad values",
     "{returning} Fehlwerte markieren …": "Mark {returning} bad values …",
     "{returning} von {total} Rückgängen kehren sofort zurück": "{returning} of {total} decreases return immediately",
@@ -1464,8 +1463,6 @@
     "{values} markiert.": "{values} marked.",
     "{values} wieder aktiv.": "{values} active again.",
     "{what} markieren?": "Mark {what}?",
-    "Markiert werden die Werte, auf die der Zähler kurz fiel und von denen er sofort zurückkehrte:": "The values marked are those the counter briefly dropped to and then immediately returned from:",
-    "Sie bleiben im Reiter „Markiert“ und lassen sich zurücknehmen. Endgültig entfernt wird nichts.": "They stay in the \"Marked\" tab and can be undone. Nothing is removed permanently.",
     "An {days} der letzten {window} Tage fiel der Zählerstand kurz ab und kehrte zurück. Das spricht für ein Problem an der Quelle (Gerät oder Integration), nicht an den einzelnen Werten. Setzt sich der Zähler planmäßig zurück, lassen sich Rückgänge in der Konfiguration erlauben.": "On {days} of the last {window} days the counter reading briefly dropped and then returned. That points to a problem at the source (device or integration), not to the individual values. If the counter resets on a schedule, decreases can be allowed in the configuration.",
     "Chart, Tabelle, Werte-Kachel, Bereinigung oder Sektion hinzufügen": "Add chart, table, value tile, cleanup or section",
     "Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden": "The counter resets on a schedule: stop reporting decreases",
@@ -2385,7 +2382,15 @@
     "Passwort": "Password",
     "Nur in den Add-on-Optionen einstellbar": "Only configurable in the add-on options",
     "nach {minutes} Min. wieder bei {value}": "back at {value} after {minutes} min",
-    "Als normal erlauben": "Allow as normal"
+    "Als normal erlauben": "Allow as normal",
+    "Bei diesen Zählern ist der Stand kurz abgefallen und gleich wieder auf den alten Wert gestiegen. Das sieht nach Messfehlern aus:": "For these counters the reading dropped briefly and rose straight back to the previous value. That looks like measurement errors:",
+    "{when}: {value} (vorher {previous})": "{when}: {value} (previously {previous})",
+    "… und {count} weitere": "… and {count} more",
+    "Die Werte werden nur markiert, nicht gelöscht. In Charts, Tabellen und Statistik zählen sie dann nicht mehr. Im Reiter „Markiert“ der Entität lassen sie sich jederzeit zurückholen; gelöscht werden sie erst bei der endgültigen Bereinigung.": "The values are only marked, not deleted. They no longer count in charts, tables and statistics. You can bring them back at any time in the entity’s “Marked” tab; they are only deleted by the final cleanup.",
+    "1 Fehlwert markieren": "Mark 1 bad value",
+    "{returning} Fehlwerte markieren": "Mark {returning} bad values",
+    "Sie zählen in Charts, Tabellen und Statistik nicht mehr mit und werden erst bei der endgültigen Bereinigung gelöscht.": "They no longer count in charts, tables and statistics and are only deleted by the final cleanup.",
+    "OK": "OK"
   },
   "js": {
     "Meldungen": "Notices",

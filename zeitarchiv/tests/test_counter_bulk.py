@@ -101,10 +101,14 @@ def test_the_routes_mark_show_the_undo_hint_and_take_it_back(client) -> None:
         page = client.get("/housekeeping").text
         assert "housekeeping/counter-decreases/mark-returning" in page
         assert "1 Fehlwert" in page
+        assert "vorher" in page  # der Dialog nennt den betroffenen Wert, nicht nur die Anzahl
+        assert 'data-confirm-label="1 Fehlwert markieren"' in page
 
         marked = client.post("/housekeeping/counter-decreases/mark-returning")
         assert marked.status_code == 200
         assert "housekeeping/counter-decreases/undo" in marked.text
+        assert "entities/sensor.pytest_bulk/cleanup?tab=marked" in marked.text  # Link auf den Reiter „Markiert“
+        assert "counter-result" in marked.text and ">OK<" in marked.text  # schließbar
         assert index.get_deleted_counts("sensor.pytest_bulk", base, base + 3600) == {base + 2 * 300: 1}
         assert "counter-bulk" not in marked.text  # nichts Offenes mehr
 
