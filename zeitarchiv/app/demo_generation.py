@@ -124,6 +124,18 @@ DEMO_ENTITIES = [
                "sensor", "measurement", "W"),
     DemoEntity("sensor.demo_wallbox2_energie", "Demo Wallbox 2 Energie",
                "sensor", "total_increasing", "kWh"),
+    # Zwischenzähler-Kaskade (Energiedashboard → „Hängt hinter Zwischenzähler“):
+    # Der Werkstatt-Zähler misst die drei Geräte dahinter plus einen kleinen
+    # eigenen Rest (Standby, Steckdosen, gelegentliche Werkbank) — so zeigt
+    # das Dashboard auch den Eintrag „übrige Verbraucher“.
+    DemoEntity("sensor.demo_werkstatt_energie", "Demo Werkstatt Zwischenzähler",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_werkstatt_kompressor_energie", "Demo Werkstatt Kompressor Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_werkstatt_licht_energie", "Demo Werkstatt Licht Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_werkstatt_ladestation_energie", "Demo Werkstatt Ladestation Energie",
+               "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_pv_leistung", "Demo PV-Leistung",
                "sensor", "measurement", "W"),
     DemoEntity("sensor.demo_pv_ertrag", "Demo PV-Ertrag",
@@ -487,6 +499,39 @@ def _boiler_power_at(dt: datetime, rng: random.Random) -> float:
     return 0.0
 
 
+def _werkstatt_kompressor_w(dt: datetime, rng: random.Random) -> float:
+    """Druckluftkompressor: Werktags nachmittags, am Wochenende vormittags,
+    jeweils im Takt (8 von 20 Minuten Lauf)."""
+    hour = dt.hour + dt.minute / 60
+    active = (dt.weekday() < 5 and 16.0 <= hour < 18.0) or (dt.weekday() >= 5 and 9.0 <= hour < 13.0)
+    if active and (dt.hour * 60 + dt.minute) % 20 < 8:
+        return 1100.0 + rng.uniform(-80, 80)
+    return 0.0
+
+
+def _werkstatt_licht_w(dt: datetime, rng: random.Random) -> float:
+    hour = dt.hour + dt.minute / 60
+    if 16.0 <= hour < 21.0 or (dt.weekday() >= 5 and 9.0 <= hour < 13.0):
+        return 58.0 + rng.uniform(-3, 3)
+    return 0.0
+
+
+def _werkstatt_ladestation_w(dt: datetime, rng: random.Random) -> float:
+    """Akku-Ladestation für Werkzeug, läuft nachts."""
+    if 0.0 <= dt.hour + dt.minute / 60 < 5.0:
+        return 85.0 + rng.uniform(-8, 8)
+    return 0.0
+
+
+def _werkstatt_rest_w(dt: datetime, rng: random.Random) -> float:
+    """Was der Zwischenzähler zusätzlich misst, ohne dass ein Gerät dahinter
+    erfasst ist: Standby und Steckdosen, am Wochenende gelegentlich Werkbank."""
+    value = 12.0 + rng.uniform(-2, 3)
+    if dt.weekday() >= 5 and 10.0 <= dt.hour + dt.minute / 60 < 12.0:
+        value += 350.0 + rng.uniform(-50, 50)
+    return value
+
+
 def _baseline_load_at(dt: datetime, rng: random.Random) -> float:
     hour = dt.hour + dt.minute / 60
     morning = 180 * math.exp(-((hour - 7.3) ** 2) / (2 * 1.1 ** 2))
@@ -658,6 +703,8 @@ def simulate_household(
         "kuehlschrank": [], "kuehlschrank_energie": [], "herd": [], "herd_energie": [],
         "homeoffice": [], "homeoffice_energie": [], "entertainment": [], "entertainment_energie": [],
         "boiler": [], "boiler_energie": [], "wallbox2": [], "wallbox2_energie": [],
+        "werkstatt_energie": [], "werkstatt_kompressor_energie": [],
+        "werkstatt_licht_energie": [], "werkstatt_ladestation_energie": [],
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
@@ -689,6 +736,15 @@ def simulate_household(
     entertainment_energie_total = counter_seed.get("entertainment_energie", rng.uniform(80, 400))
     boiler_energie_total = counter_seed.get("boiler_energie", rng.uniform(200, 700))
     wallbox2_energie_total = counter_seed.get("wallbox2_energie", rng.uniform(100, 1200))
+    werkstatt_kompressor_total = counter_seed.get("werkstatt_kompressor_energie", rng.uniform(20, 120))
+    werkstatt_licht_total = counter_seed.get("werkstatt_licht_energie", rng.uniform(20, 120))
+    werkstatt_ladestation_total = counter_seed.get("werkstatt_ladestation_energie", rng.uniform(20, 120))
+    # Der Zwischenzähler startet über der Summe seiner Geräte, damit sein
+    # Stand nie unter deren Stand liegt.
+    werkstatt_energie_total = counter_seed.get(
+        "werkstatt_energie",
+        werkstatt_kompressor_total + werkstatt_licht_total + werkstatt_ladestation_total + rng.uniform(5, 40),
+    )
     on_state = {
         "waschmaschine": appliance_seed.get("waschmaschine", 0.0),
         "spuelmaschine": appliance_seed.get("spuelmaschine", 0.0),
@@ -775,10 +831,17 @@ def simulate_household(
         entertainment_w = _appliance_power_at(schedules["entertainment"], ENTERTAINMENT_PROFILE, dt, rng)
         boiler_w = _boiler_power_at(dt, rng)
         wallbox2_w = _appliance_power_at(schedules["wallbox2"], WALLBOX2_PROFILE, dt, rng)
+        werkstatt_kompressor_w = _werkstatt_kompressor_w(dt, rng)
+        werkstatt_licht_w = _werkstatt_licht_w(dt, rng)
+        werkstatt_ladestation_w = _werkstatt_ladestation_w(dt, rng)
+        werkstatt_w = (
+            werkstatt_kompressor_w + werkstatt_licht_w + werkstatt_ladestation_w + _werkstatt_rest_w(dt, rng)
+        )
         baseline_w = _baseline_load_at(dt, rng)
         load_w = (
             baseline_w + heizung_w + waschmaschine_w + spuelmaschine_w + trockner_w + wallbox_w
             + kuehlschrank_w + herd_w + homeoffice_w + entertainment_w + boiler_w + wallbox2_w
+            + werkstatt_w
         )
         pv_w = gen_pv_power(dt, weather, rng)
 
@@ -959,6 +1022,10 @@ def simulate_household(
         entertainment_energie_total += (entertainment_w / 1000) * step_hours
         boiler_energie_total += (boiler_w / 1000) * step_hours
         wallbox2_energie_total += (wallbox2_w / 1000) * step_hours
+        werkstatt_kompressor_total += (werkstatt_kompressor_w / 1000) * step_hours
+        werkstatt_licht_total += (werkstatt_licht_w / 1000) * step_hours
+        werkstatt_ladestation_total += (werkstatt_ladestation_w / 1000) * step_hours
+        werkstatt_energie_total += (werkstatt_w / 1000) * step_hours
 
         if index % COUNTER_EVERY_N == 0:
             series["pv_ertrag"].append((ts, round(pv_ertrag_total, 3)))
@@ -974,6 +1041,10 @@ def simulate_household(
             series["entertainment_energie"].append((ts, round(entertainment_energie_total, 3)))
             series["boiler_energie"].append((ts, round(boiler_energie_total, 3)))
             series["wallbox2_energie"].append((ts, round(wallbox2_energie_total, 3)))
+            series["werkstatt_energie"].append((ts, round(werkstatt_energie_total, 3)))
+            series["werkstatt_kompressor_energie"].append((ts, round(werkstatt_kompressor_total, 3)))
+            series["werkstatt_licht_energie"].append((ts, round(werkstatt_licht_total, 3)))
+            series["werkstatt_ladestation_energie"].append((ts, round(werkstatt_ladestation_total, 3)))
             series["balkon_ertrag_gesamt"].append((ts, round(balkon_ertrag_gesamt_total, 3)))
             series["balkon_ertrag_heute"].append((ts, round(balkon_ertrag_heute_total, 3)))
             series["balkon_geladen_gesamt"].append((ts, round(balkon_geladen_gesamt_total, 3)))
@@ -1273,6 +1344,10 @@ COUNTER_SEED_ENTITY_KEYS = {
     "sensor.demo_entertainment_energie": "entertainment_energie",
     "sensor.demo_boiler_energie": "boiler_energie",
     "sensor.demo_wallbox2_energie": "wallbox2_energie",
+    "sensor.demo_werkstatt_energie": "werkstatt_energie",
+    "sensor.demo_werkstatt_kompressor_energie": "werkstatt_kompressor_energie",
+    "sensor.demo_werkstatt_licht_energie": "werkstatt_licht_energie",
+    "sensor.demo_werkstatt_ladestation_energie": "werkstatt_ladestation_energie",
     "sensor.demo_spuelmaschine_energie": "spuelmaschine_energie",
     "sensor.demo_trockner_energie": "trockner_energie",
     "sensor.demo_wallbox_energie": "wallbox_energie",
@@ -1598,6 +1673,10 @@ def run_generation(
         "sensor.demo_boiler_energie": household["boiler_energie"],
         "sensor.demo_wallbox2_leistung": household["wallbox2"],
         "sensor.demo_wallbox2_energie": household["wallbox2_energie"],
+        "sensor.demo_werkstatt_energie": household["werkstatt_energie"],
+        "sensor.demo_werkstatt_kompressor_energie": household["werkstatt_kompressor_energie"],
+        "sensor.demo_werkstatt_licht_energie": household["werkstatt_licht_energie"],
+        "sensor.demo_werkstatt_ladestation_energie": household["werkstatt_ladestation_energie"],
         "sensor.demo_pv_leistung": household["pv_power"],
         "sensor.demo_pv_ertrag": household["pv_ertrag"],
         "sensor.demo_pv_prognose_rest_heute": household["pv_prognose_rest_heute"],
