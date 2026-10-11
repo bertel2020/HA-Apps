@@ -1,5 +1,74 @@
 # Changelog
 
+## 1.4.0 - 2026-10-11
+
+### Neu
+
+- **Externes Backup-Ziel**: Jedes erfolgreiche Backup kann zusätzlich auf einen
+  Netzwerkspeicher (NFS oder SMB/CIFS, eingebunden in Home Assistant unter
+  Einstellungen → System → Speicher) oder einen WebDAV-Server (z. B. Nextcloud)
+  kopiert werden. Einrichtung auf der Backup-Seite in der Karte „Externes
+  Ziel“, mit „Verbindung testen“. Das lokale Backup bleibt erhalten.
+  Die Aufbewahrung am Ziel ist „wie lokal“ oder „Nie löschen“; gelöscht werden
+  nur Zeitarchiv-Backups. Backups, die noch nicht übertragen wurden, räumt die
+  lokale Aufbewahrung nicht weg. Das WebDAV-Passwort steht nur in den
+  Add-on-Optionen, damit es nicht in den Backups landet. Bei „Anzahl
+  behalten“ gibt es neu die Stufe 1.
+- Die Backup-Tabelle hat eine Spalte „Extern“ mit dem Stand der Übertragung.
+  Scheitert sie, erscheint eine Meldung; das lokale Backup bleibt gültig und
+  die Übertragung wird beim nächsten Backup nachgeholt.
+- **CSV-Export als Assistent**: Zeitraum und Auflösung (roh, Minute, Stunde,
+  Tag …) wählbar, mehrere Entitäten auf einmal. Bei mehreren Entitäten
+  entsteht automatisch ein ZIP mit einer CSV je Entität. Die Spalten bleiben
+  `timestamp`, `unix_ts` und `value`. Der Assistent schätzt die Zeilenzahl
+  vorab und warnt, wenn eine Datei zu groß würde.
+- **Zählerrückgänge**: Die Tabelle ist übersichtlicher. „Fehlwerte markieren“
+  zeigt vor der Bestätigung, welche Werte betroffen sind und was passiert;
+  danach nennt eine Meldung die markierten Werte mit Links zum Reiter
+  „Markiert“ und lässt sich mit „OK“ schließen. Unter der Tabelle steht, wie
+  viele Werte insgesamt markiert sind.
+
+### Geändert
+
+- Die Liste „Zähler mit erlaubten Rückgängen“ ist wie die Tabelle gestaltet.
+- Doku: Betriebsanleitung zum externen Backup-Ziel, Hinweis auf den Host
+  `127.0.0.1`, falls `localhost` nicht erreichbar ist.
+
+---
+
+### English
+
+#### New
+
+- **External backup target**: Every successful backup can additionally be
+  copied to network storage (NFS or SMB/CIFS, mounted in Home Assistant under
+  Settings → System → Storage) or a WebDAV server (e.g. Nextcloud). Set it up
+  on the Backup page in the “External target” card, with “Test connection”.
+  The local backup is kept. Retention at the target is “same as local” or
+  “Never delete”; only Zeitarchiv backups are ever deleted. Backups that have
+  not been transferred yet are not removed by local retention. The WebDAV
+  password is only set in the add-on options so that it does not end up in
+  the backups. “Number to keep” has a new step of 1.
+- The backup table has an “External” column showing the transfer status. If a
+  transfer fails, a notice appears; the local backup stays valid and the
+  transfer is retried with the next backup.
+- **CSV export as a wizard**: choose the time range and resolution (raw,
+  minute, hour, day …), and export several entities at once. With several
+  entities a ZIP with one CSV per entity is created automatically. The columns
+  stay `timestamp`, `unix_ts` and `value`. The wizard estimates the row count
+  beforehand and warns if a file would be too large.
+- **Counter decreases**: The table is clearer. “Mark bad values” shows
+  which values are affected and what will happen before you confirm; afterwards
+  a message lists the marked values with links to the “Marked” tab and can be
+  dismissed with “OK”. Below the table you see how many values are marked in
+  total.
+
+#### Changed
+
+- The “Counters with allowed decreases” list is styled like the table.
+- Docs: operations guide for the external backup target, a note about using
+  host `127.0.0.1` if `localhost` is not reachable.
+
 ## 1.3.0 - 2026-10-07
 
 ### Neu
