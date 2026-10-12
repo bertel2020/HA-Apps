@@ -1,5 +1,5 @@
 <div style="border-top:1px solid var(--border);padding-top:16px;">
-  <h3 class="eyebrow">Vorschau (nichts wurde geschrieben) &middot; {{ "Vollimport" if history_source == "full" else ("Langzeitstatistik" if history_source == "stats" else "Rohhistorie") }}{% if history_source == "stats" and period %} ({{ "Stundenwerte" if period == "hour" else "Tageswerte" }}){% endif %}</h3>
+  <h3 class="eyebrow">{{ _("Vorschau (nichts wurde geschrieben) &middot; {v1}", v1=(_("Vollimport") if history_source == "full" else (_("Langzeitstatistik") if history_source == "stats" else _("Rohhistorie")))) }}{% if history_source == "stats" and period %} ({{ _("Stundenwerte") if period == "hour" else _("Tageswerte") }}){% endif %}</h3>
 
   {% for item in items %}
   <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px;">
@@ -8,61 +8,61 @@
       <span style="font-family:var(--font-mono);color:var(--ink-faint);">{{ item.entity_id }}</span>
     </p>
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Verfügbar in Home Assistant</span><span style="color:var(--ink);text-align:right;">{{ item.available_label }}</span>
+      <span>{{ _("Verfügbar in Home Assistant") }}</span><span style="color:var(--ink);text-align:right;">{{ item.available_label }}</span>
     </div>
     {% if item.full_summary %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Langzeitstatistik</span><span style="color:var(--ink);text-align:right;">{{ item.full_summary.stats_label }}</span>
+      <span>{{ _("Langzeitstatistik") }}</span><span style="color:var(--ink);text-align:right;">{{ item.full_summary.stats_label }}</span>
     </div>
     {% if item.full_summary.cutover_label %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Nahtlose Schnittstelle</span><span style="color:var(--ink);text-align:right;">{{ item.full_summary.cutover_label }} · keine Quellenüberlappung</span>
+      <span>{{ _("Nahtlose Schnittstelle") }}</span><span style="color:var(--ink);text-align:right;">{{ _("{cutover_label} · keine Quellenüberlappung", cutover_label=item.full_summary.cutover_label) }}</span>
     </div>
     {% endif %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Rohhistorie</span><span style="color:var(--ink);text-align:right;">{{ item.full_summary.raw_label }}</span>
+      <span>{{ _("Rohhistorie") }}</span><span style="color:var(--ink);text-align:right;">{{ item.full_summary.raw_label }}</span>
     </div>
     {% if item.full_summary.raw_discarded_at_seam or item.full_summary.stats_discarded_at_seam %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);padding:3px 0;">
-      <span>An der Schnittstelle bewusst verworfen</span><span style="text-align:right;">{{ item.full_summary.raw_discarded_at_seam | format_int }} Rohwerte · {{ item.full_summary.stats_discarded_at_seam | format_int }} Statistik-Werte</span>
+      <span>{{ _("An der Schnittstelle bewusst verworfen") }}</span><span style="text-align:right;">{{ _("{raw_discarded_at_seam} Rohwerte · {stats_discarded_at_seam} Statistik-Werte", raw_discarded_at_seam=(item.full_summary.raw_discarded_at_seam | format_int), stats_discarded_at_seam=(item.full_summary.stats_discarded_at_seam | format_int)) }}</span>
     </div>
     {% endif %}
     {% if item.full_summary.boundary_anchor %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);padding:3px 0;">
-      <span>Zustand an der Schnittstelle fortgeführt</span><span style="text-align:right;">1 Rohwert-Anker</span>
+      <span>{{ _("Zustand an der Schnittstelle fortgeführt") }}</span><span style="text-align:right;">{{ _("1 Rohwert-Anker") }}</span>
     </div>
     {% endif %}
     {% endif %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Neue Monate (werden angelegt)</span>
-      <span style="color:var(--ink);text-align:right;">{{ item.plan.rows_to_import | format_int }} Zeilen{% if item.plan.months_to_import %} ({{ item.plan.months_to_import | join(', ') }}){% endif %}</span>
+      <span>{{ _("Neue Monate (werden angelegt)") }}</span>
+      <span style="color:var(--ink);text-align:right;">{{ _("{rows_to_import} Zeilen", rows_to_import=(item.plan.rows_to_import | format_int)) }}{% if item.plan.months_to_import %} ({{ item.plan.months_to_import | join(', ') }}){% endif %}</span>
     </div>
     {% if item.plan.months_to_merge %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Laufender Monat (Hot Buffer ergänzt)</span>
-      <span style="color:var(--ink);text-align:right;">{{ item.plan.rows_to_merge | format_int }} Zeilen ({{ item.plan.months_to_merge | join(', ') }})</span>
+      <span>{{ _("Laufender Monat (Hot Buffer ergänzt)") }}</span>
+      <span style="color:var(--ink);text-align:right;">{{ _("{rows_to_merge} Zeilen ({months_to_merge})", rows_to_merge=(item.plan.rows_to_merge | format_int), months_to_merge=(item.plan.months_to_merge | join(', '))) }}</span>
     </div>
     {% endif %}
     {% if item.plan.current_archives_to_repair %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--danger);padding:3px 0;">
-      <span>Fehlerhaftes Archiv des laufenden Monats wird repariert</span>
-      <span style="text-align:right;">{{ item.plan.rows_to_recover | format_int }} vorhandene Zeilen → Hot Buffer ({{ item.plan.current_archives_to_repair | join(', ') }})</span>
+      <span>{{ _("Fehlerhaftes Archiv des laufenden Monats wird repariert") }}</span>
+      <span style="text-align:right;">{{ _("{rows_to_recover} vorhandene Zeilen → Hot Buffer ({current_archives_to_repair})", rows_to_recover=(item.plan.rows_to_recover | format_int), current_archives_to_repair=(item.plan.current_archives_to_repair | join(', '))) }}</span>
     </div>
     {% endif %}
     {% if item.plan.months_to_update %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);padding:3px 0;">
-      <span>Vorhandene Monate (werden ergänzt)</span>
-      <span style="color:var(--ink);text-align:right;">{{ item.plan.rows_to_update | format_int }} neue Zeilen ({{ item.plan.months_to_update | join(', ') }})</span>
+      <span>{{ _("Vorhandene Monate (werden ergänzt)") }}</span>
+      <span style="color:var(--ink);text-align:right;">{{ _("{rows_to_update} neue Zeilen ({months_to_update})", rows_to_update=(item.plan.rows_to_update | format_int), months_to_update=(item.plan.months_to_update | join(', '))) }}</span>
     </div>
     {% endif %}
     {% if item.plan.months_to_skip %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);padding:3px 0;">
-      <span>Bereits vorhandene Monate (übersprungen)</span><span style="text-align:right;">{{ item.plan.months_to_skip | join(', ') }}</span>
+      <span>{{ _("Bereits vorhandene Monate (übersprungen)") }}</span><span style="text-align:right;">{{ item.plan.months_to_skip | join(', ') }}</span>
     </div>
     {% endif %}
     {% if item.plan.skipped_rows %}
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);padding:3px 0;">
-      <span>Übersprungene Werte (unbekannt/nicht numerisch)</span><span style="text-align:right;">{{ item.plan.skipped_rows | format_int }}</span>
+      <span>{{ _("Übersprungene Werte (unbekannt/nicht numerisch)") }}</span><span style="text-align:right;">{{ item.plan.skipped_rows | format_int }}</span>
     </div>
     {% endif %}
   </div>
@@ -73,12 +73,12 @@
   {% endfor %}
 
   {% if not items and not errors %}
-  <p style="font-size:calc(13px * var(--font-scale, 1));color:var(--ink-faint);">Keine Entität ausgewählt — nichts zu importieren.</p>
+  <p style="font-size:calc(13px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("Keine Entität ausgewählt — nichts zu importieren.") }}</p>
   {% endif %}
 
   {% if items or errors %}
   <div style="display:flex;justify-content:flex-end;margin-top:12px;">
-    <button type="submit" class="btn" formaction="import/ha/debug" formmethod="post">Debug-Datei herunterladen</button>
+    <button type="submit" class="btn" formaction="import/ha/debug" formmethod="post">{{ _("Debug-Datei herunterladen") }}</button>
   </div>
   {% endif %}
 </div>

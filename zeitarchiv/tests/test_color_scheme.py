@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import APP_CSS, APP_JS, TEMPLATES, page_text
+from _paths import APP_CSS, APP_JS, TEMPLATES, page_text, template_text
 
 
 
@@ -62,7 +62,7 @@ def test_all_full_pages_receive_the_persisted_color_scheme() -> None:
     Seite, die sie vergisst, startete im Standardschema. Der Test prüft
     deshalb jetzt beides: dass base.html sie trägt, und dass jede Vollseite
     von base.html erbt statt sich ein eigenes <html> zu bauen."""
-    base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    base = template_text("base.html")
     assert 'data-color-scheme="{{ color_scheme' in base
     assert 'data-color-mode="{{ color_mode' in base
 
@@ -97,9 +97,7 @@ def test_home_assistant_scheme_has_light_dark_and_chart_tokens() -> None:
 
 def test_modern_scheme_uses_cool_slate_cobalt_and_balanced_chart_tokens() -> None:
     css = CSS.read_text(encoding="utf-8")
-    settings = (TEMPLATES / "_settings_darstellung_form.html").read_text(
-        encoding="utf-8"
-    )
+    settings = template_text("_settings_darstellung_form.html")
     assert ':root[data-color-scheme="modern"]' in css
     assert "--bg:#F6F7FB" in css
     assert "--accent-line:#3157C8" in css

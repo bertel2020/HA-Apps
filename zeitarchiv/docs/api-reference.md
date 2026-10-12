@@ -1,5 +1,7 @@
 # API-Referenz
 
+*[English version](en/api-reference.md)*
+
 Zwei Zielgruppen, zwei Erreichbarkeiten (siehe [security.md](security.md)):
 
 - **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices`.
@@ -107,7 +109,10 @@ wie im Glocken-Icon der Zeitarchiv-UI (siehe `notices.py`,
 wenn noch keines gelungen ist (siehe `notices.latest_backup_info()`,
 `Index.get_last_successful_backup_job()`). Bewusst nur der letzte
 erfolgreiche Lauf, nicht der letzte Lauf überhaupt: ein fehlgeschlagener
-oder noch laufender Job hat keine reale, kopierbare Datei.
+oder noch laufender Job hat keine reale, kopierbare Datei. Ist ein externes
+Ziel eingerichtet, enthält es zusätzlich `external` (`status`: `ok`, `failed`
+oder `running`; `target`; `finished_at`) — rein additiv, ältere Integrationen
+ignorieren das Feld.
 
 `demo_mode` spiegelt die Add-on-Option gleichen Namens (siehe
 [Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) — `true`, solange
@@ -188,3 +193,20 @@ Beim Speichern von Dashboards, Charts und Tabellen: bereits vergebener Name
 `409`, zu langer Name `400` (siehe [data-model.md](data-model.md#eindeutige-namen-dashboards-saved_charts-saved_tables)).
 Die `detail`-Meldung ist in beiden Fällen für die direkte Anzeige in der
 Oberfläche formuliert.
+
+### Sprache der Fehlertexte
+
+Die Texte (`detail` sowie Titel und Beschreibung der Meldungen aus
+`/api/notices`) kommen in der Sprache der Anfrage:
+
+1. Steht die Einstellung `language` fest auf Deutsch oder Englisch, gilt sie.
+2. Bei „Automatisch“ (Standard) entscheidet der Header `Accept-Language`
+   (`en`, `en-GB`, `de-DE` …).
+3. Ohne passenden Header — also bei Skripten, die keinen senden — antwortet die
+   App auf **Deutsch**. Wer englische Texte will, sendet `Accept-Language: en`.
+
+Die Integration sendet die Sprache von Home Assistant mit, damit
+Reparaturmeldungen und Sensor-Attribute in dessen Sprache erscheinen.
+Ausgenommen sind Fehler, die FastAPI selbst erzeugt: Validierungsfehler (`422`,
+Liste statt Text), „Not Found“ und „Method Not Allowed“ sind immer englisch.
+Für die Auswertung in Skripten ist der HTTP-Status maßgeblich, nicht der Text.

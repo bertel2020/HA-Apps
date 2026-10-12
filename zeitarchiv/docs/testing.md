@@ -1,5 +1,7 @@
 # Tests
 
+*[English version](en/testing.md)*
+
 Eine gemeinsame Testsuite für App **und** Integration liegt unter `tests/`
 im Repository-Stamm (nicht innerhalb von `addon/`) — beide Produkte werden
 zusammen getestet, da die Integration echte Requests gegen die App-typischen

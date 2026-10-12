@@ -66,8 +66,8 @@
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.className = 'table-resize-reset';
-    reset.textContent = 'Spaltenbreiten zurücksetzen';
-    reset.title = 'Auf die ursprünglichen Spaltenbreiten dieser Tabelle zurücksetzen';
+    reset.textContent = t('Spaltenbreiten zurücksetzen');
+    reset.title = t('Auf die ursprünglichen Spaltenbreiten dieser Tabelle zurücksetzen');
     reset.addEventListener('click', () => {
       clearWidths(state.key);
       state.cols.forEach(col => { col.style.width = ''; });
@@ -154,7 +154,7 @@
       handle.className = 'table-column-resize-handle';
       handle.setAttribute('role', 'separator');
       handle.setAttribute('aria-orientation', 'vertical');
-      handle.setAttribute('aria-label', `Spaltenbreite ${normalizeHeader(header.textContent)} ändern`);
+      handle.setAttribute('aria-label', t('Spaltenbreite {name} ändern', {name: normalizeHeader(header.textContent)}));
       handle.setAttribute('hx-disable', '');
       handle.tabIndex = 0;
       handle.addEventListener('pointerdown', event => startResize(event, state, index));

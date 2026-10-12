@@ -55,6 +55,35 @@
     decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
   };
 
+  // ECharts stapelt auf einer Zeit-Achse nach INDEX in den Daten, nicht nach
+  // Zeitstempel (nachgemessen mit ECharts 5.6: Serie B mit Beginn im April
+  // landete auf Serie A vom Januar). Der Server liefert Buckets aber erst ab
+  // dem ersten vorhandenen Wert — beginnen gestapelte Serien in
+  // verschiedenen Perioden, rutscht die spätere nach links. Deshalb werden
+  // alle Serien eines Stapels vor dem Zeichnen auf die Vereinigung ihrer
+  // Zeitstempel gebracht; fehlende Stellen bekommen einen null-Wert (kein
+  // Balken, keine erfundene "0"). Tooltips lassen null-Zeilen weg.
+  // Gleiche Funktion in chart_editor.js.
+  function padStackedSeries(seriesList) {
+    const groups = new Map();
+    seriesList.forEach(s => {
+      if (!s.stack) return;
+      if (!groups.has(s.stack)) groups.set(s.stack, []);
+      groups.get(s.stack).push(s);
+    });
+    groups.forEach(list => {
+      if (list.length < 2) return;
+      const xs = new Set();
+      list.forEach(s => s.data.forEach(p => xs.add(p[0])));
+      const sorted = [...xs].sort((a, b) => a - b);
+      list.forEach(s => {
+        if (s.data.length === sorted.length) return;
+        const byX = new Map(s.data.map(p => [p[0], p]));
+        s.data = sorted.map(x => byX.get(x) || [x, null]);
+      });
+    });
+  }
+
   function resamplePoints(points, range, preset, aggregationType, windowStart) {
     const seconds = RESOLUTION_SECONDS[range] && RESOLUTION_SECONDS[range][preset];
     if (!seconds || !points.length || windowStart == null) return points;
@@ -99,18 +128,16 @@
   // bräuchte. Nur während der Tab sichtbar ist (siehe setupAutoRefresh).
   const DASHBOARD_REFRESH_INTERVAL_MS = 60000;
 
-  // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
-  // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
-  // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
-  // Sprach-Setting nur hier greifen muss.
-  const LOCALE = 'de-DE';
+  // Jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen Konstante;
+  // das Format kommt aus der Einstellung (window.ZA_FORMAT, siehe i18n.js).
+  const LOCALE = window.ZA_FORMAT;
 
   function fmtAxis(range, ts) {
     const d = new Date(ts * 1000);
-    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
-    if (range === 'week' || range === 'month') return d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit'});
-    if (range === 'decade') return d.toLocaleDateString(LOCALE, {year: 'numeric'});
-    return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
+    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(LOCALE, window.ServerTime.withZone({hour: '2-digit', minute: '2-digit'}));
+    if (range === 'week' || range === 'month') return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit'}));
+    if (range === 'decade') return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({year: 'numeric'}));
+    return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({month: 'short', year: 'numeric'}));
   }
 
   // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie in
@@ -152,23 +179,23 @@
   function fmtTooltipTimestamp(ms, bucketSeconds) {
     const d = new Date(ms);
     if (bucketSeconds == null || bucketSeconds < 86400) {
-      return d.toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+      return d.toLocaleString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}));
     }
     if (bucketSeconds < 86400 * 25) {
-      const weekday = d.toLocaleDateString(LOCALE, {weekday: 'short'}).replace(/\.$/, '');
-      const date = d.toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
+      const weekday = d.toLocaleDateString(LOCALE, window.ServerTime.withZone({weekday: 'short'})).replace(/\.$/, '');
+      const date = d.toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric'}));
       return `${weekday}, ${date}`;
     }
     if (bucketSeconds < 86400 * 200) {
-      return d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
+      return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({month: 'long', year: 'numeric'}));
     }
-    return d.toLocaleDateString(LOCALE, {year: 'numeric'});
+    return d.toLocaleDateString(LOCALE, window.ServerTime.withZone({year: 'numeric'}));
   }
 
   // "Ø"/"Σ" statt Text — dieselben Symbole wie chart_editor.js/entity_detail.js
-  // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; "Summe"
+  // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; t("Summe")
   // war bis jetzt der einzige verbliebene Text-Ausreißer.
-  const LEGEND_METRIC_LABELS = {last: 'Aktuell', min: 'Min', max: 'Max', average: 'Ø', sum: 'Σ'};
+  const LEGEND_METRIC_LABELS = {last: t('Aktuell'), min: t('Min'), max: t('Max'), average: 'Ø', sum: 'Σ'};
 
   function escLegend(s) {
     return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -334,7 +361,7 @@
     const continuous = el.dataset.continuous === 'true';
     const resolutionPreset = el.dataset.resolutionPreset || 'auto';
     // Siehe chart_editor.html (render(), dynamicYAxis-Konstante): bei
-    // Auflösung "Tag" (singleBucket weiter unten) erzwungen aus, unabhängig
+    // Auflösung t("Tag") (singleBucket weiter unten) erzwungen aus, unabhängig
     // vom gespeicherten Chart-Zustand — eine nicht bei 0 startende Y-Achse
     // würde den Summen-Vergleich der wenigen Balken verzerren.
     const dynamicYAxis = el.dataset.dynamicYAxis === 'true' && resolutionPreset !== 'full';
@@ -391,12 +418,12 @@
       const res = await fetch(`${base}/api/query-multi?${params}`);
       data = await res.json();
     } catch (e) {
-      chartEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
+      chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
     const series = data.series || [];
     if (!series.some(s => s.points && s.points.length)) {
-      chartEl.innerHTML = '<div class="dtile-loading">Keine Daten</div>';
+      chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
       return;
     }
     // Dieselbe Farbzuordnung wie echartsSeries weiter unten (PALETTE nach
@@ -806,6 +833,7 @@
       return cfg;
     });
     echartsSeries.push(...rollingSeries);
+    padStackedSeries(echartsSeries);
 
     // ECharts' eigene Legende bleibt unsichtbar (show:false, wie in
     // chart_editor.html) — die sichtbare Legende ist das eigene HTML-Element
@@ -866,14 +894,16 @@
         backgroundColor: surface,
         borderColor,
         textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
-        formatter: (params) => {
+        formatter: (allParams) => {
+          // Auffüll-Punkte gestapelter Serien (padStackedSeries) haben keinen Wert.
+          const params = allParams.filter(p => p.data[1] != null);
           if (!params.length) return '';
           // Bei singleBucket ist axisValue jetzt der Entitätsname (eigene
           // Kategorie je Entität, s. o.), keine Zeitangabe mehr — die
           // Kopfzeile zeigt stattdessen weiterhin den Periodenbeginn direkt
           // aus window_start, wie vor der Kategorie-je-Entität-Umstellung.
           const header = singleBucket
-            ? (data.window_start != null ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'}) : '')
+            ? (data.window_start != null ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric'})) : '')
             : fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
           const rows = params.map(p => {
             const unit = p.data[2] || '';
@@ -967,7 +997,7 @@
         formatter: p => {
           const [catIndex, startMs, endMs] = p.value;
           const pad = n => String(n).padStart(2, '0');
-          const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+          const fmtTime = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.hour)}:${pad(t.minute)}`; };
           return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
         },
         appendToBody: true,
@@ -1064,45 +1094,53 @@
   // hier genauso wie in der vollen Ansicht.
   async function renderTableTile(el) {
     // Ausgeblendete Spalten/Zeilen (Tabelleneditor, col.hidden/row.hidden)
-    // fliegen hier raus — dieselbe Regel wie in table_editor.html: nicht
-    // gerendert, aber weiterhin Teil der Berechnung (computeValues()
-    // bekommt hier ohnehin nur den bereits gekürzten Ausschnitt, siehe
-    // TableCompute.computeValues()-Kommentar dort zur Formel-Buchstaben-
-    // Einschränkung auf die Kachel).
+    // werden nicht gerendert, bleiben aber Teil der Berechnung — dieselbe
+    // Regel wie in table_editor.html. computeValues() bekommt deshalb ALLE
+    // Zeilen: sonst verschieben sich die Formel-Buchstaben, Formeln auf eine
+    // ausgeblendete Zeile liefern "Fehler", und Summen-/Anteilszeilen
+    // weichen vom Editor ab. Erst danach werden die sichtbaren Zeilen
+    // herausgezogen.
     const visibleCols = JSON.parse(el.dataset.columns || '[]').filter(c => !c.hidden);
-    const visibleRows = JSON.parse(el.dataset.rows || '[]').filter(r => !r.hidden);
+    const allRows = JSON.parse(el.dataset.rows || '[]');
+    const visibleRowIndexes = allRows.map((r, i) => (r.hidden ? -1 : i)).filter(i => i >= 0);
+    const visibleRows = visibleRowIndexes.map(i => allRows[i]);
     const style = JSON.parse(el.dataset.style || '{}');
     const previewEl = el.querySelector('.dtile-table-preview');
     if (!previewEl) return;
 
     if (!visibleCols.length || !visibleRows.length) {
-      previewEl.innerHTML = '<div class="dtile-loading">Keine sichtbaren Zeilen/Spalten</div>';
+      previewEl.innerHTML = '<div class="dtile-loading">' + t('Keine sichtbaren Zeilen/Spalten') + '</div>';
       return;
     }
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
-    let values, windowStarts, windowEnds, isCurrent, elapsedSeconds;
+    let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds;
     try {
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, visibleRows));
+      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows));
+      allValues = values;
+      values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
-      previewEl.innerHTML = '<div class="dtile-loading">Fehler beim Laden</div>';
+      previewEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
 
     // Abschnitts-Mitglieder (Entität-/Gruppen-Zeilen zwischen zwei Trennlinien
     // derselben Spalte) — Traversal-Gegenstück zu sectionMemberCells() in
     // table_editor.html, hier index- statt uid-basiert (dieselbe Datenform
-    // wie computeValues()). Die eigentliche Anteilsrechnung bleibt in
+    // wie computeValues()). Läuft wie dort über ALLE Zeilen des Abschnitts,
+    // auch ausgeblendete (allRows/allValues, ri ist der Index der sichtbaren
+    // Zeile). Die eigentliche Anteilsrechnung bleibt in
     // TableCompute.percentOfTotalCell(), damit beide Seiten denselben
     // Rechenkern nutzen.
     function sectionMemberCells(ci, ri) {
+      const idx = visibleRowIndexes[ri];
       let start = 0;
-      for (let j = ri - 1; j >= 0; j--) { if (visibleRows[j].row_type === 'separator') { start = j + 1; break; } }
-      let end = visibleRows.length;
-      for (let j = ri + 1; j < visibleRows.length; j++) { if (visibleRows[j].row_type === 'separator') { end = j; break; } }
+      for (let j = idx - 1; j >= 0; j--) { if (allRows[j].row_type === 'separator') { start = j + 1; break; } }
+      let end = allRows.length;
+      for (let j = idx + 1; j < allRows.length; j++) { if (allRows[j].row_type === 'separator') { end = j; break; } }
       const cells = [];
       for (let j = start; j < end; j++) {
-        if (visibleRows[j].row_type !== 'entity' && visibleRows[j].row_type !== 'group') continue;
-        cells.push(values[ci] && values[ci][j]);
+        if (allRows[j].row_type !== 'entity' && allRows[j].row_type !== 'group') continue;
+        cells.push(allValues[ci] && allValues[ci][j]);
       }
       return cells;
     }
@@ -1115,14 +1153,15 @@
     // Formelzeile ist fast immer das Maximum ihres Abschnitts und würde die
     // Skala sonst allein durch ihre Natur verzerren.
     function columnHeatmapRange(ci, ri) {
+      const idx = visibleRowIndexes[ri];
       let start = 0;
-      for (let j = ri - 1; j >= 0; j--) { if (visibleRows[j].row_type === 'separator') { start = j + 1; break; } }
-      let end = visibleRows.length;
-      for (let j = ri + 1; j < visibleRows.length; j++) { if (visibleRows[j].row_type === 'separator') { end = j; break; } }
+      for (let j = idx - 1; j >= 0; j--) { if (allRows[j].row_type === 'separator') { start = j + 1; break; } }
+      let end = allRows.length;
+      for (let j = idx + 1; j < allRows.length; j++) { if (allRows[j].row_type === 'separator') { end = j; break; } }
       const vals = [];
       for (let j = start; j < end; j++) {
-        if (visibleRows[j].row_type !== 'entity' && visibleRows[j].row_type !== 'group') continue;
-        const cell = values[ci] && values[ci][j];
+        if (allRows[j].row_type !== 'entity' && allRows[j].row_type !== 'group') continue;
+        const cell = allValues[ci] && allValues[ci][j];
         if (cell && !cell.error && cell.value != null) vals.push(cell.value);
       }
       if (!vals.length) return null;
@@ -1294,8 +1333,8 @@
               windowStarts[comparisonIndex], elapsedSeconds[comparisonIndex], visibleCols[comparisonIndex].range_key)
           : null;
         const deviationTitle = comparisonIndex < 0 ? '' : comparisonValueStr
-          ? `Gegenüber ${comparisonLabel}${comparisonTimeStr ? ` bis ${comparisonTimeStr}` : ''}: ${comparisonValueStr}`
-          : `Gegenüber ${comparisonLabel}`;
+          ? (comparisonTimeStr ? t('Gegenüber {label} bis {time}: {value}',{label: comparisonLabel, time: comparisonTimeStr, value: comparisonValueStr}) : t('Gegenüber {label}: {value}',{label: comparisonLabel, value: comparisonValueStr}))
+          : t('Gegenüber {label}',{label: comparisonLabel});
         const widthCss = col.width ? `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` : '';
         const heatmapCss = (col.heatmap && (row.row_type === 'entity' || row.row_type === 'group'))
           ? TableCompute.heatmapStyle(values[ci] && values[ci][ri], columnHeatmapRange(ci, ri)) : '';
@@ -1366,23 +1405,23 @@
   // Seite neu zu laden. Ein Test hält beide Kopien deckungsgleich.
   // [kalendarisch, rollierend]
   const TILE_RANGE_LABELS = {
-    hour: ['Std.', '60 Min.'], day: ['Tag', '24 Std.'], week: ['Woche', '7 Tage'],
-    month: ['Monat', '30 Tage'], year: ['Jahr', '12 Monate'],
+    hour: [t('Std.'), t('60 Min.')], day: [t('Tag'), t('24 Std.')], week: [t('Woche'), t('7 Tage')],
+    month: [t('Monat'), t('30 Tage')], year: [t('Jahr'), t('12 Monate')],
   };
   // Dasselbe Fenster ausgeschrieben, für den Tooltip: "Max 23,1" allein sagt
   // nicht, worüber.
   const TILE_RANGE_WINDOW = {
-    hour: ['in der laufenden Stunde', 'in den letzten 60 Minuten'],
-    day: ['heute seit Mitternacht', 'in den letzten 24 Stunden'],
-    week: ['in der laufenden Kalenderwoche', 'in den letzten 7 Tagen'],
-    month: ['im laufenden Monat', 'in den letzten 30 Tagen'],
-    year: ['im laufenden Jahr', 'in den letzten 12 Monaten'],
+    hour: [t('in der laufenden Stunde'), t('in den letzten 60 Minuten')],
+    day: [t('heute seit Mitternacht'), t('in den letzten 24 Stunden')],
+    week: [t('in der laufenden Kalenderwoche'), t('in den letzten 7 Tagen')],
+    month: [t('im laufenden Monat'), t('in den letzten 30 Tagen')],
+    year: [t('im laufenden Jahr'), t('in den letzten 12 Monaten')],
   };
   // Rückfall, falls eine Antwort die Kürzel nicht mitbringt. Maßgeblich ist
   // ctx.metric_labels vom Server: dort hängt genau eines am Entitätstyp — bei
   // einem Zähler heißt die Summe "+", weil sie der Zuwachs des Zählerstands
   // ist (siehe _tile_metric_labels() in main.py).
-  const TILE_METRIC_LABELS = {last: '', min: 'Min', avg: 'Ø', max: 'Max', sum: 'Σ'};
+  const TILE_METRIC_LABELS = {last: '', min: t('Min'), avg: 'Ø', max: t('Max'), sum: 'Σ'};
 
   function tileRangeLabel(el) {
     const pair = TILE_RANGE_LABELS[el.dataset.range] || TILE_RANGE_LABELS.day;
@@ -1391,7 +1430,7 @@
 
   // Erklärt eine Kennzahl im Klartext. Der heikle Fall ist der Zähler: dessen
   // Min/Ø/Max beziehen sich auf Bucket-Deltas, "Max" heißt dort "stärkster
-  // Tag" und nicht "größter Messwert". Die Bucket-Größe kommt vom Server
+  // Tag" und nicht t("größter Messwert"). Die Bucket-Größe kommt vom Server
   // (bucket_label), damit hier keine zweite Tabelle mit den Auflösungen des
   // Speichers entsteht, die still veralten könnte.
   function tileMetricTooltip(el, metric, serie) {
@@ -1401,14 +1440,14 @@
     const bucket = serie && serie.bucket_label;
     if (bucket) {
       const jeBucket = {
-        min: `schwächster ${bucket}`, avg: `Ø je ${bucket}`,
-        max: `stärkster ${bucket}`, sum: 'Zuwachs',
+        min: t('schwächster {bucket}', {bucket: t(bucket)}), avg: t('Ø je {bucket}', {bucket: t(bucket)}),
+        max: t('stärkster {bucket}', {bucket: t(bucket)}), sum: t('Zuwachs'),
       }[metric];
       return `${jeBucket} · ${fenster}`;
     }
     const messwert = {
-      min: 'kleinster Messwert', avg: 'Durchschnitt',
-      max: 'größter Messwert', sum: 'Summe',
+      min: t('kleinster Messwert'), avg: t('Durchschnitt'),
+      max: t('größter Messwert'), sum: t('Summe'),
     }[metric];
     return `${messwert} · ${fenster}`;
   }
@@ -1530,7 +1569,7 @@
       // "An"/"Aus" nur für den Momentanwert — eine Summe über Schalter ist
       // eine Einschaltdauer in Sekunden, kein Zustand.
       numberEl.textContent = istSchalter && primary === 'last'
-        ? (wert ? 'An' : 'Aus')
+        ? (wert ? 'An' : t('Aus'))
         : (istSchalter && primary === 'sum'
             ? NumberFormat.fmtDuration(wert)
             : NumberFormat.fmt(wert, dezimal));
@@ -1541,17 +1580,21 @@
     const ageEl = el.querySelector('.dtile-entity-age');
     const secondsAgo = serie.last_ts == null ? null : Date.now() / 1000 - serie.last_ts;
     if (ageEl) {
-      ageEl.textContent = secondsAgo == null ? 'nie' : `vor ${NumberFormat.fmtDuration(secondsAgo)}`;
+      ageEl.textContent = secondsAgo == null ? t('nie') : t('vor {dauer}', {dauer: NumberFormat.fmtDuration(secondsAgo)});
     }
     // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
-    // is-stale), der Wert bleibt immer schwarz — dieselben zwei Schwellen
-    // (15 Min./1 Std.) wie beim Server-Rendern. Hängt weiterhin am letzten
+    // is-stale), der Wert bleibt immer schwarz. Die Schwellen kommen je Kachel
+    // vom Server (data-stale-warn-after/-stale-after, Stufe stale_mode, siehe
+    // staleness.py); leer heißt "nie markieren". Hängt weiterhin am letzten
     // ROHWERT, auch wenn die große Zahl eine Aggregation ist: "veraltet"
     // meint die Entität, nicht die Kennzahl.
     const tileEl = el.closest('.dtile');
-    if (tileEl && secondsAgo != null) {
-      tileEl.classList.toggle('is-warn', secondsAgo > 900 && secondsAgo <= 3600);
-      tileEl.classList.toggle('is-stale', secondsAgo > 3600);
+    if (tileEl) {
+      const warnAfter = parseFloat(el.dataset.staleWarnAfter);
+      const staleAfter = parseFloat(el.dataset.staleStaleAfter);
+      const mark = secondsAgo != null && !Number.isNaN(warnAfter) && !Number.isNaN(staleAfter);
+      tileEl.classList.toggle('is-warn', mark && secondsAgo > warnAfter && secondsAgo <= staleAfter);
+      tileEl.classList.toggle('is-stale', mark && secondsAgo > staleAfter);
     }
 
     el.querySelectorAll('.dtile-entity-stat').forEach(statEl => {
@@ -1665,6 +1708,7 @@
       const sparklineCheckbox = control.querySelector('.dtile-sparkline-checkbox');
       const sparklineResolutionCells = Array.from(control.querySelectorAll('.dtile-sparkline-resolution-cell'));
       const showAgeCheckbox = control.querySelector('.dtile-show-age-checkbox');
+      const staleModeCells = Array.from(control.querySelectorAll('.dtile-stale-mode-cell'));
       const showPeriodCheckbox = control.querySelector('.dtile-show-period-checkbox');
       const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
       const dtileBody = tile.querySelector('.dtile-body');
@@ -1743,7 +1787,7 @@
             const chart = instances.get(tile.dataset.itemId);
             requestAnimationFrame(() => chart && chart.resize());
           } catch (e) {
-            trigger.title = 'Größe konnte nicht gespeichert werden';
+            trigger.title = t('Größe konnte nicht gespeichert werden');
           }
         });
       });
@@ -1815,7 +1859,7 @@
 
       const sparklineResolutionHead = control.querySelector('.dtile-sparkline-resolution-row')
         ?.previousElementSibling?.querySelector('strong');
-      const SPARKLINE_RESOLUTION_LABELS = {raw: 'Rohdaten', '5min': '5 Min', '15min': '15 Min', '30min': '30 Min', '1h': '1 Std'};
+      const SPARKLINE_RESOLUTION_LABELS = {raw: t('Rohdaten'), '5min': t('5 Min'), '15min': t('15 Min'), '30min': t('30 Min'), '1h': t('1 Std')};
       sparklineResolutionCells.forEach(cell => {
         cell.addEventListener('click', async () => {
           const resolution = cell.dataset.resolution;
@@ -1836,7 +1880,33 @@
               if (entityBody.dataset.showSparkline === 'true') await renderEntityTile(entityBody);
             }
           } catch (e) {
-            trigger.title = 'Sparkline-Auflösung konnte nicht gespeichert werden';
+            trigger.title = t('Sparkline-Auflösung konnte nicht gespeichert werden');
+          }
+        });
+      });
+
+      staleModeCells.forEach(cell => {
+        cell.addEventListener('click', async () => {
+          const staleMode = cell.dataset.staleMode;
+          try {
+            const response = await fetch(`${base}/dashboard/entity-stale-mode`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, pin_id: parseInt(tile.dataset.itemId, 10), stale_mode: staleMode,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
+            staleModeCells.forEach(option => option.classList.toggle('is-selected', option === cell));
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) {
+              entityBody.dataset.staleWarnAfter = result.stale_warn_after;
+              entityBody.dataset.staleStaleAfter = result.stale_stale_after;
+              await renderEntityTile(entityBody);
+            }
+          } catch (e) {
+            trigger.title = t('Veraltet-Schwelle konnte nicht gespeichert werden');
           }
         });
       });
@@ -1861,7 +1931,7 @@
               if (!ageEl) {
                 ageEl = document.createElement('span');
                 ageEl.className = 'dtile-entity-age';
-                ageEl.title = 'Letzte Aktualisierung';
+                ageEl.title = t('Letzte Aktualisierung');
                 entityBody?.querySelector('.dtile-entity-value')?.appendChild(ageEl);
               }
               if (entityBody) await renderEntityTile(entityBody);
@@ -1895,7 +1965,7 @@
       const resolutionRow = control.querySelector('.dtile-sparkline-resolution-row');
 
       if (rangeCells.length) {
-        // Rohwerte gibt es nur bis "Woche" (MAX_RAW_QUERY_POINTS) — darüber
+        // Rohwerte gibt es nur bis t("Woche") (MAX_RAW_QUERY_POINTS) — darüber
         // kommen die Sparkline-Punkte aus den Buckets der Abfrage und die
         // Auflösungs-Reihe hat keine Wirkung mehr. Ausgrauen statt
         // verschwinden lassen, wie beim Legenden-Schalter der Chart-Kacheln.
@@ -1906,7 +1976,7 @@
           resolutionRow.classList.toggle('is-disabled', aus);
           resolutionRow.querySelectorAll('button').forEach(b => { b.disabled = aus; });
           resolutionRow.title = aus
-            ? 'Bei Monat und Jahr zeichnet die Sparkline die Buckets der Abfrage — eine feinere Auflösung gibt es dort nicht.'
+            ? t('Bei Monat und Jahr zeichnet die Sparkline die Buckets der Abfrage — eine feinere Auflösung gibt es dort nicht.')
             : '';
         };
 
@@ -1991,7 +2061,7 @@
             c.classList.toggle('is-off', gesperrt);
             c.disabled = gesperrt;
             c.title = gesperrt
-              ? (c.dataset.metric === ctx.primary_metric ? 'Steht schon als Hauptwert' : 'Für diese Entität keine sinnvolle Kennzahl')
+              ? (c.dataset.metric === ctx.primary_metric ? t('Steht schon als Hauptwert') : t('Für diese Entität keine sinnvolle Kennzahl'))
               : '';
           });
           if (statsRow) statsRow.hidden = !statsCheckbox?.checked;
@@ -2011,7 +2081,7 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             uebernehmen(await response.json());
           } catch (e) {
-            trigger.title = 'Kennzahlen konnten nicht gespeichert werden';
+            trigger.title = t('Kennzahlen konnten nicht gespeichert werden');
           }
         };
 
@@ -2035,7 +2105,7 @@
               uebernehmen(await response.json());
             } catch (e) {
               showPeriodCheckbox.checked = !showPeriod;
-              trigger.title = 'Zeitraum-Anzeige konnte nicht gespeichert werden';
+              trigger.title = t('Zeitraum-Anzeige konnte nicht gespeichert werden');
             } finally {
               showPeriodCheckbox.disabled = false;
             }
@@ -2075,7 +2145,7 @@
 
       const decimalsCells = Array.from(control.querySelectorAll('.dtile-decimals-cell'));
       const decimalsHead = control.querySelector('.dtile-decimals-picker-head strong');
-      const DECIMALS_HEAD_LABELS = {auto: 'Auto', '0': '0', '1': '1', '2': '2', '3': '3'};
+      const DECIMALS_HEAD_LABELS = {auto: t('Auto'), '0': '0', '1': '1', '2': '2', '3': '3'};
       decimalsCells.forEach(cell => {
         cell.addEventListener('click', async () => {
           const decimals = cell.dataset.decimals;
@@ -2094,7 +2164,7 @@
               await renderEntityTile(entityBody);
             }
           } catch (e) {
-            trigger.title = 'Nachkommastellen konnten nicht gespeichert werden';
+            trigger.title = t('Nachkommastellen konnten nicht gespeichert werden');
           }
         });
       });
@@ -2117,7 +2187,7 @@
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             if (titleEl) titleEl.textContent = title || titleInput.placeholder;
           } catch (e) {
-            trigger.title = 'Titel konnte nicht gespeichert werden';
+            trigger.title = t('Titel konnte nicht gespeichert werden');
           }
         };
         titleInput.addEventListener('blur', saveTitle);
@@ -2297,7 +2367,7 @@
       const n = group.querySelectorAll('[data-section-grid] .dtile:not(.dtile-add)').length;
       if (group.classList.contains('collapsed') && n > 0) {
         countEl.hidden = false;
-        countEl.textContent = `(${n} Kachel${n === 1 ? '' : 'n'} ausgeblendet)`;
+        countEl.textContent = (n === 1 ? t('(1 Kachel ausgeblendet)') : t('({n} Kacheln ausgeblendet)',{n}));
       } else {
         countEl.hidden = true;
       }

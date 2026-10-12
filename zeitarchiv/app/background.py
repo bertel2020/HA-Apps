@@ -31,6 +31,7 @@ Zeile Logik unbemerkt verloren geht.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import secrets
@@ -43,7 +44,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import cleanup_stats
+from .i18n import N_, tr
+from . import cleanup_stats, counter_auto
 from . import demo_mode
 from . import ha_integration
 from . import notices as notices_mod
@@ -61,10 +63,9 @@ from .energiedashboard_routes import (
     refresh_heatmap_weekday_cache_if_stale,
     sync_hourly_rollup_flags_for_current_config,
 )
-from .limits import MAX_UI_ANALYSIS_ROWS
 from .progress import JobBusy, JobProgress
 from .route_support import dir_size
-from .storage import backup, cleanup, hotbuffer, reconcile
+from .storage import backup, backup_external, cleanup, hotbuffer, reconcile
 from .storage import resolution as resolution_mod
 from .storage import retention as retention_mod
 from .storage.coordinator import StorageCoordinator
@@ -133,6 +134,9 @@ class BackgroundDependencies:
 class BackgroundService:
     """Wartungsplaner, Backup-, Retention- und Abgleich-Läufe samt ihrem Zustand."""
 
+    # Mindestabstand zwischen zwei Kurzzeilen eines dauerhaft scheiternden Wartungsschritts.
+    _STEP_FAILURE_LOG_INTERVAL_SECONDS = 3600
+
     def __init__(self, deps: BackgroundDependencies) -> None:
         self.deps = deps
         # Abhängigkeiten flach am Dienst, nicht über self.deps.x: Der Code
@@ -180,13 +184,16 @@ class BackgroundService:
         #: Eintrag in der Kopfleiste sähe das nach einem grundlos zähen Server
         #: kurz nach dem Start aus.
         self.reconcile_progress = JobProgress(
-            "storage-reconcile", unit="Entitäten", label="Speicherabgleich"
+            "storage-reconcile", unit=N_("Entitäten"), label=N_("Speicherabgleich")
         )
         self.storage_reconcile_last: dict | None = None
         self._storage_reconcile_thread: threading.Thread | None = None
         self._storage_reconcile_stop = threading.Event()
         self._storage_reconcile_completed = False
         self._maintenance_scheduler_stop = threading.Event()
+        # Fehlerzustand je Wartungsschritt für die Log-Drosselung (_note_step_failure);
+        # nur vom Planer-Thread berührt.
+        self._step_failures: dict[str, dict] = {}
         self._maintenance_scheduler_thread: threading.Thread | None = None
 
         # Vom Wartungsplaner (alle 30s) gepflegter Zwischenstand für die Meldungen
@@ -257,6 +264,7 @@ class BackgroundService:
         # Scheduler-Heartbeat unentdeckt. Nur relevant, während
         # backup_progress.running True ist (siehe notices.py).
         self.last_backup_worker_tick = time.time()
+        self._external_retry_lock = threading.Lock()
 
     def run_storage_reconciliation(self,
         *, entity_ids: list[str] | None = None, repair: bool
@@ -310,7 +318,7 @@ class BackgroundService:
                         skipped_id,
                         status="skipped",
                         finished_at=time.time(),
-                        error="Übersprungen, weil bereits ein Retention-Lauf aktiv ist",
+                        error=tr("Übersprungen, weil bereits ein Retention-Lauf aktiv ist"),
                     )
                 return None
             job_id = self.index.create_retention_job(trigger, scheduled_for)
@@ -626,7 +634,7 @@ class BackgroundService:
                         skipped_id,
                         status="skipped",
                         finished_at=time.time(),
-                        error="Übersprungen, weil bereits ein Backup läuft",
+                        error=tr("Übersprungen, weil bereits ein Backup läuft"),
                     )
                 return False
             job_id = self.index.create_backup_job(trigger, scheduled_for)
@@ -681,13 +689,23 @@ class BackgroundService:
                         "snapshot_mode": "entity-consistent",
                     },
                 )
-                keep_count_raw = self.index.get_setting("backup_keep_count", "unlimited")
-                keep_days_raw = self.index.get_setting("backup_keep_days", "unlimited")
-                keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
-                keep_days = retention_mod.RETENTION_DAYS.get(keep_days_raw)
+                keep_count, keep_days = self._backup_keep_rules()
+                protected = None
+                if backup_external.load_config(self.index).enabled:
+                    # Externes Ziel: erst übertragen, dann lokal aufräumen. Nicht
+                    # übertragene Backups bleiben lokal liegen (Konzept).
+                    self.index.update_backup_job(
+                        job_id, filename=dest_path.name, size_bytes=dest_path.stat().st_size,
+                    )
+                    current_ok = self.external_transfer(dest_path.name, job_id)
+                    if current_ok:
+                        self._retry_pending_external(exclude=dest_path.name)
+                    protected = self._unsent_backup_names()
+                    if not current_ok:
+                        protected.add(dest_path.name)
                 cleanup_error = None
                 try:
-                    backup.prune_backups(self.backups_dir, keep_count, keep_days, time.time())
+                    backup.prune_backups(self.backups_dir, keep_count, keep_days, time.time(), protected)
                 except OSError as exc:
                     cleanup_error = f"Backup gültig; alte Sicherungen konnten nicht bereinigt werden: {exc}"[:2000]
                     logger.exception(
@@ -738,6 +756,117 @@ class BackgroundService:
         threading.Thread(target=worker, daemon=True).start()
         return True
 
+    def _backup_keep_rules(self) -> tuple[int | None, int | None]:
+        keep_count_raw = self.index.get_setting("backup_keep_count", "unlimited")
+        keep_days_raw = self.index.get_setting("backup_keep_days", "unlimited")
+        keep_count = int(keep_count_raw) if keep_count_raw != "unlimited" else None
+        return keep_count, retention_mod.RETENTION_DAYS.get(keep_days_raw)
+
+    def _unsent_backup_names(self) -> set[str]:
+        """Backups, die lokal bleiben müssen: Übertragung fehlgeschlagen oder
+        noch im Gange. Alte Backups ohne Status (von vor der Einrichtung des
+        Ziels) gehören nicht dazu und werden wie bisher aufgeräumt."""
+        return {
+            filename
+            for filename, row in self.index.list_backup_external_states().items()
+            if row["external_status"] in (backup_external.STATUS_FAILED, backup_external.STATUS_RUNNING)
+        }
+
+    def external_transfer(self, filename: str, job_id: int | None = None) -> bool:
+        """Überträgt ein lokales Backup auf das externe Ziel und hält das Ergebnis
+        im Job fest. Wirft nie; True nur bei erfolgreicher Übertragung samt
+        Aufräumen am Ziel. Läuft über den Watchdog, damit ein hängender
+        Netzwerkspeicher den Worker nicht festhält."""
+        config = backup_external.load_config(self.index)
+        if job_id is None:
+            row = self.index.get_backup_job_by_filename(filename)
+            if row is None:
+                return False
+            job_id = int(row["id"])
+        source = self.backups_dir / filename
+        self.index.update_backup_job(
+            job_id, external_status=backup_external.STATUS_RUNNING,
+            external_target=config.target_label, external_error=None,
+        )
+        keep_count, keep_days = self._backup_keep_rules()
+
+        def work(beat: Callable[[], None]) -> str:
+            def on_beat() -> None:
+                beat()
+                self.last_backup_worker_tick = time.time()
+
+            if config.type == "webdav":
+                client = backup_external.webdav_client(config, self.base_dir)
+                backup_external.transfer_webdav(client, source, on_beat)
+                if config.keep == "same":
+                    backup_external.prune_webdav(client, keep_count, keep_days, time.time(), self.tz)
+                return client.display_url
+            target = backup_external.resolve_target(config.mount, config.subfolder)
+            backup_external.cleanup_stale_parts(target)
+            backup_external.transfer(source, target, on_beat)
+            if config.keep == "same":
+                backup_external.prune_external(target, keep_count, keep_days, time.time())
+            return str(target)
+
+        try:
+            target = backup_external.run_with_watchdog(work)
+        except (backup_external.ExternalTargetError, OSError, ValueError) as exc:
+            logger.warning(
+                "Externes Backup fehlgeschlagen · event=backup_external_failed job_id=%s file=%s error=%s",
+                job_id, filename, exc,
+            )
+            self.index.update_backup_job(
+                job_id, external_status=backup_external.STATUS_FAILED,
+                external_finished_at=time.time(), external_error=str(exc)[:2000],
+            )
+            return False
+        logger.info(
+            "Externes Backup übertragen · event=backup_external_completed job_id=%s file=%s target=%s",
+            job_id, filename, target,
+        )
+        self.index.update_backup_job(
+            job_id, external_status=backup_external.STATUS_OK, external_target=target,
+            external_finished_at=time.time(), external_error=None,
+        )
+        return True
+
+    def _retry_pending_external(self, exclude: str | None = None) -> None:
+        """Nach einer gelungenen Übertragung die zuvor fehlgeschlagenen
+        nachholen, älteste zuerst; beim ersten Fehler Schluss (Ziel ist dann
+        offenbar wieder weg)."""
+        for filename, row in self.index.list_backup_external_states().items():
+            if filename == exclude or row["external_status"] != backup_external.STATUS_FAILED:
+                continue
+            if not (self.backups_dir / filename).is_file():
+                continue
+            if not self.external_transfer(filename, int(row["id"])):
+                return
+
+    def retry_external(self, filename: str) -> bool:
+        """„Erneut übertragen“: im Hintergrund, nie parallel zu einem Backup oder
+        einer anderen Übertragung. False, wenn nichts gestartet wurde."""
+        if self.backup_progress.running or not (self.backups_dir / filename).is_file():
+            return False
+        if not backup_external.load_config(self.index).enabled:
+            return False
+        if self.index.get_backup_job_by_filename(filename) is None:
+            return False
+        if not self._external_retry_lock.acquire(blocking=False):
+            return False
+        # Sofort sichtbar machen, bevor der Thread anläuft (sonst zeigt die
+        # sofort zurückgegebene Tabelle noch „fehlgeschlagen“).
+        row = self.index.get_backup_job_by_filename(filename)
+        self.index.update_backup_job(int(row["id"]), external_status=backup_external.STATUS_RUNNING)
+
+        def worker() -> None:
+            try:
+                self.external_transfer(filename)
+            finally:
+                self._external_retry_lock.release()
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
     def set_next_backup_run(self, now: datetime) -> float | None:
         schedule = self.index.get_setting("backup_schedule", "off")
         time_value = self.index.get_setting("backup_schedule_time", self.backup_default_time)
@@ -775,7 +904,7 @@ class BackgroundService:
         # über _storage_reconcile_stop/-_thread beendet — ein zweiter, von
         # JobProgress verwalteter, hätte diesen Abbruchweg unterlaufen.
         with self.reconcile_progress.track():
-            self.reconcile_progress.set_phase("Speicherindex wird geprüft", total=len(entities))
+            self.reconcile_progress.set_phase(N_("Speicherindex wird geprüft"), total=len(entities))
             for entity_id in entities:
                 if self._storage_reconcile_stop.is_set():
                     return
@@ -825,10 +954,20 @@ class BackgroundService:
         if not self.index.is_duplicate_snapshot_stale():
             return
         rows = cleanup.count_duplicate_rows_by_entity(
-            self.data_dir, self.index, self.tz, max_rows_per_entity=MAX_UI_ANALYSIS_ROWS
+            self.data_dir, self.index, self.tz
         )
         self.index.set_duplicate_snapshot(
             [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
+        )
+
+    def _refresh_counter_decrease_snapshot_if_stale(self) -> None:
+        """Zählerrückgänge der letzten 30 Tage für die Meldung und Housekeeping →
+        Zählerrückgänge, höchstens einmal pro Stunde (wie die Duplikat-Zählung) — oder
+        sofort, wenn das Markieren den Stand ungültig gemacht hat."""
+        if not self.index.is_counter_decrease_snapshot_stale():
+            return
+        self.index.set_counter_decrease_snapshot(
+            cleanup.scan_counter_decreases(self.data_dir, self.index, self.tz)
         )
 
     def _refresh_one_outlier_rate(self) -> None:
@@ -979,35 +1118,108 @@ class BackgroundService:
             )
             self.refresh_purge_preview_if_stale(force=True)
 
+    @contextlib.contextmanager
+    def _maintenance_step(self, name: str):
+        """Fängt den Fehler EINES Wartungsschritts ab, damit die übrigen im
+        selben Takt trotzdem laufen. Vorher standen alle Schritte in einem
+        gemeinsamen try: ein dauerhaft scheiternder Schritt weit vorn (z. B.
+        der Duplikat-Scan) übersprang bei jedem 30-s-Takt alles danach —
+        Backup-Zeitplan, Aufbewahrung, Kompaktierung und automatische Löschung
+        liefen dann nie."""
+        try:
+            yield
+        except Exception as exc:
+            self._note_step_failure(name, exc)
+        else:
+            self._note_step_success(name)
+
+    def _note_step_failure(self, name: str, exc: Exception) -> None:
+        """Drosselt die Fehlermeldungen eines dauerhaft scheiternden Schritts:
+        der erste Fehler kommt mit Traceback, danach höchstens einmal je
+        Stunde eine Kurzzeile mit Zähler. Bei 30-s-Takt wären es sonst 120
+        identische Tracebacks pro Stunde, die das Log verdrängen."""
+        now = time.monotonic()
+        state = self._step_failures.get(name)
+        if state is None:
+            self._step_failures[name] = {"count": 1, "since_log": 0, "last_log": now}
+            logger.exception(
+                "Wartungsschritt fehlgeschlagen · event=maintenance_step_failed step=%s", name
+            )
+            return
+        state["count"] += 1
+        state["since_log"] += 1
+        if now - state["last_log"] >= self._STEP_FAILURE_LOG_INTERVAL_SECONDS:
+            logger.error(
+                "Wartungsschritt scheitert weiterhin · event=maintenance_step_still_failing "
+                "step=%s failures=%d since_last_log=%d error=%s: %s",
+                name, state["count"], state["since_log"], type(exc).__name__, exc,
+            )
+            state["since_log"] = 0
+            state["last_log"] = now
+
+    def _note_step_success(self, name: str) -> None:
+        state = self._step_failures.pop(name, None)
+        if state is not None:
+            logger.info(
+                "Wartungsschritt wieder erfolgreich · event=maintenance_step_recovered "
+                "step=%s failures=%d",
+                name, state["count"],
+            )
+
     def _maintenance_scheduler_loop(self) -> None:
         """Prüft interne Zeitpläne und schreibt Statistikpunkte ohne UI-Aufruf."""
         while not self._maintenance_scheduler_stop.is_set():
             try:
-                if self.index.record_stats_snapshot_if_stale():
-                    logger.debug(
-                        "Stündlicher Statistik-Schnappschuss gespeichert · "
-                        "event=hourly_stats_snapshot_completed"
-                    )
-                supervisor_stats.maybe_record_memory_snapshot(self.index)
-                self.refresh_retention_overview_if_stale()
-                self.refresh_purge_preview_if_stale()
-                self._refresh_duplicate_snapshot_if_stale()
-                self._refresh_one_outlier_rate()
-                self._refresh_stale_entity_count()
-                self._refresh_host_disk_usage()
-                notices_mod.refresh_import_leftovers_if_stale(self.symcon_import_dir, self.csv_import_dir)
-                version_check.refresh_if_stale(self.index)
-                ha_integration.refresh_integration_version_check_if_stale(self.index)
-                process_pending_hourly_backfill(self.data_dir, self.index, self.tz, self.coordinator)
-                refresh_heatmap_weekday_cache_if_stale(self.energiedashboard_service)
-                self._run_backup_schedule_if_due(datetime.now(self.tz))
-                self._run_retention_enforcement_if_due(datetime.now(self.tz))
-                self._refresh_demo_dir_info_if_stale()
-                self._refresh_rollup_hot_size_if_stale()
-                self._run_demo_append_if_due(datetime.now(self.tz))
-                self._flush_stale_resolution_windows(datetime.now(self.tz))
-                self._run_automatic_compaction_if_due(datetime.now(self.tz))
-                self._run_automatic_purge_if_due(datetime.now(self.tz))
+                with self._maintenance_step("stats_snapshot"):
+                    if self.index.record_stats_snapshot_if_stale():
+                        logger.debug(
+                            "Stündlicher Statistik-Schnappschuss gespeichert · "
+                            "event=hourly_stats_snapshot_completed"
+                        )
+                with self._maintenance_step("memory_snapshot"):
+                    supervisor_stats.maybe_record_memory_snapshot(self.index)
+                with self._maintenance_step("retention_overview"):
+                    self.refresh_retention_overview_if_stale()
+                with self._maintenance_step("purge_preview"):
+                    self.refresh_purge_preview_if_stale()
+                with self._maintenance_step("duplicate_snapshot"):
+                    self._refresh_duplicate_snapshot_if_stale()
+                with self._maintenance_step("counter_decrease_snapshot"):
+                    self._refresh_counter_decrease_snapshot_if_stale()
+                with self._maintenance_step("counter_auto_mark"):
+                    counter_auto.run_if_due(self.data_dir, self.index, self.tz, self.coordinator.entity)
+                with self._maintenance_step("outlier_rate"):
+                    self._refresh_one_outlier_rate()
+                with self._maintenance_step("stale_entity_count"):
+                    self._refresh_stale_entity_count()
+                with self._maintenance_step("host_disk_usage"):
+                    self._refresh_host_disk_usage()
+                with self._maintenance_step("import_leftovers"):
+                    notices_mod.refresh_import_leftovers_if_stale(self.symcon_import_dir, self.csv_import_dir)
+                with self._maintenance_step("version_check"):
+                    version_check.refresh_if_stale(self.index)
+                with self._maintenance_step("integration_version_check"):
+                    ha_integration.refresh_integration_version_check_if_stale(self.index)
+                with self._maintenance_step("hourly_backfill"):
+                    process_pending_hourly_backfill(self.data_dir, self.index, self.tz, self.coordinator)
+                with self._maintenance_step("heatmap_weekday_cache"):
+                    refresh_heatmap_weekday_cache_if_stale(self.energiedashboard_service)
+                with self._maintenance_step("backup_schedule"):
+                    self._run_backup_schedule_if_due(datetime.now(self.tz))
+                with self._maintenance_step("retention_enforcement"):
+                    self._run_retention_enforcement_if_due(datetime.now(self.tz))
+                with self._maintenance_step("demo_dir_info"):
+                    self._refresh_demo_dir_info_if_stale()
+                with self._maintenance_step("rollup_hot_size"):
+                    self._refresh_rollup_hot_size_if_stale()
+                with self._maintenance_step("demo_append"):
+                    self._run_demo_append_if_due(datetime.now(self.tz))
+                with self._maintenance_step("flush_resolution_windows"):
+                    self._flush_stale_resolution_windows(datetime.now(self.tz))
+                with self._maintenance_step("automatic_compaction"):
+                    self._run_automatic_compaction_if_due(datetime.now(self.tz))
+                with self._maintenance_step("automatic_purge"):
+                    self._run_automatic_purge_if_due(datetime.now(self.tz))
             except Exception:
                 logger.exception(
                     "Wartungsplaner konnte den nächsten Lauf nicht prüfen · "
@@ -1138,20 +1350,20 @@ class BackgroundService:
             return {
                 "name": name,
                 "hint": hint,
-                "last_run": "Letzte 24 Stunden",
+                "last_run": tr("Letzte 24 Stunden"),
                 "pill_class": "pending" if count else "ok",
                 "pill_label": f"{count}×" if count else "OK",
             }
 
         return [
             row(
-                "Datenbank-Überlastung",
-                "Wie oft ein Datenbank-Zugriff nicht rechtzeitig drankam · 24h",
+                tr("Datenbank-Überlastung"),
+                tr("Wie oft ein Datenbank-Zugriff nicht rechtzeitig drankam · 24h"),
                 self.index.recent_lock_busy_events(),
             ),
             row(
-                "Speicherzugriff-Überlastung",
-                "Wie oft ein Datei-Zugriff (Archiv/Rollup/Hot) nicht rechtzeitig drankam · 24h",
+                tr("Speicherzugriff-Überlastung"),
+                tr("Wie oft ein Datei-Zugriff (Archiv/Rollup/Hot) nicht rechtzeitig drankam · 24h"),
                 self.coordinator.recent_busy_events(),
             ),
         ]

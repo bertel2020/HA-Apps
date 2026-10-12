@@ -1,21 +1,19 @@
-    // Zentraler Hook für eine spätere Sprachumschaltung (aktuell nur Deutsch) —
-    // jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen
-    // Konstante statt verstreuter 'de-DE'-Literale, damit ein künftiges
-    // Sprach-Setting nur hier greifen muss.
-    const LOCALE = 'de-DE';
+    // Jede Datumsformatierung in dieser Datei läuft über Intl mit dieser einen Konstante;
+    // das Format kommt aus der Einstellung (window.ZA_FORMAT, siehe i18n.js).
+    const LOCALE = window.ZA_FORMAT;
     const ENTITY_LABELS = Object.fromEntries(
       ENTITY_OPTIONS.map(opt => [opt.entity_id, opt.label])
     );
     // Reihenfolge bestimmt sowohl die Checkbox-Liste im Optionen-Menü als auch
     // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
     const LEGEND_METRIC_OPTIONS = [
-      {value: 'last', label: 'Aktuell'},
-      {value: 'min', label: 'Min'},
-      {value: 'max', label: 'Max'},
+      {value: 'last', label: t('Aktuell')},
+      {value: 'min', label: t('Min')},
+      {value: 'max', label: t('Max')},
       // Symbole statt Text, wo eines eindeutig etabliert ist — dieselben
       // Zeichen, mit denen Durchschnitt/Summe schon überall sonst in der App
       // beschriftet sind (Ø in der Legende selbst, s. u.; Ø auch in der
-      // Durchschnittslinie, siehe averageOf()-Verwendung). "Aktuell"/"Min"/
+      // Durchschnittslinie, siehe averageOf()-Verwendung). t("Aktuell")/"Min"/
       // "Max" bleiben Text — dafür gibt es kein vergleichbar etabliertes,
       // eindeutiges Zeichen in dieser App.
       {value: 'average', label: 'Ø'},
@@ -73,11 +71,11 @@
       const start = new Date(windowStart * 1000);
       const end = new Date(windowEnd * 1000 - 1000);
       switch (range) {
-        case 'hour': return `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
-        case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? 'Heute' : fmtDay(start));
+        case 'hour': return t('{range} Uhr',{range: `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)}`});
+        case 'day': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? t('Heute') : fmtDay(start));
         case 'week': return `${fmtDayMonth(start)}–${fmtDayMonth(end)} ${end.getFullYear()}`;
-        case 'month': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? `${fmtMonthYear(start)} (bis heute)` : fmtMonthYear(start));
-        case 'year': return continuous ? `${fmtMonthYear(start)} – ${fmtMonthYear(end)}` : (isCurrent ? `${start.getFullYear()} (bis heute)` : `${start.getFullYear()}`);
+        case 'month': return continuous ? `${fmtDay(start)} – ${fmtDay(end)}` : (isCurrent ? t('{period} (bis heute)', {period: fmtMonthYear(start)}) : fmtMonthYear(start));
+        case 'year': return continuous ? `${fmtMonthYear(start)} – ${fmtMonthYear(end)}` : (isCurrent ? t('{period} (bis heute)', {period: start.getFullYear()}) : `${start.getFullYear()}`);
         case 'decade': return `${start.getFullYear()}–${end.getFullYear()}`;
         default: return '';
       }
@@ -129,7 +127,7 @@
       return {
         show: true, right: 6, top: 0,
         feature: {
-          saveAsImage: {title: 'Als Bild speichern', backgroundColor: surface, name: exportFilename},
+          saveAsImage: {title: t('Als Bild speichern'), backgroundColor: surface, name: exportFilename},
         },
         iconStyle: {borderColor: inkFaint},
       };
@@ -137,16 +135,16 @@
 
     function previousPeriodLabel(range) {
       return ({
-        hour: 'Vorherige Stunde', day: 'Vortag', week: 'Vorwoche',
-        month: 'Vormonat', year: 'Vorjahr', decade: 'Vorherige Dekade',
-      })[range] || 'Vorperiode';
+        hour: t('Vorherige Stunde'), day: t('Vortag'), week: t('Vorwoche'),
+        month: t('Vormonat'), year: t('Vorjahr'), decade: t('Vorherige Dekade'),
+      })[range] || t('Vorperiode');
     }
 
     function previousYearPeriodLabel(range) {
       return ({
-        hour: 'Vorjahresstunde', day: 'Vorjahrestag', week: 'Vorjahreswoche',
-        month: 'Vorjahresmonat', year: 'Vorjahr', decade: 'Vorjahresdekade',
-      })[range] || 'Vorjahreszeitraum';
+        hour: t('Vorjahresstunde'), day: t('Vorjahrestag'), week: t('Vorjahreswoche'),
+        month: t('Vorjahresmonat'), year: t('Vorjahr'), decade: t('Vorjahresdekade'),
+      })[range] || t('Vorjahreszeitraum');
     }
 
     // Zwei Zeiträume bekommen keine zweite Vergleichszeile, aus zwei
@@ -220,12 +218,12 @@
       decade: {medium: 365 * 24 * 60 * 60, coarse: 2 * 365 * 24 * 60 * 60},
     };
     const RESOLUTION_LABELS = {
-      hour: {medium: '5 Minuten', coarse: '15 Minuten'},
-      day: {medium: '30 Minuten', coarse: '1 Stunde', full: 'Tag'},
-      week: {medium: '6 Stunden', coarse: '1 Tag', full: 'Woche'},
-      month: {medium: '1 Tag', coarse: '1 Woche', full: 'Monat'},
-      year: {medium: '1 Monat', coarse: '3 Monate', full: 'Jahr'},
-      decade: {medium: '1 Jahr', coarse: '2 Jahre'},
+      hour: {medium: t('5 Minuten'), coarse: t('15 Minuten')},
+      day: {medium: t('30 Minuten'), coarse: t('1 Stunde'), full: t('Tag')},
+      week: {medium: t('6 Stunden'), coarse: t('1 Tag'), full: t('Woche')},
+      month: {medium: t('1 Tag'), coarse: t('1 Woche'), full: t('Monat')},
+      year: {medium: t('1 Monat'), coarse: t('3 Monate'), full: t('Jahr')},
+      decade: {medium: t('1 Jahr'), coarse: t('2 Jahre')},
     };
 
     // Zeigt bei "Automatisch" die tatsächlich vom Server gelieferte Auflösung
@@ -266,23 +264,23 @@
     }
 
     const DURATION_UNITS = [
-      [365 * 24 * 3600, 'Jahr', 'Jahre'],
-      [30 * 24 * 3600, 'Monat', 'Monate'],
-      [7 * 24 * 3600, 'Woche', 'Wochen'],
-      [24 * 3600, 'Tag', 'Tage'],
-      [3600, 'Stunde', 'Stunden'],
-      [60, 'Minute', 'Minuten'],
-      [1, 'Sekunde', 'Sekunden'],
+      [365 * 24 * 3600, t('Jahr'), t('Jahre')],
+      [30 * 24 * 3600, t('Monat'), t('Monate')],
+      [7 * 24 * 3600, t('Woche'), t('Wochen')],
+      [24 * 3600, t('Tag'), t('Tage')],
+      [3600, t('Stunde'), t('Stunden')],
+      [60, t('Minute'), t('Minuten')],
+      [1, t('Sekunde'), t('Sekunden')],
     ];
     function fmtDurationLabel(seconds) {
       if (seconds == null) return '';
       for (const [unitSeconds, singular, plural] of DURATION_UNITS) {
         if (seconds >= unitSeconds * 0.9) {
           const n = Math.max(1, Math.round(seconds / unitSeconds));
-          return `${n} ${n === 1 ? singular : plural}`;
+          return `${n} ${t(n === 1 ? singular : plural)}`;
         }
       }
-      return `${Math.round(seconds)} Sekunden`;
+      return t('{n} Sekunden',{n: Math.round(seconds)});
     }
 
     // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
@@ -309,6 +307,35 @@
         return d.toLocaleDateString(LOCALE, {month: 'long', year: 'numeric'});
       }
       return d.toLocaleDateString(LOCALE, {year: 'numeric'});
+    }
+
+    // ECharts stapelt auf einer Zeit-Achse nach INDEX in den Daten, nicht nach
+    // Zeitstempel (nachgemessen mit ECharts 5.6: Serie B mit Beginn im April
+    // landete auf Serie A vom Januar). Der Server liefert Buckets aber erst ab
+    // dem ersten vorhandenen Wert — beginnen gestapelte Serien in
+    // verschiedenen Perioden, rutscht die spätere nach links. Deshalb werden
+    // alle Serien eines Stapels vor dem Zeichnen auf die Vereinigung ihrer
+    // Zeitstempel gebracht; fehlende Stellen bekommen einen null-Wert (kein
+    // Balken, keine erfundene "0"). Tooltips lassen null-Zeilen weg.
+    // Gleiche Funktion in dashboard-tiles.js bzw. chart_editor.js.
+    function padStackedSeries(seriesList) {
+      const groups = new Map();
+      seriesList.forEach(s => {
+        if (!s.stack) return;
+        if (!groups.has(s.stack)) groups.set(s.stack, []);
+        groups.get(s.stack).push(s);
+      });
+      groups.forEach(list => {
+        if (list.length < 2) return;
+        const xs = new Set();
+        list.forEach(s => s.data.forEach(p => xs.add(p[0])));
+        const sorted = [...xs].sort((a, b) => a - b);
+        list.forEach(s => {
+          if (s.data.length === sorted.length) return;
+          const byX = new Map(s.data.map(p => [p[0], p]));
+          s.data = sorted.map(x => byX.get(x) || [x, null]);
+        });
+      });
     }
 
     function resamplePoints(points, range, preset, aggregationType, windowStart) {
@@ -535,6 +562,10 @@
         // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
         // Chart gespeicherte Wahl verwerfen.
         timeline: CHART_TYPE === 'timeline',
+        // Ob die Darstellungsart schon feststeht (gespeichert oder per Klick
+        // gewählt). Solange nicht, wird ein reines Schalter-Chart nach dem
+        // Laden automatisch zum Zeitstrahl (Standard) — siehe load().
+        typeChosen: CHART_TYPE !== 'auto',
         // Donut statt Zeitverlauf — ein Anteil je Serie (Summe/Durchschnitt/
         // Letzter Wert, siehe donutAggregation) statt einer Zeitachse.
         // Eigenes Feld statt eines dritten timeline-artigen Strings, weil
@@ -637,7 +668,7 @@
         get resolutionOptions() {
           const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
           const options = [
-            {value: 'auto', label: 'Automatisch'},
+            {value: 'auto', label: t('Automatisch')},
             {value: 'medium', label: labels.medium},
             {value: 'coarse', label: labels.coarse},
           ];
@@ -708,6 +739,18 @@
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },
+        // Summe der Vergleichsperiode „bis zum gleichen Tag“ (bzw. zur gleichen Uhrzeit), solange
+        // die aktuelle Periode läuft. Nur wenn sie sich von der Gesamtsumme daneben unterscheidet —
+        // beim Vorjahr ist das Fenster ohnehin schon gekappt, und zwei gleiche Zahlen wären Lärm.
+        compareCutFor(s) {
+          if (!s.compare_cut_points) return null;
+          const full = this.seriesStatsFor(s, s.compare_points, s.compare_window_end).sum;
+          const cut = this.seriesStatsFor(s, s.compare_cut_points, s.compare_cut_end).sum;
+          if (cut === null || cut === full) return null;
+          const end = new Date(s.compare_cut_end * 1000);
+          const where = ['hour', 'day'].includes(this.range) ? fmtTime(end) : fmtDayMonth(end);
+          return {label: t('bis {cut}', {cut: where}), sum: cut};
+        },
         get seriesStats() {
           return this.series.map((s, i) => {
             // Vergleichs-Nebenserie (Vorjahr/Vorperiode, siehe render()) taucht
@@ -716,9 +759,10 @@
             // Legende sie als gedämpfte Unterzeile je Entität zeigen können.
             const compare = (this.compare && s.compare_points && s.compare_points.length)
               ? {
-                  seriesLabel: this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode',
+                  seriesLabel: this.compareMode === 'year' ? t('Vorjahr') : t('Vorperiode'),
                   period: formatPeriodLabel(this.range, this.continuous, s.compare_window_start, s.compare_window_end, false),
                   ...this.seriesStatsFor(s, s.compare_points, s.compare_window_end),
+                  cut: this.compareCutFor(s),
                 }
               : null;
             return {
@@ -798,7 +842,7 @@
         // "Vergleichen" + separatem Auswahl-Segment daneben) — passt sich wie
         // die beiden Label-Getter oben automatisch an den Zeitraum an.
         get compareButtonLabel() {
-          if (!this.compare) return 'Vergleichen';
+          if (!this.compare) return t('Vergleichen');
           return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
         // EIN Ort für "zeichnet render() gerade über renderYearsCompare()"
@@ -1043,6 +1087,7 @@
         // eine Fläche) — sichtbar als plötzliche Linie statt der eigentlich
         // erwarteten automatischen Balken für Zähler/Schalter.
         toggleTimeline() {
+          this.typeChosen = true;
           this.timeline = !this.timeline;
           if (this.timeline) { this.raw = true; }
           else { this.raw = false; }
@@ -1060,6 +1105,7 @@
         setDisplayMode(mode) {
           const wantDonut = mode === 'donut';
           if (wantDonut === this.donut) return;
+          this.typeChosen = true;
           this.donut = wantDonut;
           if (wantDonut) {
             // render() prüft this.timeline VOR this.donut (s. o.) — ein noch
@@ -1110,6 +1156,15 @@
           // dann fällt die Ansicht automatisch auf Linie/Balken zurück statt
           // einen inzwischen unpassenden Zeitstrahl weiterzuzeigen.
           if (this.timeline && !this.allSwitch) this.timeline = false;
+          // Standard für reine Schalter-Charts: Zeitstrahl. Die Serien kamen
+          // ohne Rohwerte, deshalb einmal neu laden.
+          if (!this.typeChosen && !this.timeline && !this.donut && this.allSwitch) {
+            this.typeChosen = true;
+            this.timeline = true;
+            this.raw = true;
+            this.loading = false;
+            return this.load();
+          }
           this.autoResolutionLabel = this.computeAutoResolutionLabel();
           this.windowStart = data.window_start ?? null;
           this.windowEnd = data.window_end ?? null;
@@ -1291,7 +1346,7 @@
             const axisDynamic = dynamicYAxis && !axisHasBar.has(u);
             return {
               type: 'value',
-              name: isPercentAxis ? 'Anteil' : (isDuration ? 'Dauer' : (u || undefined)),
+              name: isPercentAxis ? t('Anteil') : (isDuration ? t('Dauer') : (u || undefined)),
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
@@ -1538,7 +1593,7 @@
               // einzeln umschaltbar (wie cmp auch nicht) — sie gehört
               // sichtbar zur Hauptserie, kein eigener Umschalt-Anspruch.
               echartsSeries.push({
-                name: `${displayName} (Ø gleitend)`,
+                name: t('{name} (Ø gleitend)',{name: displayName}),
                 type: 'line',
                 yAxisIndex: units.indexOf(axisKey(s)),
                 data: rollingData,
@@ -1565,7 +1620,7 @@
               const compareLabel = formatPeriodLabel(
                 this.range, this.continuous, s.compare_window_start, s.compare_window_end, false
               );
-              const seriesLabel = this.compareMode === 'year' ? 'Vorjahr' : 'Vorperiode';
+              const seriesLabel = this.compareMode === 'year' ? t('Vorjahr') : t('Vorperiode');
               const comparePoints = resamplePoints(
                 s.compare_points, this.range, this.resolutionPreset,
                 s.aggregation_type, s.compare_window_start
@@ -1598,6 +1653,7 @@
               echartsSeries.push(cmp);
             }
           });
+          padStackedSeries(echartsSeries);
           chartInstance.setOption({
             toolbox: toolboxOption(
               this.exportFilename,
@@ -1685,7 +1741,10 @@
               // (Vergleich aktiv), bekommt jede Zeile ihr eigenes Datum, aber
               // weiterhin einheitlich ÜBER dem Wert (wie überall sonst in der
               // App, siehe dashboard-tiles.js/entity_detail.html).
-              formatter: params => {
+              formatter: allParams => {
+                // Auffüll-Punkte gestapelter Serien (padStackedSeries) haben keinen Wert.
+                const params = allParams.filter(p => p.data[1] != null);
+                if (!params.length) return '';
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
                 // 100%-Normierung: zeigt IMMER beides — Anteil und
@@ -1816,7 +1875,7 @@
         // Achse statt einer Zeitachse, keine Stacking-/Prozent-/gleitender-
         // Durchschnitt-Fälle — für "Jahre" ohnehin nicht erreichbar.
         renderYearsCompare() {
-          const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+          const MONTHS = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
           const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
           const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
           const hasCompare = s => !!s.compare_points;
@@ -1888,7 +1947,7 @@
               // abzuschalten nimmt der Achse jeden Platzanspruch, show:false
               // bleibt zusätzlich als Absicherung stehen.
               show: !hidden,
-              name: hidden ? '' : (isDuration ? 'Dauer' : u || '') + (isCum ? ' kumuliert' : '') || undefined,
+              name: hidden ? '' : (isDuration ? t('Dauer') : u || '') + (isCum ? t(' kumuliert') : '') || undefined,
               nameLocation: 'end',
               position: pos % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(pos / 2) * 55,
@@ -1974,7 +2033,7 @@
               });
               if (this.compareCumsum) {
                 echartsSeries.push({
-                  name: `${displayName} (${year}) kumuliert`,
+                  name: t('{name} ({year}) kumuliert',{name: displayName, year}),
                   type: 'line',
                   yAxisIndex: cumAxisIndex(axisUnit(s)),
                   data: cumulate(monthly),
@@ -2103,7 +2162,7 @@
           const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
           const lines = [];
           if (this.donut) {
-            lines.push(['Entität', 'Wert'].map(csvEscape).join(';'));
+            lines.push([t('Entität'), t('Wert')].map(csvEscape).join(';'));
             this.series.forEach(s => {
               const name = this.entityNames[s.entity_id] || s.friendly_name;
               const value = fmtNum(this.donutValueFor(s), this.effectiveDecimals(s)) + (s.unit ? ` ${s.unit}` : '');
@@ -2114,7 +2173,7 @@
             this.series.forEach(s => s.points.forEach(p => tsSet.add(p.ts)));
             const timestamps = [...tsSet].sort((a, b) => a - b);
             const names = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
-            lines.push(['Zeit', ...names].map(csvEscape).join(';'));
+            lines.push([t('Zeit'), ...names].map(csvEscape).join(';'));
             timestamps.forEach(ts => {
               const row = [new Date(ts * 1000).toLocaleString(LOCALE)];
               this.series.forEach(s => {
@@ -2136,8 +2195,8 @@
         },
 
         async save() {
-          if (!this.name.trim()) { appAlert('Bitte einen Namen für das Chart angeben.'); return; }
-          if (this.selectedEntityIds.length === 0) { appAlert('Bitte mindestens eine Entität auswählen.'); return; }
+          if (!this.name.trim()) { appAlert(t('Bitte einen Namen für das Chart angeben.')); return; }
+          if (this.selectedEntityIds.length === 0) { appAlert(t('Bitte mindestens eine Entität auswählen.')); return; }
           this.saving = true;
           this.savedMessage = '';
           // Nur Namen tatsächlich ausgewählter Entitäten mitschicken — eine
@@ -2162,7 +2221,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : 'auto'),
+            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : (this.allSwitch ? 'bar' : 'auto')),
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
@@ -2180,7 +2239,7 @@
             });
             if (!res.ok) {
               const err = await res.json().catch(() => ({}));
-              appAlert(err.detail || 'Speichern fehlgeschlagen.');
+              appAlert(err.detail || t('Speichern fehlgeschlagen.'));
               return;
             }
             const data = await res.json();
@@ -2188,7 +2247,7 @@
               window.location.href = `${BASE}/charts/${data.id}`;
               return;
             }
-            this.savedMessage = '✓ Gespeichert';
+            this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
             setTimeout(() => { this.savedMessage = ''; }, 2000);
           } finally {
@@ -2197,7 +2256,7 @@
         },
 
         async deleteChart() {
-          if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+          if (!await appConfirm(t('Dieses Chart wirklich löschen?'), {danger: true})) return;
           await fetch(`${BASE}/charts/${CHART_ID}/delete`, {method: 'POST'});
           window.location.href = `${BASE}/charts`;
         },

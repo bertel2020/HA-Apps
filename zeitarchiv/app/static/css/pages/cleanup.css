@@ -391,3 +391,110 @@
        oben — sie gilt in beiden Breiten. */
   }
 
+
+/* Reiter "Markiert": alle zur Löschung markierten Werte, nach Charge gruppiert. */
+.marked-card{margin-top:4px;}
+.marked-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+/* Chargenkopf: eigene Zeile, damit die Zeilen darunter erkennbar zusammengehören. */
+.marked-group td{
+  background:var(--surface-alt);color:var(--ink-muted);font-weight:600;
+  font-size:calc(12.5px * var(--font-scale, 1));
+}
+.marked-group td>span{margin-right:12px;}
+.marked-confirm{
+  margin:0 0 12px;padding:10px 14px;border:1px solid var(--notice-warn);border-radius:8px;
+  background:var(--warning-soft);font-size:calc(13px * var(--font-scale, 1));
+}
+.marked-confirm p{margin:0 0 10px;line-height:1.5;}
+.marked-confirm-actions{display:flex;gap:8px;}
+/* Link neben dem Rückgängig-Knopf in der Aktionszeile. */
+.marked-link{font-size:calc(13px * var(--font-scale, 1));color:var(--accent-line);margin-right:10px;white-space:nowrap;}
+
+/* Chargen einklappbar: der Kopf ist der Schalter, der Pfeil dreht sich. */
+.marked-toggle{
+  all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-right:12px;
+}
+.marked-toggle:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;border-radius:4px;}
+.marked-chev{display:inline-block;transition:transform .15s;font-size:11px;}
+.marked-chev.open{transform:rotate(90deg);}
+.marked-notice{
+  margin:10px 0;padding:8px 12px;border-radius:8px;font-size:calc(13px * var(--font-scale, 1));
+  background:var(--accent-soft, var(--surface-alt));color:var(--ink);
+}
+.marked-notice.err{background:var(--danger-soft);color:var(--danger);}
+
+/* Endgültig entfernen: eigener Bereich ganz unten, getrennt vom Zurücknehmen. */
+.marked-zone{
+  margin-top:16px;padding-top:12px;border-top:1px solid var(--border);
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+}
+.marked-zone p{margin:0;flex:1;min-width:220px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+.marked-danger{
+  margin-top:12px;padding:12px 14px;border:1px solid var(--danger);border-radius:8px;
+  background:var(--danger-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));
+}
+.marked-danger p{margin:0 0 10px;line-height:1.5;}
+.marked-danger-note{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.marked-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:0 0 10px;}
+.marked-nums div{background:var(--surface);border-radius:8px;padding:8px 10px;}
+.marked-nums b{display:block;font-size:calc(18px * var(--font-scale, 1));font-weight:600;}
+.marked-nums span{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);}
+
+/* Mit dem fünften Reiter ("Markiert") ist die Zeile bei 375px zu schmal: lieber umbrechen,
+   als den neuen Reiter hinter dem Rand zu verstecken. */
+@media (max-width:480px){
+  .edit-tabs{flex-wrap:wrap;row-gap:4px;}
+}
+
+/* Reiter "Verlauf": Protokoll der Änderungen an einer Entität, nach Tagen gruppiert. */
+.history-card{margin-top:4px;}
+.history-filters{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0;align-items:center;}
+.history-days{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;}
+.history-chip{
+  border:1px solid var(--border);border-radius:14px;padding:3px 10px;background:transparent;
+  color:var(--ink-muted);font:inherit;font-size:calc(12px * var(--font-scale, 1));cursor:pointer;
+}
+.history-chip:hover:not(.on){background:var(--surface-alt);color:var(--ink);}
+.history-chip.on{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
+.history-day{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-weight:600;margin:14px 0 4px;}
+.history-event{
+  display:grid;grid-template-columns:48px 108px 1fr auto;gap:10px;align-items:start;
+  padding:9px 0;border-top:1px solid var(--border);
+}
+.history-time{color:var(--ink-muted);font-variant-numeric:tabular-nums;font-size:calc(13px * var(--font-scale, 1));}
+.history-tag{
+  display:inline-block;padding:1px 8px;border-radius:10px;font-weight:600;
+  font-size:calc(12px * var(--font-scale, 1));
+}
+.history-tag.t-mark{background:var(--warning-soft);color:var(--notice-warn);}
+.history-tag.t-undo{background:var(--surface-alt);color:var(--positive);}
+.history-tag.t-fix{background:var(--accent-line-soft);color:var(--accent-line);}
+.history-tag.t-purge{background:var(--danger-soft);color:var(--danger);}
+.history-tag.t-misc{background:var(--surface-alt);color:var(--ink-muted);}
+.history-sub{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin-top:2px;}
+.history-old{text-decoration:line-through;}
+.history-link{font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);white-space:nowrap;}
+
+@media (max-width:640px){
+  /* Schmale Breite: Marke und Zeit in einer Zeile, darunter der Text als Karte. */
+  .history-event{grid-template-columns:auto 1fr auto;row-gap:2px;}
+  .history-time{order:2;}
+  .history-none{order:5;}
+  .history-what{grid-column:1 / -1;order:4;}
+  .history-link{order:3;justify-self:end;}
+  .history-days{margin-left:0;}
+}
+
+/* Reiter "Markiert": wann die automatische Bereinigung eine Charge entfernt. Rot, wenn es in den
+   nächsten Tagen soweit ist; sonst die ruhige Akzentmarke. */
+.marked-due{
+  display:inline-block;margin-right:12px;padding:0 8px;border-radius:10px;font-weight:600;
+  font-size:calc(12px * var(--font-scale, 1));background:var(--accent-line-soft);color:var(--accent-line);
+}
+.marked-due.soon{background:var(--danger-soft);color:var(--danger);}
+/* Herkunft der Charge (manuell, Duplikate, Sammelaktion …) — ruhiger als die Fälligkeit daneben. */
+.marked-source{
+  display:inline-block;margin-right:8px;padding:0 8px;border-radius:10px;
+  font-size:calc(12px * var(--font-scale, 1));background:var(--surface-alt);color:var(--ink-muted);
+}
+.marked-zone p a{color:var(--accent-line);white-space:nowrap;}

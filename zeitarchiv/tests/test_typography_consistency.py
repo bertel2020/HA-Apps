@@ -156,7 +156,7 @@ def test_choice_buttons_use_the_display_font_not_mono() -> None:
     auf Fließtext, sagt sie nichts mehr aus".
     """
     css = APP_CSS.read_text(encoding="utf-8")
-    for selektor in (".dtile-choice-cell", ".dtile-sparkline-resolution-cell"):
+    for selektor in (".dtile-choice-cell", ".dtile-sparkline-resolution-cell", ".dtile-stale-mode-cell"):
         assert "var(--font-display)" in _regel(css, selektor), selektor
         assert "var(--font-mono)" not in _regel(css, selektor), selektor
 

@@ -25,6 +25,8 @@ denselben Wert ergeben."""
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import json
 import logging
 import math
@@ -98,9 +100,7 @@ def _token() -> str:
         or os.environ.get("SUPERVISOR_TOKEN")
     )
     if not token:
-        raise HaApiError(
-            "Kein Home-Assistant-Token konfiguriert"
-        )
+        raise HaApiError(tr("Supervisor ist in dieser Umgebung nicht verfügbar"))
     return token
 
 def token_available() -> bool:
@@ -152,12 +152,12 @@ def _get(path: str, params: dict | None = None) -> object:
         # JSON-Body, z. B. eine HTML-Fehlerseite eines vorgeschalteten
         # Proxys) bleibt der Code die einzige verlässliche Angabe.
         stripped = detail.lstrip(": ")
-        message = stripped if stripped.startswith(str(exc.code)) else f"Fehler {exc.code}{detail}"
-        raise HaApiError(f"Home-Assistant-API antwortete mit {message}") from exc
+        message = stripped if stripped.startswith(str(exc.code)) else tr("Fehler {code}{detail}", code=exc.code, detail=detail)
+        raise HaApiError(tr("Home-Assistant-API antwortete mit {message}", message=message)) from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise HaApiError(f"Home-Assistant-API nicht erreichbar: {exc.reason if isinstance(exc, urllib.error.URLError) else exc}") from exc
+        raise HaApiError(tr("Home-Assistant-API nicht erreichbar: {v}", v=exc.reason if isinstance(exc, urllib.error.URLError) else exc)) from exc
     except ValueError as exc:
-        raise HaApiError("Home-Assistant-API lieferte keine gültige JSON-Antwort") from exc
+        raise HaApiError(tr("Home-Assistant-API lieferte keine gültige JSON-Antwort")) from exc
 
 
 def _http_error_detail(exc: "urllib.error.HTTPError") -> str:
@@ -261,32 +261,32 @@ def fetch_history_rows(
         for entry in entries:
             if not isinstance(entry, dict):
                 result.skipped += 1
-                _discard(result, "Eintrag ist kein Objekt", entry)
+                _discard(result, tr("Eintrag ist kein Objekt"), entry)
                 continue
             changed = entry.get("last_changed") or entry.get("last_updated")
             if not changed:
                 result.skipped += 1
-                _discard(result, "Zeitstempel fehlt", entry)
+                _discard(result, tr("Zeitstempel fehlt"), entry)
                 continue
             try:
                 ts = datetime.fromisoformat(str(changed).replace("Z", "+00:00")).timestamp()
             except ValueError:
                 result.skipped += 1
-                _discard(result, "Zeitstempel ist ungültig", entry)
+                _discard(result, tr("Zeitstempel ist ungültig"), entry)
                 continue
             value = _parse_state(str(entry.get("state")), domain)
             if value is None:
                 result.skipped += 1
-                _discard(result, "Zustand ist nicht importierbar", entry)
+                _discard(result, tr("Zustand ist nicht importierbar"), entry)
                 continue
             if last_ts is not None and ts <= last_ts:
-                _discard(result, "Zeitstempel ist doppelt oder nicht aufsteigend", entry)
+                _discard(result, tr("Zeitstempel ist doppelt oder nicht aufsteigend"), entry)
                 continue
             result.rows.append((ts, value))
             last_ts = ts
             if len(result.rows) > max_rows:
                 raise ValueError(
-                    f"HA-Historie enthält mehr als {max_rows:,} Datenpunkte".replace(",", ".")
+                    tr("HA-Historie enthält mehr als {limit} Datenpunkte", limit=f"{max_rows:,}".replace(",", "."))
                 )
         window_start = window_end
     return result

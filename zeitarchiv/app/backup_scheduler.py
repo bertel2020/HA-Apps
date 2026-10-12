@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import tr
+
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -11,7 +13,7 @@ def parse_schedule_time(value: str) -> time:
     try:
         parsed = datetime.strptime(value, "%H:%M").time()
     except (TypeError, ValueError) as exc:
-        raise ValueError("Ungültige Uhrzeit") from exc
+        raise ValueError(tr("Ungültige Uhrzeit")) from exc
     return parsed.replace(second=0, microsecond=0)
 
 
@@ -28,7 +30,7 @@ def _valid_local_datetime(day, local_time: time, tz: ZoneInfo) -> datetime:
         if roundtrip.replace(tzinfo=None) == candidate.replace(tzinfo=None):
             return candidate
         candidate += timedelta(minutes=1)
-    raise ValueError("Lokaler Sicherungszeitpunkt ist ungültig")
+    raise ValueError(tr("Lokaler Sicherungszeitpunkt ist ungültig"))
 
 
 def next_scheduled_run(
@@ -41,11 +43,11 @@ def next_scheduled_run(
     if schedule == "off":
         return None
     if schedule not in {"daily", "weekly"}:
-        raise ValueError("Ungültiger Zeitplan")
+        raise ValueError(tr("Ungültiger Zeitplan"))
     if now.tzinfo is None:
-        raise ValueError("now benötigt eine Zeitzone")
+        raise ValueError(tr("now benötigt eine Zeitzone"))
     if weekday not in range(7):
-        raise ValueError("Ungültiger Wochentag")
+        raise ValueError(tr("Ungültiger Wochentag"))
 
     local_now = now.astimezone(now.tzinfo)
     local_time = parse_schedule_time(time_value)

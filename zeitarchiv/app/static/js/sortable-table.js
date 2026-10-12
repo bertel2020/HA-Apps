@@ -66,8 +66,8 @@
     const start = (page - 1) * pageSize + 1;
     const end = Math.min(rows.length, page * pageSize);
     pager.innerHTML =
-      '<span class="pager-range">' + start + '–' + end + ' von ' + rows.length + '</span>' +
-      '<button class="btn navbtn" type="button" data-page-action="first"' + (page <= 1 ? ' disabled' : '') + ' title="Erste Seite">«</button>' +
+      '<span class="pager-range">' + start + '–' + end + ' ' + t('von') + ' ' + rows.length + '</span>' +
+      '<button class="btn navbtn" type="button" data-page-action="first"' + (page <= 1 ? ' disabled' : '') + ' title="' + t('Erste Seite') + '">«</button>' +
       '<button class="btn navbtn" type="button" data-page-action="prev"' + (page <= 1 ? ' disabled' : '') + '>‹</button>' +
       // Direkte Seiteneingabe wie in den serverseitigen Pagern (siehe
       // .pager-page-input in _entities_table.html u. a.) — ohne sie muss man
@@ -75,10 +75,10 @@
       // der Klick-Handler darunter ruft für jedes so ausgezeichnete Element
       // updatePager() auf, das den Pager neu schreibt — der Klick ins Feld
       // würde es also im selben Moment ersetzen und den Fokus verlieren.
-      '<span class="pager-page">Seite <input type="number" class="pager-page-input" ' +
-        'min="1" max="' + totalPages + '" value="' + page + '" aria-label="Seite"> / ' + totalPages + '</span>' +
+      '<span class="pager-page">' + t('Seite') + ' <input type="number" class="pager-page-input" ' +
+        'min="1" max="' + totalPages + '" value="' + page + '" aria-label="' + t('Seite') + '"> / ' + totalPages + '</span>' +
       '<button class="btn navbtn" type="button" data-page-action="next"' + (page >= totalPages ? ' disabled' : '') + '>›</button>' +
-      '<button class="btn navbtn" type="button" data-page-action="last"' + (page >= totalPages ? ' disabled' : '') + ' title="Letzte Seite">»</button>';
+      '<button class="btn navbtn" type="button" data-page-action="last"' + (page >= totalPages ? ' disabled' : '') + ' title="' + t('Letzte Seite') + '">»</button>';
     const pageInput = pager.querySelector('.pager-page-input');
     if (pageInput) {
       pageInput.addEventListener('change', () => {

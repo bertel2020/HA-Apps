@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from _paths import APP_CSS, APP_JS, TEMPLATES, page_text
+from _paths import APP_CSS, APP_JS, TEMPLATES, page_text, template_text
 
 
 
@@ -54,13 +54,13 @@ def test_wide_resized_tables_scroll_without_expanding_settings_panel() -> None:
 
 
 def test_entity_config_preview_uses_shared_scroll_wrapper() -> None:
-    source = (TEMPLATES / "_entity_config_form.html").read_text(encoding="utf-8")
+    source = template_text("_entity_config_form.html")
     assert '<div class="tbl-wrap">' in source
     assert '<table class="dt compact">' in source
 
 
 def test_csv_export_unit_and_rows_are_left_aligned() -> None:
-    source = (TEMPLATES / "_export_table.html").read_text(encoding="utf-8")
+    source = template_text("_export_table.html")
     page = page_text("export.html")
     assert "'centered' if col.key == 'type'" in source
     assert '<td>{{ row.unit or "—" }}</td>' in source

@@ -1,0 +1,17 @@
+configuration:
+  timezone:
+    name: Time zone
+    description: >-
+      IANA time zone (e.g. Europe/Berlin) for navigation, schedules and
+      presentation. The app must be restarted after a change.
+  demo_mode:
+    name: Demo mode
+    description: >-
+      Switches to a separate instance, isolated from the real data, with
+      synthetic showcase data. The app must be restarted after a change.
+  webdav_password:
+    name: WebDAV password
+    description: >-
+      Password for the external backup target via WebDAV (System → Backup / Restore → External target). It is deliberately not stored in the app database so that it does not end up in the backups. The app must be restarted after a change.
+network:
+  8127/tcp: Zeitarchiv REST API

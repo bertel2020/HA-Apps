@@ -27,6 +27,8 @@ Fetch-Module beschränkt."""
 
 from __future__ import annotations
 
+from ..i18n import N_, tr
+
 import json
 import logging
 import math
@@ -67,7 +69,7 @@ MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 # die Wartezeit je Nachricht, dieser Zähler zusätzlich die Gesamtzahl.
 MAX_MESSAGES_PER_CALL = 2000
 
-PERIODS = {"hour": "Stundenwerte", "day": "Tageswerte"}
+PERIODS = {"hour": N_("Stundenwerte"), "day": N_("Tageswerte")}
 DEFAULT_PERIOD = "hour"
 
 
@@ -100,7 +102,7 @@ def _token() -> str:
         or os.environ.get("SUPERVISOR_TOKEN")
     )
     if not token:
-        raise HaApiError("Kein Home-Assistant-Token konfiguriert")
+        raise HaApiError(tr("Supervisor ist in dieser Umgebung nicht verfügbar"))
     return token
 
 
@@ -147,7 +149,7 @@ def _ws_call(commands: list[dict]) -> list[dict]:
             ws.send(json.dumps({"type": "auth", "access_token": token}))
             auth_result = json.loads(ws.recv(timeout=REQUEST_TIMEOUT))
             if auth_result.get("type") != "auth_ok":
-                raise HaApiError("Home-Assistant-WebSocket-API: Authentifizierung fehlgeschlagen")
+                raise HaApiError(tr("Home-Assistant-WebSocket-API: Authentifizierung fehlgeschlagen"))
 
             for msg_id, command in enumerate(commands, start=1):
                 ws.send(json.dumps({**command, "id": msg_id}))
@@ -158,7 +160,7 @@ def _ws_call(commands: list[dict]) -> list[dict]:
             while pending:
                 reads += 1
                 if reads > MAX_MESSAGES_PER_CALL:
-                    raise HaApiError("Home-Assistant-WebSocket-API: keine vollständige Antwort erhalten")
+                    raise HaApiError(tr("Home-Assistant-WebSocket-API: keine vollständige Antwort erhalten"))
                 response = json.loads(ws.recv(timeout=REQUEST_TIMEOUT))
                 resp_id = response.get("id")
                 if resp_id in pending:
@@ -185,11 +187,11 @@ def _ws_call(commands: list[dict]) -> list[dict]:
     except HaApiError:
         raise
     except TimeoutError as exc:
-        raise HaApiError("Home-Assistant-WebSocket-API antwortete nicht rechtzeitig") from exc
+        raise HaApiError(tr("Home-Assistant-WebSocket-API antwortete nicht rechtzeitig")) from exc
     except (WebSocketException, OSError) as exc:
-        raise HaApiError(f"Home-Assistant-WebSocket-API nicht erreichbar: {exc}") from exc
+        raise HaApiError(tr("Home-Assistant-WebSocket-API nicht erreichbar: {exc}", exc=exc)) from exc
     except (ValueError, KeyError) as exc:
-        raise HaApiError("Home-Assistant-WebSocket-API lieferte eine unerwartete Antwort") from exc
+        raise HaApiError(tr("Home-Assistant-WebSocket-API lieferte eine unerwartete Antwort")) from exc
 
 
 def fetch_statistic_meta(entity_ids: list[str]) -> dict[str, StatisticMeta]:
@@ -300,7 +302,7 @@ def fetch_statistics_rows(
             if not isinstance(entry, dict):
                 result.skipped += 1
                 result.discarded.append({
-                    "reason": "Statistik-Eintrag ist kein Objekt",
+                    "reason": tr("Statistik-Eintrag ist kein Objekt"),
                     "entry_type": type(entry).__name__,
                     "value": repr(entry)[:500],
                 })
@@ -309,7 +311,7 @@ def fetch_statistics_rows(
             if ts is None:
                 result.skipped += 1
                 result.discarded.append({
-                    "reason": "Statistik-Zeitstempel fehlt oder ist ungültig",
+                    "reason": tr("Statistik-Zeitstempel fehlt oder ist ungültig"),
                     "start": entry.get("start"),
                     "mean": entry.get("mean"),
                     "state": entry.get("state"),
@@ -319,7 +321,7 @@ def fetch_statistics_rows(
             if value is None:
                 result.skipped += 1
                 result.discarded.append({
-                    "reason": "Statistik enthält weder Mittelwert noch Zählerstand",
+                    "reason": tr("Statistik enthält weder Mittelwert noch Zählerstand"),
                     "start": entry.get("start"),
                     "mean": entry.get("mean"),
                     "state": entry.get("state"),
@@ -327,7 +329,7 @@ def fetch_statistics_rows(
                 continue
             if ts in seen_timestamps:
                 result.discarded.append({
-                    "reason": "Statistik-Zeitstempel ist doppelt",
+                    "reason": tr("Statistik-Zeitstempel ist doppelt"),
                     "start": entry.get("start"),
                     "timestamp": ts,
                     "value": value,
@@ -337,7 +339,7 @@ def fetch_statistics_rows(
             result.rows.append((ts, value))
             if len(result.rows) > max_rows:
                 raise ValueError(
-                    f"HA-Langzeitstatistik enthält mehr als {max_rows:,} Datenpunkte".replace(",", ".")
+                    tr("HA-Langzeitstatistik enthält mehr als {limit} Datenpunkte", limit=f"{max_rows:,}".replace(",", "."))
                 )
     result.rows.sort(key=lambda row: row[0])
     return result

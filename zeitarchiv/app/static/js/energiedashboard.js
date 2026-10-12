@@ -71,8 +71,8 @@
     // und unabhängig vom Nutzernamen.
     if (node.kind === 'storage_out') return palette.storageOut;
     if (node.kind === 'storage_in') return palette.storage;
-    if (node.name === 'Netzbezug') return palette.grid;
-    if (node.name === 'Einspeisung') return palette.exportColor;
+    if (node.name === t('Netzbezug')) return palette.grid;
+    if (node.name === t('Einspeisung')) return palette.exportColor;
     if (node.role === 'source') return palette.pv;
     return palette.use;
   }
@@ -189,7 +189,7 @@
       + `<path class="area" d="${paths.area}"/><path class="line" d="${paths.line}"/></svg>`;
   }
 
-  // "Stunde" nach demselben Muster wie formatPeriodLabel() in
+  // t("Stunde") nach demselben Muster wie formatPeriodLabel() in
   // entity_detail.html ("27.08.2026 · 14:00–15:00 Uhr") — windowEnd ist
   // exklusiv, dieselbe Sekunde-zurück-Korrektur wie dort.
   // Woche/Monat/Jahr mit offset 0 sind noch laufende, unvollständige
@@ -202,20 +202,21 @@
   const CURRENT_PERIOD_SUFFIX_RANGES = new Set(['week', 'month', 'year']);
 
   function periodLabel(data) {
+    const zone = window.ServerTime.withZone;
     const start = new Date(data.window_start_ts * 1000);
     if (data.range === 'hour') {
       const end = new Date(data.window_end_ts * 1000 - 1000);
-      const fmtTime = (d) => d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
-      const day = start.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'});
-      return `${day} · ${fmtTime(start)}–${fmtTime(end)} Uhr`;
+      const fmtTime = (d) => d.toLocaleTimeString(window.ZA_FORMAT, zone({hour: '2-digit', minute: '2-digit'}));
+      const day = start.toLocaleDateString(window.ZA_FORMAT, zone({day: '2-digit', month: '2-digit', year: 'numeric'}));
+      return t('{range} Uhr', {range: `${day} · ${fmtTime(start)}–${fmtTime(end)}`});
     }
     let opts = {weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric'};
     if (data.range === 'month') opts = {month: 'long', year: 'numeric'};
     if (data.range === 'year') opts = {year: 'numeric'};
-    let label = start.toLocaleDateString('de-DE', opts);
+    let label = start.toLocaleDateString(window.ZA_FORMAT, zone(opts));
     if (data.offset === 0 && CURRENT_PERIOD_SUFFIX_RANGES.has(data.range)) {
       const end = new Date(data.window_end_ts * 1000);
-      label += ` · bis ${end.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'})}`;
+      label += ' · ' + t('bis {date}', {date: end.toLocaleDateString(window.ZA_FORMAT, zone({day: '2-digit', month: '2-digit'}))});
     }
     return label;
   }
@@ -298,7 +299,7 @@
   window.energieFlow = function energieFlow() {
     const initialPeriod = readInitialRangeOffset();
     return {
-      ranges: [{key: 'hour', label: 'Stunde'}, {key: 'day', label: 'Tag'}, {key: 'month', label: 'Monat'}, {key: 'year', label: 'Jahr'}],
+      ranges: [{key: 'hour', label: t('Stunde')}, {key: 'day', label: t('Tag')}, {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}],
       range: initialPeriod.range,
       offset: initialPeriod.offset,
       loading: false,
@@ -348,16 +349,16 @@
       // in zwei Kacheln aufgeteilt, damit ein Umsortieren der Liste nicht
       // versehentlich die falsche Kachel als "Bilanz" ausgibt.
       get bilanzCheck() {
-        return (this.quality.checks || []).find((c) => c.label === 'Grundlast plausibel') || {ok: true, detail: ''};
+        return (this.quality.checks || []).find((c) => c.label === t('Grundlast plausibel')) || {ok: true, detail: ''};
       },
       get otherChecks() {
-        return (this.quality.checks || []).filter((c) => c.label !== 'Grundlast plausibel');
+        return (this.quality.checks || []).filter((c) => c.label !== t('Grundlast plausibel'));
       },
       get otherChecksOk() {
         return this.otherChecks.every((c) => c.ok);
       },
       get grundlastShare() {
-        const g = this.verbraucherBreakdown.find((v) => v.name === 'Grundlast');
+        const g = this.verbraucherBreakdown.find((v) => v.name === t('Grundlast'));
         return g ? g.share : null;
       },
 
@@ -468,10 +469,16 @@
         return value == null ? '—' : this.fmt(value, 0) + ' %';
       },
 
-      // Preis-Sensoren werden als €/kWh vorausgesetzt (siehe Hinweistext im
-      // Setup) — kein Einheiten-/Währungs-Handling darüber hinaus für v1.
+      // Preis-Sensoren werden als Währung/kWh vorausgesetzt (siehe Hinweistext im
+      // Setup); die Währung kommt aus der Einstellung (window.ZA_CURRENCY, siehe
+      // i18n.js) — es wird nichts umgerechnet, nur Symbol und Stellung ändern sich.
       fmtCurrency(value) {
-        return value == null ? '—' : this.fmt(value, 2) + ' €';
+        if (value == null) return '—';
+        const c = window.ZA_CURRENCY;
+        const sign = Math.round(value * 100) < 0 ? '-' : '';
+        const number = this.fmt(Math.abs(value), 2);
+        if (c.position === 'after') return `${sign}${number} ${c.symbol}`;
+        return `${sign}${c.symbol}${c.spaced ? ' ' : ''}${number}`;
       },
 
       // Alltags-Vergleich für "Vermiedenes CO2" — bewusst nur eine grobe
@@ -481,7 +488,7 @@
       co2VermiedenKmText() {
         if (this.kpi.co2_vermieden == null) return '';
         const km = (this.kpi.co2_vermieden * 1000) / 130;
-        return '≈ ' + this.fmt(km, 0) + ' km Autofahrt';
+        return '≈ ' + this.fmt(km, 0) + t(' km Autofahrt');
       },
 
       // Netto-CO2 für die dritte KPI-Kachel im CO2-Dialog — negativ heißt
@@ -496,8 +503,20 @@
       // Erfolgstext für die Saldo-Kachel im Kostenanalyse-Dialog, analog zum
       // CO2-Pendant oben — nur bei negativem Saldo (Einspeisung-Erlös
       // überwiegt die Netzbezug-Kosten).
+      // Kosten ohne Preis für einen Teil der Energie (bzw. Tage beim Grundpreis): der Betrag
+      // ist dann zu niedrig. Chip, Hero-Zeile und Kostenanalyse zeigen das an (siehe
+      // kosten_luecke in compute_flow).
+      costGaps() {
+        return this.kpi.kosten_luecke || [];
+      },
+      costGap(key) {
+        return this.costGaps().find(g => g.key === key) || null;
+      },
+      costGapHint() {
+        return t('Preis fehlt für einen Teil der Energie, die Kosten sind zu niedrig.');
+      },
       costWinText() {
-        return this.kpi.net_cost != null && this.kpi.net_cost < 0 ? '💶 Mehr erlöst als bezahlt!' : '';
+        return this.kpi.net_cost != null && this.kpi.net_cost < 0 ? t('💶 Mehr erlöst als bezahlt!') : '';
       },
 
       // Eine Sparkline je Jahres-Zeile im Wirkungsgrad-Trend-Popup — 12
@@ -531,7 +550,7 @@
           .map((p) => `<circle class="sparkline-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="1.6"/>`)
           .join('');
         const svg = `<svg class="sparkline" viewBox="0 0 300 32" preserveAspectRatio="none" style="width:100%;height:32px;display:block;">${lines}${dots}</svg>`;
-        const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+        const monthNames = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
         const slotWidth = 100 / 12;
         const slots = months.map((v, i) => {
           if (v == null) return '';
@@ -584,7 +603,7 @@
       // socNowTooltipText() unten. Ohne diesen Satz liest sich "1,0 kWh" wie
       // ein aktueller Füllstand statt eines Perioden-Saldos.
       speicherTooltipText() {
-        const base = 'Ladung minus Entladung im gewählten Zeitraum — nicht der aktuelle Ladezustand (siehe Ring „Speicher SOC" unten).';
+        const base = t('Ladung minus Entladung im gewählten Zeitraum — nicht der aktuelle Ladezustand (siehe Ring „Speicher SOC" unten).');
         const breakdown = this.speicherBreakdownText();
         return breakdown ? base + '\n\n' + breakdown : base;
       },
@@ -605,7 +624,7 @@
       // 89 %" nicht, wie sich das über mehrere Speicher unterschiedlicher
       // Kapazität zusammensetzt.
       socNowTooltipText() {
-        const base = 'Aktueller Ladezustand, unabhängig vom gewählten Zeitraum — der Ring unten zeigt den Ø-Wert über die Periode.';
+        const base = t('Aktueller Ladezustand, unabhängig vom gewählten Zeitraum — der Ring unten zeigt den Ø-Wert über die Periode.');
         const breakdown = this.speicherSocNowBreakdownText();
         return breakdown ? base + '\n\n' + breakdown : base;
       },
@@ -629,6 +648,17 @@
         return cssVar(SHARE_COLORS[idx % SHARE_COLORS.length]);
       },
 
+      // Zwischenzähler (kind 'meter') haben in der Tabelle eine Zeile mit eingerückten Geräten, der Donut zeigt
+      // dagegen nur die Blätter: sonst stünde der Zähler neben seinen eigenen Geräten, und die Segmente
+      // ergäben mehr als den Verbrauch. Farbe und Hover hängen deshalb am Index unter den Blättern.
+      get verbraucherLeaves() {
+        return this.verbraucherBreakdown.filter((i) => i.kind !== 'meter');
+      },
+      leafColor(item) {
+        const idx = this.verbraucherLeaves.findIndex((i) => i.name === item.name);
+        return idx === -1 ? 'transparent' : this.shareColor(idx);
+      },
+
       // Kosten-Spalte in der Verbraucheranteile-Tabelle nur einblenden, wenn
       // ein Netzbezug-Preis konfiguriert ist (siehe kosten in compute_flow) —
       // sonst ist item.kosten bei jeder Zeile null.
@@ -637,7 +667,8 @@
       },
       verbraucherKostenTotal() {
         if (!this.verbraucherHasKosten) return null;
-        return this.verbraucherBreakdown.reduce((sum, i) => sum + (i.kosten || 0), 0);
+        // Nur die oberste Ebene: die Geräte hinter einem Zwischenzähler sind in dessen Kosten schon enthalten.
+        return this.verbraucherBreakdown.filter((i) => !i.parent).reduce((sum, i) => sum + (i.kosten || 0), 0);
       },
 
       // Nur die Tabelle deckelt sich (siehe verbraucherExpanded oben) — der
@@ -673,13 +704,13 @@
         if (!entry || !this.compareLabel) return '';
         if (entry.pct != null) {
           const sign = entry.pct > 0 ? '+' : '';
-          return `${sign}${this.fmt(entry.pct, 1)} % vs. ${this.compareLabel}`;
+          return `${sign}` + t('{value} % vs. {label}', {value: this.fmt(entry.pct, 1), label: t(this.compareLabel)});
         }
         // Fallback für eine Vorperiode von exakt 0 (% wäre Division durch 0,
         // siehe _compare_kpi) — absolute kWh-Differenz statt gar nichts.
         if (entry.abs != null) {
           const sign = entry.abs > 0 ? '+' : '';
-          return `${sign}${this.fmt(entry.abs, 1)} kWh vs. ${this.compareLabel}`;
+          return `${sign}` + t('{value} kWh vs. {label}', {value: this.fmt(entry.abs, 1), label: t(this.compareLabel)});
         }
         return '';
       },
@@ -721,7 +752,7 @@
           this.speicherSocNowBreakdown = data.speicher_soc_now_breakdown || [];
           this.anomalien = data.anomalien || [];
           this.renderChart(data);
-          this.renderShareChart(this.verbraucherBreakdown);
+          this.renderShareChart(this.verbraucherLeaves);
           this.renderVersorgungChart(this.versorgungBreakdown);
           this.renderSparklines(data.kpi_series || {});
         } catch (e) {
@@ -801,8 +832,8 @@
       // periodText kommt aus load() (derselbe range/offset), deshalb hier
       // ohne eigene Datumsformatierung wiederverwendet.
       heatmapNote() {
-        if (this.range === 'month' || this.range === 'year') return `Ø je Wochentag · ${this.periodText}`;
-        return 'letzte 7 Tage';
+        if (this.range === 'month' || this.range === 'year') return t('Ø je Wochentag · {period}',{period: this.periodText});
+        return t('letzte 7 Tage');
       },
 
       // Als ECharts-heatmap-Serie statt eigenem HTML/CSS-Grid gerendert —
@@ -962,32 +993,32 @@
         const nodes = data.nodes || [];
         const hat = (pruef) => nodes.some(pruef);
         const items = [];
-        if (hat(n => n.role === 'source' && n.name !== 'Netzbezug' && n.kind !== 'storage_out')) {
-          items.push({name: 'Erzeugung', color: palette.pv});
+        if (hat(n => n.role === 'source' && n.name !== t('Netzbezug') && n.kind !== 'storage_out')) {
+          items.push({name: t('Erzeugung'), color: palette.pv});
         }
-        const netzbezug = nodes.find(n => n.name === 'Netzbezug');
-        if (netzbezug) items.push({name: netzbezug.label || 'Netzbezug', color: palette.grid});
+        const netzbezug = nodes.find(n => n.name === t('Netzbezug'));
+        if (netzbezug) items.push({name: netzbezug.label || t('Netzbezug'), color: palette.grid});
         if (hat(n => n.kind === 'storage_out')) {
-          items.push({name: 'Speicher-Entladung', color: palette.storageOut});
+          items.push({name: t('Speicher-Entladung'), color: palette.storageOut});
         }
         if (hat(n => n.kind === 'storage_in')) {
-          items.push({name: 'Speicher-Ladung', color: palette.storage});
+          items.push({name: t('Speicher-Ladung'), color: palette.storage});
         }
-        const einspeisung = nodes.find(n => n.name === 'Einspeisung');
-        if (einspeisung) items.push({name: einspeisung.label || 'Einspeisung', color: palette.exportColor});
+        const einspeisung = nodes.find(n => n.name === t('Einspeisung'));
+        if (einspeisung) items.push({name: einspeisung.label || t('Einspeisung'), color: palette.exportColor});
         // Der Verbrauchs-Eintrag trägt den tatsächlichen Mischton der
         // Bus→Verbraucher-Bahnen (siehe green_ratio/blendColors in
         // renderChart) statt einer generischen Verbrauchsfarbe — genau dieser
         // Farbton ist ohne Erklärung sonst am schwersten zu deuten, und der
         // Prozentwert sagt direkt, woher die Mischung kommt.
-        if (hat(n => n.role === 'sink' && n.name !== 'Einspeisung' && n.kind !== 'storage_in')) {
+        if (hat(n => n.role === 'sink' && n.name !== t('Einspeisung') && n.kind !== 'storage_in')) {
           if (data.green_ratio != null) {
             items.push({
-              name: `Verbrauch (${this.fmt(data.green_ratio * 100, 0)} % aus eigener Erzeugung)`,
+              name: t('Verbrauch ({pct} % aus eigener Erzeugung)', {pct: this.fmt(data.green_ratio * 100, 0)}),
               color: blendColors(palette.pv, palette.grid, data.green_ratio),
             });
           } else {
-            items.push({name: 'Verbrauch', color: palette.use});
+            items.push({name: t('Verbrauch'), color: palette.use});
           }
         }
         this.legendItems = items;
@@ -1167,7 +1198,7 @@
           if (!(bezug > 0)) return '';
           const pct = (value / bezug) * 100;
           if (pct >= 99.5) return '';
-          return ` (${this.fmt(pct, 0)} % von ${labelFor(bezugName)})`;
+          return t(' ({pct} % von {name})', {pct: this.fmt(pct, 0), name: labelFor(bezugName)});
         };
         const shareSuffix = (sourceName, targetName, value) => {
           const target = nodeByName[targetName];
@@ -1209,8 +1240,9 @@
                 const head = `${label}: ${fmt(p.value)} kWh${nodeShareSuffix(p.name, p.value)}`;
                 if (node && node.anomaly) {
                   return `${head}<br/>`
-                    + `<span style="color:${palette.warning}">+${node.anomaly_pct} % über dem Schnitt `
-                    + `der letzten Perioden (${fmt(node.anomaly_baseline)} kWh)</span>`;
+                    + `<span style="color:${palette.warning}">`
+                    + t('+{pct} % über dem Schnitt der letzten Perioden ({baseline} kWh)', {pct: node.anomaly_pct, baseline: fmt(node.anomaly_baseline)})
+                    + '</span>';
                 }
                 return head;
               }

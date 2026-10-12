@@ -1,5 +1,7 @@
 # Benutzerhandbuch
 
+*[English version](en/user-guide.md)*
+
 Dieses Dokument ist die ausführliche Anleitung für Nutzer der App — Schritt
 für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 Überblick (was die App ist, Kernfunktionen auf einen Blick) siehe die
@@ -23,8 +25,10 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Energiedashboard](#energiedashboard)
   - [Einrichtung](#einrichtung)
   - [Benötigte und sinnvolle Entitäten](#benötigte-und-sinnvolle-entitäten)
+  - [Kosten, Grundpreis und fehlende Preise](#kosten-grundpreis-und-fehlende-preise)
   - [Aufbewahrung richtig einstellen](#aufbewahrung-richtig-einstellen)
   - [Energiefluss und Verbraucher-Gruppen](#energiefluss-und-verbraucher-gruppen)
+  - [Geräte hinter einem Zwischenzähler](#geräte-hinter-einem-zwischenzähler)
   - [Kennzahlen, Ringe und Badges](#kennzahlen-ringe-und-badges)
   - [Status, Datenqualität und Auffälligkeiten](#status-datenqualität-und-auffälligkeiten)
   - [Tageslastprofil](#tageslastprofil)
@@ -353,9 +357,11 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   Zeitraum-Etikett (z. B. „Monat" unter dem Hauptwert) lässt sich separat
   ein-/ausblenden — unabhängig von der Anzeige der letzten Aktualisierung,
   beide lassen sich gleichzeitig zeigen. Ist der
-  letzte Wert älter als 15
-  Minuten bzw. eine Stunde, hebt sich der Kartenrahmen gelb bzw. rot
-  hervor. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
+  letzte Wert zu alt, hebt sich der Kartenrahmen gelb bzw. rot hervor.
+  Ab wann, stellst du je Kachel unter **Als veraltet markieren** ein:
+  **Standard** (gelb nach 15 Minuten, rot nach 1 Stunde), **Täglich**
+  (26 bzw. 48 Stunden, für Tageswerte), **Selten** (3 bzw. 7 Tage, für
+  Zähler, die nur bei Aktivität melden) oder **Aus**. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
   größeren Einstellungs-Popup (⋮), da hier deutlich mehr Optionen als bei
   Chart-/Tabellen-Kacheln zusammenkommen.
 - **Kachel hinzufügen:** die "+"-Kachel öffnet ein Popup mit Registerkarten
@@ -443,7 +449,8 @@ eingerichtet werden, was nicht ohnehin schon in Zeitarchiv ankommt.
 | Speicher: Ladezustand (SOC) | nein | Momentanwert in Prozent, kein Zähler — bei mehreren Speichern kapazitätsgewichtet gemittelt |
 | Speicher: Kapazität | nein | Gesamtkapazität in kWh (Entität oder fester Wert; Wh-Entitäten werden automatisch umgerechnet) — nur nötig, damit der Ladezustand zusätzlich in kWh angezeigt und bei mehreren Speichern richtig gewichtet wird |
 | Verbraucher (beliebig viele) | nein | je ein Verbrauchszähler (kWh, aufsteigend) mit eigenem Namen und optional einer frei benannten Gruppe — alles nicht einzeln zugeordnete bleibt automatisch als „Grundlast“ sichtbar |
-| Strompreis (Bezug/Einspeisung) | nein | €/kWh-Entität; ohne passende Entität ersatzweise ein fester Cent-Betrag |
+| Strompreis (Bezug/Einspeisung) | nein | Währung/kWh-Entität (Währung siehe Einstellungen → Darstellung); ohne passende Entität ersatzweise ein fester Betrag in der Untereinheit (Cent, Pence, Rappen) |
+| Grundpreis | nein | Betrag pro Monat in der Währung (Entität oder fester Betrag); wird tageweise auf den Zeitraum umgerechnet und getrennt vom Arbeitspreis ausgewiesen |
 | CO₂-Intensität | nein | g/kWh-Entität; ohne passende Entität ersatzweise ein fester Wert |
 | PV-Ertragsprognose | nein | kWh für „Rest heute“ und „morgen“, z. B. aus einer Forecast.Solar-Integration |
 
@@ -461,6 +468,48 @@ kWh-Zähler-Entität, nicht die Watt-Entität. Speicher-SOC, Speicher-Kapazität
 Strompreis, CO₂-Intensität und PV-Prognose sind dagegen bewusst
 Momentan-/Messwerte (`measurement`), keine Zähler.
 
+### Kosten, Grundpreis und fehlende Preise
+
+Die Kosten setzen sich aus bis zu vier Teilen zusammen, die in der
+Kostenanalyse (💰) getrennt stehen: **Netzbezug** (Arbeitspreis × bezogene
+kWh), **Grundpreis**, **Einspeisung Erlös** und, falls aktiviert,
+**Eigenverbrauchsvergütung**. Der **Saldo** ist Netzbezug plus Grundpreis
+minus Erlöse.
+
+**Arbeitspreis und Grundpreis eingeben.** Beide gibt es als *Entität* oder als
+*fester Wert*; ist eine Entität gewählt, hat sie Vorrang. Am besten ist eine
+**Entität oder ein Helfer** (z. B. ein Helfer vom Typ „Zahl“): Jeder Wert gilt
+ab seinem Zeitpunkt, und nach einem Tarifwechsel bleiben frühere Monate
+richtig. Ein **fester Wert gilt rückwirkend für alle Zeiträume** — ändert sich
+der Tarif, rechnet das Dashboard auch die Vergangenheit mit dem neuen Wert.
+Der Arbeitspreis wird in Cent (bzw. Pence, Rappen) je kWh eingegeben, der
+Grundpreis in der Währung selbst **pro Monat**.
+
+**Grundpreis.** Das Dashboard rechnet den Monatsbetrag tageweise auf den
+gewählten Zeitraum um (Monatswert × 12 ÷ 365 je Tag; ein laufender Zeitraum
+zählt nur die bisher vergangene Zeit). Bei einem Helfer gilt sein letzter Wert
+bis zur nächsten Änderung, auch wenn er sich lange nicht gemeldet hat.
+
+**Helfer, die sich nur selten ändern.** Meldet eine Preis-Entität sich nur bei
+Änderungen (typisch bei einem Helfer mit dem Tarif), in den Einstellungen der
+Entität die **Lückenerkennung auf „Aus“** stellen. Sonst gilt der letzte
+Arbeitspreis nur kurz nach seiner Meldung, danach fehlt der Preis, und die
+Entität erscheint im Status als veraltet.
+
+**Wenn ein Preis fehlt.** Gibt es für einen Teil der Energie (beim Grundpreis:
+der Tage) keinen gültigen Preis, rechnet das Dashboard diesen Teil nicht mit —
+der Betrag ist dann zu niedrig. Das steht nicht still im Status, sondern
+direkt bei den Kosten:
+
+- hinter dem Kosten-Betrag im Kopfbereich und in der Kennzahlen-Leiste
+  erscheint ein **Warndreieck** (der Hinweistext steht im Tooltip),
+- die Kostenanalyse umrandet die betroffenen Kacheln gelb, nennt den Anteil
+  (z. B. „Preis fehlt für 4 % der Energie“) und erklärt darunter die Ursache,
+- der Energiebericht führt dieselbe Zeile unter den Kosten.
+
+Eine Lücke wird erst ab einem Prozent der Energie gemeldet, damit ein einzelner
+Zeitabschnitt am Periodenanfang, vor dem ersten bekannten Preis, nicht warnt.
+
 ### Aufbewahrung richtig einstellen
 
 Die je Entität eingestellte [Aufbewahrungsfrist](#aufbewahrung-retention)
@@ -477,8 +526,9 @@ Rolle braucht dieselbe Frist:
   festen Werts eingebunden) werden je angezeigtem Zeitraum-Bucket
   eingerechnet. Fehlen dafür Werte, weil die Aufbewahrungsfrist sie
   inzwischen entfernt hat, fällt die Kosten-/CO₂-Bilanz für diesen
-  vergangenen Zeitraum lediglich kleiner aus — kein Fehler, nur eine
-  unvollständige Auswertung. Wer hauptsächlich aktuelle bis wenige Monate
+  vergangenen Zeitraum kleiner aus — die Kosten zeigen das dann mit einem
+  Warnsymbol an (siehe [Kosten, Grundpreis und fehlende
+  Preise](#kosten-grundpreis-und-fehlende-preise)). Wer hauptsächlich aktuelle bis wenige Monate
   alte Auswertungen braucht, kommt hier mit **90 Tage** oder **365 Tage**
   aus und spart Speicherplatz: dynamische Tarife und CO₂-Signale
   aktualisieren sich oft im Minutentakt und wachsen entsprechend schnell.
@@ -514,6 +564,30 @@ angelegt hat, kann zusätzlich in der Rollenzuordnung unter
 **„Verbraucheranteile" → „Nach Gruppe anzeigen"** umschalten, ob die Tabelle
 jeden Verbraucher einzeln oder gruppiert (eine Zeile je Gruppe, ungruppierte
 Geräte bleiben einzeln) zeigt.
+
+### Geräte hinter einem Zwischenzähler
+
+Hängen mehrere Geräte hinter einem **Zwischenzähler** (z. B. einer Unterverteilung
+für die Werkstatt), legst du den Zwischenzähler wie jeden anderen Verbraucher an
+und ordnest die Geräte ihm im jeweiligen Verbraucher unter **„Hängt hinter
+Zwischenzähler“** zu. Der Zwischenzähler zählt seine Geräte schon mit — deshalb
+zählt in der Bilanz (Grundlast, Verbrauch, Autarkie, Tageslastprofil) nur er
+selbst, nie zusätzlich seine Geräte.
+
+- **Energiefluss:** Zentraler Knoten → Zwischenzähler → seine Geräte und der
+  **Rest** („Werkstatt, übrige Verbraucher“ = Zähler minus Geräte, nie negativ).
+- **Verbraucheranteile:** Der Zwischenzähler steht als Zeile mit seinen Geräten
+  und dem Rest eingerückt darunter; Anteile beziehen sich auf den gesamten
+  Verbrauch, Summe und Kosten zählen nur die oberste Ebene. Der Donut zeigt die
+  einzelnen Geräte, nicht den Zwischenzähler zusätzlich.
+- **Nur eine Ebene:** Ein Verbraucher, der selbst Geräte hat, kann nirgends
+  dahinterhängen. Ein Gerät hat entweder eine Gruppe oder einen Zwischenzähler;
+  der Zwischenzähler selbst darf in einer Gruppe sein.
+- **Entfernen:** Entfernst du einen Zwischenzähler, bleiben seine Geräte als
+  eigene Verbraucher erhalten.
+- **Prüfung:** Zählen die Geräte zusammen mehr als der Zwischenzähler
+  (Messfehler oder falsche Zuordnung), meldet der Status **„Zwischenzähler
+  plausibel“** mit den Werten; der Knoten zeigt dann die Summe der Geräte.
 
 ### Kennzahlen, Ringe und Badges
 
@@ -961,10 +1035,14 @@ Eine Spalte ist ein Zeitraum: frei benannt (z. B. „Heute", „Aug Vorjahr",
 Dekade) und einem Versatz relativ zu heute (0 = aktuell, −1 = vorheriger,
 usw.). So lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende
 Jahre in zwölf Spalten nebeneinanderstellen. Die Beschriftung kann
-Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten,
+Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten
+(auch englisch: `{year}`, `{month}`, `{quarter}`, `{week}` — beide Schreibweisen
+funktionieren in jeder Sprache, die Einfüge-Hilfe nutzt die der Oberfläche),
 die sich automatisch auf den jeweiligen Zeitraum der Spalte auflösen
 (Einfüge-Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des
-aufgelösten Werts).
+aufgelösten Werts). Maßgeblich ist die Zeitzone der App (Option `timezone`),
+nicht die des Browsers — auch auf Reisen zeigt `{jahr}` also das Jahr des
+Zeitraums, den die Tabelle tatsächlich abfragt.
 
 **Vorjahresvergleich** setzt den Versatz einer Spalte automatisch auf
 denselben Zeitraum ein Jahr zuvor (schaltjahrsicher) — verschiebt dabei
@@ -1901,9 +1979,32 @@ dupliziert also nichts, ebenso wenig ein wiederholter Home-Assistant-Import
 
 ### CSV-Export
 
-Von der Verlaufsansicht einer Entität aus: die vollständige
-Rohdatenhistorie dieser einen Entität bis zum Exportlimit als CSV
-herunterladen.
+Unter **System → Export** führt ein Assistent in vier Schritten zur Datei:
+
+1. **Entitäten:** ankreuzen, was exportiert werden soll — gefiltert nach Typ,
+   Einheit oder Suchbegriff, auch alle auf einmal.
+2. **Zeitraum:** Alles, ein Jahr, ein Monat oder frei von/bis. Für ein
+   Jahres-Backup ein Jahr wählen, für eine Auswertung einen einzelnen Monat.
+3. **Auflösung:** Rohwerte, Minute, Stunde oder Tag. Gröbere Auflösung macht
+   die Dateien deutlich kleiner; im Zeitstempel steht dann der Beginn des
+   Intervalls. Gemittelt wird bei normalen Sensoren, bei Zählern und Schaltern
+   gilt der letzte Wert des Intervalls (in lokaler Zeit).
+4. **Prüfen und herunterladen:** zeigt die Zeilenzahl der größten Datei im
+   gewählten Zeitraum und sperrt den Download, wenn sie über dem Limit liegt.
+
+Eine Entität ergibt eine CSV, mehrere ergeben automatisch ein ZIP mit je einer
+CSV. Mehrere Entitäten in einer gemeinsamen Datei gibt es bewusst nicht: Rohwerte
+haben je Entität eigene Zeitstempel, die Datei bestünde größtenteils aus leeren
+Zellen. Die Spalten sind `timestamp` (lokale Zeit), `unix_ts` und `value`.
+
+Das Exportlimit von 5 Millionen Zeilen gilt je Datei. Bei Sekundenwerten
+(rund 2 Millionen Zeilen pro Jahr) ist ein Jahr also noch möglich, mehrere Jahre
+roh nicht mehr — dafür Zeitraum oder Auflösung anpassen. Die Zeilenzahl vorab
+ist eine Schätzung: zur Löschung markierte Werte sind nicht abgezogen, ein
+angeschnittener Monat wird anteilig nach Zeit gerechnet.
+
+Der Button **CSV herunterladen** in einer Zeile der Liste lädt weiterhin sofort
+die komplette Historie dieser Entität als Rohwerte.
 
 ## Backup / Restore
 
@@ -1923,6 +2024,36 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   wiederherstellbares Backup in der Liste erscheint — bei einer zu großen
   oder beschädigten Datei bleibt der bisherige Datenbestand unangetastet.
   Obergrenzen: 2 GiB Upload, 5 GiB entpackt.
+- **Externes Ziel:** kopiert jedes erfolgreiche Backup zusätzlich auf einen
+  Netzwerkspeicher (NFS oder SMB/CIFS). Der Speicher wird in Home Assistant
+  eingerichtet (Einstellungen → System → Speicher → Netzwerkspeicher, Verwendung
+  „Medien“ oder „Share“, nicht „Backup“) und erscheint dann in der Karte
+  **Externes Ziel** zur Auswahl — mit freiem Platz; ein Ordner, der keine
+  eingebundene Freigabe ist, ist gesperrt, damit Backups nicht unbemerkt auf dem
+  lokalen Datenträger landen. Optional ein Unterordner. **Verbindung testen**
+  schreibt, liest und löscht eine Testdatei. Die Spalte **Extern** der Liste
+  zeigt je Backup „übertragen“, „fehlgeschlagen“ oder „nicht übertragen“, bei
+  einem Fehler gibt es **Erneut übertragen** und eine Meldung. Lokale Backups
+  bleiben, bis sie übertragen sind; danach greift die Aufbewahrung.
+  Bei „Anzahl behalten“ = 1 bleibt lokal nur das neueste Backup. Am Ziel werden
+  nur Dateien nach dem Muster `zeitarchiv-backup-*.zip` gelöscht. Typische
+  Fehler: bei NFS verweigert der Export des NAS den Zugriff (`root_squash`
+  oder fehlende Freigabe für die Home-Assistant-Adresse), bei CIFS stimmen
+  Benutzer oder Freigabe-Rechte nicht.
+- **WebDAV als externes Ziel:** statt eines Netzwerkspeichers lädt die App die
+  Backups per WebDAV hoch (z. B. Nextcloud, ownCloud, ein NAS). In der Karte
+  **Externes Ziel** die Adresse des Zielordners eintragen (bei Nextcloud
+  `https://…/remote.php/dav/files/<Benutzer>/<Ordner>/`) und den Benutzer. Das
+  **Passwort** steht nur in den Add-on-Optionen (Einstellungen → Add-ons →
+  Zeitarchiv → Konfiguration → WebDAV-Passwort), damit es nicht in den Backups
+  selbst landet; nach einer Änderung das Add-on neu starten. Ein selbst
+  signiertes Zertifikat lässt sich mit „Zertifikat nicht prüfen“ zulassen;
+  bei einer Adresse mit `http://` werden Zugangsdaten unverschlüsselt gesendet.
+  Die Datei wird zunächst unter einem `.part`-Namen hochgeladen, geprüft und
+  erst dann umbenannt. Lehnt der Server große Dateien ab (Fehler 413), die
+  Upload-Grenze am Server anheben. Am Ziel werden nur Dateien nach dem Muster
+  `zeitarchiv-backup-*.zip` gelöscht, die Reihenfolge ergibt sich aus dem
+  Zeitpunkt im Dateinamen.
 - **Zeitplan:** automatisch nach Zeitplan (Intervall, Uhrzeit, ggf.
   Wochentag), mit automatischer Aufräumung älterer Backups nach Anzahl
   und/oder Alter, damit der Speicherplatz nicht unbegrenzt wächst.
@@ -2078,7 +2209,7 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |

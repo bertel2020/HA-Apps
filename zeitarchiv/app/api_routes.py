@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import logging
 import secrets
 import threading
@@ -244,12 +246,12 @@ def _duration_noun(seconds: int) -> str:
     """"Stunde", "5 Minuten", "2 Stunden" — für Tooltip-Text, nicht für Rechnen."""
     if seconds % 3600 == 0:
         hours = seconds // 3600
-        return "Stunde" if hours == 1 else f"{hours} Stunden"
+        return tr("Stunde") if hours == 1 else tr("{hours} Stunden", hours=hours)
     minutes = max(1, seconds // 60)
-    return "Minute" if minutes == 1 else f"{minutes} Minuten"
+    return tr("Minute") if minutes == 1 else tr("{minutes} Minuten", minutes=minutes)
 
 
-_ROLLUP_LEVEL_NOUNS = {"minute": "Minute", "stunde": "Stunde", "tag": "Tag", "monat": "Monat", "jahr": "Jahr"}
+_ROLLUP_LEVEL_NOUNS = {"minute": N_("Minute"), "stunde": N_("Stunde"), "tag": N_("Tag"), "monat": N_("Monat"), "jahr": N_("Jahr")}
 
 
 def _counter_bucket_label(range_key: str) -> str | None:
@@ -313,12 +315,10 @@ def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None
     bisher" unfair gegen den ganzen "Vortag" statt gegen "Vortag bis zur
     selben Uhrzeit". None, wenn kein fairer Vergleich angefordert wurde
     (kein same_elapsed, offset>=0, oder year_over_year)."""
-    elapsed_seconds = result.get("elapsed_seconds")
-    if elapsed_seconds is None:
+    comparison_points = result.get("comparison_points")
+    if comparison_points is None:
         return None
-    cutoff = result["window_start"] + elapsed_seconds
-    capped_points = [point for point in result["points"] if point["ts"] < cutoff]
-    return _table_aggregates({**result, "points": capped_points})
+    return _table_aggregates({**result, "points": comparison_points})
 
 
 def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
@@ -356,7 +356,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     state.connection_stats["auth_failures"],
                     interval_seconds=300,
                 )
-            raise HTTPException(status_code=401, detail="Ungültiger oder fehlender API-Token")
+            raise HTTPException(status_code=401, detail=tr("Ungültiger oder fehlender API-Token"))
         if integration_version:
             ha_integration.record_seen(deps.index, integration_version)
 
@@ -365,7 +365,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         if len(ids) > MAX_MULTI_QUERY_ENTITIES:
             raise HTTPException(
                 status_code=413,
-                detail=f"Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage",
+                detail=tr("Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage", MAX_MULTI_QUERY_ENTITIES=MAX_MULTI_QUERY_ENTITIES),
             )
         return ids
 
@@ -562,7 +562,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     ) -> dict:
         _validate_entity_id_or_400(entity_id)
         if chart_type not in (None, "line", "bar"):
-            raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
         now = datetime.now(deps.tz)
         # Ein Cache für beide Abfragen dieses Requests: Mit "Vergleichen" wird
         # dieselbe Entität zweimal abgefragt, nur mit verschobenem Fenster —
@@ -671,6 +671,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     compare_window_start=compare_result["window_start"],
                     compare_window_end=compare_result["window_end"],
                 )
+                # Summe „bis zum gleichen Tag“ (Chart-Legende): nur dort, wo es eine Summe gibt
+                # (Zähler, Schalter) und die aktuelle Periode noch läuft.
+                if result["aggregation_type"] in ("counter", "switch"):
+                    cut = query_mod.query_compare_cut(
+                        deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                        offset=offset, continuous=continuous, year_over_year=compare_mode == "year",
+                    )
+                    if cut:
+                        entry.update(compare_cut_points=cut["points"], compare_cut_end=cut["window_end"])
             series.append(entry)
             if window_start is None:
                 window_start, window_end = result["window_start"], result["window_end"]
@@ -706,9 +715,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         entsteht nur für Kacheln, die auch wirklich eine Kennzahl zeigen.
         """
         if range not in DASHBOARD_TILE_RANGES:
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
         if resolution not in _SPARKLINE_BUCKET_SECONDS:
-            raise HTTPException(status_code=400, detail="Ungültige Sparkline-Auflösung")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Sparkline-Auflösung"))
         ids = list(dict.fromkeys(limited_multi_entity_ids({"entity_ids": entity_ids})))
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
@@ -812,7 +821,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             _validate_entity_id_or_400(entity_id)
         for column in body.columns:
             if column.range_key not in query_mod.RANGE_KEYS:
-                raise HTTPException(status_code=400, detail="Ungültiger Tabellenzeitraum")
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Tabellenzeitraum"))
 
         now = datetime.now(deps.tz)
         read_cache = query_mod.QueryReadCache()

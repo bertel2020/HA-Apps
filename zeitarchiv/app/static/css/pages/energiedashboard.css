@@ -75,6 +75,24 @@
     color:var(--positive);
   }
   .edash-cost-badge.is-surplus:hover{border-color:var(--positive);}
+  /* Warndreieck hinter dem Betrag, wenn für einen Teil der Energie kein Preis vorliegt. */
+  .edash-cost-warn-wrap{display:inline-flex;align-items:center;color:var(--warning);}
+  .edash-cost-warn{flex:none;}
+  .edash-kpi.is-gap{border-color:var(--warning);}
+  .edash-kpi-gap{font-size:calc(11.5px * var(--font-scale, 1));color:var(--warning);margin-top:2px;line-height:1.35;}
+  .edash-cost-gap-note{
+    display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px 12px;border-radius:8px;
+    background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning);
+    font-size:calc(13px * var(--font-scale, 1));line-height:1.5;
+  }
+  .edash-cost-gap-note svg{flex:none;margin-top:2px;}
+  .edash-cost-gap-note p{margin:0;}
+  .edash-cost-gap-note p + p{margin-top:4px;}
+  .edash-cost-gap-note a{color:inherit;text-decoration:underline;white-space:nowrap;}
+  .settings-panel .edash-price-advice{
+    margin:14px 0 0;padding:9px 12px;border-radius:8px;border-left:3px solid var(--accent-line);
+    background:var(--accent-line-soft);color:var(--ink);line-height:1.5;
+  }
 
   .edash-setup-cta{
     border:1px dashed var(--border-strong);border-radius:14px;background:var(--surface);
@@ -553,6 +571,12 @@
      fett — Verbraucher mit Entität sind anklickbar (öffnet entities/…),
      Grundlast bleibt reiner Text ohne Link. */
   .edash-share-link{font-weight:600;color:inherit;}
+  /* Zwischenzähler: Geräte und Rest eingerückt unter ihm. Der Rest ist schwächer und kursiv, weil er kein
+     gemessenes Gerät ist, sondern Zähler minus Geräte. */
+  .edash-share-table tr.edash-share-child td.label{padding-left:30px;}
+  .edash-share-table tr.edash-share-child td:not(.label){color:var(--ink-muted);}
+  .edash-share-table tr.edash-share-rest td.label{font-style:italic;color:var(--ink-muted);}
+  .edash-share-table tr.edash-share-meter td.label .edash-share-link,.edash-share-table tr.edash-share-meter td.label span{font-weight:600;}
   /* white-space:nowrap zusätzlich zum bestehenden text-align:right — ohne
      das brach "100 %"/Währungswerte bei schmalerer Kartenbreite (z. B. mit
      der neuen Kosten-Spalte) mitten im Wert auf zwei Zeilen um, während die
@@ -586,6 +610,8 @@
        und bricht erst um, wenn er wirklich zu lang ist. */
     table.edash-share-table td.label{position:relative;padding-left:20px;}
     .edash-share-table .edash-share-dot{position:absolute;left:6px;top:0;bottom:0;margin:auto 0;width:8px;height:8px;}
+    .edash-share-table tr.edash-share-child td.label{padding-left:30px;}
+    .edash-share-table tr.edash-share-child .edash-share-dot{left:16px;}
   }
   /* Mobil: flex-basis (220px) ausschalten, sonst gewinnt sie gegen
      width:100% und der Donut hängt 220px breit links in der Kachel. Als
@@ -1088,3 +1114,6 @@
      Eingabefeld wird dadurch breiter als die Namensfelder darüber statt mit
      ihnen bündig abzuschließen. */
   .edash-gruppen-add .edash-setup-add{flex:none;width:128px;justify-content:center;}
+
+  /* Setup: Geräte hinter einem Zwischenzähler wirken etwas zurückgenommen. */
+  .edash-item-tile.is-child .edash-item-accent{opacity:.5;}

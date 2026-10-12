@@ -7,6 +7,8 @@ Tabelle (state_class → Standard/Zähler, Domain → Schalter).
 
 from __future__ import annotations
 
+from ..i18n import N_, tr
+
 import json
 import math
 import sqlite3
@@ -17,6 +19,7 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
+from ..staleness import STALE_MODES
 from .paths import validate_entity_id
 
 SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
@@ -79,9 +82,9 @@ _RESOLUTION_SECONDS = {
 # Kachel-Anheftdialog, Kachelüberschriften) — zwei gleich heißende Einträge
 # sind dort nicht auseinanderzuhalten.
 _NAME_UNIQUE_TABLES = {
-    "dashboards": "Ein Dashboard",
-    "saved_charts": "Ein Chart",
-    "saved_tables": "Eine Tabelle",
+    "dashboards": N_("Ein Dashboard"),
+    "saved_charts": N_("Ein Chart"),
+    "saved_tables": N_("Eine Tabelle"),
 }
 
 
@@ -289,6 +292,10 @@ CREATE TABLE IF NOT EXISTS entities (
     value_filter TEXT NOT NULL DEFAULT 'off',
     gap_threshold TEXT NOT NULL DEFAULT '15',
     outlier_threshold TEXT NOT NULL DEFAULT '50',
+    counter_decreases TEXT NOT NULL DEFAULT 'report',
+    counter_auto_mark INTEGER NOT NULL DEFAULT 0,
+    counter_auto_since REAL,
+    counter_auto_halted_at REAL,
     unit TEXT,
     state_class TEXT,
     friendly_name TEXT,
@@ -313,6 +320,13 @@ CREATE TABLE IF NOT EXISTS entities (
 -- einem Duplikat (zwei Rohwerte mit exakt demselben Zeitstempel) muss sich
 -- gezielt nur eines der beiden Vorkommen entfernen lassen, ohne das andere
 -- gleich mit zu löschen.
+-- Zeitstempel, die bei einem Zähler mit Regel „Fehlwerte automatisch markieren“ zurückgenommen wurden:
+-- sie gelten als bewusst behalten und werden von der Regel nicht erneut markiert (counter_auto.py).
+CREATE TABLE IF NOT EXISTS counter_mark_ignored (
+    entity_id TEXT NOT NULL,
+    ts REAL NOT NULL,
+    PRIMARY KEY (entity_id, ts)
+);
 CREATE TABLE IF NOT EXISTS deleted_points (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_id TEXT NOT NULL,
@@ -434,6 +448,8 @@ CREATE TABLE IF NOT EXISTS entity_actions (
 );
 CREATE INDEX IF NOT EXISTS idx_entity_actions_created_at
     ON entity_actions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_entity_actions_entity
+    ON entity_actions(entity_id, created_at DESC);
 
 -- Persistente Idempotenz für den Live-Schreibpfad. "processing" wird vor
 -- dem Dateianhang gespeichert; "done" wird gemeinsam mit den Entitäts-
@@ -559,6 +575,9 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     -- Nur bei Werte-Kacheln: "vor X"-Alter neben dem Wert ein-/ausblendbar —
     -- Standard an, da das bisherige (einzige) Verhalten.
     show_age INTEGER NOT NULL DEFAULT 1,
+    -- Nur bei Werte-Kacheln: ab wann der Rahmen "veraltet" anzeigt (Stufen
+    -- siehe staleness.py) — 'standard' ist das bisherige, einzige Verhalten.
+    stale_mode TEXT NOT NULL DEFAULT 'standard',
     -- Nur bei Werte-Kacheln: das Zeitraum-Etikett ("Jahr" etc., sonst
     -- automatisch in Kennzahlen-Zeile oder Wert-Bereich platziert, siehe
     -- _tile_metric_context() in main.py) ein-/ausblendbar, unabhängig von
@@ -715,7 +734,7 @@ class _TimeoutLock:
             while self._busy_events and now - self._busy_events[0] > _BUSY_EVENTS_WINDOW_SECONDS:
                 self._busy_events.popleft()
             raise IndexBusy(
-                f"Index-Lock nicht innerhalb von {self._timeout:g}s erhalten"
+                tr("Index-Lock nicht innerhalb von {_timeout:g}s erhalten", _timeout=self._timeout)
             )
 
     def __exit__(self, *exc_info: object) -> None:
@@ -749,7 +768,7 @@ class Index:
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._read_local = threading.local()
-        self._read_conns: list[sqlite3.Connection] = []
+        self._read_conns: list[tuple[threading.Thread, sqlite3.Connection]] = []
         self._read_conns_registry_lock = threading.Lock()
         # Phase 1 von ROADMAP.md 1.14 (Index/Storage-Lock-Umbau): WAL statt
         # des SQLite-Standard-Rollback-Journals — Leser blockieren Schreiber
@@ -796,13 +815,36 @@ class Index:
             conn.row_factory = sqlite3.Row
             self._read_local.conn = conn
             with self._read_conns_registry_lock:
-                self._read_conns.append(conn)
+                # The anyio thread pool retires idle workers after 10 s, so
+                # threads come and go all the time. Close the connections of
+                # threads that no longer exist; otherwise the registry keeps
+                # them alive and each one holds two file descriptors
+                # (index.sqlite + -wal) until the process runs out of them.
+                alive = []
+                for thread, stale in self._read_conns:
+                    if thread.is_alive():
+                        alive.append((thread, stale))
+                    else:
+                        stale.close()
+                alive.append((threading.current_thread(), conn))
+                self._read_conns = alive
         return conn
 
     def _migrate(self) -> None:
         """Fügt Spalten nach, die es in einer schon laufenden Datenbank noch nicht gibt
         (z. B. friendly_name, nachträglich in Phase 2 ergänzt) — CREATE TABLE IF NOT EXISTS
         allein reicht dafür nicht, das legt nur neue Tabellen an."""
+        # Externes Backup-Ziel (BACKUP_EXTERN_KONZEPT.md): Übertragungsstatus je
+        # Backup-Lauf. NULL = nie übertragen (Backups von vor der Einrichtung).
+        bj_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(backup_jobs)")}
+        for column, ddl in (
+            ("external_status", "TEXT"),
+            ("external_target", "TEXT"),
+            ("external_finished_at", "REAL"),
+            ("external_error", "TEXT"),
+        ):
+            if column not in bj_columns:
+                self._conn.execute(f"ALTER TABLE backup_jobs ADD COLUMN {column} {ddl}")
         columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(entities)")}
         if "friendly_name" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN friendly_name TEXT")
@@ -816,6 +858,17 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN gap_threshold TEXT NOT NULL DEFAULT '15'")
         if "outlier_threshold" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN outlier_threshold TEXT NOT NULL DEFAULT '50'")
+        if "counter_decreases" not in columns:
+            # "report" = Rückgänge eines Zählers werden markiert/gemeldet (Standard),
+            # "allow" = der Zähler setzt sich planmäßig zurück (siehe counter_bulk.py).
+            self._conn.execute("ALTER TABLE entities ADD COLUMN counter_decreases TEXT NOT NULL DEFAULT 'report'")
+        for column, ddl in (
+            ("counter_auto_mark", "INTEGER NOT NULL DEFAULT 0"),
+            ("counter_auto_since", "REAL"),
+            ("counter_auto_halted_at", "REAL"),
+        ):
+            if column not in columns:
+                self._conn.execute(f"ALTER TABLE entities ADD COLUMN {column} {ddl}")
         if "is_favorite" not in columns:
             # Favoriten (Konzept-Erweiterung) — Entitäten lassen sich markieren,
             # um sie in der Übersicht/Liste immer oben zu finden.
@@ -1227,6 +1280,10 @@ class Index:
             # "vor X"-Alter neben dem Wert ein-/ausblendbar — Standard an
             # (bisheriges, einziges Verhalten).
             self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN show_age INTEGER NOT NULL DEFAULT 1")
+        if "stale_mode" not in dashboard_columns:
+            # Veraltet-Schwelle je Kachel — 'standard' (15 Min./1 Std.) ist
+            # das bisherige Verhalten, bestehende Kacheln ändern sich nicht.
+            self._conn.execute("ALTER TABLE dashboard_pins ADD COLUMN stale_mode TEXT NOT NULL DEFAULT 'standard'")
         if "show_period" not in dashboard_columns:
             # Zeitraum-Etikett ein-/ausblendbar — Standard an (bisheriges,
             # einziges Verhalten).
@@ -1384,8 +1441,7 @@ class Index:
                 if aggregation_type != old_type:
                     if on_type_change is None:
                         raise ValueError(
-                            f"Aggregationstyp von {entity_id} änderte sich von "
-                            f"{old_type} zu {aggregation_type}; Rollup-Migration erforderlich"
+                            tr("Aggregationstyp von {entity_id} änderte sich von {old_type} zu {aggregation_type}; Rollup-Migration erforderlich", entity_id=entity_id, old_type=old_type, aggregation_type=aggregation_type)
                         )
                     on_type_change(old_type, aggregation_type, bool(row["hourly_rollup"]))
                 self._conn.execute(
@@ -1512,7 +1568,7 @@ class Index:
                 "SELECT status FROM ingested_events WHERE event_id = ?", (event_id,)
             ).fetchone()
             if state is None:
-                raise ValueError("Unbekannte Event-ID kann nicht abgeschlossen werden")
+                raise ValueError(tr("Unbekannte Event-ID kann nicht abgeschlossen werden"))
             if state["status"] == "done":
                 return
             if recorded:
@@ -1867,7 +1923,10 @@ class Index:
             return int(cur.lastrowid)
 
     def update_backup_job(self, job_id: int, **values) -> None:
-        allowed = {"started_at", "finished_at", "status", "filename", "size_bytes", "error"}
+        allowed = {
+            "started_at", "finished_at", "status", "filename", "size_bytes", "error",
+            "external_status", "external_target", "external_finished_at", "external_error",
+        }
         updates = {key: value for key, value in values.items() if key in allowed}
         if not updates:
             return
@@ -1898,6 +1957,25 @@ class Index:
                 "ORDER BY created_at DESC, id DESC LIMIT 1",
             ).fetchone()
 
+    def get_backup_job_by_filename(self, filename: str) -> sqlite3.Row | None:
+        """Jüngster erfolgreicher Lauf zu einer Backup-Datei (Übertragungsstatus)."""
+        with self._lock, self._conn:
+            return self._conn.execute(
+                "SELECT * FROM backup_jobs WHERE filename = ? AND status = 'success' "
+                "ORDER BY created_at DESC, id DESC LIMIT 1",
+                (filename,),
+            ).fetchone()
+
+    def list_backup_external_states(self) -> dict[str, sqlite3.Row]:
+        """Dateiname → Job-Zeile (jüngste je Datei) für die Spalte „Extern“ und
+        die Aufbewahrung. Nur erfolgreiche Läufe haben einen Dateinamen."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT * FROM backup_jobs WHERE status = 'success' AND filename IS NOT NULL "
+                "ORDER BY created_at ASC, id ASC"
+            ).fetchall()
+        return {row["filename"]: row for row in rows}
+
     def recover_interrupted_backup_jobs(self, now: float | None = None) -> int:
         finished_at = time.time() if now is None else now
         with self._lock, self._conn:
@@ -1907,7 +1985,16 @@ class Index:
                 "WHERE status IN ('queued', 'running')",
                 (finished_at,),
             )
-            return cur.rowcount
+            count = cur.rowcount
+            # Eine beim Beenden laufende Übertragung auf das externe Ziel gilt
+            # als fehlgeschlagen, sonst bliebe sie ewig „wird übertragen“.
+            self._conn.execute(
+                "UPDATE backup_jobs SET external_status = 'failed', external_finished_at = ?, "
+                "external_error = COALESCE(external_error, 'App wurde während der Übertragung beendet') "
+                "WHERE external_status = 'running'",
+                (finished_at,),
+            )
+            return count
 
     def create_retention_job(self, trigger: str, scheduled_for: float | None = None) -> int:
         now = time.time()
@@ -2006,6 +2093,33 @@ class Index:
                 (safe_limit,),
             ).fetchall()
 
+    def list_entity_actions_for_entity(
+        self,
+        entity_id: str,
+        *,
+        since_ts: float | None = None,
+        actions: tuple[str, ...] = (),
+        limit: int = 500,
+    ) -> list[sqlite3.Row]:
+        """Verlauf EINER Entität (Reiter „Verlauf“) — dieselbe Tabelle wie die
+        globale Aktivität, nur gefiltert. Läufe ohne Entität (z. B. die globale
+        Aufbewahrung) gehören nicht dazu."""
+        where = ["entity_id = ?"]
+        params: list = [entity_id]
+        if since_ts is not None:
+            where.append("created_at >= ?")
+            params.append(since_ts)
+        if actions:
+            where.append(f"action IN ({','.join('?' * len(actions))})")
+            params.extend(actions)
+        params.append(max(1, min(int(limit), 1000)))
+        with self._lock, self._conn:
+            return self._conn.execute(
+                f"SELECT * FROM entity_actions WHERE {' AND '.join(where)} "
+                "ORDER BY created_at DESC, id DESC LIMIT ?",
+                params,
+            ).fetchall()
+
     # -- Eindeutige Namen (Dashboards/Charts/Tabellen) -------------------------
     # Die drei folgenden Helfer setzen voraus, dass der Aufrufer self._lock
     # bereits hält (threading.Lock ist nicht reentrant) — sie laufen deshalb
@@ -2020,7 +2134,7 @@ class Index:
         # echte Prüfung statt assert: die fällt unter "python -O" weg und
         # damit genau die Absicherung der Interpolation.
         if table not in _NAME_UNIQUE_TABLES:
-            raise ValueError(f"Keine Namenstabelle: {table}")
+            raise ValueError(tr("Keine Namenstabelle: {table}", table=table))
         rows = self._conn.execute(f"SELECT id, name FROM {table}").fetchall()
         return {
             _normalized_name(row["name"]) for row in rows if row["id"] != exclude_id
@@ -2032,13 +2146,11 @@ class Index:
         trimmed = name.strip()
         if len(trimmed) > MAX_SAVED_NAME_LENGTH:
             raise NameTooLongError(
-                f"Der Name darf höchstens {MAX_SAVED_NAME_LENGTH} Zeichen lang "
-                f"sein (aktuell {len(trimmed)})."
+                tr("Der Name darf höchstens {MAX_SAVED_NAME_LENGTH} Zeichen lang sein (aktuell {len}).", MAX_SAVED_NAME_LENGTH=MAX_SAVED_NAME_LENGTH, len=len(trimmed))
             )
         if _normalized_name(trimmed) in self._taken_names_locked(table, exclude_id):
             raise DuplicateNameError(
-                f'{_NAME_UNIQUE_TABLES[table]} mit dem Namen "{trimmed}" '
-                "gibt es bereits. Bitte einen anderen Namen wählen."
+                tr("{v} mit dem Namen \"{trimmed}\" gibt es bereits. Bitte einen anderen Namen wählen.", v=tr(_NAME_UNIQUE_TABLES[table]), trimmed=trimmed)
             )
 
     def _unused_name_locked(
@@ -2388,7 +2500,7 @@ class Index:
             new_id = cursor.lastrowid
             pins = self._conn.execute(
                 "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, sparkline_resolution, decimals, title, show_age, show_period, "
+                "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
                 "range_key, continuous, primary_metric, stats_metrics "
                 "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
                 (dashboard_id,),
@@ -2396,15 +2508,15 @@ class Index:
             self._conn.executemany(
                 "INSERT INTO dashboard_pins "
                 "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
-                "show_sparkline, sparkline_resolution, decimals, title, show_age, show_period, "
+                "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
                 "range_key, continuous, primary_metric, stats_metrics) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
                         p["grid_cols"], p["grid_rows"], p["show_legend"], p["show_sparkline"],
                         p["sparkline_resolution"],
-                        p["decimals"], p["title"], p["show_age"], p["show_period"],
+                        p["decimals"], p["title"], p["show_age"], p["stale_mode"], p["show_period"],
                         p["range_key"], p["continuous"], p["primary_metric"], p["stats_metrics"],
                     )
                     for p in pins
@@ -2478,7 +2590,7 @@ class Index:
         vermeidet getrennte Pin- und Dashboard-Lookups in den Editor-Routen.
         """
         if item_type not in {"chart", "table"}:
-            raise ValueError("Ungültiger Dashboard-Kacheltyp")
+            raise ValueError(tr("Ungültiger Dashboard-Kacheltyp"))
         with self._lock, self._conn:
             rows = self._conn.execute(
                 "SELECT d.id, d.name, d.is_default "
@@ -2533,9 +2645,9 @@ class Index:
         angegebene Kachel ist nicht (mehr) angeheftet.
         """
         if item_type not in {"chart", "table"}:
-            raise ValueError("Ungültiger Dashboard-Kacheltyp")
+            raise ValueError(tr("Ungültiger Dashboard-Kacheltyp"))
         if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
-            raise ValueError(f"Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen")
+            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max_size))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
@@ -2556,7 +2668,7 @@ class Index:
         nicht verloren geht.
         """
         if item_type != "chart":
-            raise ValueError("Legende ist nur für Charts verfügbar")
+            raise ValueError(tr("Legende ist nur für Charts verfügbar"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET show_legend = ? "
@@ -2684,6 +2796,36 @@ class Index:
             self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (pin_id, pin_id))
             return pin_id
 
+    def pin_cleanup_to_dashboard(self, dashboard_id: int) -> int | None:
+        """Heftet die Kachel „Bereinigung“ an (cleanup_tile.py) — höchstens eine je Dashboard. Gibt die
+        Pin-ID zurück (Größe 2×2: drei Zeilen passen in 2×1 nicht), bei einer schon vorhandenen deren ID, oder None, wenn DASHBOARD_TILE_LIMIT erreicht
+        ist. Wie bei Werte-Kacheln trägt item_id die eigene Zeilen-ID, damit Umsortieren sie findet."""
+        with self._lock, self._conn:
+            existing = self._conn.execute(
+                "SELECT item_id FROM dashboard_pins WHERE dashboard_id = ? AND item_type = 'cleanup'", (dashboard_id,)
+            ).fetchone()
+            if existing:
+                return existing["item_id"]
+            count = self._conn.execute(
+                "SELECT COUNT(*) FROM dashboard_pins WHERE dashboard_id = ? AND item_type != 'section'", (dashboard_id,)
+            ).fetchone()[0]
+            if count >= self.DASHBOARD_TILE_LIMIT:
+                return None
+            max_pos = self._conn.execute(
+                "SELECT MAX(position) FROM dashboard_pins WHERE dashboard_id = ?", (dashboard_id,)
+            ).fetchone()[0]
+            cursor = self._conn.execute(
+                "INSERT INTO dashboard_pins (dashboard_id, item_type, item_id, position, grid_cols, grid_rows) "
+                "VALUES (?, 'cleanup', 0, ?, 2, 2)",
+                (dashboard_id, (max_pos or 0) + 1),
+            )
+            self._conn.execute("UPDATE dashboard_pins SET item_id = ? WHERE id = ?", (cursor.lastrowid, cursor.lastrowid))
+            return cursor.lastrowid
+
+    def count_marked_values(self) -> int:
+        """Alle zur Löschung markierten, noch nicht endgültig entfernten Werte (über alle Entitäten)."""
+        return self._read_conn().execute("SELECT COUNT(*) FROM deleted_points").fetchone()[0]
+
     def unpin_entity_from_dashboard(self, dashboard_id: int, pin_id: int) -> None:
         with self._lock, self._conn:
             self._conn.execute(
@@ -2715,11 +2857,21 @@ class Index:
         self, dashboard_id: int, pin_id: int, grid_cols: int, grid_rows: int, max_size: int = 6
     ) -> bool:
         if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
-            raise ValueError(f"Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen")
+            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max_size))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
+                (int(grid_cols), int(grid_rows), dashboard_id, pin_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_cleanup_size(self, dashboard_id: int, pin_id: int, grid_cols: int, grid_rows: int) -> bool:
+        """Größe der Kachel „Bereinigung“ (cleanup_tile.py): 2×2 mit den drei Zeilen oder 1×1 mit der Summe."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
+                "WHERE dashboard_id = ? AND item_type = 'cleanup' AND item_id = ?",
                 (int(grid_cols), int(grid_rows), dashboard_id, pin_id),
             )
             return cursor.rowcount > 0
@@ -2739,7 +2891,7 @@ class Index:
         self, dashboard_id: int, pin_id: int, resolution: str
     ) -> bool:
         if resolution not in ("raw", "5min", "15min", "30min", "1h"):
-            raise ValueError("Ungültige Sparkline-Auflösung")
+            raise ValueError(tr("Ungültige Sparkline-Auflösung"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET sparkline_resolution = ? "
@@ -2774,6 +2926,17 @@ class Index:
             )
             return cursor.rowcount > 0
 
+    def set_dashboard_entity_pin_stale_mode(self, dashboard_id: int, pin_id: int, stale_mode: str) -> bool:
+        if stale_mode not in STALE_MODES:
+            raise ValueError(tr("Ungültige Veraltet-Stufe"))
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET stale_mode = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
+                (stale_mode, dashboard_id, pin_id),
+            )
+            return cursor.rowcount > 0
+
     def set_dashboard_entity_pin_show_period(self, dashboard_id: int, pin_id: int, show_period: bool) -> bool:
         with self._lock, self._conn:
             cursor = self._conn.execute(
@@ -2785,7 +2948,7 @@ class Index:
 
     def set_dashboard_entity_pin_decimals(self, dashboard_id: int, pin_id: int, decimals: str) -> bool:
         if decimals not in ("auto", "0", "1", "2", "3"):
-            raise ValueError("Ungültige Nachkommastellen")
+            raise ValueError(tr("Ungültige Nachkommastellen"))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET decimals = ? "
@@ -2820,7 +2983,7 @@ class Index:
         values: list[object] = []
         if range_key is not None:
             if range_key not in DASHBOARD_TILE_RANGES:
-                raise ValueError("Ungültiger Zeitraum")
+                raise ValueError(tr("Ungültiger Zeitraum"))
             fields.append("range_key = ?")
             values.append(range_key)
         if continuous is not None:
@@ -2828,13 +2991,13 @@ class Index:
             values.append(int(continuous))
         if primary_metric is not None:
             if primary_metric not in DASHBOARD_TILE_PRIMARY_METRICS:
-                raise ValueError("Ungültiger Hauptwert")
+                raise ValueError(tr("Ungültiger Hauptwert"))
             fields.append("primary_metric = ?")
             values.append(primary_metric)
         if stats_metrics is not None:
             unknown = set(stats_metrics) - set(DASHBOARD_TILE_STATS_METRICS)
             if unknown:
-                raise ValueError("Ungültige Kennzahl")
+                raise ValueError(tr("Ungültige Kennzahl"))
             ordered = [m for m in DASHBOARD_TILE_STATS_METRICS if m in stats_metrics]
             fields.append("stats_metrics = ?")
             values.append(",".join(ordered))
@@ -3207,7 +3370,7 @@ class Index:
             )
             if quick_check != "ok":
                 raise sqlite3.DatabaseError(
-                    f"SQLite quick_check nach VACUUM: {quick_check}"
+                    tr("SQLite quick_check nach VACUUM: {quick_check}", quick_check=quick_check)
                 )
             after = self._get_database_maintenance_stats_unlocked()
         return {"before": before, "after": after, "quick_check": quick_check}
@@ -3311,6 +3474,48 @@ class Index:
             return json.loads(raw)
         except json.JSONDecodeError:
             return None
+
+    _COUNTER_DECREASE_SNAPSHOT_KEY = "counter_decrease_snapshot_cache"
+    # Hochzählen, sobald sich die Regeln der Erkennung ändern: ein Schnappschuss nach
+    # alten Regeln gilt dann sofort als veraltet statt bis zu einer Stunde weiterzuwirken.
+    _COUNTER_DECREASE_RULES = 3
+
+    def is_counter_decrease_snapshot_stale(self, min_interval_seconds: float = 3600) -> bool:
+        """Wie is_duplicate_snapshot_stale(): die Zählung braucht den Storage-Layer und bleibt
+        Sache des Aufrufers, der Index kennt nur den Cache-Stand."""
+        raw = self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY)
+        if raw is None:
+            return True
+        try:
+            snapshot = json.loads(raw)
+            checked_at = snapshot.get("checked_at")
+            rules = snapshot.get("rules")
+        except (json.JSONDecodeError, AttributeError):
+            return True
+        if rules != self._COUNTER_DECREASE_RULES:
+            return True
+        return checked_at is None or time.time() - checked_at >= min_interval_seconds
+
+    def set_counter_decrease_snapshot(self, rows: list[dict]) -> None:
+        payload = json.dumps({"checked_at": time.time(), "rules": self._COUNTER_DECREASE_RULES, "rows": rows})
+        self.set_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY, payload)
+
+    def get_counter_decrease_snapshot(self) -> dict | None:
+        raw = self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY)
+        if raw is None:
+            return None
+        try:
+            snapshot = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        # Nach anderen Regeln berechnet: lieber keine Zahlen als falsche, bis der nächste Lauf neu rechnet.
+        return snapshot if snapshot.get("rules") == self._COUNTER_DECREASE_RULES else None
+
+    def invalidate_counter_decrease_snapshot(self) -> None:
+        """Nach dem Markieren: die Meldung soll nicht eine Stunde lang auf einen Rückgang
+        zeigen, den man gerade zur Löschung markiert hat. Der nächste Wartungstakt rechnet neu."""
+        if self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY) is not None:
+            self.set_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY, json.dumps({"checked_at": 0, "rules": self._COUNTER_DECREASE_RULES, "rows": []}))
 
     _HEATMAP_WEEKDAY_CACHE_KEY = "energiedashboard_heatmap_weekday_cache"
 
@@ -3513,6 +3718,57 @@ class Index:
             (entity_id,),
         ).fetchone()
 
+    def set_counter_decreases(self, entity_id: str, mode: str) -> None:
+        """"report" oder "allow" — bei "allow" gelten Rückgänge dieses Zählers als normal."""
+        if mode not in ("report", "allow"):
+            raise ValueError(mode)
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE entities SET counter_decreases = ? WHERE entity_id = ?", (mode, entity_id))
+            if mode == "allow":  # erlaubte Rückgänge: die Regel „Fehlwerte markieren“ gibt es dann nicht
+                self._conn.execute(
+                    "UPDATE entities SET counter_auto_mark = 0, counter_auto_since = NULL, counter_auto_halted_at = NULL "
+                    "WHERE entity_id = ?", (entity_id,),
+                )
+
+    def set_counter_auto_mark(self, entity_id: str, enabled: bool, now: float) -> None:
+        """Regel „Fehlwerte automatisch markieren“ (counter_auto.py) ein-/ausschalten. Eingeschaltet gilt sie
+        nur für Rückgänge ab ``now``; ein Wiedereinschalten hebt auch ein „angehalten“ auf."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE entities SET counter_auto_mark = ?, counter_auto_since = ?, counter_auto_halted_at = NULL "
+                "WHERE entity_id = ?", (int(enabled), now if enabled else None, entity_id),
+            )
+
+    def set_counter_auto_halted(self, entity_id: str, now: float) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE entities SET counter_auto_halted_at = ? WHERE entity_id = ?", (now, entity_id))
+
+    def list_counter_auto_entities(self) -> list[sqlite3.Row]:
+        return self._read_conn().execute(
+            "SELECT * FROM entities WHERE counter_auto_mark = 1 AND counter_decreases != 'allow' "
+            "AND state_class = 'total_increasing'"
+        ).fetchall()
+
+    def list_counter_mark_ignored(self, entity_id: str) -> set[float]:
+        rows = self._read_conn().execute("SELECT ts FROM counter_mark_ignored WHERE entity_id = ?", (entity_id,)).fetchall()
+        return {row["ts"] for row in rows}
+
+    def _remember_undone(self, entity_id: str, where: str, params: tuple) -> None:
+        """Merkt sich die Zeitstempel zurückgenommener Markierungen, wenn der Zähler die Regel nutzt —
+        sonst käme derselbe Rückgang beim nächsten Lauf sofort wieder. Läuft in der Transaktion des Aufrufers."""
+        self._conn.execute(
+            "INSERT OR IGNORE INTO counter_mark_ignored (entity_id, ts) "
+            f"SELECT entity_id, ts FROM deleted_points WHERE entity_id = ? AND {where} "
+            "AND EXISTS (SELECT 1 FROM entities WHERE entity_id = ? AND counter_auto_mark = 1)",
+            (entity_id, *params, entity_id),
+        )
+
+    def list_counter_decreases_allowed(self) -> list[sqlite3.Row]:
+        return self._read_conn().execute(
+            "SELECT entity_id, custom_name, friendly_name FROM entities "
+            "WHERE counter_decreases = 'allow' ORDER BY COALESCE(custom_name, friendly_name, entity_id)"
+        ).fetchall()
+
     def clear_entity_data(self, entity_id: str) -> None:
         """Setzt eine Entität auf leer zurück, behält aber ihre Konfiguration."""
         validate_entity_id(entity_id)
@@ -3571,6 +3827,18 @@ class Index:
                 (len(timestamps), entity_id),
             )
 
+    def oldest_deleted_at(self, entity_id: str | None = None) -> float | None:
+        """Zeitpunkt der ältesten noch bestehenden Markierung (einer Entität oder insgesamt) — für die
+        Hinweise zur automatischen Bereinigung, die ab diesem Zeitpunkt zählt."""
+        sql = "SELECT MIN(deleted_at) AS oldest FROM deleted_points"
+        params: tuple = ()
+        if entity_id is not None:
+            sql += " WHERE entity_id = ?"
+            params = (entity_id,)
+        with self._lock, self._conn:
+            row = self._conn.execute(sql, params).fetchone()
+        return row["oldest"] if row and row["oldest"] is not None else None
+
     def undo_last_deleted_batch(self, entity_id: str) -> int:
         """Macht die zuletzt gelöschte Charge (gleicher deleted_at-Zeitstempel) rückgängig."""
         with self._lock, self._conn:
@@ -3581,6 +3849,7 @@ class Index:
             latest = row["latest"] if row else None
             if latest is None:
                 return 0
+            self._remember_undone(entity_id, "deleted_at = ?", (latest,))
             cursor = self._conn.execute(
                 "DELETE FROM deleted_points WHERE entity_id = ? AND deleted_at = ?",
                 (entity_id, latest),
@@ -3590,6 +3859,55 @@ class Index:
                 (cursor.rowcount, entity_id),
             )
             return cursor.rowcount
+
+    def _undo_deleted_where(self, entity_id: str, where: str, params: tuple) -> int:
+        """Nimmt Markierungen zurück, die `where` trifft, und führt deleted_count
+        im selben Schritt nach — dieselbe Buchführung wie undo_last_deleted_batch()."""
+        with self._lock, self._conn:
+            self._remember_undone(entity_id, where, params)
+            cursor = self._conn.execute(
+                f"DELETE FROM deleted_points WHERE entity_id = ? AND {where}", (entity_id, *params)
+            )
+            self._conn.execute(
+                "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
+                (cursor.rowcount, entity_id),
+            )
+            return cursor.rowcount
+
+    def undo_deleted_ids(self, entity_id: str, ids: list[int]) -> int:
+        """Nimmt einzelne Markierungen zurück (deleted_points.id, nicht der
+        Zeitstempel: bei Duplikaten mit gleichem Zeitstempel trifft das genau die
+        gewählte Markierung). In Stücken, damit die Zahl der Platzhalter nie an
+        eine SQLite-Grenze stößt."""
+        restored = 0
+        for start in range(0, len(ids), 500):
+            chunk = [int(i) for i in ids[start:start + 500]]
+            restored += self._undo_deleted_where(
+                entity_id, f"id IN ({','.join('?' * len(chunk))})", tuple(chunk)
+            )
+        return restored
+
+    def undo_deleted_batch(self, entity_id: str, deleted_at: float) -> int:
+        """Nimmt EINE bestimmte Charge zurück (gleicher deleted_at-Wert), nicht nur
+        die jüngste wie undo_last_deleted_batch()."""
+        return self._undo_deleted_where(entity_id, "deleted_at = ?", (deleted_at,))
+
+    def undo_all_deleted(self, entity_id: str) -> int:
+        """Nimmt alle Markierungen einer Entität zurück."""
+        return self._undo_deleted_where(entity_id, "1 = 1", ())
+
+    def count_deleted_by_batch(self, entity_id: str, deleted_ats: list[float]) -> dict[float, int]:
+        """Größe der angegebenen Chargen (deleted_at -> Anzahl Markierungen) — nur
+        für die Chargen, die eine Seite der Markiert-Ansicht gerade zeigt."""
+        if not deleted_ats:
+            return {}
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                f"SELECT deleted_at, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? "
+                f"AND deleted_at IN ({','.join('?' * len(deleted_ats))}) GROUP BY deleted_at",
+                (entity_id, *deleted_ats),
+            ).fetchall()
+            return {row["deleted_at"]: row["n"] for row in rows}
 
     def get_last_deleted_batch(self, entity_id: str) -> list[float]:
         """Zeitstempel der zuletzt gelöschten Charge (gleicher deleted_at-Wert),
@@ -3805,6 +4123,6 @@ class Index:
         # mitschließen — sonst blieben sie als offene Dateihandles auf
         # index.sqlite zurück, unsichtbar für den Aufrufer dieser Methode.
         with self._read_conns_registry_lock:
-            for conn in self._read_conns:
+            for _thread, conn in self._read_conns:
                 conn.close()
             self._read_conns.clear()

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Protokoll{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Protokoll") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/logs.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Protokoll</h1>
-    <p class="sub">Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll.</p>
+    <h1>{{ _("Protokoll") }}</h1>
+    <p class="sub">{{ _("Aktuelle Meldungen der App — unter Home Assistant direkt aus dem Supervisor-Protokoll.") }}</p>
 
     {# Direkt hier statt nur verlinkt (früher "Protokollierung einstellen →"
        zu settings#protokollierung) — wer sich das Protokoll ansieht, will die
@@ -17,7 +17,7 @@
        Werkzeugleiste des Viewers darunter. #}
     <div class="settings-panel log-settings-panel">
       <section class="settings-section log-settings-section" id="log-settings-section">
-        <h2 class="settings-subsection-title" id="log-settings-toggle" aria-controls="logging-settings">Protokollierung</h2>
+        <h2 class="settings-subsection-title" id="log-settings-toggle" aria-controls="logging-settings">{{ _("Protokollierung") }}</h2>
         <div id="logging-settings">
           {% include "_settings_logging_form.html" %}
         </div>
@@ -27,12 +27,12 @@
     <div class="settings-panel">
         <section>
           <div class="log-toolbar">
-            <select id="log-source-mode" class="btn" aria-label="Logquelle wählen">
-              <option value="local">Live</option>
-              <option value="supervisor">Supervisor-Historie</option>
+            <select id="log-source-mode" class="btn" aria-label="{{ _('Logquelle wählen') }}">
+              <option value="local">{{ _("Live") }}</option>
+              <option value="supervisor">{{ _("Supervisor-Historie") }}</option>
             </select>
             <span class="dd-picker-wrap">
-              <button type="button" class="btn" id="log-filter-btn" onclick="toggleDDPicker('log-filter')" aria-label="Loglevel filtern">Level: {{ log_filter_options[0][1] }} ▾</button>
+              <button type="button" class="btn" id="log-filter-btn" onclick="toggleDDPicker('log-filter')" aria-label="{{ _('Loglevel filtern') }}">{{ _("Level: {v1} ▾", v1=log_filter_options[0][1]) }}</button>
               <input type="hidden" id="log-filter-input" value="{{ log_filter_options[0][0] }}">
               <div class="dd-picker-popover" id="log-filter-popover">
                 {% for key, label in log_filter_options %}
@@ -40,16 +40,16 @@
                 {% endfor %}
               </div>
             </span>
-            <input id="log-search" class="search" type="search" placeholder="Protokoll durchsuchen …" aria-label="Protokoll durchsuchen">
-            <button type="button" class="btn" id="log-refresh">Jetzt aktualisieren</button>
-            <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> Automatisch (15 s)</label>
-            <a class="btn" id="log-download" href="logs/download">Herunterladen</a>
+            <input id="log-search" class="search" type="search" placeholder="{{ _('Protokoll durchsuchen …') }}" aria-label="{{ _('Protokoll durchsuchen') }}">
+            <button type="button" class="btn" id="log-refresh">{{ _("Jetzt aktualisieren") }}</button>
+            <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> {{ _("Automatisch (15 s)") }}</label>
+            <a class="btn" id="log-download" href="logs/download">{{ _("Herunterladen") }}</a>
           </div>
           <div class="log-meta">
-            <span id="log-source">Quelle wird geladen …</span>
+            <span id="log-source">{{ _("Quelle wird geladen …") }}</span>
             <span id="log-status" aria-live="polite"></span>
           </div>
-          <pre id="log-output" tabindex="0" aria-label="Zeitarchiv-Protokoll">Protokoll wird geladen …</pre>
+          <pre id="log-output" tabindex="0" aria-label="{{ _('Zeitarchiv-Protokoll') }}">{{ _("Protokoll wird geladen …") }}</pre>
         </section>
     </div>
   </div>

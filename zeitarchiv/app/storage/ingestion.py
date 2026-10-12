@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..i18n import N_, tr
+
 import hashlib
 import json
 import logging
@@ -96,7 +98,7 @@ _PENDING_WARNING_SECONDS = 5 * 60
 #: also keinen Aufrufer, dem die Anzeige gehören könnte. progress.py hängt
 #: seinerseits an nichts außer der Standardbibliothek — dieselbe Ebene wie
 #: ..limits und ..logging_setup, die dieses Modul bereits benutzt.
-_rollup_rebuild_progress = JobProgress("rollup-rebuild", label="Rollup-Neuaufbau")
+_rollup_rebuild_progress = JobProgress("rollup-rebuild", label=N_("Rollup-Neuaufbau"))
 
 
 def _rebuild_after_type_change(
@@ -360,7 +362,7 @@ class IngestionService:
         )
         claim = self._index.claim_ingest_event(event.event_id, event.entity_id, event.ts)
         if claim["entity_id"] != event.entity_id or claim["ts"] != event.ts:
-            raise ValueError("Event-ID wurde bereits für ein anderes Event verwendet")
+            raise ValueError(tr("Event-ID wurde bereits für ein anderes Event verwendet"))
         if claim["status"] == "done":
             return "duplicate"
 
@@ -420,6 +422,7 @@ class IngestionService:
 
         counter_decrease = (
             entity["state_class"] == "total_increasing"
+            and entity["counter_decreases"] != "allow"
             and entity["last_value"] is not None
             and entity["last_ts"] is not None
             and event.ts > entity["last_ts"]

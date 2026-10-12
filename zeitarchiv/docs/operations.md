@@ -1,5 +1,7 @@
 # Betrieb
 
+*[English version](en/operations.md)*
+
 ## Backup und Restore
 
 Implementierung: `storage/backup.py`.
@@ -33,6 +35,64 @@ Sowohl Backup als auch Restore laufen unter
 `StorageCoordinator.exclusive()` (siehe [architecture.md](architecture.md)) —
 kein gleichzeitiger Schreibverkehr während der Operation.
 
+### Externes Ziel
+
+Implementierung: `storage/backup_external.py` (Netzwerkspeicher),
+`storage/webdav.py` (WebDAV), Ablauf in `background.py`
+(`external_transfer`), Oberfläche in `backup_external_routes.py`. Konzept und
+Begründungen: `BACKUP_EXTERN_KONZEPT.md` (Dev-Dokument).
+
+**Ablauf.** Der Backup-Worker erzeugt das Backup lokal und kopiert es danach
+auf das Ziel; erst dann räumt er lokal auf. Der Job bleibt `success`, auch wenn
+nur die Übertragung scheitert — Status, Ziel, Zeitpunkt und Fehlertext stehen in
+`backup_jobs.external_status` (`NULL`, `ok`, `failed`, `running`),
+`external_target`, `external_finished_at`, `external_error`. Backups von vor der
+Einführung haben `NULL` und werden wie bisher aufgeräumt.
+
+**Netzwerkspeicher.** Die App mountet nichts: Sie sieht nur Freigaben, die Home
+Assistant unter `/media` oder `/share` eingebunden hat (`map` in `config.yaml`),
+gefunden über `/proc/self/mountinfo`. Ein systemd-Automount (`autofs`) zählt als
+eingebunden und wird beim ersten Zugriff aktiviert. Weil NFS beliebig lange
+blockieren kann, laufen Test und Übertragung hinter einem Watchdog
+(`run_with_watchdog`): Rührt sich der Transfer 120 s nicht, bricht die App ab
+und meldet einen Fehler. Der Thread bleibt als Daemon zurück; ein hängender
+Mount belegt also einen Thread, aber nicht den Worker.
+
+**Übertragung.** Geschrieben wird als `.zeitarchiv-backup-*.part` und per
+`os.replace` umbenannt, unter dem Endnamen liegt nie eine halbe Datei. Die
+Änderungszeit wird übernommen, damit die Reihenfolge der Aufbewahrung stimmt.
+Übrig gebliebene `.part`-Dateien (Abbruch, Absturz) räumt die App nach 24 h
+am Ziel weg. Bei WebDAV heißt der Zwischenstand `.<name>.part` und wird per
+`PUT`, `PROPFIND` (Größenvergleich) und `MOVE` abgeschlossen; Weiterleitungen
+folgt der Client nicht, sondern nennt die Zieladresse im Fehlertext.
+
+**Aufbewahrung.** Lokal gilt dieselbe Anzahl-/Alters-Regel wie bisher, mit einer
+Ausnahme: Backups mit `external_status` `failed` oder `running` werden nicht
+gelöscht, bis sie übertragen sind (`prune_backups(..., protected)`). Am Ziel
+gibt es nur „wie lokal“ oder „nie löschen“, und gelöscht werden ausschließlich
+Dateien nach dem Muster `zeitarchiv-backup-*.zip`. Bei WebDAV gibt es keine
+verlässliche Änderungszeit; die Reihenfolge kommt aus dem Zeitstempel im
+Dateinamen.
+
+**Fehlersuche bei fehlgeschlagener Übertragung.**
+
+1. Meldung `backup.external_failed` und Spalte „Extern“ auf der Seite Sicherung
+   zeigen den Fehlertext. Er ist bewusst für die Oberfläche formuliert
+   („Zugriff verweigert“, „Anmeldung abgelehnt (401)“, Zertifikat,
+   Zeitüberschreitung …).
+2. „Verbindung testen“ legt eine Testdatei an und löscht sie wieder; so lässt
+   sich das Ziel prüfen, ohne ein Backup abzuwarten.
+3. „Übertragen“ bzw. „Erneut übertragen“ in der Backup-Tabelle wiederholt die Übertragung eines
+   einzelnen Backups. Ohnehin versucht die App nach jeder erfolgreichen
+   Übertragung, offene frühere Backups nachzuliefern.
+4. Ein beim Neustart noch laufender Transfer wird als `failed` markiert
+   (`recover_interrupted_backup_jobs`).
+
+**Passwort (WebDAV).** Nur als Add-on-Option `webdav_password` in
+`options.json` (Ersatz: Umgebungsvariable `ZEITARCHIV_WEBDAV_PASSWORD`),
+nie im Index: Der Index liegt in jedem Backup, und das Passwort würde sonst
+mit auf das Ziel kopiert. Eine Änderung wirkt erst nach Neustart des Add-ons.
+
 ## Retention-Durchsetzung
 
 `storage/retention.py`, ausgeführt manuell (Vorschau + Klick) oder geplant
@@ -59,8 +119,17 @@ sowie — nur im Demo-Modus bzw. bei einer liegengebliebenen Demo-Instanz releva
 (siehe [Benutzerhandbuch → Demo-Modus](user-guide.md#demo-modus)) —
 `_refresh_demo_dir_info_if_stale()` (Belegter-Platz-Cache für den Zustand
 „ungenutzt") und `_run_demo_append_if_due()` (fälligkeitsbasiertes
-automatisches Ergänzen der Demo-Daten). Ein Fehler in einem Durchlauf wird
-geloggt und bricht die Schleife nicht ab.
+automatisches Ergänzen der Demo-Daten). Jeder dieser Schritte läuft einzeln
+abgesichert (`_maintenance_step(name)`): scheitert einer, wird das geloggt, und
+die übrigen Schritte desselben Durchlaufs laufen trotzdem — ein dauerhaft
+scheiternder Schritt (z. B. die Duplikat-Übersicht) blockiert damit weder
+Backup-Zeitplan noch Aufbewahrung, Verdichtung oder automatische Bereinigung.
+Das Log ist dabei gedrosselt: der erste Fehler eines Schritts erscheint mit
+Traceback (`event=maintenance_step_failed step=<name>`), danach höchstens
+stündlich eine Kurzzeile mit Zähler
+(`event=maintenance_step_still_failing`), und bei der Rückkehr zum Normalbetrieb
+einmal `event=maintenance_step_recovered`. Ein Fehler außerhalb der Schritte
+(`event=maintenance_scheduler_failed`) bricht die Schleife ebenfalls nicht ab.
 
 Backup, Import, Rotation und Retention greifen wegen
 `StorageCoordinator.exclusive()` nie gleichzeitig auf den Datenbestand zu —

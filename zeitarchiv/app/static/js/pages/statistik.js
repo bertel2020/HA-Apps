@@ -25,7 +25,7 @@
       const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
       growthChart.setOption({
         textStyle: {fontFamily: fontMono, color: inkMuted, fontSize: Math.round(12 * uiFontScale * 10) / 10},
-        // Kein eigener yAxis-Titel ("Datensätze"/"Größe") mehr — stand bei
+        // Kein eigener yAxis-Titel (t("Datensätze")/t("Größe")) mehr — stand bei
         // wenig Platz über der Achse (Zeitraum-Auswahl direkt darüber) und war
         // ohnehin redundant zur Legende unten, die dieselbe Zuordnung schon
         // per Farbe herstellt.
@@ -49,12 +49,12 @@
         },
         series: [
           {
-            name: 'Datensätze', type: 'line', yAxisIndex: 0, data: rowsData,
+            name: t('Datensätze'), type: 'line', yAxisIndex: 0, data: rowsData,
             itemStyle: {color: getComputedStyle(document.body).getPropertyValue('--chart-line')},
             lineStyle: {width: 1.5}, showSymbol: false,
           },
           {
-            name: 'Größe', type: 'line', yAxisIndex: 1, data: sizeData,
+            name: t('Größe'), type: 'line', yAxisIndex: 1, data: sizeData,
             itemStyle: {color: getComputedStyle(document.body).getPropertyValue('--chart-bar')},
             lineStyle: {width: 1.5}, showSymbol: false,
           },

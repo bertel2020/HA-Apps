@@ -40,7 +40,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.demo_generation import DEMO_ENTITIES, run_generation  # noqa: E402
+from app.demo_generation import DEMO_ENTITIES, localized_id, run_generation  # noqa: E402
 from app.storage.entity_removal import delete_all_values, delete_entity  # noqa: E402
 from app.storage.index import Index  # noqa: E402
 
@@ -68,6 +68,7 @@ def main() -> None:
             "mit --clean/--append/--months aus."
         ),
     )
+    parser.add_argument("--language", choices=["de", "en"], default="de", help="Sprache der Demo-Entitäten (Namen und entity_ids) (Standard: de). Die entity_ids folgen dem Namen (en: sensor.demo_living_room_temperature); ein Lauf in der anderen Sprache ersetzt den vorhandenen Datensatz")
     args = parser.parse_args()
     if args.append and args.clean:
         parser.error("--append und --clean schließen sich gegenseitig aus.")
@@ -79,7 +80,7 @@ def main() -> None:
 
     if args.clear:
         existing = {e["entity_id"] for e in index.list_entities()}
-        wanted = {e.entity_id for e in DEMO_ENTITIES}
+        wanted = {localized_id(e.entity_id, lang) for e in DEMO_ENTITIES for lang in ("de", "en")}
         targets = existing & wanted
         if args.clear == "values":
             for entity_id in targets:
@@ -99,6 +100,7 @@ def main() -> None:
         months=args.months, append=args.append, clean=args.clean,
         on_entity=lambda _i, entity_id, n: print(f"{entity_id}: {n} Werte geschrieben"),
         on_status=print,
+        language=args.language,
     )
 
     if result.skipped:

@@ -1,44 +1,42 @@
 <div id="ha-section">
 {% if not ha_available %}
 <div class="callout" style="border-left-color:var(--danger);">
-  Home-Assistant-API nicht erreichbar{% if ha_error %}: {{ ha_error }}{% endif %}. Die Auswahl unten
-  bleibt sichtbar, ein Dry Run/Import würde aber fehlschlagen — z. B. bei lokaler Entwicklung ohne
-  Supervisor.
+  {{ _("Home-Assistant-API nicht erreichbar") }}{% if ha_error %}: {{ ha_error }}{% endif %}{{ _(". Die Auswahl unten bleibt sichtbar, ein Dry Run/Import würde aber fehlschlagen — z. B. bei lokaler Entwicklung ohne Supervisor.") }}
 </div>
 {% endif %}
 {% if ha_availability_error %}
 <div class="callout" style="border-left-color:var(--danger);">
-  Verfügbarkeit konnte nicht geprüft werden: {{ ha_availability_error }}
+  {{ _("Verfügbarkeit konnte nicht geprüft werden: {ha_availability_error}", ha_availability_error=ha_availability_error) }}
 </div>
 {% endif %}
 {% if not ha_entities %}
-<div class="empty">Noch keine Entität in Zeitarchiv bekannt — die HA-Integration muss mindestens einen Live-Wert übertragen haben, bevor ein Import für diese Entität möglich ist.</div>
+<div class="empty">{{ _("Noch keine Entität in Zeitarchiv bekannt — die HA-Integration muss mindestens einen Live-Wert übertragen haben, bevor ein Import für diese Entität möglich ist.") }}</div>
 {% else %}
 <form id="ha-form" method="post" action="import/ha/dry-run">
   <input type="hidden" name="history_source" id="ha-source-input" value="{{ ha_history_source }}">
   <div class="ha-import-config">
     <div class="ha-import-config-block">
-      <span class="ha-import-config-label">Importmodus</span>
-      <span class="seg-toggle" role="group" aria-label="Importmodus">
-        <button type="button" class="{{ 'active' if ha_history_source == 'full' }}" onclick="onHaSourceChange('full')">Vollimport</button>
-        <button type="button" class="{{ 'active' if ha_history_source == 'raw' }}" onclick="onHaSourceChange('raw')">Rohhistorie</button>
-        <button type="button" class="{{ 'active' if ha_history_source == 'stats' }}" onclick="onHaSourceChange('stats')">Langzeitstatistik</button>
+      <span class="ha-import-config-label">{{ _("Importmodus") }}</span>
+      <span class="seg-toggle" role="group" aria-label="{{ _('Importmodus') }}">
+        <button type="button" class="{{ 'active' if ha_history_source == 'full' }}" onclick="onHaSourceChange('full')">{{ _("Vollimport") }}</button>
+        <button type="button" class="{{ 'active' if ha_history_source == 'raw' }}" onclick="onHaSourceChange('raw')">{{ _("Rohhistorie") }}</button>
+        <button type="button" class="{{ 'active' if ha_history_source == 'stats' }}" onclick="onHaSourceChange('stats')">{{ _("Langzeitstatistik") }}</button>
       </span>
     </div>
 
     {% if ha_history_source == "full" %}
     <div class="ha-full-controls">
       <label class="ha-import-field">
-        <span>Rohhistorie</span>
-        <select name="range_preset" class="ha-import-select" title="Zeitraum der Rohhistorie" onchange="onHaRangeChanged()">
+        <span>{{ _("Rohhistorie") }}</span>
+        <select name="range_preset" class="ha-import-select" title="{{ _('Zeitraum der Rohhistorie') }}" onchange="onHaRangeChanged()">
           {% for value, label in ha_range_options %}
           <option value="{{ value }}" {% if value == ha_range_preset %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </label>
       <label class="ha-import-field">
-        <span>Ältere Langzeitstatistik</span>
-        <select name="stats_range_preset" class="ha-import-select" title="Zeitraum der Langzeitstatistik" onchange="onHaRangeChanged()">
+        <span>{{ _("Ältere Langzeitstatistik") }}</span>
+        <select name="stats_range_preset" class="ha-import-select" title="{{ _('Zeitraum der Langzeitstatistik') }}" onchange="onHaRangeChanged()">
           {% for value, label in ha_stats_range_options %}
           <option value="{{ value }}" {% if value == ha_stats_range_preset %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
@@ -53,8 +51,8 @@
     <div class="ha-full-controls">
       {% if ha_history_source == "stats" %}
       <label class="ha-import-field">
-        <span>Auflösung</span>
-        <select id="ha-period-select" name="period" onchange="onHaPeriodChange(this.value)" title="Auflösung">
+        <span>{{ _("Auflösung") }}</span>
+        <select id="ha-period-select" name="period" onchange="onHaPeriodChange(this.value)" title="{{ _('Auflösung') }}">
           {% for value, label in ha_period_options %}
           <option value="{{ value }}" {% if value == ha_period %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
@@ -65,9 +63,9 @@
       {% endif %}
 
       <div class="ha-import-field">
-        <span>Zeitraum</span>
+        <span>{{ _("Zeitraum") }}</span>
         <span class="dd-picker-wrap">
-          <button type="button" class="btn" id="ha-range-btn" onclick="toggleDDPicker('ha-range')" title="Zeitraum">{% for value, label in ha_range_options %}{% if value == ha_range_preset %}{{ label }}{% endif %}{% endfor %} ▾</button>
+          <button type="button" class="btn" id="ha-range-btn" onclick="toggleDDPicker('ha-range')" title="{{ _('Zeitraum') }}">{% for value, label in ha_range_options %}{% if value == ha_range_preset %}{{ label }}{% endif %}{% endfor %} ▾</button>
           <input type="hidden" name="range_preset" id="ha-range-input" value="{{ ha_range_preset }}">
           <span class="dd-picker-popover" id="ha-range-popover">
             {% for value, label in ha_range_options %}
@@ -77,40 +75,40 @@
         </span>
       </div>
       <span id="ha-custom-range-fields" class="ha-custom-range" style="{{ '' if ha_range_preset == 'custom' else 'display:none;' }}">
-        <label class="ha-import-field" for="ha-date-from"><span>Von</span><input type="date" id="ha-date-from" name="date_from" value="{{ ha_date_from }}"></label>
-        <label class="ha-import-field" for="ha-date-to"><span>Bis</span><input type="date" id="ha-date-to" name="date_to" value="{{ ha_date_to }}"></label>
+        <label class="ha-import-field" for="ha-date-from"><span>{{ _("Von") }}</span><input type="date" id="ha-date-from" name="date_from" value="{{ ha_date_from }}"></label>
+        <label class="ha-import-field" for="ha-date-to"><span>{{ _("Bis") }}</span><input type="date" id="ha-date-to" name="date_to" value="{{ ha_date_to }}"></label>
       </span>
     </div>
     {% endif %}
 
     <div class="ha-import-config-block">
-      <span class="ha-import-config-label">Importoptionen</span>
+      <span class="ha-import-config-label">{{ _("Importoptionen") }}</span>
       <span class="ha-archive-option-row">
         <label class="ha-archive-option">
           <input type="checkbox" name="include_existing_months" {% if ha_include_existing_months %}checked{% endif %}>
-          <span>Archivlücken füllen</span>
+          <span>{{ _("Archivlücken füllen") }}</span>
         </label>
-        <span class="ha-archive-help" tabindex="0" role="button" aria-label="Information zu Archivlücken füllen">
+        <span class="ha-archive-help" tabindex="0" role="button" aria-label="{{ _('Information zu Archivlücken füllen') }}">
           <span aria-hidden="true">i</span>
-          <span class="ha-archive-help-popover" role="tooltip">Füllt in abgeschlossenen Monatsarchiven ausschließlich fehlende Zeitstempel. Vorhandene Werte bleiben unverändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist die Option nicht nötig.</span>
+          <span class="ha-archive-help-popover" role="tooltip">{{ _("Füllt in abgeschlossenen Monatsarchiven ausschließlich fehlende Zeitstempel. Vorhandene Werte bleiben unverändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist die Option nicht nötig.") }}</span>
         </span>
       </span>
     </div>
 
     <div class="ha-import-check-row">
-      <button type="button" class="btn" id="ha-availability-btn" title="Prüft nur die markierten Entitäten" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#ha-availability-status">
-        Verfügbarkeit prüfen
+      <button type="button" class="btn" id="ha-availability-btn" title="{{ _('Prüft nur die markierten Entitäten') }}" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#ha-availability-status">
+        {{ _("Verfügbarkeit prüfen") }}
       </button>
-      <span class="ha-checked-at {{ 'is-error' if ha_availability_error else ('is-checked' if ha_availability_checked_at_label else 'is-idle') }}" id="ha-availability-status" title="Status der Verfügbarkeitsprüfung für diesen Importmodus">
-        <span class="ha-status-idle">{% if ha_availability_checked_at_label %}Geprüft: {{ ha_availability_checked_at_label }}{% else %}Noch nicht geprüft{% endif %}{% if ha_availability_stale %} · <span class="ha-stale-badge" title="Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben.">⏳ Nicht mehr taufrisch</span>{% endif %}</span>
-        <span class="htmx-indicator">Prüfung läuft …</span>
+      <span class="ha-checked-at {{ 'is-error' if ha_availability_error else ('is-checked' if ha_availability_checked_at_label else 'is-idle') }}" id="ha-availability-status" title="{{ _('Status der Verfügbarkeitsprüfung für diesen Importmodus') }}">
+        <span class="ha-status-idle">{% if ha_availability_checked_at_label %}{{ _("Geprüft: {ha_availability_checked_at_label}", ha_availability_checked_at_label=ha_availability_checked_at_label) }}{% else %}{{ _("Noch nicht geprüft") }}{% endif %}{% if ha_availability_stale %} · <span class="ha-stale-badge" title="{{ _('Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben.') }}">{{ _("⏳ Nicht mehr taufrisch") }}</span>{% endif %}</span>
+        <span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
       </span>
     </div>
   </div>
 
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
-    <input type="search" class="search" id="ha-entity-search" placeholder="Entität suchen …" oninput="onHaSearch(this.value)">
-    <span class="count-chip" id="ha-marked-count">0 markiert</span>
+    <input type="search" class="search" id="ha-entity-search" placeholder="{{ _('Entität suchen …') }}" oninput="onHaSearch(this.value)">
+    <span class="count-chip" id="ha-marked-count">{{ _("0 markiert") }}</span>
     {# Rechtsbündige Gruppe am Ende der Toolbar, wie in entity_detail.html/
        chart_editor.html (.toolbar-right in app.css) — beide Knöpfe in EINEM
        Behälter, nicht margin-left:auto auf dem ersten, sonst würde nur er
@@ -120,9 +118,9 @@
          Entität), schreibt aber nichts und hat deshalb keine Zahl, gegen die
          ein Balken laufen könnte — hier reicht der Läuft-Chip. #}
       <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
-              hx-disabled-elt="this">Vorschau (Dry Run)</button>
+              hx-disabled-elt="this">{{ _("Vorschau (Dry Run)") }}</button>
       <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
-              hx-disabled-elt="this">{{ "Vollimport starten" if ha_history_source == "full" else "Import starten" }}</button>
+              hx-disabled-elt="this">{{ _("Vollimport starten") if ha_history_source == "full" else _("Import starten") }}</button>
     </div>
   </div>
 
@@ -134,12 +132,12 @@
         <col class="ha-col-type"><col class="ha-col-unit"><col class="ha-col-art"><col class="ha-col-available">
       </colgroup>
       <tr>
-        <th><input type="checkbox" onchange="toggleAllHaRows(this)" title="Alle auf dieser Seite markieren"></th>
-        <th><a href="#" onclick="sortHaTable('entity');return false;">Entität<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('type');return false;">Typ<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('unit');return false;">Einheit<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('art');return false;">Art<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('available');return false;">Verfügbar<span class="sort-arrow"></span></a></th>
+        <th><input type="checkbox" onchange="toggleAllHaRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th>
+        <th><a href="#" onclick="sortHaTable('entity');return false;">{{ _("Entität") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('type');return false;">{{ _("Typ") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('art');return false;">{{ _("Art") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" onclick="sortHaTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
@@ -167,23 +165,23 @@
         <td>{{ entity.unit or "—" }}</td>
         <td>
           {% if entity.has_data is none %}
-          <span class="ha-art-badge unknown" title="Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken">–</span>
+          <span class="ha-art-badge unknown" title="{{ _('Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken') }}">–</span>
           {% elif ha_history_source == "full" and entity.full_details %}
           {% if entity.full_details.raw.count and entity.full_details.stats.count %}
-          <span class="ha-art-badge has-data">Vollimport</span>
+          <span class="ha-art-badge has-data">{{ _("Vollimport") }}</span>
           {% elif entity.full_details.raw.count %}
-          <span class="ha-art-badge has-data">Nur Rohhistorie</span>
+          <span class="ha-art-badge has-data">{{ _("Nur Rohhistorie") }}</span>
           {% elif entity.full_details.stats.count %}
-          <span class="ha-art-badge has-data">Nur Statistik</span>
+          <span class="ha-art-badge has-data">{{ _("Nur Statistik") }}</span>
           {% else %}
-          <span class="ha-art-badge no-data">Keine Daten</span>
+          <span class="ha-art-badge no-data">{{ _("Keine Daten") }}</span>
           {% endif %}
           {% elif entity.supported == false %}
-          <span class="ha-art-badge unknown" title="Diese Entität führt keine Langzeitstatistik, i. d. R. ohne HA-state_class (z. B. Schalter/Text)">Nicht unterstützt</span>
+          <span class="ha-art-badge unknown" title="{{ _('Diese Entität führt keine Langzeitstatistik, i. d. R. ohne HA-state_class (z. B. Schalter/Text)') }}">{{ _("Nicht unterstützt") }}</span>
           {% elif entity.has_data %}
-          <span class="ha-art-badge has-data">{{ "Langzeitstatistik" if ha_history_source == "stats" else "Rohhistorie" }}</span>
+          <span class="ha-art-badge has-data">{{ _("Langzeitstatistik") if ha_history_source == "stats" else _("Rohhistorie") }}</span>
           {% else %}
-          <span class="ha-art-badge no-data">{{ "Keine Langzeitstatistik" if ha_history_source == "stats" else "Keine Rohhistorie" }}</span>
+          <span class="ha-art-badge no-data">{{ _("Keine Langzeitstatistik") if ha_history_source == "stats" else _("Keine Rohhistorie") }}</span>
           {% endif %}
         </td>
         <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
@@ -211,11 +209,11 @@
       <span class="pager-page" id="ha-pager-page"></span>
       <button type="button" class="btn navbtn" id="ha-pager-next" onclick="stepHaPage(1)">›</button>
     </div>
-    <select id="ha-page-size" onchange="setHaPageSize(this.value)" title="Zeilen pro Seite">
-      <option value="20" selected>20 / Seite</option>
-      <option value="50">50 / Seite</option>
-      <option value="100">100 / Seite</option>
-      <option value="500">500 / Seite</option>
+    <select id="ha-page-size" onchange="setHaPageSize(this.value)" title="{{ _('Zeilen pro Seite') }}">
+      <option value="20" selected>{{ _("20 / Seite") }}</option>
+      <option value="50">{{ _("50 / Seite") }}</option>
+      <option value="100">{{ _("100 / Seite") }}</option>
+      <option value="500">{{ _("500 / Seite") }}</option>
     </select>
   </div>
 

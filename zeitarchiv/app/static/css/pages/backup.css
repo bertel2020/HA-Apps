@@ -1,0 +1,67 @@
+/* Karte „Externes Ziel“ auf der Backup-Seite. Farben ausschließlich über die
+   Tokens aus app.css; Aufbau wie die übrigen Einstellungs-Karten. */
+#backup-external-card{margin:24px 0;padding-bottom:18px;border-bottom:1px solid var(--border);min-width:0}
+.ext-hint{color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));margin:0 0 14px;max-width:70ch}
+.ext-note{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));margin:0;max-width:70ch}
+/* Ein Raster mit festem Abstand statt einzelner Außenabstände */
+.ext-body,.ext-dir,.ext-webdav{display:grid;gap:16px;min-width:0}
+.ext-mono{font-family:var(--font-mono);overflow-wrap:anywhere}
+.ext-seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.ext-seg label{display:flex;cursor:pointer;border-right:1px solid var(--border)}
+.ext-seg label:last-child{border-right:0}
+.ext-seg input{position:absolute;opacity:0;pointer-events:none}
+.ext-seg span{padding:7px 16px;background:var(--surface);color:var(--ink);font-size:calc(13px * var(--font-scale, 1))}
+.ext-seg input:checked + span{background:var(--accent-line);color:var(--accent-contrast)}
+.ext-seg input:focus-visible + span{outline:2px solid var(--accent-line);outline-offset:-2px}
+.ext-form:has(input[name=external_type][value=off]:checked) .ext-body{display:none}
+.ext-form:not(:has(input[name=external_type][value=off]:checked)) .ext-off-actions{display:none}
+.ext-form:not(:has(input[name=external_type][value=dir]:checked)) .ext-dir{display:none}
+.ext-form:not(:has(input[name=external_type][value=webdav]:checked)) .ext-webdav{display:none}
+.ext-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:640px){.ext-pair{grid-template-columns:minmax(0,1fr)}}
+.ext-pw{display:flex;gap:6px 10px;align-items:center;flex-wrap:wrap;min-height:34px}
+.ext-pw-short{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted)}
+.ext-check{display:flex;gap:8px;align-items:center;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);margin:0}
+.ext-check input{accent-color:var(--accent-line)}
+.ext-mounts{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);padding:6px 8px;margin:0;min-width:0}
+.ext-mounts legend{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);padding:0 4px}
+.ext-mount{display:flex;gap:12px;align-items:flex-start;padding:10px 6px;border-top:1px solid var(--border);cursor:pointer;border-radius:6px}
+.ext-mount:first-of-type{border-top:0}
+.ext-mount:has(input:checked){background:var(--accent-line-soft)}
+.ext-mount.disabled{cursor:not-allowed;opacity:.75}
+.ext-mount input{margin-top:4px;accent-color:var(--accent-line)}
+.ext-mounts{position:relative}
+.ext-mounts-toggle{position:absolute;top:-2px;right:8px;display:flex;gap:6px;align-items:center;background:var(--surface-alt);border:0;padding:0 4px;font:inherit;font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);cursor:pointer}
+.ext-mounts-arrow{display:inline-block;transition:transform .15s}
+.ext-mounts-toggle[aria-expanded="true"] .ext-mounts-arrow{transform:rotate(90deg)}
+.ext-mounts:not(.collapsed) .ext-when-collapsed,.ext-mounts.collapsed .ext-when-open{display:none}
+.ext-mounts.collapsed .ext-mount:not(:has(input:checked)),.ext-mounts.collapsed .ext-idle{display:none}
+.ext-mounts.collapsed .ext-mount:has(input:checked){border-top:0}
+.ext-idle{border-top:1px solid var(--border);margin-top:4px}
+.ext-idle summary{padding:10px 6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer}
+.ext-mount-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ext-sub{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);overflow-wrap:anywhere}
+.ext-bar{height:6px;width:140px;max-width:100%;border-radius:3px;background:var(--border);overflow:hidden;margin-top:4px}
+.ext-bar i{display:block;height:100%;background:var(--positive)}
+.ext-pill{display:inline-block;font-size:calc(11.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border-strong);white-space:nowrap}
+.ext-pill.bad{color:var(--danger);border-color:var(--danger)}
+.ext-none{border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);padding:12px;margin:0}
+.ext-none p{margin:6px 0 0;color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));max-width:70ch}
+.ext-field{display:flex;flex-direction:column;gap:5px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);min-width:0}
+.ext-field input{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:7px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);min-width:0;max-width:100%}
+.ext-field input{width:100%}
+.ext-field-narrow{max-width:360px}
+.ext-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.ext-result{display:block;margin:10px 0 0;padding:10px 12px;border-radius:8px;font-size:calc(13px * var(--font-scale, 1))}
+.ext-result.ok{background:var(--accent-line-soft);border:1px solid var(--accent-line)}
+.ext-result.bad{background:var(--danger-soft);border:1px solid var(--danger);color:var(--danger)}
+.ext-last{margin:14px 0 0;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));overflow-wrap:anywhere}
+.ext-last.bad{color:var(--danger)}
+.ext-pill-state{display:inline-block;font-size:calc(11.5px * var(--font-scale, 1));padding:2px 8px;border-radius:999px;border:1px solid var(--border-strong);white-space:nowrap}
+.ext-pill-state.ok{color:var(--positive);border-color:var(--positive)}
+.ext-pill-state.failed{color:var(--danger);border-color:var(--danger)}
+.ext-pill-state.none,.ext-pill-state.running{color:var(--ink-faint)}
+
+/* Aktionsknöpfe der Backup-Seite rechtsbündig */
+.backup-action{display:flex;justify-content:flex-end;}
+.ext-group{display:grid;gap:8px;min-width:0}

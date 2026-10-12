@@ -1,0 +1,132 @@
+{# Karte „Externes Ziel“ (BACKUP_EXTERN_KONZEPT.md). Per htmx von backup.html
+   nachgeladen und beim Speichern ersetzt. Die Auswahl der Freigabe kommt aus
+   backup_external.list_mounts(); es gibt bewusst kein freies Pfadfeld. #}
+<div id="backup-external-card">
+  <h3 style="margin:0 0 4px;">{{ _("Externes Ziel") }}</h3>
+  <p class="ext-hint">{{ _("Kopiert jedes erfolgreiche Backup zusätzlich auf einen Netzwerkspeicher oder einen WebDAV-Server. Das lokale Backup bleibt erhalten.") }}</p>
+
+  {% if ext.message %}<p class="ext-result ok" role="status">{{ ext.message }}</p>{% endif %}
+  {% if ext.error %}<p class="ext-result bad" role="alert">{{ ext.error }}</p>{% endif %}
+
+  <form id="backup-external-form" class="ext-form"
+        hx-post="backup/external" hx-target="#backup-external-card" hx-swap="outerHTML">
+    <div class="ext-seg" role="radiogroup" aria-label="{{ _('Ziel') }}">
+      <label><input type="radio" name="external_type" value="off" {% if ext.type != 'dir' %}checked{% endif %}><span>{{ _("Aus") }}</span></label>
+      <label><input type="radio" name="external_type" value="dir" {% if ext.type == 'dir' %}checked{% endif %}><span>{{ _("Netzwerkspeicher") }}</span></label>
+      <label><input type="radio" name="external_type" value="webdav" {% if ext.type == 'webdav' %}checked{% endif %}><span>{{ _("WebDAV") }}</span></label>
+    </div>
+
+    <div class="ext-body">
+      <div class="ext-dir">
+      {% if ext.mounts %}
+      {% set ready = ext.mounts | selectattr('mounted') | list %}
+      {% set idle = ext.mounts | rejectattr('mounted') | list %}
+      {# Eingeklappt bleibt nur die gewählte Freigabe sichtbar; ohne Auswahl startet die Karte aufgeklappt. #}
+      <fieldset class="ext-mounts{% if ext.mounts | selectattr('selected') | list %} collapsed{% endif %}">
+        <legend>{{ _("Netzwerkspeicher aus Home Assistant") }}</legend>
+        <button type="button" class="ext-mounts-toggle" aria-expanded="{{ 'false' if ext.mounts | selectattr('selected') | list else 'true' }}"
+                onclick="toggleExtMounts(this)">
+          <span class="ext-mounts-arrow" aria-hidden="true">▸</span>
+          <span class="ext-mounts-hint ext-when-collapsed">{{ _("Ändern") }}</span>
+          <span class="ext-mounts-hint ext-when-open">{{ _("Einklappen") }}</span>
+        </button>
+        {% macro mount_row(m) %}
+        <label class="ext-mount{% if not m.mounted %} disabled{% endif %}">
+          <input type="radio" name="external_mount" value="{{ m.path }}"
+                 {% if m.selected %}checked{% endif %}{% if not m.mounted %} disabled{% else %} onchange="collapseExtMounts(this)"{% endif %}>
+          <span class="ext-mount-main">
+            <span><span class="ext-mono">{{ m.path }}</span> <span class="ext-pill{% if not m.mounted %} bad{% endif %}">{% if m.mounted %}{{ m.kind }}{% else %}{{ _("nicht eingebunden") }}{% endif %}</span></span>
+            {% if m.mounted %}
+            <span class="ext-sub">{% if m.source %}{{ m.source }}{% endif %}{% if m.free %} · {{ _("{free} frei von {total}", free=m.free, total=m.total) }}{% endif %}</span>
+            {% if m.used_percent is not none %}<span class="ext-bar" aria-hidden="true"><i style="width:{{ m.used_percent }}%"></i></span>{% endif %}
+            {% else %}
+            <span class="ext-sub">{{ _("Der Ordner existiert, ist aber keine Freigabe. Backups würden auf dem lokalen Datenträger landen.") }}</span>
+            {% endif %}
+          </span>
+        </label>
+        {% endmacro %}
+        {% for m in ready %}{{ mount_row(m) }}{% endfor %}
+        {% if idle %}
+        {# Nicht wählbar, nur zur Information: bleibt immer zugeklappt, auch wenn die Karte neu geladen wird. #}
+        <details class="ext-idle">
+          <summary>{% if idle | length == 1 %}{{ _("1 weiterer Ordner (nicht eingebunden)") }}{% else %}{{ _("{n} weitere Ordner (nicht eingebunden)", n=idle | length) }}{% endif %}</summary>
+          {% for m in idle %}{{ mount_row(m) }}{% endfor %}
+        </details>
+        {% endif %}
+      </fieldset>
+      {% else %}
+      <div class="ext-none">
+        <strong>{{ _("Kein Netzwerkspeicher gefunden") }}</strong>
+        <p>{{ _("Zeitarchiv sieht nur Freigaben, die Home Assistant mit der Verwendung „Medien“ oder „Share“ eingebunden hat. Richte eine ein unter Einstellungen → System → Speicher → Netzwerkspeicher (NFS oder SMB/CIFS) und lade diese Seite neu. Die Verwendung „Backup“ ist nur für Home Assistants eigene Backups.") }}</p>
+      </div>
+      {% endif %}
+
+      <label class="ext-field ext-field-narrow">{{ _("Unterordner (optional)") }}
+        <input type="text" name="external_subfolder" value="{{ ext.subfolder }}" maxlength="64"
+               placeholder="{{ _('z. B. zeitarchiv') }}" autocomplete="off">
+      </label>
+      </div>
+
+      <div class="ext-webdav">
+        <div class="ext-group">
+          <label class="ext-field">{{ _("Adresse des Zielordners") }}
+            <input type="text" name="external_url" value="{{ ext.webdav_url }}" maxlength="500"
+                   placeholder="https://cloud.example.de/remote.php/dav/files/benutzer/Zeitarchiv/" autocomplete="off" spellcheck="false">
+          </label>
+          <label class="ext-check"><input type="checkbox" name="external_insecure" value="1" {% if not ext.webdav_verify_tls %}checked{% endif %}>
+            {{ _("Zertifikat nicht prüfen (selbst signiert)") }}</label>
+          {% if ext.webdav_url.startswith('http://') %}<p class="ext-result bad" role="note">{{ _("Die Adresse beginnt mit http://. Benutzer und Passwort würden unverschlüsselt übertragen.") }}</p>{% endif %}
+        </div>
+        <div class="ext-pair">
+          <label class="ext-field">{{ _("Benutzer") }}
+            <input type="text" name="external_user" value="{{ ext.webdav_user }}" maxlength="200" autocomplete="off">
+          </label>
+          <div class="ext-field">{{ _("Passwort") }}
+            <span class="ext-pw">
+              {% if ext.webdav_password_set %}<span class="ext-pill-state ok">{{ _("Passwort hinterlegt") }}</span>
+              {% else %}<span class="ext-pill-state failed">{{ _("Kein Passwort hinterlegt") }}</span>{% endif %}
+              <span class="ext-pw-short">{{ _("Nur in den Add-on-Optionen einstellbar") }}</span>
+            </span>
+          </div>
+        </div>
+        <p class="ext-note">{{ _("Das Passwort steht nur in den Add-on-Optionen (Einstellungen → Add-ons → Zeitarchiv → Konfiguration), damit es nicht in den Backups selbst landet. Nach einer Änderung das Add-on neu starten.") }}</p>
+      </div>
+
+      {% set keep_options = [('same', _("wie lokal (Anzahl und Alter)")), ('never', _("Nie löschen"))] %}
+      {# <div> statt <label>: Ein Label leitet den Klick auf eine Zeile an den Auslöser weiter und öffnet das Popover sofort wieder. #}
+      <div class="ext-field ext-field-narrow">{{ _("Aufbewahrung am Ziel") }}
+        <span class="dd-picker-wrap">
+          <button type="button" class="btn" id="backup-external-keep-btn" onclick="toggleDDPicker('backup-external-keep')">{% for v, l in keep_options %}{% if v == ext.keep %}{{ l }}{% endif %}{% endfor %} ▾</button>
+          <input type="hidden" name="external_keep" id="backup-external-keep-input" value="{{ ext.keep }}">
+          <div class="dd-picker-popover" id="backup-external-keep-popover">
+            {% for value, label in keep_options %}
+            <div class="dd-picker-row{% if value == ext.keep %} active{% endif %}" onclick="selectDDOption('backup-external-keep', '{{ value }}', '{{ label }}')">{{ label }}</div>
+            {% endfor %}
+          </div>
+        </span>
+      </div>
+      <p class="ext-note">{{ _("Gelöscht werden am Ziel nur Dateien nach dem Muster zeitarchiv-backup-*.zip. Backups, die noch nicht übertragen wurden, bleiben lokal erhalten.") }}</p>
+
+      <div class="ext-actions">
+        <button type="button" class="btn" hx-post="backup/external/test" hx-include="#backup-external-form"
+                hx-target="#backup-external-result" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Verbindung testen") }}</button>
+        <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
+      </div>
+      <div id="backup-external-result" aria-live="polite"></div>
+    </div>
+    {# Beim Ausschalten genügt Speichern. #}
+    <div class="ext-actions ext-off-actions">
+      <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
+    </div>
+  </form>
+
+  {% if ext.last %}
+  <p class="ext-last {{ 'bad' if ext.last.status == 'failed' else '' }}">
+    {% if ext.last.status == 'ok' %}
+      {{ _("Letzte Übertragung: {when}, {size} nach {target}", when=ext.last.when, size=ext.last.size, target=ext.last.target) }}
+    {% else %}
+      {{ _("Letzte Übertragung fehlgeschlagen ({when}): {error}", when=ext.last.when, error=ext.last.error | retranslate) }}
+    {% endif %}
+  </p>
+  {% endif %}
+</div>

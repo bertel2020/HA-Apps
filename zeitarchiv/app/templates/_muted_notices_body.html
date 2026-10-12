@@ -10,15 +10,15 @@
       <span class="settings-compact-label">{{ entry.title }}</span>
       <div class="settings-compact-hint hint-status">{{ entry.detail }}</div>
       <div class="settings-compact-hint hint-status">
-        Stummgeschaltet seit {{ entry.muted_at_text }}
-        {% if entry.until_text %} &middot; läuft ab {{ entry.until_text }} aus{% endif %}
+        {{ _("Stummgeschaltet seit {muted_at_text}", muted_at_text=entry.muted_at_text) }}
+        {% if entry.until_text %} {{ _("&middot; läuft ab {until_text} aus", until_text=entry.until_text) }}{% endif %}
         {% if entry.meta %} &middot; {{ entry.meta }}{% endif %}
       </div>
     </div>
-    <button type="button" class="btn btn-sm" onclick="unmuteNotice(event)">Zurückholen</button>
+    <button type="button" class="btn btn-sm" onclick="unmuteNotice(event)">{{ _("Zurückholen") }}</button>
   </div>
   {% endfor %}
 </div>
 {% else %}
-<div class="empty">Keine stummgeschalteten Meldungen.</div>
+<div class="empty">{{ _("Keine stummgeschalteten Meldungen.") }}</div>
 {% endif %}

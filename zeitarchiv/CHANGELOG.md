@@ -1,5 +1,367 @@
 # Changelog
 
+## 1.5.0 - 2026-10-11
+
+### Neu
+
+- **Energiedashboard: Geräte hinter einem Zwischenzähler**. Ein Verbraucher
+  kann jetzt hinter einem anderen Verbraucher hängen (Dialog „Hängt hinter
+  Zwischenzähler“, eine Ebene). Nichts wird doppelt gezählt: Verbrauch,
+  Grundlast und Autarkie rechnen mit dem Zwischenzähler, die Geräte
+  schlüsseln ihn auf. Was der Zähler mehr misst als seine Geräte, erscheint als
+  „… übrige Verbraucher“. Sankey, Verbraucheranteile, Diagramm und
+  Energiebericht zeigen die Geräte unter ihrem Zähler; zählen die Geräte mehr
+  als der Zähler, meldet der Status das. Entfernst du einen Zwischenzähler,
+  bleiben seine Geräte als eigene Verbraucher erhalten.
+- **Energiedashboard: Grundpreis** in Euro pro Monat, als Entität oder fester
+  Wert. Er wird tageweise anteilig berechnet, fließt ins Saldo ein und hat eine
+  eigene Kachel in der Kostenanalyse und im Bericht.
+- **Fehlende Preise sind sichtbar**: Fehlt für einen Teil des Zeitraums ein
+  Preis (Arbeitspreis, Einspeisevergütung, Grundpreis), zeigt die Kostenkachel
+  ein Warnsymbol, die betroffenen Kacheln sind gelb markiert, und ein Hinweis
+  nennt den Anteil. Der Bericht enthält eine entsprechende Zeile.
+- Beim Einrichten der Preise empfiehlt ein Hinweis eine Entität oder einen
+  Helfer: So bleiben frühere Monate bei einem Tarifwechsel richtig, ein fester
+  Wert gilt rückwirkend.
+
+### Geändert
+
+- Die Liste der Netzwerkspeicher beim externen Backup-Ziel ist einklappbar;
+  nicht eingebundene Ordner stehen getrennt darunter.
+- Preis-Entitäten, deren Lückenerkennung auf „Aus“ steht, gelten nicht mehr als
+  veraltet, weil sie sich nur bei Änderungen melden.
+
+### Behoben
+
+- Ein selten geänderter Preis-Helfer (z. B. „Zahl“) galt im laufenden Monat nur
+  ab heute; der Rest des Monats stand ohne Preis da. Der zuletzt gesetzte Preis
+  gilt jetzt auch für den Monatsanfang.
+
+---
+
+### English
+
+#### New
+
+- **Energy dashboard: devices behind a sub-meter**. A consumer can now be
+  attached behind another consumer (“Behind sub-meter” in the dialog,
+  one level). Nothing is counted twice: consumption, base load and
+  self-sufficiency use the sub-meter, and the devices break it down. Whatever
+  the meter measures beyond its devices appears as “… other consumers”. Sankey,
+  consumer shares, chart and energy report show the devices under their
+  meter; if the devices count more than the meter, the status says so. If you
+  remove a sub-meter, its devices are kept as separate consumers.
+- **Energy dashboard: standing charge** in euros per month, as an entity or a
+  fixed value. It is calculated pro rata per day, is part of the balance and has
+  its own tile in the cost analysis and in the report.
+- **Missing prices are visible**: If a price (energy price, feed-in tariff,
+  standing charge) is missing for part of the period, the cost tile shows a
+  warning symbol, the affected tiles are outlined in yellow, and a note gives
+  the share. The report has a matching line.
+- When setting up prices, a note recommends an entity or helper: earlier
+  months stay correct after a tariff change, while a fixed value applies
+  retroactively.
+
+#### Changed
+
+- The list of network shares for the external backup target can be collapsed;
+  shares that are not mounted are shown separately below.
+- Price entities whose gap detection is set to “Off” are no longer considered
+  stale, since they only report changes.
+
+#### Fixed
+
+- A rarely changing price helper (e.g. “Number”) only applied from today in the
+  current month; the rest of the month had no price. The last set price now
+  also applies to the start of the month.
+
+---
+
+## 1.4.0 - 2026-10-11
+
+### Neu
+
+- **Externes Backup-Ziel**: Jedes erfolgreiche Backup kann zusätzlich auf einen
+  Netzwerkspeicher (NFS oder SMB/CIFS, eingebunden in Home Assistant unter
+  Einstellungen → System → Speicher) oder einen WebDAV-Server (z. B. Nextcloud)
+  kopiert werden. Einrichtung auf der Backup-Seite in der Karte „Externes
+  Ziel“, mit „Verbindung testen“. Das lokale Backup bleibt erhalten.
+  Die Aufbewahrung am Ziel ist „wie lokal“ oder „Nie löschen“; gelöscht werden
+  nur Zeitarchiv-Backups. Backups, die noch nicht übertragen wurden, räumt die
+  lokale Aufbewahrung nicht weg. Das WebDAV-Passwort steht nur in den
+  Add-on-Optionen, damit es nicht in den Backups landet. Bei „Anzahl
+  behalten“ gibt es neu die Stufe 1.
+- Die Backup-Tabelle hat eine Spalte „Extern“ mit dem Stand der Übertragung.
+  Scheitert sie, erscheint eine Meldung; das lokale Backup bleibt gültig und
+  die Übertragung wird beim nächsten Backup nachgeholt.
+- **CSV-Export als Assistent**: Zeitraum und Auflösung (roh, Minute, Stunde,
+  Tag …) wählbar, mehrere Entitäten auf einmal. Bei mehreren Entitäten
+  entsteht automatisch ein ZIP mit einer CSV je Entität. Die Spalten bleiben
+  `timestamp`, `unix_ts` und `value`. Der Assistent schätzt die Zeilenzahl
+  vorab und warnt, wenn eine Datei zu groß würde.
+- **Zählerrückgänge**: Die Tabelle ist übersichtlicher. „Fehlwerte markieren“
+  zeigt vor der Bestätigung, welche Werte betroffen sind und was passiert;
+  danach nennt eine Meldung die markierten Werte mit Links zum Reiter
+  „Markiert“ und lässt sich mit „OK“ schließen. Unter der Tabelle steht, wie
+  viele Werte insgesamt markiert sind.
+
+### Geändert
+
+- Die Liste „Zähler mit erlaubten Rückgängen“ ist wie die Tabelle gestaltet.
+- Doku: Betriebsanleitung zum externen Backup-Ziel, Hinweis auf den Host
+  `127.0.0.1`, falls `localhost` nicht erreichbar ist.
+
+---
+
+### English
+
+#### New
+
+- **External backup target**: Every successful backup can additionally be
+  copied to network storage (NFS or SMB/CIFS, mounted in Home Assistant under
+  Settings → System → Storage) or a WebDAV server (e.g. Nextcloud). Set it up
+  on the Backup page in the “External target” card, with “Test connection”.
+  The local backup is kept. Retention at the target is “same as local” or
+  “Never delete”; only Zeitarchiv backups are ever deleted. Backups that have
+  not been transferred yet are not removed by local retention. The WebDAV
+  password is only set in the add-on options so that it does not end up in
+  the backups. “Number to keep” has a new step of 1.
+- The backup table has an “External” column showing the transfer status. If a
+  transfer fails, a notice appears; the local backup stays valid and the
+  transfer is retried with the next backup.
+- **CSV export as a wizard**: choose the time range and resolution (raw,
+  minute, hour, day …), and export several entities at once. With several
+  entities a ZIP with one CSV per entity is created automatically. The columns
+  stay `timestamp`, `unix_ts` and `value`. The wizard estimates the row count
+  beforehand and warns if a file would be too large.
+- **Counter decreases**: The table is clearer. “Mark bad values” shows
+  which values are affected and what will happen before you confirm; afterwards
+  a message lists the marked values with links to the “Marked” tab and can be
+  dismissed with “OK”. Below the table you see how many values are marked in
+  total.
+
+#### Changed
+
+- The “Counters with allowed decreases” list is styled like the table.
+- Docs: operations guide for the external backup target, a note about using
+  host `127.0.0.1` if `localhost` is not reachable.
+
+## 1.3.0 - 2026-10-07
+
+### Neu
+
+- Zahlen- und Datumsformat als eigene Einstellung (Darstellung): Deutsch,
+  English UK oder English US, Standard „Automatisch“ nach dem Browser.
+  Das Format ist von der Sprache getrennt und gilt für Zahlen, Daten und
+  Uhrzeiten (en-US mit 12-Stunden-Uhr) in Oberfläche, Charts und Tabellen.
+- Währung als eigene Einstellung (Darstellung): Automatisch aus Home
+  Assistant, Euro, Pfund, US-Dollar oder Schweizer Franken. Sie bestimmt
+  Symbol, Stellung und Untereinheit (Cent, Pence, Rappen) im Energie-
+  dashboard. Es wird nichts umgerechnet — bei einem Wechsel trägst du deine
+  Preise neu ein.
+- Gespeicherte Meldungen (z. B. Hinweise, Bereinigungs- und Backup-Texte)
+  erscheinen in der aktuellen Anzeigesprache. Hintergrundaufgaben nutzen die
+  eingestellte bzw. zuletzt gesehene Sprache.
+- Demo-Daten auf Englisch: Das Skript (`--language en`) und der Demo-Modus
+  erzeugen englische Namen und Entity-IDs. Das Standard-Dashboard „Übersicht“
+  erscheint bei englischer Oberfläche als „Overview“.
+- Add-on-Konfiguration und Port-Beschreibung sind auf Deutsch und Englisch
+  übersetzt. Der Home-Assistant-Integration wird die HA-Sprache an die API
+  mitgegeben, sodass Fehlertexte in dieser Sprache kommen.
+- Laufzeit- und Altersangaben („3 Tage, 4 Std.“) sind übersetzt.
+
+### Geändert
+
+- Die Sprache steht standardmäßig auf „Automatisch (Browser)“, Rückfall
+  Deutsch. Auch bestehende Installationen ohne gespeicherte Auswahl folgen
+  damit dem Browser.
+- Fehlertexte der Einstellungsrouten sind einheitlich und folgen der Sprache.
+- Charts, die nur aus Schaltern bestehen, öffnen standardmäßig als Zeitstrahl;
+  beim Zeitraumwechsel bleiben die Rohwerte erhalten.
+
+### Behoben
+
+- Zeitzone: „Wert hinzufügen“ und „Verdichten“ rechnen in der Zeitzone des
+  Servers.
+- Sankey-Legende stürzte bei gleichnamigen Einträgen ab.
+
+---
+
+### English
+
+#### New
+
+- Number and date format as a separate setting (Appearance): German,
+  English UK or English US, default “Automatic” following the browser.
+  The format is independent of the language and applies to numbers, dates
+  and times (en-US with a 12-hour clock) in the interface, charts and tables.
+- Currency as a separate setting (Appearance): automatic from Home
+  Assistant, euro, pound, US dollar or Swiss franc. It determines symbol,
+  position and subunit (cent, pence, rappen) in the energy dashboard. Nothing
+  is converted — when you switch, you enter your prices again.
+- Stored notices (e.g. hints, cleanup and backup texts) appear in the current
+  display language. Background tasks use the configured or last seen language.
+- Demo data in English: the script (`--language en`) and demo mode generate
+  English names and entity IDs. The default dashboard “Übersicht” shows as
+  “Overview” in the English interface.
+- Add-on configuration and port descriptions are translated into German and
+  English. The Home Assistant integration passes the HA language to the API,
+  so error messages come in that language.
+- Uptime and age values (“3 days, 4 h”) are translated.
+
+#### Changed
+
+- The language now defaults to “Automatic (browser)”, falling back to German.
+  Existing installations without a stored choice follow the browser as well.
+- Error texts of the settings routes are consistent and follow the language.
+- Charts consisting only of switches open as a timeline by default; raw values
+  are kept when changing the time range.
+
+#### Fixed
+
+- Time zone: “Add value” and “Compact” calculate in the server’s time zone.
+- The Sankey legend crashed on entries with identical names.
+
+## 1.2.0 - 2026-10-06
+
+### Neu
+
+- Englische Oberfläche: Die gesamte App gibt es jetzt auch auf Englisch.
+  Die Sprache wählst du in den Einstellungen („Automatisch“, Deutsch oder
+  Englisch); Standard bleibt Deutsch. Die Dokumentation liegt ebenfalls auf
+  Englisch vor.
+- Zählerrückgänge: Fällt ein Zählerstand, meldet die App das und ordnet es
+  ein („kehrt zurück“ = wahrscheinlich Fehlwert, „bleibt niedrig“ =
+  wahrscheinlich Zählerwechsel). Housekeeping hat dazu einen eigenen
+  Abschnitt, und die Bereinigungsseite zeigt die Einordnung am Wert. Fehlwerte
+  lassen sich in Housekeeping gesammelt zur Löschung markieren und wieder
+  zurücknehmen.
+- Zähler, die sich planmäßig zurücksetzen (z. B. täglich), lassen sich in der
+  Konfiguration auf „Erlauben“ stellen: Ihre Rückgänge werden dann nicht mehr
+  beanstandet. Bei „Melden“ gibt es zusätzlich die Regel „Fehlwerte
+  automatisch markieren“ (standardmäßig aus), die zurückkehrende Rückgänge
+  stündlich selbst markiert. Wiederholen sich Fehlwerte über mehrere Tage,
+  weist die Glocke auf ein Problem an der Quelle hin.
+- Reiter „Markiert“: Alle zur Löschung markierten Werte einer Entität lassen
+  sich ansehen, einzeln oder als Charge zurücknehmen und endgültig entfernen.
+  Jede Charge zeigt ihre Herkunft (manuell, Duplikate, Wiederholungen,
+  Sammelaktion, Regel) und, wenn die automatische Bereinigung an ist, wann
+  sie entfernt wird. Ausstehende Bereinigungen stehen auch in der Glocke, im
+  Banner und in der Entitätenliste.
+- Reiter „Verlauf“: Zeigt je Entität, was geändert wurde (markiert,
+  zurückgenommen, korrigiert mit altem und neuem Wert, hinzugefügt,
+  entfernt, verdichtet), nach Tagen und filterbar.
+- Charts: Beim Vergleich mit dem Vorjahr oder der Vorperiode zeigt die
+  Legende zusätzlich die Summe „bis zum gleichen Tag“. Der Legenden-Stil
+  „Tabelle“ funktioniert jetzt auch beim Jahresvergleich mit Laufsumme, und
+  die Tabelle bricht auf dem Smartphone nicht mehr mitten in Zahl und Einheit.
+- Kachel „Status“: Neue Kachel in der Zahlenreihe der Übersicht und als
+  Dashboard-Kachel (Größe 2×2 oder 1×1). Sie zeigt die inaktiven Entitäten
+  sowie offene Zählerrückgänge, doppelte Zeitstempel und markierte Werte, mit
+  Link nach Housekeeping. Das „+“-Popup zum Hinzufügen von Kacheln ist
+  breiter, hat eine feste Höhe und einen Reiter „Weitere“.
+- Import: VictoriaMetrics als vierter Importreiter für einen einmaligen
+  Backfill.
+- Tipps: Neue Tipps zu Verlauf, automatischer Bereinigung und Legenden-Tabelle;
+  der Tipp zu Zählerrückgängen beschreibt jetzt die Meldung.
+
+### Behoben
+
+- Vorjahresvergleich und „Gleicher Zeitpunkt“ zählten angeschnittene
+  Zeiträume komplett mit (z. B. enthielt „2025 bis 06.10.“ den ganzen
+  Oktober). Die Werte enden jetzt am gewählten Tag.
+
+---
+
+### English
+
+#### New
+
+- English interface: The whole app is now also available in English. Choose
+  the language in the settings (“Automatic”, German or English); the default
+  stays German. The documentation is available in English as well.
+- Counter decreases: When a counter reading drops, the app reports it and
+  classifies it (“returns” = probably a bad value, “stays low” = probably a
+  meter replacement). Housekeeping has its own section for it, and the
+  cleanup page shows the classification on the value. Bad values can be
+  marked for deletion in bulk in Housekeeping and undone again.
+- Counters that reset on a schedule (e.g. daily) can be set to “Allow” in the
+  configuration, so their decreases are no longer flagged. With “Report”
+  there is also the rule “Mark bad values automatically” (off by default),
+  which marks returning decreases itself every hour. If bad values repeat
+  over several days, the notification bell points to a problem at the
+  source.
+- “Marked” tab: All values marked for deletion for an entity can be viewed,
+  undone individually or as a batch, and removed permanently. Each batch
+  shows its origin (manual, duplicates, repetitions, bulk action, rule) and,
+  if automatic cleanup is on, when it will be removed. Pending cleanups also
+  appear in the bell, the banner and the entity list.
+- “History” tab: Shows per entity what was changed (marked, undone,
+  corrected with old and new value, added, removed, compacted), grouped by
+  day and filterable.
+- Charts: When comparing with the previous year or period, the legend now
+  also shows the total “up to the same day”. The legend style “Table” now
+  also works for the year comparison with running total, and the table no
+  longer breaks between number and unit on a smartphone.
+- “Status” tile: A new tile in the overview’s row of figures and as a
+  dashboard tile (size 2×2 or 1×1). It shows the inactive entities as well
+  as open counter decreases, duplicate timestamps and marked values, linking
+  to Housekeeping. The “+” popup for adding tiles is wider, has a fixed
+  height and a “More” tab.
+- Import: VictoriaMetrics as a fourth import tab for a one-off backfill.
+- Tips: New tips on history, automatic cleanup and the legend table; the tip
+  on counter decreases now describes the notification.
+
+#### Fixed
+
+- The previous-year comparison and “Same point in time” counted partial
+  periods in full (e.g. “2025 up to 06.10.” included the whole of October).
+  The values now end on the chosen day.
+
+## 1.1.0 - 2026-10-06
+
+### Neu
+
+- Werte-Kachel: Wann eine Kachel als „veraltet" gelb bzw. rot umrandet wird,
+  lässt sich jetzt je Kachel einstellen (Standard, Täglich, Selten oder Aus).
+  Tageswerte und selten meldende Zähler stehen dadurch nicht mehr dauerhaft
+  auf Rot. Bestehende Kacheln bleiben auf „Standard".
+
+### Behoben
+
+- Zu viele offene Dateien: Bei längerem Betrieb konnte die App nach einigen
+  Stunden keine Dateien mehr öffnen („Too many open files"), die Oberfläche
+  und die Annahme neuer Werte fielen aus. Die Ursache ist behoben (Dank an
+  dnlbbrg).
+- Wartungsplaner: Eine Entität mit sehr vielen Rohwerten im Monat ließ die
+  Duplikat-Prüfung scheitern, wodurch auch Backup-Zeitplan, Aufbewahrung,
+  Kompaktierung und automatische Löschung nicht mehr liefen. Die Prüfung
+  kommt jetzt mit beliebig vielen Werten zurecht, und ein fehlschlagender
+  Wartungsschritt blockiert die übrigen nicht mehr. Wiederholte Fehler
+  werden im Log höchstens stündlich gemeldet. Wer 1.0.0 mit sehr dichten
+  Entitäten betrieben hat, sollte prüfen, ob in der Zwischenzeit Backups
+  oder Löschläufe ausgeblieben sind.
+- Zeiträume und Beschriftungen stimmen jetzt auch, wenn der Browser in einer
+  anderen Zeitzone als Home Assistant läuft: Im Energiedashboard und in
+  Tabellen mit Jahres- oder Monatsvergleich erschien sonst kurz nach
+  Periodenbeginn der Vormonat bzw. das Vorjahr.
+- Gestapelte Balken: Beginnen die Datenreihen in verschiedenen Monaten oder
+  Jahren, saßen die späteren Balken auf dem falschen Zeitraum.
+- Tabellen-Kachel: Zeilenbeschriftungen wurden bei schmaler Kachel Buchstabe
+  für Buchstabe umgebrochen. Sie brechen jetzt nur noch an Wortgrenzen, die
+  Tabelle scrollt bei Bedarf waagerecht.
+- Tabellen-Kachel: Ausgeblendete Zeilen werden wie im Editor mitgerechnet,
+  sodass Summen und Anteile übereinstimmen. Eine Division durch 0 in einer
+  Formel zeigt „–" statt „Fehler" (Dank an dnlbbrg).
+- Zähler: Der Bezugswert eines Monats wird auch über Monate ohne Archivdatei
+  korrekt gefunden. Bereits berechnete Monatswerte korrigieren sich erst nach
+  einem Neuaufbau der Rollups der betroffenen Zähler (Dank an dnlbbrg).
+- Das Favicon fehlte im Container-Image.
+
+### Geändert
+
+- Healthcheck-Zeile im Log widerspricht sich nicht mehr selbst.
+
 ## 1.0.0 - 2026-09-22
 
 ### Neu

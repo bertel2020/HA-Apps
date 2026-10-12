@@ -13,18 +13,18 @@ die meiste Zeit deaktiviert — seine Funktion liegt jetzt als Zweitfunktion auf
 der schon aktiven Zeitraum-Stufe, dieselbe Geste wie im Energiedashboard.
 """
 
-from _paths import APP, page_text
+from _paths import APP, page_text, template_text
 
 
 ENTITY = page_text("entity_detail.html")
 # Für Strukturaussagen nur das Template: page_text() hängt CSS und JS an, in
 # denen dieselben Namen (compareMenuOpen …) erneut vorkommen.
-TEMPLATE = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
+TEMPLATE = template_text("entity_detail.html")
 # energiedashboard.js liegt unter static/js/ (nicht static/js/pages/) und
 # wird deshalb nicht von page_text() eingesammelt.
 ENERGIE = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
 EDITOR = page_text("chart_editor.html")
-EDITOR_TEMPLATE = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+EDITOR_TEMPLATE = template_text("chart_editor.html")
 DETAIL_JS = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8")
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 APP_CSS = (APP / "static/css/app.css").read_text(encoding="utf-8")
@@ -53,7 +53,7 @@ def test_the_second_function_is_discoverable() -> None:
     """Eine Zweitfunktion ohne Hinweis ist keine. Der title erscheint nur,
     solange es etwas zu tun gibt — an einer Ansicht, die ohnehin auf „jetzt"
     steht, wäre er eine Lüge."""
-    assert "'Zurück zur laufenden Periode' : ''" in ENTITY
+    assert "t('Zurück zur laufenden Periode') : ''" in ENTITY
 
 
 def test_the_energy_dashboard_has_the_same_gesture() -> None:

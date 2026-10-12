@@ -17,27 +17,27 @@
   }
 
   async function hkDeleteChart(id, btn) {
-    if (!await appConfirm('Dieses Chart wirklich löschen?', {danger: true})) return;
+    if (!await appConfirm(t('Dieses Chart wirklich löschen?'), {danger: true})) return;
     btn.disabled = true;
     fetch(`${BASE}/charts/${id}/delete`, {method: 'POST'}).then(r => {
       if (r.ok) {
         hkRemoveRow(btn);
       } else {
         btn.disabled = false;
-        appAlert('Löschen fehlgeschlagen.');
+        appAlert(t('Löschen fehlgeschlagen.'));
       }
-    }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
+    }).catch(() => { btn.disabled = false; appAlert(t('Löschen fehlgeschlagen.')); });
   }
 
   async function hkDeleteTable(id, btn) {
-    if (!await appConfirm('Diese Tabelle wirklich löschen?', {danger: true})) return;
+    if (!await appConfirm(t('Diese Tabelle wirklich löschen?'), {danger: true})) return;
     btn.disabled = true;
     fetch(`${BASE}/tables/${id}/delete`, {method: 'POST'}).then(r => {
       if (r.ok) {
         hkRemoveRow(btn);
       } else {
         btn.disabled = false;
-        appAlert('Löschen fehlgeschlagen.');
+        appAlert(t('Löschen fehlgeschlagen.'));
       }
-    }).catch(() => { btn.disabled = false; appAlert('Löschen fehlgeschlagen.'); });
+    }).catch(() => { btn.disabled = false; appAlert(t('Löschen fehlgeschlagen.')); });
   }

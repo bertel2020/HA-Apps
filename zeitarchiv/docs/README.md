@@ -1,5 +1,7 @@
 # Zeitarchiv — Dokumentation
 
+*[English version](en/README.md)*
+
 Für einen kurzen Überblick (Installation, Funktionsliste) siehe die
 [App-README](../README.md).
 

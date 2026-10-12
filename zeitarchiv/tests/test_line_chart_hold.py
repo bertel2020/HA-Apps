@@ -1,7 +1,7 @@
 """Regressionstests für geglättete Linien ohne künstliche Randlücken."""
 
 
-from _paths import APP, DOCS, page_text
+from _paths import APP, DOCS, page_text, template_text
 
 
 ENTITY = page_text("entity_detail.html")
@@ -30,7 +30,7 @@ def test_line_charts_do_not_mix_smoothing_with_step_mode() -> None:
     assert ".step = 'end'" not in DASHBOARD
 
 
-SETTINGS_FORM = (APP / "templates/_settings_darstellung_form.html").read_text(encoding="utf-8")
+SETTINGS_FORM = template_text("_settings_darstellung_form.html")
 
 
 def test_the_rolling_window_switch_is_not_described_as_a_drawing_option() -> None:
@@ -68,7 +68,7 @@ def test_the_chart_options_menu_uses_the_same_word_as_the_settings_page() -> Non
     Kachelmenü heißen alle "Rollierend". Vorher hieß dasselbe an zwei Stellen
     "Kontinuierlich" — das Handbuch behalf sich schon mit dem Doppelnamen
     "Kontinuierlich/Rollierend"."""
-    tile_menu = (APP / "templates/_dashboard_tile_menu.html").read_text(encoding="utf-8")
+    tile_menu = template_text("_dashboard_tile_menu.html")
     guide = (DOCS / "user-guide.md").read_text(encoding="utf-8")
     assert ">Rollierend</span>" in ENTITY
     assert "Rollierend" in tile_menu

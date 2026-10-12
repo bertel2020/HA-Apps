@@ -1,5 +1,5 @@
 name: "Zeitarchiv"
-version: "1.0.0"
+version: "1.5.0"
 slug: "zeitarchiv"
 description: "Kompaktes Zeitreihen-Archiv für Home Assistant"
 url: "https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv"
@@ -11,6 +11,15 @@ arch:
   - amd64
   - aarch64
 init: false
+# Nur für das externe Backup-Ziel: Netzwerkspeicher, die Home Assistant mit der
+# Verwendung „Medien“ oder „Share“ einbindet, erscheinen so unter /media bzw.
+# /share (storage/backup_external.py). Geschrieben wird nur in den gewählten
+# Ordner.
+map:
+  - type: media
+    read_only: false
+  - type: share
+    read_only: false
 startup: application
 boot: auto
 stage: stable
@@ -29,9 +38,11 @@ panel_icon: "mdi:database-clock"
 options:
   timezone: "Europe/Berlin"
   demo_mode: false
+  webdav_password: ""
 schema:
   timezone: "match(^[A-Za-z][A-Za-z0-9._+-]*(/[A-Za-z0-9][A-Za-z0-9._+-]*)*$)"
   demo_mode: "bool"
+  webdav_password: "password?"
 ports:
   8127/tcp: 8127
 ports_description:

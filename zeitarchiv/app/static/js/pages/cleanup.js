@@ -13,6 +13,27 @@
         modeField.value = newMode;
         modeField.dispatchEvent(new Event('change', {bubbles: true}));
       }
+      // "Markiert" lädt seine Liste bei JEDEM Öffnen frisch: dort wird zurückgenommen,
+      // und die Zahlen sollen stimmen, wenn man aus "Bereinigen" hierher wechselt.
+      if (tab === 'marked') htmx.trigger(document.getElementById('marked-panel'), 'load-marked');
+      // "Verlauf" ebenso: jedes Öffnen zeigt den aktuellen Stand der Protokolleinträge.
+      if (tab === 'history') htmx.trigger(document.getElementById('history-panel'), 'load-history');
+    }
+
+    // Auswahl-Zähler im Reiter "Markiert": die Zeilen kommen per htmx (immer
+    // wieder neu), deshalb ein delegierter Listener statt Handlern an den Kästchen.
+    document.addEventListener('change', (e) => {
+      if (!e.target.classList || !e.target.classList.contains('marked-sel')) return;
+      const n = document.querySelectorAll('.marked-sel:checked').length;
+      document.getElementById('marked-sel-count').textContent = String(n);
+      document.getElementById('marked-undo-selection').disabled = n === 0;
+    });
+
+    // Direkteinstieg …/cleanup?tab=marked (z. B. aus dem Link "Alle markierten Werte
+    // ansehen"): den Reiter gleich öffnen.
+    const directTab = new URLSearchParams(location.search).get('tab');
+    if (directTab === 'marked' || directTab === 'history') {
+      document.addEventListener('DOMContentLoaded', () => setTab(directTab));
     }
 
     async function submitAddValue() {
@@ -23,14 +44,16 @@
       statusEl.textContent = '';
       if (!dtStr || valueStr === '') {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = 'Bitte Datum/Uhrzeit und Wert angeben.';
+        statusEl.textContent = t('Bitte Datum/Uhrzeit und Wert angeben.');
         return;
       }
-      const ts = new Date(dtStr).getTime() / 1000;
+      // Die Uhrzeit des Feldes gilt in der Zeitzone des Servers, nicht des Browsers.
+      const [, y, mo, d, h, mi, sec] = dtStr.match(/^(\d+)-(\d+)-(\d+)T(\d+):(\d+)(?::(\d+))?/).map(Number);
+      const ts = ServerTime.toEpoch(y, mo, d, h, mi, sec || 0);
       const value = NumberFormat.parse(valueStr);
       if (Number.isNaN(value)) {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = 'Ungültiger Wert.';
+        statusEl.textContent = t('Ungültiger Wert.');
         return;
       }
       try {
@@ -40,15 +63,15 @@
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           statusEl.className = 'add-value-status err';
-          statusEl.textContent = err.detail || 'Hinzufügen fehlgeschlagen.';
+          statusEl.textContent = err.detail || t('Hinzufügen fehlgeschlagen.');
           return;
         }
         statusEl.className = 'add-value-status ok';
-        statusEl.textContent = '✓ Wert hinzugefügt.';
+        statusEl.textContent = t('✓ Wert hinzugefügt.');
         document.getElementById('add-value').value = '';
       } catch (e) {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = 'Hinzufügen fehlgeschlagen.';
+        statusEl.textContent = t('Hinzufügen fehlgeschlagen.');
       }
     }
 
@@ -68,7 +91,7 @@
       previewEl.innerHTML = '';
       if (!startStr || !endStr) {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = 'Bitte Zeitraum angeben.';
+        statusEl.textContent = t('Bitte Zeitraum angeben.');
         return;
       }
       // Verdichtung arbeitet ausschließlich auf ganzen Kalendermonaten
@@ -78,11 +101,12 @@
       // verdichtet werden.
       const [startYear, startMonth] = startStr.split('-').map(Number);
       const [endYear, endMonth] = endStr.split('-').map(Number);
-      const startTs = new Date(startYear, startMonth - 1, 1).getTime() / 1000;
-      const endTs = new Date(endYear, endMonth, 0, 23, 59, 59).getTime() / 1000;
+      // Monatsgrenzen in der Serverzone — dort liegen auch die Monatsarchive.
+      const startTs = ServerTime.toEpoch(startYear, startMonth, 1);
+      const endTs = ServerTime.toEpoch(endYear, endMonth + 1, 0, 23, 59, 59);
       if (endTs <= startTs) {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = '"Bis" muss nach "Von" liegen.';
+        statusEl.textContent = t('"Bis" muss nach "Von" liegen.');
         return;
       }
       try {
@@ -93,37 +117,37 @@
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           statusEl.className = 'add-value-status err';
-          statusEl.textContent = err.detail || 'Vorschau fehlgeschlagen.';
+          statusEl.textContent = err.detail || t('Vorschau fehlgeschlagen.');
           return;
         }
         const data = await res.json();
         if (data.months === 0) {
           previewEl.innerHTML =
-            '<p class="hint" style="margin-top:12px;">Keine bereits archivierten, noch nicht (bzw. bei Zählern: nicht gröber) verdichteten Monate in diesem Zeitraum.</p>';
+            '<p class="hint" style="margin-top:12px;">' + t('Keine bereits archivierten, noch nicht (bzw. bei Zählern: nicht gröber) verdichteten Monate in diesem Zeitraum.') + '</p>';
           return;
         }
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn btn-danger';
-        btn.textContent = 'Verdichten — nicht umkehrbar';
+        btn.textContent = t('Verdichten — nicht umkehrbar');
         btn.onclick = () => submitCompact(startTs, endTs, target);
         previewEl.innerHTML =
           '<div class="stat-row" style="margin:12px 0;">' +
-          `<div class="stat"><div class="label">Zeilen aktuell</div><div class="value">${data.rows_before}</div></div>` +
-          `<div class="stat"><div class="label">Zeilen danach (geschätzt)</div><div class="value">${data.rows_after}</div></div>` +
-          `<div class="stat"><div class="label">Monate</div><div class="value">${data.months}</div></div>` +
+          `<div class="stat"><div class="label">${t('Zeilen aktuell')}</div><div class="value">${data.rows_before}</div></div>` +
+          `<div class="stat"><div class="label">${t('Zeilen danach (geschätzt)')}</div><div class="value">${data.rows_after}</div></div>` +
+          `<div class="stat"><div class="label">${t('Monate')}</div><div class="value">${data.months}</div></div>` +
           '</div>';
         previewEl.appendChild(btn);
       } catch (e) {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = 'Vorschau fehlgeschlagen.';
+        statusEl.textContent = t('Vorschau fehlgeschlagen.');
       }
     }
 
     async function submitCompact(startTs, endTs, target) {
       const statusEl = document.getElementById('compact-value-status');
       const ok = await appConfirm(
-        'Werte im gewählten Zeitraum jetzt verdichten? Das lässt sich nicht rückgängig machen.',
+        t('Werte im gewählten Zeitraum jetzt verdichten? Das lässt sich nicht rückgängig machen.'),
         {danger: true}
       );
       if (!ok) return;
@@ -137,17 +161,17 @@
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           statusEl.className = 'add-value-status err';
-          statusEl.textContent = err.detail || 'Verdichten fehlgeschlagen.';
+          statusEl.textContent = err.detail || t('Verdichten fehlgeschlagen.');
           return;
         }
         const data = await res.json();
         statusEl.className = 'add-value-status ok';
         statusEl.textContent =
-          `✓ ${data.months_compacted.length} Monat(e) verdichtet, ${data.rows_before} → ${data.rows_after} Zeilen.`;
+          t('✓ {months} Monat(e) verdichtet, {before} → {after} Zeilen.', {months: data.months_compacted.length, before: data.rows_before, after: data.rows_after});
         document.getElementById('compact-preview').innerHTML = '';
       } catch (e) {
         statusEl.className = 'add-value-status err';
-        statusEl.textContent = 'Verdichten fehlgeschlagen.';
+        statusEl.textContent = t('Verdichten fehlgeschlagen.');
       }
     }
 
@@ -176,13 +200,13 @@
       const confirm = document.createElement('button');
       confirm.type = 'button';
       confirm.className = 'correct-confirm';
-      confirm.title = 'Speichern';
+      confirm.title = t('Speichern');
       confirm.textContent = '✓';
       confirm.addEventListener('click', () => confirmCorrect(confirm));
       const cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'correct-cancel';
-      cancel.title = 'Abbrechen';
+      cancel.title = t('Abbrechen');
       cancel.textContent = '✗';
       cancel.addEventListener('click', () => htmx.trigger('#controls', 'change'));
       wrapper.append(input, confirm, cancel);
@@ -201,10 +225,10 @@
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ts: parseFloat(cell.dataset.ts), old_value: parseFloat(cell.dataset.oldValue), new_value: newValue}),
         });
-        if (!res.ok) { appAlert('Korrigieren fehlgeschlagen.'); btn.disabled = false; return; }
+        if (!res.ok) { appAlert(t('Korrigieren fehlgeschlagen.')); btn.disabled = false; return; }
         htmx.trigger('#controls', 'change');
       } catch (e) {
-        appAlert('Korrigieren fehlgeschlagen.');
+        appAlert(t('Korrigieren fehlgeschlagen.'));
         btn.disabled = false;
       }
     }

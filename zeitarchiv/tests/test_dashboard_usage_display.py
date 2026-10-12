@@ -8,13 +8,13 @@ from pathlib import Path
 
 from app.storage.index import Index
 
-from _paths import APP
+from _paths import template_text
 
 
 
-PARTIAL = (APP / "templates/_dashboard_usage.html").read_text(encoding="utf-8")
-CHART_EDITOR = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
-TABLE_EDITOR = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+PARTIAL = template_text("_dashboard_usage.html")
+CHART_EDITOR = template_text("chart_editor.html")
+TABLE_EDITOR = template_text("table_editor.html")
 
 
 def test_usage_partial_follows_app_chip_and_popover_patterns() -> None:

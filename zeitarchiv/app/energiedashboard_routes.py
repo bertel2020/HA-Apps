@@ -17,6 +17,8 @@ siehe rollup.py) — kein eigener Subtraktions-/Aggregations-Code."""
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import bisect
 import calendar
 import json
@@ -31,7 +33,9 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import formats
 from .formatting import entity_display_name
+from .limits import MAX_RAW_QUERY_POINTS
 from .progress import JobProgress
 from .storage import cleanup as cleanup_mod
 from .storage import query as query_mod
@@ -57,7 +61,7 @@ SETTING_HOURLY_BACKFILL_PENDING = "energiedashboard_hourly_backfill_pending"
 #: Entität warten — sichtbar nur hier, denn ausgelöst hat ihn niemand
 #: absichtlich: er hängt am Speichern der Energiedashboard-Konfiguration und
 #: läuft erst Minuten später im Wartungsplaner an.
-_backfill_progress = JobProgress("hourly-backfill", label="Stunden-Rollup")
+_backfill_progress = JobProgress("hourly-backfill", label=N_("Stunden-Rollup"))
 # Kurzlebiger Cache für den Speicher-Wirkungsgrad (siehe _speicher_efficiency).
 # Sechs Stunden: der Wert wird über die gesamte Historie gebildet und bewegt
 # sich innerhalb eines Tages nicht sichtbar, ein Nutzer soll eine korrigierte
@@ -66,14 +70,14 @@ _backfill_progress = JobProgress("hourly-backfill", label="Stunden-Rollup")
 SETTING_EFFICIENCY_CACHE = "energiedashboard_speicher_efficiency_cache"
 EFFICIENCY_CACHE_TTL_SECONDS = 6 * 60 * 60
 
-RANGE_LABELS = {"hour": "Stunde", "day": "Tag", "month": "Monat", "year": "Jahr"}
+RANGE_LABELS = {"hour": N_("Stunde"), "day": N_("Tag"), "month": N_("Monat"), "year": N_("Jahr")}
 RANGE_KEYS = tuple(RANGE_LABELS)
 # Eigene Kopie statt Import von main.py._MONTH_NAMES_DE — dort modul-privat
 # (Unterstrich-Präfix), und eine einzelne kurze Konstante rechtfertigt keine
 # Kopplung zwischen den Modulen.
 _MONTH_NAMES_DE = (
-    "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
+    N_("Januar"), N_("Februar"), N_("März"), N_("April"), N_("Mai"), N_("Juni"),
+    N_("Juli"), N_("August"), N_("September"), N_("Oktober"), N_("November"), N_("Dezember"),
 )
 # Energiebericht (siehe /energiedashboard/report): nur für Monat/Jahr
 # sinnvoll — Stunde/Tag sind zu kurze Zeiträume für einen druckbaren
@@ -86,7 +90,7 @@ REPORT_RANGE_KEYS = ("month", "year")
 # Labels bewusst weiter "Vortag/Vormonat/Vorjahr" (nicht "letzte 24 Std."
 # o. ä.): auf ±1 Tag/Monat/Jahr genau ist das rollierende Fenster ohnehin
 # dasselbe, nur ohne Kalendergrenze als Bezugspunkt.
-COMPARE_LABELS = {"hour": "Vorstunde", "day": "Vortag", "month": "Vormonat", "year": "Vorjahr"}
+COMPARE_LABELS = {"hour": N_("Vorstunde"), "day": N_("Vortag"), "month": N_("Vormonat"), "year": N_("Vorjahr")}
 
 # Ab diesem Sensor-Alter gilt ein Wert als "seit Längerem keine neuen Daten"
 # und fließt als Warnung in die Bilanz-Kachel ein — unabhängig vom gerade
@@ -162,7 +166,7 @@ _WEEK_GROUP_STARTS = (1, 8, 15, 22, 29)
 _OUTAGE_EPSILON_KWH = 0.01
 
 
-DEFAULT_HUB_NAME = "Haus"
+DEFAULT_HUB_NAME = N_("Haus")
 
 # Auffälligkeiten (Schwellenwert-Färbung): bewusst eine EIGENE Leiter und
 # ausdrücklich NICHT die Ausreißer-Schwelle je Entität (OUTLIER_THRESHOLD_
@@ -170,7 +174,7 @@ DEFAULT_HUB_NAME = "Haus"
 # dem Schnitt der Vorperioden — ein Prozentsatz ist dafür die richtige Größe,
 # weil beide Seiten dieselbe Größenordnung haben. Die Ausreißer-Erkennung sucht
 # dagegen unplausible EINZELwerte und misst deshalb in Vielfachen des Üblichen.
-ANOMALIE_SCHWELLE_LABELS = {"off": "Aus", "25": "25 %", "50": "50 %", "100": "100 %"}
+ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100": "100 %"}
 # Anzahl vorheriger Perioden, deren Schnitt als "üblicher" Vergleichswert
 # dient — mehrere statt nur der einen Vorperiode, damit ein Gerät, das
 # einfach nicht jeden Tag läuft (z. B. Waschmaschine), nicht bei jedem
@@ -345,7 +349,7 @@ def process_pending_hourly_backfill(data_dir: Path, index: Index, tz: ZoneInfo, 
         # zeigte die Kopfleiste bei jedem 30s-Takt kurz einen Vorgang an, auch
         # wenn nichts zu tun war oder die Rolle inzwischen wieder weg ist.
         with _backfill_progress.track():
-            _backfill_progress.set_phase("Stunden-Rollup wird nachgebaut")
+            _backfill_progress.set_phase(tr("Stunden-Rollup wird nachgebaut"))
             _backfill_progress.set_detail(entity_id)
             rollup_mod.rebuild_entity_rollups(data_dir, entity_id, "counter", tz, hourly_rollup=True)
 
@@ -373,6 +377,47 @@ def _is_enabled(index: Index) -> bool:
     return index.get_setting(SETTING_ENABLED, "0") == "1"
 
 
+def _check_cascade(rows: list[dict]) -> None:
+    """Ablehnen, was die Oberfläche gar nicht anbietet: Zeiger auf sich selbst, auf einen
+    unbekannten Verbraucher oder auf ein Gerät, das selbst hinter einem Zwischenzähler hängt."""
+    ids = {row["entity_id"] for row in rows}
+    parent_of = {row["entity_id"]: row["parent"] for row in rows if row.get("parent")}
+    for entity_id, parent in parent_of.items():
+        if parent == entity_id:
+            raise HTTPException(status_code=422, detail=tr("Ein Verbraucher kann nicht hinter sich selbst hängen."))
+        if parent not in ids:
+            raise HTTPException(status_code=422, detail=tr("Der Zwischenzähler „{name}“ ist kein Verbraucher in dieser Liste.", name=parent))
+        if parent in parent_of:
+            raise HTTPException(
+                status_code=422,
+                detail=tr("„{name}“ hängt selbst hinter einem Zwischenzähler und kann keiner sein. Es ist nur eine Ebene möglich.", name=parent),
+            )
+
+
+def cascade_structure(rows: list[dict]) -> tuple[dict[str, list[dict]], set[str]]:
+    """Zwischenzähler-Kaskade der Verbraucher: (Kinder je Zwischenzähler, Entity-IDs der Kinder).
+
+    Ein Verbraucher kann über ``parent`` (Entity-ID eines anderen Verbrauchers) hinter einem
+    Zwischenzähler hängen. Es gilt genau EINE Ebene: Ein Verbraucher, der selbst Kinder hat,
+    gilt nie als Kind. Ein unbekannter Zeiger oder einer auf sich selbst wird ignoriert, der
+    Verbraucher bleibt dann eigenständig. Die Reihenfolge der Kinder ist die der Konfiguration."""
+    ids = {row["entity_id"] for row in rows if row.get("entity_id")}
+    parent_of: dict[str, str] = {}
+    for row in rows:
+        entity_id = row.get("entity_id")
+        parent = (row.get("parent") or "").strip()
+        if entity_id and parent and parent != entity_id and parent in ids:
+            parent_of[entity_id] = parent
+    parents = set(parent_of.values())
+    child_ids = {entity_id for entity_id in parent_of if entity_id not in parents}
+    children: dict[str, list[dict]] = {}
+    for row in rows:
+        entity_id = row.get("entity_id")
+        if entity_id in child_ids:
+            children.setdefault(parent_of[entity_id], []).append(row)
+    return children, child_ids
+
+
 def _is_configured(config: dict) -> bool:
     return bool(config.get("netzbezug"))
 
@@ -385,7 +430,7 @@ def _speicher_link_entities(config: dict) -> list[dict]:
     die Speicher-Rollen braucht, nicht alle Konfig-Rollen."""
     entities: list[dict] = []
     for sp in config.get("speicher") or []:
-        sp_name = sp.get("name") or "Speicher"
+        sp_name = sp.get("name") or tr("Speicher")
         if sp.get("laden_entity_id"):
             entities.append({"entity_id": sp["laden_entity_id"], "name": f"{sp_name} (Ladung)"})
         if sp.get("entladen_entity_id"):
@@ -542,11 +587,16 @@ class EnergieDashboardService:
         if not continuous and offset == 0 and finer_range and series:
             # Letzten (noch laufenden) Bucket durch die feinere Aufschlüsselung
             # desselben Zeitraums ersetzen (siehe _FINER_RANGE oben).
-            del series[max(series)]
             finer_result = query_mod.query_series(
                 self.deps.data_dir, self.deps.index, entity_id, finer_range,
                 self.deps.tz, now, offset=0, read_cache=read_cache,
             )
+            # Nur ersetzen, was die feinere Abfrage auch abdeckt. Ein Wert, der sich nur
+            # selten ändert (Tarif-Helfer), hat im Monat nur den Randpunkt am Fensteranfang;
+            # ihn zu löschen ließe den Preis erst ab heute gelten, und der ganze Rest des
+            # Monats stünde ohne Preis da.
+            if max(series) >= finer_result["window_start"]:
+                del series[max(series)]
             for point in finer_result["points"]:
                 series[point["ts"]] = point["value"] or 0.0
         entity = self.deps.index.get_entity(entity_id)
@@ -740,7 +790,7 @@ class EnergieDashboardService:
         for ts in all_ts:
             local = datetime.fromtimestamp(ts, tz)
             group: dict = {
-                "label": _MONTH_NAMES_DE[local.month - 1][:3],
+                "label": tr(_MONTH_NAMES_DE[local.month - 1])[:3],
                 "day_count": calendar.monthrange(local.year, local.month)[1],
             }
             for role, series in series_by_role.items():
@@ -907,7 +957,7 @@ class EnergieDashboardService:
             local = datetime.fromtimestamp(ts, tz)
             delta = (v - avg) if as_points else ((v - avg) / avg * 100 if avg else None)
             return {
-                "date_label": f"{local.day}. {_MONTH_NAMES_DE[local.month - 1][:3]}",
+                "date_label": formats.day_month_label(local.day, tr(_MONTH_NAMES_DE[local.month - 1])[:3]),
                 "value": v,
                 "delta": round(delta, 1) if delta is not None else None,
             }
@@ -965,18 +1015,18 @@ class EnergieDashboardService:
         tz = self.deps.tz
         rows = []
         for label, role, invert in (
-            ("Stromertrag", "erzeugung", False),
-            ("Netzbezug", "netzbezug", True),
-            ("Verbrauch", "verbrauch", True),
-            ("Einspeisung", "einspeisung", False),
+            (tr("Stromertrag"), "erzeugung", False),
+            (tr("Netzbezug"), "netzbezug", True),
+            (tr("Verbrauch"), "verbrauch", True),
+            (tr("Einspeisung"), "einspeisung", False),
         ):
             result = self._strongest_weakest_row(
                 series.get(role, {}), erzeugung_by_day, verbrauch_by_day, invert, tz,
             )
             rows.append({"label": label, "role": role, "unit": "kWh", "decimals": 1, "is_pkt": False, **result})
         for label, role, values_by_day in (
-            ("Autarkie", "autarkie", autarkie_pct_by_day),
-            ("Eigenverbrauch", "eigenverbrauch", eigenverbrauch_pct_by_day),
+            (tr("Autarkie"), "autarkie", autarkie_pct_by_day),
+            (tr("Eigenverbrauch"), "eigenverbrauch", eigenverbrauch_pct_by_day),
         ):
             result = self._strongest_weakest_row(
                 values_by_day, erzeugung_by_day, verbrauch_by_day, False, tz, as_points=True,
@@ -1062,9 +1112,9 @@ class EnergieDashboardService:
         fälschlich als Fehler markieren."""
         roles: list[tuple[str, str]] = []
         if config.get("netzbezug"):
-            roles.append((config["netzbezug"], config.get("netzbezug_name") or "Netzbezug"))
+            roles.append((config["netzbezug"], config.get("netzbezug_name") or tr("Netzbezug")))
         if config.get("einspeisung"):
-            roles.append((config["einspeisung"], config.get("einspeisung_name") or "Einspeisung"))
+            roles.append((config["einspeisung"], config.get("einspeisung_name") or tr("Einspeisung")))
         for erz in config.get("erzeuger") or []:
             entity_id = erz.get("entity_id")
             if entity_id:
@@ -1074,7 +1124,7 @@ class EnergieDashboardService:
             if entity_id:
                 roles.append((entity_id, self._display_name(entity_id, verbraucher.get("name", ""))))
         for sp in config.get("speicher") or []:
-            sp_name = sp.get("name") or "Speicher"
+            sp_name = sp.get("name") or tr("Speicher")
             if sp.get("laden_entity_id"):
                 roles.append((sp["laden_entity_id"], f"{sp_name} (Ladung)"))
             if sp.get("entladen_entity_id"):
@@ -1135,6 +1185,51 @@ class EnergieDashboardService:
                 previous_value = value
         return reset_labels, fully_checked
 
+    def _grundpreis_zustand(
+        self, entity_id: str, window_start: datetime, window_end: datetime, now: datetime,
+        read_cache: query_mod.QueryReadCache, fallback: Callable[[], dict[float, float]],
+    ) -> dict[float, float]:
+        """Zeitpunkt -> Wert der Grundpreis-Entität: der letzte Rohwert vor dem Fenster plus
+        alle Rohwerte darin. Die Bucket-Serie von _entity_series() taugt dafür nicht: Ein
+        Helfer, der sich nur bei Änderungen meldet, hätte im Monat nur einen Randpunkt, und
+        der laufende Bucket wird dort durch die feinere Auflösung ersetzt (Randpunkt weg).
+        Meldet die Entität so oft, dass die Rohwerte das Abfragelimit sprengen (kein Helfer,
+        sondern ein Sensor), bleibt die Bucket-Serie als Ersatz."""
+        tz = self.deps.tz
+        start_ts = window_start.timestamp()
+        zustand: dict[float, float] = {}
+        vorher = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
+            self.deps.data_dir, entity_id, start_ts, tz, read_cache
+        )
+        if vorher is not None:
+            zustand[start_ts] = vorher
+        try:
+            for ts, value in cleanup_mod.iter_raw_rows(
+                self.deps.data_dir, self.deps.index, entity_id, start_ts, min(window_end, now).timestamp(), tz,
+                now=now, max_rows=MAX_RAW_QUERY_POINTS, hot_rows_loader=read_cache.read_hot_rows,
+            ):
+                zustand[ts] = value
+        except cleanup_mod.ResultLimitExceeded:
+            return fallback()
+        return zustand
+
+    def _grundpreis_tage(self, window_start: datetime, window_end: datetime, now: datetime) -> list[tuple[float, float, float]]:
+        """(Beginn, Ende des Abschnitts, Anteil an einem Tag) je lokalem Kalendertag im Zeitraum,
+        bis höchstens `now`. Ein angebrochener Tag zählt anteilig nach Sekunden (Tage mit
+        Zeitumstellung sind 23 bzw. 25 Stunden lang und zählen trotzdem als ein ganzer Tag)."""
+        tz = self.deps.tz
+        ende = min(window_end, now)
+        result: list[tuple[float, float, float]] = []
+        tag = window_start.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        while tag < ende:
+            naechster = (tag + timedelta(days=1, hours=3)).replace(hour=0, minute=0, second=0, microsecond=0)
+            start = max(tag, window_start)
+            stop = min(naechster, ende)
+            if stop > start:
+                result.append((start.timestamp(), stop.timestamp(), (stop - start).total_seconds() / (naechster - tag).total_seconds()))
+            tag = naechster
+        return result
+
     def compute_flow(
         self, config: dict, range_key: str, offset: int, continuous: bool = False, skip_quality: bool = False,
         read_cache: query_mod.QueryReadCache | None = None,
@@ -1146,7 +1241,7 @@ class EnergieDashboardService:
         request-lokal, siehe dessen Docstring in query.py, wird hier nur
         NICHT mehr implizit pro Aufruf neu erzeugt)."""
         if range_key not in RANGE_KEYS:
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
         now = datetime.now(self.deps.tz)
         if read_cache is None:
             read_cache = query_mod.QueryReadCache()
@@ -1160,12 +1255,12 @@ class EnergieDashboardService:
         # da es dafür keine feste HA-Konvention gibt (siehe Recherche zum
         # offiziellen Energy-Dashboard: der dortige Sankey benennt seinen
         # Sammelpunkt gar nicht prominent).
-        hub_name = (config.get("hub_name") or "").strip() or DEFAULT_HUB_NAME
+        hub_name = (config.get("hub_name") or "").strip() or tr(DEFAULT_HUB_NAME)
 
         nodes: list[dict] = []
         links: list[dict] = []
         stale_labels: list[str] = []
-        factor_gap_entries: list[tuple[str, float, int]] = []
+        factor_gap_entries: list[tuple[str, float, int, str]] = []
 
         def _carry_limit(entity_id: str, stuetzstellen: list[float]) -> float | None:
             """Wie lange ein Faktorwert fortgeschrieben werden darf, in Sekunden.
@@ -1197,8 +1292,12 @@ class EnergieDashboardService:
             minuten = int(schwelle) if str(schwelle).isdigit() else 15
             return max(float(minuten) * 60.0, takt)
 
-        def add_factor_gap(label: str, ohne_faktor: float, gesamt: float) -> None:
-            """Merkt sich Energie, für die kein Preis/Faktor gilt.
+        def _gap_detection_off(entity_id: str) -> bool:
+            entity = self.deps.index.get_entity(entity_id)
+            return bool(entity) and entity["gap_threshold"] == "off"
+
+        def add_factor_gap(label: str, ohne_faktor: float, gesamt: float, unit: str = "kWh") -> None:
+            """Merkt sich Energie (beim Grundpreis: Tage), für die kein Preis/Faktor gilt.
 
             Vorher verschwand sie stillschweigend aus der Summe. Gemeldet wird
             erst ab einem Prozent, damit ein einzelner Bucket am
@@ -1210,7 +1309,7 @@ class EnergieDashboardService:
             anteil = ohne_faktor / gesamt
             if anteil < 0.01:
                 return
-            eintrag = (label, round(ohne_faktor, 2), round(anteil * 100))
+            eintrag = (label, round(ohne_faktor, 2), round(anteil * 100), unit)
             if eintrag not in factor_gap_entries:
                 factor_gap_entries.append(eintrag)
 
@@ -1234,13 +1333,13 @@ class EnergieDashboardService:
             netzbezug_series, stale = entity_series(netzbezug_id)
             netzbezug_val = self._series_total(netzbezug_series)
             nodes.append({
-                "name": "Netzbezug", "entity_id": netzbezug_id, "role": "source",
+                "name": tr("Netzbezug"), "entity_id": netzbezug_id, "role": "source",
                 "value": max(netzbezug_val, 0.0), "stale": stale,
-                "label": config.get("netzbezug_name") or "Netzbezug",
+                "label": config.get("netzbezug_name") or tr("Netzbezug"),
             })
-            links.append({"source": "Netzbezug", "target": hub_name, "value": max(netzbezug_val, 0.0)})
+            links.append({"source": tr("Netzbezug"), "target": hub_name, "value": max(netzbezug_val, 0.0)})
             bus_in += netzbezug_val
-            add_stale_issue(config.get("netzbezug_name") or "Netzbezug", stale)
+            add_stale_issue(config.get("netzbezug_name") or tr("Netzbezug"), stale)
 
         for erz in config.get("erzeuger") or []:
             entity_id = erz.get("entity_id")
@@ -1291,7 +1390,7 @@ class EnergieDashboardService:
         soc_now_breakdown: list[dict] = []
         speicher_breakdown: list[dict] = []
         for sp in speicher_list:
-            sp_name = sp.get("name") or "Speicher"
+            sp_name = sp.get("name") or tr("Speicher")
             sp_entladen_val = 0.0
             sp_laden_val = 0.0
             if sp.get("entladen_entity_id"):
@@ -1565,14 +1664,13 @@ class EnergieDashboardService:
             gruppe_name_cfg = (verbraucher.get("gruppe") or "").strip()
             if gruppe_name_cfg:
                 gruppen_mitglieder[gruppe_name_cfg] = gruppen_mitglieder.get(gruppe_name_cfg, 0) + 1
-        for verbraucher in config.get("verbraucher") or []:
-            entity_id = verbraucher.get("entity_id")
-            if not entity_id:
-                continue
-            name = self._display_name(entity_id, verbraucher.get("name", ""))
-            gruppe = (verbraucher.get("gruppe") or "").strip() or None
-            if gruppe and gruppen_mitglieder.get(gruppe, 0) < 2:
-                gruppe = None
+        verbraucher_rows = config.get("verbraucher") or []
+        kinder_je_zaehler, kind_ids = cascade_structure(verbraucher_rows)
+        zaehler_ueberschreitung: list[tuple[str, float, float]] = []
+
+        def build_row(verbraucher: dict, name: str, gruppe: str | None, blend: bool) -> tuple:
+            """Serie, Wert und Sankey-Knoten EINES Verbrauchers samt Auffälligkeits-Prüfung."""
+            entity_id = verbraucher["entity_id"]
             series, stale = entity_series(entity_id)
             val = self._series_total(series)
             display_val = max(val, 0.0)
@@ -1588,10 +1686,10 @@ class EnergieDashboardService:
                 # wenig wie für eine Gruppe. Ohne dieses Flag hing die Farbe
                 # eines Geräts davon ab, ob es zufällig gruppiert ist — eine
                 # reine Darstellungsfrage hätte damit die Bedeutung der Farbe
-                # bestimmt. Innerhalb einer Gruppe (Gruppe -> Gerät) bleibt es
-                # beim normalen Verlaufs-Farbton, dort trägt bereits die Bahn
-                # Bus -> Gruppe den Mischton.
-                **({"blend": True} if gruppe is None else {}),
+                # bestimmt. Innerhalb einer Gruppe (Gruppe -> Gerät) oder hinter
+                # einem Zwischenzähler bleibt es beim normalen Verlaufs-Farbton,
+                # dort trägt bereits die Bahn davor den Mischton.
+                **({"blend": True} if blend else {}),
             }
             if anomalie_active:
                 # Baseline == 0 (Gerät lief in keiner der Vergleichsperioden)
@@ -1611,6 +1709,59 @@ class EnergieDashboardService:
                             "name": name, "value": round(display_val, 3),
                             "baseline": round(baseline, 3), "pct": pct,
                         })
+            add_stale_issue(name, stale)
+            return series, val, display_val, node
+
+        for verbraucher in verbraucher_rows:
+            entity_id = verbraucher.get("entity_id")
+            if not entity_id or entity_id in kind_ids:
+                continue  # Kinder entstehen unten, innerhalb ihres Zwischenzählers
+            name = self._display_name(entity_id, verbraucher.get("name", ""))
+            gruppe = (verbraucher.get("gruppe") or "").strip() or None
+            if gruppe and gruppen_mitglieder.get(gruppe, 0) < 2:
+                gruppe = None
+            series, val, display_val, node = build_row(verbraucher, name, gruppe, blend=gruppe is None)
+            kinder = kinder_je_zaehler.get(entity_id, [])
+            kind_eintraege: list[dict] = []
+            if kinder:
+                # Zwischenzähler: sein Wert enthält die Geräte dahinter bereits. Für die Bilanz zählt
+                # nur er selbst (unten verbraucher_sum += val), die Kinder sind Aufschlüsselung.
+                # Der Rest ist Zähler minus Geräte, je Bucket auf 0 gekappt wie die Grundlast.
+                kinder_summe = 0.0
+                kinder_serien: list[dict[float, float]] = []
+                for kind in kinder:
+                    kind_name = self._display_name(kind["entity_id"], kind.get("name", ""))
+                    kind_series, kind_val, kind_display, kind_node = build_row(kind, kind_name, None, blend=False)
+                    links.append({"source": name, "target": kind_name, "value": kind_display})
+                    kind_eintraege.append({
+                        "name": kind_name, "value": round(kind_display, 3), "entity_id": kind["entity_id"],
+                        "parent": name,
+                    })
+                    nodes.append(kind_node)
+                    verbraucher_series_by_name[kind_name] = kind_series
+                    kinder_summe += kind_display
+                    kinder_serien.append(kind_series)
+                if kinder_summe > display_val + 0.05:
+                    zaehler_ueberschreitung.append((name, round(kinder_summe, 2), round(display_val, 2)))
+                    display_val = kinder_summe
+                    node["value"] = display_val
+                rest = max(display_val - kinder_summe, 0.0)
+                rest_name = tr("{name}, übrige Verbraucher", name=name)
+                rest_series = {
+                    ts: max(value, 0.0)
+                    for ts, value in self._series_merge(
+                        series, *kinder_serien, factors=[1.0] + [-1.0] * len(kinder_serien)
+                    ).items()
+                }
+                if rest > 0:
+                    nodes.append({"name": rest_name, "role": "sink", "value": round(rest, 3)})
+                    links.append({"source": name, "target": rest_name, "value": round(rest, 3)})
+                kind_eintraege.sort(key=lambda item: item["value"], reverse=True)
+                if rest > 0:
+                    kind_eintraege.append({
+                        "name": rest_name, "value": round(rest, 3), "parent": name, "rest": True,
+                    })
+                verbraucher_series_by_name[rest_name] = rest_series
             nodes.append(node)
             if gruppe:
                 links.append({"source": gruppe, "target": name, "value": display_val})
@@ -1622,9 +1773,10 @@ class EnergieDashboardService:
             verbraucher_series_list.append(series)
             verbraucher_breakdown.append({
                 "name": name, "value": round(display_val, 3), "entity_id": entity_id, "gruppe": gruppe,
+                **({"kind": "meter"} if kinder else {}),
             })
+            verbraucher_breakdown.extend(kind_eintraege)
             verbraucher_series_by_name[name] = series
-            add_stale_issue(name, stale)
         if config.get("verbraucheranteile_gruppieren"):
             # Verbraucheranteile-Tabelle/-Donut optional nach Gruppe statt je
             # Einzelgerät — dieselbe (bereits auf >=2 Mitglieder gefilterte)
@@ -1637,7 +1789,14 @@ class EnergieDashboardService:
             grouped_series: dict[str, list[dict[float, float]]] = {}
             grouped_order: list[str] = []
             ungrouped_breakdown: list[dict] = []
+            # Ein Zwischenzähler in einer Gruppe geht samt Wert in die Gruppenzeile ein; seine Geräte
+            # und der Rest würden daneben als verwaiste Zeilen stehen und doppelt zählen.
+            gruppierte_zaehler = {
+                item["name"] for item in verbraucher_breakdown if item.get("kind") == "meter" and item.get("gruppe")
+            }
             for item in verbraucher_breakdown:
+                if item.get("parent") in gruppierte_zaehler:
+                    continue
                 gruppe_name = item.get("gruppe")
                 if not gruppe_name:
                     ungrouped_breakdown.append(item)
@@ -1681,17 +1840,17 @@ class EnergieDashboardService:
             einspeisung_series, stale = entity_series(einspeisung_id)
             einspeisung_val = self._series_total(einspeisung_series)
             nodes.append({
-                "name": "Einspeisung", "entity_id": einspeisung_id, "role": "sink",
+                "name": tr("Einspeisung"), "entity_id": einspeisung_id, "role": "sink",
                 "value": max(einspeisung_val, 0.0), "stale": stale,
-                "label": config.get("einspeisung_name") or "Einspeisung",
+                "label": config.get("einspeisung_name") or tr("Einspeisung"),
             })
-            links.append({"source": hub_name, "target": "Einspeisung", "value": max(einspeisung_val, 0.0)})
-            add_stale_issue(config.get("einspeisung_name") or "Einspeisung", stale)
+            links.append({"source": hub_name, "target": tr("Einspeisung"), "value": max(einspeisung_val, 0.0)})
+            add_stale_issue(config.get("einspeisung_name") or tr("Einspeisung"), stale)
 
         for sp, sp_laden_val in zip(speicher_list, speicher_laden_vals):
             if not sp.get("laden_entity_id"):
                 continue
-            sp_name = sp.get("name") or "Speicher"
+            sp_name = sp.get("name") or tr("Speicher")
             label = f"{sp_name} (Ladung)"
             nodes.append({
                 "name": label, "entity_id": sp["laden_entity_id"], "role": "sink",
@@ -1748,7 +1907,17 @@ class EnergieDashboardService:
         verbraucher_breakdown.append({"name": "Grundlast", "value": round(grundlast_display, 3)})
         for item in verbraucher_breakdown:
             item["share"] = round(item["value"] / verbrauch_total * 100, 1) if verbrauch_total > 0 else None
-        verbraucher_breakdown.sort(key=lambda item: item["value"], reverse=True)
+        # Oberste Ebene nach Wert; hinter einem Zwischenzähler stehen seine Geräte (Wert absteigend) und
+        # zuletzt der Rest, genau in der Reihenfolge, in der sie berechnet wurden.
+        all_breakdown_children = [item for item in verbraucher_breakdown if item.get("parent")]
+        oberste = [item for item in verbraucher_breakdown if not item.get("parent")]
+        oberste.sort(key=lambda item: item["value"], reverse=True)
+        verbraucher_breakdown = []
+        for item in oberste:
+            verbraucher_breakdown.append(item)
+            verbraucher_breakdown.extend(
+                kind for kind in all_breakdown_children if kind.get("parent") == item["name"]
+            )
 
         # Versorgungsanteile: Pendant zu Verbraucheranteile für die
         # Angebotsseite — Erzeuger bleiben mit ihrem VOLLEN Ertrag stehen
@@ -1767,13 +1936,13 @@ class EnergieDashboardService:
         versorgung_breakdown: list[dict] = [dict(item) for item in erzeuger_breakdown]
         if netzbezug_id:
             versorgung_breakdown.append({
-                "name": config.get("netzbezug_name") or "Netzbezug",
+                "name": config.get("netzbezug_name") or tr("Netzbezug"),
                 "value": round(max(netzbezug_val, 0.0), 3),
                 "entity_id": netzbezug_id,
             })
         if speicher_laden_val or speicher_entladen_val:
             versorgung_breakdown.append({
-                "name": "Speichernutzung", "value": round(speicher_entladen_val - speicher_laden_val, 3),
+                "name": tr("Speichernutzung"), "value": round(speicher_entladen_val - speicher_laden_val, 3),
             })
         # Summe der Zeilen statt bus_in als Nenner — deckt sich dadurch immer
         # mit Verbrauch + Einspeisung (der Teil, der wirklich "versorgt"
@@ -1820,6 +1989,8 @@ class EnergieDashboardService:
         einspeisung_revenue = None
         vermiedene_kosten = None
         eigenverbrauch_verguetung = None
+        grundpreis_cost = None
+        grundpreis_info = None
         co2_ausstoss = None
         co2_vermieden = None
         if not (continuous or skip_quality):
@@ -1839,7 +2010,10 @@ class EnergieDashboardService:
                 # in g/kWh — hier keine weitere Umrechnung nötig.
                 if factor_entity_id:
                     factor_series, stale = entity_series(factor_entity_id)
-                    add_stale_issue(label, stale)
+                    # Lückenerkennung "Aus" heißt: die Entität meldet sich nur bei
+                    # Änderungen (typisch: ein Helfer mit dem Tarif). Dass sie seit
+                    # Tagen nichts gesendet hat, ist dann kein Zeichen für einen Ausfall.
+                    add_stale_issue(label, stale and not _gap_detection_off(factor_entity_id))
                     if not factor_series:
                         return None
                     # Der Faktor wird als ZUSTAND ausgewertet, nicht über
@@ -1932,10 +2106,53 @@ class EnergieDashboardService:
                     pv_eigenverbrauch_series,
                     kosten.get("preis_eigenverbrauch"),
                     kosten.get("preis_eigenverbrauch_fixed"),
-                    "Vergütung Eigenverbrauch",
+                    tr("Vergütung Eigenverbrauch"),
                 )
                 if eigenverbrauch_verguetung is not None:
                     eigenverbrauch_verguetung = round(eigenverbrauch_verguetung, 2)
+
+            # Grundpreis: €/Monat, tageweise anteilig (Monatswert × 12 / 365 je Tag).
+            # Im laufenden Zeitraum zählt nur die bisher verstrichene Zeit. Eine
+            # Entität gilt als Zustand: der zuletzt bekannte Wert zu Beginn des
+            # Tagesabschnitts (genauer: bis zu dessen Ende), OHNE Fortschreib-Grenze — ein Grundpreis gilt bis
+            # zur nächsten Änderung, ein Helfer meldet sich nur dann. Fehlt der
+            # Wert (noch kein Eintrag vor dem Abschnitt), wird der Abschnitt nicht
+            # angesetzt und als Lücke in Tagen gemeldet.
+            if kosten.get("grundpreis") or kosten.get("grundpreis_fixed") is not None:
+                tage = self._grundpreis_tage(window_start, window_end, now)
+                gesamt_tage = sum(weight for _start, _ende, weight in tage)
+                entity_id_gp = kosten.get("grundpreis")
+                stuetzstellen_gp: list[float] = []
+                werte_gp: dict[float, float] = {}
+                if entity_id_gp:
+                    werte_gp = self._grundpreis_zustand(
+                        entity_id_gp, window_start, window_end, now, read_cache, lambda: entity_series(entity_id_gp)[0]
+                    )
+                    stuetzstellen_gp = sorted(werte_gp)
+                summe_gp = 0.0
+                ohne_wert = 0.0
+                monatswerte: list[float] = []
+                for _start_ts, ende_ts, weight in tage:
+                    if entity_id_gp:
+                        # Der letzte VOR dem Ende des Abschnitts bekannte Wert: ein Wert, der im
+                        # Lauf des Tages gesetzt wurde, gilt für diesen Tag (sonst wäre schon
+                        # der erste Tag nach der Einrichtung eine Lücke).
+                        stelle = bisect.bisect_left(stuetzstellen_gp, ende_ts) - 1
+                        if stelle < 0:
+                            ohne_wert += weight
+                            continue
+                        monat = werte_gp[stuetzstellen_gp[stelle]]
+                    else:
+                        monat = kosten["grundpreis_fixed"]
+                    monatswerte.append(monat)
+                    summe_gp += weight * monat * 12.0 / 365.0
+                add_factor_gap(tr("Grundpreis"), ohne_wert, gesamt_tage, tr("Tage"))
+                if monatswerte or not entity_id_gp:
+                    grundpreis_cost = round(summe_gp, 2)
+                grundpreis_info = {
+                    "tage": round(gesamt_tage - ohne_wert, 1),
+                    "monat": round(monatswerte[-1], 2) if monatswerte else None,
+                }
 
             # CO2-Bilanz: dieselbe Faktor×Energie-Logik wie Kosten, aber ein
             # einziger Faktor (g CO2/kWh) für den bezogenen Netzstrom — PV und
@@ -1975,10 +2192,36 @@ class EnergieDashboardService:
         # Einspeisung Erlös) — "Einsparung"/vermiedene_kosten bewusst nicht
         # (rein rechnerischer Vergleichswert, siehe Kommentar dort).
         net_cost = (
-            round((netzbezug_cost or 0.0) - (einspeisung_revenue or 0.0) - (eigenverbrauch_verguetung or 0.0), 2)
-            if netzbezug_cost is not None or einspeisung_revenue is not None or eigenverbrauch_verguetung is not None
+            round(
+                (netzbezug_cost or 0.0) + (grundpreis_cost or 0.0)
+                - (einspeisung_revenue or 0.0) - (eigenverbrauch_verguetung or 0.0),
+                2,
+            )
+            if netzbezug_cost is not None or einspeisung_revenue is not None
+            or eigenverbrauch_verguetung is not None or grundpreis_cost is not None
             else None
         )
+        # Lücken, die die KOSTEN betreffen (nicht den CO2-Faktor): Chip, Hero-Zeile und
+        # Kostenanalyse zeigen daran, dass der Betrag zu niedrig ist.
+        # Derselbe Preis wird mehrfach verrechnet (Netzbezug, Einsparung, je Verbraucher);
+        # ein Eintrag je Preis genügt, und der erste ist der des eigentlichen Betrags.
+        # "key" ordnet die Lücke der betroffenen Kachel zu (Kostenanalyse im Dashboard).
+        kosten_luecke: list[dict] = []
+        kosten_schluessel = {
+            "Preis Netzbezug": ("netzbezug", tr("Netzbezug-Preis")),
+            "Preis Einspeisung": ("einspeisung", tr("Einspeisevergütung")),
+            tr("Vergütung Eigenverbrauch"): ("eigenverbrauch", tr("Vergütung Eigenverbrauch")),
+            tr("Grundpreis"): ("grundpreis", tr("Grundpreis")),
+        }
+        for label, menge, anteil, einheit in factor_gap_entries:
+            if label not in kosten_schluessel:
+                continue  # CO2-Faktor: betrifft nicht die Kosten
+            schluessel, anzeige = kosten_schluessel[label]
+            if any(eintrag["key"] == schluessel for eintrag in kosten_luecke):
+                continue
+            kosten_luecke.append(
+                {"key": schluessel, "label": anzeige, "menge": menge, "anteil": anteil, "einheit": einheit}
+            )
 
         # Metadaten-/Zählerrückgang-Prüfungen nur für die tatsächlich
         # angezeigte Periode — energiedashboard_data ruft compute_flow()
@@ -2015,17 +2258,16 @@ class EnergieDashboardService:
         if any(sp.get("entladen_entity_id") for sp in speicher_list):
             balance_sources.append("Speicherentladung")
         if netzbezug_id:
-            balance_sources.append(config.get("netzbezug_name") or "Netzbezug")
-        balance_sinks = ["Verbrauch"]
+            balance_sources.append(config.get("netzbezug_name") or tr("Netzbezug"))
+        balance_sinks = [tr("Verbrauch")]
         if any(sp.get("laden_entity_id") for sp in speicher_list):
             balance_sinks.append("Speicherladung")
         if einspeisung_id:
-            balance_sinks.append(config.get("einspeisung_name") or "Einspeisung")
+            balance_sinks.append(config.get("einspeisung_name") or tr("Einspeisung"))
         balance_description = (
-            f"{' + '.join(balance_sources)} entsprechen {' + '.join(balance_sinks)}, innerhalb der Toleranz. "
-            "Nicht einzeln gemessene Lasten erscheinen als „Grundlast“."
+            tr("{join} entsprechen {join2}, innerhalb der Toleranz. Nicht einzeln gemessene Lasten erscheinen als „Grundlast“.", join=' + '.join(balance_sources), join2=' + '.join(balance_sinks))
             if balance_sources else
-            "Verbraucher, Einspeisung und Speicherladung übersteigen nicht den Energiebus."
+            tr("Verbraucher, Einspeisung und Speicherladung übersteigen nicht den Energiebus.")
         )
 
         # Speicher: über einen längeren Zeitraum kann nicht mehr entladen als
@@ -2066,12 +2308,12 @@ class EnergieDashboardService:
         # wurde, nicht nur schweigen, wenn nichts auffällt.
         quality_checks = [
             {
-                "label": "Sensorwerte aktuell",
+                "label": tr("Sensorwerte aktuell"),
                 "ok": not stale_labels,
                 "detail": (
-                    "Veraltet (>2 Tage ohne neue Werte): " + ", ".join(stale_labels)
+                    tr("Veraltet (>2 Tage ohne neue Werte): ") + ", ".join(stale_labels)
                     if stale_labels
-                    else "Alle zugeordneten Sensoren melden aktuelle Werte."
+                    else tr("Alle zugeordneten Sensoren melden aktuelle Werte.")
                 ),
             },
             {
@@ -2080,77 +2322,87 @@ class EnergieDashboardService:
                 # niedrigen Betrag, ohne das kenntlich zu machen. Jetzt wird
                 # der Rest, der auch durch Fortschreiben nicht abgedeckt ist,
                 # ausgewiesen statt verschwiegen.
-                "label": "Preise und Faktoren vollständig",
+                "label": tr("Preise und Faktoren vollständig"),
                 "ok": not factor_gap_entries,
                 "detail": (
-                    "Ohne gültigen Wert: "
+                    tr("Ohne gültigen Wert: ")
                     + ", ".join(
-                        f"{bezeichnung} ({menge} kWh, {anteil} %)"
-                        for bezeichnung, menge, anteil in factor_gap_entries
+                        f"{bezeichnung} ({menge} {einheit}, {anteil} %)"
+                        for bezeichnung, menge, anteil, einheit in factor_gap_entries
                     )
                     if factor_gap_entries
-                    else "Für die gesamte Energie liegt ein Preis bzw. CO2-Faktor vor."
+                    else tr("Für die gesamte Energie liegt ein Preis bzw. CO2-Faktor vor.")
                 ),
             },
             {
-                "label": "Grundlast plausibel",
+                "label": tr("Grundlast plausibel"),
                 "ok": not grundlast_negative,
                 "detail": (
-                    f"Grundlast wäre rechnerisch negativ ({round(grundlast, 2)} kWh) — "
-                    "Zuordnung oder Vorzeichen der Rollen prüfen."
+                    tr("Grundlast wäre rechnerisch negativ ({round} kWh) — Zuordnung oder Vorzeichen der Rollen prüfen.", round=round(grundlast, 2))
                     if grundlast_negative
                     else balance_description
                 ),
             },
             {
-                "label": "Einheit korrekt (kWh)",
+                "label": tr("Einheit korrekt (kWh)"),
                 "ok": not metadata["unit_issues"],
                 "detail": (
                     "Nicht in kWh: " + ", ".join(metadata["unit_issues"])
                     if metadata["unit_issues"]
-                    else "Alle zugeordneten Rollen sind in kWh."
+                    else tr("Alle zugeordneten Rollen sind in kWh.")
                 ),
             },
             {
-                "label": "Zähler-Typ korrekt",
+                "label": tr("Zähler-Typ korrekt"),
                 "ok": not metadata["type_issues"],
                 "detail": (
-                    "Kein Zähler (Summe ergibt hier keinen Sinn): " + ", ".join(metadata["type_issues"])
+                    tr("Kein Zähler (Summe ergibt hier keinen Sinn): ") + ", ".join(metadata["type_issues"])
                     if metadata["type_issues"]
-                    else "Alle zugeordneten Rollen sind Zähler (steigende Gesamtsumme)."
+                    else tr("Alle zugeordneten Rollen sind Zähler (steigende Gesamtsumme).")
                 ),
             },
             {
-                "label": "Keine doppelt zugeordneten Entitäten",
+                "label": tr("Keine doppelt zugeordneten Entitäten"),
                 "ok": not metadata["duplicate_labels"],
                 "detail": (
                     "Mehrfach zugeordnet: " + "; ".join(metadata["duplicate_labels"])
                     if metadata["duplicate_labels"]
-                    else "Jede Entität ist nur einer Rolle zugeordnet."
+                    else tr("Jede Entität ist nur einer Rolle zugeordnet.")
                 ),
             },
             {
-                "label": "Keine Zählerrücksetzungen",
+                "label": tr("Keine Zählerrücksetzungen"),
                 "ok": not reset_labels,
                 "detail": (
-                    "Abnehmender Zählerstand erkannt (Reset/Tausch?): " + ", ".join(reset_labels)
+                    tr("Abnehmender Zählerstand erkannt (Reset/Tausch?): ") + ", ".join(reset_labels)
                     if reset_labels
                     else (
-                        "Keine abnehmenden Zählerstände im Zeitraum."
+                        tr("Keine abnehmenden Zählerstände im Zeitraum.")
                         if resets_fully_checked
-                        else "Keine abnehmenden Zählerstände in den geprüften Rollen "
-                        "(bei mind. einer Rolle wegen der Datenmenge nicht vollständig geprüft)."
+                        else tr("Keine abnehmenden Zählerstände in den geprüften Rollen (bei mind. einer Rolle wegen der Datenmenge nicht vollständig geprüft).")
                     )
                 ),
             },
         ]
         if speicher_entladen_exceeds_names:
             quality_checks.append({
-                "label": "Speicher-Wirkungsgrad plausibel",
+                "label": tr("Speicher-Wirkungsgrad plausibel"),
                 "ok": False,
                 "detail": (
-                    "Entladung übersteigt Ladung — Ladung/Entladung vertauscht? "
+                    tr("Entladung übersteigt Ladung — Ladung/Entladung vertauscht? ")
                     + ", ".join(speicher_entladen_exceeds_names)
+                ),
+            })
+        if zaehler_ueberschreitung:
+            quality_checks.append({
+                "label": tr("Zwischenzähler plausibel"),
+                "ok": False,
+                "detail": " ".join(
+                    tr(
+                        "{name}: Die Geräte ({kinder} kWh) liegen über dem Zwischenzähler ({zaehler} kWh). Zähler oder Zuordnung prüfen.",
+                        name=name, kinder=kinder, zaehler=zaehler,
+                    )
+                    for name, kinder, zaehler in zaehler_ueberschreitung
                 ),
             })
         quality_plausible = all(check["ok"] for check in quality_checks)
@@ -2204,6 +2456,9 @@ class EnergieDashboardService:
                 "einspeisung_revenue": einspeisung_revenue,
                 "vermiedene_kosten": vermiedene_kosten,
                 "eigenverbrauch_verguetung": eigenverbrauch_verguetung,
+                "grundpreis_cost": grundpreis_cost,
+                "grundpreis_info": grundpreis_info,
+                "kosten_luecke": kosten_luecke,
                 "net_cost": net_cost,
                 "co2_ausstoss": co2_ausstoss,
                 "co2_vermieden": co2_vermieden,
@@ -2552,7 +2807,7 @@ class EnergieDashboardService:
         Jahresansicht trotzdem mit wenigen Parquet-Lesevorgängen günstig statt
         365 Einzel-Tagesabfragen."""
         if range_key not in ("month", "year"):
-            raise HTTPException(status_code=400, detail="Nur 'month' oder 'year' unterstützt")
+            raise HTTPException(status_code=400, detail=tr("Nur 'month' oder 'year' unterstützt"))
         if read_cache is None:
             read_cache = query_mod.QueryReadCache()
         now = datetime.now(self.deps.tz)
@@ -2588,10 +2843,12 @@ class EnergieDashboardService:
             self._series_merge(*speicher_entladen_series_list) if speicher_entladen_series_list else {}
         )
         speicher_laden_series = self._series_merge(*speicher_laden_series_list) if speicher_laden_series_list else {}
+        # Nur die oberste Ebene: Geräte hinter einem Zwischenzähler sind in dessen Wert schon enthalten.
+        _kinder, kind_ids = cascade_structure(config.get("verbraucher") or [])
         verbraucher_series_list = [
             hourly(verbraucher.get("entity_id"))
             for verbraucher in (config.get("verbraucher") or [])
-            if verbraucher.get("entity_id")
+            if verbraucher.get("entity_id") and verbraucher["entity_id"] not in kind_ids
         ]
         einspeisung_series = hourly(config.get("einspeisung"))
 
@@ -2666,7 +2923,7 @@ class EnergieDashboardService:
             if verbrauch_month > 0:
                 autarkie_month = round(max(0.0, min(1.0, 1 - netzbezug_month / verbrauch_month)) * 100, 1)
             rows_by_month[dt.month] = {
-                "name": _MONTH_NAMES_DE[dt.month - 1],
+                "name": tr(_MONTH_NAMES_DE[dt.month - 1]),
                 "erzeugung": round(erzeugung_month, 1),
                 "verbrauch": round(verbrauch_month, 1),
                 "netzbezug": round(netzbezug_month, 1),
@@ -2693,7 +2950,7 @@ class EnergieDashboardService:
                 break
             flow = self.compute_flow(config, "month", offset, read_cache=read_cache)
             for anomaly in flow.get("anomalien") or []:
-                result.append({"month": _MONTH_NAMES_DE[month - 1], **anomaly})
+                result.append({"month": tr(_MONTH_NAMES_DE[month - 1]), **anomaly})
         return result
 
     def _page_context(self, request: Request) -> dict:
@@ -2792,6 +3049,7 @@ class EnergieDashboardService:
             verbraucher_entity_id: list[str] = Form([]),
             verbraucher_name: list[str] = Form([]),
             verbraucher_gruppe: list[str] = Form([]),
+            verbraucher_parent: list[str] = Form([]),
             verbraucher_gruppen: list[str] = Form([]),
             preis_netzbezug: str = Form(""),
             preis_einspeisung: str = Form(""),
@@ -2799,6 +3057,8 @@ class EnergieDashboardService:
             preis_netzbezug_fixed: str = Form(""),
             preis_einspeisung_fixed: str = Form(""),
             preis_eigenverbrauch_fixed: str = Form(""),
+            grundpreis: str = Form(""),
+            grundpreis_fixed: str = Form(""),
             co2_faktor_netzbezug_entity: str = Form(""),
             co2_faktor_netzbezug_fixed: str = Form(""),
             prognose_rest_heute_entity_id: str = Form(""),
@@ -2815,11 +3075,14 @@ class EnergieDashboardService:
             anomalie_schwelle: str = Form("50"),
         ) -> HTMLResponse:
             if not netzbezug.strip():
-                raise HTTPException(status_code=422, detail="Netzbezug ist Pflicht")
+                raise HTTPException(status_code=422, detail=tr("Netzbezug ist Pflicht"))
             if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
-                raise HTTPException(status_code=422, detail="Ungültige Auffälligkeiten-Schwelle")
+                raise HTTPException(status_code=422, detail=tr("Ungültige Auffälligkeiten-Schwelle"))
 
-            def pairs(entity_ids: list[str], names: list[str], gruppen: list[str] | None = None) -> list[dict]:
+            def pairs(
+                entity_ids: list[str], names: list[str], gruppen: list[str] | None = None,
+                parents: list[str] | None = None,
+            ) -> list[dict]:
                 # Reihen ohne gewählte Entität (z. B. eine per "+ hinzufügen"
                 # angelegte, dann leer gelassene Zeile) werden stillschweigend
                 # übersprungen statt einer leeren Rolle gespeichert zu werden.
@@ -2837,6 +3100,13 @@ class EnergieDashboardService:
                     }
                     if gruppen is not None:
                         row["gruppe"] = (gruppen[idx] if idx < len(gruppen) else "").strip() or None
+                    if parents is not None:
+                        # Zwischenzähler (Entity-ID eines anderen Verbrauchers); ein Gerät hat ENTWEDER
+                        # eine Gruppe oder einen Zwischenzähler, damit der Energiefluss eindeutig bleibt.
+                        parent = (parents[idx] if idx < len(parents) else "").strip()
+                        if parent:
+                            row["parent"] = parent
+                            row["gruppe"] = None
                     rows.append(row)
                 return rows
 
@@ -2895,8 +3165,11 @@ class EnergieDashboardService:
             preis_netzbezug_fixed_val = _cent_to_euro(preis_netzbezug_fixed)
             preis_einspeisung_fixed_val = _cent_to_euro(preis_einspeisung_fixed)
             preis_eigenverbrauch_fixed_val = _cent_to_euro(preis_eigenverbrauch_fixed)
+            # Der Grundpreis steht dagegen in der Währung selbst (€ je Monat), nicht in Cent.
+            grundpreis_fixed_val = _parse_float(grundpreis_fixed)
             if (
                 preis_netzbezug.strip() or preis_einspeisung.strip() or preis_eigenverbrauch.strip()
+                or grundpreis.strip() or grundpreis_fixed_val is not None
                 or preis_netzbezug_fixed_val is not None
                 or preis_einspeisung_fixed_val is not None
                 or preis_eigenverbrauch_fixed_val is not None
@@ -2908,6 +3181,8 @@ class EnergieDashboardService:
                     "preis_netzbezug_fixed": preis_netzbezug_fixed_val,
                     "preis_einspeisung_fixed": preis_einspeisung_fixed_val,
                     "preis_eigenverbrauch_fixed": preis_eigenverbrauch_fixed_val,
+                    "grundpreis": grundpreis.strip() or None,
+                    "grundpreis_fixed": grundpreis_fixed_val,
                 }
 
             # CO2-Faktor wird — anders als der Preis — direkt in g/kWh
@@ -2930,6 +3205,8 @@ class EnergieDashboardService:
                     "morgen_entity_id": prognose_morgen_entity_id.strip() or None,
                 }
 
+            verbraucher_rows = pairs(verbraucher_entity_id, verbraucher_name, verbraucher_gruppe, verbraucher_parent)
+            _check_cascade(verbraucher_rows)
             config = {
                 "hub_name": hub_name.strip() or None,
                 "netzbezug": netzbezug.strip(),
@@ -2938,7 +3215,7 @@ class EnergieDashboardService:
                 "einspeisung_name": einspeisung_name.strip() or None,
                 "erzeuger": pairs(erzeuger_entity_id, erzeuger_name),
                 "speicher": speicher,
-                "verbraucher": pairs(verbraucher_entity_id, verbraucher_name, verbraucher_gruppe),
+                "verbraucher": verbraucher_rows,
                 # dict.fromkeys() statt set() — entfernt Duplikate (z. B. wenn
                 # eine Gruppe angelegt, aber nie einem Verbraucher zugewiesen
                 # wurde und trotzdem zusätzlich noch im Verwalten-Popup
@@ -2985,7 +3262,7 @@ class EnergieDashboardService:
         def energiedashboard_data(range: str = "day", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             # Ein Cache für alle drei compute_flow()-Aufrufe dieses Requests
             # (aktuell/rollierend-aktuell/rollierend-vorherig) — deren
             # Fenster überlappen oder grenzen direkt aneinander an, ohne
@@ -3010,10 +3287,10 @@ class EnergieDashboardService:
             # bereits im Browser eingebaut (ROADMAP.md 1.7). Nur Monat/Jahr
             # ergeben als Rückblick Sinn, siehe REPORT_RANGE_KEYS.
             if range not in REPORT_RANGE_KEYS:
-                raise HTTPException(status_code=400, detail="Ungültiger Zeitraum für den Energiebericht")
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum für den Energiebericht"))
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             now = datetime.now(self.deps.tz)
             read_cache = query_mod.QueryReadCache()
             current = self.compute_flow(config, range, offset, read_cache=read_cache)
@@ -3050,18 +3327,22 @@ class EnergieDashboardService:
             # innerhalb der Periode liegt).
             display_end = window_end if offset == 0 else natural_end - timedelta(days=1)
             if range == "year":
-                period_title = f"Jahr {window_start.year}"
+                period_title = tr("Jahr {year}", year=window_start.year)
                 if offset == 0:
-                    period_range_text = (
-                        f"1. Januar – {display_end.day}. {_MONTH_NAMES_DE[display_end.month - 1]} {display_end.year}"
+                    period_range_text = tr(
+                        "1. Januar – {day}. {month} {year}",
+                        day=display_end.day, month=tr(_MONTH_NAMES_DE[display_end.month - 1]), year=display_end.year,
                     )
                 else:
-                    period_range_text = f"1. Januar – 31. Dezember {window_start.year}"
+                    period_range_text = tr("1. Januar – 31. Dezember {year}", year=window_start.year)
                 monatsverlauf = self._monatsverlauf_for_year(config, window_start.year, now, read_cache)
                 anomalien_report = self._anomalien_for_months(config, window_start.year, now, read_cache)
             else:
-                period_title = f"{_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
-                period_range_text = f"1.–{display_end.day}. {_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
+                period_title = f"{tr(_MONTH_NAMES_DE[window_start.month - 1])} {window_start.year}"
+                period_range_text = tr(
+                    "1.–{day}. {month} {year}",
+                    day=display_end.day, month=tr(_MONTH_NAMES_DE[window_start.month - 1]), year=window_start.year,
+                )
                 monatsverlauf = []
                 anomalien_report = [{"month": None, **a} for a in (current.get("anomalien") or [])]
             detail_charts = self._report_detail_charts(config, range, offset, now, read_cache)
@@ -3070,8 +3351,8 @@ class EnergieDashboardService:
                 # Autarkie/Eigenverbrauch nur, wenn die KPI-Kachel selbst
                 # existiert (dieselbe Bedingung wie im KPI-Grid) — ein
                 # System ohne Erzeuger hat schlicht keine dieser Quoten.
-                if row["label"] != "Autarkie" or current["kpi"].get("autarkie") is not None
-                if row["label"] != "Eigenverbrauch" or current["kpi"].get("eigenverbrauch") is not None
+                if row["label"] != tr("Autarkie") or current["kpi"].get("autarkie") is not None
+                if row["label"] != tr("Eigenverbrauch") or current["kpi"].get("eigenverbrauch") is not None
             ]
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_report.html",
@@ -3092,7 +3373,7 @@ class EnergieDashboardService:
                     "detail_charts": detail_charts,
                     "staerkster_schwaechster": staerkster_schwaechster,
                     "generated_at": now,
-                    "month_names": _MONTH_NAMES_DE,
+                    "month_names": [tr(name) for name in _MONTH_NAMES_DE],
                     # app_root deckt auch diese Seite ab, obwohl sie eine Ebene
                     # tiefer liegt als die übrigen — genau dafür ist der Präfix
                     # absolut statt relativ (ZG-03).
@@ -3109,14 +3390,14 @@ class EnergieDashboardService:
             # bei jedem Perioden-Wechsel mitzuschleppen.
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.compute_trends(config)
 
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)
             if not _is_configured(config):
-                raise HTTPException(status_code=409, detail="Noch nicht eingerichtet")
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             # Tag/Woche: unverändert sieben konkrete Kalendertage (Kachel ist
             # hier bewusst vom Zeitraum-Umschalter entkoppelt). Monat/Jahr:
             # Wochentags-Mittel über den gesamten gewählten Zeitraum, siehe

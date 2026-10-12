@@ -12,9 +12,13 @@ automatisch im Hintergrund ab einem eingestellten Mindestalter der Markierung
 
 from __future__ import annotations
 
+from ..i18n import tr
+
+import json
 import statistics
+import time
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -22,6 +26,7 @@ from zoneinfo import ZoneInfo
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .. import formats
 from ..formatting import decimals_to_int, format_value
 from . import hotbuffer, rollup
 from . import resolution as resolution_mod
@@ -36,7 +41,7 @@ def _format_val(value: float, decimals: str) -> str:
 
 
 def _format_ts(ts: float, tz: ZoneInfo) -> str:
-    return datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y %H:%M:%S")
+    return formats.format_datetime(datetime.fromtimestamp(ts, tz))
 
 
 def _months_between(start_ts: float, end_ts: float, tz: ZoneInfo) -> list[tuple[int, int]]:
@@ -195,10 +200,7 @@ class OutlierDetector:
             ueblich = statistics.median(self._steps)
             if ueblich > 0 and zuwachs > self.factor * ueblich:
                 grund = (
-                    f"Zuwachs {_format_val(zuwachs, self.decimals)} ist das "
-                    f"{_format_factor(zuwachs / ueblich)} des üblichen Zuwachses "
-                    f"({_format_val(ueblich, self.decimals)}, Median der letzten "
-                    f"{len(self._steps)}){self._vorwert()}"
+                    tr("Zuwachs {_format_val} ist das {_format_factor} des üblichen Zuwachses ({_format_val2}, Median der letzten {len}){_vorwert}", _format_val=_format_val(zuwachs, self.decimals), _format_factor=_format_factor(zuwachs / ueblich), _format_val2=_format_val(ueblich, self.decimals), len=len(self._steps), _vorwert=self._vorwert())
                 )
         self._steps.append(zuwachs)
         return grund
@@ -211,11 +213,7 @@ class OutlierDetector:
             abstand = abs(value - mitte)
             if streuung > 0 and abstand > self.factor * streuung:
                 grund = (
-                    f"{_format_val(value, self.decimals)} liegt "
-                    f"{_format_factor(abstand / streuung)} weiter vom Median der letzten "
-                    f"{len(self._values)} Werte ({_format_val(mitte, self.decimals)}) "
-                    f"entfernt als üblich (±{_format_val(streuung, self.decimals)})"
-                    f"{self._vorwert()}"
+                    tr("{_format_val} liegt {_format_factor} weiter vom Median der letzten {len} Werte ({_format_val2}) entfernt als üblich (±{_format_val3}){_vorwert}", _format_val=_format_val(value, self.decimals), _format_factor=_format_factor(abstand / streuung), len=len(self._values), _format_val2=_format_val(mitte, self.decimals), _format_val3=_format_val(streuung, self.decimals), _vorwert=self._vorwert())
                 )
         self._values.append(value)
         return grund
@@ -299,7 +297,7 @@ def analyze_raw_rows_page(
             formatted_values = " / ".join(
                 _format_val(row["value"], decimals) for row in group_rows
             )
-            duplicate_reason = f"{len(group_rows)}× derselbe Zeitstempel — Werte: {formatted_values}"
+            duplicate_reason = tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
         if group_outlier is not None:
             counts["outliers"] += 1
         if group_gap is not None:
@@ -329,11 +327,11 @@ def analyze_raw_rows_page(
                 row["flags"] = [
                     {"label": label, "reason": reason}
                     for label, reason in (
-                        ("Ausreißer", group_outlier),
-                        ("Lücke", group_gap),
+                        (tr("Ausreißer"), group_outlier),
+                        (tr("Lücke"), group_gap),
                         ("Duplikat", duplicate_reason),
                         ("Wiederholung", repetition_reason),
-                        ("Zählerrückgang", counter_decrease_reason),
+                        (tr("Zählerrückgang"), counter_decrease_reason),
                     )
                     if reason is not None
                 ]
@@ -352,9 +350,7 @@ def analyze_raw_rows_page(
             delta = ts - previous_ts
             if delta > gap_seconds:
                 group_gap = (
-                    f"{_format_duration(delta)} seit vorherigem Wert "
-                    f"{_format_val(previous_value, decimals)} um {_format_ts(previous_ts, tz)} "
-                    f"(Schwellwert: {_format_duration(gap_seconds)})"
+                    tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(previous_value, decimals), _format_ts=_format_ts(previous_ts, tz), _format_duration2=_format_duration(gap_seconds))
                 )
         # Immer aufrufen, auch bei ausgeschalteter Erkennung: der Detektor baut
         # dabei seinen Bezug auf. Ein bereits markierter Zeitstempel bleibt
@@ -463,7 +459,7 @@ def iter_raw_rows(
                 emitted += 1
                 if max_rows is not None and emitted > max_rows:
                     raise ResultLimitExceeded(
-                        f"Ergebnis überschreitet {max_rows} Rohwerte"
+                        tr("Ergebnis überschreitet {max_rows} Rohwerte", max_rows=max_rows)
                     )
                 yield ts, value
 
@@ -510,7 +506,7 @@ def _format_duration(seconds: float) -> str:
     if hours < 24:
         return f"{hours} Std. {minutes} Min." if minutes else f"{hours} Std."
     days, hours = divmod(hours, 24)
-    return f"{days} Tage {hours} Std." if hours else f"{days} Tage"
+    return tr("{days} Tage {hours} Std.", days=days, hours=hours) if hours else tr("{days} Tage", days=days)
 
 
 def detect_duplicates(
@@ -525,7 +521,7 @@ def detect_duplicates(
         values_by_ts.setdefault(ts, []).append(value)
     return {
         ts: (
-            f"{len(values)}× derselbe Zeitstempel — Werte: "
+            tr("{len}× derselbe Zeitstempel — Werte: ", len=len(values))
             + " / ".join(_format_val(v, decimals) for v in values)
         )
         for ts, values in values_by_ts.items()
@@ -538,8 +534,7 @@ def _repetition_reason(
 ) -> str:
     precision = "3 (Automatisch)" if decimals == "auto" else decimals
     return (
-        f"Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — "
-        f"wie Vorwert {_format_val(last_kept_value, decimals)} um {_format_ts(last_kept_ts, tz)}"
+        tr("Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — wie Vorwert {_format_val} um {_format_ts}", precision=precision, _format_val=_format_val(last_kept_value, decimals), _format_ts=_format_ts(last_kept_ts, tz))
     )
 
 
@@ -593,12 +588,10 @@ def _counter_decrease_reason(previous_value: float, value: float) -> str:
     if previous_value:
         percentage = difference / abs(previous_value) * 100
         return (
-            f"Vorwert {previous_value:.12g} → {value:.12g}; "
-            f"Rückgang um {difference:.12g} ({percentage:.1f} %)"
+            tr("Vorwert {previous_value:.12g} → {value:.12g}; Rückgang um {difference:.12g} ({percentage:.1f} %)", previous_value=previous_value, value=value, difference=difference, percentage=percentage)
         )
     return (
-        f"Vorwert {previous_value:.12g} → {value:.12g}; "
-        f"Rückgang um {difference:.12g}"
+        tr("Vorwert {previous_value:.12g} → {value:.12g}; Rückgang um {difference:.12g}", previous_value=previous_value, value=value, difference=difference)
     )
 
 
@@ -657,7 +650,6 @@ def count_duplicate_rows_by_entity(
     tz: ZoneInfo,
     window_days: int = 30,
     now: datetime | None = None,
-    max_rows_per_entity: int | None = None,
 ) -> list[dict]:
     """Aufschlüsselung erkannter Duplikate je Entität für die Statistik-
     Übersicht — bewusst auf ein Zeitfenster begrenzt (Standard: letzte 30
@@ -665,6 +657,14 @@ def count_duplicate_rows_by_entity(
     Vorkommen (eigene Tabelle, billig abzufragen) sind Duplikate nirgends
     persistiert, eine archiv-weite Suche über Jahre an Rohdaten für jede
     Entität wäre bei mehreren Millionen Zeilen pro Entität spürbar langsam.
+
+    Zählt im Streaming (iter_raw_rows + iter_duplicate_rows_to_delete) statt
+    die Zeilen in eine Liste zu lesen: Speicherbedarf und Dauer hängen nicht
+    an der Zeilenzahl, und es gibt bewusst KEIN Zeilenlimit. Das frühere
+    max_rows_per_entity (MAX_UI_ANALYSIS_ROWS, 500.000) war ein Schutz für
+    die Oberfläche; im Hintergrundlauf ließ eine einzige dichte Entität
+    (ein Wert alle ~5 s über 30 Tage) ResultLimitExceeded fliegen und den
+    ganzen Wartungsplaner-Durchlauf scheitern.
 
     Gibt nur Entitäten mit mindestens einem gefundenen Duplikat zurück,
     sortiert nach Anzahl absteigend."""
@@ -674,11 +674,8 @@ def count_duplicate_rows_by_entity(
     results: list[dict] = []
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
-        rows = list_raw_rows(
-            data_dir, index, entity_id, window_start, window_end, tz,
-            now=now, max_rows=max_rows_per_entity
-        )
-        count = len(duplicate_rows_to_delete(rows))
+        rows = iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now)
+        count = sum(1 for _ in iter_duplicate_rows_to_delete(rows))
         if count:
             results.append({
                 "entity_id": entity_id,
@@ -686,6 +683,126 @@ def count_duplicate_rows_by_entity(
                 "count": count,
             })
     results.sort(key=lambda r: r["count"], reverse=True)
+    return results
+
+
+# „Kehrt zurück“: nach einem Rückgang erreicht ein Folgewert den Vorwert wieder, innerhalb
+# von 30 Minuten ODER 10 Werten (je nach Sendetakt zählt das eine oder das andere).
+COUNTER_WINDOW_DAYS = 30
+# Fehlwert-Häufung (Meldung): an so vielen verschiedenen Tagen der letzten 14 Tage kehrte ein Rückgang zurück.
+COUNTER_PATTERN_DAYS = 14
+COUNTER_PATTERN_MIN_DAYS = 3
+COUNTER_RETURN_SECONDS = 1800
+COUNTER_RETURN_VALUES = 10
+
+
+# Zähler mit planmäßigem Rücksetzen (Tages-, Monatsertrag: „… heute“) fallen jede Nacht auf
+# nahe 0. Das ist kein Fehler und würde die Meldung dauerhaft füllen.
+PERIODIC_RESET_MAX_RATIO = 0.1
+
+
+def _is_periodic_reset(previous_ts: float, ts: float, previous: float, value: float, tz: ZoneInfo) -> bool:
+    """Der Rückgang liegt über einem Kalendertagwechsel und fällt auf höchstens ein Zehntel
+    des Vorwerts — so setzt sich ein Tages-, Wochen- oder Monatszähler selbst zurück."""
+    if datetime.fromtimestamp(previous_ts, tz).date() == datetime.fromtimestamp(ts, tz).date():
+        return False
+    return previous > 0 and value <= previous * PERIODIC_RESET_MAX_RATIO
+
+
+def classify_counter_decreases(
+    rows: Iterable[tuple[float, float]], tz: ZoneInfo | None = None
+) -> list[dict]:
+    """Rückgänge eines Zählers samt Einordnung — im Streaming, ohne die Zeilen zu halten.
+
+    Ein Rückgang ist wie in detect_counter_decreases() die erste niedrigere Zeile nach einem
+    höheren Stand; danach gilt der niedrige Wert als neue Bezugsgröße. ``returns`` ist
+    True, wenn ein Folgewert den Vorwert wieder erreicht (Fehlwert), False, wenn das
+    in beiden Grenzen (Zeit UND Anzahl) ausbleibt (Zählerwechsel oder Rücksetzer), und
+    None, solange die Daten enden, bevor sich das entscheiden lässt.
+
+    Mit ``tz`` werden planmäßige Rücksetzer um Mitternacht (siehe _is_periodic_reset) nicht
+    mitgezählt; ohne bleibt es bei jedem Rückgang."""
+    found: list[dict] = []
+    pending: list[dict] = []
+    previous_ts: float | None = None
+    previous_value: float | None = None
+    for ts, value in rows:
+        for item in list(pending):
+            item["seen"] += 1
+            if value >= item["previous"]:
+                item.update(returns=True, recovered_value=value, recovered_after=ts - item["ts"])
+                pending.remove(item)
+            elif ts - item["ts"] > COUNTER_RETURN_SECONDS and item["seen"] > COUNTER_RETURN_VALUES:
+                item["returns"] = False
+                pending.remove(item)
+        if previous_ts is None:
+            previous_ts, previous_value = ts, value
+            continue
+        if ts <= previous_ts:
+            continue
+        if previous_value is not None and value < previous_value and not (
+            tz is not None and _is_periodic_reset(previous_ts, ts, previous_value, value, tz)
+        ):
+            item = {
+                "ts": ts, "previous": previous_value, "value": value,
+                "returns": None, "recovered_value": None, "recovered_after": None, "seen": 0,
+            }
+            found.append(item)
+            pending.append(item)
+        previous_ts, previous_value = ts, value
+    for item in found:
+        item.pop("seen", None)
+    return found
+
+
+def scan_counter_decreases(
+    data_dir: Path,
+    index: Index,
+    tz: ZoneInfo,
+    window_days: int = COUNTER_WINDOW_DAYS,
+    now: datetime | None = None,
+    entity_ids: Collection[str] | None = None,
+) -> list[dict]:
+    """Zählerrückgänge der letzten Tage je Zähler (state_class total_increasing) für die Meldung
+    und den Housekeeping-Abschnitt. Dasselbe Streaming und dieselbe Fensterbegrenzung wie
+    count_duplicate_rows_by_entity(): eine Suche über die ganze Historie wäre bei Millionen
+    Zeilen spürbar langsam, und ein Rückgang von vor Monaten ist längst entschieden."""
+    now = now or datetime.now(tz)
+    window_start = (now - timedelta(days=window_days)).timestamp()
+    window_end = now.timestamp()
+    results: list[dict] = []
+    for entity in index.list_entities():
+        if entity["state_class"] != "total_increasing" or entity["counter_decreases"] == "allow":
+            continue
+        entity_id = entity["entity_id"]
+        if entity_ids is not None and entity_id not in entity_ids:
+            continue
+        decreases = classify_counter_decreases(
+            iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now), tz
+        )
+        if not decreases:
+            continue
+        last = decreases[-1]
+        results.append({
+            "entity_id": entity_id,
+            "friendly_name": entity["custom_name"] or entity["friendly_name"],
+            "unit": entity["unit"],
+            "decimals": entity["decimals"],
+            "count": len(decreases),
+            "returning": sum(1 for item in decreases if item["returns"]),
+            "returning_days": sorted({
+                datetime.fromtimestamp(item["ts"], tz).date().isoformat()
+                for item in decreases
+                if item["returns"] and item["ts"] >= now.timestamp() - COUNTER_PATTERN_DAYS * 86400
+            }),
+            # Die jüngsten zurückkehrenden Rückgänge im Einzelnen, damit die Sammelaktion vor dem Markieren
+            # zeigen kann, welche Werte genau betroffen sind (der Schnappschuss wird sonst nur gezählt).
+            "returning_items": [
+                {key: item[key] for key in ("ts", "previous", "value")} for item in decreases if item["returns"]
+            ][-5:],
+            "last": {key: last[key] for key in ("ts", "previous", "value", "returns", "recovered_value", "recovered_after")},
+        })
+    results.sort(key=lambda r: r["last"]["ts"], reverse=True)
     return results
 
 
@@ -711,9 +828,7 @@ def detect_gaps(
         delta = rows[i + 1][0] - prev_ts
         if delta > threshold_seconds:
             flagged[rows[i + 1][0]] = (
-                f"{_format_duration(delta)} seit vorherigem Wert "
-                f"{_format_val(prev_value, decimals)} um {_format_ts(prev_ts, tz)} "
-                f"(Schwellwert: {_format_duration(threshold_seconds)})"
+                tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(prev_value, decimals), _format_ts=_format_ts(prev_ts, tz), _format_duration2=_format_duration(threshold_seconds))
             )
     return flagged
 
@@ -747,14 +862,37 @@ def detect_outliers(
     return flagged
 
 
-def soft_delete(index: Index, entity_id: str, timestamps: list[float]) -> None:
-    index.mark_deleted(entity_id, timestamps)
+#: Herkunft einer Markierung (Reiter „Markiert“, „Verlauf“): was die Chargen auslöste.
+MARK_SOURCES = ("manual", "duplicates", "repetitions", "counter_bulk", "counter_rule")
+
+
+def soft_delete(
+    index: Index, entity_id: str, timestamps: list[float], deleted_at: float | None = None,
+    source: str = "manual", trigger: str = "manual",
+) -> None:
+    started_at = time.time()
+    deleted_at = started_at if deleted_at is None else deleted_at
+    index.mark_deleted(entity_id, timestamps, deleted_at=deleted_at)
+    if timestamps:
+        index.invalidate_counter_decrease_snapshot()
+        index.log_entity_action(
+            entity_id, "mark", trigger, started_at, time.time(), "success",
+            rows_affected=len(timestamps),
+            detail=json.dumps({"source": source if source in MARK_SOURCES else "manual", "batch": deleted_at}),
+        )
 
 
 def undo_last_delete(index: Index, entity_id: str) -> int:
     """Macht die zuletzt gelöschte Charge rückgängig (ein Klick = ein 'Löschen'-Vorgang
     rückgängig, wie im Konzept-Mockup "Rückgängig" beschrieben)."""
-    return index.undo_last_deleted_batch(entity_id)
+    started_at = time.time()
+    count = index.undo_last_deleted_batch(entity_id)
+    if count:
+        index.log_entity_action(
+            entity_id, "undo", "manual", started_at, time.time(), "success",
+            rows_affected=count, detail=json.dumps({"mode": "last"}),
+        )
+    return count
 
 
 def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict[float, int]]:
@@ -773,12 +911,16 @@ def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict
 
 
 def preview_purge(
-    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None,
+    entity_ids: list[str] | None = None,
 ) -> dict:
     """Ermittelt exakt, welche Soft-Deletes der manuelle Purge entfernen kann.
 
     Es werden nur Zeitstempelspalten und der aktuelle Hot Buffer gelesen. Archiv,
     Rollups, Indexzähler und Löschmarkierungen bleiben unverändert.
+
+    ``entity_ids`` beschränkt auf diese Entitäten (Reiter „Markiert“ einer
+    einzelnen Entität); None = alle.
     """
     now = now or datetime.now(tz)
     rows: list[dict] = []
@@ -800,7 +942,7 @@ def preview_purge(
                 removed += 1
         return removed
 
-    for entity in index.list_entities():
+    for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         deleted = index.get_deleted_counts_for_entity(entity_id)
         marked = sum(deleted.values())
@@ -858,8 +1000,18 @@ def preview_purge(
     return {"totals": totals, "rows": rows}
 
 
+def _entities_in_scope(index: Index, entity_ids: list[str] | None):
+    """Alle Entitäten, oder nur die genannten (Purge einer einzelnen Entität)."""
+    entities = index.list_entities()
+    if entity_ids is None:
+        return entities
+    wanted = set(entity_ids)
+    return [entity for entity in entities if entity["entity_id"] in wanted]
+
+
 def purge_hot_buffer(
-    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None, older_than: float | None = None
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None, older_than: float | None = None,
+    entity_ids: list[str] | None = None,
 ) -> int:
     """Entfernt weich gelöschte Vorkommen physisch aus dem Hot Buffer (laufender
     Monat, unkomprimiertes CSV) — der laufende Monat hat keine Rollup-Datei,
@@ -872,11 +1024,13 @@ def purge_hot_buffer(
     Markierungen, die mindestens so alt sind — für die automatische
     Bereinigung (background.py). Der manuelle Purge lässt es weg.
 
+    ``entity_ids`` beschränkt auf diese Entitäten, None = alle.
+
     Gibt die Anzahl tatsächlich physisch entfernter Zeilen zurück."""
     now = now or datetime.now(tz)
     current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
     purged_total = 0
-    for entity in index.list_entities():
+    for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         deleted = index.get_deleted_counts_for_entity(entity_id, older_than=older_than)
         relevant = {ts: count for ts, count in deleted.items() if ts >= current_month_start}
@@ -931,6 +1085,7 @@ def purge_archived_months(
     now: datetime | None = None,
     on_month: Callable[[int, str], None] | None = None,
     older_than: float | None = None,
+    entity_ids: list[str] | None = None,
 ) -> dict:
     """Entfernt weich gelöschte Vorkommen physisch aus bereits archivierten
     Monaten — schreibt die betroffene Parquet-Datei ohne die gelöschten
@@ -956,11 +1111,13 @@ def purge_archived_months(
     CSV je Entität für den laufenden Monat und in Bruchteilen einer Sekunde
     durch.
 
+    ``entity_ids`` beschränkt auf diese Entitäten, None = alle.
+
     Gibt eine Zusammenfassung zurück (rows_purged, months_purged)."""
     now = now or datetime.now(tz)
     rows_purged = 0
     months_purged = 0
-    for entity in index.list_entities():
+    for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         aggregation_type = entity["aggregation_type"]
         hourly_rollup = bool(entity["hourly_rollup"])
@@ -1154,7 +1311,7 @@ def add_raw_value(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     now_month_key = now.strftime("%Y-%m")
     ts_dt = datetime.fromtimestamp(ts, tz)
     ts_month_key = ts_dt.strftime("%Y-%m")
@@ -1195,7 +1352,7 @@ def correct_raw_value(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     now_month_key = now.strftime("%Y-%m")
     ts_dt = datetime.fromtimestamp(ts, tz)
     ts_month_key = ts_dt.strftime("%Y-%m")
@@ -1343,10 +1500,10 @@ def _compactable_months(
 
 def _validate_compaction_target(entity: dict, target_resolution: str) -> int:
     if entity["aggregation_type"] == "switch":
-        raise CompactionError("Verdichten ist für Schalter nicht verfügbar")
+        raise CompactionError(tr("Verdichten ist für Schalter nicht verfügbar"))
     interval = resolution_seconds(target_resolution)
     if interval is None:
-        raise CompactionError(f"Ungültiges Verdichtungsziel: {target_resolution}")
+        raise CompactionError(tr("Ungültiges Verdichtungsziel: {target_resolution}", target_resolution=target_resolution))
     return interval
 
 
@@ -1360,7 +1517,7 @@ def preview_compact_raw_values(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     interval = _validate_compaction_target(entity, target_resolution)
     aggregation_type = entity["aggregation_type"]
     current_month_start = datetime(now.year, now.month, 1, tzinfo=tz).timestamp()
@@ -1502,7 +1659,7 @@ def compact_raw_values(
     now = now or datetime.now(tz)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise ValueError(f"Unbekannte Entität: {entity_id}")
+        raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
     interval = _validate_compaction_target(entity, target_resolution)
     aggregation_type = entity["aggregation_type"]
     hourly_rollup = bool(entity["hourly_rollup"])

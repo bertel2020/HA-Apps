@@ -24,6 +24,8 @@
   <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
+<p align="center"><em><a href="README.en.md">English version</a></em></p>
+
 Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
 Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
 [Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv) sammelt
@@ -244,8 +246,9 @@ Jeder Import bleibt als Report nachvollziehbar; bereits vorhandene
 Zeitstempel werden dabei nie dupliziert. Der laufende Monat wird automatisch
 im Hot Buffer ergänzt; historische Lücken in abgeschlossenen Archiven lassen
 sich optional schließen. Der Dry Run stellt zusätzlich eine ausführliche
-Debug-Datei zur Diagnose bereit. Die vollständige Rohdatenhistorie einer
-Entität lässt sich als CSV exportieren.
+Debug-Datei zur Diagnose bereit. Unter System → Export führt ein
+Assistent zur CSV-Datei (mehrere Entitäten als ZIP): mit Zeitraum und wahlweise
+gröberer Auflösung (Minute, Stunde, Tag) statt der kompletten Rohwerte.
 
 ## Screenshots
 
@@ -300,11 +303,16 @@ importieren. Eine Wiederherstellung wird vor der Anwendung geprüft
 bisherige Datenbestand wird vor dem Überschreiben verschoben, nicht
 gelöscht.
 
-Zeitarchiv spricht selbst kein S3/WebDAV/SMB — für ein Offsite-Ziel meldet
-die App stattdessen das letzte erfolgreiche Backup an die
-Home-Assistant-Integration, die daraus eine Sensor-Entity und ein
-Automations-Blueprint macht (siehe Integrations-README). Die eigentliche
-Übertragung übernimmt dann eine eigene Automation, z. B. mit `rclone`.
+Als **externes Ziel** kopiert die App jedes erfolgreiche Backup zusätzlich auf
+einen Netzwerkspeicher (NFS oder SMB/CIFS), den Home Assistant unter
+*Einstellungen → System → Speicher → Netzwerkspeicher* mit der Verwendung
+„Medien“ oder „Share“ einbindet. Zeitarchiv bindet nichts selbst ein, die
+Zugangsdaten bleiben bei Home Assistant. Alternativ lädt die App Backups per
+**WebDAV** hoch (z. B. Nextcloud oder ein NAS); das Passwort steht dafür nur in
+den Add-on-Optionen. Für andere Ziele (S3, Cloud) meldet die App das letzte erfolgreiche Backup an die Home-Assistant-Integration,
+die daraus eine Sensor-Entity und ein Automations-Blueprint macht (siehe
+Integrations-README); die Übertragung übernimmt dann eine eigene Automation,
+z. B. mit `rclone`.
 
 ## Sicherheit und Netzwerk
 

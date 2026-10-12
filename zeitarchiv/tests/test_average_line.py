@@ -6,10 +6,10 @@ nicht an „Statistik in Legende" gekoppelt: die Legende nennt die Zahl, die
 Linie zeigt, wo sie im Bild liegt.
 """
 
-from _paths import APP
+from _paths import APP, template_text
 
-DETAIL_TEMPLATE = (APP / "templates/entity_detail.html").read_text(encoding="utf-8")
-EDITOR_TEMPLATE = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+DETAIL_TEMPLATE = template_text("entity_detail.html")
+EDITOR_TEMPLATE = template_text("chart_editor.html")
 DETAIL_JS = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8")
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 

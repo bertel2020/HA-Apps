@@ -1,38 +1,38 @@
 {% extends "base.html" %}
 {% from "_hints.html" import hint_button, hint_body %}
-{% block title %}Zeitarchiv — Einstellungen{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Einstellungen") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/settings.css') }}">
 {% endblock %}
 {% block content %}
   
   <div class="page">
-    <h1>Einstellungen</h1>
-    <p class="sub">Globale Konfiguration &mdash; unabhängig von einzelnen Entitäten.</p>
+    <h1>{{ _("Einstellungen") }}</h1>
+    <p class="sub">{{ _("Globale Konfiguration &mdash; unabhängig von einzelnen Entitäten.") }}</p>
 
     <div class="settings-layout">
       {% set nav_active = 'darstellung' %}
       {% include "_settings_nav.html" %}
       <div class="settings-panel">
         <section id="darstellung" class="settings-section">
-          <h2 class="settings-section-title">Darstellung {{ hint_button('Darstellung') }}</h2>
-          {% call hint_body('settings-section-description') %}Aussehen der App sowie Standardwerte für Chart-Optionen festlegen.{% endcall %}
+          <h2 class="settings-section-title">{{ _("Darstellung") }} {{ hint_button(_('Darstellung')) }}</h2>
+          {% call hint_body('settings-section-description') %}{{ _("Aussehen der App sowie Standardwerte für Chart-Optionen festlegen.") }}{% endcall %}
           <div id="darstellung-form">
             {% include "_settings_darstellung_form.html" %}
           </div>
         </section>
 
         <section id="archivierung" class="settings-section">
-          <h2 class="settings-section-title">Archivierung</h2>
-          <p>Standardwerte für neu erkannte Entitäten. Bestehende bleiben unverändert. Einzeln änderbar in der Entität-Konfiguration.</p>
+          <h2 class="settings-section-title">{{ _("Archivierung") }}</h2>
+          <p>{{ _("Standardwerte für neu erkannte Entitäten. Bestehende bleiben unverändert. Einzeln änderbar in der Entität-Konfiguration.") }}</p>
           <div id="archivierung-form">
             {% include "_settings_archivierung_form.html" %}
           </div>
         </section>
 
         <section id="meldungen" class="settings-section">
-          <h2 class="settings-section-title">Meldungen {{ hint_button('Meldungen') }}</h2>
-          {% call hint_body('settings-section-description') %}Stummgeschaltete Meldungen aus dem Meldungs-Center (Glocken-Icon oben) &mdash; nur Empfehlungen lassen sich stumm schalten, keine Fehler.{% endcall %}
+          <h2 class="settings-section-title">{{ _("Meldungen") }} {{ hint_button(_('Meldungen')) }}</h2>
+          {% call hint_body('settings-section-description') %}{{ _("Stummgeschaltete Meldungen aus dem Meldungs-Center (Glocken-Icon oben) &mdash; nur Empfehlungen lassen sich stumm schalten, keine Fehler.") }}{% endcall %}
           <div class="settings-subsection">
             <div id="tips-settings-form">
               {% include "_settings_tips_form.html" %}
@@ -40,10 +40,10 @@
             <dialog id="tips-list-dialog" class="detail-dialog" aria-labelledby="tips-list-title">
               <div class="detail-dialog-header">
                 <div>
-                  <h2 id="tips-list-title">Alle Tipps {{ hint_button('Alle Tipps') }}</h2>
-                  {% call hint_body() %}Nur der heutige Tipp lässt sich ausblenden — morgen ist ohnehin ein anderer dran.{% endcall %}
+                  <h2 id="tips-list-title">{{ _("Alle Tipps") }} {{ hint_button(_('Alle Tipps')) }}</h2>
+                  {% call hint_body() %}{{ _("Nur der heutige Tipp lässt sich ausblenden — morgen ist ohnehin ein anderer dran.") }}{% endcall %}
                 </div>
-                <form method="dialog"><button class="btn" aria-label="Dialog schließen">Schließen</button></form>
+                <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
               </div>
               <div id="tips-list-body">
                 {% include "_tips_list_body.html" %}
@@ -51,7 +51,7 @@
             </dialog>
           </div>
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Stummgeschaltet</h3>
+            <h3 class="settings-subsection-title">{{ _("Stummgeschaltet") }}</h3>
             <div id="muted-notices-body">
               {% include "_muted_notices_body.html" %}
             </div>
@@ -59,43 +59,43 @@
         </section>
 
         <section id="verbindung" class="settings-section">
-          <h2 class="settings-section-title">Verbindung</h2>
+          <h2 class="settings-section-title">{{ _("Verbindung") }}</h2>
           <div id="verbindung-form">
             {% include "_settings_verbindung_form.html" %}
           </div>
         </section>
 
         <section id="diagnose" class="settings-section">
-          <h2 class="settings-section-title">Diagnose {{ hint_button('Diagnose') }}</h2>
-          {% call hint_body('settings-section-description') %}Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.{% endcall %}
+          <h2 class="settings-section-title">{{ _("Diagnose") }} {{ hint_button(_('Diagnose')) }}</h2>
+          {% call hint_body('settings-section-description') %}{{ _("Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.") }}{% endcall %}
           {% include "_settings_debug_tools.html" %}
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Diagnosebericht {{ hint_button('Diagnosebericht') }}</h3>
-            {% call hint_body() %}Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.{% endcall %}
+            <h3 class="settings-subsection-title">{{ _("Diagnosebericht") }} {{ hint_button(_('Diagnosebericht')) }}</h3>
+            {% call hint_body() %}{{ _("Betriebs- und Konfigurationsdaten, keine Token, Messwerte oder Entitäts-IDs.") }}{% endcall %}
             <div class="actionbar" style="justify-content:flex-end;">
-              <a class="btn" href="settings/diagnostics">Diagnosedaten herunterladen</a>
+              <a class="btn" href="settings/diagnostics">{{ _("Diagnosedaten herunterladen") }}</a>
             </div>
           </div>
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Prozess</h3>
+            <h3 class="settings-subsection-title">{{ _("Prozess") }}</h3>
             <div class="settings-compact-list">
               <div class="settings-compact-row" id="settings-ram" hx-get="settings/ram" hx-trigger="load" hx-swap="outerHTML">
-                <span class="settings-compact-label">RAM-Verbrauch</span>
-                <span class="settings-compact-value">wird geladen …</span>
+                <span class="settings-compact-label">{{ _("RAM-Verbrauch") }}</span>
+                <span class="settings-compact-value">{{ _("wird geladen …") }}</span>
               </div>
               <div class="settings-compact-row">
-                <span class="settings-compact-label">Startzeitpunkt</span>
+                <span class="settings-compact-label">{{ _("Startzeitpunkt") }}</span>
                 <span class="settings-compact-value">{{ server_started_at }}</span>
               </div>
               <div class="settings-compact-row">
-                <span class="settings-compact-label">Laufzeit</span>
+                <span class="settings-compact-label">{{ _("Laufzeit") }}</span>
                 <span class="settings-compact-value">{{ uptime }}</span>
               </div>
             </div>
           </div>
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Hintergrundprozesse {{ hint_button('Hintergrundprozesse') }}</h3>
-            {% call hint_body() %}Was der Wartungsplaner alle 30 Sekunden prüft, mit letztem Lauf und Status.{% endcall %}
+            <h3 class="settings-subsection-title">{{ _("Hintergrundprozesse") }} {{ hint_button(_('Hintergrundprozesse')) }}</h3>
+            {% call hint_body() %}{{ _("Was der Wartungsplaner alle 30 Sekunden prüft, mit letztem Lauf und Status.") }}{% endcall %}
             <div>
               {% for proc in background_processes %}
               <div class="bgproc-row">
@@ -110,8 +110,8 @@
             </div>
           </div>
           <div class="settings-subsection">
-            <h3 class="settings-subsection-title">Sperren {{ hint_button('Sperren') }}</h3>
-            {% call hint_body() %}Wie oft ein Zugriff wegen Überlastung nicht rechtzeitig drankam — einzelne Vorkommen sind normal (z. B. während eines Backups oder einer Index-Optimierung), erst Häufung wäre auffällig.{% endcall %}
+            <h3 class="settings-subsection-title">{{ _("Sperren") }} {{ hint_button(_('Sperren')) }}</h3>
+            {% call hint_body() %}{{ _("Wie oft ein Zugriff wegen Überlastung nicht rechtzeitig drankam — einzelne Vorkommen sind normal (z. B. während eines Backups oder einer Index-Optimierung), erst Häufung wäre auffällig.") }}{% endcall %}
             <div>
               {% for proc in lock_status %}
               <div class="bgproc-row">
@@ -139,10 +139,10 @@
         {% endif %}
 
         <section id="ueber" class="settings-section">
-          <h2 class="settings-section-title">Über Zeitarchiv</h2>
+          <h2 class="settings-section-title">{{ _("Über Zeitarchiv") }}</h2>
 
           <div class="about-card">
-            <svg class="about-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeitarchiv-Logo">
+            <svg class="about-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{{ _('Zeitarchiv-Logo') }}">
               <rect width="64" height="64" rx="14" fill="#13211C"/>
               <rect x="13" y="44" width="6" height="7" rx="1.5" fill="#E79A5B"/>
               <rect x="23.8" y="35.87" width="6" height="15.13" rx="1.5" fill="#E79A5B"/>
@@ -155,40 +155,40 @@
             </svg>
             <div class="about-card-body">
               <div class="about-card-heading">
-                <span class="about-app-name">Zeitarchiv</span>
+                <span class="about-app-name">{{ _("Zeitarchiv") }}</span>
                 <span class="about-version-badge">v{{ app_version }}</span>
                 {% if update_available %}
                 <a class="about-update-chip is-update" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">
-                  Update auf v{{ latest_version }} verfügbar
+                  {{ _("Update auf v{latest_version} verfügbar", latest_version=latest_version) }}
                 </a>
                 {% elif latest_version %}
-                <span class="about-update-chip">Aktuell</span>
+                <span class="about-update-chip">{{ _("Aktuell") }}</span>
                 {% endif %}
               </div>
-              <p class="about-tagline">Home-Assistant-App zur langfristigen Archivierung und Auswertung von Entitäts-Zeitreihen &mdash; platzsparende Parquet+zstd-Speicherung, Charts, Tabellen, Import/Export und sichere Datenpflege.</p>
+              <p class="about-tagline">{{ _("Home-Assistant-App zur langfristigen Archivierung und Auswertung von Entitäts-Zeitreihen &mdash; platzsparende Parquet+zstd-Speicherung, Charts, Tabellen, Import/Export und sichere Datenpflege.") }}</p>
             </div>
           </div>
 
           <div class="about-meta-grid">
             <div class="about-meta-item">
-              <span class="about-meta-label">Zeitzone</span>
+              <span class="about-meta-label">{{ _("Zeitzone") }}</span>
               <span class="about-meta-value">{{ timezone }}</span>
             </div>
             <div class="about-meta-item">
-              <span class="about-meta-label">Datenverzeichnis</span>
+              <span class="about-meta-label">{{ _("Datenverzeichnis") }}</span>
               <span class="about-meta-value">{{ data_dir }}</span>
             </div>
           </div>
 
           <div class="actionbar" style="justify-content:flex-end;">
-            <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md" target="_blank" rel="noopener noreferrer">Dokumentation</a>
-            <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">Changelog</a>
-            <a class="btn" href="https://github.com/bertel2020/HA-Apps/issues" target="_blank" rel="noopener noreferrer">Fehler melden</a>
+            <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md" target="_blank" rel="noopener noreferrer">{{ _("Dokumentation") }}</a>
+            <a class="btn" href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md" target="_blank" rel="noopener noreferrer">{{ _("Changelog") }}</a>
+            <a class="btn" href="https://github.com/bertel2020/HA-Apps/issues" target="_blank" rel="noopener noreferrer">{{ _("Fehler melden") }}</a>
           </div>
 
           <footer class="about-copyright">
             <span class="copyright-mark" aria-hidden="true">©</span>
-            <span>2026 <a href="https://github.com/bertel2020" target="_blank" rel="noopener noreferrer">bertel2020</a></span>
+            <span>2026 <a href="https://github.com/bertel2020" target="_blank" rel="noopener noreferrer">{{ _("bertel2020") }}</a></span>
           </footer>
         </section>
       </div>

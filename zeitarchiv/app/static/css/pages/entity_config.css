@@ -54,3 +54,14 @@
     .config-card{padding:18px 16px;}
     .entity-data-action .btn{width:100%;}
   }
+
+/* Regel „Fehlwerte automatisch markieren“ unter dem Feld „Zählerrückgänge“ (_counter_decrease_field.html). */
+.counter-auto{
+  margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;max-width:560px;
+}
+.counter-auto .counter-auto-state{
+  padding:0 8px;border-radius:10px;font-weight:600;font-size:calc(12px * var(--font-scale, 1));
+  background:var(--surface);color:var(--ink-muted);
+}
+.counter-auto .hint{flex-basis:100%;margin:0;}

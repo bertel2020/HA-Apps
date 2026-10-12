@@ -25,7 +25,7 @@ from app.energiedashboard_routes import (
 )
 from app.storage.index import Index
 
-from _paths import TEMPLATES, page_text
+from _paths import TEMPLATES, page_text, template_text
 
 TEMPLATES_DIR = TEMPLATES
 
@@ -150,7 +150,7 @@ def test_page_context_carries_app_root_for_kpi_links() -> None:
     _with_service(run)
 
 
-_VIEW_TEMPLATE = (TEMPLATES_DIR / "_energiedashboard_view.html").read_text(encoding="utf-8")
+_VIEW_TEMPLATE = template_text("_energiedashboard_view.html")
 
 
 def test_erzeugung_und_verbrauch_kacheln_verlinken_nur_bei_eindeutiger_quelle() -> None:

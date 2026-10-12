@@ -166,6 +166,8 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     "refresh_retention_overview_if_stale": "Aufbewahrung-Übersicht",
     "refresh_purge_preview_if_stale": "Löschvorschau",
     "_refresh_duplicate_snapshot_if_stale": "Duplikat-Erkennung",
+    "_refresh_counter_decrease_snapshot_if_stale": "Zählerrückgang-Erkennung",
+    "run_if_due": "Fehlwerte-Regel",
     "_refresh_one_outlier_rate": "Ausreißer-Quoten",
     "refresh_if_stale": "Versionsprüfung",
     "process_pending_hourly_backfill": "Energiedashboard · Stunden-Rollup-Backfill",
@@ -203,8 +205,9 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
 #: sein Ergebnis genau so lange gilt wie der Prozess.
 ZEILE_AUSSERHALB_DES_TAKTS = "Speicherindex-Abgleich"
 
-#: Kein Arbeitsschritt, sondern Gerüst der Schleife selbst.
-KEIN_SCHRITT = {"debug", "exception", "wait", "is_set", "now", "time"}
+#: Kein Arbeitsschritt, sondern Gerüst der Schleife selbst (auch die
+#: Fehlerklammer _maintenance_step, die jeden Schritt einzeln umschließt).
+KEIN_SCHRITT = {"debug", "exception", "wait", "is_set", "now", "time", "_maintenance_step"}
 
 
 def _wartungsplaner_schritte() -> set[str]:
@@ -226,19 +229,26 @@ def _diagnose_zeilennamen() -> set[str]:
     Energiedashboard-Zeilen entstehen nur bei konfiguriertem Dashboard und
     fehlten in einer Testumgebung sonst immer."""
     funktion = _function("_settings_background_processes_context")
+
+    def text(knoten):
+        """Konstante oder tr("…") um eine Konstante (Übersetzung) → der deutsche Text, sonst None."""
+        if isinstance(knoten, ast.Call) and isinstance(knoten.func, ast.Name) and knoten.func.id == "tr" and knoten.args:
+            knoten = knoten.args[0]
+        return knoten.value if isinstance(knoten, ast.Constant) else None
+
     namen = set()
     for knoten in ast.walk(funktion):
         # row("Name", …) — die festen Zeilen
         if (isinstance(knoten, ast.Call) and isinstance(knoten.func, ast.Name)
                 and knoten.func.id == "row" and knoten.args
-                and isinstance(knoten.args[0], ast.Constant)):
-            namen.add(knoten.args[0].value)
+                and text(knoten.args[0]) is not None):
+            namen.add(text(knoten.args[0]))
         # {"name": "…", …} — die Zeilen mit eigener Pille
         if isinstance(knoten, ast.Dict):
             for schluessel, wert in zip(knoten.keys, knoten.values):
                 if (isinstance(schluessel, ast.Constant) and schluessel.value == "name"
-                        and isinstance(wert, ast.Constant)):
-                    namen.add(wert.value)
+                        and text(wert) is not None):
+                    namen.add(text(wert))
     return namen
 
 

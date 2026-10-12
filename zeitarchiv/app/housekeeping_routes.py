@@ -22,6 +22,8 @@ zu wissen, wer sie im Hintergrund pflegt.
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import json
 import logging
 import time
@@ -32,10 +34,13 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import formats
 from . import cleanup_stats
+from . import cleanup_tile, counter_auto, counter_bulk
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -88,14 +93,19 @@ logger = logging.getLogger(__name__)
 #: Seitenwechsel neu aufgebaut wird. Es gibt genau einen Bereinigungslauf
 #: gleichzeitig — der Auftrag hält die globale Wartungssperre, ein zweiter
 #: könnte ohnehin nur warten.
-_purge_progress = JobProgress("purge", unit="Monate", label="Bereinigung")
+_purge_progress = JobProgress("purge", unit=N_("Monate"), label=N_("Bereinigung"))
+#: Öffentlicher Name für den Reiter „Markiert“ einer Entität (marked_values_routes.py):
+#: die Bereinigung genau EINER Entität teilt sich diesen Auftrag. Es läuft damit
+#: weiterhin höchstens eine Bereinigung gleichzeitig, und sie steht in der
+#: Kopfleiste und in Housekeeping, egal von wo sie angestoßen wurde.
+purge_progress = _purge_progress
 
 #: Fortschritt der manuellen Rotation. Sie bleibt bewusst synchron — wer sie
 #: auslöst, wartet auf die Antwort und braucht keine eigene Anzeige. In der
 #: Kopfleiste steht sie trotzdem, weil sie unter der globalen Wartungssperre
 #: läuft: Für jeden ANDEREN Tab sieht das sonst nach einem grundlos hängenden
 #: Server aus. Siehe JobProgress.track().
-_rotation_progress = JobProgress("rotation", unit="Entitäten", label="Rotation")
+_rotation_progress = JobProgress("rotation", unit=N_("Entitäten"), label=N_("Rotation"))
 
 
 def _rotation_step(nummer: int, gesamt: int, entity_id: str) -> None:
@@ -135,6 +145,7 @@ class HousekeepingDependencies:
     storage_locked: Callable[..., Callable]
     settings_archivierung_context: Callable[..., dict]
     refresh_purge_preview_if_stale: Callable[..., object]
+    invalidate_purge_preview: Callable[[], None]
     refresh_retention_overview_if_stale: Callable[..., object]
     begin_retention_job: Callable[..., object]
     finish_retention_job: Callable[..., object]
@@ -204,14 +215,14 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
             interval = "off"
         interval_seconds = demo_mode.DEMO_APPEND_INTERVAL_SECONDS.get(interval)
         next_run_label = (
-            f"in {format_uptime((last_run if last_run is not None else now) + interval_seconds - now)}"
+            tr("in {dauer}", dauer=format_uptime((last_run if last_run is not None else now) + interval_seconds - now))
             if interval_seconds is not None else "—"
         )
         context.update({
             "demo_entity_count_label": format_int(overview["entity_count"]),
             "demo_row_count_label": format_int(overview["total_rows"]),
             "demo_size_label": format_size(overview["total_size_bytes"]),
-            "demo_last_run_label": f"vor {format_uptime(now - last_run)}" if last_run else "Noch nie",
+            "demo_last_run_label": tr("vor {format_uptime}", format_uptime=format_uptime(now - last_run)) if last_run else tr("Noch nie"),
             "demo_next_run_label": next_run_label,
             "demo_append_interval": interval,
             "demo_append_interval_options": list(DEMO_APPEND_INTERVAL_LABELS.items()),
@@ -220,7 +231,7 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
         context.update({
             "demo_entity_count_label": format_int(dir_info["entity_count_approx"]),
             "demo_size_label": format_size(dir_info["size_bytes"]),
-            "demo_newest_label": f"vor {format_uptime(now - dir_info['newest_mtime'])}",
+            "demo_newest_label": tr("vor {format_uptime}", format_uptime=format_uptime(now - dir_info['newest_mtime'])),
         })
     return context
 
@@ -246,6 +257,142 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         ]
         duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
         return duplicate_rows, duplicates_by_entity, duplicates_total
+
+    def _keep_together(label: str) -> str:
+        """Wert und Einheit nicht trennen: sonst steht „kWh“ allein in der nächsten Zeile."""
+        return label.replace(" ", "\u00a0")
+
+    def _counter_decreases_for_display() -> list[dict]:
+        """Housekeeping → Zählerrückgänge: der gecachte Schnappschuss (stündlich, oder sofort
+        neu nach dem Markieren), je Zähler mit dem letzten Rückgang und seiner Einordnung."""
+        rows = []
+        for row in (deps.index.get_counter_decrease_snapshot() or {}).get("rows", []):
+            last = row["last"]
+            if last["returns"]:
+                verdict = "returns"
+                note = tr(
+                    "nach {minutes} Min. wieder bei {value}",
+                    minutes=max(1, round((last["recovered_after"] or 0) / 60)),
+                    value=_keep_together(notices_mod.counter_value_label(last["recovered_value"], row)),
+                )
+            elif last["returns"] is False:
+                verdict = "stays"
+                note = tr("kein Wiederanstieg auf den Vorwert in den folgenden 30 Minuten")
+            else:
+                verdict = "open"
+                note = tr("noch zu wenige Folgewerte")
+            rows.append({
+                "entity_id": row["entity_id"],
+                "friendly_name": row["friendly_name"],
+                "returning": row.get("returning", 0),
+                "unit_label": row.get("unit") or "",
+                "count": row["count"],
+                "count_label": format_int(row["count"]),
+                "last_ts": last["ts"],
+                "last_label": f"{format_timestamp(last['ts'], deps.tz)[:6]} {format_time(last['ts'], deps.tz)[:5]}",
+                "change": tr(
+                    "{previous} → {value}",
+                    previous=_keep_together(notices_mod.counter_value_label(last["previous"], row)),
+                    value=_keep_together(notices_mod.counter_value_label(last["value"], row)),
+                ),
+                "verdict": verdict,
+                "note": note,
+                "returning_detail": [
+                    {
+                        "when": f"{format_timestamp(item['ts'], deps.tz)[:6]} {format_time(item['ts'], deps.tz)[:5]}",
+                        "value": _keep_together(notices_mod.counter_value_label(item["value"], row)),
+                        "previous": _keep_together(notices_mod.counter_value_label(item["previous"], row)),
+                    }
+                    for item in reversed(row.get("returning_items") or [])
+                ],
+            })
+        # Zähler mit der Regel „Fehlwerte automatisch markieren“: ihr Stand neben den offenen Rückgängen,
+        # auch wenn nichts mehr offen ist (die Regel hat es ja schon erledigt).
+        rule = counter_auto.summary(deps.index)
+        for row in rows:
+            row["rule"] = rule.get(row["entity_id"])
+        listed = {row["entity_id"] for row in rows}
+        for entity_id, state in rule.items():
+            if entity_id in listed or not (state["marked"] or state["halted"]):
+                continue
+            entity = deps.index.get_entity(entity_id)
+            rows.append({
+                "entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"], "returning": 0,
+                "unit_label": "", "count": 0, "count_label": "0", "last_ts": 0, "last_label": "—", "change": "",
+                "verdict": "none", "note": tr("nichts offen"), "rule": state,
+            })
+        return rows
+
+    # Zählermodus („report“/„allow“) für das Konfigurationsfeld; None bei allem, was kein Zähler ist.
+    def _counter_mode(entity_id: str) -> str | None:
+        entity = deps.index.get_entity(entity_id)
+        if entity is None or entity["state_class"] != "total_increasing":
+            return None
+        return "allow" if entity["counter_decreases"] == "allow" else "report"
+
+    deps.templates.env.globals["counter_decrease_mode"] = _counter_mode
+    deps.templates.env.globals["counter_auto_limit"] = counter_auto.MAX_PER_RUN
+    # Kachel „Status“ der Übersicht (entities.html), siehe cleanup_tile.status().
+    deps.templates.env.globals["cleanup_status"] = lambda: cleanup_tile.status(deps.index, deps.tz)
+
+    def _counter_auto_state(entity_id: str) -> dict:
+        entity = deps.index.get_entity(entity_id)
+        return {"on": bool(entity and entity["counter_auto_mark"]), "halted": bool(entity and entity["counter_auto_halted_at"] is not None)}
+
+    deps.templates.env.globals["counter_auto_state"] = _counter_auto_state
+    # Einordnung der Zählerrückgänge in der Bereinigungsansicht (_rows_table.html).
+    deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdicts_for_rows(
+        deps.data_dir, deps.index, deps.tz, entity_id, rows
+    )
+
+    def _counter_decreases_context(result: dict | None = None) -> dict:
+        """Kontext von _counter_decreases.html: die Tabelle samt Sammelaktion „Fehlwerte markieren“
+        und, nach einer Aktion, dem Ergebnishinweis mit „Rückgängig“."""
+        rows = _counter_decreases_for_display()
+        returning = sum(row["returning"] for row in rows)
+        bulk = None
+        if returning:
+            total = sum(row["count"] for row in rows)
+            entries = []
+            for row in rows:
+                if not row["returning"]:
+                    continue
+                shown = row["returning_detail"][:3]
+                name = row["friendly_name"] or row["entity_id"]
+                entries.append({
+                    "name": name,
+                    "entity_id": row["entity_id"] if name != row["entity_id"] else "",
+                    "details": shown,
+                    "more": max(0, row["returning"] - len(shown)) if shown else 0,
+                    # Schnappschuss aus einer älteren Version: nur die Anzahl bekannt
+                    "count_label": _values_label(row["returning"]),
+                })
+            what = tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)
+            title = tr("{what} markieren?", what=what)
+            bulk = {
+                "lead": tr("{returning} von {total} Rückgängen kehren sofort zurück", returning=returning, total=total),
+                "rest": tr("und sehen nach Fehlwerten aus."),
+                "button": tr("1 Fehlwert markieren …") if returning == 1 else tr("{returning} Fehlwerte markieren …", returning=returning),
+                "confirm_label": tr("1 Fehlwert markieren") if returning == 1 else tr("{returning} Fehlwerte markieren", returning=returning),
+                # Die Frage für htmx (hx-confirm braucht einen Text); angezeigt wird der gegliederte Inhalt
+                # aus dem <template> in _counter_decreases.html.
+                "confirm": title,
+                "title": title,
+                "entries": entries,
+            }
+        return {
+            "counter_decreases": rows,
+            "counter_allowed": [
+                {"entity_id": row["entity_id"], "name": row["custom_name"] or row["friendly_name"] or row["entity_id"]}
+                for row in deps.index.list_counter_decreases_allowed()
+            ],
+            "counter_bulk": bulk,
+            "counter_result": result,
+            "marked_total": deps.index.count_marked_values(),
+        }
+
+    def _values_label(count: int) -> str:
+        return tr("1 Wert") if count == 1 else tr("{count} Werte", count=count)
 
     def _host_disk_usage_context() -> dict:
         """Für die immer sichtbare Host-Speicherplatz-Zeile in housekeeping.html —
@@ -292,29 +439,30 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     # statt in formatting.py, dasselbe Muster wie status_labels in
     # _settings_retention_context() — nur für diese eine Seite gebraucht.
     _ACTIVITY_ACTION_LABELS = {
-        "add": "Hinzufügen", "correct": "Korrektur", "purge": "Bereinigen",
-        "compact": "Verdichten", "retention": "Aufbewahrung",
+        "add": N_("Hinzufügen"), "correct": N_("Korrektur"), "purge": N_("Bereinigen"),
+        "mark": N_("Markieren"), "undo": N_("Rückgängig"),
+        "compact": N_("Verdichten"), "retention": N_("Aufbewahrung"),
     }
     _ACTIVITY_STATUS_LABELS = {
-        "success": "Erfolgreich", "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen",
+        "success": N_("Erfolgreich"), "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"),
         # "queued"/"running"/"skipped" kommen nur von retention_jobs — entity_actions
         # protokolliert ausschließlich bereits abgeschlossene ("success") Aktionen.
-        "queued": "Geplant", "running": "Läuft", "skipped": "Übersprungen",
+        "queued": N_("Geplant"), "running": N_("Läuft"), "skipped": N_("Übersprungen"),
     }
     # Filter-Dropdowns (Aktionstyp/Status/Zeitraum): erste Option ist immer der
     # leere Wert = "kein Filter", genau wie bei den bestehenden dd-picker-
     # Filtern (siehe _rows_filter_menu.html). Die Entität-Liste ist dynamisch
     # (siehe _settings_activity_context) und deshalb kein Modulkonstante.
-    _ACTIVITY_ACTION_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_ACTION_LABELS.items())
-    _ACTIVITY_STATUS_FILTER_OPTIONS = [("", "Alle")] + list(_ACTIVITY_STATUS_LABELS.items())
-    _ACTIVITY_DAYS_FILTER_OPTIONS = [("", "Alle"), ("7", "7 Tage"), ("30", "30 Tage"), ("90", "90 Tage")]
+    _ACTIVITY_ACTION_FILTER_OPTIONS = [("", N_("Alle"))] + list(_ACTIVITY_ACTION_LABELS.items())
+    _ACTIVITY_STATUS_FILTER_OPTIONS = [("", N_("Alle"))] + list(_ACTIVITY_STATUS_LABELS.items())
+    _ACTIVITY_DAYS_FILTER_OPTIONS = [("", N_("Alle")), ("7", N_("7 Tage")), ("30", N_("30 Tage")), ("90", N_("90 Tage"))]
 
     # Nur für die Monatsliste im Verdichten-Detail (unten) — dieselben Namen
     # wie main.py:_MONTH_NAMES_DE, hier lokal statt geteilt, weil sonst nirgends
     # in diesem Modul gebraucht.
     _MONTH_NAMES_DE = (
-        "Januar", "Februar", "März", "April", "Mai", "Juni",
-        "Juli", "August", "September", "Oktober", "November", "Dezember",
+        N_("Januar"), N_("Februar"), N_("März"), N_("April"), N_("Mai"), N_("Juni"),
+        N_("Juli"), N_("August"), N_("September"), N_("Oktober"), N_("November"), N_("Dezember"),
     )
 
     def _month_year_label(month_key: str) -> str:
@@ -324,7 +472,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         deren genaues Format sich in einer künftigen Version ändern könnte."""
         try:
             year_str, month_str = month_key.split("-")
-            return f"{_MONTH_NAMES_DE[int(month_str) - 1]} {year_str}"
+            return f"{tr(_MONTH_NAMES_DE[int(month_str) - 1])} {year_str}"
         except (ValueError, IndexError):
             return month_key
 
@@ -346,16 +494,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         # .confirm-message (app.css) auch als eigene Zeile im Popup.
         if action == "compact":
             months_list = sorted(detail.get("months_compacted") or [])
-            lines = [f"Zielauflösung: {format_compact_target(detail.get('target_resolution', ''))}"]
+            lines = [tr("Zielauflösung: {format_compact_target}", format_compact_target=format_compact_target(detail.get('target_resolution', '')))]
             if months_list:
-                lines.append(f"Zeitraum: {', '.join(_month_year_label(m) for m in months_list)}")
+                lines.append(tr("Zeitraum: {join}", join=', '.join(_month_year_label(m) for m in months_list)))
             rows_before, rows_after = detail.get("rows_before"), detail.get("rows_after")
             if rows_before is not None and rows_after is not None:
-                lines.append(f"Zeilen: {format_int(rows_before)} → {format_int(rows_after)}")
+                lines.append(tr("Zeilen: {format_int} → {format_int2}", format_int=format_int(rows_before), format_int2=format_int(rows_after)))
             stale_markers = detail.get("stale_markers_removed")
             if stale_markers:
                 lines.append(
-                    f"Aufgeräumt: {format_int(stale_markers)} verwaiste Löschmarkierung{'en' if stale_markers != 1 else ''}"
+                    (tr("Aufgeräumt: {count} verwaiste Löschmarkierung", count=format_int(stale_markers)) if stale_markers == 1 else tr("Aufgeräumt: {count} verwaiste Löschmarkierungen", count=format_int(stale_markers)))
                 )
             return "\n".join(lines)
         # action == "purge" — bisher nur vom automatischen Lauf gefüllt (siehe
@@ -363,10 +511,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         min_age_label = PURGE_MIN_AGE_DAYS_LABELS.get(
             str(detail.get("min_age_days", "")), f"{detail.get('min_age_days')} Tage"
         )
-        lines = [f"Mindestalter der Markierung: {min_age_label}"]
+        lines = [tr("Mindestalter der Markierung: {min_age_label}", min_age_label=min_age_label)]
         months_purged = detail.get("months_purged")
         if months_purged:
-            lines.append(f"Neu berechnete Monate: {format_int(months_purged)}")
+            lines.append(tr("Neu berechnete Monate: {format_int}", format_int=format_int(months_purged)))
         return "\n".join(lines)
 
     def _settings_activity_context(
@@ -398,7 +546,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 entity_label = entity_display_name(a["entity_id"], entity["friendly_name"], entity["custom_name"])
                 entity_options_map[a["entity_id"]] = entity_label
             else:
-                entity_label = a["entity_id"] or "mehrere Entitäten"
+                entity_label = a["entity_id"] or tr("mehrere Entitäten")
             rows.append({
                 "created_at": f"{format_timestamp(a['created_at'], deps.tz)} {format_time(a['created_at'], deps.tz)}",
                 "created_at_ts": a["created_at"],
@@ -406,7 +554,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "action": _ACTIVITY_ACTION_LABELS.get(a["action"], a["action"]),
                 "entity_key": a["entity_id"] or "",
                 "entity_label": entity_label,
-                "trigger": "Automatisch" if a["trigger"] == "automatic" else "Manuell",
+                "trigger": tr("Automatisch") if a["trigger"] == "automatic" else tr("Manuell"),
                 "rows_affected": format_int(a["rows_affected"]) if a["rows_affected"] is not None else "—",
                 "status": _ACTIVITY_STATUS_LABELS.get(a["status"], a["status"]),
                 "status_key": a["status"],
@@ -421,9 +569,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "action": _ACTIVITY_ACTION_LABELS["retention"],
                 "entity_key": "",
                 "entity_label": (
-                    f"{job['entities_affected']} Entitäten" if job["entities_affected"] else "mehrere Entitäten"
+                    tr("{count} Entitäten", count=job["entities_affected"]) if job["entities_affected"] else tr("mehrere Entitäten")
                 ),
-                "trigger": "Automatisch" if job["trigger"] == "scheduled" else "Manuell",
+                "trigger": tr("Automatisch") if job["trigger"] == "scheduled" else tr("Manuell"),
                 "rows_affected": format_int(job["rows_deleted"]) if job["rows_deleted"] is not None else "—",
                 "status": _ACTIVITY_STATUS_LABELS.get(job["status"], job["status"]),
                 "status_key": job["status"],
@@ -448,7 +596,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "activity_action_filter": action_filter,
             "activity_status_filter": status_filter,
             "activity_days_filter": days_filter,
-            "activity_entity_options": [("", "Alle Entitäten")] + sorted(
+            "activity_entity_options": [("", tr("Alle Entitäten"))] + sorted(
                 entity_options_map.items(), key=lambda kv: kv[1]
             ),
             "activity_action_options": _ACTIVITY_ACTION_FILTER_OPTIONS,
@@ -544,7 +692,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             months_due = int(due.get("months_due", 0) or 0)
             next_expiration_ts = due.get("next_expiration_ts")
             if rows_due or months_due:
-                next_expiration = "Jetzt fällig"
+                next_expiration = tr("Jetzt fällig")
             elif isinstance(next_expiration_ts, (int, float)):
                 next_expiration = (
                     f"{format_timestamp(next_expiration_ts, deps.tz)} "
@@ -572,8 +720,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             return f"{format_timestamp(ts, deps.tz)} {format_time(ts, deps.tz)}" if ts else "—"
 
         status_labels = {
-            "queued": "Geplant", "running": "Läuft", "success": "Erfolgreich",
-            "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen", "skipped": "Übersprungen",
+            "queued": N_("Geplant"), "running": N_("Läuft"), "success": N_("Erfolgreich"),
+            "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"), "skipped": N_("Übersprungen"),
         }
         jobs = []
         for job in deps.index.list_retention_jobs(8):
@@ -622,12 +770,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 f"{format_timestamp(retention_overview['generated_at'], deps.tz)} "
                 f"{format_time(retention_overview['generated_at'], deps.tz)}"
                 if isinstance(retention_overview.get("generated_at"), (int, float))
-                else "Wird berechnet …"
+                else tr("Wird berechnet …")
             ),
             "result": result,
         }
 
-    _STALE_ENTITIES_DAY_OPTIONS = [("1", "1 Tag"), ("3", "3 Tage"), ("7", "7 Tage"), ("14", "14 Tage"), ("30", "30 Tage")]
+    _STALE_ENTITIES_DAY_OPTIONS = [("1", N_("1 Tag")), ("3", N_("3 Tage")), ("7", N_("7 Tage")), ("14", N_("14 Tage")), ("30", N_("30 Tage"))]
     _STALE_ENTITIES_DEFAULT_DAYS = "3"
 
 
@@ -659,14 +807,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
                 "has_name": has_name,
                 "last_value_label": (
-                    datetime.fromtimestamp(last_ts, deps.tz).strftime("%d.%m.%Y, %H:%M") if last_ts is not None else "Nie empfangen"
+                    formats.format_datetime(datetime.fromtimestamp(last_ts, deps.tz), seconds=False, comma=True) if last_ts is not None else "Nie empfangen"
                 ),
                 # 10**6 Tage statt float('inf') — sortiert serverseitig genauso
                 # zuverlässig an die Spitze, ist aber über data-sort auch für
                 # sortable-table.js' parseFloat() im Client ein gültiger Wert
                 # ("inf" wird dort zu NaN).
                 "days_ago_raw": days_ago if days_ago is not None else 10**6,
-                "days_ago_label": f"{format_value(days_ago, 1)} Tage" if days_ago is not None else "—",
+                "days_ago_label": tr("{format_value} Tage", format_value=format_value(days_ago, 1)) if days_ago is not None else "—",
                 "row_count": format_int(entity["row_count"]),
                 "row_count_raw": entity["row_count"],
             })
@@ -724,6 +872,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "table_count": deps.index.count_saved_tables(),
                 "duplicates_by_entity": duplicates_by_entity,
                 "duplicates_total": duplicates_total,
+                **_counter_decreases_context(),
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(
@@ -751,13 +900,13 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         beim Neuanlegen auf diese Standardwerte zu)."""
         form = await request.form()
         fields = {
-            "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, "Ungültige Auflösung"),
-            "default_retention": (form.get("default_retention"), RETENTION_LABELS, "Ungültige Aufbewahrung"),
-            "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, "Ungültige Nachkommastellen"),
-            "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, "Ungültiger Wertänderungsfilter"),
-            "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, "Ungültige Lücken-Erkennung"),
-            "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, "Ungültige Ausreißer-Erkennung"),
-            "default_compact_target": (form.get("default_compact_target"), COMPACT_TARGET_LABELS, "Ungültiges Verdichtungsziel"),
+            "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, tr("Ungültige Auflösung")),
+            "default_retention": (form.get("default_retention"), RETENTION_LABELS, tr("Ungültige Aufbewahrung")),
+            "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, tr("Ungültige Nachkommastellen")),
+            "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, tr("Ungültiger Wertänderungsfilter")),
+            "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, tr("Ungültige Lücken-Erkennung")),
+            "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, tr("Ungültige Ausreißer-Erkennung")),
+            "default_compact_target": (form.get("default_compact_target"), COMPACT_TARGET_LABELS, tr("Ungültiges Verdichtungsziel")),
         }
         for _key, (value, labels, error) in fields.items():
             if value is not None and value not in labels:
@@ -782,7 +931,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 gap_threshold_auto_adjusted = True
                 reason = "value_filter" if current_value_filter == "decimals" else "resolution"
                 gap_threshold_auto_adjusted_message = deps.gap_threshold_auto_adjust_message(
-                    reason, new_gap, current_resolution, label="Standard-Lücken-Erkennung")
+                    reason, new_gap, current_resolution, label=tr("Standard-Lücken-Erkennung"))
         context = deps.settings_archivierung_context(saved=True)
         context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
         context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
@@ -796,13 +945,13 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         komplett aufhört zu senden, würde ihre letzte Hot-Datei sonst nie von
         selbst archivieren)."""
         with _rotation_progress.track():
-            _rotation_progress.set_phase("Hot-Dateien werden archiviert")
+            _rotation_progress.set_phase(N_("Hot-Dateien werden archiviert"))
             with deps.coordinator.exclusive():
                 rotated = rotate.rotate_all_stale(
                     deps.data_dir, deps.index, deps.tz, on_entity=_rotation_step
                 )
         if rotated == 0:
-            result = "Nichts zu tun — alle Entitäten sind bereits aktuell rotiert."
+            result = tr("Nichts zu tun — alle Entitäten sind bereits aktuell rotiert.")
         else:
             result = f"{rotated} Monatsdatei{'en' if rotated != 1 else ''} archiviert."
         logger.info(
@@ -824,9 +973,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         auto_enabled = form.get("compact_auto_enabled")
         min_age_months = form.get("compact_min_age_months")
         if auto_enabled is not None and auto_enabled not in COMPACT_AUTO_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Wert für Automatische Verdichtung")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert für Automatische Verdichtung"))
         if min_age_months is not None and min_age_months not in COMPACT_MIN_AGE_MONTHS_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiges Mindestalter")
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Mindestalter"))
         if auto_enabled is not None:
             deps.index.set_setting("compact_auto_enabled", auto_enabled)
         if min_age_months is not None:
@@ -846,9 +995,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         auto_enabled = form.get("purge_auto_enabled")
         min_age_days = form.get("purge_min_age_days")
         if auto_enabled is not None and auto_enabled not in PURGE_AUTO_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Wert für Automatische Bereinigung")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert für Automatische Bereinigung"))
         if min_age_days is not None and min_age_days not in PURGE_MIN_AGE_DAYS_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiges Mindestalter")
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Mindestalter"))
         if auto_enabled is not None:
             deps.index.set_setting("purge_auto_enabled", auto_enabled)
         if min_age_days is not None:
@@ -895,7 +1044,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         # ist ehrlicher als eine geschätzte Gesamtzahl.
         vorschau = deps.load_purge_preview() or {}
         _purge_progress.set_phase(
-            "Bereinigung läuft…",
+            N_("Bereinigung läuft…"),
             int(vorschau.get("totals", {}).get("archive_months", 0) or 0),
         )
         started_at = time.time()
@@ -908,13 +1057,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         total_rows = hot_purged + archive_result["rows_purged"]
         months = archive_result["months_purged"]
         if total_rows == 0:
-            result = "Nichts zu bereinigen — aktuell keine entfernbaren Datensätze gefunden."
+            result = tr("Nichts zu bereinigen — aktuell keine entfernbaren Datensätze gefunden.")
         elif months == 0:
-            result = f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt."
+            result = (tr("{total_rows} Zeile physisch entfernt.", total_rows=total_rows) if total_rows == 1 else tr("{total_rows} Zeilen physisch entfernt.", total_rows=total_rows))
         else:
             result = (
-                f"{total_rows} Zeile{'n' if total_rows != 1 else ''} physisch entfernt, "
-                f"davon {months} bereits archivierte{'r' if months == 1 else ''} Monat{'e' if months != 1 else ''} neu berechnet."
+                tr("{rows} physisch entfernt, davon {months} neu berechnet.", rows=(tr("{count} Zeile", count=total_rows) if total_rows == 1 else tr("{count} Zeilen", count=total_rows)), months=(tr("{count} bereits archivierter Monat", count=months) if months == 1 else tr("{count} bereits archivierte Monate", count=months)))
             )
         logger.info(
             "Manuelle Bereinigung abgeschlossen · event=manual_cleanup_completed "
@@ -966,7 +1114,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 request, "_job_progress.html", _purge_progress_context()
             )
         if stand["error"]:
-            ergebnis = f"Bereinigung fehlgeschlagen: {stand['error']}"
+            ergebnis = tr("Bereinigung fehlgeschlagen: {error}", error=stand['error'])
         else:
             ergebnis = stand["result"]
         return deps.templates.TemplateResponse(
@@ -1036,7 +1184,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         komplette Historie der Entität."""
         entity = deps.index.get_entity(entity_id)
         if entity is None:
-            raise HTTPException(status_code=404, detail="Unbekannte Entität")
+            raise HTTPException(status_code=404, detail=tr("Unbekannte Entität"))
         result = deps.index.list_deleted_points_for_entity(entity_id, page=page, page_size=page_size)
         values = cleanup.read_values_for_timestamps(
             deps.data_dir, entity_id, [row["ts"] for row in result["rows"]], deps.tz
@@ -1076,14 +1224,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         schedule_time = str(form.get("retention_enforcement_time", deps.retention_default_time))
         weekday_raw = str(form.get("retention_enforcement_weekday", deps.retention_default_weekday))
         if schedule not in BACKUP_SCHEDULE_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitplan")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitplan"))
         try:
             parse_schedule_time(schedule_time)
             weekday = int(weekday_raw)
             if weekday not in range(7):
                 raise ValueError
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Ungültige Uhrzeit") from exc
+            raise HTTPException(status_code=400, detail=tr("Ungültige Uhrzeit")) from exc
         deps.index.set_setting("retention_enforcement", schedule)
         deps.index.set_setting("retention_enforcement_time", schedule_time)
         deps.index.set_setting("retention_enforcement_weekday", str(weekday))
@@ -1096,18 +1244,15 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     def _retention_result_text(totals: dict, *, preview: bool = False) -> str:
         if totals["rows_deleted"] == 0:
             return (
-                "Vorschau: Aktuell würden keine Werte gelöscht."
+                tr("Vorschau: Aktuell würden keine Werte gelöscht.")
                 if preview else
-                "Nichts zu tun — keine Werte jenseits der konfigurierten Aufbewahrungsfrist gefunden."
+                tr("Nichts zu tun — keine Werte jenseits der konfigurierten Aufbewahrungsfrist gefunden.")
             )
-        action = "würden endgültig gelöscht" if preview else "endgültig gelöscht"
-        storage_action = "würden frei" if preview else "wurden frei"
-        prefix = "Vorschau: " if preview else ""
+        action = tr("würden endgültig gelöscht") if preview else tr("endgültig gelöscht")
+        storage_action = tr("würden frei") if preview else tr("wurden frei")
+        prefix = tr("Vorschau: ") if preview else ""
         return (
-            f"{prefix}{totals['rows_deleted']} Zeile{'n' if totals['rows_deleted'] != 1 else ''} in "
-            f"{totals['months_deleted']} Monatsdatei{'en' if totals['months_deleted'] != 1 else ''} über "
-            f"{totals['entities_affected']} Entität{'en' if totals['entities_affected'] != 1 else ''} {action}; "
-            f"etwa {format_size(totals['bytes_freed'])} Archivspeicher {storage_action}."
+            tr("{prefix}{rows} in {files} über {entities} {action}; etwa {format_size} Archivspeicher {storage_action}.", prefix=prefix, rows=(tr("{count} Zeile", count=totals['rows_deleted']) if totals['rows_deleted'] == 1 else tr("{count} Zeilen", count=totals['rows_deleted'])), files=(tr("{count} Monatsdatei", count=totals['months_deleted']) if totals['months_deleted'] == 1 else tr("{count} Monatsdateien", count=totals['months_deleted'])), entities=(tr("{count} Entität", count=totals['entities_affected']) if totals['entities_affected'] == 1 else tr("{count} Entitäten", count=totals['entities_affected'])), action=action, format_size=format_size(totals['bytes_freed']), storage_action=storage_action)
         )
 
 
@@ -1128,16 +1273,106 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         unabhängig davon ob/wann der tägliche Automatik-Lauf zuletzt lief."""
         job_id = deps.begin_retention_job("manual")
         if job_id is None:
-            result = "Retention läuft bereits — es wurde kein zweiter Lauf gestartet."
+            result = tr("Retention läuft bereits — es wurde kein zweiter Lauf gestartet.")
         else:
             outcome = deps.finish_retention_job(job_id)
             if outcome["status"] == "success":
                 result = _retention_result_text(outcome["totals"])
             else:
-                result = f"Retention fehlgeschlagen: {outcome['error']}"
+                result = tr("Retention fehlgeschlagen: {error}", error=outcome['error'])
         return deps.templates.TemplateResponse(
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
         )
+
+    @router.post("/entities/{entity_id}/counter-decreases", response_class=HTMLResponse)
+    async def entity_counter_decreases(request: Request, entity_id: str) -> HTMLResponse:
+        """Stellt einen Zähler auf „Melden“ oder „Erlauben“ (planmäßig zurücksetzender Zähler).
+        Kommt von der Konfigurationsseite (liefert nur das Feld zurück) oder aus Housekeeping
+        (Feld ``from=housekeeping``, liefert den Abschnitt Zählerrückgänge zurück)."""
+        form = await request.form()
+        auto_mark = form.get("auto_mark")
+        mode = str(form.get("counter_decreases", "" if auto_mark else "x"))
+        if (mode and mode not in ("report", "allow")) or auto_mark not in (None, "on", "off"):
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        current = _counter_mode(entity_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail=tr("Kein Zähler"))
+        if mode:
+            await run_in_threadpool(counter_bulk.set_mode, deps.data_dir, deps.index, deps.tz, entity_id, mode)
+            current = mode
+        if auto_mark:
+            if current != "report":  # die Regel gibt es nur bei „Melden“
+                raise HTTPException(status_code=409, detail=tr("Nur bei „Melden“ möglich"))
+            deps.index.set_counter_auto_mark(entity_id, auto_mark == "on", time.time())
+        mode = current
+        if form.get("from") == "housekeeping":
+            return deps.templates.TemplateResponse(request, "_counter_decreases.html", _counter_decreases_context())
+        return deps.templates.TemplateResponse(
+            request, "_counter_decrease_field.html", {"entity_id": entity_id, "counter_mode": mode}
+        )
+
+    @router.post("/dashboard/cleanup-size/{pin_id}", response_class=HTMLResponse)
+    def dashboard_cleanup_size(pin_id: int, dashboard_id: int = 1, size: str = "large") -> HTMLResponse:
+        """Größe der Kachel „Bereinigung“: ``large`` (2×2, drei Zeilen) oder ``small`` (1×1, nur die Summe).
+        Die Antwort lässt htmx die Seite neu laden (HX-Refresh), das Raster baut main.py auf."""
+        if size not in ("large", "small"):
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        dashboard = deps.index.get_dashboard(dashboard_id)
+        if dashboard is not None and dashboard["locked"]:
+            raise HTTPException(status_code=423, detail=tr("Dashboard ist fixiert — Layout-Änderungen sind gesperrt"))
+        span = 2 if size == "large" else 1
+        if not deps.index.set_dashboard_cleanup_size(dashboard_id, pin_id, span, span):
+            raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
+
+    @router.post("/housekeeping/counter-decreases/mark-returning", response_class=HTMLResponse)
+    async def housekeeping_counter_mark_returning(request: Request) -> HTMLResponse:
+        """Markiert alle zurückkehrenden Zählerrückgänge zur Löschung (counter_bulk.py)."""
+
+        def run() -> dict:
+            outcome = counter_bulk.mark_returning(deps.data_dir, deps.index, deps.tz)
+            entity_ids = list(outcome["entities"])
+            if not entity_ids:
+                return {"message": tr("Nichts zu markieren: es kehrt kein Rückgang mehr zurück.")}
+            one = len(entity_ids) == 1
+            items = []
+            for entity_id in entity_ids:
+                entity = deps.index.get_entity(entity_id)
+                items.append({
+                    "name": (entity is not None and (entity["custom_name"] or entity["friendly_name"])) or entity_id,
+                    "count_label": _values_label(outcome["entities"][entity_id]),
+                    "link": f"entities/{entity_id}/cleanup?tab=marked",
+                })
+            return {
+                "message": (
+                    tr("{values} markiert.", values=_values_label(outcome["values"]))
+                    if one else
+                    tr("{values} bei {entities} Entitäten markiert.", values=_values_label(outcome["values"]), entities=len(entity_ids))
+                ),
+                "entries": items,
+                "note": tr("Sie zählen in Charts, Tabellen und Statistik nicht mehr mit und werden erst bei der endgültigen Bereinigung gelöscht."),
+                "undo_vals": json.dumps({"batch_at": repr(outcome["batch_at"]), "entity_ids": ",".join(entity_ids)}),
+            }
+
+        result = await run_in_threadpool(run)
+        deps.invalidate_purge_preview()
+        return deps.templates.TemplateResponse(request, "_counter_decreases.html", _counter_decreases_context(result))
+
+    @router.post("/housekeeping/counter-decreases/undo", response_class=HTMLResponse)
+    async def housekeeping_counter_undo(request: Request) -> HTMLResponse:
+        """Nimmt eine Sammelmarkierung von oben wieder zurück (gleiche Charge, gleiche Entitäten)."""
+        form = await request.form()
+        try:
+            batch_at = float(form.get("batch_at", ""))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe")) from None
+        entity_ids = [e for e in str(form.get("entity_ids", "")).split(",") if e]
+        restored = await run_in_threadpool(
+            counter_bulk.undo_batch, deps.data_dir, deps.index, deps.tz, batch_at, entity_ids
+        )
+        deps.invalidate_purge_preview()
+        result = {"message": tr("{values} wieder aktiv.", values=_values_label(restored))}
+        return deps.templates.TemplateResponse(request, "_counter_decreases.html", _counter_decreases_context(result))
 
     @router.post("/housekeeping/demo-data/append-now", response_class=HTMLResponse)
     def housekeeping_demo_data_append_now(request: Request) -> HTMLResponse:
@@ -1147,7 +1382,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         Hintergrund; ein zweiter Klick bekommt die Anzeige des schon
         laufenden Auftrags zurück (JobProgress.claim)."""
         if not deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+            raise HTTPException(status_code=409, detail=tr("Nur im Demo-Modus verfügbar"))
         try:
             demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "append"), logger)
         except JobBusy:
@@ -1160,7 +1395,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         komplette Historie neu (Rückfrage per hx-confirm im Template, wie
         beim manuellen Löschen im Bereinigen-Tab)."""
         if not deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+            raise HTTPException(status_code=409, detail=tr("Nur im Demo-Modus verfügbar"))
         try:
             demo_mode.demo_progress.start(demo_mode.build_demo_worker(deps.data_dir, deps.index, deps.tz, deps.coordinator, "regenerate"), logger)
         except JobBusy:
@@ -1188,11 +1423,11 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         Hook siehe background.py). Nur im Demo-Modus sinnvoll — der Dropdown
         rendert sonst nicht."""
         if not deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nur im Demo-Modus verfügbar")
+            raise HTTPException(status_code=409, detail=tr("Nur im Demo-Modus verfügbar"))
         form = await request.form()
         interval = form.get("demo_append_interval")
         if interval not in DEMO_APPEND_INTERVAL_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiges Intervall")
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Intervall"))
         deps.index.set_setting("demo_append_interval", str(interval))
         return deps.templates.TemplateResponse(
             request, "_housekeeping_demo_data_body.html",
@@ -1214,7 +1449,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         <script>, das refreshNoticePanel() (_topnav.html) aufruft, damit die
         Glocke sofort verschwindet statt erst beim nächsten Seitenaufruf."""
         if deps.demo_mode_active:
-            raise HTTPException(status_code=409, detail="Nicht möglich, während die Instanz im Demo-Modus läuft")
+            raise HTTPException(status_code=409, detail=tr("Nicht möglich, während die Instanz im Demo-Modus läuft"))
         demo_mode.remove_demo_dir(deps.base_dir)
         return HTMLResponse(
             '<div id="demo-nav-entry" hx-swap-oob="delete"></div>'

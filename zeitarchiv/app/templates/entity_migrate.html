@@ -1,62 +1,62 @@
 {% extends "base.html" %}
-{% block title %}Zeitarchiv — Migrieren — {{ entity_id }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Migrieren — {entity_id}", entity_id=entity_id) }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/entity_migrate.css') }}">
 {% endblock %}
 {% block content %}
   <div class="page">
-    <p class="crumb"><a href="{{ app_root }}/entities/{{ entity_id }}/config">← zurück zur Konfiguration</a></p>
-    <h1>Datensätze migrieren</h1>
-    <p class="sub">Überträgt den archivierten Verlauf einer Entität vollständig in eine andere.</p>
+    <p class="crumb"><a href="{{ app_root }}/entities/{{ entity_id }}/config">{{ _("← zurück zur Konfiguration") }}</a></p>
+    <h1>{{ _("Datensätze migrieren") }}</h1>
+    <p class="sub">{{ _("Überträgt den archivierten Verlauf einer Entität vollständig in eine andere.") }}</p>
 
     <div class="migrate-stepper" id="migrate-stepper">
-      <div class="migrate-step active" data-step="1"><span class="dot">1</span><span>Quelle &amp; Ziel</span></div>
+      <div class="migrate-step active" data-step="1"><span class="dot">1</span><span>{{ _("Quelle &amp; Ziel") }}</span></div>
       <div class="migrate-connector"></div>
-      <div class="migrate-step" data-step="2"><span class="dot">2</span><span>Vorschau</span></div>
+      <div class="migrate-step" data-step="2"><span class="dot">2</span><span>{{ _("Vorschau") }}</span></div>
       <div class="migrate-connector"></div>
-      <div class="migrate-step" data-step="3"><span class="dot">3</span><span>Bestätigung</span></div>
+      <div class="migrate-step" data-step="3"><span class="dot">3</span><span>{{ _("Bestätigung") }}</span></div>
     </div>
 
     <div class="card" id="migrate-step-1">
-      <p class="hint">Quelle: der Verlauf, der übertragen werden soll. Ziel: die Entität, die ihn übernimmt.</p>
+      <p class="hint">{{ _("Quelle: der Verlauf, der übertragen werden soll. Ziel: die Entität, die ihn übernimmt.") }}</p>
 
       <div class="migrate-compare-grid"
            x-data='{...entityPicker(migrateTargetOptions, {{ initial_target_entity_id | tojson }}), targetInfo() { return this.options.find(o => o.entity_id === this.entityId) || null; }}'
            @click.outside="open = false">
         <div class="migrate-entity-card">
-          <div class="migrate-entity-role">Quelle</div>
+          <div class="migrate-entity-role">{{ _("Quelle") }}</div>
           <div class="migrate-entity-name">{{ display_name }}</div>
           <code class="migrate-entity-id">{{ entity_id }}</code>
           <dl class="migrate-entity-stats">
-            <dt>Typ</dt><dd>{{ type_label }}</dd>
-            <dt>Einheit</dt><dd>{{ unit }}</dd>
-            <dt>Zeitraum</dt><dd>{{ first_ts }} – {{ last_ts }}</dd>
-            <dt>Datensätze</dt><dd>{{ row_count }}</dd>
+            <dt>{{ _("Typ") }}</dt><dd>{{ type_label }}</dd>
+            <dt>{{ _("Einheit") }}</dt><dd>{{ unit }}</dd>
+            <dt>{{ _("Zeitraum") }}</dt><dd>{{ first_ts }} – {{ last_ts }}</dd>
+            <dt>{{ _("Datensätze") }}</dt><dd>{{ row_count }}</dd>
           </dl>
         </div>
 
-        <button type="button" class="migrate-swap-btn" title="Quelle und Ziel tauschen" :disabled="!entityId"
+        <button type="button" class="migrate-swap-btn" title="{{ _('Quelle und Ziel tauschen') }}" :disabled="!entityId"
                 @click="window.location.href = BASE + '/entities/' + entityId + '/migrate?target=' + ENTITY_ID">⇄</button>
 
         <div class="migrate-target-column">
           <div class="migrate-entity-card target" :class="{'is-empty': !entityId}">
             <template x-if="entityId && targetInfo()">
               <div>
-                <div class="migrate-entity-role">Ziel</div>
+                <div class="migrate-entity-role">{{ _("Ziel") }}</div>
                 <div class="migrate-entity-name" x-text="targetInfo().label"></div>
                 <code class="migrate-entity-id" x-text="entityId"></code>
                 <dl class="migrate-entity-stats">
-                  <dt>Typ</dt><dd x-text="targetInfo().type_label"></dd>
-                  <dt>Einheit</dt><dd x-text="targetInfo().unit"></dd>
-                  <dt>Zeitraum</dt><dd x-text="targetInfo().first_ts + ' – ' + targetInfo().last_ts"></dd>
-                  <dt>Datensätze</dt><dd x-text="targetInfo().row_count"></dd>
+                  <dt>{{ _("Typ") }}</dt><dd x-text="targetInfo().type_label"></dd>
+                  <dt>{{ _("Einheit") }}</dt><dd x-text="targetInfo().unit"></dd>
+                  <dt>{{ _("Zeitraum") }}</dt><dd x-text="targetInfo().first_ts + ' – ' + targetInfo().last_ts"></dd>
+                  <dt>{{ _("Datensätze") }}</dt><dd x-text="targetInfo().row_count"></dd>
                 </dl>
               </div>
             </template>
             <template x-if="!entityId">
               <div class="migrate-entity-empty">
-                <p class="hint">Noch keine Ziel-Entität gewählt.</p>
-                <button type="button" class="btn primary" @click="toggleOpen($refs.search)">Ziel wählen …</button>
+                <p class="hint">{{ _("Noch keine Ziel-Entität gewählt.") }}</p>
+                <button type="button" class="btn primary" @click="toggleOpen($refs.search)">{{ _("Ziel wählen …") }}</button>
               </div>
             </template>
           </div>
@@ -66,16 +66,16 @@
                im gefüllten Zustand höher als die Quelle-Karte daneben, beide
                sollen aber gleich hoch bleiben. -->
           <button type="button" class="btn btn-sm migrate-picker-btn" x-show="entityId" x-cloak
-                  @click="toggleOpen($refs.search)">andere Ziel-Entität wählen …</button>
+                  @click="toggleOpen($refs.search)">{{ _("andere Ziel-Entität wählen …") }}</button>
 
           <div class="dd-picker-popover dd-picker-popover-alpine migrate-target-popover" x-show="open" x-cloak>
-            <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="Suchen …">
+            <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
             <div class="migrate-target-picker-list">
               <template x-for="opt in filtered()" :key="opt.entity_id">
                 <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"
                      @mouseenter="scheduleHover(opt, $event.currentTarget)" @mouseleave="clearHover()">
                   <span x-text="opt.label"></span>
-                  <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="App-eigener Anzeigename"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
+                  <span x-show="opt.is_custom" x-cloak class="custom-name-icon" data-tooltip="{{ _('App-eigener Anzeigename') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
                 </div>
               </template>
             </div>
@@ -94,8 +94,8 @@
       </div>
 
       <div class="migrate-footer-row">
-        <a class="btn" href="{{ app_root }}/entities/{{ entity_id }}/config">Abbrechen</a>
-        <button type="button" class="btn primary" id="migrate-preview-btn" onclick="migratePreview()">Weiter →</button>
+        <a class="btn" href="{{ app_root }}/entities/{{ entity_id }}/config">{{ _("Abbrechen") }}</a>
+        <button type="button" class="btn primary" id="migrate-preview-btn" onclick="migratePreview()">{{ _("Weiter →") }}</button>
       </div>
     </div>
 
@@ -104,15 +104,15 @@
     </div>
 
     <div class="card" id="migrate-result" hidden>
-      <div class="migrate-banner positive">✓ Migration abgeschlossen</div>
+      <div class="migrate-banner positive">{{ _("✓ Migration abgeschlossen") }}</div>
       <div class="stat-row" id="migrate-result-stats"></div>
       <div class="config-card-header">
-        <h2>Was passiert ist</h2>
+        <h2>{{ _("Was passiert ist") }}</h2>
       </div>
       <p class="hint" id="migrate-result-summary"></p>
       <div id="migrate-result-dashboards"></div>
       <div class="migrate-footer-row" style="justify-content:flex-end;">
-        <a class="btn primary" id="migrate-result-done-btn" href="#">Fertig — zur Entität</a>
+        <a class="btn primary" id="migrate-result-done-btn" href="#">{{ _("Fertig — zur Entität") }}</a>
       </div>
     </div>
   </div>

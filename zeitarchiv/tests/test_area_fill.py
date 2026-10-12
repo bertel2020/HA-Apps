@@ -8,12 +8,12 @@ show_values, Default AN (nicht 0 wie bei jenen): das entspricht dem bisherigen,
 unveränderten Kachel-Verhalten.
 """
 
-from _paths import APP
+from _paths import APP, template_text
 
-EDITOR_TEMPLATE = (APP / "templates/chart_editor.html").read_text(encoding="utf-8")
+EDITOR_TEMPLATE = template_text("chart_editor.html")
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 TILES_JS = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
-TILES_TEMPLATE = (APP / "templates/_dashboard_tiles.html").read_text(encoding="utf-8")
+TILES_TEMPLATE = template_text("_dashboard_tiles.html")
 
 
 def test_the_option_row_exists_and_toggles_areafill() -> None:

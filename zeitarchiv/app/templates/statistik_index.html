@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_hints.html" import hint_button, hint_body %}
-{% block title %}Zeitarchiv — Indexdetails{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Indexdetails") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/statistik_index.css') }}">
 {# Nur die drei Regeln, deren Werte von index_sizes_available abhaengen und
@@ -14,8 +14,8 @@
 {% endblock %}
 {% block content %}
 <div class="page">
-  <h1>Indexdetails</h1>
-  <p class="sub" data-dynamic-back data-app-root="{{ app_root }}"><a href="{{ app_root }}/statistik">&larr; Zurück zur Statistik</a></p>
+  <h1>{{ _("Indexdetails") }}</h1>
+  <p class="sub" data-dynamic-back data-app-root="{{ app_root }}"><a href="{{ app_root }}/statistik">{{ _("&larr; Zurück zur Statistik") }}</a></p>
   <div class="settings-panel" id="statistik-index-body">
     {% include "_statistik_index_body.html" %}
   </div>

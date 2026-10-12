@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import re
 
-from _paths import PAGE_CSS, TEMPLATES
+from _paths import PAGE_CSS, TEMPLATES, template_text
 
 #: Nur `statistik_index.html` darf noch inline stylen — dort hängen drei
 #: Spaltenbreiten an `index_sizes_available` und müssen gerendert werden.
@@ -56,7 +56,7 @@ def test_no_page_carries_its_stylesheet_inline_any_more() -> None:
 
 
 def test_the_one_inline_exception_holds_only_what_jinja_has_to_render() -> None:
-    source = (TEMPLATES / "statistik_index.html").read_text(encoding="utf-8")
+    source = template_text("statistik_index.html")
     block = source[source.index("<style>") : source.index("</style>")]
     rules = [line for line in block.splitlines() if line.strip().startswith(".")]
     assert rules, "Ausnahme ohne Regeln — dann kann der Block ganz weg"

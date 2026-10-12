@@ -1,0 +1,39 @@
+{% from "_hints.html" import hint_button, hint_body %}
+{% set counter_auto = counter_auto_state(entity_id) if counter_auto_state is defined else none %}
+{% set counter_auto_on = counter_auto.on if counter_auto else false %}
+{% set counter_auto_halted = counter_auto.halted if counter_auto else false %}
+{# Konfiguration → „Zählerrückgänge“ (nur bei Zählern): „Erlauben“ für Zähler, die sich planmäßig
+   zurücksetzen (täglich, wöchentlich, monatlich). Wird von entity_config_form eingebunden und von
+   POST /entities/{id}/counter-decreases (housekeeping_routes.py) allein neu gerendert. #}
+<div class="field" id="counter-decrease-field">
+  <label>{{ _("Zählerrückgänge") }} {{ hint_button(_('Zählerrückgänge')) }}</label>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="counter-decreases-btn" onclick="toggleDDPicker('counter-decreases')">{{ _("Erlauben") if counter_mode == 'allow' else _("Melden") }} ▾</button>
+    <input type="hidden" name="counter_decreases" id="counter-decreases-input" value="{{ counter_mode }}"
+           hx-post="{{ app_root }}/entities/{{ entity_id }}/counter-decreases" hx-trigger="change" hx-target="#counter-decrease-field" hx-swap="outerHTML">
+    <div class="dd-picker-popover" id="counter-decreases-popover">
+      <div class="dd-picker-row" onclick="selectDDOption('counter-decreases', 'report', '{{ _("Melden") }}')">{{ _("Melden") }}</div>
+      <div class="dd-picker-row" onclick="selectDDOption('counter-decreases', 'allow', '{{ _("Erlauben") }}')">{{ _("Erlauben") }}</div>
+    </div>
+  </span>
+  {% call hint_body() %}{{ _("Melden (Standard): ein Rückgang des Zählerstands wird auf der Bereinigungs-Seite markiert, gemeldet und in Housekeeping gelistet. Erlauben: für Zähler, die sich planmäßig zurücksetzen, z. B. täglich um Mitternacht. Rückgänge gelten dann als normal, bereits gespeicherte Werte bleiben unverändert.") }}{% endcall %}
+  {% if counter_mode == 'allow' %}<p class="hint hint-status">{{ _("Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.") }}</p>
+  {% else %}
+  {# Regel „Fehlwerte automatisch markieren“ (counter_auto.py): nur bei „Melden“. Einschalten mit Rückfrage,
+     weil der stündliche Lauf danach von selbst markiert; ausschalten ohne. #}
+  <div class="counter-auto">
+    <strong>{{ _("Fehlwerte automatisch markieren") }}</strong>
+    <span class="counter-auto-state">{{ _("Ein") if counter_auto_on else _("Aus") }}</span>
+    {% if counter_auto_on %}
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/counter-decreases" hx-vals='{"auto_mark": "off"}'
+            hx-target="#counter-decrease-field" hx-swap="outerHTML">{{ _("Ausschalten") }}</button>
+    {% else %}
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/counter-decreases" hx-vals='{"auto_mark": "on"}'
+            hx-target="#counter-decrease-field" hx-swap="outerHTML"
+            hx-confirm="{{ _('Fehlwerte ab jetzt automatisch markieren? Rückgänge, die sofort zurückkehren, werden künftig vom stündlichen Lauf zur Löschung markiert. Vorhandene Rückgänge bleiben unberührt, und nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ und lassen sich zurücknehmen.') }}">{{ _("Einschalten …") }}</button>
+    {% endif %}
+    <p class="hint">{{ _("Ein Rückgang, der sofort zurückkehrt (der Stand erreicht den Vorwert innerhalb von 30 Minuten oder 10 Werten wieder), wird vom stündlichen Lauf zur Löschung markiert. Zurückgenommene Werte werden nicht erneut markiert.") }}</p>
+    {% if counter_auto_halted %}<p class="hint hint-status">{{ _("Angehalten: in einem Lauf gab es mehr als {limit} zurückkehrende Rückgänge. Die Regel markiert nichts mehr, bis sie neu eingeschaltet wird.", limit=counter_auto_limit) }}</p>{% endif %}
+  </div>
+  {% endif %}
+</div>

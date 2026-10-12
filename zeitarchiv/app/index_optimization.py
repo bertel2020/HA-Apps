@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import N_, tr
+
 import logging
 import shutil
 import sqlite3
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 #: für die Dauer also WIEDER mit. Ohne diesen Eintrag sähe trotzdem jeder
 #: andere Tab nur einen Server, der ohne erkennbaren Grund nicht mehr
 #: antwortet.
-_optimize_progress = JobProgress("index-optimize", label="Index-Optimierung")
+_optimize_progress = JobProgress("index-optimize", label=N_("Index-Optimierung"))
 
 INDEX_VACUUM_MIN_FILE_BYTES = 50 * 1024 * 1024
 INDEX_VACUUM_MIN_RECLAIMABLE_BYTES = 10 * 1024 * 1024
@@ -63,7 +65,7 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
     if not state["can_optimize"]:
         return {
             "success": False,
-            "message": "Keine vollständig freien SQLite-Seiten vorhanden.",
+            "message": tr("Keine vollständig freien SQLite-Seiten vorhanden."),
         }
 
     required_free = state["file_bytes"] * 2 + INDEX_VACUUM_DISK_MARGIN_BYTES
@@ -72,16 +74,14 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
         return {
             "success": False,
             "message": (
-                "Nicht genug freier Speicher für die sichere Optimierung: "
-                f"benötigt {format_size(required_free)}, verfügbar "
-                f"{format_size(available_free)}."
+                tr("Nicht genug freier Speicher für die sichere Optimierung: benötigt {format_size}, verfügbar {format_size2}.", format_size=format_size(required_free), format_size2=format_size(available_free))
             ),
         }
 
     started_at = time.monotonic()
     try:
         with _optimize_progress.track():
-            _optimize_progress.set_phase("Indexdatei wird kompaktiert")
+            _optimize_progress.set_phase(tr("Indexdatei wird kompaktiert"))
             _optimize_progress.set_detail(index_path.name)
             with storage_coordinator.exclusive():
                 # Unter der Wartungssperre erneut messen, da sich der Zustand seit
@@ -89,7 +89,7 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
                 latest = get_index_optimization_state(index, index_path)
                 if not latest["can_optimize"]:
                     raise ValueError(
-                        "Keine vollständig freien SQLite-Seiten mehr vorhanden."
+                        tr("Keine vollständig freien SQLite-Seiten mehr vorhanden.")
                     )
                 vacuum_result = index.vacuum_database()
         before_bytes = int(vacuum_result["before"]["database_bytes"])
@@ -106,9 +106,7 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
         return {
             "success": True,
             "message": (
-                f"Index optimiert · {format_size(freed_bytes)} freigegeben "
-                f"· Integritätsprüfung erfolgreich · "
-                f"{time.monotonic() - started_at:.2f} Sekunden"
+                tr("Index optimiert · {format_size} freigegeben · Integritätsprüfung erfolgreich · {v:.2f} Sekunden", format_size=format_size(freed_bytes), v=time.monotonic() - started_at)
             ),
         }
     except (sqlite3.DatabaseError, OSError, ValueError) as exc:
@@ -119,7 +117,7 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
         )
         return {
             "success": False,
-            "message": f"Optimierung fehlgeschlagen: {exc}",
+            "message": tr("Optimierung fehlgeschlagen: {exc}", exc=exc),
         }
 
 
@@ -199,8 +197,8 @@ def build_index_detail_context(
         "index_optimization": {
             **optimization,
             "status_label": (
-                "Optimierung empfohlen"
-                if optimization["recommended"] else "Optimierung nicht nötig"
+                tr("Optimierung empfohlen")
+                if optimization["recommended"] else tr("Optimierung nicht nötig")
             ),
             "reclaimable_size": format_size(optimization["reclaimable_bytes"]),
             "estimated_after_size": format_size(
@@ -232,8 +230,8 @@ def _unassigned_group(rows: list[dict]) -> dict:
     index_bytes = sum(int(row["index_bytes"] or 0) for row in tables)
     row_count = sum(row["rows"] for row in tables)
     return {
-        "label": "Weitere Fachtabellen",
-        "description": "Noch keiner fachlichen Gruppe zugeordnete Tabellen.",
+        "label": tr("Weitere Fachtabellen"),
+        "description": tr("Noch keiner fachlichen Gruppe zugeordnete Tabellen."),
         "tables": tables,
         "rows": row_count,
         "rows_label": format_int(row_count),

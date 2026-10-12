@@ -23,7 +23,7 @@ window.TableCompute = (() => {
   // Unterstützt +, -, *, /, Klammern, Zeilen-Buchstaben (A-Z) und Zahlen.
   function evalFormula(expr, scope) {
     const s = (expr || '').replace(/\s+/g, '').toUpperCase();
-    if (!s) throw new Error('Leere Formel');
+    if (!s) throw new Error(t('Leere Formel'));
     let pos = 0;
     const peek = () => s[pos];
     function parseExpr() {
@@ -49,26 +49,29 @@ window.TableCompute = (() => {
       if (peek() === '(') {
         pos++;
         const v = parseExpr();
-        if (peek() !== ')') throw new Error('Schließende Klammer fehlt');
+        if (peek() !== ')') throw new Error(t('Schließende Klammer fehlt'));
         pos++;
         return v;
       }
       if (peek() && /[A-Z]/.test(peek())) {
         const letter = s[pos++];
-        if (!(letter in scope)) throw new Error(`Zeile ${letter} ist hier nicht verfügbar`);
+        if (!(letter in scope)) throw new Error(t('Zeile {letter} ist hier nicht verfügbar', {letter}));
         const v = scope[letter];
-        if (v == null) throw new Error(`Zeile ${letter} hat keinen Wert`);
+        if (v == null) throw new Error(t('Zeile {letter} hat keinen Wert', {letter}));
         return v;
       }
       const start = pos;
       while (peek() && (/[0-9.]/.test(peek()) || peek() === FORMULA_DECIMAL_SEP)) pos++;
-      if (pos === start) throw new Error(`Unerwartetes Zeichen "${peek() ?? ''}"`);
+      if (pos === start) throw new Error(t('Unerwartetes Zeichen „{char}“',{char: peek() ?? ''}));
       const numText = s.slice(start, pos);
       return parseFloat(FORMULA_DECIMAL_SEP === '.' ? numText : numText.replace(FORMULA_DECIMAL_SEP, '.'));
     }
     const result = parseExpr();
-    if (pos < s.length) throw new Error('Unerwarteter Rest in der Formel');
-    if (!Number.isFinite(result)) throw new Error('Ergebnis ist nicht endlich (z. B. Division durch 0)');
+    if (pos < s.length) throw new Error(t('Unerwarteter Rest in der Formel'));
+    // Division durch 0 (auch 0 / 0) ist kein Fehler in der Formel, sondern
+    // eine Periode ohne Bezugsgröße (z. B. "km / Einheiten" in einem Monat
+    // ohne Einheit) — deshalb kein Wert ("–") statt t("Fehler").
+    if (!Number.isFinite(result)) return null;
     return result;
   }
 
@@ -82,9 +85,9 @@ window.TableCompute = (() => {
   // Angabe (ältere, vor dieser Funktion gespeicherte Tabellen) unverändert
   // NumberFormat.fmt()s Default (bis zu 4 signifikante Stellen).
   function cellValueText(cell, decimals, explicitMissing = false) {
-    if (!cell) return explicitMissing ? 'Keine Daten' : '–';
-    if (cell.error) return 'Fehler';
-    if (cell.value == null) return explicitMissing ? 'Keine Daten' : '–';
+    if (!cell) return explicitMissing ? t('Keine Daten') : '–';
+    if (cell.error) return t('Fehler');
+    if (cell.value == null) return explicitMissing ? t('Keine Daten') : '–';
     const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10) : null;
     return fmtNum(cell.value, decimalsInt);
   }
@@ -316,7 +319,7 @@ window.TableCompute = (() => {
             })),
           }),
         });
-        if (!res.ok) throw new Error(`Tabellenabfrage fehlgeschlagen (${res.status})`);
+        if (!res.ok) throw new Error(t('Tabellenabfrage fehlgeschlagen ({status})',{status: res.status}));
         columnData = (await res.json()).columns || [];
       } catch (e) {
         columnData = [];
@@ -410,6 +413,10 @@ window.TableCompute = (() => {
     return {values, windowStarts, windowEnds, isCurrent, elapsedSeconds};
   }
 
+  // Datum/Uhrzeit in der Zeitzone des Servers (static/js/server-time.js), nicht
+  // des Browsers — sonst zeigt ein Browser hinter der Serverzone den Vortag.
+  const zoned = (options) => window.ServerTime.withZone(options);
+
   // Uhrzeit-Text für den fairen Vergleichswert einer same_elapsed-Spalte
   // (z. B. "bis 12:16 Uhr", siehe elapsed_seconds oben) — der tatsächliche
   // Bezugszeitpunkt ist windowStart + elapsedSeconds derselben Spalte. null,
@@ -422,9 +429,9 @@ window.TableCompute = (() => {
   function comparisonElapsedTimeText(windowStart, elapsedSeconds, rangeKey) {
     if (windowStart == null || elapsedSeconds == null) return null;
     const cutoff = new Date((windowStart + elapsedSeconds) * 1000);
-    const timeText = `${cutoff.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} Uhr`;
+    const timeText = t('{range} Uhr', {range: cutoff.toLocaleTimeString(window.ZA_FORMAT, zoned({hour: '2-digit', minute: '2-digit'}))});
     if (rangeKey === 'hour' || rangeKey === 'day') return timeText;
-    const dateText = cutoff.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+    const dateText = cutoff.toLocaleDateString(window.ZA_FORMAT, zoned({day: '2-digit', month: '2-digit'}));
     return `${dateText}, ${timeText}`;
   }
 
@@ -433,7 +440,7 @@ window.TableCompute = (() => {
   // Spalte, siehe shortCutoffText()/currentPeriodNote() unten.
   function shortDateText(epochSeconds) {
     if (epochSeconds == null) return null;
-    return new Date(epochSeconds * 1000).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
+    return new Date(epochSeconds * 1000).toLocaleDateString(window.ZA_FORMAT, zoned({day: '2-digit', month: '2-digit'}));
   }
 
   // "HH:MM Uhr" für eine noch laufende Stunde/Tag-Spalte — ein Datum wäre
@@ -442,7 +449,7 @@ window.TableCompute = (() => {
   // nicht, WIE weit der Tag/die Stunde bereits gelaufen ist.
   function shortTimeText(epochSeconds) {
     if (epochSeconds == null) return null;
-    return `${new Date(epochSeconds * 1000).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})} Uhr`;
+    return t('{range} Uhr', {range: new Date(epochSeconds * 1000).toLocaleTimeString(window.ZA_FORMAT, zoned({hour: '2-digit', minute: '2-digit'}))});
   }
 
   // Cutoff-Text passend zum Zeitraumtyp — Uhrzeit bei Stunde/Tag, sonst
@@ -460,7 +467,7 @@ window.TableCompute = (() => {
   // eigenes Datum identifiziert den Zeitraum bereits eindeutig, "im
   // laufenden Tag" wäre nur Rauschen.
   const CURRENT_PERIOD_PHRASE = {
-    week: 'in der laufenden Kalenderwoche', month: 'im laufenden Monat', year: 'im laufenden Jahr',
+    week: t('in der laufenden Kalenderwoche'), month: t('im laufenden Monat'), year: t('im laufenden Jahr'),
   };
 
   // Erklärender Hinweis für eine Spalte, deren Wert (noch) nicht den ganzen
@@ -485,9 +492,9 @@ window.TableCompute = (() => {
     if (!isCurrentCol) return null;
     const cutoff = shortCutoffText(col.range_key, windowEnd);
     if (!cutoff) return null;
-    if (col.year_over_year) return `bis ${cutoff}`;
+    if (col.year_over_year) return t('bis {cutoff}', {cutoff});
     const phrase = CURRENT_PERIOD_PHRASE[col.range_key];
-    return phrase ? `${phrase} · bis ${cutoff}` : null;
+    return phrase ? t('{phrase} · bis {cutoff}', {phrase, cutoff}) : null;
   }
 
   // Dieselbe Bedingung wie currentPeriodNote() (über deren Rückgabe geprüft,
@@ -495,14 +502,14 @@ window.TableCompute = (() => {
   // Hover (CSV-Export) statt des ausgeschriebenen Tooltips.
   function currentPeriodShortSuffix(col, isCurrentCol, windowEnd) {
     if (!currentPeriodNote(col, isCurrentCol, windowEnd)) return '';
-    return ` (bis ${shortCutoffText(col.range_key, windowEnd)})`;
+    return ' ' + t('(bis {cutoff})', {cutoff: shortCutoffText(col.range_key, windowEnd)});
   }
 
   // Monatsnamen/-kürzel für resolveLabel() unten — dieselbe Wortwahl wie der
   // Rest der Oberfläche (z. B. previousYearPeriodLabel in entity_detail.html),
   // hier nur als Kalender-Vokabular statt Zeitraum-Namen.
-  const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-  const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  const MONTH_NAMES = [t('Januar'), t('Februar'), t('März'), t('April'), t('Mai'), t('Juni'), t('Juli'), t('August'), t('September'), t('Oktober'), t('November'), t('Dezember')];
+  const MONTH_NAMES_SHORT = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
 
   // ISO-8601-Kalenderwoche (Woche 1 = die Woche mit dem ersten Donnerstag des
   // Jahres) — Standardalgorithmus über den nächsten Donnerstag derselben
@@ -522,7 +529,15 @@ window.TableCompute = (() => {
   // Nur diese Namen werden ersetzt; ein Tippfehler wie "{jhar}" matcht das
   // Muster nicht und bleibt deshalb sichtbar im Text stehen, statt
   // kommentarlos zu verschwinden.
-  const LABEL_TOKEN_PATTERN = /\{(jahr|jahr_kurz|quartal|monat|monat_kurz|monat_nr|woche|tag|dekade)\}/g;
+  // Zu jedem deutschen Namen gibt es einen englischen Alias; gespeichert wird,
+  // was im Feld steht, beide Schreibweisen funktionieren in jeder Sprache. Die
+  // deutschen Namen bleiben gültig, weil sie in bestehenden Tabellen stehen.
+  const LABEL_TOKEN_ALIASES = {
+    year: 'jahr', year_short: 'jahr_kurz', quarter: 'quartal', month: 'monat',
+    month_short: 'monat_kurz', month_no: 'monat_nr', week: 'woche', day: 'tag', decade: 'dekade',
+  };
+  const LABEL_TOKEN_PATTERN = new RegExp(
+    '\\{(' + [...Object.keys(LABEL_TOKEN_ALIASES), ...Object.values(LABEL_TOKEN_ALIASES)].join('|') + ')\\}', 'g');
 
   // Ersetzt Platzhalter in einer Spalten-Beschriftung durch Kalenderwerte des
   // TATSÄCHLICH aufgelösten Zeitraums dieser Spalte (windowStartEpoch, aus
@@ -534,7 +549,10 @@ window.TableCompute = (() => {
   // Beschriftung unverändert zurück.
   function resolveLabel(label, windowStartEpoch) {
     if (!label || !label.includes('{') || windowStartEpoch == null) return label;
-    const d = new Date(windowStartEpoch * 1000);
+    // Kalenderwerte der SERVERzone; als lokales Date neu aufgebaut, damit
+    // isoWeekNumber() und die getMonth()-Zugriffe unten unverändert bleiben.
+    const sp = window.ServerTime.parts(windowStartEpoch);
+    const d = new Date(sp.year, sp.month - 1, sp.day);
     const tokenValues = {
       jahr: String(d.getFullYear()),
       jahr_kurz: String(d.getFullYear()).slice(-2),
@@ -549,9 +567,9 @@ window.TableCompute = (() => {
       // Zweistellig wie monat_nr (01 statt 1) — konsistent mit dem
       // "DD.MM."-Format, in dem Tag/Monat sonst überall in der App erscheinen.
       tag: String(d.getDate()).padStart(2, '0'),
-      dekade: `${Math.floor(d.getFullYear() / 10) * 10}er`,
+      dekade: t('{decade}er', {decade: Math.floor(d.getFullYear() / 10) * 10}),
     };
-    return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[token]);
+    return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[LABEL_TOKEN_ALIASES[token] || token]);
   }
 
   // Einfügehilfe im Editor (siehe table_editor.html) — Token + Anzeigename,
@@ -559,11 +577,15 @@ window.TableCompute = (() => {
   // Object.keys() auf tokenValues in resolveLabel(), weil die Anzeige-
   // Reihenfolge (grob → fein) bewusst anders ist als der Ersetzungs-Code sie
   // bräuchte.
+  // Eingefügt wird der Name in der Sprache der Oberfläche ({year} statt {jahr}).
   const LABEL_VARIABLES = [
-    ['jahr', 'Jahr'], ['jahr_kurz', 'Jahr (kurz)'], ['quartal', 'Quartal'],
-    ['monat', 'Monat'], ['monat_kurz', 'Monat (kurz)'], ['monat_nr', 'Monat (Nr.)'],
-    ['woche', 'Woche'], ['tag', 'Tag'], ['dekade', 'Dekade'],
-  ];
+    ['jahr', t('Jahr')], ['jahr_kurz', t('Jahr (kurz)')], ['quartal', t('Quartal')],
+    ['monat', t('Monat')], ['monat_kurz', t('Monat (kurz)')], ['monat_nr', t('Monat (Nr.)')],
+    ['woche', t('Woche')], ['tag', t('Tag')], ['dekade', t('Dekade')],
+  ].map(([token, label]) => {
+    const english = Object.keys(LABEL_TOKEN_ALIASES).find((key) => LABEL_TOKEN_ALIASES[key] === token);
+    return [document.documentElement.lang === 'en' ? english : token, label];
+  });
 
   // CSS-Klassen für die Darstellungs-Optionen (Zebra/Rahmen/Dichte/Kopfzeile)
   // — dieselbe Zuordnung für die volle Tabellen-Seite UND die Dashboard-

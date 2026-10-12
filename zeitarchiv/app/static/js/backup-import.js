@@ -12,14 +12,14 @@
 
   function submitFile(zone, file) {
     if (!file || !file.name.toLowerCase().endsWith('.zip')) {
-      setState(zone, 'Bitte eine ZIP-Datei auswählen.');
+      setState(zone, t('Bitte eine ZIP-Datei auswählen.'));
       return;
     }
     const input = zone.querySelector('input[type="file"]');
     const transfer = new DataTransfer();
     transfer.items.add(file);
     input.files = transfer.files;
-    setState(zone, file.name + ' wird hochgeladen und geprüft…');
+    setState(zone, t('{name} wird hochgeladen und geprüft…', {name: file.name}));
     zone.closest('form').requestSubmit();
   }
 

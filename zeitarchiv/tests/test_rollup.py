@@ -173,6 +173,31 @@ def test_append_completed_month_appends_across_multiple_calls() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_counter_reference_value_skips_months_without_archive_file() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-rollup-test-"))
+    try:
+        entity_id = "sensor.fitness_distance_total"
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        # A counter that only reports when something happens: nothing in
+        # August, so there is no 2024-08 archive file at all.
+        july = pa.table({"ts": [_ts(2024, 7, 15, 8)], "value": [50.0]})
+        pq.write_table(july, archive_dir / "2024-07.parquet")
+        rollup.append_completed_month(tmp, entity_id, "counter", july, 2024, 7, TZ)
+
+        september = pa.table({"ts": [_ts(2024, 9, 3, 8), _ts(2024, 9, 20, 8)], "value": [62.0, 70.0]})
+        pq.write_table(september, archive_dir / "2024-09.parquet")
+        rollup.append_completed_month(tmp, entity_id, "counter", september, 2024, 9, TZ)
+
+        assert rollup.last_value_before_month(tmp, entity_id, 2024, 9) == 50.0
+        monat_table = pq.read_table(rollup.rollup_path(tmp, entity_id, "monat")).sort_by("bucket_start")
+        # The first September increase (50 -> 62) must count, not only 62 -> 70.
+        assert monat_table.column("value").to_pylist() == [0.0, 20.0]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_append_completed_month_does_not_read_existing_rollup_history(monkeypatch) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-rollup-test-"))
     try:

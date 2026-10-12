@@ -45,7 +45,9 @@ from starlette.datastructures import MutableHeaders
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import Receive, Scope, Send
 
+from .staleness import staleness as staleness_for, stale_thresholds
 from .formatting import (
+    TYPE_LABELS,
     BACKUP_KEEP_COUNT_LABELS,
     BACKUP_SCHEDULE_LABELS,
     COMPACT_TARGET_BLOCKED_REASONS,
@@ -75,14 +77,14 @@ from .formatting import (
 )
 from .limits import (
     MAX_CSV_UPLOAD_BYTES,
-    MAX_EXPORT_ROWS,
     MAX_UI_ANALYSIS_ROWS,
     MAX_ZIP_MEMBERS,
     MAX_ZIP_UNCOMPRESSED_BYTES,
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines
-from . import demo_mode
+from . import currency, demo_mode, formats, i18n
+from .i18n import N_, tr
 from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
@@ -103,6 +105,7 @@ from .storage import (
     hotbuffer,
     import_reports,
 )
+from .storage import backup_external
 from .storage import query as query_mod
 from .storage.index import (
     DEFAULT_COMPACT_TARGET,
@@ -140,6 +143,9 @@ from .housekeeping_routes import (
     create_housekeeping_router,
     demo_data_context,
 )
+from .backup_external_routes import BackupExternalDependencies, create_backup_external_router
+from .export_routes import ExportDependencies, create_export_router
+from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
     SETTING_HOURLY_BACKFILL_PENDING,
@@ -149,11 +155,12 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats
+from . import cleanup_stats, cleanup_tile
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
+from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -216,8 +223,8 @@ BACKUP_DEFAULT_WEEKDAY = 6
 RETENTION_DEFAULT_TIME = "04:30"
 RETENTION_DEFAULT_WEEKDAY = 6
 BACKUP_WEEKDAY_OPTIONS = [
-    (0, "Montag"), (1, "Dienstag"), (2, "Mittwoch"), (3, "Donnerstag"),
-    (4, "Freitag"), (5, "Samstag"), (6, "Sonntag"),
+    (0, N_("Montag")), (1, N_("Dienstag")), (2, N_("Mittwoch")), (3, N_("Donnerstag")),
+    (4, N_("Freitag")), (5, N_("Samstag")), (6, N_("Sonntag")),
 ]
 
 
@@ -253,20 +260,20 @@ FONT_SCALE = {"1": "1", "2": "1.125", "3": "1.25"}
 DASHBOARD_ROW_HEIGHT = {"1": 210, "2": 218, "3": 228}
 LEGACY_FONT_SCALE = {"0": "1", "4": "3"}
 COLOR_SCHEME_LABELS = {
-    "zeitarchiv": "Zeitarchiv",
-    "home_assistant": "Home Assistant",
-    "modern": "Modern",
+    "zeitarchiv": N_("Zeitarchiv"),
+    "home_assistant": N_("Home Assistant"),
+    "modern": N_("Modern"),
 }
 COLOR_MODE_LABELS = {
-    "auto": "Automatisch",
-    "light": "Hell",
-    "dark": "Dunkel",
+    "auto": N_("Automatisch"),
+    "light": N_("Hell"),
+    "dark": N_("Dunkel"),
 }
 # Vormals eine pro-Chart-Einstellung (saved_charts.dashboard_animation) — gilt
 # jetzt global für alle Dashboard-Kacheln (Einstellungen → Darstellung), da
 # eine Kachel-für-Kachel-Steuerung in der Praxis kaum genutzt wurde und die
 # Chart-Bearbeitung dafür unnötig überladen hat.
-DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
+DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": N_("Aus")}
 # Steuert, wohin "/" (Ingress-Root — was beim Öffnen von Zeitarchiv über die
 # HA-Sidebar erscheint) weiterleitet. Die Übersicht selbst lebt dafür unter
 # der eigenen URL "/uebersicht" statt weiter unter "/" — die Topnav
@@ -274,7 +281,7 @@ DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": "Aus"}
 # Übersicht führt, unabhängig von dieser Einstellung (sonst würde er bei
 # startseite="energiedashboard" auf sich selbst zurückverweisen und die
 # Übersicht wäre über die Topnav gar nicht mehr erreichbar).
-STARTSEITE_LABELS = {"uebersicht": "Übersicht", "energiedashboard": "Energiedashboard"}
+STARTSEITE_LABELS = {"uebersicht": N_("Übersicht"), "energiedashboard": N_("Energiedashboard")}
 
 
 def _current_font_scale() -> str:
@@ -356,13 +363,15 @@ def _collect_all_notices() -> list[dict]:
     """Ein Aufhänger für drei gleichlautende collect_notices()-Aufrufstellen
     statt derselben elf Argumente je einmal (_background existiert erst
     später im Modul — unproblematisch, gebunden wird erst beim Aufruf)."""
+    purge_preview = _background.load_purge_preview()
     return collect_notices(
-        index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+        index, DATA_DIR / "index.sqlite", TZ, purge_preview["totals"],
         _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
         _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
         _background.last_backup_worker_tick, _background.backup_progress.running, _background.demo_dir_info_cached,
         coordinator_busy_events=storage_coordinator.recent_busy_events(),
         duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
+        purge_rows=purge_preview["rows"],
     )
 
 
@@ -384,11 +393,15 @@ def _notices_context(request: Request) -> dict:
     }
 
 
-app = FastAPI(title="Zeitarchiv")
+app = FastAPI(title="Zeitarchiv", dependencies=i18n.dependencies(lambda: index))
 templates = Jinja2Templates(
     directory=str(APP_DIR / "templates"),
-    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context],
+    context_processors=[_font_scale_context, _app_root_context, _nav_dashboards_context, _notices_context, i18n.make_context_processor(lambda: index)],
 )
+i18n.install(templates)
+i18n.set_background_language(lambda: index)
+templates.env.filters["retranslate"] = i18n.retranslate
+app.include_router(i18n.make_router(lambda: index))
 
 
 class RequestLoggingMiddleware:
@@ -592,11 +605,15 @@ def asset(kontext, pfad: str) -> str:
 # *_label-Kopien übersetzen) hier mehr Code für denselben Zweck wäre.
 templates.env.filters["format_int"] = format_int
 templates.env.filters["format_value"] = format_value
+templates.env.filters["format_money"] = currency.format_money
 # Eine Funktion statt der drei Zahlen css_v/js_v/vendor_v (ZG-05). Ein
 # Template schreibt {{ asset('js/pages/statistik.js') }} und bekommt Präfix und
 # Cache-Buster mitgeliefert; welcher der drei Ordner gemeint ist, muss es nicht
 # mehr wissen. Die Begründung für den Inhalts-Hash steht bei _AssetVersions.
 templates.env.globals["asset"] = asset
+# Zeitzone des Servers für die Oberfläche (data-tz am <html>, static/js/server-time.js):
+# Datumsangaben dürfen nicht in der Zeitzone des Browsers entstehen.
+templates.env.globals["server_tz"] = str(TZ)
 # Namenslänge für Dashboards/Charts/Tabellen: als maxlength in die
 # Eingabefelder, damit die Grenze schon beim Tippen gilt statt erst beim
 # Speichern. Die verbindliche Prüfung bleibt serverseitig
@@ -650,8 +667,7 @@ storage_coordinator = StorageCoordinator()
 # count_stale_entities als Lambda, weil _count_stale_entities() weiter unten in
 # dieser Datei steht — aufgelöst wird es erst beim Aufruf.
 _background = BackgroundService(BackgroundDependencies(
-    data_dir=DATA_DIR,
-    tz=TZ,
+    data_dir=DATA_DIR, tz=TZ,
     index=index,
     coordinator=storage_coordinator,
     base_dir=BASE_DIR, demo_mode_active=DEMO_MODE,
@@ -777,7 +793,7 @@ async def _index_busy_handler(_request: Request, exc: IndexBusy) -> JSONResponse
     Anfrage ist, sondern ein "gleich nochmal versuchen"-Zustand."""
     return JSONResponse(
         status_code=503,
-        content={"detail": "Datenbank kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
+        content={"detail": tr("Datenbank kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen.")},
     )
 
 
@@ -787,7 +803,7 @@ async def _coordinator_busy_handler(_request: Request, exc: CoordinatorBusy) -> 
     Index-Locks (siehe CoordinatorBusy/storage_locked() in route_support.py)."""
     return JSONResponse(
         status_code=503,
-        content={"detail": "Speicherzugriff kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen."},
+        content={"detail": tr("Speicherzugriff kurzzeitig ausgelastet — bitte in ein paar Sekunden erneut versuchen.")},
     )
 
 
@@ -865,7 +881,7 @@ def entities_view(request: Request) -> HTMLResponse:
     snapshots = index.get_stats_snapshots(time.time() - 24 * 3600)
     type_counts = {row["aggregation_type"]: row["entity_count"] for row in index.get_stats_by_type()}
     type_breakdown = " · ".join(
-        f"{type_counts[key]} {label}" for key, label in (("standard", "Standard"), ("counter", "Zähler"), ("switch", "Schalter")) if type_counts.get(key)
+        f"{type_counts[key]} {tr(TYPE_LABELS[key])}" for key in ("standard", "counter", "switch") if type_counts.get(key)
     )
     context = {
         "entity_count": overview["entity_count"],
@@ -889,7 +905,7 @@ def entities_list_view(request: Request) -> HTMLResponse:
     Fragment, nur der umgebende Seitenrahmen ist jetzt die settings-layout-
     Familie (Sidebar wie Statistik/Import/Export/Backup)."""
     units = index.list_distinct_units()
-    unit_options = [{"value": "__none__" if u is None else u, "label": "Ohne Einheit" if u is None else u} for u in units]
+    unit_options = [{"value": "__none__" if u is None else u, "label": tr("Ohne Einheit") if u is None else u} for u in units]
     return templates.TemplateResponse(
         request,
         "entities_list.html",
@@ -1065,46 +1081,47 @@ def _settings_background_processes_context() -> dict:
 
     def row(name: str, hint: str, ts: float | None, *, error: bool = False) -> dict:
         if error:
-            pill_class, pill_label = "error", "Fehler"
+            pill_class, pill_label = "error", tr("Fehler")
         elif ts is None:
             pill_class, pill_label = "none", "–"
         else:
             pill_class, pill_label = "ok", "OK"
-        last_run = f"vor {format_uptime(now - ts)}" if ts is not None else "noch nie gelaufen"
+        last_run = tr("vor {dauer}", dauer=format_uptime(now - ts)) if ts is not None else tr("noch nie gelaufen")
         return {"name": name, "hint": hint, "last_run": last_run, "pill_class": pill_class, "pill_label": pill_label}
 
-    duplicate_snapshot = index.get_duplicate_snapshot()
     version_state = version_check.get_cached_state(index)
     reconcile = _background.storage_reconcile_last or {}
     reconcile_ts = reconcile.get("checked_at") or reconcile.get("started_at")
 
     rows = [
         row(
-            "Statistik-Snapshot", "Kennzahlen-Schnappschuss für die Statistik-Seite · stündlich",
+            tr("Statistik-Snapshot"), tr("Kennzahlen-Schnappschuss für die Statistik-Seite · stündlich"),
             index.get_latest_stats_snapshot_ts(),
         ),
         row(
-            "Arbeitsspeicher-Snapshot", "RAM-Verlauf für die Statistik-Seite · stündlich",
+            tr("Arbeitsspeicher-Snapshot"), tr("RAM-Verlauf für die Statistik-Seite · stündlich"),
             index.get_latest_memory_snapshot_ts(),
         ),
         row(
-            "Aufbewahrung-Übersicht", "Vorschau der von der Frist betroffenen Zeilen · bei Bedarf",
+            tr("Aufbewahrung-Übersicht"), tr("Vorschau der von der Frist betroffenen Zeilen · bei Bedarf"),
             _background.load_retention_overview().get("generated_at"),
         ),
         row(
-            "Löschvorschau", "Vorschau für weich gelöschte, noch nicht entfernte Werte · bei Bedarf",
+            tr("Löschvorschau"), tr("Vorschau für weich gelöschte, noch nicht entfernte Werte · bei Bedarf"),
             _background.load_purge_preview().get("generated_at"),
         ),
         row(
-            "Duplikat-Erkennung", "Zählt doppelte Zeitstempel je Entität vor · stündlich",
-            duplicate_snapshot.get("checked_at") if duplicate_snapshot else None,
+            tr("Duplikat-Erkennung"), tr("Zählt doppelte Zeitstempel je Entität vor · stündlich"),
+            (index.get_duplicate_snapshot() or {}).get("checked_at"),
         ),
+        row(tr("Zählerrückgang-Erkennung"), tr("Sucht Rückgänge bei Zählern der letzten 30 Tage · stündlich"), (index.get_counter_decrease_snapshot() or {}).get("checked_at")),
+        row(tr("Fehlwerte-Regel"), tr("Markiert bei Zählern mit eingeschalteter Regel zurückkehrende Rückgänge · stündlich"), float(index.get_setting("counter_auto_mark_last_run") or 0) or None),
         row(
-            "Versionsprüfung", "Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich",
+            tr("Versionsprüfung"), tr("Prüft auf GitHub, ob eine neuere Version verfügbar ist · täglich"),
             version_state.get("checked_at") if version_state else None,
         ),
         row(
-            "Speicherindex-Abgleich", "Gleicht Zeilenzahl/Größe je Entität mit den Dateien ab · nach Neustart",
+            tr("Speicherindex-Abgleich"), tr("Gleicht Zeilenzahl/Größe je Entität mit den Dateien ab · nach Neustart"),
             reconcile_ts, error=bool(reconcile.get("errors")),
         ),
     ]
@@ -1116,14 +1133,14 @@ def _settings_background_processes_context() -> dict:
     outlier = cleanup_stats.outlier_rate_overview(index)
     outlier_gesamt = outlier["measured"] + outlier["pending"]
     rows.append({
-        "name": "Ausreißer-Quoten",
-        "hint": "Misst je Entität die Markierungsquote über die ganze Historie · 1 Entität/30s",
+        "name": tr("Ausreißer-Quoten"),
+        "hint": tr("Misst je Entität die Markierungsquote über die ganze Historie · 1 Entität/30s"),
         "last_run": (
-            f"{outlier['measured']} von {outlier_gesamt} gemessen" if outlier_gesamt
-            else "keine Entität mit Ausreißer-Erkennung"
+            tr("{measured} von {outlier_gesamt} gemessen", measured=outlier['measured'], outlier_gesamt=outlier_gesamt) if outlier_gesamt
+            else tr("keine Entität mit Ausreißer-Erkennung")
         ),
         "pill_class": "pending" if outlier["pending"] else "ok",
-        "pill_label": f"{outlier['pending']} ausstehend" if outlier["pending"] else "OK",
+        "pill_label": tr("{pending} ausstehend", pending=outlier['pending']) if outlier["pending"] else "OK",
     })
 
     if is_energiedashboard_configured(index):
@@ -1133,11 +1150,11 @@ def _settings_background_processes_context() -> dict:
             pending = []
         pending_count = len(pending) if isinstance(pending, list) else 0
         rows.append({
-            "name": "Energiedashboard · Stunden-Rollup-Backfill",
-            "hint": "Baut die feinere Auflösung für neu zugeordnete Zähler-Rollen rückwirkend auf · 1 Entität/30s",
-            "last_run": "Warteschlange leer" if not pending_count else "–",
+            "name": tr("Energiedashboard · Stunden-Rollup-Backfill"),
+            "hint": tr("Baut die feinere Auflösung für neu zugeordnete Zähler-Rollen rückwirkend auf · 1 Entität/30s"),
+            "last_run": tr("Warteschlange leer") if not pending_count else "–",
             "pill_class": "pending" if pending_count else "ok",
-            "pill_label": f"{pending_count} ausstehend" if pending_count else "OK",
+            "pill_label": tr("{pending_count} ausstehend", pending_count=pending_count) if pending_count else "OK",
         })
 
         heatmap_snapshots = [
@@ -1145,8 +1162,8 @@ def _settings_background_processes_context() -> dict:
         ]
         heatmap_ts_values = [s["checked_at"] for s in heatmap_snapshots if s and s.get("checked_at") is not None]
         rows.append(row(
-            "Energiedashboard · Tageslastprofil-Cache",
-            "Berechnet die Wochentags-Ansicht für Monat/Jahr im Voraus · täglich",
+            tr("Energiedashboard · Tageslastprofil-Cache"),
+            tr("Berechnet die Wochentags-Ansicht für Monat/Jahr im Voraus · täglich"),
             min(heatmap_ts_values) if heatmap_ts_values else None,
         ))
 
@@ -1213,6 +1230,9 @@ def _settings_notices_context() -> dict:
     muted = [
         {
             **entry,
+            "title": i18n.retranslate(entry["title"]),
+            "detail": i18n.retranslate(entry["detail"]),
+            "meta": i18n.retranslate(entry["meta"]),
             "muted_at_text": (
                 f"{format_timestamp(entry['muted_at'], TZ)} {format_time(entry['muted_at'], TZ)}"
                 if entry["muted_at"] else "—"
@@ -1275,28 +1295,30 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     Dauer kommt aus einer festen Preset-Liste (SNOOZE_PRESETS) statt einem
     frei wählbaren Datum — "forever" (None) eingeschlossen, bleibt trotzdem
     sicher, siehe Kommentar dort (Fingerprint statt Ablaufdatum)."""
+    purge_preview = _background.load_purge_preview()
     notice = next(
         (
             n for n in notices_mod.build_notices(
-                index, DATA_DIR / "index.sqlite", TZ, _background.load_purge_preview()["totals"],
+                index, DATA_DIR / "index.sqlite", TZ, purge_preview["totals"],
                 _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
                 _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
                 demo_dir_info=_background.demo_dir_info_cached,
                 coordinator_busy_events=storage_coordinator.recent_busy_events(),
                 duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
+                purge_rows=purge_preview["rows"],
             )
             if n["id"] == notice_id
         ),
         None,
     )
     if notice is None:
-        raise HTTPException(status_code=404, detail="Meldung nicht gefunden oder nicht mehr aktiv")
+        raise HTTPException(status_code=404, detail=tr("Meldung nicht gefunden oder nicht mehr aktiv"))
     if not notice["mutable"]:
-        raise HTTPException(status_code=400, detail="Diese Meldung lässt sich nicht stumm schalten")
+        raise HTTPException(status_code=400, detail=tr("Diese Meldung lässt sich nicht stumm schalten"))
     form = await request.form()
     duration = form.get("duration")
     if duration not in notices_mod.SNOOZE_PRESETS:
-        raise HTTPException(status_code=400, detail="Ungültige Dauer")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Dauer"))
     seconds = notices_mod.SNOOZE_PRESETS[duration]
     until = time.time() + seconds if seconds is not None else None
     notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
@@ -1347,7 +1369,7 @@ async def settings_tips_enabled(request: Request) -> HTMLResponse:
     form = await request.form()
     enabled = form.get("tips_enabled")
     if enabled not in _ON_OFF_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Wert")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Wert"))
     notices_mod.set_tips_enabled(index, enabled == "1")
     return templates.TemplateResponse(request, "_settings_tips_form.html", _settings_notices_context())
 
@@ -1363,7 +1385,7 @@ async def settings_tips_hide(request: Request) -> HTMLResponse:
     slug = form.get("slug")
     today_tip, ordinal = notices_mod.resolve_today_tip(TZ)
     if slug != today_tip["slug"]:
-        raise HTTPException(status_code=400, detail="Nur der heute fällige Tipp lässt sich ausblenden")
+        raise HTTPException(status_code=400, detail=tr("Nur der heute fällige Tipp lässt sich ausblenden"))
     notices_mod.hide_tip_today(index, slug, ordinal)
     return templates.TemplateResponse(request, "_tips_list_body.html", _settings_notices_context())
 
@@ -1391,7 +1413,7 @@ def logs_view(request: Request) -> HTMLResponse:
         request,
         "logs.html",
         {
-            "log_filter_options": [("all", "Alle"), *LOG_LEVEL_LABELS.items()],
+            "log_filter_options": [("all", tr("Alle")), *LOG_LEVEL_LABELS.items()],
             **_settings_logging_context(),
         },
     )
@@ -1401,9 +1423,9 @@ def _validate_log_request(
     level: str, search: str, limit: int, source: str = "local"
 ) -> tuple[str, str, int, str]:
     if level != "all" and level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Logfilter")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Logfilter"))
     if source not in {"local", "supervisor"}:
-        raise HTTPException(status_code=400, detail="Ungültige Logquelle")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Logquelle"))
     return level, search[:200], max(50, min(limit, 5_000)), source
 
 
@@ -1469,25 +1491,25 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
     color_scheme = form.get("color_scheme")
     color_mode = form.get("color_mode")
     if font_scale is not None and font_scale not in FONT_SCALE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Schriftgröße")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Schriftgröße"))
     if font_scale is not None:
         index.set_setting("font_scale", str(font_scale))
     if color_scheme is not None and color_scheme not in COLOR_SCHEME_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges Farbschema")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Farbschema"))
     if color_scheme is not None:
         index.set_setting("color_scheme", str(color_scheme))
     if color_mode is not None and color_mode not in COLOR_MODE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Darstellungsmodus")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Darstellungsmodus"))
     if color_mode is not None:
         index.set_setting("color_mode", str(color_mode))
     dashboard_animation = form.get("dashboard_animation")
     if dashboard_animation is not None and dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Dashboard-Animation")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Dashboard-Animation"))
     if dashboard_animation is not None:
         index.set_setting("dashboard_animation", str(dashboard_animation))
     startseite = form.get("startseite")
     if startseite is not None and startseite not in STARTSEITE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Startseite")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Startseite"))
     if startseite is not None:
         index.set_setting("startseite", str(startseite))
 
@@ -1506,17 +1528,17 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         if value is None:
             continue
         if value not in _ON_OFF_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültiger Wert")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert"))
         _update_entity_chart_default(option_key, value == "1")
     entity_legend_style = form.get("entity_legend_style")
     if entity_legend_style is not None and entity_legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
     if entity_legend_style is not None:
         _update_entity_chart_default("legend_style", entity_legend_style)
     if "entity_legend_metrics" in form:
         entity_legend_metrics = form.getlist("entity_legend_metrics")
         if not set(entity_legend_metrics) <= _CHART_LEGEND_METRICS:
-            raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
         _update_entity_chart_default("legend_metrics", entity_legend_metrics)
 
     return templates.TemplateResponse(
@@ -1531,9 +1553,9 @@ async def settings_logging(request: Request) -> HTMLResponse:
     level = str(form.get("log_level", DEFAULT_LOG_LEVEL))
     access_mode = str(form.get("access_log_mode", DEFAULT_ACCESS_LOG_MODE))
     if level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges Loglevel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Loglevel"))
     if access_mode not in ACCESS_LOG_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges HTTP-Protokoll")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges HTTP-Protokoll"))
     index.set_setting("log_level", level)
     index.set_setting("access_log_mode", access_mode)
     configure_logging(level, access_mode)
@@ -1588,7 +1610,7 @@ def settings_capture_write_download() -> Response:
         payload = _write_capture["payload"]
         captured_at = _write_capture["captured_at"]
     if payload is None:
-        raise HTTPException(status_code=404, detail="Keine Aufzeichnung vorhanden")
+        raise HTTPException(status_code=404, detail=tr("Keine Aufzeichnung vorhanden"))
     filename = f"zeitarchiv-write-capture-{datetime.fromtimestamp(captured_at, TZ).strftime('%Y%m%d-%H%M%S')}.json"
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -1609,7 +1631,7 @@ async def settings_trace_start(request: Request) -> HTMLResponse:
     form = await request.form()
     entity_id = str(form.get("entity_id", "")).strip()
     if not entity_id:
-        raise HTTPException(status_code=400, detail="Entity-ID fehlt")
+        raise HTTPException(status_code=400, detail=tr("Entity-ID fehlt"))
     try:
         validate_entity_id(entity_id)
     except ValueError as exc:
@@ -1648,8 +1670,8 @@ def settings_trace_stop(request: Request) -> HTMLResponse:
 # Adapter selbst stehen in notices.py, wo auch der Rest der Glocken-Anzeige
 # lebt — main.py hat ein Zeilenbudget (test_route_modules.py), und
 # Anzeigelogik ist genau das, was hier nicht mehr dazukommen soll.
-register_source("retention", "Aufbewahrung", lambda: notices_mod.retention_activity(_background.retention_progress))
-register_source("backup", "Backup", lambda: notices_mod.backup_activity(_background.backup_progress))
+register_source("retention", N_("Aufbewahrung"), lambda: notices_mod.retention_activity(_background.retention_progress))
+register_source("backup", N_("Backup"), lambda: notices_mod.backup_activity(_background.backup_progress))
 
 
 
@@ -1685,7 +1707,7 @@ async def _lifespan(_: FastAPI):
 app.router.lifespan_context = _lifespan
 
 
-_BACKUP_SORT_COLUMNS = [("created_at", "Erstellt"), ("size_bytes", "Größe")]
+_BACKUP_SORT_COLUMNS = [("created_at", N_("Erstellt")), ("size_bytes", N_("Größe"))]
 
 
 def _backup_list_context(sort: str = "created_at", direction: str = "desc", page: int = 1, page_size: int = 10) -> dict:
@@ -1702,14 +1724,23 @@ def _backup_list_context(sort: str = "created_at", direction: str = "desc", page
     raw = backup.list_backups(BACKUPS_DIR)
     raw.sort(key=lambda b: b[sort], reverse=(direction == "desc"))
     page_raw, pagination = _paginate(raw, page, page_size)
-    backups = [
-        {
+    external_states = index.list_backup_external_states()
+    external_enabled = backup_external.load_config(index).enabled
+    backups = []
+    for b in page_raw:
+        job = external_states.get(b["filename"])
+        status = job["external_status"] if job is not None else None
+        backups.append({
             "filename": b["filename"],
             "size": format_size(b["size_bytes"]),
             "created_at": f"{format_timestamp(b['created_at'], TZ)} {format_time(b['created_at'], TZ)}",
-        }
-        for b in page_raw
-    ]
+            "external_status": status or "none",
+            "external_error": (job["external_error"] if job is not None else None) or "",
+            "external_can_retry": external_enabled and job is not None and status in (None, "failed"),
+        })
+    show_external = external_enabled or any(
+        row["external_status"] for row in external_states.values()
+    )
 
     def _next_dir(column: str) -> str:
         return "asc" if sort == column and direction == "desc" else "desc"
@@ -1726,6 +1757,7 @@ def _backup_list_context(sort: str = "created_at", direction: str = "desc", page
     ]
     return {
         "backups": backups,
+        "backup_show_external": show_external,
         "backup_columns": columns,
         "backup_sort": sort,
         "backup_dir": direction,
@@ -1745,8 +1777,8 @@ def _backup_context(
     percent = int(done / total * 100) if total else 0
     jobs = []
     status_labels = {
-        "queued": "Geplant", "running": "Läuft", "success": "Erfolgreich",
-        "failed": "Fehlgeschlagen", "interrupted": "Abgebrochen", "skipped": "Übersprungen",
+        "queued": N_("Geplant"), "running": N_("Läuft"), "success": N_("Erfolgreich"),
+        "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"), "skipped": N_("Übersprungen"),
     }
     for job in index.list_backup_jobs(10):
         jobs.append({
@@ -1776,7 +1808,7 @@ def _backup_context(
     for event in backup.list_restore_events(DATA_DIR):
         jobs.append({
             "trigger": "Wiederherstellung",
-            "status": "Erfolgreich",
+            "status": tr("Erfolgreich"),
             "status_key": "success",
             "created_at": f"{format_timestamp(event['created_at'], TZ)} {format_time(event['created_at'], TZ)}",
             "created_at_ts": event["created_at"],
@@ -1807,7 +1839,7 @@ def _backup_context(
         free_bytes = shutil.disk_usage(DATA_DIR).free
         if source_size and free_bytes < source_size * 2:
             warnings.append(
-                f"Wenig freier Speicher: Für ein Backup werden ungefähr {format_size(source_size * 2)} frei empfohlen."
+                tr("Wenig freier Speicher: Für ein Backup werden ungefähr {format_size} frei empfohlen.", format_size=format_size(source_size * 2))
             )
     except OSError:
         pass
@@ -1819,17 +1851,17 @@ def _backup_context(
         last_success_ts = None
     stale_after = {"daily": 2 * 86400, "weekly": 14 * 86400}.get(schedule_value)
     if stale_after and last_success_ts and time.time() - last_success_ts > stale_after:
-        warnings.append("Das letzte erfolgreiche Backup ist älter als zwei Sicherungsintervalle.")
+        warnings.append(tr("Das letzte erfolgreiche Backup ist älter als zwei Sicherungsintervalle."))
 
     global _restore_startup_result
     if message is None and _restore_startup_result:
         if _restore_startup_result.get("success"):
-            message = (
-                f"{_restore_startup_result['source']} wurde wiederhergestellt. "
-                f"Der vorherige Stand liegt in {_restore_startup_result['rollback']}."
+            message = tr(
+                "{source} wurde wiederhergestellt. Der vorherige Stand liegt in {rollback}.",
+                source=_restore_startup_result["source"], rollback=_restore_startup_result["rollback"],
             )
         else:
-            message = f"Wiederherstellung fehlgeschlagen: {_restore_startup_result.get('error', 'Unbekannter Fehler')}"
+            message = tr("Wiederherstellung fehlgeschlagen: {get}", get=_restore_startup_result.get('error', 'Unbekannter Fehler'))
         # Einmalige Meldung nach einem Neustart — ohne dieses Löschen würde sie bei
         # JEDER folgenden Aktion ohne eigene message (Backup löschen, Backup starten,
         # Fortschritts-Polling) erneut auftauchen, weil _restore_startup_result für
@@ -1855,6 +1887,7 @@ def _backup_context(
         "backup_next_run": display_ts(str(next_ts) if next_ts is not None else None),
         "backup_last_success": display_ts(last_success_raw),
         "backup_last_failure": display_ts(index.get_setting("backup_last_failure", "")),
+        "backup_external_enabled": backup_external.load_config(index).enabled,
         "backup_keep_count": index.get_setting("backup_keep_count", "unlimited"),
         "backup_keep_count_options": list(BACKUP_KEEP_COUNT_LABELS.items()),
         "backup_keep_days": index.get_setting("backup_keep_days", "unlimited"),
@@ -1899,18 +1932,18 @@ async def backup_schedule_save(request: Request) -> HTMLResponse:
     schedule_time = str(form.get("backup_schedule_time", BACKUP_DEFAULT_TIME))
     weekday_raw = str(form.get("backup_schedule_weekday", BACKUP_DEFAULT_WEEKDAY))
     if schedule is not None and schedule not in BACKUP_SCHEDULE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitplan")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitplan"))
     if keep_count is not None and keep_count not in BACKUP_KEEP_COUNT_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Anzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl"))
     if keep_days is not None and keep_days not in RETENTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Aufbewahrung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
     try:
         parse_schedule_time(schedule_time)
         weekday = int(weekday_raw)
         if weekday not in range(7):
             raise ValueError
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Ungültiger Sicherungszeitpunkt") from exc
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Sicherungszeitpunkt")) from exc
     if schedule is not None:
         index.set_setting("backup_schedule", str(schedule))
     if keep_count is not None:
@@ -1929,20 +1962,20 @@ async def backup_schedule_save(request: Request) -> HTMLResponse:
 def backup_verify(request: Request, filename: str) -> HTMLResponse:
     path = backup.resolve_backup_path(BACKUPS_DIR, filename)
     if path is None or not path.is_file():
-        raise HTTPException(status_code=404, detail="Backup nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
     try:
         manifest = backup.validate_backup(path)
     except ValueError as exc:
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Prüfung fehlgeschlagen: {exc}"),
+            _backup_context(message=tr("Prüfung fehlgeschlagen: {exc}", exc=exc)),
         )
     version = manifest.get("format_version", 0)
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
-        _backup_context(message=f"Backup erfolgreich geprüft (Formatversion {version})."),
+        _backup_context(message=tr("Backup erfolgreich geprüft (Formatversion {version}).", version=version)),
     )
 
 
@@ -1958,7 +1991,7 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message="Import fehlgeschlagen: Bitte eine ZIP-Datei auswählen."),
+            _backup_context(message=tr("Import fehlgeschlagen: Bitte eine ZIP-Datei auswählen.")),
         )
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
     staging = BACKUPS_DIR / f".backup-upload-{secrets.token_hex(12)}.zip"
@@ -1982,14 +2015,14 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Import fehlgeschlagen: {exc}"),
+            _backup_context(message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
         )
     except (OSError, ValueError) as exc:
         logger.warning("Backup-Import fehlgeschlagen · %s", exc)
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Import fehlgeschlagen: {exc}"),
+            _backup_context(message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
         )
     finally:
         staging.unlink(missing_ok=True)
@@ -2005,7 +2038,7 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         request,
         "_settings_backup_ready.html",
         _backup_context(
-            message=f"Backup importiert und erfolgreich geprüft (Formatversion {version}, {destination.name})."
+            message=tr("Backup importiert und erfolgreich geprüft (Formatversion {version}, {name}).", version=version, name=destination.name)
         ),
     )
 
@@ -2019,14 +2052,13 @@ def backup_restore_prepare(request: Request, filename: str) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Wiederherstellung nicht vorbereitet: {exc}"),
+            _backup_context(message=tr("Wiederherstellung nicht vorbereitet: {exc}", exc=exc)),
         )
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
         _backup_context(
-            message="Wiederherstellung vorbereitet. Das Backup wird beim nächsten Start eingespielt, "
-                    "der aktuelle Stand bleibt als Rollback erhalten.",
+            message=tr("Wiederherstellung vorbereitet. Das Backup wird beim nächsten Start eingespielt, der aktuelle Stand bleibt als Rollback erhalten."),
             offer_restart=True,
         ),
     )
@@ -2044,14 +2076,13 @@ def backup_rollback_restore(request: Request, name: str) -> HTMLResponse:
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=f"Wiederherstellung nicht vorbereitet: {exc}"),
+            _backup_context(message=tr("Wiederherstellung nicht vorbereitet: {exc}", exc=exc)),
         )
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
         _backup_context(
-            message="Wiederherstellung vorbereitet. Der gewählte Rollback-Stand wird beim nächsten "
-                    "Start eingespielt, der aktuelle Stand bleibt zusätzlich als neuer Rollback erhalten.",
+            message=tr("Wiederherstellung vorbereitet. Der gewählte Rollback-Stand wird beim nächsten Start eingespielt, der aktuelle Stand bleibt zusätzlich als neuer Rollback erhalten."),
             offer_restart=True,
         ),
     )
@@ -2062,11 +2093,11 @@ def backup_rollback_delete(request: Request, name: str) -> HTMLResponse:
     with storage_coordinator.exclusive():
         deleted = backup.delete_restore_rollback(DATA_DIR, name)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Rollback nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Rollback nicht gefunden"))
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
-        _backup_context(message="Rollback-Daten wurden gelöscht."),
+        _backup_context(message=tr("Rollback-Daten wurden gelöscht.")),
     )
 
 
@@ -2080,9 +2111,9 @@ def system_restart(request: Request) -> HTMLResponse:
     zurück statt eines stillen Fehlschlags."""
     try:
         supervisor_stats.restart_addon()
-        message = "Neustart angefordert — die Seite lädt in Kürze neu."
+        message = tr("Neustart angefordert — die Seite lädt in Kürze neu.")
     except RuntimeError as exc:
-        message = f"Automatischer Neustart nicht möglich: {exc}. Bitte das Add-on manuell neu starten."
+        message = tr("Automatischer Neustart nicht möglich: {exc}. Bitte das Add-on manuell neu starten.", exc=exc)
     return templates.TemplateResponse(
         request, "_settings_backup_ready.html", _backup_context(message=message),
     )
@@ -2092,7 +2123,7 @@ def system_restart(request: Request) -> HTMLResponse:
 def backup_download(filename: str) -> StreamingResponse:
     path = backup.resolve_backup_path(BACKUPS_DIR, filename)
     if path is None or not path.is_file():
-        raise HTTPException(status_code=404, detail="Backup nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
 
     def generate():
         with path.open("rb") as f:
@@ -2112,7 +2143,7 @@ def backup_delete(request: Request, filename: str) -> HTMLResponse:
     with storage_coordinator.exclusive():
         deleted = backup.delete_backup(BACKUPS_DIR, filename)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Backup nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
     return _backup_status_response(request)
 
 
@@ -2123,7 +2154,7 @@ def backup_delete_all(request: Request) -> HTMLResponse:
     ihre jeweiligen Löschaktionen steuerbar)."""
     with storage_coordinator.exclusive():
         count = backup.delete_all_backups(BACKUPS_DIR)
-    message = f"{count} Backup(s) gelöscht." if count else "Keine Backups zum Löschen vorhanden."
+    message = tr("{count} Backup(s) gelöscht.", count=count) if count else tr("Keine Backups zum Löschen vorhanden.")
     return templates.TemplateResponse(request, "_settings_backup_ready.html", _backup_context(message=message))
 
 
@@ -2145,13 +2176,13 @@ def backup_list(
 
 
 _GROWTH_RANGE_SINCE_SECONDS = {"day": 86400, "month": 30 * 86400, "year": 365 * 86400, "all": None}
-_GROWTH_RANGE_OPTIONS = [("day", "Tag"), ("month", "Monat"), ("year", "Jahr"), ("all", "Gesamt")]
+_GROWTH_RANGE_OPTIONS = [("day", N_("Tag")), ("month", N_("Monat")), ("year", N_("Jahr")), ("all", N_("Gesamt"))]
 
 
 @app.get("/api/stats-snapshots")
 def api_stats_snapshots(range: str = "month") -> dict:
     if range not in _GROWTH_RANGE_SINCE_SECONDS:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     seconds = _GROWTH_RANGE_SINCE_SECONDS[range]
     since_ts = 0.0 if seconds is None else time.time() - seconds
     snapshots = index.get_stats_snapshots(since_ts)
@@ -2182,15 +2213,15 @@ def _storage_breakdown() -> list[dict]:
         row["size_bytes"] for row in backup.list_restore_rollback_details(DATA_DIR)
     )
     return [
-        {"key": "archive", "label": "Archiv", "bytes": index.get_overview()["total_size_bytes"]},
+        {"key": "archive", "label": tr("Archiv"), "bytes": index.get_overview()["total_size_bytes"]},
         {"key": "rollup", "label": "Rollups", "bytes": dir_size(DATA_DIR / "rollup")},
-        {"key": "hot", "label": "Laufender Monat (Hot Buffer)", "bytes": dir_size(DATA_DIR / "hot")},
-        {"key": "index", "label": "Index", "bytes": index_path.stat().st_size if index_path.exists() else 0},
+        {"key": "hot", "label": tr("Laufender Monat (Hot Buffer)"), "bytes": dir_size(DATA_DIR / "hot")},
+        {"key": "index", "label": tr("Index"), "bytes": index_path.stat().st_size if index_path.exists() else 0},
         {"key": "backups", "label": "Backups", "bytes": dir_size(DATA_DIR / "backups") + rollback_bytes},
-        {"key": "reports", "label": "Import-Reports", "bytes": dir_size(DATA_DIR / "reports")},
+        {"key": "reports", "label": tr("Import-Reports"), "bytes": dir_size(DATA_DIR / "reports")},
         {
             "key": "import",
-            "label": "Import-Zwischendateien",
+            "label": tr("Import-Zwischendateien"),
             "bytes": dir_size(DATA_DIR / "symcon_import") + dir_size(DATA_DIR / "csv_import"),
         },
     ]
@@ -2399,26 +2430,23 @@ def statistik_view(request: Request) -> HTMLResponse:
 
 _INDEX_DETAIL_GROUPS = [
     {
-        "label": "Entitäten und Archivstatus",
+        "label": N_("Entitäten und Archivstatus"),
         "description": (
-            "Konfiguration, Anzeigenamen, Einheiten, letzter Wert sowie die vom "
-            "Dateibestand abgeleiteten Zeilen- und Größenstände jeder Entität."
+            N_("Konfiguration, Anzeigenamen, Einheiten, letzter Wert sowie die vom Dateibestand abgeleiteten Zeilen- und Größenstände jeder Entität.")
         ),
         "tables": ["entities"],
     },
     {
-        "label": "Schreibsicherheit und Bereinigung",
+        "label": N_("Schreibsicherheit und Bereinigung"),
         "description": (
-            "Idempotenzstatus eingehender Ereignisse und vorgemerkte, noch nicht "
-            "physisch entfernte Rohwerte."
+            N_("Idempotenzstatus eingehender Ereignisse und vorgemerkte, noch nicht physisch entfernte Rohwerte.")
         ),
         "tables": ["ingested_events", "deleted_points"],
     },
     {
-        "label": "Charts, Tabellen und Dashboards",
+        "label": N_("Charts, Tabellen und Dashboards"),
         "description": (
-            "Gespeicherte Ansichten, Tabellenaufbau, Dashboards sowie Position und "
-            "Darstellungsoptionen ihrer Kacheln; keine Messwerte."
+            N_("Gespeicherte Ansichten, Tabellenaufbau, Dashboards sowie Position und Darstellungsoptionen ihrer Kacheln; keine Messwerte.")
         ),
         "tables": [
             "saved_charts", "saved_tables", "table_columns", "table_rows",
@@ -2426,18 +2454,16 @@ _INDEX_DETAIL_GROUPS = [
         ],
     },
     {
-        "label": "Statistikverlauf",
+        "label": N_("Statistikverlauf"),
         "description": (
-            "Stündliche Schnappschüsse von Datenbestand, Speichergröße und optionalem "
-            "RAM-Verbrauch für Verlaufsanzeigen."
+            N_("Stündliche Schnappschüsse von Datenbestand, Speichergröße und optionalem RAM-Verbrauch für Verlaufsanzeigen.")
         ),
         "tables": ["stats_snapshots", "memory_snapshots"],
     },
     {
-        "label": "Einstellungen und Wartung",
+        "label": N_("Einstellungen und Wartung"),
         "description": (
-            "App-Einstellungen sowie Ausführungsverläufe von Backups und "
-            "Aufbewahrungsbereinigungen. Import-Reports selbst liegen als JSON-Dateien vor."
+            N_("App-Einstellungen sowie Ausführungsverläufe von Backups und Aufbewahrungsbereinigungen. Import-Reports selbst liegen als JSON-Dateien vor.")
         ),
         "tables": ["settings", "backup_jobs", "retention_jobs"],
     },
@@ -2482,140 +2508,10 @@ def statistik_index_optimize(request: Request) -> HTMLResponse:
     )
 
 
-@app.get("/export", response_class=HTMLResponse)
-def export_page(request: Request) -> HTMLResponse:
-    """CSV-Export (Einstellungen-Bereich, analog zum Import): pro Entität die
-    komplette Rohdaten-Historie (Hot Buffer + Archiv, ohne zur Löschung
-    markierte Datensätze) als CSV herunterladbar — nutzt dieselbe list_raw_rows() wie die
-    Bereinigungs-Seite, also garantiert dieselbe Sicht auf die Daten. Die eigentliche
-    Liste lädt wie bei der Entitäten-Übersicht per htmx aus /export-table, damit
-    Suche/Filter/Sortierung ohne Reload greifen."""
-    units = index.list_distinct_units()
-    unit_options = [{"value": "__none__" if u is None else u, "label": "Ohne Einheit" if u is None else u} for u in units]
-    return templates.TemplateResponse(request, "export.html", {"unit_options": unit_options})
-
-
 def _visible_row_count(entity) -> int:
     """Logische Rohwerte: physischer Indexzähler abzüglich Soft-Deletes."""
     deleted_count = int(entity["deleted_count"] or 0)
     return max(0, int(entity["row_count"] or 0) - deleted_count)
-
-
-def _export_table_response(
-    request: Request,
-    search: str,
-    type_filter: list[str],
-    unit_filter: str,
-    sort: str,
-    direction: str,
-    page: int = 1,
-    page_size: int = 20,
-) -> HTMLResponse:
-    total = index.count_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter)
-    pagination = _paginate_meta(total, page, page_size)
-    page_matched = index.list_entities(
-        search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction,
-        limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
-    )
-    rows = [
-        {
-            "entity_id": row["entity_id"],
-            "friendly_name": row["friendly_name"],
-            "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
-            "has_custom_name": bool(row["custom_name"]),
-            "aggregation_type": row["aggregation_type"],
-            "type_label": format_type(row["aggregation_type"]),
-            "unit": row["unit"],
-            "row_count": _visible_row_count(row),
-        }
-        for row in page_matched
-    ]
-
-    def _next_dir(column: str) -> str:
-        return "desc" if sort == column and direction == "asc" else "asc"
-
-    columns = [
-        ("entity_id", "Entität"),
-        ("type", "Typ"),
-        ("unit", "Einheit"),
-        ("rows", "Datensätze"),
-    ]
-    header_links = [
-        {
-            "key": key,
-            "label": label,
-            "next_dir": _next_dir(key),
-            "active": sort == key,
-            "arrow": ("↓" if direction == "asc" else "↑") if sort == key else "",
-        }
-        for key, label in columns
-    ]
-
-    return templates.TemplateResponse(
-        request,
-        "_export_table.html",
-        {
-            "rows": rows,
-            "search": search,
-            "type": type_filter,
-            "unit": unit_filter,
-            "columns": header_links,
-            "pagination": pagination,
-        },
-    )
-
-
-@app.get("/export-table", response_class=HTMLResponse)
-def export_table(
-    request: Request,
-    search: str = "",
-    type: list[str] = Query(["all"]),
-    unit: str = "all",
-    sort: str = "entity_id",
-    dir: str = "asc",
-    page: int = 1,
-    page_size: int = 20,
-) -> HTMLResponse:
-    return _export_table_response(request, search, type, unit, sort, dir, page, page_size)
-
-
-@app.get("/export/download")
-def export_download(entity_id: str) -> StreamingResponse:
-    entity = _require_entity(entity_id)
-
-    if _visible_row_count(entity) > MAX_EXPORT_ROWS:
-        raise HTTPException(
-            status_code=413,
-            detail=f"CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt",
-        )
-
-    first_ts = entity["first_ts"]
-    last_ts = entity["last_ts"]
-
-    def generate():
-        with storage_coordinator.entity(entity_id):
-            yield "timestamp,unix_ts,value\r\n"
-            if first_ts is None or last_ts is None:
-                return
-            rows = cleanup.iter_raw_rows(
-                DATA_DIR,
-                index,
-                entity_id,
-                first_ts,
-                last_ts + 1,
-                TZ,
-                max_rows=MAX_EXPORT_ROWS,
-            )
-            for ts, value in rows:
-                timestamp = datetime.fromtimestamp(ts, TZ).strftime("%Y-%m-%d %H:%M:%S")
-                yield f"{timestamp},{ts:.3f},{value}\r\n"
-
-    filename = f"{entity_id}.csv"
-    return StreamingResponse(
-        generate(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
 
 
 # Spalten der Entitäten-Tabelle jenseits von Favorit-Stern und Entität
@@ -2627,17 +2523,17 @@ def export_download(entity_id: str) -> StreamingResponse:
 # wird wie font_scale über die settings-Tabelle persistiert (index.get_setting/
 # set_setting), gilt also global fürs ganze Add-on, nicht pro Browser.
 ENTITIES_OPTIONAL_COLUMNS = [
-    ("type", "Typ"),
-    ("first_ts", "Erster Wert"),
-    ("last_ts", "Letzter Wert"),
-    ("resolution", "Auflösung"),
-    ("retention", "Aufbewahrung"),
-    ("unit", "Einheit"),
-    ("rows", "Datensätze"),
-    ("size", "Größe"),
-    ("value_filter", "Wertfilter"),
-    ("gap_threshold", "Lücken"),
-    ("outlier_threshold", "Ausreißer"),
+    ("type", N_("Typ")),
+    ("first_ts", N_("Erster Wert")),
+    ("last_ts", N_("Letzter Wert")),
+    ("resolution", N_("Auflösung")),
+    ("retention", N_("Aufbewahrung")),
+    ("unit", N_("Einheit")),
+    ("rows", N_("Datensätze")),
+    ("size", N_("Größe")),
+    ("value_filter", N_("Wertfilter")),
+    ("gap_threshold", N_("Lücken")),
+    ("outlier_threshold", N_("Ausreißer")),
 ]
 # Nur Auflösung/Aufbewahrung initial aus — diese beiden Konfigurationsdetails
 # sind für den ersten Überblick am ehesten verzichtbar. Alle übrigen Spalten,
@@ -2688,6 +2584,9 @@ def _entities_table_response(
             "display_name": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
             "has_custom_name": bool(row["custom_name"]),
             "is_favorite": bool(row["is_favorite"]),
+            # Zur Löschung markierte, noch nicht bereinigte Werte — immer
+            # gebraucht (Zeilentönung + Hinweiszeile), keine Spalte zum Abwählen.
+            "pending_purge": int(row["deleted_count"] or 0),
         }
         if "type" in visible_columns:
             entry["aggregation_type"] = row["aggregation_type"]
@@ -2730,7 +2629,7 @@ def _entities_table_response(
     def _next_dir(column: str) -> str:
         return "desc" if sort == column and direction == "asc" else "asc"
 
-    columns = [("entity_id", "Entität")] + [
+    columns = [("entity_id", N_("Entität"))] + [
         (key, label) for key, label in ENTITIES_OPTIONAL_COLUMNS if key in visible_columns
     ]
     # Eine CSS-Klasse pro Spalte, gemeinsam von <th> und <td> genutzt (siehe
@@ -2821,16 +2720,12 @@ def _gap_threshold_auto_adjust_message(
     globalen Standards)."""
     new_label = GAP_THRESHOLD_LABELS.get(new_gap, new_gap)
     cause = (
-        f"Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst "
-        f"nach spätestens {new_label} wieder"
+        tr("Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst nach spätestens {new_label} wieder", new_label=new_label)
         if reason == "value_filter" else
-        f"Die gewählte Auflösung „{RESOLUTION_LABELS.get(resolution, resolution)}“ lässt "
-        f"ohnehin nur alle {new_label} einen neuen Wert zu"
+        tr("Die gewählte Auflösung „{get}“ lässt ohnehin nur alle {new_label} einen neuen Wert zu", get=RESOLUTION_LABELS.get(resolution, resolution), new_label=new_label)
     )
     return (
-        f"{label} automatisch auf {new_label} gesetzt: {cause} — eine kürzere Lücken-Schwelle "
-        "hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit "
-        "wieder manuell verkleinern."
+        tr("{label} automatisch auf {new_label} gesetzt: {cause} — eine kürzere Lücken-Schwelle hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit wieder manuell verkleinern.", label=label, new_label=new_label, cause=cause)
     )
 
 
@@ -2852,7 +2747,7 @@ def _entity_config_context(entity) -> dict:
         last_rows.append((ts, value))
     preview_rows = [
         {
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
             "formatted_value": format_value(value, decimals_int),
         }
         for ts, value in reversed(last_rows)
@@ -2963,22 +2858,22 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         if len(custom_name) > MAX_CUSTOM_NAME_LENGTH:
             raise HTTPException(
                 status_code=400,
-                detail=f"Der Anzeigename darf höchstens {MAX_CUSTOM_NAME_LENGTH} Zeichen lang sein",
+                detail=tr("Der Anzeigename darf höchstens {MAX_CUSTOM_NAME_LENGTH} Zeichen lang sein", MAX_CUSTOM_NAME_LENGTH=MAX_CUSTOM_NAME_LENGTH),
             )
     if resolution is not None and resolution not in RESOLUTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Auflösung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Auflösung"))
     if retention is not None and retention not in RETENTION_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Aufbewahrung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
     if decimals is not None and decimals not in DECIMALS_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Angabe")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Angabe"))
     if value_filter is not None and value_filter not in VALUE_FILTER_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Wertänderungsfilter")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Wertänderungsfilter"))
     if gap_threshold is not None and gap_threshold not in GAP_THRESHOLD_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Lücken-Schwellwert")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Lücken-Schwellwert"))
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Ausreißer-Schwellwert")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Ausreißer-Schwellwert"))
     if compact_target is not None and compact_target not in COMPACT_TARGET_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiges Verdichtungsziel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Verdichtungsziel"))
     # Für Zähler/Schalter ist das Feld deaktiviert (siehe
     # outlier_detection_applies()). Ein trotzdem mitgeschickter Wert wird
     # verworfen statt abgelehnt: die Einstellung wirkt für diese Typen ohnehin
@@ -2994,7 +2889,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         resolution = None
         compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
-        raise HTTPException(status_code=400, detail="Ungültiger Anzeigemodus")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Anzeigemodus"))
     def update_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
             index.set_config(
@@ -3039,7 +2934,7 @@ def _require_entity(entity_id: str):
     _validate_entity_id_or_400(entity_id)
     entity = index.get_entity(entity_id)
     if entity is None:
-        raise HTTPException(status_code=404, detail="Entität nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
     return entity
 
 
@@ -3047,7 +2942,7 @@ def _validate_entity_id_or_400(entity_id: str) -> str:
     try:
         return validate_entity_id(entity_id)
     except ValueError as err:
-        raise HTTPException(status_code=400, detail="Ungültige Entitäts-ID") from err
+        raise HTTPException(status_code=400, detail=tr("Ungültige Entitäts-ID")) from err
 
 
 @app.post("/entities/{entity_id}/favorite")
@@ -3215,7 +3110,7 @@ def entity_migrate_preview(request: Request, entity_id: str, body: _EntityMigrat
     source = _require_entity(entity_id)
     target = _require_entity(body.target_entity_id)
     if body.overlap_resolution not in entity_migration.OVERLAP_RESOLUTIONS:
-        raise HTTPException(status_code=400, detail="Ungültiger Umgang mit Überschneidungen")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Umgang mit Überschneidungen"))
     plan = None
     error = None
     result_first_ts = None
@@ -3271,9 +3166,9 @@ def entity_migrate_execute(entity_id: str, body: _EntityMigrateExecuteBody) -> d
     _require_entity(entity_id)
     _require_entity(body.target_entity_id)
     if body.post_action not in entity_migration.POST_ACTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Aktion für die Quelle")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Aktion für die Quelle"))
     if body.overlap_resolution not in entity_migration.OVERLAP_RESOLUTIONS:
-        raise HTTPException(status_code=400, detail="Ungültiger Umgang mit Überschneidungen")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Umgang mit Überschneidungen"))
     try:
         result = entity_migration.execute_migration(
             DATA_DIR, index, entity_id, body.target_entity_id, TZ,
@@ -3306,19 +3201,12 @@ def entity_migrate_execute(entity_id: str, body: _EntityMigrateExecuteBody) -> d
 # ---------------------------------------------------------------------------
 
 _CHART_RANGE_OPTIONS = [
-    ("hour", "Stunde"), ("day", "Tag"), ("week", "Woche"),
-    ("month", "Monat"), ("year", "Jahr"), ("decade", "Dekade"),
+    ("hour", N_("Stunde")), ("day", N_("Tag")), ("week", N_("Woche")),
+    ("month", N_("Monat")), ("year", N_("Jahr")), ("decade", N_("Dekade")),
 ]
 _CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse", "full"}
 _CHART_LEGEND_METRICS = {"last", "min", "max", "average", "sum"}
 _CHART_LEGEND_STYLES = {"chips", "table"}
-# "timeline" nur clientseitig erzwingbar, wenn tatsächlich alle Serien
-# Schalter sind (siehe allSwitch-Getter in chart_editor.html) — hier nur
-# generell als gültiger Wert zugelassen, dieselbe Konvention wie
-# _ENTITY_CHART_TYPES oben. "donut" ist die dritte, chart-weite
-# Darstellungsart (Optionen-Menü, "Darstellungsart") — ein Anteil je Serie
-# statt eines Zeitverlaufs, siehe chart_editor.js renderDonut().
-_CHART_EDITOR_CHART_TYPES = {"auto", "timeline", "donut"}
 # "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
 # Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
 # siehe chart_editor.js render()/movingAverage().
@@ -3333,7 +3221,6 @@ _CHART_DONUT_AGGREGATIONS = {"sum", "average", "last"}
 # ein globaler Default (Setting "entity_chart_defaults", Einstellungen →
 # Darstellung) plus eine optionale, vollständige Übersteuerung pro Entität
 # (entities.chart_options), siehe _resolve_entity_chart_options() unten.
-_ENTITY_CHART_TYPES = {"auto", "line", "bar", "timeline"}
 _ENTITY_CHART_OPTION_DEFAULTS = {
     "continuous": False,
     "raw": False,
@@ -3361,20 +3248,20 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "decimals": "auto",
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
-_ON_OFF_LABELS = {"1": "An", "0": "Aus"}
-_ENTITY_LEGEND_STYLE_LABELS = {"chips": "Chips", "table": "Tabelle"}
-_ENTITY_LEGEND_METRIC_LABELS = {"last": "Aktuell", "min": "Min", "max": "Max", "average": "Durchschnitt", "sum": "Summe"}
+_ON_OFF_LABELS = {"1": "An", "0": N_("Aus")}
+_ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle")}
+_ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": N_("Max"), "average": N_("Durchschnitt"), "sum": N_("Summe")}
 
 
 def _validate_entity_chart_options(data: dict) -> None:
-    if "chart_type" in data and data["chart_type"] not in _ENTITY_CHART_TYPES:
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+    if "chart_type" in data and data["chart_type"] not in ENTITY_CHART_TYPES:
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if "legend_metrics" in data and not set(data["legend_metrics"]) <= _CHART_LEGEND_METRICS:
-        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if "legend_style" in data and data["legend_style"] not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
     if "decimals" in data and data["decimals"] not in _ENTITY_CHART_DECIMALS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
 
 
 def _get_entity_chart_defaults() -> dict:
@@ -3414,58 +3301,23 @@ def _resolve_entity_chart_options(entity) -> dict:
     return options
 
 
-# Kennung -> Beschriftung. Die Kennung ist die Grundform, nicht das Label: sie
-# trägt auf /charts zusätzlich die Kachel-Klasse für den Kopfstreifen je Typ
-# (siehe .is-typ-* in pages/charts.css). Aus dem zusammengesetzten Label
-# "Linie + Balken" im Template eine Klasse abzuleiten wäre der umgekehrte,
-# brüchige Weg.
-_CHART_TYPE_LABELS = {
-    "zeitstrahl": "Zeitstrahl",
-    "linie": "Linie",
-    "balken": "Balken",
-    "gemischt": "Linie + Balken",
-    "donut": "Donut",
-}
-
-
-def _chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
-    """Wie das Chart tatsächlich gezeichnet wird, für die Übersichtskachel.
-
-    Gespeichert ist "auto", "timeline" oder "donut" — bei "auto" entscheidet
-    der Aggregationstyp JEDER Entität einzeln (Zähler/Schalter → Balken, sonst
-    Linie, dieselbe Regel wie _resolved_chart_type() in storage/query.py).
-    Ein Chart kann deshalb beides zugleich enthalten. Ein Chart ohne
-    Entitäten hat keinen Typ — leere Kennung, Kachel ohne Streifen."""
-    if chart["chart_type"] == "timeline":
-        return "zeitstrahl"
-    if chart["chart_type"] == "donut":
-        return "donut"
-    vorhanden = {
-        "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
-        for entity_id in chart["entity_ids"]
-    }
-    return "gemischt" if len(vorhanden) > 1 else next(iter(vorhanden), "")
-
-
-def _chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
-    return _CHART_TYPE_LABELS.get(_chart_type_key(chart, aggregation_types), "")
+def _aggregation_types() -> dict[str, str]:
+    return {row["entity_id"]: row["aggregation_type"] for row in index.list_entities()}
 
 
 @app.get("/charts", response_class=HTMLResponse)
 def charts_list(request: Request) -> HTMLResponse:
     charts = index.list_saved_charts()
     # Einmal alle Entitätstypen holen statt je Chart einzeln nachzuschlagen.
-    aggregation_types = {
-        row["entity_id"]: row["aggregation_type"] for row in index.list_entities()
-    }
+    aggregation_types = _aggregation_types()
     rows = [
         {
             "id": c["id"],
             "name": c["name"],
             "entity_count": len(c["entity_ids"]),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
-            "type_label": _chart_type_label(c, aggregation_types),
-            "type_key": _chart_type_key(c, aggregation_types),
+            "type_label": chart_type_label(c, aggregation_types),
+            "type_key": chart_type_key(c, aggregation_types),
             # Nur für "Neueste/Älteste zuerst" im Browser (card-browser.js),
             # nicht zum Anzeigen — deshalb roh statt formatiert.
             "created_at": c["created_at"],
@@ -3502,7 +3354,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_stats": chart["chart_stats"] if chart else True,
         "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
         "legend_style": chart["legend_style"] if chart else "chips",
-        "chart_type": chart["chart_type"] if chart else "auto",
+        "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else "auto",
         "decimals": chart["decimals"] if chart else "auto",
         "show_values": chart["show_values"] if chart else False,
         "average_line": chart["average_line"] if chart else False,
@@ -3593,25 +3445,25 @@ def _hidden_for(body: _SaveChartBody) -> list[str]:
 @app.post("/charts")
 def charts_create(body: _SaveChartBody) -> dict:
     if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Bitte einen Namen für das Chart angeben")
+        raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für das Chart angeben"))
     if not body.entity_ids:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Entität auswählen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Entität auswählen"))
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
-        raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Chart-Auflösung"))
     if not set(body.legend_metrics) <= _CHART_LEGEND_METRICS:
-        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
-    if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
+    if body.chart_type not in CHART_EDITOR_CHART_TYPES:
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
     if body.average_style not in _CHART_AVERAGE_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Durchschnittslinien-Darstellung"))
     if body.donut_aggregation not in _CHART_DONUT_AGGREGATIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Donut-Aggregation")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Donut-Aggregation"))
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     chart_id = index.create_saved_chart(
         body.name.strip(), body.entity_ids, body.range_key, body.continuous,
@@ -3631,34 +3483,34 @@ def charts_create(body: _SaveChartBody) -> dict:
 def charts_view(request: Request, chart_id: int) -> HTMLResponse:
     chart = index.get_saved_chart(chart_id)
     if chart is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(chart))
 
 
 @app.post("/charts/{chart_id}")
 def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
     if index.get_saved_chart(chart_id) is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Bitte einen Namen für das Chart angeben")
+        raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für das Chart angeben"))
     if not body.entity_ids:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Entität auswählen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Entität auswählen"))
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
-        raise HTTPException(status_code=400, detail="Ungültige Chart-Auflösung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Chart-Auflösung"))
     if not set(body.legend_metrics) <= _CHART_LEGEND_METRICS:
-        raise HTTPException(status_code=400, detail="Ungültige Legenden-Kennzahl")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültiger Legenden-Stil")
-    if body.chart_type not in _CHART_EDITOR_CHART_TYPES:
-        raise HTTPException(status_code=400, detail="Ungültiger Diagrammtyp")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
+    if body.chart_type not in CHART_EDITOR_CHART_TYPES:
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
-        raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
     if body.average_style not in _CHART_AVERAGE_STYLES:
-        raise HTTPException(status_code=400, detail="Ungültige Durchschnittslinien-Darstellung")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Durchschnittslinien-Darstellung"))
     if body.donut_aggregation not in _CHART_DONUT_AGGREGATIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Donut-Aggregation")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Donut-Aggregation"))
     entity_names = {k: v.strip() for k, v in body.entity_names.items() if v.strip()}
     index.update_saved_chart(
         chart_id, body.name.strip(), body.entity_ids, body.range_key,
@@ -3684,7 +3536,7 @@ def charts_delete(chart_id: int) -> dict:
 def charts_favorite_toggle(chart_id: int) -> dict:
     chart = index.get_saved_chart(chart_id)
     if chart is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     new_state = not chart["is_favorite"]
     index.set_chart_favorite(chart_id, new_state)
     return {"is_favorite": new_state}
@@ -3697,7 +3549,7 @@ def charts_duplicate(chart_id: int) -> dict:
     zwei inhaltsgleiche favorisierte Karten."""
     chart = index.get_saved_chart(chart_id)
     if chart is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     new_id = index.create_saved_chart(
         index.copy_name_for("saved_charts", chart["name"]),
         chart["entity_ids"], chart["range_key"], chart["continuous"],
@@ -3728,17 +3580,17 @@ def charts_duplicate(chart_id: int) -> dict:
 # Änderung im Kachelmenü neu, ohne die Seite neu zu laden. Ein Test hält beide
 # Kopien deckungsgleich (test_dashboard_value_tile_settings.py).
 _TILE_RANGE_LABELS = {
-    "hour": ("Std.", "60 Min."),
-    "day": ("Tag", "24 Std."),
-    "week": ("Woche", "7 Tage"),
-    "month": ("Monat", "30 Tage"),
-    "year": ("Jahr", "12 Monate"),
+    "hour": (N_("Std."), N_("60 Min.")),
+    "day": (N_("Tag"), N_("24 Std.")),
+    "week": (N_("Woche"), N_("7 Tage")),
+    "month": (N_("Monat"), N_("30 Tage")),
+    "year": (N_("Jahr"), N_("12 Monate")),
 }
 # Kennzeichen vor der großen Zahl, sobald diese nicht der aktuelle Wert ist —
 # ohne das wäre "16,8 °C" nicht von einem Momentanwert zu unterscheiden.
 # "last" trägt bewusst keins: der aktuelle Wert ist der Normalfall und braucht
 # keine Erklärung.
-_TILE_METRIC_LABELS = {"last": "", "min": "Min", "avg": "Ø", "max": "Max", "sum": "Σ"}
+_TILE_METRIC_LABELS = {"last": "", "min": N_("Min"), "avg": "Ø", "max": N_("Max"), "sum": "Σ"}
 
 
 def _tile_metric_labels(aggregation_type: str | None) -> dict[str, str]:
@@ -3852,6 +3704,7 @@ def _dashboard_tiles_context(
     reiste der Wert sogar als Query-Parameter durch die URL. Mit app_root
     entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
+    aggregation_types = _aggregation_types()
     tiles = []
     # Sektionen (item_type='section') gruppieren die Kacheln rein über ihre
     # Position in derselben Liste — keine Kachel trägt eine section_id. Die
@@ -3891,7 +3744,8 @@ def _dashboard_tiles_context(
                 # gezeigt werden, und Chips vs. Tabelle sind dort konfiguriert,
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
-                "legend_style": c["legend_style"], "chart_type": c["chart_type"],
+                "legend_style": c["legend_style"],
+                "chart_type": effective_chart_type(c, aggregation_types),
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
@@ -3907,6 +3761,9 @@ def _dashboard_tiles_context(
                 "columns": t["columns"], "rows": t["rows"], "style": t["style"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
+            groups[-1]["tiles"].append(tiles[-1])
+        elif p["item_type"] == "cleanup":
+            tiles.append(cleanup_tile.build(index, TZ, p))
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "entity":
             e = index.get_entity(p["item_entity_id"])
@@ -3937,20 +3794,16 @@ def _dashboard_tiles_context(
             else:
                 value_text = format_value(e["last_value"], decimals_to_int(effective_decimals))
             seconds_ago = (time.time() - e["last_ts"]) if e["last_ts"] is not None else None
-            # Zwei Schwellen (Konzept-Wunsch): 15 Minuten (gelb) und eine
-            # Stunde (rot) — unabhängig vom Auflösungsintervall der Entität,
-            # bewusst feste, für den Nutzer nachvollziehbare Werte statt einer
-            # datenabhängigen Heuristik. Nur der Kartenrahmen zeigt das an
-            # (siehe .dtile-entity.is-warn/is-stale), der Wert selbst bleibt
-            # immer schwarz.
-            if seconds_ago is None:
-                staleness = "fresh"
-            elif seconds_ago > 3600:
-                staleness = "stale"
-            elif seconds_ago > 900:
-                staleness = "warn"
-            else:
-                staleness = "fresh"
+            # Zwei Schwellen je Kachel (Stufe stale_mode, siehe staleness.py);
+            # Standard ist 15 Minuten (gelb) / eine Stunde (rot), unabhängig
+            # vom Auflösungsintervall der Entität. Bewusst feste, für den
+            # Nutzer nachvollziehbare Stufen statt einer datenabhängigen
+            # Heuristik. Nur der Kartenrahmen zeigt das an (siehe
+            # .dtile-entity.is-warn/is-stale), der Wert selbst bleibt immer
+            # schwarz.
+            stale_mode = p["stale_mode"]
+            staleness = staleness_for(seconds_ago, stale_mode)
+            stale_limits = stale_thresholds(stale_mode)
             tiles.append({
                 "kind": "entity", "entity_id": e["entity_id"],
                 # Eigene Zeilen-ID der Kachel (nicht der Entität!) — macht
@@ -3965,10 +3818,13 @@ def _dashboard_tiles_context(
                 "custom_title": p["title"] or "",
                 "value_text": value_text, "unit": "" if is_switch else (e["unit"] or ""),
                 "is_switch": is_switch, "decimals": effective_decimals,
-                "age_text": f"vor {format_uptime(seconds_ago)}" if seconds_ago is not None else "nie",
+                "age_text": tr("vor {format_uptime}", format_uptime=format_uptime(seconds_ago)) if seconds_ago is not None else tr("nie"),
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
                 "show_sparkline": bool(p["show_sparkline"]), "show_age": bool(p["show_age"]),
+                "stale_mode": stale_mode,
+                "stale_warn_after": stale_limits[0] if stale_limits else "",
+                "stale_stale_after": stale_limits[1] if stale_limits else "",
                 "sparkline_resolution": p["sparkline_resolution"],
                 **metric_context,
             })
@@ -3998,7 +3854,7 @@ def _dashboard_tiles_context(
     ]
     return {
         "dashboard_id": dashboard_id,
-        "dashboard_name": dashboard["name"] if dashboard else "Dashboard",
+        "dashboard_name": (i18n.retranslate(dashboard["name"]) if dashboard["is_default"] else dashboard["name"]) if dashboard else "Dashboard",
         "dashboard_locked": dashboard_locked,
         # Präziser Modus: Gitter/Zeilenhöhe halbiert (.dashboard-grid.is-precise),
         # Größen-Picker geht dann bis 6x6 statt 3x3 (siehe _dashboard_tile_menu.html).
@@ -4033,13 +3889,13 @@ def _require_dashboard_unlocked(dashboard_id: int) -> None:
     ist berechtigt, ist aber aktiv gesperrt."""
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is not None and dashboard["locked"]:
-        raise HTTPException(status_code=423, detail="Dashboard ist fixiert — Layout-Änderungen sind gesperrt")
+        raise HTTPException(status_code=423, detail=tr("Dashboard ist fixiert — Layout-Änderungen sind gesperrt"))
 
 
 def _get_dashboard_or_404(dashboard_id: int) -> dict:
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is None:
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return dashboard
 
 
@@ -4052,7 +3908,7 @@ def dashboard_section_add(request: Request, dashboard_id: int = Form(1), name: s
     _require_dashboard_unlocked(dashboard_id)
     name = name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        raise HTTPException(status_code=422, detail=tr("Name darf nicht leer sein"))
     index.add_dashboard_section(dashboard_id, name)
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
@@ -4065,9 +3921,9 @@ def dashboard_section_rename(
     _require_dashboard_unlocked(dashboard_id)
     name = name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        raise HTTPException(status_code=422, detail=tr("Name darf nicht leer sein"))
     if not index.rename_dashboard_section(dashboard_id, section_id, name):
-        raise HTTPException(status_code=404, detail="Sektion nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Sektion nicht gefunden"))
     return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
@@ -4084,7 +3940,7 @@ def dashboard_section_remove(request: Request, section_id: int, dashboard_id: in
 @app.post("/charts/{chart_id}/pin", response_class=HTMLResponse)
 def charts_pin(request: Request, chart_id: int, dashboard_id: int = 1) -> HTMLResponse:
     if index.get_saved_chart(chart_id) is None:
-        raise HTTPException(status_code=404, detail="Chart nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "chart", chart_id)
@@ -4135,7 +3991,7 @@ def dashboard_reorder(body: _ReorderDashboardBody) -> dict:
 @app.post("/dashboard/size")
 def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     if body.item_type not in {"chart", "table"}:
-        raise HTTPException(status_code=422, detail="Ungültiger Dashboard-Kacheltyp")
+        raise HTTPException(status_code=422, detail=tr("Ungültiger Dashboard-Kacheltyp"))
     _require_dashboard_unlocked(body.dashboard_id)
     dashboard = index.get_dashboard(body.dashboard_id)
     max_size = 6 if dashboard and dashboard["precise_mode"] else 3
@@ -4146,7 +4002,7 @@ def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
 
 
@@ -4160,12 +4016,12 @@ class _LegendDashboardTileBody(BaseModel):
 @app.post("/dashboard/legend")
 def dashboard_legend(body: _LegendDashboardTileBody) -> dict:
     if body.item_type != "chart":
-        raise HTTPException(status_code=422, detail="Legende ist nur für Charts verfügbar")
+        raise HTTPException(status_code=422, detail=tr("Legende ist nur für Charts verfügbar"))
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_pin_legend(
         body.dashboard_id, body.item_type, body.item_id, body.show_legend
     ):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_legend": body.show_legend}
 
 
@@ -4199,11 +4055,26 @@ async def dashboard_entity_change(
     new_entity_id = str(form.get("new_entity_id", "")).strip()
     _require_entity(new_entity_id)
     if not index.set_dashboard_entity_pin_entity(dashboard_id, pin_id, new_entity_id):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return templates.TemplateResponse(
         request, "_dashboard_tiles.html",
         _dashboard_tiles_context(dashboard_id, auto_open_pin_id=pin_id),
     )
+
+
+@app.post("/dashboard/pin-cleanup", response_class=HTMLResponse)
+def dashboard_pin_cleanup(request: Request, dashboard_id: int = 1) -> HTMLResponse:
+    _get_dashboard_or_404(dashboard_id)
+    _require_dashboard_unlocked(dashboard_id)
+    index.pin_cleanup_to_dashboard(dashboard_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
+
+
+@app.post("/dashboard/unpin-cleanup/{pin_id}", response_class=HTMLResponse)
+def dashboard_unpin_cleanup(request: Request, pin_id: int, dashboard_id: int = 1) -> HTMLResponse:
+    _require_dashboard_unlocked(dashboard_id)
+    index.unpin_item_from_dashboard(dashboard_id, "cleanup", pin_id)
+    return templates.TemplateResponse(request, "_dashboard_tiles.html", _dashboard_tiles_context(dashboard_id))
 
 
 @app.post("/dashboard/unpin-entity/{pin_id}", response_class=HTMLResponse)
@@ -4232,7 +4103,7 @@ def dashboard_entity_size(body: _ResizeDashboardEntityTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "grid_cols": body.grid_cols, "grid_rows": body.grid_rows}
 
 
@@ -4246,7 +4117,7 @@ class _SparklineDashboardTileBody(BaseModel):
 def dashboard_sparkline(body: _SparklineDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_entity_pin_sparkline(body.dashboard_id, body.pin_id, body.show_sparkline):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_sparkline": body.show_sparkline}
 
 
@@ -4266,7 +4137,7 @@ def dashboard_sparkline_resolution(body: _SparklineResolutionDashboardTileBody) 
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "resolution": body.resolution}
 
 
@@ -4280,8 +4151,31 @@ class _ShowAgeDashboardTileBody(BaseModel):
 def dashboard_entity_show_age(body: _ShowAgeDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_entity_pin_show_age(body.dashboard_id, body.pin_id, body.show_age):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_age": body.show_age}
+
+
+class _StaleModeDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    pin_id: int
+    stale_mode: str
+
+
+@app.post("/dashboard/entity-stale-mode")
+def dashboard_entity_stale_mode(body: _StaleModeDashboardTileBody) -> dict:
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        updated = index.set_dashboard_entity_pin_stale_mode(body.dashboard_id, body.pin_id, body.stale_mode)
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
+    thresholds = stale_thresholds(body.stale_mode)
+    return {
+        "ok": True, "stale_mode": body.stale_mode,
+        "stale_warn_after": thresholds[0] if thresholds else "",
+        "stale_stale_after": thresholds[1] if thresholds else "",
+    }
 
 
 class _ShowPeriodDashboardTileBody(BaseModel):
@@ -4306,7 +4200,7 @@ def _get_dashboard_entity_pin(dashboard_id: int, pin_id: int) -> dict | None:
 def dashboard_entity_show_period(body: _ShowPeriodDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     if not index.set_dashboard_entity_pin_show_period(body.dashboard_id, body.pin_id, body.show_period):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     # Voller Kachel-Kontext statt nur {"show_period": ...} zurück: anders als
     # show_age (rein additiv, eigenes <span>) wirkt show_period auf dieselbe
     # Stelle wie Zeitraum/Hauptwert/Kennzahlen-Zeile (Kennzahlen-Zeile ODER
@@ -4315,7 +4209,7 @@ def dashboard_entity_show_period(body: _ShowPeriodDashboardTileBody) -> dict:
     # /dashboard/entity-metrics, statt eine dritte Variante zu bauen.
     pin = _get_dashboard_entity_pin(body.dashboard_id, body.pin_id)
     if pin is None:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     entity = index.get_entity(pin["item_entity_id"])
     return {
         "ok": True,
@@ -4337,7 +4231,7 @@ def dashboard_entity_decimals(body: _DecimalsDashboardTileBody) -> dict:
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
     if not updated:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "decimals": body.decimals}
 
 
@@ -4352,7 +4246,7 @@ def dashboard_entity_title(body: _TitleDashboardTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     title = body.title.strip()
     if not index.set_dashboard_entity_pin_title(body.dashboard_id, body.pin_id, title or None):
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "title": title}
 
 
@@ -4389,10 +4283,10 @@ def dashboard_entity_metrics(body: _MetricsDashboardTileBody) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not geaendert:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     pin = _get_dashboard_entity_pin(body.dashboard_id, body.pin_id)
     if pin is None:
-        raise HTTPException(status_code=404, detail="Dashboard-Kachel nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     entity = index.get_entity(pin["item_entity_id"])
     # Den fertigen Anzeigezustand zurückgeben statt nur "ok": der Browser muss
     # das Zeitraum-Etikett und die um Hauptwert und Entitätstyp bereinigte
@@ -4443,7 +4337,7 @@ def dashboards_create(body: _DashboardCreateBody) -> dict:
     # Ohne Eingabe einen freien Vorgabenamen wählen ("Neues Dashboard 2", …)
     # statt an der Eindeutigkeitsprüfung zu scheitern — der Nutzer hat hier
     # ja gerade KEINEN Namen genannt, den man ihm zurückweisen könnte.
-    name = body.name.strip() or index.free_name_for("dashboards", "Neues Dashboard")
+    name = body.name.strip() or index.free_name_for("dashboards", tr("Neues Dashboard"))
     dashboard_id = index.create_dashboard(name)
     return {"id": dashboard_id, "name": name}
 
@@ -4478,9 +4372,9 @@ def dashboards_edit(request: Request, dashboard_id: int) -> HTMLResponse:
 def dashboards_rename(dashboard_id: int, body: _DashboardRenameBody) -> dict:
     name = body.name.strip()
     if not name:
-        raise HTTPException(status_code=422, detail="Name darf nicht leer sein")
+        raise HTTPException(status_code=422, detail=tr("Name darf nicht leer sein"))
     if not index.rename_dashboard(dashboard_id, name):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "name": name}
 
 
@@ -4495,7 +4389,7 @@ def dashboards_lock(dashboard_id: int, body: _DashboardLockBody) -> dict:
     Kachel-Layout-Aktionen (Pin/Unpin/Resize/Reorder) werden durch
     _require_dashboard_unlocked() blockiert, nicht diese Route hier."""
     if not index.set_dashboard_locked(dashboard_id, body.locked):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "locked": body.locked}
 
 
@@ -4506,7 +4400,7 @@ class _DashboardPreciseModeBody(BaseModel):
 @app.post("/dashboards/{dashboard_id}/precise-mode")
 def dashboards_precise_mode(dashboard_id: int, body: _DashboardPreciseModeBody) -> dict:
     if not index.set_dashboard_precise_mode(dashboard_id, body.precise_mode):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "precise_mode": body.precise_mode}
 
 
@@ -4517,14 +4411,14 @@ class _DashboardFillGapsBody(BaseModel):
 @app.post("/dashboards/{dashboard_id}/fill-gaps")
 def dashboards_fill_gaps(dashboard_id: int, body: _DashboardFillGapsBody) -> dict:
     if not index.set_dashboard_fill_gaps(dashboard_id, body.fill_gaps):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "fill_gaps": body.fill_gaps}
 
 
 @app.post("/dashboards/{dashboard_id}/delete")
 def dashboards_delete(dashboard_id: int) -> dict:
     if not index.delete_dashboard(dashboard_id):
-        raise HTTPException(status_code=400, detail="Dashboard kann nicht gelöscht werden")
+        raise HTTPException(status_code=400, detail=tr("Dashboard kann nicht gelöscht werden"))
     return {"ok": True}
 
 
@@ -4532,7 +4426,7 @@ def dashboards_delete(dashboard_id: int) -> dict:
 def dashboards_favorite_toggle(dashboard_id: int) -> dict:
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is None:
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     new_state = not dashboard["is_favorite"]
     index.set_dashboard_favorite(dashboard_id, new_state)
     return {"is_favorite": new_state}
@@ -4542,14 +4436,14 @@ def dashboards_favorite_toggle(dashboard_id: int) -> dict:
 def dashboards_duplicate(dashboard_id: int) -> dict:
     new_id = index.duplicate_dashboard(dashboard_id)
     if new_id is None:
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"id": new_id}
 
 
 @app.post("/dashboards/{dashboard_id}/set-default")
 def dashboards_set_default(dashboard_id: int) -> dict:
     if not index.set_default_dashboard(dashboard_id):
-        raise HTTPException(status_code=404, detail="Dashboard nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True}
 
 
@@ -4730,46 +4624,46 @@ def tables_new(request: Request) -> HTMLResponse:
 
 def _validate_table_body(body: _SaveTableBody) -> None:
     if not body.name.strip():
-        raise HTTPException(status_code=400, detail="Bitte einen Namen für die Tabelle angeben")
+        raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für die Tabelle angeben"))
     if not body.columns:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Spalte anlegen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Spalte anlegen"))
     if not body.rows:
-        raise HTTPException(status_code=400, detail="Bitte mindestens eine Zeile anlegen")
+        raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Zeile anlegen"))
     for c in body.columns:
         if c.range_key not in dict(_CHART_RANGE_OPTIONS):
-            raise HTTPException(status_code=400, detail="Ungültiger Zeitraum in einer Spalte")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum in einer Spalte"))
         if c.decimals not in DECIMALS_LABELS:
-            raise HTTPException(status_code=400, detail="Ungültige Nachkommastellen-Option in einer Spalte")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Option in einer Spalte"))
         if c.width is not None and not (30 <= c.width <= 800):
-            raise HTTPException(status_code=400, detail="Ungültige Spaltenbreite")
+            raise HTTPException(status_code=400, detail=tr("Ungültige Spaltenbreite"))
     if body.style.label_col_width is not None and not (30 <= body.style.label_col_width <= 800):
-        raise HTTPException(status_code=400, detail="Ungültige Spaltenbreite")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Spaltenbreite"))
     for r in body.rows:
         if r.row_type not in ("entity", "group", "formula", "separator", "summary"):
-            raise HTTPException(status_code=400, detail="Ungültiger Zeilentyp")
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeilentyp"))
         if len(r.label) > MAX_TABLE_ROW_LABEL_LENGTH:
             raise HTTPException(
                 status_code=400,
-                detail=f"Eine Zeilenbeschriftung darf höchstens {MAX_TABLE_ROW_LABEL_LENGTH} Zeichen lang sein",
+                detail=tr("Eine Zeilenbeschriftung darf höchstens {MAX_TABLE_ROW_LABEL_LENGTH} Zeichen lang sein", MAX_TABLE_ROW_LABEL_LENGTH=MAX_TABLE_ROW_LABEL_LENGTH),
             )
         if r.row_type in ("entity", "group") and not r.entity_ids:
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht mindestens eine Entität')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht mindestens eine Entität", label=r.label))
         if r.row_type == "formula" and not r.formula.strip():
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht eine Formel')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht eine Formel", label=r.label))
         # summary: dieselben zwei Werte wie die Aggregation von Entität-/
         # Gruppen-Zeilen (Summe/Durchschnitt), nur ohne "auto"/"min"/"max" —
         # eine automatische Summenzeile ist immer eindeutig Summe oder
         # Durchschnitt, nie kontextabhängig wie bei einer einzelnen Entität.
         if r.row_type == "summary" and r.aggregation not in ("sum", "avg"):
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" braucht Summe oder Durchschnitt')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht Summe oder Durchschnitt", label=r.label))
         if r.aggregation not in _TABLE_ROW_AGGREGATIONS:
-            raise HTTPException(status_code=400, detail=f'Zeile "{r.label}" hat eine ungültige Aggregation')
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" hat eine ungültige Aggregation", label=r.label))
     if body.style.borders not in _TABLE_BORDER_OPTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Rahmen-Option")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Rahmen-Option"))
     if body.style.density not in _TABLE_DENSITY_OPTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Dichte-Option")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Dichte-Option"))
     if body.style.header_align not in _TABLE_ALIGN_OPTIONS or body.style.value_align not in _TABLE_ALIGN_OPTIONS:
-        raise HTTPException(status_code=400, detail="Ungültige Ausrichtungs-Option")
+        raise HTTPException(status_code=400, detail=tr("Ungültige Ausrichtungs-Option"))
 
 
 # Muss VOR "/tables/{table_id}" stehen — dieselbe Begründung wie bei
@@ -4791,14 +4685,14 @@ def tables_create(body: _SaveTableBody) -> dict:
 def tables_view(request: Request, table_id: int) -> HTMLResponse:
     table = index.get_saved_table(table_id)
     if table is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     return templates.TemplateResponse(request, "table_editor.html", _table_editor_context(table))
 
 
 @app.post("/tables/{table_id}")
 def tables_update(table_id: int, body: _SaveTableBody) -> dict:
     if index.get_saved_table(table_id) is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     _validate_table_body(body)
     index.update_saved_table(
         table_id,
@@ -4820,7 +4714,7 @@ def tables_delete(table_id: int) -> dict:
 def tables_favorite_toggle(table_id: int) -> dict:
     table = index.get_saved_table(table_id)
     if table is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     new_state = not table["is_favorite"]
     index.set_table_favorite(table_id, new_state)
     return {"is_favorite": new_state}
@@ -4833,7 +4727,7 @@ def tables_duplicate(table_id: int) -> dict:
     zwei inhaltsgleiche favorisierte Karten."""
     table = index.get_saved_table(table_id)
     if table is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     new_id = index.create_saved_table(
         index.copy_name_for("saved_tables", table["name"]),
         table["columns"], table["rows"], table["style"],
@@ -4844,7 +4738,7 @@ def tables_duplicate(table_id: int) -> dict:
 @app.post("/tables/{table_id}/pin", response_class=HTMLResponse)
 def tables_pin(request: Request, table_id: int, dashboard_id: int = 1) -> HTMLResponse:
     if index.get_saved_table(table_id) is None:
-        raise HTTPException(status_code=404, detail="Tabelle nicht gefunden")
+        raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
     _get_dashboard_or_404(dashboard_id)
     _require_dashboard_unlocked(dashboard_id)
     index.pin_item_to_dashboard(dashboard_id, "table", table_id)
@@ -4922,6 +4816,7 @@ def entity_detail(
             # Sidebar-Kachel nicht zuverlässig funktioniert (document.referrer
             # fehlt dort).
             "used_in_energiedashboard": entity_has_energiedashboard_role(index, entity_id),
+            "pending_purge": notices_mod.pending_purge_for(entity, _background.load_purge_preview()["rows"]),
         },
     )
 
@@ -4953,10 +4848,12 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "outlier_detection_enabled": effective_outlier_threshold(
                 entity["aggregation_type"], entity["outlier_threshold"]
             ) != "off",
-            "counter_decrease_enabled": entity["state_class"] == "total_increasing",
+            "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
+            "marked_count": int(entity["deleted_count"] or 0),
+            "pending_purge": notices_mod.pending_purge_for(entity, _background.load_purge_preview()["rows"]),
         },
     )
 
@@ -4971,7 +4868,7 @@ def entity_data_days(entity_id: str, year: int, month: int) -> dict:
     einzugrenzen."""
     _require_entity(entity_id)
     if not (1 <= month <= 12):
-        raise HTTPException(status_code=400, detail="Ungültiger Monat")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Monat"))
     days_in_month = calendar.monthrange(year, month)[1]
     month_start = datetime(year, month, 1, tzinfo=TZ)
     month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=TZ)
@@ -5015,8 +4912,8 @@ def _paginate_meta(total: int, page: int, page_size: int) -> dict:
 _STREAMING_RANGE_KEYS = ("year", "all")
 
 _MONTH_NAMES_DE = (
-    "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
+    N_("Januar"), N_("Februar"), N_("März"), N_("April"), N_("Mai"), N_("Juni"),
+    N_("Juli"), N_("August"), N_("September"), N_("Oktober"), N_("November"), N_("Dezember"),
 )
 
 
@@ -5029,22 +4926,25 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
     Alpine-Reaktivität berechnet."""
     display_end = window_end - timedelta(seconds=1)  # window_end ist exklusiv
     if range_key == "hour":
-        return f"{window_start.strftime('%d.%m.%Y')} · {window_start.strftime('%H:%M')}–{display_end.strftime('%H:%M')} Uhr"
+        span = f"{formats.format_clock(window_start)}–{formats.format_clock(display_end)}"
+        return f"{formats.format_date(window_start)} · {tr('{range} Uhr', range=span)}"
     if range_key == "day":
         if offset == 0:
-            return "Heute"
+            return tr("Heute")
         if offset == -1:
-            return "Gestern"
-        return window_start.strftime("%d.%m.%Y")
+            return tr("Gestern")
+        return formats.format_date(window_start)
     if range_key == "week":
-        return f"{window_start.strftime('%d.%m.')}–{display_end.strftime('%d.%m.')} {display_end.year}"
+        if formats.current_format.get() != "de-DE":
+            return f"{formats.format_date(window_start)}–{formats.format_date(display_end)}"
+        return f"{formats.format_day_month(window_start)}–{formats.format_day_month(display_end)} {display_end.year}"
     if range_key == "month":
-        label = f"{_MONTH_NAMES_DE[window_start.month - 1]} {window_start.year}"
-        return f"{label} (bis heute)" if window_end >= now else label
+        label = f"{tr(_MONTH_NAMES_DE[window_start.month - 1])} {window_start.year}"
+        return tr("{label} (bis heute)", label=label) if window_end >= now else label
     if range_key == "year":
-        return f"{window_start.year} (bis heute)" if window_end >= now else f"{window_start.year}"
+        return tr("{year} (bis heute)", year=window_start.year) if window_end >= now else f"{window_start.year}"
     if range_key == "all":
-        return f"Gesamter Zeitraum (seit {window_start.strftime('%d.%m.%Y')})"
+        return tr("Gesamter Zeitraum (seit {strftime})", strftime=formats.format_date(window_start))
     return ""
 
 
@@ -5098,7 +4998,7 @@ def _rows_fragment(
             ),
             tz=TZ,
             decimals=entity["decimals"],
-            counter_decrease_enabled=entity["state_class"] == "total_increasing",
+            counter_decrease_enabled=cleanup_stats.counter_decreases_flagged(entity),
             outlier_mode=cleanup_stats.outlier_mode(entity),
         )
         counts = analysis["counts"]
@@ -5107,9 +5007,7 @@ def _rows_fragment(
             {
                 **row,
                 "formatted_value": format_value(row["value"], decimals_int),
-                "formatted_ts": datetime.fromtimestamp(row["ts"], TZ).strftime(
-                    "%d.%m.%Y %H:%M:%S"
-                ),
+                "formatted_ts": formats.format_datetime(datetime.fromtimestamp(row["ts"], TZ)),
             }
             for row in analysis["rows"]
         ]
@@ -5136,7 +5034,7 @@ def _rows_fragment(
         repetitions = cleanup.detect_repetitions(rows, entity["decimals"], TZ)
         counter_decreases = (
             cleanup.detect_counter_decreases(rows)
-            if entity["state_class"] == "total_increasing"
+            if cleanup_stats.counter_decreases_flagged(entity)
             else {}
         )
         counts = {
@@ -5165,17 +5063,15 @@ def _rows_fragment(
                 "ts": ts,
                 "value": value,
                 "formatted_value": format_value(value, decimals_int),
-                "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime(
-                    "%d.%m.%Y %H:%M:%S"
-                ),
+                "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
                 "flags": [
                     {"label": label, "reason": reasons[ts]}
                     for label, reasons in (
-                        ("Ausreißer", outliers),
-                        ("Lücke", gaps),
+                        (tr("Ausreißer"), outliers),
+                        (tr("Lücke"), gaps),
                         ("Duplikat", duplicates),
                         ("Wiederholung", repetitions),
-                        ("Zählerrückgang", counter_decreases),
+                        (tr("Zählerrückgang"), counter_decreases),
                     )
                     if ts in reasons
                 ],
@@ -5199,9 +5095,7 @@ def _rows_fragment(
         marker = index.get_compacted_month(entity_id, window_start.year, window_start.month)
         if marker is not None:
             compacted_month_hint = (
-                f"Dieser Monat wurde am {format_timestamp(marker['compacted_at'], TZ)} auf "
-                f"{format_compact_target(marker['target_resolution'])} verdichtet — angezeigte Zeilen "
-                "sind bereits zusammengefasst, keine Rohwerte mehr."
+                tr("Dieser Monat wurde am {format_timestamp} auf {format_compact_target} verdichtet — angezeigte Zeilen sind bereits zusammengefasst, keine Rohwerte mehr.", format_timestamp=format_timestamp(marker['compacted_at'], TZ), format_compact_target=format_compact_target(marker['target_resolution']))
             )
 
     period_label = _rows_period_label(range_key, offset, window_start, window_end, now)
@@ -5242,12 +5136,14 @@ def _rows_fragment(
             "pagination": pagination,
             "gap_detection_enabled": gap_threshold != "off",
             "outlier_detection_enabled": outlier_threshold != "off",
-            "counter_decrease_enabled": entity["state_class"] == "total_increasing",
-            "undo_available": bool(index.get_last_deleted_batch(entity_id)),
+            "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
+            "last_batch_count": len(index.get_last_deleted_batch(entity_id)),
+            "marked_count": int(entity["deleted_count"] or 0),
             "first_date": first_date,
             "last_date": last_date,
             "deleted_count": deleted_count,
             "compacted_month_hint": compacted_month_hint,
+            "pending_purge": notices_mod.pending_purge_for(entity, _background.load_purge_preview()["rows"]),
         },
     )
 
@@ -5287,7 +5183,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
 
     def delete_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
-            cleanup.soft_delete(index, entity_id, timestamps)
+            cleanup.soft_delete(index, entity_id, timestamps, source=str(form.get("source", "manual")))
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode,
                 deleted_count=len(timestamps) or None,
@@ -5315,11 +5211,11 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     _require_entity(entity_id)
     now = datetime.now(TZ)
     if body.ts <= 0 or body.ts > now.timestamp() + 3600:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitstempel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitstempel"))
     started_at = time.time()
     cleanup.add_raw_value(DATA_DIR, index, entity_id, body.ts, body.value, TZ, now=now)
     index.log_entity_action(
-        entity_id, "add", "manual", started_at, time.time(), "success", rows_affected=1
+        entity_id, "add", "manual", started_at, time.time(), "success", 1, json.dumps({"ts": body.ts, "value": body.value})
     )
     return {"ok": True}
 
@@ -5346,9 +5242,10 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
         DATA_DIR, index, entity_id, body.ts, body.old_value, body.new_value, TZ
     )
     if not changed:
-        raise HTTPException(status_code=404, detail="Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)")
+        raise HTTPException(status_code=404, detail=tr("Kein passender Rohwert gefunden (evtl. zwischenzeitlich geändert)"))
     index.log_entity_action(
-        entity_id, "correct", "manual", started_at, time.time(), "success", rows_affected=1
+        entity_id, "correct", "manual", started_at, time.time(), "success", rows_affected=1,
+        detail=json.dumps({"ts": body.ts, "old": body.old_value, "new": body.new_value}),
     )
     return {"ok": True}
 
@@ -5361,9 +5258,9 @@ class _CompactValuesBody(BaseModel):
 
 def _validate_compact_body(entity_id: str, body: _CompactValuesBody) -> None:
     if body.target_resolution not in COMPACT_TARGET_LABELS or body.target_resolution == "off":
-        raise HTTPException(status_code=400, detail="Ungültiges Verdichtungsziel")
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Verdichtungsziel"))
     if body.end_ts <= body.start_ts:
-        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum")
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
 
 
 @app.post("/entities/{entity_id}/rows/compact/preview")
@@ -5460,7 +5357,7 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
         }
         for ts, value in list(reversed(values))[:_UNDO_PREVIEW_LIMIT]
     ]
@@ -5526,7 +5423,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
         {
             "ts": ts,
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
         }
         for ts, value in list(reversed(to_delete))[:_DUPLICATES_PREVIEW_LIMIT]
     ]
@@ -5580,7 +5477,7 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
-            "formatted_ts": datetime.fromtimestamp(ts, TZ).strftime("%d.%m.%Y %H:%M:%S"),
+            "formatted_ts": formats.format_datetime(datetime.fromtimestamp(ts, TZ)),
         }
         for ts, value in newest_rows
     ]
@@ -5626,11 +5523,11 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
             for ts, _value in cleanup.iter_repeated_rows(rows, entity["decimals"]):
                 batch.append(ts)
                 if len(batch) >= 10_000:
-                    index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                    cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="repetitions")
                     deleted_total += len(batch)
                     batch = []
             if batch:
-                index.mark_deleted(entity_id, batch, deleted_at=deleted_at)
+                cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="repetitions")
                 deleted_total += len(batch)
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode,
@@ -5670,6 +5567,19 @@ app.include_router(_import_service.router())
 # hereingereichten Funktionen bleiben bewusst hier: sie werden auch vom
 # Hintergrund-Scheduler und von der Einstellungsseite gebraucht (siehe
 # Modul-Docstring in housekeeping_routes.py).
+app.include_router(create_backup_external_router(BackupExternalDependencies(
+    index=index, templates=templates, background=_background, tz=TZ, base_dir=BASE_DIR,
+    backup_table_context=lambda: _backup_list_context(),
+)))
+app.include_router(create_export_router(ExportDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
+    visible_row_count=_visible_row_count, paginate_meta=_paginate_meta,
+)))
+app.include_router(create_marked_values_router(MarkedValuesDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
+    invalidate_purge_preview=_background.invalidate_purge_preview,
+    load_purge_rows=lambda: _background.load_purge_preview()["rows"],
+)))
 app.include_router(create_housekeeping_router(HousekeepingDependencies(
     data_dir=DATA_DIR,
     tz=TZ,
@@ -5686,13 +5596,14 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     storage_locked=_storage_locked,
     settings_archivierung_context=_settings_archivierung_context,
     refresh_purge_preview_if_stale=_background.refresh_purge_preview_if_stale,
+    invalidate_purge_preview=_background.invalidate_purge_preview,
     refresh_retention_overview_if_stale=_background.refresh_retention_overview_if_stale,
     begin_retention_job=_background.begin_retention_job,
     finish_retention_job=_background.finish_retention_job,
     run_storage_reconciliation=_background.run_storage_reconciliation,
     gap_threshold_auto_adjust_message=_gap_threshold_auto_adjust_message,
     set_next_retention_run=_background.set_next_retention_run,
-    chart_type_label=_chart_type_label,
+    chart_type_label=chart_type_label,
     count_stale_entities=_count_stale_entities,
     load_purge_preview=_background.load_purge_preview,
     load_retention_overview=_background.load_retention_overview,

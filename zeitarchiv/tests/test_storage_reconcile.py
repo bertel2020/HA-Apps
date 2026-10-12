@@ -10,7 +10,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from jinja2 import Environment, FileSystemLoader
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, template_text
 
 
 TZ = ZoneInfo("Europe/Berlin")
@@ -104,10 +104,10 @@ def test_a_corrupt_hot_line_is_reported_as_corrupted_not_silently_dropped(tmp_pa
 
 
 def test_storage_index_settings_fragment_has_preview_and_confirmed_repair() -> None:
-    source = (TEMPLATES / "_settings_storage_index_form.html").read_text(encoding="utf-8")
+    source = template_text("_settings_storage_index_form.html")
     # Speicherplatz/Indexkonsistenz lebt seit 0.75.0 in Housekeeping statt
     # Einstellungen — die Formular-Datei selbst blieb unverändert.
-    housekeeping = (TEMPLATES / "housekeeping.html").read_text(encoding="utf-8")
+    housekeeping = template_text("housekeeping.html")
     assert 'id="storage-index-form"' in housekeeping
     assert "Indexkonsistenz" in source
     assert 'hx-post="settings/storage-index/check"' in source

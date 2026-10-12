@@ -1,11 +1,11 @@
 """Der Hinweis zur Nachkommastellen-Auswahl beschreibt beide Modi eindeutig."""
 
 
-from _paths import APP
+from _paths import template_text
 
 
 
-SOURCE = (APP / "templates/_entity_config_form.html").read_text(encoding="utf-8")
+SOURCE = template_text("_entity_config_form.html")
 
 
 def test_decimals_hint_explains_automatic_and_fixed_formatting() -> None:

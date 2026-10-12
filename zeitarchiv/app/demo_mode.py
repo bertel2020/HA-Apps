@@ -17,6 +17,8 @@ aus der offenen Verbindung — siehe Aufrufer in housekeeping_routes.py.
 
 from __future__ import annotations
 
+from .i18n import N_, active_language, tr
+
 import json
 import os
 import random
@@ -44,12 +46,12 @@ DEMO_DIR_NAME = "demo"
 #: Lebt hier statt in housekeeping_routes.py, weil auch background.py
 #: (Scheduler, Erststart) darauf zugreifen muss, ohne von den Routen
 #: abhängig zu werden.
-demo_progress = JobProgress("demo-generate", unit="Entitäten", label="Demo-Daten")
+demo_progress = JobProgress("demo-generate", unit=N_("Entitäten"), label=N_("Demo-Daten"))
 
 _DEMO_PHASE_LABELS = {
-    "append": "Demo-Daten werden ergänzt …",
-    "regenerate": "Demo-Daten werden neu erzeugt …",
-    "fresh": "Demo-Daten werden erstmalig erzeugt …",
+    "append": N_("Demo-Daten werden ergänzt …"),
+    "regenerate": N_("Demo-Daten werden neu erzeugt …"),
+    "fresh": N_("Demo-Daten werden erstmalig erzeugt …"),
 }
 
 # Sekundenwerte zu formatting.DEMO_APPEND_INTERVAL_LABELS — getrennt von den
@@ -158,6 +160,9 @@ def build_demo_worker(
     gegenseitig aus, deshalb ein gemeinsamer Worker statt dreier. Läuft über
     demo_progress.start(), egal wer aufruft."""
 
+    # Sprache jetzt festhalten: der Worker läuft in einem Thread ohne Anfrage.
+    language = active_language()
+
     def worker() -> str:
         demo_progress.set_phase(_DEMO_PHASE_LABELS[mode], len(DEMO_ENTITIES))
         with coordinator.exclusive():
@@ -165,10 +170,11 @@ def build_demo_worker(
                 data_dir, index, tz, random.Random(),
                 append=(mode == "append"), clean=(mode == "regenerate"),
                 on_entity=lambda i, entity_id, _n: demo_progress.advance(i, entity_id),
+                language=language,
             )
         index.set_setting("demo_append_last_run", str(time.time()))
         if result.skipped:
             return result.skip_reason
-        return f"{result.rows_written} Werte über {result.entity_count} Entitäten geschrieben."
+        return tr("{rows_written} Werte über {entity_count} Entitäten geschrieben.", rows_written=result.rows_written, entity_count=result.entity_count)
 
     return worker

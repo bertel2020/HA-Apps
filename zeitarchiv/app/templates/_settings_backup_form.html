@@ -1,4 +1,6 @@
 {% include "_settings_backup_schedule_form.html" %}
+{# Außerhalb von #backup-status, damit das Nachladen nach einem Backup eine halb ausgefüllte Karte nicht zurücksetzt. #}
+<div id="backup-external-slot" hx-get="backup/external" hx-trigger="load" hx-swap="outerHTML"></div>
 {% if running %}
 {% include "_settings_backup_progress.html" %}
 {% else %}

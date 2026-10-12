@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import logging
 import os
 import re
@@ -27,7 +29,7 @@ def fetch_supervisor_log_text(lines: int = 2_000) -> str:
     """Liest den aktuellen Containerstart aus dem Supervisor-Journal."""
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
-        raise RuntimeError("Supervisor ist in dieser Umgebung nicht verfügbar")
+        raise RuntimeError(tr("Supervisor ist in dieser Umgebung nicht verfügbar"))
     request = urllib.request.Request(
         f"{SUPERVISOR_LOG_URL}?lines={lines}",
         headers={
@@ -40,7 +42,7 @@ def fetch_supervisor_log_text(lines: int = 2_000) -> str:
         with urllib.request.urlopen(request, timeout=5) as response:
             payload = response.read(8 * 1024 * 1024 + 1)
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise RuntimeError("Supervisor-Protokoll konnte nicht geladen werden") from exc
+        raise RuntimeError(tr("Supervisor-Protokoll konnte nicht geladen werden")) from exc
     if len(payload) > 8 * 1024 * 1024:
         payload = payload[-8 * 1024 * 1024 :]
     return payload.decode("utf-8", errors="replace")

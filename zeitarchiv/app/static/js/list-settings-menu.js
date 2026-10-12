@@ -71,7 +71,7 @@
     const bar = leiste();
     if (!bar || !button) return;
     const n = aktiveFilter(bar);
-    const text = n ? `Ansicht (${n}) ▾` : 'Ansicht ▾';
+    const text = n ? t('Ansicht ({n}) ▾',{n}) : t('Ansicht ▾');
     // Nur schreiben, wenn sich etwas ändert: der MutationObserver unten
     // beobachtet childList, und ein neu gesetzter Textknoten wäre eine
     // Änderung — die Beschriftung würde sich selbst endlos neu auslösen.

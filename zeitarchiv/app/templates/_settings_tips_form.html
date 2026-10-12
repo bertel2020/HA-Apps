@@ -5,11 +5,11 @@
 <div class="settings-compact-list">
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">Tipps anzeigen {{ hint_button('Tipps anzeigen') }}</div>
-      {% call hint_body('settings-compact-hint') %}Wechselnder Praxis-Tipp im Meldungs-Center{% endcall %}
+      <div class="settings-compact-label">{{ _("Tipps anzeigen") }} {{ hint_button(_('Tipps anzeigen')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Wechselnder Praxis-Tipp im Meldungs-Center") }}{% endcall %}
     </div>
     <div class="settings-compact-actions">
-      <button type="button" class="btn btn-sm" onclick="document.getElementById('tips-list-dialog').showModal()">Alle Tipps</button>
+      <button type="button" class="btn btn-sm" onclick="document.getElementById('tips-list-dialog').showModal()">{{ _("Alle Tipps") }}</button>
       <span class="dd-picker-wrap">
         <button type="button" class="btn btn-sm" id="tips-enabled-btn" onclick="toggleDDPicker('tips-enabled')">{% for k, l in tips_on_off_options %}{% if k == tips_enabled %}{{ l }}{% endif %}{% endfor %} ▾</button>
         <input type="hidden" name="tips_enabled" id="tips-enabled-input" value="{{ tips_enabled }}"

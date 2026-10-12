@@ -26,7 +26,7 @@ def create(
     reconciliation: dict | None = None,
 ) -> dict:
     """Schreibt einen abgeschlossenen Report atomar unter reports/import/Jahr."""
-    if source_type not in {"symcon", "csv", "ha"}:
+    if source_type not in {"symcon", "csv", "ha", "vm"}:
         raise ValueError("Unbekannter Importtyp")
     finished_at = datetime.now(timezone.utc)
     started_utc = started_at.astimezone(timezone.utc)

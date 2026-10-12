@@ -25,6 +25,8 @@ Symcon-Import genutzte Import-Modul um eine Overwrite-Option zu erweitern.
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -65,22 +67,21 @@ def _validate_factor(factor: float) -> None:
     """Dieselbe Grenze wie symcon_import._scaled_raw_rows() — dort privat und
     an SymconVariable gebunden, hier für beliebige (ts, value)-Zeilen."""
     if not math.isfinite(factor) or factor == 0 or abs(factor) > 1_000_000_000_000:
-        raise ValueError("Ungültiger Umrechnungsfaktor")
+        raise ValueError(tr("Ungültiger Umrechnungsfaktor"))
 
 
 def _require_entities(index: Index, source_entity_id: str, target_entity_id: str) -> tuple:
     if source_entity_id == target_entity_id:
-        raise ValueError("Quelle und Ziel müssen unterschiedliche Entitäten sein")
+        raise ValueError(tr("Quelle und Ziel müssen unterschiedliche Entitäten sein"))
     source = index.get_entity(source_entity_id)
     target = index.get_entity(target_entity_id)
     if source is None:
-        raise ValueError(f"Unbekannte Quell-Entität: {source_entity_id}")
+        raise ValueError(tr("Unbekannte Quell-Entität: {source_entity_id}", source_entity_id=source_entity_id))
     if target is None:
-        raise ValueError(f"Unbekannte Ziel-Entität: {target_entity_id}")
+        raise ValueError(tr("Unbekannte Ziel-Entität: {target_entity_id}", target_entity_id=target_entity_id))
     if source["aggregation_type"] != target["aggregation_type"]:
         raise IncompatibleTypesError(
-            f"Quelle ({source['aggregation_type']}) und Ziel ({target['aggregation_type']}) "
-            "sind unterschiedliche Zähltypen und können nicht zusammengeführt werden."
+            tr("Quelle ({aggregation_type}) und Ziel ({aggregation_type2}) sind unterschiedliche Zähltypen und können nicht zusammengeführt werden.", aggregation_type=source['aggregation_type'], aggregation_type2=target['aggregation_type'])
         )
     return source, target
 
@@ -345,9 +346,9 @@ def execute_migration(
     [source, target]) halten — genau wie beim CSV-/Symcon-Import ist hier kein
     eigenes Locking eingebaut."""
     if post_action not in POST_ACTIONS:
-        raise ValueError(f"Ungültige post_action: {post_action!r}")
+        raise ValueError(tr("Ungültige post_action: {post_action!r}", post_action=post_action))
     if overlap_resolution not in OVERLAP_RESOLUTIONS:
-        raise ValueError(f"Ungültige overlap_resolution: {overlap_resolution!r}")
+        raise ValueError(tr("Ungültige overlap_resolution: {overlap_resolution!r}", overlap_resolution=overlap_resolution))
     _validate_factor(factor)
     _, target = _require_entities(index, source_entity_id, target_entity_id)
     rows = _scaled(_read_source_rows(data_dir, index, source_entity_id, tz), factor)

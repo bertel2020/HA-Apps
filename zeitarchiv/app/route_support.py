@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import functools
 import inspect
 import stat
@@ -39,7 +41,7 @@ def copy_upload_limited(source, destination: Path, max_bytes: int) -> int:
                 written += len(chunk)
                 if written > max_bytes:
                     raise UploadLimitExceeded(
-                        f"Upload ist größer als {format_upload_limit(max_bytes)}"
+                        tr("Upload ist größer als {format_upload_limit}", format_upload_limit=format_upload_limit(max_bytes))
                     )
                 handle.write(chunk)
         part_path.replace(destination)

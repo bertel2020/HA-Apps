@@ -119,6 +119,44 @@ def test_read_methods_bypass_the_lock_held_by_a_writer() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_read_connections_of_finished_threads_are_closed() -> None:
+    """_read_conn() opens one connection per thread. The thread pool behind
+    synchronous FastAPI routes (anyio) retires a worker after 10 s idle and
+    starts a fresh one later, so over hours the process sees hundreds of
+    short-lived threads. A connection must not outlive its thread: before
+    the fix every one stayed referenced in _read_conns and kept two file
+    descriptors (index.sqlite + -wal) open until the process hit its
+    1024-fd limit and every request failed with "Too many open files"."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-readconn-leak-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", "kWh")
+
+        opened: list[sqlite3.Connection] = []
+
+        def read_once() -> None:
+            assert index.get_entity("sensor.a")["entity_id"] == "sensor.a"
+            opened.append(index._read_conn())
+
+        for _ in range(50):
+            t = threading.Thread(target=read_once)
+            t.start()
+            t.join(2)
+
+        assert len(opened) == 50
+        # All but the most recent thread are gone; their connections must be closed.
+        for conn in opened[:-1]:
+            try:
+                conn.execute("SELECT 1")
+            except sqlite3.ProgrammingError:
+                continue
+            raise AssertionError("read connection of a finished thread is still open")
+        assert len(index._read_conns) <= 1
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_get_setting_still_waits_for_the_lock_held_by_a_writer() -> None:
     """Gegenstück zu oben: get_setting() wurde bewusst NICHT auf _read_conn()
     umgestellt (siehe Kommentar in Index.get_setting) — ensure_api_token()

@@ -1,0 +1,45 @@
+{# Reiter „Verlauf“ (Teilstück, landet in #history-panel). Die Chips und der
+   Zeitraum sind Links, die dasselbe Teilstück neu holen — Filter und Zeitraum
+   stecken in der Adresse, ein zweiter Zustand im Browser ist nicht nötig. #}
+<div class="history-filters">
+  {% for key, label in filters %}
+  <button type="button" class="history-chip{{ ' on' if key == filter_key else '' }}"
+          hx-get="{{ app_root }}/entities/{{ entity_id }}/history?filter={{ key }}&days={{ days_key }}"
+          hx-target="#history-panel" hx-swap="innerHTML">{{ _(label) }}</button>
+  {% endfor %}
+  <span class="history-days">
+    {% for option in days_options %}
+    <button type="button" class="history-chip{{ ' on' if option == days_key else '' }}"
+            hx-get="{{ app_root }}/entities/{{ entity_id }}/history?filter={{ filter_key }}&days={{ option }}"
+            hx-target="#history-panel" hx-swap="innerHTML">{% if option == 0 %}{{ _("Alle") }}{% else %}{{ _("{count} Tage", count=option) }}{% endif %}</button>
+    {% endfor %}
+  </span>
+</div>
+
+{% if not days_list %}
+<p class="hint hint-status">{{ _("Keine Einträge im gewählten Zeitraum.") }}</p>
+{% else %}
+{% for day in days_list %}
+<div class="history-day">{{ day.label }}</div>
+{% for event in day.events %}
+<div class="history-event">
+  <span class="history-time">{{ event.time }}</span>
+  <span><span class="history-tag t-{{ 'purge' if event.failed else event.css }}">{{ event.label }}</span></span>
+  <span class="history-what">
+    <b>{{ event.title }}</b>
+    {% if event.old is not none %}
+    <div class="history-sub"><span class="history-old">{{ event.old }}</span> → {{ event.new }}</div>
+    {% elif event.sub %}
+    <div class="history-sub">{{ event.sub }}</div>
+    {% endif %}
+  </span>
+  {% if event.link_marked %}
+  <a class="history-link" href="#" @click.prevent="setTab('marked')">{{ _("Zu „Markiert“") }}</a>
+  {% else %}<span class="history-none"></span>{% endif %}
+</div>
+{% endfor %}
+{% endfor %}
+{% if truncated %}
+<p class="hint hint-status">{{ _("Es werden die neuesten {limit} Einträge angezeigt. Wähle einen kürzeren Zeitraum oder einen Filter, um ältere zu sehen.", limit=limit) }}</p>
+{% endif %}
+{% endif %}

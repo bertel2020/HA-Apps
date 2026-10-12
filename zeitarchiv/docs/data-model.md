@@ -1,5 +1,7 @@
 # Datenmodell
 
+*[English version](en/data-model.md)*
+
 Zeitreihen-Rohdaten leben in Dateien (CSV/Parquet); alles Strukturelle
 (Metadaten, gespeicherte Charts/Tabellen/Dashboards, Einstellungen, Job-
 Historie) liegt in einer einzigen SQLite-Datei, `index.sqlite`. Diese Trennung

@@ -11,7 +11,7 @@
     <colgroup>
       <col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte">
     </colgroup>
-    <thead><tr><th>Entität</th><th>Letzter Wert</th><th class="num">Vor</th><th class="num">Datenpunkte</th></tr></thead>
+    <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Vor") }}</th><th class="num">{{ _("Datenpunkte") }}</th></tr></thead>
     <tbody>
     {% for row in stale_entities %}
     <tr>
@@ -34,5 +34,5 @@
   </table>
 </div>
 {% else %}
-<div class="empty">Alle Entitäten haben in den letzten {{ stale_entities_days }} Tagen neue Werte geliefert.</div>
+<div class="empty">{{ _("Alle Entitäten haben in den letzten {stale_entities_days} Tagen neue Werte geliefert.", stale_entities_days=stale_entities_days) }}</div>
 {% endif %}

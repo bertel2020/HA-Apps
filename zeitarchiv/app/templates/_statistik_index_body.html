@@ -9,28 +9,28 @@
    Internal-Server-Error-Antwort. Größen/Tabellen unten werden bei jeder
    Antwort ohnehin frisch berechnet (_statistik_index_context()), zeigen nach
    einer erfolgreichen Optimierung also direkt den kompaktierten Stand. #}
-<p class="index-intro">Der Index ist die SQLite-Datei <code>index.sqlite</code>. Er enthält Metadaten, Konfiguration und Betriebsverläufe, aber nicht die eigentlichen Messreihen: Rohwerte liegen im Hot Buffer und Archiv, Aggregate in den Rollups.</p>
+<p class="index-intro">{{ _("Der Index ist die SQLite-Datei <code>index.sqlite</code>. Er enthält Metadaten, Konfiguration und Betriebsverläufe, aber nicht die eigentlichen Messreihen: Rohwerte liegen im Hot Buffer und Archiv, Aggregate in den Rollups.") }}</p>
 <div class="stat-row">
-  <div class="stat"><div class="label">Dateigröße</div><div class="value">{{ index_file_size }}</div></div>
-  {% if index_sizes_available %}<div class="stat"><div class="label">Fachdaten inkl. Indizes</div><div class="value">{{ index_allocated_size }}</div></div>{% endif %}
-  <div class="stat"><div class="label">Fachtabellen</div><div class="value">{{ index_table_count }}</div></div>
-  <div class="stat"><div class="label">Einträge gesamt</div><div class="value">{{ index_entry_count }}</div></div>
+  <div class="stat"><div class="label">{{ _("Dateigröße") }}</div><div class="value">{{ index_file_size }}</div></div>
+  {% if index_sizes_available %}<div class="stat"><div class="label">{{ _("Fachdaten inkl. Indizes") }}</div><div class="value">{{ index_allocated_size }}</div></div>{% endif %}
+  <div class="stat"><div class="label">{{ _("Fachtabellen") }}</div><div class="value">{{ index_table_count }}</div></div>
+  <div class="stat"><div class="label">{{ _("Einträge gesamt") }}</div><div class="value">{{ index_entry_count }}</div></div>
 </div>
 
 <section class="index-maintenance">
-  <h2>Index-Optimierung {{ hint_button('Index-Optimierung') }}</h2>
-  {% call hint_body() %}SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn eine Optimierung gestartet wird.{% endcall %}
+  <h2>{{ _("Index-Optimierung") }} {{ hint_button(_('Index-Optimierung')) }}</h2>
+  {% call hint_body() %}{{ _("SQLite nutzt freie Seiten von selbst wieder. Kompakt neu geschrieben wird die Datei nur, wenn eine Optimierung gestartet wird.") }}{% endcall %}
   <div class="stat-row">
-    <div class="stat index-status-stat {{ 'is-recommended' if index_optimization.recommended else '' }}"><div class="label">Status</div><div class="value">{{ index_optimization.status_label }}</div></div>
-    <div class="stat"><div class="label">Freier/reclaimbarer Speicher</div><div class="value">{{ index_optimization.reclaimable_size }}</div><div class="sub-value">{{ index_optimization.reclaimable_percent }} % der Indexdatei</div></div>
-    <div class="stat"><div class="label">Geschätzte Größe danach</div><div class="value">{{ index_optimization.estimated_after_size }}</div><div class="sub-value">nur vollständig freie Seiten</div></div>
+    <div class="stat index-status-stat {{ 'is-recommended' if index_optimization.recommended else '' }}"><div class="label">{{ _("Status") }}</div><div class="value">{{ index_optimization.status_label }}</div></div>
+    <div class="stat"><div class="label">{{ _("Freier/reclaimbarer Speicher") }}</div><div class="value">{{ index_optimization.reclaimable_size }}</div><div class="sub-value">{{ _("{reclaimable_percent} % der Indexdatei", reclaimable_percent=index_optimization.reclaimable_percent) }}</div></div>
+    <div class="stat"><div class="label">{{ _("Geschätzte Größe danach") }}</div><div class="value">{{ index_optimization.estimated_after_size }}</div><div class="sub-value">{{ _("nur vollständig freie Seiten") }}</div></div>
   </div>
   {% if index_optimization.can_optimize %}<div class="index-maintenance-actions">
     <button class="btn {{ 'primary' if index_optimization.recommended else '' }}" type="button"
             hx-post="{{ app_root }}/statistik/index/optimize" hx-target="#statistik-index-body" hx-swap="innerHTML"
             hx-disabled-elt="this"
-            hx-confirm="Index jetzt optimieren? Die Indexdatei wird kompakt neu geschrieben, Schreibzugriffe werden währenddessen kurz pausiert."
-            data-confirm-label="Optimieren">Index optimieren</button>
+            hx-confirm="{{ _('Index jetzt optimieren? Die Indexdatei wird kompakt neu geschrieben, Schreibzugriffe werden währenddessen kurz pausiert.') }}"
+            data-confirm-label="{{ _('Optimieren') }}">{{ _("Index optimieren") }}</button>
   </div>{% endif %}
   {% if index_optimization_result %}<p class="index-optimization-result {{ '' if index_optimization_result.success else 'is-error' }}">{{ '✓ ' if index_optimization_result.success else '' }}{{ index_optimization_result.message }}</p>{% endif %}
 </section>
@@ -41,19 +41,19 @@
   <p class="hint">{{ group.description }}</p>
   <div class="tbl-wrap">
     <table class="dt index-table" data-sortable>
-      <thead><tr><th>Tabelle</th><th>Einträge</th>{% if index_sizes_available %}<th>Daten</th><th>Indizes</th><th>Gesamt</th>{% endif %}</tr></thead>
+      <thead><tr><th>{{ _("Tabelle") }}</th><th>{{ _("Einträge") }}</th>{% if index_sizes_available %}<th>{{ _("Daten") }}</th><th>{{ _("Indizes") }}</th><th>{{ _("Gesamt") }}</th>{% endif %}</tr></thead>
       <tbody>
       {% for table in group.tables %}
       <tr><td><code>{{ table.table }}</code></td><td data-sort="{{ table.rows }}">{{ table.rows_label }}</td>{% if index_sizes_available %}<td data-sort="{{ table.data_bytes or 0 }}">{{ table.data_size_label }}</td><td data-sort="{{ table.index_bytes or 0 }}">{{ table.index_size_label }}</td><td data-sort="{{ table.bytes or 0 }}">{{ table.size_label }}</td>{% endif %}</tr>
       {% endfor %}
       </tbody>
-      <tfoot><tr><td><strong>Bereich gesamt</strong></td><td><strong>{{ group.rows_label }}</strong></td>{% if index_sizes_available %}<td><strong>{{ group.data_size_label }}</strong></td><td><strong>{{ group.index_size_label }}</strong></td><td><strong>{{ group.size_label }}</strong></td>{% endif %}</tr></tfoot>
+      <tfoot><tr><td><strong>{{ _("Bereich gesamt") }}</strong></td><td><strong>{{ group.rows_label }}</strong></td>{% if index_sizes_available %}<td><strong>{{ group.data_size_label }}</strong></td><td><strong>{{ group.index_size_label }}</strong></td><td><strong>{{ group.size_label }}</strong></td>{% endif %}</tr></tfoot>
     </table>
   </div>
 </section>
 {% endfor %}
 
 <section class="index-group">
-  <h2>SQLite-Struktur</h2>
-  {% if index_sizes_available %}<p class="hint">Die Werte beruhen auf belegten SQLite-Seiten, Indizes sind der jeweiligen Tabelle zugerechnet. {{ index_overhead_size }} entfallen auf interne Strukturen und freie Seiten.</p>{% else %}<p class="hint">Die Dateigröße enthält auch interne Strukturen und freie Seiten. Größen je Tabelle liefert diese SQLite-Laufzeit nicht — daher die Eintragszahlen.</p>{% endif %}
+  <h2>{{ _("SQLite-Struktur") }}</h2>
+  {% if index_sizes_available %}<p class="hint">{{ _("Die Werte beruhen auf belegten SQLite-Seiten, Indizes sind der jeweiligen Tabelle zugerechnet. {index_overhead_size} entfallen auf interne Strukturen und freie Seiten.", index_overhead_size=index_overhead_size) }}</p>{% else %}<p class="hint">{{ _("Die Dateigröße enthält auch interne Strukturen und freie Seiten. Größen je Tabelle liefert diese SQLite-Laufzeit nicht — daher die Eintragszahlen.") }}</p>{% endif %}
 </section>

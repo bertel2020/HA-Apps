@@ -21,7 +21,7 @@ Einbahnstraße — man käme hin, aber nicht zurück.
 from __future__ import annotations
 
 
-from _paths import TEMPLATES
+from _paths import TEMPLATES, template_text
 
 
 TEMPLATES_DIR = TEMPLATES
@@ -30,7 +30,7 @@ LISTEN_LINK = '{{ app_root }}/entities">← zurück zu Entitäten</a>'
 
 
 def _source(name: str) -> str:
-    return (TEMPLATES_DIR / name).read_text(encoding="utf-8")
+    return template_text(name)
 
 
 def test_all_three_entity_pages_carry_the_tab_row() -> None:

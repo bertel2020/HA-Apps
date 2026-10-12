@@ -45,7 +45,7 @@ def test_comparison_columns_and_deviation_share_pairing_logic() -> None:
     assert "TableCompute.comparisonIndexForBase(visibleCols, ci)" in DASHBOARD
     assert "TableCompute.deviationText(baseCell, comparisonCell)" in EDITOR
     assert "const comparisonLabel = this.renderedColumnLabel(comparisonCol);" in EDITOR
-    assert "`Gegenüber ${comparisonLabel}" in EDITOR
+    assert "t('Gegenüber {label}" in EDITOR
 
 
 def test_separator_label_is_editable_saved_and_rendered() -> None:

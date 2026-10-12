@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from . import formats
+from .i18n import N_, tr
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -36,7 +39,7 @@ def format_timestamp(ts: float | None, tz: ZoneInfo) -> str:
     konfigurierte Zeitzone verwenden."""
     if ts is None:
         return "—"
-    return datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y")
+    return formats.format_date(datetime.fromtimestamp(ts, tz))
 
 
 def format_time(ts: float | None, tz: ZoneInfo) -> str:
@@ -45,7 +48,7 @@ def format_time(ts: float | None, tz: ZoneInfo) -> str:
     kleiner, unter dem Datum) statt beides in einer Zeile."""
     if ts is None:
         return ""
-    return datetime.fromtimestamp(ts, tz).strftime("%H:%M:%S")
+    return formats.format_clock(datetime.fromtimestamp(ts, tz), seconds=True)
 
 
 def format_uptime(seconds: float) -> str:
@@ -59,28 +62,18 @@ def format_uptime(seconds: float) -> str:
     hours, rem = divmod(rem, 3600)
     minutes, secs = divmod(rem, 60)
     if days:
-        suffix = f" {hours} Std." if hours else ""
-        return f"{days} Tag{'e' if days != 1 else ''}{suffix}"
+        day_text = tr("{n} Tag", n=days) if days == 1 else tr("{n} Tage", n=days)
+        return f"{day_text} {tr('{n} Std.', n=hours)}" if hours else day_text
     if hours:
-        suffix = f" {minutes} Min." if minutes else ""
-        return f"{hours} Std.{suffix}"
+        return f"{tr('{n} Std.', n=hours)} {tr('{n} Min.', n=minutes)}" if minutes else tr("{n} Std.", n=hours)
     if minutes:
-        return f"{minutes} Min."
-    return f"{secs} Sek."
+        return tr("{n} Min.", n=minutes)
+    return tr("{n} Sek.", n=secs)
 
 
-# Zentrale Stelle für das Zahlenformat der Oberfläche — aktuell nur Deutsch
-# (Komma als Dezimal-, Punkt als Tausendertrennzeichen). Eine künftige
-# Sprachumschaltung (z. B. Englisch, NUMBER_LOCALE="en-US") ändert nur diese
-# eine Konstante bzw. wählt den Eintrag dynamisch (z. B. aus einer
-# Nutzereinstellung) — format_value()/format_int() selbst kennen kein
-# hartcodiertes Trennzeichen mehr. Dasselbe Prinzip wie auf der JS-Seite
-# (static/js/number-format.js, window.NumberFormat.LOCALE).
-NUMBER_SEPARATORS = {
-    "de-DE": {"decimal": ",", "thousands": "."},
-    "en-US": {"decimal": ".", "thousands": ","},
-}
-NUMBER_LOCALE = "de-DE"
+# Zahlenformat der Oberfläche: Trennzeichen kommen aus formats.FORMATS, das Format aus der
+# laufenden Anfrage (formats.current_format — Einstellung "regional_format", sonst Browser).
+# Dasselbe Prinzip wie auf der JS-Seite (static/js/number-format.js, window.ZA_FORMAT).
 
 
 def _group_thousands(int_text: str, sep: str) -> str:
@@ -95,10 +88,11 @@ def _group_thousands(int_text: str, sep: str) -> str:
     return f"-{grouped}" if negative else grouped
 
 
-def _localize_number_text(text: str, locale: str = NUMBER_LOCALE) -> str:
+def _localize_number_text(text: str, locale: str | None = None) -> str:
     """Wandelt einen Punkt-Dezimal-String (z. B. "1234.5") ins Oberflächen-
-    format des angegebenen locale um, inkl. Tausendergruppierung."""
-    seps = NUMBER_SEPARATORS[locale]
+    format des angegebenen locale (Standard: das der laufenden Anfrage) um,
+    inkl. Tausendergruppierung."""
+    seps = formats.number_separators(locale)
     int_part, _, frac_part = text.partition(".")
     grouped = _group_thousands(int_part, seps["thousands"])
     return f"{grouped}{seps['decimal']}{frac_part}" if frac_part else grouped
@@ -106,7 +100,7 @@ def _localize_number_text(text: str, locale: str = NUMBER_LOCALE) -> str:
 
 def format_int(value: int, signed: bool = False) -> str:
     """Tausendergruppierte Ganzzahl im aktuellen Oberflächenformat
-    (NUMBER_LOCALE) — für Zeilen-/Datensatzzähler u. Ä. in der GUI.
+    (formats.current_format) — für Zeilen-/Datensatzzähler u. Ä. in der GUI.
     signed=True erzwingt ein führendes "+" bei positiven Werten (z. B. für
     eine Differenzanzeige "+42" / "-15"), wie Pythons eigenes "{:+}"."""
     value = int(value)
@@ -124,7 +118,7 @@ def format_value(value: float, decimals: int | None = None) -> str:
     Nachkommastellenzahl aufgefüllt zu werden. Mit explizitem decimals (pro
     Entität konfigurierbar, Konzept Abschnitt 03) wird stattdessen immer genau
     auf diese Anzahl gerundet/aufgefüllt — auch wenn das Nullen anhängt.
-    Ergebnis im Oberflächenformat (NUMBER_LOCALE), inkl. Tausendergruppierung."""
+    Ergebnis im Oberflächenformat (formats.current_format), inkl. Tausendergruppierung."""
     if decimals is not None:
         text = f"{value:.{decimals}f}"
     else:
@@ -134,14 +128,13 @@ def format_value(value: float, decimals: int | None = None) -> str:
     return _localize_number_text(text)
 
 
-def parse_localized_number(text: str, locale: str = NUMBER_LOCALE) -> float:
+def parse_localized_number(text: str, locale: str | None = None) -> float:
     """Gegenstück zu format_value()/format_int() für Freitext-Zahleneingaben im
     Oberflächenformat (z. B. ein vom Nutzer getippter Umrechnungsfaktor beim
-    Symcon-Import) — Dezimal-/Tausendertrennzeichen kommen aus NUMBER_SEPARATORS
-    statt hartcodiert zu sein, damit eine künftige Sprachumschaltung automatisch
-    mitzieht. Dasselbe Prinzip wie NumberFormat.parse() auf der JS-Seite
+    Symcon-Import) — Dezimal-/Tausendertrennzeichen kommen aus formats.FORMATS
+    (Format der laufenden Anfrage). Dasselbe Prinzip wie NumberFormat.parse() auf der JS-Seite
     (static/js/number-format.js)."""
-    seps = NUMBER_SEPARATORS[locale]
+    seps = formats.number_separators(locale)
     normalized = text.strip()
     if seps["thousands"]:
         normalized = normalized.replace(seps["thousands"], "")
@@ -164,37 +157,37 @@ def decimals_to_int(value: str | None) -> int | None:
 # Anzeige-Übersetzungen für die intern (englisch) gespeicherten Werte — die
 # gespeicherten Werte selbst bleiben stabile Schlüssel (Sortierung, Filter-URLs,
 # interne Logik in rollup.py/query.py), nur die Darstellung wird eingedeutscht.
-TYPE_LABELS = {"standard": "Standard", "counter": "Zähler", "switch": "Schalter"}
+TYPE_LABELS = {"standard": N_("Standard"), "counter": N_("Zähler"), "switch": N_("Schalter")}
 RESOLUTION_LABELS = {
-    "raw": "Rohdaten",
-    "30s": "30 Sek.",
-    "1min": "1 Min.",
-    "5min": "5 Min.",
-    "15min": "15 Min.",
-    "1h": "1 Std.",
+    "raw": N_("Rohdaten"),
+    "30s": N_("30 Sek."),
+    "1min": N_("1 Min."),
+    "5min": N_("5 Min."),
+    "15min": N_("15 Min."),
+    "1h": N_("1 Std."),
 }
 COMPACT_TARGET_LABELS = {
-    "off": "Aus",
-    "30s": "30 Sek.",
-    "1min": "1 Min.",
-    "5min": "5 Min.",
-    "15min": "15 Min.",
-    "1h": "1 Std.",
+    "off": N_("Aus"),
+    "30s": N_("30 Sek."),
+    "1min": N_("1 Min."),
+    "5min": N_("5 Min."),
+    "15min": N_("15 Min."),
+    "1h": N_("1 Std."),
 }
 # Housekeeping → Verdichten: globaler Schalter für die automatische
 # (Wartungsplaner-)Verdichtung, standardmäßig AUS — anders als die manuelle
 # Aktion (immer verfügbar) greift die Automatik erst nach bewusster Aktivierung
 # in fremde, bereits archivierte Daten ein.
-COMPACT_AUTO_LABELS = {"off": "Aus", "on": "An"}
+COMPACT_AUTO_LABELS = {"off": N_("Aus"), "on": "An"}
 DEFAULT_COMPACT_AUTO_ENABLED = "off"
 # Wie lange ein archivierter Monat unangetastet bleibt, bevor die Automatik
 # ihn verdichtet — siehe compact_raw_values()/background.py.
-COMPACT_MIN_AGE_MONTHS_LABELS = {"3": "3 Monate", "6": "6 Monate", "12": "12 Monate"}
+COMPACT_MIN_AGE_MONTHS_LABELS = {"3": N_("3 Monate"), "6": N_("6 Monate"), "12": N_("12 Monate")}
 DEFAULT_COMPACT_MIN_AGE_MONTHS = "3"
 # Housekeeping → Speicherplatz: globaler Schalter für die automatische
 # (Wartungsplaner-)Bereinigung, standardmäßig AUS — dasselbe Muster wie bei
 # der Verdichten-Automatik oben.
-PURGE_AUTO_LABELS = {"off": "Aus", "on": "An"}
+PURGE_AUTO_LABELS = {"off": N_("Aus"), "on": "An"}
 DEFAULT_PURGE_AUTO_ENABLED = "off"
 # Wie lange eine Löschmarkierung (deleted_points.deleted_at) unangetastet
 # bleibt, bevor die Automatik sie physisch entfernt — in Tagen statt Monaten
@@ -202,41 +195,41 @@ DEFAULT_PURGE_AUTO_ENABLED = "off"
 # nur die zuletzt markierte Charge zurückholen kann und dafür ein kurzes statt
 # ein monatelanges Zeitfenster braucht. Siehe purge_hot_buffer()/
 # purge_archived_months() (cleanup.py) und background.py.
-PURGE_MIN_AGE_DAYS_LABELS = {"7": "1 Woche", "14": "2 Wochen", "30": "1 Monat", "90": "3 Monate"}
+PURGE_MIN_AGE_DAYS_LABELS = {"7": N_("1 Woche"), "14": N_("2 Wochen"), "30": N_("1 Monat"), "90": N_("3 Monate")}
 DEFAULT_PURGE_MIN_AGE_DAYS = "30"
 RETENTION_LABELS = {
-    "unlimited": "Unbegrenzt",
-    "30d": "30 Tage",
-    "90d": "90 Tage",
-    "365d": "365 Tage",
-    "2y": "2 Jahre",
-    "5y": "5 Jahre",
+    "unlimited": N_("Unbegrenzt"),
+    "30d": N_("30 Tage"),
+    "90d": N_("90 Tage"),
+    "365d": N_("365 Tage"),
+    "2y": N_("2 Jahre"),
+    "5y": N_("5 Jahre"),
 }
 DECIMALS_LABELS = {
-    "auto": "Automatisch",
-    "0": "0 Nachkommastellen",
-    "1": "1 Nachkommastelle",
-    "2": "2 Nachkommastellen",
-    "3": "3 Nachkommastellen",
+    "auto": N_("Automatisch"),
+    "0": N_("0 Nachkommastellen"),
+    "1": N_("1 Nachkommastelle"),
+    "2": N_("2 Nachkommastellen"),
+    "3": N_("3 Nachkommastellen"),
 }
 VALUE_FILTER_LABELS = {
-    "off": "Aus",
-    "decimals": "Gleiche gerundete Werte filtern",
+    "off": N_("Aus"),
+    "decimals": N_("Gleiche gerundete Werte filtern"),
 }
 GAP_THRESHOLD_LABELS = {
-    "1": "1 Minute",
-    "5": "5 Minuten",
-    "15": "15 Minuten",
-    "30": "30 Minuten",
-    "60": "1 Stunde",
-    "360": "6 Stunden",
-    "720": "12 Stunden",
-    "1440": "1 Tag",
-    "off": "Aus",
+    "1": N_("1 Minute"),
+    "5": N_("5 Minuten"),
+    "15": N_("15 Minuten"),
+    "30": N_("30 Minuten"),
+    "60": N_("1 Stunde"),
+    "360": N_("6 Stunden"),
+    "720": N_("12 Stunden"),
+    "1440": N_("1 Tag"),
+    "off": N_("Aus"),
 }
 DISPLAY_MODE_LABELS = {
-    "onoff": "AN/AUS (Rohwert)",
-    "time": "Zeit (Dauer)",
+    "onoff": N_("AN/AUS (Rohwert)"),
+    "time": N_("Zeit (Dauer)"),
 }
 # Vielfache des für die Entität Üblichen, nicht Prozent eines Werts — die
 # Begründung steht in storage/cleanup.py (OutlierDetector). Die Schlüssel sind
@@ -247,7 +240,7 @@ OUTLIER_THRESHOLD_LABELS = {
     "20": "20×",
     "50": "50×",
     "100": "100×",
-    "off": "Aus",
+    "off": N_("Aus"),
 }
 # Warum die Ausreißer-Erkennung für diesen Typ nicht angeboten wird — die
 # Bedingung selbst steht als outlier_detection_applies() in storage/index.py.
@@ -255,9 +248,7 @@ OUTLIER_THRESHOLD_LABELS = {
 # dass das Feld nicht ohne Erklärung ausgegraut dasteht.
 OUTLIER_BLOCKED_REASONS = {
     "switch": (
-        "Für Schalter nicht verfügbar: Bei Werten, die nur AN oder AUS sein können, "
-        "gibt es keine übliche Schwankung, an der sich ein Vielfaches messen ließe — "
-        "die Erkennung würde nie etwas markieren."
+        N_("Für Schalter nicht verfügbar: Bei Werten, die nur AN oder AUS sein können, gibt es keine übliche Schwankung, an der sich ein Vielfaches messen ließe — die Erkennung würde nie etwas markieren.")
     ),
 }
 # Warum die Auflösung für diesen Typ fest auf "Rohdaten" steht — die Bedingung
@@ -267,36 +258,35 @@ OUTLIER_BLOCKED_REASONS = {
 # nicht nur wirkungslos, sondern potenziell irreführend.
 RESOLUTION_BLOCKED_REASONS = {
     "switch": (
-        "Für Schalter fest auf „Rohdaten“: Ein Zeitfenster könnte sonst einen "
-        "echten Zustandswechsel (AN/AUS) verwerfen."
+        N_("Für Schalter fest auf „Rohdaten“: Ein Zeitfenster könnte sonst einen echten Zustandswechsel (AN/AUS) verwerfen.")
     ),
 }
 # Aus demselben Grund wie RESOLUTION_BLOCKED_REASONS: eine rückwirkende
 # Verdichtung könnte einen echten Zustandswechsel wegkomprimieren.
 COMPACT_TARGET_BLOCKED_REASONS = {
     "switch": (
-        "Für Schalter nicht verfügbar: Eine rückwirkende Verdichtung könnte "
-        "einen echten Zustandswechsel (AN/AUS) wegkomprimieren."
+        N_("Für Schalter nicht verfügbar: Eine rückwirkende Verdichtung könnte einen echten Zustandswechsel (AN/AUS) wegkomprimieren.")
     ),
 }
 BACKUP_SCHEDULE_LABELS = {
-    "off": "Aus",
-    "daily": "Täglich",
-    "weekly": "Wöchentlich",
+    "off": N_("Aus"),
+    "daily": N_("Täglich"),
+    "weekly": N_("Wöchentlich"),
 }
 # Demo-Modus (DEMO_MODUS_PLAN.md) — bewusst ein Intervall statt eines
 # Kalendertermins wie bei BACKUP_SCHEDULE_LABELS: "alle 15 Minuten" statt
 # "einmal nachts", siehe app.demo_mode.DEMO_APPEND_INTERVAL_SECONDS für die
 # zugehörigen Sekundenwerte.
 DEMO_APPEND_INTERVAL_LABELS = {
-    "off": "Aus",
-    "5m": "Alle 5 Minuten",
-    "15m": "Alle 15 Minuten",
-    "30m": "Alle 30 Minuten",
-    "60m": "Stündlich",
+    "off": N_("Aus"),
+    "5m": N_("Alle 5 Minuten"),
+    "15m": N_("Alle 15 Minuten"),
+    "30m": N_("Alle 30 Minuten"),
+    "60m": N_("Stündlich"),
 }
 BACKUP_KEEP_COUNT_LABELS = {
-    "unlimited": "Unbegrenzt",
+    "unlimited": N_("Unbegrenzt"),
+    "1": "1",
     "3": "3",
     "5": "5",
     "10": "10",
@@ -307,9 +297,9 @@ BACKUP_KEEP_COUNT_LABELS = {
 # entfallen; main.py bildet sie über LEGACY_FONT_SCALE auf die nächstgelegene
 # verbliebene Stufe ab. Faktoren und Begründung siehe FONT_SCALE dort.
 FONT_SCALE_LABELS = {
-    "1": "Klein",
-    "2": "Normal",
-    "3": "Groß",
+    "1": N_("Klein"),
+    "2": N_("Normal"),
+    "3": N_("Groß"),
 }
 
 

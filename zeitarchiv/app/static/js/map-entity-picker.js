@@ -105,7 +105,7 @@
       empty.className = 'dd-picker-row';
       empty.style.color = 'var(--ink-faint)';
       empty.style.cursor = 'default';
-      empty.textContent = 'Keine Treffer';
+      empty.textContent = t('Keine Treffer');
       popover.appendChild(empty);
     }
   }

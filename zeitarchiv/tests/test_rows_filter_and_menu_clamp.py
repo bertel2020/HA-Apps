@@ -10,7 +10,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from app.formatting import format_int, format_value
 
-from _paths import APP, TEMPLATES, page_text
+from _paths import APP, TEMPLATES, page_text, template_text
 
 
 def _css(name: str) -> str:
@@ -24,7 +24,7 @@ def test_the_marking_filter_is_one_dropdown_and_not_a_row_of_chips() -> None:
     wie das andere, brauchte eine eigene Werkzeugzeile und brach auf dem
     Telefon in zwei Reihen um."""
     cleanup = page_text("cleanup.html")
-    menu = (TEMPLATES / "_rows_filter_menu.html").read_text(encoding="utf-8")
+    menu = template_text("_rows_filter_menu.html")
 
     assert 'class="filter-chip"' not in cleanup
     assert "toolbar-filters" not in cleanup
@@ -40,9 +40,7 @@ def test_the_marking_filter_is_one_dropdown_and_not_a_row_of_chips() -> None:
     # Zeitraum-/Seitenwechsel per oob nachgezogen werden — sonst blieben die
     # Zahlen auf dem Stand des ersten Aufrufs stehen.
     assert 'hx-swap-oob="true"' in menu
-    assert '{% include "_rows_filter_menu.html" %}' in (
-        TEMPLATES / "_rows_table.html"
-    ).read_text(encoding="utf-8")
+    assert '{% include "_rows_filter_menu.html" %}' in template_text("_rows_table.html")
 
 
 def test_every_marking_carries_its_hit_count_and_empty_ones_are_not_selectable() -> None:
@@ -50,7 +48,7 @@ def test_every_marking_carries_its_hit_count_and_empty_ones_are_not_selectable()
     Quelle wie die Kennzahlen-Tabelle darüber). Ohne sie sahen alle Kategorien
     gleich aus, und die Auswahl einer leeren endete zwangsläufig auf „Keine
     Werte in diesem Zeitraum/Filter“."""
-    menu = (TEMPLATES / "_rows_filter_menu.html").read_text(encoding="utf-8")
+    menu = template_text("_rows_filter_menu.html")
     for schluessel in ("all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases"):
         assert f"counts['{schluessel}']" in menu, schluessel
     assert "| format_int" in menu
@@ -69,7 +67,7 @@ def test_the_values_table_stays_a_table_on_phones() -> None:
     zusammenschrumpft. Hier sind es vier schmale Spalten — als Karten stünde
     jeder Wert einzeln, und das Vergleichen aufeinanderfolgender Zeitstempel
     (worum es beim Bereinigen geht) wäre vorbei."""
-    rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
+    rows = template_text("_rows_table.html")
     assert 'data-cards="off"' in rows
     assert "rows-values-table" in rows
     # Die Breiten dürfen NICHT inline stehen: unter 640px werden sie auf auto
@@ -113,7 +111,7 @@ def test_the_action_bar_is_the_head_of_the_table() -> None:
     """Gemessen bei 1.280x900: das erste Auswahlkästchen lag bei y=456, der
     „Löschen"-Knopf bei y=1215 — 759px auseinander und damit außerhalb des
     Bildes, während man die oberen Zeilen ankreuzt. Jetzt 95px."""
-    rows = (TEMPLATES / "_rows_table.html").read_text(encoding="utf-8")
+    rows = template_text("_rows_table.html")
     leiste = rows.index('<div class="rows-actionbar">')
     tabelle = rows.index('class="dt compact rows-values-table"')
     pager = rows.index('<div class="pager"')

@@ -82,8 +82,8 @@
       abzeichen.textContent = anzahl > 1 ? String(anzahl) : '';
     }
     const label = anzahl === 0
-      ? 'Meldungen'
-      : 'Meldungen — ' + anzahl + (anzahl === 1 ? ' Vorgang läuft' : ' Vorgänge laufen');
+      ? t('Meldungen')
+      : t('Meldungen') + ' — ' + anzahl + ' ' + (anzahl === 1 ? t('Vorgang läuft') : t('Vorgänge laufen'));
     knopf.setAttribute('aria-label', label);
   }
 

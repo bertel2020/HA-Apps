@@ -3,6 +3,9 @@
 // zur restlichen Oberfläche). Drei Wege, es auszulösen:
 //   1. hx-confirm="..." auf einem htmx-Element — hier über das htmx:confirm-
 //      Event abgefangen (siehe htmx-Doku zu hx-confirm für dieses Muster).
+//      Optional data-confirm-label (Text des Bestätigen-Knopfs) und
+//      data-confirm-template="#id" (ein <template> mit gegliedertem Inhalt, der
+//      statt des Fragetexts erscheint).
 //   2. Direkter Aufruf window.appConfirm(text, {danger}) für Bestätigungen
 //      außerhalb von htmx (z. B. Chart löschen), als Promise<boolean>.
 //   3. window.appAlert(text, {danger}) als Ersatz für window.alert() — reine
@@ -26,9 +29,10 @@
     overlay.setAttribute('role', 'alertdialog');
     overlay.innerHTML =
       '<p class="confirm-message"></p>' +
+      '<div class="confirm-rich" hidden></div>' +
       '<div class="confirm-actions">' +
-        '<button type="button" class="btn confirm-cancel">Abbrechen</button>' +
-        '<button type="button" class="btn confirm-ok">Bestätigen</button>' +
+        '<button type="button" class="btn confirm-cancel">' + t('Abbrechen') + '</button>' +
+        '<button type="button" class="btn confirm-ok">' + t('Bestätigen') + '</button>' +
       '</div>';
     document.body.appendChild(overlay);
     return overlay;
@@ -37,10 +41,23 @@
   window.appConfirm = function (message, opts) {
     opts = opts || {};
     if (!overlay) build();
-    overlay.querySelector('.confirm-message').textContent = message;
+    // Gegliederter Inhalt: opts.template ist ein <template>-Element der Seite (serverseitig
+    // gerendert, also bereits escaped); sein Inhalt ersetzt den reinen Text.
+    const messageEl = overlay.querySelector('.confirm-message');
+    const richEl = overlay.querySelector('.confirm-rich');
+    richEl.textContent = '';
+    if (opts.template && opts.template.content) {
+      richEl.appendChild(opts.template.content.cloneNode(true));
+      richEl.hidden = false;
+      messageEl.hidden = true;
+    } else {
+      richEl.hidden = true;
+      messageEl.hidden = false;
+      messageEl.textContent = message;
+    }
     const okBtn = overlay.querySelector('.confirm-ok');
     const cancelBtn = overlay.querySelector('.confirm-cancel');
-    okBtn.textContent = opts.confirmLabel || 'Bestätigen';
+    okBtn.textContent = opts.confirmLabel || t('Bestätigen');
     okBtn.className = 'btn confirm-ok ' + (opts.danger ? 'btn-danger' : 'primary');
     if (!overlay.open) overlay.showModal();
     // .open separat von showModal() — showModal() zeigt sofort an (nötig für
@@ -121,7 +138,9 @@
     const elt = evt.detail.elt;
     const danger = !!(elt && elt.classList.contains('btn-danger'));
     const confirmLabel = elt && elt.dataset ? elt.dataset.confirmLabel : undefined;
-    window.appConfirm(evt.detail.question, {danger, confirmLabel}).then((ok) => {
+    const template = elt && elt.dataset && elt.dataset.confirmTemplate
+      ? document.querySelector(elt.dataset.confirmTemplate) : null;
+    window.appConfirm(evt.detail.question, {danger, confirmLabel, template}).then((ok) => {
       if (ok) evt.detail.issueRequest(true);
     });
   });

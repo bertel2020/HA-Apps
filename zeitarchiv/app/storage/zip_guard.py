@@ -16,6 +16,8 @@ messbaren Speicher, gegenüber 3,2 ms und einer wachsenden Liste beim Öffnen.
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import logging
 import zipfile
 from pathlib import Path
@@ -66,6 +68,5 @@ def ensure_entry_count_allowed(path: Path, limit: int, message: str) -> None:
     count = declared_entry_count(path)
     if count is not None and count > limit:
         raise ValueError(
-            f"{message} (enthält {format_int(count)} Einträge, "
-            f"erlaubt sind {format_int(limit)})"
+            tr("{message} (enthält {format_int} Einträge, erlaubt sind {format_int2})", message=message, format_int=format_int(count), format_int2=format_int(limit))
         )

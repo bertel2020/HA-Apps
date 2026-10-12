@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import threading
 import time
 from collections import deque
@@ -109,14 +111,14 @@ class StorageCoordinator:
             if not acquired:
                 self._record_busy_event()
                 raise CoordinatorBusy(
-                    f"Speicherzugriff für {entity_id!r} nicht innerhalb von {timeout:g}s erhalten"
+                    tr("Speicherzugriff für {entity_id!r} nicht innerhalb von {timeout:g}s erhalten", entity_id=entity_id, timeout=timeout)
                 )
             self._active_entity_operations += 1
         if not entity_lock.acquire(timeout=_acquire_timeout(deadline)):
             self._finish_entity_operation()
             self._record_busy_event()
             raise CoordinatorBusy(
-                f"Speicherzugriff für {entity_id!r} nicht innerhalb von {timeout:g}s erhalten"
+                tr("Speicherzugriff für {entity_id!r} nicht innerhalb von {timeout:g}s erhalten", entity_id=entity_id, timeout=timeout)
             )
         try:
             yield
@@ -144,14 +146,14 @@ class StorageCoordinator:
             )
             if not acquired:
                 self._record_busy_event()
-                raise CoordinatorBusy(f"Speicherzugriff nicht innerhalb von {timeout:g}s erhalten")
+                raise CoordinatorBusy(tr("Speicherzugriff nicht innerhalb von {timeout:g}s erhalten", timeout=timeout))
             self._active_entity_operations += 1
         held: list[threading.RLock] = []
         try:
             for lock in locks:
                 if not lock.acquire(timeout=_acquire_timeout(deadline)):
                     self._record_busy_event()
-                    raise CoordinatorBusy(f"Speicherzugriff nicht innerhalb von {timeout:g}s erhalten")
+                    raise CoordinatorBusy(tr("Speicherzugriff nicht innerhalb von {timeout:g}s erhalten", timeout=timeout))
                 held.append(lock)
         except CoordinatorBusy:
             for lock in reversed(held):
@@ -186,7 +188,7 @@ class StorageCoordinator:
                 if not acquired:
                     self._record_busy_event()
                     raise CoordinatorBusy(
-                        f"Exklusiver Speicherzugriff nicht innerhalb von {timeout:g}s erhalten"
+                        tr("Exklusiver Speicherzugriff nicht innerhalb von {timeout:g}s erhalten", timeout=timeout)
                     )
                 self._exclusive_active = True
             finally:

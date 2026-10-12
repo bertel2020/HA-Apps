@@ -26,6 +26,8 @@ app.css), nicht den Zustand.
 
 from __future__ import annotations
 
+from .i18n import tr
+
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -95,7 +97,7 @@ def activity_snapshot() -> list[dict]:
         except Exception:  # noqa: BLE001 — siehe Docstring
             continue
         if stand:
-            laufend.append({"id": quelle.kennung, "label": quelle.label, **stand})
+            laufend.append({"id": quelle.kennung, "label": tr(quelle.label), **stand})
     return laufend
 
 
@@ -255,7 +257,7 @@ class JobProgress:
         Neustart als laufend gilt.
         """
         if not self._besetzen(kind):
-            raise JobBusy(f"{self.name} läuft bereits")
+            raise JobBusy(tr("{name} läuft bereits", name=self.name))
         try:
             yield
         except BaseException:

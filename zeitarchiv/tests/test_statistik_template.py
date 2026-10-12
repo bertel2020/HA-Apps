@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import ADDON, TEMPLATES, page_text
+from _paths import ADDON, TEMPLATES, page_text, template_text
 from app.main import asset as asset_helper
 
 
@@ -133,7 +133,7 @@ def test_retention_overview_separates_due_and_historical_deletions() -> None:
     # statistik.html — die "not in"-Abgrenzung gegen die Bestand-und-
     # Fälligkeit-Tabelle entfällt, weil beides jetzt bewusst im selben Formular
     # liegt (siehe test_retention_breakdown_is_located_with_retention_settings).
-    retention = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
+    retention = template_text("_settings_retention_form.html")
     assert "Aktuell durch Aufbewahrung fällig" in retention
     assert "Manuell zur Löschung markiert" not in retention
     assert "<h2>Zur Löschung markiert</h2>" not in retention
@@ -141,13 +141,13 @@ def test_retention_overview_separates_due_and_historical_deletions() -> None:
 
 
 def test_reclaimable_storage_tile_uses_short_single_line_caption() -> None:
-    retention = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
+    retention = template_text("_settings_retention_form.html")
     assert '<div class="sub-value">Archivdateien</div>' in retention
     assert "Archivdateien der aktuellen Vorschau" not in retention
 
 
 def test_retention_status_tiles_use_surface_background() -> None:
-    source = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
+    source = template_text("_settings_retention_form.html")
     css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
     assert source.count('class="status-card"') == 4
     assert ".status-card{" in css and "background:var(--surface)" in css
@@ -155,9 +155,9 @@ def test_retention_status_tiles_use_surface_background() -> None:
 
 def test_ui_typography_and_field_colors_follow_shared_semantics() -> None:
     css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
-    backup = (TEMPLATES_DIR / "_settings_backup_schedule_form.html").read_text(encoding="utf-8")
-    archive_settings = (TEMPLATES_DIR / "_settings_archivierung_form.html").read_text(encoding="utf-8")
-    entity_settings = (TEMPLATES_DIR / "_entity_config_form.html").read_text(encoding="utf-8")
+    backup = template_text("_settings_backup_schedule_form.html")
+    archive_settings = template_text("_settings_archivierung_form.html")
+    entity_settings = template_text("_entity_config_form.html")
     assert ".settings-panel p{" in css and "max-width:100%" in css
     assert ".settings-panel .hint,.settings-panel p.hint" in css
     assert "max-width:78ch" not in css and "max-width:82ch" not in css
@@ -169,7 +169,7 @@ def test_ui_typography_and_field_colors_follow_shared_semantics() -> None:
 
 
 def test_retention_breakdown_is_located_with_retention_settings() -> None:
-    settings = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
+    settings = template_text("_settings_retention_form.html")
     statistics = page_text("statistik.html")
     assert "Bestand und Fälligkeit nach Aufbewahrungsfrist" in settings
     assert "retention_preview_generated_at" in settings
@@ -180,7 +180,7 @@ def test_retention_summary_values_align_below_two_line_titles() -> None:
     # Beide Teile zogen mit der Retention-Übersicht nach Housekeeping um: das
     # Markup in _settings_retention_form.html, die CSS-Regel (kein eigener
     # app.css-Eintrag, siehe .seg-Kommentar dort) inline in housekeeping.html.
-    retention = (TEMPLATES_DIR / "_settings_retention_form.html").read_text(encoding="utf-8")
+    retention = template_text("_settings_retention_form.html")
     housekeeping = page_text("housekeeping.html")
     assert 'class="stat-row retention-summary"' in retention
     assert ".retention-summary .stat .label{min-height:3em;}" in housekeeping
@@ -190,9 +190,7 @@ def test_index_details_explain_all_logical_database_areas() -> None:
     # Der eigentliche Inhalt steckt in _statistik_index_body.html (per
     # {% include %} eingebunden) — page_text() folgt keinen Includes, deshalb
     # hier dazugelesen.
-    source = page_text("statistik_index.html") + (
-        TEMPLATES_DIR / "_statistik_index_body.html"
-    ).read_text(encoding="utf-8")
+    source = page_text("statistik_index.html") + template_text("_statistik_index_body.html")
     main = (TEMPLATES_DIR.parent / "main.py").read_text(encoding="utf-8")
     assert "Entitäten und Archivstatus" in main
     assert "Schreibsicherheit und Bereinigung" in main

@@ -12,10 +12,12 @@
       document.getElementById('tab-symcon').style.display = name === 'symcon' ? '' : 'none';
       document.getElementById('tab-csv').style.display = name === 'csv' ? '' : 'none';
       document.getElementById('tab-ha').style.display = name === 'ha' ? '' : 'none';
+      document.getElementById('tab-vm').style.display = name === 'vm' ? '' : 'none';
       document.getElementById('tab-reports').style.display = name === 'reports' ? '' : 'none';
       document.getElementById('tab-btn-symcon').classList.toggle('active', name === 'symcon');
       document.getElementById('tab-btn-csv').classList.toggle('active', name === 'csv');
       document.getElementById('tab-btn-ha').classList.toggle('active', name === 'ha');
+      document.getElementById('tab-btn-vm').classList.toggle('active', name === 'vm');
       document.getElementById('tab-btn-reports').classList.toggle('active', name === 'reports');
       if (name === 'symcon') url.searchParams.delete('tab');
       else url.searchParams.set('tab', name);
@@ -62,8 +64,8 @@
     async function confirmReportsDelete(event, form) {
       event.preventDefault();
       const confirmed = await appConfirm(
-        'Alle Import-Reports endgültig löschen? Diese Aktion lässt sich nicht rückgängig machen.',
-        {danger: true, confirmLabel: 'Alle Reports löschen'}
+        t('Alle Import-Reports endgültig löschen? Diese Aktion lässt sich nicht rückgängig machen.'),
+        {danger: true, confirmLabel: t('Alle Reports löschen')}
       );
       if (confirmed) form.submit();
     }
@@ -148,7 +150,7 @@
       panel.hidden = !mismatch;
       if (mismatch) {
         panel.querySelector('.unit-warning').textContent =
-          `Einheiten stimmen nicht überein: ${sourceUnit} → ${targetUnit}`;
+          t('Einheiten stimmen nicht überein: {source} → {target}', {source: sourceUnit, target: targetUnit});
       } else if (!factor.dataset.userEdited) {
         factor.value = '1';
       }
@@ -157,8 +159,8 @@
     async function confirmSymconDelete(event, form) {
       event.preventDefault();
       const confirmed = await appConfirm(
-        'Hochgeladene Symcon-Quelldaten einschließlich der optionalen settings.json wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten.',
-        {danger: true, confirmLabel: 'Quelldaten löschen'}
+        t('Hochgeladene Symcon-Quelldaten einschließlich der optionalen settings.json wirklich löschen? Bereits importierte Zeitarchiv-Daten bleiben erhalten.'),
+        {danger: true, confirmLabel: t('Quelldaten löschen')}
       );
       if (confirmed) form.submit();
     }
@@ -257,7 +259,7 @@
     // Hintergrund weiter (bei tausenden Dateien nicht mehr trivial schnell) —
     // hier per fetch()-Polling verfolgt, mit eigenem Schritt-Label je Phase,
     // statt die Fortschrittsanzeige nach dem Upload einfach einfrieren zu lassen.
-    const PHASE_LABELS = { extracting: 'Wird entpackt', scanning: 'Scanne Variablen' };
+    const PHASE_LABELS = { extracting: t('Wird entpackt'), scanning: t('Scanne Variablen') };
     function pollUploadProgress() {
       fetch('import/upload-progress').then(r => r.json()).then(state => {
         if (state.phase === 'done') {
@@ -268,14 +270,14 @@
           appendUploadError(uploadArea, state.error);
           return;
         }
-        const label = PHASE_LABELS[state.phase] || 'Wird verarbeitet';
+        const label = PHASE_LABELS[state.phase] || t('Wird verarbeitet');
         const pct = state.total ? Math.round((state.done / state.total) * 100) : null;
         const stepNum = state.phase === 'scanning' ? '2/2' : '1/2';
         renderUploadProgress(
           uploadArea,
-          `Schritt ${stepNum} · ${label}…`,
+          t('Schritt {step} · {label}…', {step: stepNum, label}),
           pct,
-          state.total ? `${state.done} von ${state.total}` : ''
+          state.total ? t('{done} von {total}', {done: state.done, total: state.total}) : ''
         );
         setTimeout(pollUploadProgress, 400);
       });
@@ -288,7 +290,7 @@
       function uploadZip(file) {
         const progress = renderUploadProgress(
           uploadArea,
-          'Wird hochgeladen…',
+          t('Wird hochgeladen…'),
           0,
           `${file.name} · ${NumberFormat.fmt(file.size / 1024 / 1024, 1)} MB`,
           true
@@ -310,13 +312,13 @@
           if (xhr.status === 200) {
             pollUploadProgress();
           } else {
-            let message = 'ZIP konnte nicht verarbeitet werden.';
+            let message = t('ZIP konnte nicht verarbeitet werden.');
             try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
             appendUploadError(uploadArea, message);
           }
         };
         xhr.onerror = () => {
-          appendUploadError(uploadArea, 'Upload fehlgeschlagen — Verbindung unterbrochen.');
+          appendUploadError(uploadArea, t('Upload fehlgeschlagen — Verbindung unterbrochen.'));
         };
         xhr.send(formData);
       }
@@ -354,7 +356,7 @@
       if (!area) return;
       const progress = renderUploadProgress(
         area,
-        'Wird hochgeladen…',
+        t('Wird hochgeladen…'),
         0,
         `${file.name} · ${NumberFormat.fmt(file.size / 1024 / 1024, 1)} MB`,
         true
@@ -381,13 +383,13 @@
           if (neu && window.htmx) window.htmx.process(neu);
           return;
         }
-        let message = 'Bitte eine CSV-Datei hochladen.';
+        let message = t('Bitte eine CSV-Datei hochladen.');
         try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
         if (window.appAlert) window.appAlert(message);
         renderCsvDropzoneFallback(area);
       };
       xhr.onerror = () => {
-        if (window.appAlert) window.appAlert('Upload fehlgeschlagen — Verbindung unterbrochen.');
+        if (window.appAlert) window.appAlert(t('Upload fehlgeschlagen — Verbindung unterbrochen.'));
         renderCsvDropzoneFallback(area);
       };
       xhr.send(formData);
@@ -406,7 +408,7 @@
       label.setAttribute('role', 'button');
       label.tabIndex = 0;
       const zeile = document.createElement('p');
-      zeile.textContent = 'CSV-Datei hierher ziehen oder klicken zum Auswählen';
+      zeile.textContent = t('CSV-Datei hierher ziehen oder klicken zum Auswählen');
       const feld = document.createElement('input');
       feld.type = 'file';
       feld.name = 'file';
@@ -447,11 +449,11 @@
           location.reload();
           return;
         }
-        let message = 'settings.json konnte nicht verarbeitet werden.';
+        let message = t('settings.json konnte nicht verarbeitet werden.');
         try { message = (await r.json()).detail || message; } catch (e) {}
         appendUploadError(hint, message, true);
       }).catch(() => {
-        appendUploadError(hint, 'Upload fehlgeschlagen — Verbindung unterbrochen.', true);
+        appendUploadError(hint, t('Upload fehlgeschlagen — Verbindung unterbrochen.'), true);
       });
     }
 
@@ -494,7 +496,7 @@
       const markedCount = table.querySelectorAll('tr.marked').length;
       const chip = document.getElementById('marked-count');
       chip.classList.toggle('active', markedCount > 0);
-      chip.textContent = markedCount + ' markiert';
+      chip.textContent = t('{count} markiert',{count: markedCount});
       applyImportPaging();  // Markieren ändert die Zeilenreihenfolge -> sichtbaren Bereich neu berechnen
     }
 
@@ -540,9 +542,9 @@
       rows.forEach((row, i) => { row.style.display = (i >= start && i < end) ? '' : 'none'; });
 
       const range = document.getElementById('import-pager-range');
-      if (range) range.textContent = total ? `${start + 1}–${end} von ${total}` : '0 von 0';
+      if (range) range.textContent = total ? t('{start}–{end} von {total}', {start: start + 1, end, total}) : t('0 von 0');
       const pageLabel = document.getElementById('import-pager-page');
-      if (pageLabel) pageLabel.textContent = `Seite ${importPage} / ${totalPages}`;
+      if (pageLabel) pageLabel.textContent = t('Seite {page} / {pages}', {page: importPage, pages: totalPages});
       const prevBtn = document.getElementById('import-pager-prev');
       if (prevBtn) prevBtn.disabled = importPage <= 1;
       const nextBtn = document.getElementById('import-pager-next');

@@ -33,12 +33,15 @@
    Kein <body> im Bestand trägt Attribute — geprüft über alle 23 —, deshalb
    steht es hier ohne Block. #}
 <!doctype html>
-<html lang="de" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
+<html lang="{{ lang | default('de') }}" data-format="{{ format_locale | default('de-DE') }}" data-currency='{{ currency_info | default({"code": "EUR", "symbol": "€", "spaced": false, "position": "after", "short": "Ct"}) | tojson }}' data-tz="{{ server_tz }}" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Zeitarchiv{% endblock %}</title>
+<title>{% block title %}{{ _("Zeitarchiv") }}{% endblock %}</title>
 <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+<script src="{{ asset('js/server-time.js') }}"></script>
+{% if lang | default('de') != 'de' %}<script>window.ZA_CATALOG = {{ js_catalog | tojson }};</script>{% endif %}
+<script src="{{ asset('js/i18n.js') }}"></script>
 <style>:root{--font-scale:{{ font_scale_value }};{% block root_vars %}{% endblock %}}</style>
 {% block page_css %}{% endblock %}
 </head>
@@ -46,7 +49,7 @@
 <div class="page-sticky-header">
 {% block topnav %}
 {% if demo_mode_active %}
-<div class="demo-banner">🧪 Demo-Modus aktiv — synthetische Vorführdaten, keine echten Werte</div>
+<div class="demo-banner">{{ _("🧪 Demo-Modus aktiv — synthetische Vorführdaten, keine echten Werte") }}</div>
 {% endif %}
 {% include "_topnav.html" %}
 {% endblock %}

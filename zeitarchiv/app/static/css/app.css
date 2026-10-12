@@ -650,13 +650,18 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
    Stellen. Den Hover-Wechsel bekommen nur die verlinkten Kacheln (a.stat) —
    die übrigen sind reine Anzeigen und sollen nicht so tun, als führten sie
    irgendwohin. */
-.stat{flex:1 1 160px;background:var(--tile-wash), var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0;box-shadow:var(--shadow);}
-a.stat{display:block;text-decoration:none;color:inherit;transition:background .16s ease,border-color .12s,transform .12s;}
+.stat{flex:1 1 160px;background:var(--tile-wash), var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0;box-shadow:var(--shadow);display:flex;flex-direction:column;}
+a.stat{display:flex;text-decoration:none;color:inherit;transition:background .16s ease,border-color .12s,transform .12s;}
 a.stat:hover{background:var(--tile-wash-hover), var(--surface);border-color:var(--accent-line);transform:translateY(-1px);}
 a.stat:hover .label{color:var(--accent-line);}
 .stat .label{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);font-weight:500;margin-bottom:6px;}
 .stat .value{font-family:var(--font-display);font-size:calc(19px * var(--font-scale, 1));font-weight:700;font-variant-numeric:tabular-nums;word-break:break-word;}
 .stat .sub-value{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;font-variant-numeric:tabular-nums;}
+/* Eine Kachel mit mehr Zeilen (Übersicht: „Status“) streckt die ganze Reihe; Zusatzzeile und Verlauf bleiben
+   dann bei den übrigen unten, statt mit nach oben zu rutschen. */
+.stat > .sub-value,.stat > .sparkline{margin-top:auto;}
+.stat > .sub-value{padding-top:3px;}
+.stat > .sparkline{box-sizing:content-box;padding-top:6px;}
 /* Auf dem Telefon stehen zwei Kacheln nebeneinander, jede mit 136px für den
    Wert. Bei 19px reicht das für elf Zeichen ("486.911.150"); ab einer
    Milliarde Datensätzen ("4.861.911.150") bricht der Wert um — und weil
@@ -991,6 +996,15 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
   margin:7px 0 0;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.45;
 }
 .dtile-sparkline-resolution-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;}
+/* Veraltet-Schwelle: dieselbe Optik wie die Auflösungs-Reihe, vier Stufen. */
+.dtile-stale-mode-row{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+.dtile-stale-mode-cell{
+  padding:5px 3px;border:1px solid var(--border);border-radius:6px;background:var(--surface-alt);
+  color:var(--ink);font-family:var(--font-display);font-size:calc(11px * var(--font-scale, 1));cursor:pointer;text-align:center;
+  white-space:nowrap;
+}
+.dtile-stale-mode-cell:hover{border-color:var(--accent-line);}
+.dtile-stale-mode-cell.is-selected{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
 /* Wie .dtile-choice-cell Display statt Mono: "Roh"/"5 Min"/"1 Std" sind
    Beschriftungen. Die Nachkommastellen-Reihe daneben behält Mono, weil sie
    überwiegend Ziffern zeigt (0/1/2/3) — dort ist der Text der Wert selbst. */
@@ -1071,6 +1085,12 @@ a.menu-row{text-decoration:none;}
   text-overflow:ellipsis;max-width:180px;font-size:calc(11px * var(--font-scale, 1));
 }
 .chart-legend-item .compare-row .values{color:var(--ink-faint);}
+/* Summe „bis zum gleichen Tag“ der Vergleichsperiode — als Zusatz neben der Gesamtsumme, damit sie
+   sich vom Rest der gedämpften Zeile abhebt. */
+.chart-legend-item .compare-row .compare-cut{
+  color:var(--accent-line);background:var(--accent-line-soft);border-radius:8px;padding:0 7px;white-space:nowrap;
+}
+.chart-legend-table td .legend-compare-value.compare-cut{color:var(--accent-line);}
 .chart-legend-item:hover{border-color:var(--accent-line);}
 .chart-legend-item.inactive{opacity:.4;}
 /* Für die per role="button"/tabindex="0" bedienbaren Chips in den Dashboard-
@@ -1097,7 +1117,13 @@ a.menu-row{text-decoration:none;}
    "Legenden-Stil") statt der Chip-Reihe — dieselben table.dt-Regeln oben,
    nur mit rechtsbündigen Zahlenspalten und Farbpunkt in der Namensspalte. */
 .chart-legend-table th:not(.legend-name-col),.chart-legend-table td:not(.legend-name-col){
-  text-align:right;font-variant-numeric:tabular-nums;
+  text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* Mobil: Zahl und Einheit nie trennen (oben); der Name bekommt eine feste
+   Breite und bricht dort um (zwei Zeilen statt vier), damit die Werte neben
+   ihm noch ins Bild passen. Die Tabelle scrollt seitlich. */
+@media (max-width:640px){
+  .chart-legend-table .legend-name-col{width:14rem;min-width:14rem;max-width:14rem;}
 }
 .chart-legend-table td.legend-name-col{font-weight:600;color:var(--ink);}
 .chart-legend-table .legend-name-cell{display:inline-flex;align-items:center;gap:8px;}
@@ -1106,6 +1132,7 @@ a.menu-row{text-decoration:none;}
    toggleLegendItem(); dashboard-tiles.js: dieselbe Aktion über
    toggleTileLegendItem()). */
 .chart-legend-table-row{cursor:pointer;}
+.chart-legend-table-row.static{cursor:default;}
 .chart-legend-table-row.inactive{opacity:.4;}
 .chart-legend-table-row[tabindex]:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 /* Vergleichsperiode (Vorjahr/Vorperiode) als gedämpfte Unterzeile je Zelle —
@@ -1776,6 +1803,38 @@ button[data-tooltip]{cursor:pointer;}
   background:var(--accent-line);border-radius:2px 2px 0 0;
 }
 
+/* Zur Löschung markierte, noch nicht endgültig entfernte Werte: Banner auf der
+   Verlaufsseite und getönte Zeile in der Entitätenliste. Warnton wie die
+   Meldung in der Glocke (--notice-warn), bewusst NICHT --danger: das gehört dem
+   Chart und dem Markierungs-Chip ("welche Punkte sind markiert"), hier geht es um
+   "es steht noch etwas aus". Die Tönung allein trägt die Aussage nicht — Punkt
+   und Text stehen in jedem Fall dabei. */
+.pending-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none;background:var(--notice-warn);}
+.entity-purge-banner{
+  display:flex;align-items:flex-start;gap:10px;margin:0 0 14px;padding:10px 14px;
+  background:var(--warning-soft);border:1px solid var(--notice-warn);border-radius:8px;
+  font-size:calc(13px * var(--font-scale, 1));color:var(--ink);
+}
+.entity-purge-banner .pending-dot{margin-top:6px;}
+.entity-purge-banner p{margin:0;line-height:1.5;}
+.entity-purge-banner strong{font-weight:600;}
+.entity-purge-banner a{color:var(--accent-line);white-space:nowrap;}
+.entity-purge-banner .purge-auto-note{display:block;color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));margin-top:2px;}
+table.dt tr.has-pending-purge td{background:color-mix(in srgb, var(--warning-soft) 55%, transparent);}
+table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
+.pending-purge-note{
+  display:flex;align-items:center;gap:6px;margin-top:3px;
+  font-size:calc(11.5px * var(--font-scale, 1));color:var(--notice-warn);
+}
+/* Kartenform (Smartphone): die Karte ist der <tr>, nicht die Zellen — getönt wird
+   deshalb die Karte als Ganzes, sonst stünden zwei getönte Streifen in einer
+   weißen Karte. */
+@media (max-width:640px){
+  table.dt.dt-cards tr.has-pending-purge{background:color-mix(in srgb, var(--warning-soft) 55%, var(--surface));}
+  table.dt.dt-cards tr.has-pending-purge td,
+  table.dt.dt-cards tbody tr.has-pending-purge:hover td{background:transparent;}
+}
+
 /* Aktionsleiste unter Tabellen */
 .actionbar{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);flex-wrap:wrap;}
 
@@ -2131,6 +2190,8 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
   transform:translateY(4px) scale(.98);transition:transform .12s ease;
 }
 .confirm-overlay.open{transform:translateY(0) scale(1);}
+/* Gegliederter Inhalt (opts.template): breiter, damit Tabellenzeilen nicht umbrechen. */
+.confirm-overlay:has(.confirm-rich:not([hidden])){width:min(540px, calc(100vw - 32px));}
 .confirm-overlay::backdrop{background:rgba(0,0,0,.4);}
 .confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);white-space:pre-line;}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}

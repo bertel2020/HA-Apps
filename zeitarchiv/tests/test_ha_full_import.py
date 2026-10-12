@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from app import import_routes
 from app.storage import ha_import, ha_statistics
 
-from _paths import TEMPLATES, page_text
+from _paths import page_text, template_text
 
 
 TZ = ZoneInfo("Europe/Berlin")
@@ -176,8 +176,7 @@ def test_full_availability_cache_is_separate_for_ranges_and_stats_option() -> No
 
 
 def test_full_import_ui_uses_existing_app_typography_and_controls() -> None:
-    templates = TEMPLATES
-    section = (templates / "_ha_import_section.html").read_text(encoding="utf-8")
+    section = template_text("_ha_import_section.html")
     page = page_text("import.html")
     ha_page = page.split('<div id="tab-ha"', 1)[1]
 

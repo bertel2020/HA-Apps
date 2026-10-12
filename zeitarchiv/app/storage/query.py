@@ -15,6 +15,8 @@ Monate/Jahre automatisch korrekt, ohne dass die Split-Logik etwas davon wissen m
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -120,7 +122,7 @@ def _hot_rows(path: Path, read_cache: QueryReadCache | None) -> list[tuple[float
 def _resolved_chart_type(aggregation_type: str, chart_type: str | None) -> str:
     if chart_type is not None:
         if chart_type not in ("line", "bar"):
-            raise ValueError(f"Unbekannter Diagrammtyp: {chart_type}")
+            raise ValueError(tr("Unbekannter Diagrammtyp: {chart_type}", chart_type=chart_type))
         return chart_type
     return "bar" if aggregation_type in ("counter", "switch") else "line"
 
@@ -238,7 +240,7 @@ def _window(
         natural_end = start.replace(year=decade_start_year + 10)
         return start, _cap(start, natural_end), natural_end
 
-    raise ValueError(f"Unbekannter Zeitraum: {range_key}")
+    raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
 
 
 def _read_hot_rows_filtered(
@@ -518,6 +520,97 @@ def _aggregate_rollup_rows(
     return result
 
 
+def _fine_rows_until(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    aggregation_type: str,
+    level: str,
+    start: datetime,
+    end: datetime,
+    tz: ZoneInfo,
+    now_local: datetime,
+    read_cache: QueryReadCache | None = None,
+) -> list[rollup.FineRow]:
+    """Feine Rollup-Zeilen (tag/stunde) für [start, end) — auch dann exakt, wenn
+    ``end`` MITTEN in einem Bucket liegt.
+
+    Ein Rollup kennt nur ganze Buckets: ein Fenster, das um 17:51 Uhr des 6.
+    Oktobers endet, würde mit ``bucket_start < end`` den GANZEN 6. Oktober
+    mitzählen. Das trifft jede Abfrage, deren Ende nicht auf einer Bucket-Grenze
+    liegt und in einem abgeschlossenen Monat (also im Rollup) liegt: den
+    Vorjahresvergleich ("2025 YTD bis 06.10.") und den "Gleichen Zeitpunkt"-
+    Vergleich einer Vorperiode. Der angeschnittene letzte Bucket wird deshalb
+    aus den Rohdaten bis ``end`` neu berechnet, alle davor kommen weiter aus dem
+    Rollup. Liegt ``end`` auf einer Grenze, bleibt es beim reinen Rollup-Lesen."""
+    key_fn = rollup.named_bucket_key(tz, level)
+    tail_start = key_fn(end.timestamp())
+    if tail_start >= end:
+        return _read_rollup_rows(
+            data_dir, entity_id, level, start.timestamp(), end.timestamp(), read_cache
+        )
+    rows = _read_rollup_rows(
+        data_dir, entity_id, level, start.timestamp(), tail_start.timestamp(), read_cache
+    )
+    raw_start = max(start, tail_start)
+    raw = list(
+        cleanup.iter_raw_rows(
+            data_dir,
+            index,
+            entity_id,
+            raw_start.timestamp(),
+            end.timestamp(),
+            tz,
+            now=now_local,
+            max_rows=MAX_RAW_QUERY_POINTS,
+            hot_rows_loader=read_cache.read_hot_rows if read_cache is not None else read_rows,
+        )
+    )
+    boundary = (
+        _boundary_value(data_dir, entity_id, raw_start.timestamp(), tz, read_cache)
+        if aggregation_type == "counter"
+        else None
+    )
+    tail, _ = rollup.compute_fine_rollup_with_key(
+        raw, aggregation_type, key_fn, boundary, end.timestamp(),
+        bucket_next_fn=rollup.named_bucket_next(tz, level),
+    )
+    return rows + tail
+
+
+def _month_rows_until(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    aggregation_type: str,
+    start: datetime,
+    end: datetime,
+    tz: ZoneInfo,
+    now_local: datetime,
+    read_cache: QueryReadCache | None = None,
+) -> list[rollup.FineRow]:
+    """Monats-Rollup-Zeilen für [start, end) — der angeschnittene letzte Monat
+    wird aus feineren Daten bis ``end`` zusammengesetzt statt als GANZER Monat zu
+    zählen (siehe _fine_rows_until). Er entsteht aus denselben Tages-/Stunden-
+    Zeilen und derselben Verdichtung wie die Monatszeile im Rollup selbst."""
+    tail_month = rollup.named_bucket_key(tz, "monat")(end.timestamp())
+    if tail_month >= end:
+        return _read_rollup_rows(
+            data_dir, entity_id, "monat", start.timestamp(), end.timestamp(), read_cache
+        )
+    rows = _read_rollup_rows(
+        data_dir, entity_id, "monat", start.timestamp(), tail_month.timestamp(), read_cache
+    )
+    if tail_month >= start:
+        fine = _fine_rows_until(
+            data_dir, index, entity_id, aggregation_type, FINE_LEVEL[aggregation_type],
+            tail_month, end, tz, now_local, read_cache,
+        )
+        if fine:
+            rows.append(rollup.aggregate_fine_to_month(fine, aggregation_type, tail_month.timestamp()))
+    return rows
+
+
 def _query_completed_plus_live_fine(
     data_dir: Path,
     index: Index,
@@ -545,9 +638,9 @@ def _query_completed_plus_live_fine(
 
     completed_end = min(window_end, current_month_start)
     source_level = FINE_LEVEL[aggregation_type]
-    completed = _read_rollup_rows(
-        data_dir, entity_id, source_level,
-        window_start.timestamp(), completed_end.timestamp()
+    completed = _fine_rows_until(
+        data_dir, index, entity_id, aggregation_type, source_level,
+        window_start, completed_end, tz, now_local, read_cache,
     )
     if level != source_level:
         completed = _aggregate_rollup_rows(completed, aggregation_type, level, tz)
@@ -704,9 +797,9 @@ def _query_year_level(
         else ("jahr" if range_key == "decade" and aggregation_type == "counter" else "monat")
     )
     if resolution == "monat":
-        completed = _read_rollup_rows(
-            data_dir, entity_id, "monat", window_start.timestamp(), completed_month_end.timestamp(),
-            read_cache,
+        completed = _month_rows_until(
+            data_dir, index, entity_id, aggregation_type, window_start, completed_month_end,
+            tz, now_local, read_cache,
         )
         if live_row is not None:
             completed.append(live_row)
@@ -731,9 +824,9 @@ def _query_year_level(
                 row = jahr_rows[0]
 
         if row is None:
-            monat_rows = _read_rollup_rows(
-                data_dir, entity_id, "monat", clip_start.timestamp(),
-                min(clip_end, completed_month_end).timestamp(), read_cache,
+            monat_rows = _month_rows_until(
+                data_dir, index, entity_id, aggregation_type, clip_start,
+                min(clip_end, completed_month_end), tz, now_local, read_cache,
             )
             year_rows = list(monat_rows)
             if live_row is not None and clip_start.timestamp() <= live_row.bucket_start < clip_end.timestamp():
@@ -780,9 +873,13 @@ def query_series(
     chart_type: str | None = None,
     read_cache: QueryReadCache | None = None,
     same_elapsed: bool = False,
+    cap_to: timedelta | None = None,
 ) -> dict:
+    """cap_to: deckelt eine bereits vergangene Periode (offset<0) auf diesen
+    Abstand vom Periodenanfang — nur für den fairen "Gleicher Zeitpunkt"-
+    Vergleichswert (siehe unten), nicht für die Anzeige der Periode selbst."""
     if range_key not in RANGE_KEYS:
-        raise ValueError(f"Unbekannter Zeitraum: {range_key}")
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
 
     entity = index.get_entity(entity_id)
     if entity is None:
@@ -808,7 +905,7 @@ def query_series(
     if same_elapsed and offset < 0 and not year_over_year:
         current_start, _current_end, _current_natural = _window(range_key, now_local, 0, continuous)
         elapsed = now_local - current_start
-    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous, elapsed=cap_to)
     if year_over_year:
         # Vorjahresvergleich verschiebt nur das Fenster um ein Jahr zurück, NICHT
         # now_local — der Rollup/Live-Split (Datei-Modulgrenze in diesem Modul,
@@ -865,7 +962,7 @@ def query_series(
                 },
             )
 
-    return {
+    result = {
         "entity_id": entity_id,
         "aggregation_type": aggregation_type,
         "chart_type": resolved_chart_type,
@@ -876,6 +973,54 @@ def query_series(
         "is_current": offset == 0,
         "elapsed_seconds": elapsed.total_seconds() if elapsed is not None else None,
     }
+    if elapsed is not None:
+        # Fairer Vergleichswert: dieselbe Periode, aber WIRKLICH nur bis zum
+        # selben Abstand vom Periodenanfang abgefragt. Früher wurden hier die
+        # fertigen Buckets nach bucket_start gekappt — ein angeschnittener
+        # Bucket (der 6. Oktober um 17:51 Uhr, der Oktober eines Jahresvergleichs)
+        # zählte dann komplett mit.
+        result["comparison_points"] = query_series(
+            data_dir, index, entity_id, range_key, tz, now, offset=offset, continuous=continuous,
+            chart_type=chart_type, read_cache=read_cache, cap_to=elapsed,
+        )["points"]
+    return result
+
+
+def query_compare_cut(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    range_key: str,
+    tz: ZoneInfo,
+    now: datetime,
+    *,
+    offset: int,
+    continuous: bool,
+    year_over_year: bool,
+    chart_type: str | None = None,
+    read_cache: QueryReadCache | None = None,
+) -> dict | None:
+    """Die Vergleichsperiode einer LAUFENDEN Periode, nur bis zum selben Abstand vom
+    Periodenanfang — für die Summe „bis zum gleichen Tag“ in der Chart-Legende.
+
+    Die Vergleichsreihe des Charts zeigt bewusst die ganze Vorperiode (bzw. beim Vorjahr
+    ein Fenster, dessen letzter Bucket meist angeschnitten ist), und deren Summe steht
+    neben der des laufenden, unvollständigen Zeitraums. Diese Abfrage liefert die faire
+    Gegenzahl: dieselbe Kappung wie der Vergleichswert der Tabelle (comparison_points),
+    der letzte Bucket also aus den Rohwerten bis zum Schnittpunkt.
+
+    None, wenn es nichts zu kappen gibt: der Zeitraum ist schon abgeschlossen (offset<0)
+    oder rollierend (continuous, immer volle Länge)."""
+    if offset != 0 or continuous:
+        return None
+    now_local = now.astimezone(tz)
+    current_start, _current_end, _current_natural = _window(range_key, now_local, 0, continuous)
+    result = query_series(
+        data_dir, index, entity_id, range_key, tz, now,
+        offset=0 if year_over_year else -1, continuous=continuous, year_over_year=year_over_year,
+        chart_type=chart_type, read_cache=read_cache, cap_to=now_local - current_start,
+    )
+    return {"points": result["points"], "window_end": result["window_end"]}
 
 
 def query_raw_series(
@@ -895,7 +1040,7 @@ def query_raw_series(
     immer als Linie — Balken pro Rohwert würden bei tausenden Punkten nur noch
     als flächige Masse erscheinen, nicht als lesbares Diagramm."""
     if range_key not in RANGE_KEYS:
-        raise ValueError(f"Unbekannter Zeitraum: {range_key}")
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
 
     entity = index.get_entity(entity_id)
     if entity is None:

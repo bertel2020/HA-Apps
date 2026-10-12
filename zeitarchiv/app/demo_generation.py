@@ -17,8 +17,10 @@ umgekehrt, ein Import in die andere Richtung wäre der falsche Weg gewesen.
 
 from __future__ import annotations
 
+import contextvars
 import math
 import random
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -27,8 +29,9 @@ from zoneinfo import ZoneInfo
 
 import pyarrow.parquet as pq
 
+from .i18n import LANGUAGES, SOURCE_LANGUAGE, translate
 from .storage import hotbuffer, reconcile
-from .storage.entity_removal import delete_all_values
+from .storage.entity_removal import delete_all_values, delete_entity
 from .storage.index import Index
 from .storage.paths import entity_dir, storage_area_dir
 from .storage.symcon_import import import_rows
@@ -120,6 +123,18 @@ DEMO_ENTITIES = [
     DemoEntity("sensor.demo_wallbox2_leistung", "Demo Wallbox 2 Leistung",
                "sensor", "measurement", "W"),
     DemoEntity("sensor.demo_wallbox2_energie", "Demo Wallbox 2 Energie",
+               "sensor", "total_increasing", "kWh"),
+    # Zwischenzähler-Kaskade (Energiedashboard → „Hängt hinter Zwischenzähler“):
+    # Der Werkstatt-Zähler misst die drei Geräte dahinter plus einen kleinen
+    # eigenen Rest (Standby, Steckdosen, gelegentliche Werkbank) — so zeigt
+    # das Dashboard auch den Eintrag „übrige Verbraucher“.
+    DemoEntity("sensor.demo_werkstatt_energie", "Demo Werkstatt Zwischenzähler",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_werkstatt_kompressor_energie", "Demo Werkstatt Kompressor Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_werkstatt_licht_energie", "Demo Werkstatt Licht Energie",
+               "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_werkstatt_ladestation_energie", "Demo Werkstatt Ladestation Energie",
                "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_pv_leistung", "Demo PV-Leistung",
                "sensor", "measurement", "W"),
@@ -484,6 +499,39 @@ def _boiler_power_at(dt: datetime, rng: random.Random) -> float:
     return 0.0
 
 
+def _werkstatt_kompressor_w(dt: datetime, rng: random.Random) -> float:
+    """Druckluftkompressor: Werktags nachmittags, am Wochenende vormittags,
+    jeweils im Takt (8 von 20 Minuten Lauf)."""
+    hour = dt.hour + dt.minute / 60
+    active = (dt.weekday() < 5 and 16.0 <= hour < 18.0) or (dt.weekday() >= 5 and 9.0 <= hour < 13.0)
+    if active and (dt.hour * 60 + dt.minute) % 20 < 8:
+        return 1100.0 + rng.uniform(-80, 80)
+    return 0.0
+
+
+def _werkstatt_licht_w(dt: datetime, rng: random.Random) -> float:
+    hour = dt.hour + dt.minute / 60
+    if 16.0 <= hour < 21.0 or (dt.weekday() >= 5 and 9.0 <= hour < 13.0):
+        return 58.0 + rng.uniform(-3, 3)
+    return 0.0
+
+
+def _werkstatt_ladestation_w(dt: datetime, rng: random.Random) -> float:
+    """Akku-Ladestation für Werkzeug, läuft nachts."""
+    if 0.0 <= dt.hour + dt.minute / 60 < 5.0:
+        return 85.0 + rng.uniform(-8, 8)
+    return 0.0
+
+
+def _werkstatt_rest_w(dt: datetime, rng: random.Random) -> float:
+    """Was der Zwischenzähler zusätzlich misst, ohne dass ein Gerät dahinter
+    erfasst ist: Standby und Steckdosen, am Wochenende gelegentlich Werkbank."""
+    value = 12.0 + rng.uniform(-2, 3)
+    if dt.weekday() >= 5 and 10.0 <= dt.hour + dt.minute / 60 < 12.0:
+        value += 350.0 + rng.uniform(-50, 50)
+    return value
+
+
 def _baseline_load_at(dt: datetime, rng: random.Random) -> float:
     hour = dt.hour + dt.minute / 60
     morning = 180 * math.exp(-((hour - 7.3) ** 2) / (2 * 1.1 ** 2))
@@ -655,6 +703,8 @@ def simulate_household(
         "kuehlschrank": [], "kuehlschrank_energie": [], "herd": [], "herd_energie": [],
         "homeoffice": [], "homeoffice_energie": [], "entertainment": [], "entertainment_energie": [],
         "boiler": [], "boiler_energie": [], "wallbox2": [], "wallbox2_energie": [],
+        "werkstatt_energie": [], "werkstatt_kompressor_energie": [],
+        "werkstatt_licht_energie": [], "werkstatt_ladestation_energie": [],
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
@@ -686,6 +736,15 @@ def simulate_household(
     entertainment_energie_total = counter_seed.get("entertainment_energie", rng.uniform(80, 400))
     boiler_energie_total = counter_seed.get("boiler_energie", rng.uniform(200, 700))
     wallbox2_energie_total = counter_seed.get("wallbox2_energie", rng.uniform(100, 1200))
+    werkstatt_kompressor_total = counter_seed.get("werkstatt_kompressor_energie", rng.uniform(20, 120))
+    werkstatt_licht_total = counter_seed.get("werkstatt_licht_energie", rng.uniform(20, 120))
+    werkstatt_ladestation_total = counter_seed.get("werkstatt_ladestation_energie", rng.uniform(20, 120))
+    # Der Zwischenzähler startet über der Summe seiner Geräte, damit sein
+    # Stand nie unter deren Stand liegt.
+    werkstatt_energie_total = counter_seed.get(
+        "werkstatt_energie",
+        werkstatt_kompressor_total + werkstatt_licht_total + werkstatt_ladestation_total + rng.uniform(5, 40),
+    )
     on_state = {
         "waschmaschine": appliance_seed.get("waschmaschine", 0.0),
         "spuelmaschine": appliance_seed.get("spuelmaschine", 0.0),
@@ -772,10 +831,17 @@ def simulate_household(
         entertainment_w = _appliance_power_at(schedules["entertainment"], ENTERTAINMENT_PROFILE, dt, rng)
         boiler_w = _boiler_power_at(dt, rng)
         wallbox2_w = _appliance_power_at(schedules["wallbox2"], WALLBOX2_PROFILE, dt, rng)
+        werkstatt_kompressor_w = _werkstatt_kompressor_w(dt, rng)
+        werkstatt_licht_w = _werkstatt_licht_w(dt, rng)
+        werkstatt_ladestation_w = _werkstatt_ladestation_w(dt, rng)
+        werkstatt_w = (
+            werkstatt_kompressor_w + werkstatt_licht_w + werkstatt_ladestation_w + _werkstatt_rest_w(dt, rng)
+        )
         baseline_w = _baseline_load_at(dt, rng)
         load_w = (
             baseline_w + heizung_w + waschmaschine_w + spuelmaschine_w + trockner_w + wallbox_w
             + kuehlschrank_w + herd_w + homeoffice_w + entertainment_w + boiler_w + wallbox2_w
+            + werkstatt_w
         )
         pv_w = gen_pv_power(dt, weather, rng)
 
@@ -956,6 +1022,10 @@ def simulate_household(
         entertainment_energie_total += (entertainment_w / 1000) * step_hours
         boiler_energie_total += (boiler_w / 1000) * step_hours
         wallbox2_energie_total += (wallbox2_w / 1000) * step_hours
+        werkstatt_kompressor_total += (werkstatt_kompressor_w / 1000) * step_hours
+        werkstatt_licht_total += (werkstatt_licht_w / 1000) * step_hours
+        werkstatt_ladestation_total += (werkstatt_ladestation_w / 1000) * step_hours
+        werkstatt_energie_total += (werkstatt_w / 1000) * step_hours
 
         if index % COUNTER_EVERY_N == 0:
             series["pv_ertrag"].append((ts, round(pv_ertrag_total, 3)))
@@ -971,6 +1041,10 @@ def simulate_household(
             series["entertainment_energie"].append((ts, round(entertainment_energie_total, 3)))
             series["boiler_energie"].append((ts, round(boiler_energie_total, 3)))
             series["wallbox2_energie"].append((ts, round(wallbox2_energie_total, 3)))
+            series["werkstatt_energie"].append((ts, round(werkstatt_energie_total, 3)))
+            series["werkstatt_kompressor_energie"].append((ts, round(werkstatt_kompressor_total, 3)))
+            series["werkstatt_licht_energie"].append((ts, round(werkstatt_licht_total, 3)))
+            series["werkstatt_ladestation_energie"].append((ts, round(werkstatt_ladestation_total, 3)))
             series["balkon_ertrag_gesamt"].append((ts, round(balkon_ertrag_gesamt_total, 3)))
             series["balkon_ertrag_heute"].append((ts, round(balkon_ertrag_heute_total, 3)))
             series["balkon_geladen_gesamt"].append((ts, round(balkon_geladen_gesamt_total, 3)))
@@ -1217,10 +1291,28 @@ def inject_data_quality_issues(
     return result
 
 
-def write_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity, rows: list[Row]) -> None:
+# Sprache der laufenden Erzeugung für die Lesehelfer unten (sie bekommen nur die deutschen IDs).
+_run_language: contextvars.ContextVar[str] = contextvars.ContextVar("demo_language", default=SOURCE_LANGUAGE)
+
+
+def localized_id(entity_id: str, language: str = SOURCE_LANGUAGE) -> str:
+    """entity_id in der Sprache des Demo-Datensatzes: Deutsch wie im Code, sonst der Slug des übersetzten
+    Namens (``sensor.demo_living_room_temperature``) — die Domain bleibt."""
+    if language == SOURCE_LANGUAGE:
+        return entity_id
+    domain = entity_id.split(".", 1)[0]
+    name = next(e.friendly_name for e in DEMO_ENTITIES if e.entity_id == entity_id)
+    slug = re.sub(r"[^a-z0-9]+", "_", translate(name, language).lower()).strip("_")
+    return f"{domain}.{slug}"
+
+
+def write_entity(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity, rows: list[Row], language: str = SOURCE_LANGUAGE,
+) -> None:
+    entity_id = localized_id(entity.entity_id, language)
     index.get_or_create_entity(
-        entity.entity_id, entity.domain, entity.state_class, entity.unit,
-        friendly_name=entity.friendly_name,
+        entity_id, entity.domain, entity.state_class, entity.unit,
+        friendly_name=translate(entity.friendly_name, language),
     )
     current_month_start = month_start(datetime.now(tz)).timestamp()
     past_rows = [r for r in rows if r[0] < current_month_start]
@@ -1233,9 +1325,9 @@ def write_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity: DemoEntity,
     # erst NACH dem ersten Aufruf — deshalb erst die abgeschlossenen Monate,
     # dann getrennt der laufende.
     if past_rows:
-        import_rows(data_dir, index, past_rows, entity.entity_id, tz, source_label="demo")
+        import_rows(data_dir, index, past_rows, entity_id, tz, source_label="demo")
     if current_rows:
-        import_rows(data_dir, index, current_rows, entity.entity_id, tz, source_label="demo")
+        import_rows(data_dir, index, current_rows, entity_id, tz, source_label="demo")
 
 
 # Entity-ID -> Schlüssel in simulate_household()s counter_seed-Dict (siehe
@@ -1252,6 +1344,10 @@ COUNTER_SEED_ENTITY_KEYS = {
     "sensor.demo_entertainment_energie": "entertainment_energie",
     "sensor.demo_boiler_energie": "boiler_energie",
     "sensor.demo_wallbox2_energie": "wallbox2_energie",
+    "sensor.demo_werkstatt_energie": "werkstatt_energie",
+    "sensor.demo_werkstatt_kompressor_energie": "werkstatt_kompressor_energie",
+    "sensor.demo_werkstatt_licht_energie": "werkstatt_licht_energie",
+    "sensor.demo_werkstatt_ladestation_energie": "werkstatt_ladestation_energie",
     "sensor.demo_spuelmaschine_energie": "spuelmaschine_energie",
     "sensor.demo_trockner_energie": "trockner_energie",
     "sensor.demo_wallbox_energie": "wallbox_energie",
@@ -1277,6 +1373,7 @@ def _last_actual_point(data_dir: Path, entity_id: str) -> Row | None:
     _dashboard_tiles_context() (main.py)/dashboard-tiles.js. Dieselbe Datei-
     Fundlogik wie reconcile._entity_storage_stats(), hier zusätzlich mit dem
     Wert statt nur dem Zeitstempel."""
+    entity_id = localized_id(entity_id, _run_language.get())
     best: Row | None = None
     hot_dir = storage_area_dir(data_dir, "hot")
     for path in sorted(hot_dir.glob(f"{entity_id}-*.csv")) if hot_dir.exists() else []:
@@ -1418,6 +1515,7 @@ def run_generation(
     clean: bool = False,
     on_entity: Callable[[int, str, int], None] | None = None,
     on_status: Callable[[str], None] | None = None,
+    language: str = SOURCE_LANGUAGE,
 ) -> GenerationResult:
     """Erzeugt (volle Historie), ergänzt (append=True) oder bereinigt+erzeugt
     neu (clean=True) die komplette Demo-Historie — der gemeinsame Kern von
@@ -1435,13 +1533,18 @@ def run_generation(
     bisher VOR der (ggf. langen) Haupterzeugung eine Statuszeile ausgab
     (Bereinigung abgeschlossen, Ergänzungszeitraum) — als Rückgabewert allein
     kämen diese Meldungen bei main() erst NACH allen Entitäten-Zeilen an,
-    stünden in der Konsole also am falschen Ende."""
+    stünden in der Konsole also am falschen Ende.
+
+    language bestimmt die Sprache der friendly_names und der entity_ids (Katalog
+    ``app/i18n/en.json``; die ID ist der Slug des übersetzten Namens). Ein Lauf in der anderen
+    Sprache ersetzt den vorhandenen Datensatz (Entitäten der anderen Sprache werden entfernt,
+    Dashboards darauf zeigen dann ins Leere)."""
     now = datetime.now(tz)
     cleaned_count = 0
 
     if clean:
         existing = {e["entity_id"] for e in index.list_entities()}
-        wanted = {e.entity_id for e in DEMO_ENTITIES}
+        wanted = {localized_id(e.entity_id, language) for e in DEMO_ENTITIES}
         # delete_all_values() statt delete_entity(): entfernt nur die Werte,
         # behält die Entität (Konfiguration, first_ts=NULL für den
         # anschließenden Neuaufbau) durchgehend im Index — Dashboards/Charts/
@@ -1453,6 +1556,7 @@ def run_generation(
         if on_status is not None:
             on_status(f"{cleaned_count} vorhandene Demo-Entität(en) bereinigt.")
 
+    _run_language.set(language)
     counter_seed: dict[str, float] = {}
     appliance_seed: dict[str, float] = {}
     rain_seed = 0.0
@@ -1468,7 +1572,7 @@ def run_generation(
 
     fell_back_to_full_history = False
     if append:
-        anchor = index.get_entity(APPEND_ANCHOR_ENTITY_ID)
+        anchor = index.get_entity(localized_id(APPEND_ANCHOR_ENTITY_ID, language))
         if anchor is None or anchor["last_ts"] is None:
             fell_back_to_full_history = True
             start = now - timedelta(days=months * 30)
@@ -1521,7 +1625,7 @@ def run_generation(
     # wiederholt gegen ein bereits befülltes Verzeichnis (dafür gibt es
     # --append bzw. --clean), ein Reset ist dort also nicht nötig.
     if append:
-        for entity_id in MIGRATION_TEST_ENTITY_IDS:
+        for entity_id in (localized_id(i, language) for i in MIGRATION_TEST_ENTITY_IDS):
             if index.get_entity(entity_id) is not None:
                 delete_all_values(data_dir, index, entity_id)
     migration_start = now - timedelta(days=MIGRATION_BACKFILL_DAYS) if append else start
@@ -1569,6 +1673,10 @@ def run_generation(
         "sensor.demo_boiler_energie": household["boiler_energie"],
         "sensor.demo_wallbox2_leistung": household["wallbox2"],
         "sensor.demo_wallbox2_energie": household["wallbox2_energie"],
+        "sensor.demo_werkstatt_energie": household["werkstatt_energie"],
+        "sensor.demo_werkstatt_kompressor_energie": household["werkstatt_kompressor_energie"],
+        "sensor.demo_werkstatt_licht_energie": household["werkstatt_licht_energie"],
+        "sensor.demo_werkstatt_ladestation_energie": household["werkstatt_ladestation_energie"],
         "sensor.demo_pv_leistung": household["pv_power"],
         "sensor.demo_pv_ertrag": household["pv_ertrag"],
         "sensor.demo_pv_prognose_rest_heute": household["pv_prognose_rest_heute"],
@@ -1616,18 +1724,28 @@ def run_generation(
         "sensor.demo_migration2_stromverbrauch": gen_migration2_new_counter(migration_start, now, rng),
     }
 
+    if not append or fell_back_to_full_history:
+        # Ein Sprachwechsel soll den Datensatz ersetzen, nicht verdoppeln: IDs der anderen Sprache entfernen.
+        for other in LANGUAGES:
+            if other == language:
+                continue
+            for entity in DEMO_ENTITIES:
+                other_id = localized_id(entity.entity_id, other)
+                if index.get_entity(other_id) is not None:
+                    delete_entity(data_dir, index, other_id)
+
     month_boundary_ts = month_start(now).timestamp()
     total_rows = 0
     for index_in_list, entity in enumerate(DEMO_ENTITIES, start=1):
         rows = inject_data_quality_issues(entity, rows_by_key[entity.entity_id], rng, month_boundary_ts)
-        write_entity(data_dir, index, tz, entity, rows)
+        write_entity(data_dir, index, tz, entity, rows, language)
         total_rows += len(rows)
         if on_entity is not None:
-            on_entity(index_in_list, entity.entity_id, len(rows))
+            on_entity(index_in_list, localized_id(entity.entity_id, language), len(rows))
 
     report = reconcile.audit_storage_metadata(
         data_dir, index, tz,
-        entity_ids=[e.entity_id for e in DEMO_ENTITIES],
+        entity_ids=[localized_id(e.entity_id, language) for e in DEMO_ENTITIES],
         repair=True,
     )
 

@@ -1,5 +1,7 @@
 # Zeitarchiv
 
+*[English version](DOCS.en.md)*
+
 Zeitarchiv archiviert ausgewählte Home-Assistant-Zustände langfristig und
 platzsparend als Parquet-Dateien. Die separat zu installierende
 Zeitarchiv-Integration sendet die Zustandsänderungen an die App; Ingress
@@ -24,6 +26,9 @@ Detail, Einstellungen-Referenz, typische Aufgaben.
 4. Die Zeitarchiv-Integration installieren (über HACS oder manuell von
    [github.com/bertel2020/HA-Zeitarchiv](https://github.com/bertel2020/HA-Zeitarchiv))
    und mit Host `localhost`, Port `8127` und diesem Token einrichten.
+   Meldet die Einrichtung „Verbindung fehlgeschlagen“, obwohl die App läuft,
+   stattdessen Host `127.0.0.1` eintragen: Auf manchen Systemen löst `localhost`
+   zuerst zu IPv6 (`::1`) auf, und darüber ist die App nicht erreichbar.
 5. Auf der Integrationskachel unter **Konfigurieren → Archivfilter
    bearbeiten** die zu archivierenden Domains, Entitäten, Bereiche oder
    Geräte auswählen. Ohne Filter kommen keine Daten an — ohne Fehlermeldung.
@@ -50,7 +55,10 @@ dauerhaft gespeichert.
 Die App-Option `demo_mode` schaltet die App auf eine eigene, komplett von
 den echten Daten getrennte Instanz mit synthetischen Vorführ-/Testdaten um
 — siehe [Benutzerhandbuch → Demo-Modus](docs/user-guide.md#demo-modus).
-Beide Optionen brauchen nach einer Änderung einen Add-on-Neustart.
+Die App-Option `webdav_password` ist das Passwort für ein WebDAV-Ziel der
+Backups (Karte **Externes Ziel** unter System → Backup / Restore); sie steht
+bewusst nicht in der App-Datenbank, damit sie nicht in den Backups landet.
+Alle Optionen brauchen nach einer Änderung einen Add-on-Neustart.
 
 Das optionale Energiedashboard (Energiefluss als Sankey-Diagramm, dazu
 Autarkie-, Kosten- und CO₂-Auswertung) lässt sich über eine Kachel auf der

@@ -1,14 +1,22 @@
 # Home Assistant Apps by bertel2020
 
+*[English version](README.en.md)*
+
 Dieses Repository stellt verschiedene Apps für Home Assistant bereit. Jede App
 liegt in einem eigenen Ordner und kann unabhängig installiert und aktualisiert
 werden.
+
+<p align="center">
+  <a href="https://buymeacoffee.com/bertel2020"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://ko-fi.com/bertel2020"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
+</p>
 
 ## Verfügbare Apps
 
 | App | Version | Beschreibung | Dokumentation |
 | --- | --- | --- | --- |
-| Zeitarchiv | 1.0.0 | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Energie-Dashboard, Charts, Importen sowie sicherer Logging- und Ingest-Diagnose. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
+| Zeitarchiv | 1.5.0 | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Energie-Dashboard, Charts, Importen sowie sicherer Logging- und Ingest-Diagnose. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
 
 Weitere Apps können später als zusätzlicher Ordner im Repository-Stamm ergänzt
 und in dieser Tabelle eingetragen werden.
@@ -51,14 +59,6 @@ HA-Apps/
     ├── Dockerfile
     └── ...
 ```
-
-## Unterstützen
-
-<p align="center">
-  <a href="https://buymeacoffee.com/bertel2020"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
-  <a href="https://ko-fi.com/bertel2020"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
-  <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
-</p>
 
 ## Fehler melden
 

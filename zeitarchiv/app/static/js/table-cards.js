@@ -146,7 +146,7 @@
     button.type = 'button';
     button.className = 'dt-card-toggle';
     button.setAttribute('aria-expanded', 'false');
-    button.setAttribute('aria-label', 'Weitere Werte anzeigen');
+    button.setAttribute('aria-label', t('Weitere Werte anzeigen'));
     button.textContent = '▾';
     button.addEventListener('click', event => {
       // Die Überschrift ist auf manchen Seiten selbst ein Link (Entitätenliste)
@@ -155,7 +155,7 @@
       event.stopPropagation();
       const offen = row.classList.toggle('is-open');
       button.setAttribute('aria-expanded', String(offen));
-      button.setAttribute('aria-label', offen ? 'Weitere Werte verbergen' : 'Weitere Werte anzeigen');
+      button.setAttribute('aria-label', offen ? t('Weitere Werte verbergen') : t('Weitere Werte anzeigen'));
     });
     return button;
   }
@@ -187,7 +187,7 @@
   function setMenuLabel(button, head) {
     const cell = activeCell(head);
     const name = cell ? labelOf(cell) : '';
-    button.textContent = name ? `Sortieren: ${name} ${directionOf(cell)}`.trim() : 'Sortieren ▾';
+    button.textContent = name ? `${t('Sortieren:')} ${name} ${directionOf(cell)}`.trim() : t('Sortieren ▾');
     button.classList.toggle('dt-cards-sort-active', Boolean(name));
   }
 

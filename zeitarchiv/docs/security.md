@@ -1,5 +1,7 @@
 # Sicherheit
 
+*[English version](en/security.md)*
+
 ## Netzwerktrennung (nginx-Gateway)
 
 Siehe [architecture.md](architecture.md) für das Diagramm. Kernpunkt: die

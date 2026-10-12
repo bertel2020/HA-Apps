@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader
 
-from _paths import ADDON, TEMPLATES, page_text
+from _paths import ADDON, TEMPLATES, page_text, template_text
 
 
 
@@ -45,8 +45,8 @@ def test_logs_page_embeds_logging_settings_directly() -> None:
 def test_logging_settings_are_not_duplicated_in_settings_nav() -> None:
     # Protokollierung ist seit der Einbettung in logs.html keine eigene
     # settings.html-Sektion mehr — dort würde sie sonst doppelt gepflegt.
-    nav = (TEMPLATES / "_settings_nav.html").read_text(encoding="utf-8")
-    settings = (TEMPLATES / "settings.html").read_text(encoding="utf-8")
+    nav = template_text("_settings_nav.html")
+    settings = template_text("settings.html")
     assert "protokollierung" not in nav
     assert '_settings_logging_form.html' not in settings
 

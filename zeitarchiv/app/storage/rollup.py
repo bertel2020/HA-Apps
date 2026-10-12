@@ -16,6 +16,8 @@ Daraus folgen die persistierten Rollup-Stufen:
 
 from __future__ import annotations
 
+from ..i18n import tr
+
 import calendar
 import os
 import shutil
@@ -55,21 +57,22 @@ def _month_str(year: int, month: int) -> str:
     return f"{year:04d}-{month:02d}"
 
 
-def _prev_month(year: int, month: int) -> tuple[int, int]:
-    return (year - 1, 12) if month == 1 else (year, month - 1)
-
-
 def last_value_before_month(data_dir: Path, entity_id: str, year: int, month: int) -> float | None:
-    """Letzter Rohwert der unmittelbar vorherigen Archiv-Monatsdatei — Referenzwert
-    für die Zähler-Delta-Berechnung am Monatsanfang (Konzept Abschnitt 05)."""
-    prev_year, prev_month = _prev_month(year, month)
-    path = entity_dir(data_dir, "archive", entity_id) / f"{_month_str(prev_year, prev_month)}.parquet"
-    if not path.exists():
+    """Last raw value of the most recent archive month file before ``year-month``,
+    the reference value for the counter delta at the start of the month (concept
+    section 05). Searches backwards past months without any file, so the first
+    increase after a quiet month is not lost (same rule as query._boundary_value)."""
+    archive_dir = entity_dir(data_dir, "archive", entity_id)
+    if not archive_dir.exists():
         return None
-    table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
-    if table.num_rows == 0:
-        return None
-    return table.column("value")[-1].as_py()
+    target = _month_str(year, month)
+    for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
+        if path.stem >= target:
+            continue
+        table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
+        if table.num_rows:
+            return table.column("value")[-1].as_py()
+    return None
 
 
 def _bucket_key(ts: float, tz: ZoneInfo, level: str) -> datetime:
@@ -85,7 +88,7 @@ def _bucket_key(ts: float, tz: ZoneInfo, level: str) -> datetime:
         return local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if level == "jahr":
         return local.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    raise ValueError(f"Unbekanntes Bucket-Level: {level}")
+    raise ValueError(tr("Unbekanntes Bucket-Level: {level}", level=level))
 
 
 def _named_bucket_next(level: str):
@@ -102,7 +105,7 @@ def _named_bucket_next(level: str):
         return _next
     if level == "jahr":
         return lambda start: start.replace(year=start.year + 1)
-    raise ValueError(f"Unbekanntes Bucket-Level: {level}")
+    raise ValueError(tr("Unbekanntes Bucket-Level: {level}", level=level))
 
 
 def named_bucket_key(tz: ZoneInfo, level: str):
@@ -213,7 +216,7 @@ def compute_fine_rollup_with_key(
 
     if aggregation_type == "switch":
         if bucket_next_fn is None:
-            raise ValueError("bucket_next_fn wird für Schalter-Entitäten benötigt")
+            raise ValueError(tr("bucket_next_fn wird für Schalter-Entitäten benötigt"))
         on_seconds: dict[datetime, float] = {}
         for i, (ts, value) in enumerate(rows):
             interval_end = rows[i + 1][0] if i + 1 < len(rows) else window_end_ts
@@ -238,7 +241,7 @@ def compute_fine_rollup_with_key(
         ]
         return fine, None
 
-    raise ValueError(f"Unbekannter Aggregationstyp: {aggregation_type}")
+    raise ValueError(tr("Unbekannter Aggregationstyp: {aggregation_type}", aggregation_type=aggregation_type))
 
 
 def _fine_schema(aggregation_type: str) -> pa.Schema:
@@ -329,6 +332,11 @@ def _aggregate_fine_to_month(rows: list[FineRow], aggregation_type: str, month_s
             max_value=max(all_max) if all_max else None,
         )
     return FineRow(bucket_start=month_start_ts, on_seconds=sum(r.on_seconds or 0.0 for r in rows))
+
+
+aggregate_fine_to_month = _aggregate_fine_to_month
+"""Öffentlicher Name für query.py: ein angeschnittener Monat wird dort aus
+feineren Zeilen genauso verdichtet wie die Monatszeile beim Archivieren."""
 
 
 def append_completed_month(

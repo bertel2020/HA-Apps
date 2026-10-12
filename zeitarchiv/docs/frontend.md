@@ -1,5 +1,7 @@
 # Frontend-Architektur
 
+*[English version](en/frontend.md)*
+
 Kein Build-Schritt, kein Bundler, kein npm. `static/vendor/` enthält
 unveränderte Kopien von Alpine.js, htmx und ECharts; alle App-eigenen Skripte
 liegen unkompiliert unter `static/js/`.
@@ -229,6 +231,12 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   Schriftgröße und wird deshalb per JS gemessen und als Custom Property
   `--tbl-group-header-h` gesetzt (`syncLetterPositions()` im Editor,
   `renderTableTile()` in `dashboard-tiles.js`).
+- **Beschriftungsspalte der Kachel bricht nicht im Wort:** Wertezellen sind
+  `nowrap` (Mindestbreite = Inhalt). Hätte die Beschriftung `word-break:
+  break-word` (Mindestbreite ein Zeichen), drückte das Auto-Layout bei zu
+  schmaler Kachel allein diese Spalte zu einem Buchstabenstreifen zusammen.
+  `th:first-child, td:first-child` setzen deshalb `word-break:normal`; die
+  Tabelle scrollt stattdessen waagerecht (`.dtile-table-preview`).
 - **Gleich breite Werte-Spalten (`style.equal_value_cols`):** ein reiner
   `width:1%`-CSS-Trick verteilt bei `table-layout:auto` den Platz NICHT
   zuverlässig gleichmäßig, sobald sich Zahlenlängen zwischen Spalten stark
@@ -238,6 +246,81 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   `<col>`-Breite, alle übrigen `<col>`-Elemente ohne eigene Breite teilen
   sich den Rest laut Spezifikation zu gleichen Teilen — motorunabhängig,
   anders als Breiten über Zellen der "ersten Zeile" bei fixed layout.
+
+## Mehrsprachigkeit (Deutsch ↔ Englisch)
+
+Deutsch ist der Quelltext, jede weitere Sprache ein Katalog (`app/i18n/en.json`, Abschnitte `app` und `js`).
+**Der deutsche Text selbst ist der Schlüssel** (wie bei gettext): was im Katalog fehlt, erscheint unverändert
+deutsch, die App bleibt in jedem Zwischenstand benutzbar. Die Sprache steht in der Einstellung `language`
+(`auto`/`de`/`en`, Standard `de`; Einstellungen → Darstellung); `auto` folgt `Accept-Language`.
+
+| Wo | Aufruf | Anmerkung |
+|---|---|---|
+| Template | `{{ _("Text {n}", n=wert) }}` | Schlüssel ist HTML-Quelltext (`&hellip;`, `<strong>`), Ergebnis ist `Markup`; eingesetzte Werte werden maskiert. |
+| Skript / Alpine-Ausdruck | `t('Text {n}', {n: wert})` | `static/js/i18n.js`; der JS-Katalog wird nur für Nicht-Deutsch inline als `window.ZA_CATALOG` ausgeliefert. |
+| Python, zur Anfragezeit | `tr("Text {n}", n=wert)` | liest die Sprache der laufenden Anfrage (`i18n.current_language`, gesetzt von einer app-weiten Abhängigkeit vor jeder Route); ohne Anfrage die Hintergrundsprache (siehe unten). |
+| Python, Konstante | `N_("Text")` | liefert ein `Lazy`: ein `str` mit dem deutschen Wortlaut, das erst beim Anzeigen (`{{ label }}`) übersetzt wird. Für Beschriftungslisten, die beim Import entstehen. |
+
+Regeln, die sich bewährt haben: ganze Sätze mit Platzhaltern statt zusammengeklebter Teile; Pluralformen als zwei
+vollständige Schlüssel (`… Zeile` / `… Zeilen`) statt `Zeile{{ 'n' if … }}`; Logzeilen bleiben deutsch.
+`tests/test_i18n.py` prüft, dass jeder markierte Text einen Katalogeintrag hat, dass kein Eintrag verwaist ist und
+dass die Platzhalter der Übersetzung zu denen des deutschen Textes passen. Quelltext-Tests, die Templates
+lesen, gehen über `template_text()`/`german()` (`tests/_paths.py`), das die `_()`-Aufrufe wieder in deutschen
+Klartext zurückbaut.
+
+Noch nicht übersetzt: Logzeilen und die ECharts-Eigenbeschriftungen. Anleitung und READMEs gibt es auf Englisch
+unter `docs/en/`.
+
+### Hintergrundaufgaben und gespeicherte Texte
+
+**Ohne Anfrage** (Scheduler für Backup, Retention, automatische Bereinigung) ist `current_language` nicht gesetzt;
+`tr()` und `_()` fragen dann `i18n.active_language()`. Die Hintergrundsprache ist die feste Spracheinstellung,
+bei „Automatisch“ die Sprache, die ein Browser zuletzt angefragt hat (Einstellung `language_last_seen`, wird nur
+bei einer Änderung und nur bei einem passenden `Accept-Language` geschrieben — ein Skript ohne Header überschreibt
+sie nicht), ohne bisherige Anfrage Deutsch. `i18n.set_background_language()` registriert das beim Start.
+
+**Gespeicherte Freitexte** (Fehler in Aktivität und Job-Tabellen, `errors` der Import-Reports, Titel/Detail/Meta
+einer Stummschaltung) liegen als fertiger Text vor, in der Sprache, die beim Schreiben galt. Das gespeicherte Format
+bleibt unverändert; beim Anzeigen bringt `i18n.retranslate()` (Jinja-Filter `retranslate`) sie in die Sprache der
+Anfrage: Ein Text, der einem Katalogeintrag entspricht — deutsch oder übersetzt, auch mit Platzhalterwerten —,
+wird über den deutschen Schlüssel neu gebaut. Das gilt auch für ältere Einträge. Rohe Ausnahmetexte (`{exc}`) und
+eigene Namen passen zu keinem Eintrag und bleiben, wie sie sind. Bei mehreren passenden Mustern gewinnt das mit
+dem meisten festen Wortlaut; reine Platzhaltermuster (`{a}: {b}`) zählen nicht. Neue Anzeigestelle für
+gespeicherten Text: Filter anwenden.
+
+### Zahlen-, Datums- und Währungsformat
+
+Format und Währung hängen **nicht** an der Sprache — ein deutscher Nutzer mit englischer Oberfläche zahlt trotzdem in
+Euro, und `en-GB` und `en-US` schreiben Datum und Uhr verschieden. Zwei eigene Einstellungen (Einstellungen →
+Darstellung), beide mit Wert `auto`:
+
+| Einstellung | Werte | `auto` |
+|---|---|---|
+| `regional_format` (`app/formats.py`) | `de-DE`, `en-GB`, `en-US` | Region aus `Accept-Language` (`en-GB`/`en-AU` → britisch, `en-US`/`en-CA` → amerikanisch, `de-*` → deutsch); ohne Treffer nach der Oberflächensprache (`en` → `en-GB`) |
+| `currency` (`app/currency.py`) | `EUR`, `GBP`, `USD`, `CHF` | `currency` aus `http://supervisor/core/api/config`, 3 s Timeout, Treffer 1 h und Fehlschlag 5 min gecacht; ohne Supervisor, ohne Antwort oder bei einer anderen Währung `EUR` |
+
+Der Server löst beides **einmal pro Anfrage** auf und gibt es an beide Seiten weiter, damit Kachel und Diagramm
+nebeneinander nie verschieden schreiben:
+
+- **Python:** ContextVars `formats.current_format` und `currency.current_currency`, gesetzt von derselben app-weiten
+  Abhängigkeit wie die Sprache (`i18n.dependencies`). `format_int`/`format_value`/`format_size` (`formatting.py`),
+  `formats.format_date`/`format_datetime`/`format_clock`/`format_day_month` und der Jinja-Filter `format_money`
+  lesen sie. `strftime("%d.%m.%Y")` und ein festes „ €" gehören nicht in Anzeigecode.
+- **Browser:** `<html data-format="en-GB" data-currency='{…}'>` (JSON mit Symbol, Stellung, Untereinheit) →
+  `window.ZA_FORMAT` und `window.ZA_CURRENCY` (`static/js/i18n.js`). Alle `Intl`-/`toLocale…`-Aufrufe und
+  `NumberFormat` nehmen `ZA_FORMAT`; Beträge schreibt `fmtCurrency()` aus `ZA_CURRENCY`. Bewusst kein
+  `Intl`-Währungsformat: `en-GB` schriebe USD als „US$", Server und Browser wichen ab.
+- **Schreibweise:** deutsch Symbol hinter dem Betrag (`2,52 €`), englisch davor (`€2.52`, `CHF 2.52`); `en-US` mit
+  12-Stunden-Uhr, sonst 24 Stunden. Negative Beträge: Minus vor dem Ganzen (`-£1,234.50`).
+- **Unberührt:** Maschinenformate (ISO-Daten, CSV-Export, Dateinamen, `strptime`-Muster im CSV-Import).
+- **Währung rechnet nichts um:** Preise liegen ohne Währung als „Einheit je kWh" vor; die Einstellung ändert nur
+  Symbol, Stellung und die Untereinheit in Eingabefeld und Hinweisen (Ct/p/¢/Rp, im Text Cent/Pence/Rappen).
+
+Beide Einstellungen haben eine eigene Route (`POST /settings/regional-format`, `POST /settings/currency`, Antwort
+`204` mit `HX-Refresh`, ungültiger Wert `400`), weil sich beim Wechsel die ganze Seite ändert. Neues Format oder neue
+Währung: Eintrag in `FORMATS` bzw. `CURRENCIES` samt Label in `FORMAT_CHOICES`/`CURRENCY_CHOICES` und im Katalog.
+`tests/test_formats.py` und `tests/test_currency.py` decken Auflösung, Schreibweise und Seiten ab; ein Test fängt
+feste `'de-DE'` in Skripten und ein festes „€" in Skripten und Bericht ab.
 
 ## Theming
 
@@ -816,10 +899,21 @@ die Liste im Panel sagt ohnehin, was.
   Chart- und Tabellenansichten. Sie nutzt die bestehenden Chip-, Menü- und
   Popover-Bausteine; bei mehreren Zuordnungen steht das Standard-Dashboard
   zuerst, danach folgen die Namen alphabetisch.
-- **`number-format.js`**: einzige Stelle, die ein Zahlenformat kennt
-  (aktuell deutsch, Komma als Dezimaltrennzeichen); eine künftige
-  Sprachumschaltung ändert nur diese eine Datei, nicht jede einzelne
-  Tabellen-/Chart-Seite.
+- **`number-format.js`**: einzige Stelle, die ein Zahlenformat kennt; das Format
+  kommt aus `window.ZA_FORMAT` (Einstellung „Zahlen- und Datumsformat", siehe
+  [Zahlen-, Datums- und Währungsformat](#zahlen--datums--und-währungsformat)),
+  nicht mehr fest aus `de-DE`.
+- **`server-time.js`**: Kalenderangaben in der Zeitzone des SERVERS statt des
+  Browsers. Der Server rechnet Zeiträume in seiner Zeitzone (Option `timezone`)
+  und liefert Zeitstempel; wer daraus mit `getFullYear()`/`getMonth()` oder
+  `toLocaleDateString()` ohne `timeZone` ein Datum macht, bekommt bei einem
+  Browser hinter der Serverzone (z. B. Portugal, Server in Deutschland) den
+  Vortag — am 01.10. „September", im Januar das Vorjahr. Die Zone steht als
+  `data-tz` am `<html>` (`base.html`); `ServerTime.withZone(optionen)` ergänzt
+  `timeZone` für `toLocale*String()`, `ServerTime.parts(epochSekunden)` liefert
+  Jahr/Monat/Tag/Stunde/Minute/Wochentag. Neuer Code, der Serverzeitstempel
+  anzeigt, nimmt diesen Helfer. Noch nicht umgestellt (Roadmap): Entitäts-/
+  Chart-Editor und die ECharts-Zeitachsen.
 - **`sortable-table.js`**: einheitliches Sortierverhalten für längere
   Listen-/Verwaltungstabellen (Bereinigungs-Vorschau, Indexkonsistenz,
   Datenintegrität, Ausführungsverläufe, Duplikate je Entität,

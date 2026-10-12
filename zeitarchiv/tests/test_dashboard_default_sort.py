@@ -8,11 +8,11 @@ from pathlib import Path
 
 from app.storage.index import Index
 
-from _paths import APP
+from _paths import APP, template_text
 
 
 
-TEMPLATE = (APP / "templates/dashboards.html").read_text(encoding="utf-8")
+TEMPLATE = template_text("dashboards.html")
 CARD_BROWSER = (APP / "static/js/card-browser.js").read_text(encoding="utf-8")
 
 

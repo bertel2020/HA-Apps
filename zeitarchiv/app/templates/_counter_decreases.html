@@ -1,0 +1,117 @@
+{# Inhalt von <div id="counter-decreases"> in housekeeping.html — die Sammelaktion
+   (counter_bulk.py) tauscht dieses Partial per hx-target="#counter-decreases" aus. #}
+{% if counter_result %}
+<div class="counter-result" role="status">
+  <div class="counter-result-main">
+    <strong>{{ counter_result.message }}</strong>
+    {% if counter_result.entries %}
+    <ul class="counter-result-list">
+      {% for item in counter_result.entries %}
+      <li><span>{{ item.name }} · {{ item.count_label }}</span> <a href="{{ item.link }}">{{ _("Markierte Werte ansehen ›") }}</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if counter_result.note %}<p class="counter-result-note">{{ counter_result.note }}</p>{% endif %}
+  </div>
+  <div class="counter-result-actions">
+    {% if counter_result.undo_vals %}
+    <button type="button" class="btn btn-sm" hx-post="housekeeping/counter-decreases/undo" hx-target="#counter-decreases" hx-swap="innerHTML"
+            hx-vals='{{ counter_result.undo_vals }}'>{{ _("Rückgängig") }}</button>
+    {% endif %}
+    <button type="button" class="btn btn-sm" onclick="this.closest('.counter-result').remove()">{{ _("OK") }}</button>
+  </div>
+</div>
+{% endif %}
+{% if counter_bulk %}
+<div class="counter-bulk">
+  <p><strong>{{ counter_bulk.lead }}</strong> {{ counter_bulk.rest }}</p>
+  <button type="button" class="btn primary" hx-post="housekeeping/counter-decreases/mark-returning" hx-target="#counter-decreases" hx-swap="innerHTML"
+          hx-confirm="{{ counter_bulk.confirm }}" data-confirm-label="{{ counter_bulk.confirm_label }}" data-confirm-template="#counter-bulk-confirm">{{ counter_bulk.button }}</button>
+</div>
+{# Inhalt des Bestätigungsdialogs (confirm-dialog.js zeigt ihn statt des reinen Fragetexts an). #}
+<template id="counter-bulk-confirm">
+  <div class="cbc">
+    <p class="cbc-title">{{ counter_bulk.title }}</p>
+    <p class="cbc-lead">{{ _("Der Zählerstand fiel kurz ab und stieg sofort wieder auf den alten Wert. Das sieht nach Messfehlern aus.") }}</p>
+    <div class="cbc-list">
+      <div class="cbc-head">{{ _("Betroffene Werte") }}</div>
+      {% for entry in counter_bulk.entries %}
+      <div class="cbc-row">
+        <div class="cbc-entity"><span class="cbc-name">{{ entry.name }}</span>{% if entry.entity_id %}<span class="cbc-id">{{ entry.entity_id }}</span>{% endif %}</div>
+        <div class="cbc-values">
+          {% for d in entry.details %}
+          <div><span>{{ d.when }} · <strong>{{ d.value }}</strong></span><span class="cbc-sub">{{ _("vorher {previous}", previous=d.previous) }}</span></div>
+          {% else %}
+          <div>{{ entry.count_label }}</div>
+          {% endfor %}
+          {% if entry.more %}<div class="cbc-sub">{{ _("… und {count} weitere", count=entry.more) }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <ul class="cbc-effects">
+      <li>{{ _("Nichts wird gelöscht, die Werte werden nur markiert.") }}</li>
+      <li>{{ _("Markierte Werte zählen in Charts, Tabellen und Statistik nicht mehr mit.") }}</li>
+      <li>{{ _("Du kannst sie jederzeit im Reiter „Markiert“ der Entität zurückholen. Gelöscht werden sie erst bei der endgültigen Bereinigung.") }}</li>
+    </ul>
+  </div>
+</template>
+{% endif %}
+        <div class="tbl-wrap">
+          {% if counter_decreases %}
+          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+            <colgroup><col><col class="hk-col-cd-count"><col class="hk-col-cd-last"><col class="hk-col-cd-verdict"><col class="hk-col-cd-action"></colgroup>
+            <thead><tr><th>{{ _("Entität") }}</th><th class="cd-num">{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th><th class="cd-action">{{ _("Aktion") }}</th></tr></thead>
+            <tbody>
+            {% for row in counter_decreases %}
+            <tr>
+              <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
+                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+                  {% if row.friendly_name %}
+                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+                  {% else %}
+                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+                  {% endif %}
+                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
+                </a>
+                {% if row.rule %}
+                <span class="counter-verdict rule">{{ _("Regel angehalten") if row.rule.halted else _("Regel an") }}</span>
+                <div class="counter-note">{{ _("{count} automatisch markiert (7 Tage)", count=row.rule.marked) }}</div>
+                {% endif %}
+              </td>
+              <td class="cd-num" data-sort="{{ row.count }}">{{ row.count_label }}</td>
+              <td data-sort="{{ row.last_ts }}">{{ row.last_label }}{% if row.change %}<div class="counter-note">{{ row.change }}</div>{% endif %}</td>
+              {# Bei „bleibt niedrig“ steht die Begründung in der Einleitung (Info-Symbol) und hier nur als Tooltip; bei den übrigen trägt sie die Zeile (Zeitpunkt und Wert der Rückkehr). #}
+              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}"{% if row.verdict == 'stays' %} title="{{ row.note }}"{% endif %}>{% if row.verdict == 'returns' %}{{ _("kehrt zurück") }}{% elif row.verdict == 'stays' %}{{ _("bleibt niedrig") }}{% else %}{{ _("noch offen") }}{% endif %}</span>{% endif %}{% if row.verdict != 'stays' %}<div class="counter-note">{{ row.note }}</div>{% endif %}</td>
+              <td class="cd-action">{% if row.verdict == 'stays' %}<button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
+                      hx-target="#counter-decreases" hx-swap="innerHTML" title="{{ _('Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden') }}">{{ _("Als normal erlauben") }}</button>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty">{{ _("Keine Zählerrückgänge in den letzten 30 Tagen gefunden.") }}</div>
+          {% endif %}
+        </div>
+{% if counter_allowed %}
+<details class="counter-allowed">
+  <summary>
+    <span class="counter-allowed-count">{{ _("{count} Zähler mit erlaubten Rückgängen", count=counter_allowed | length) }}</span>
+    <span class="counter-allowed-hint">{{ _("Für diese Zähler werden Rückgänge nicht gemeldet, weil sie sich planmäßig zurücksetzen.") }}</span>
+  </summary>
+  <ul class="counter-allowed-list">
+    {% for row in counter_allowed %}
+    <li>
+      <a href="entities/{{ row.entity_id }}/config" class="counter-allowed-entity">
+        <span class="name">{{ row.name }}</span>{% if row.name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
+      </a>
+      <span class="counter-allowed-action"><button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "report", "from": "housekeeping"}'
+              hx-target="#counter-decreases" hx-swap="innerHTML">{{ _("Wieder melden") }}</button></span>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% if marked_total %}
+<p class="counter-marked-total">{% if marked_total == 1 %}{{ _("Aktuell ist 1 Wert zur Löschung markiert.") }}{% else %}{{ _("Aktuell sind {count} Werte zur Löschung markiert.", count=(marked_total | format_int)) }}{% endif %} <a href="#speicherplatz">{{ _("Zur Übersicht ›") }}</a></p>
+{% endif %}

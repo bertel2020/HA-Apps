@@ -20,8 +20,8 @@
 {% if activity %}
 <div class="activity-block">
   <div class="activity-head">
-    <h4>Läuft gerade</h4>
-    <span>{{ activity | length }} {{ 'Vorgang' if activity | length == 1 else 'Vorgänge' }}</span>
+    <h4>{{ _('Läuft gerade') }}</h4>
+    <span>{{ activity | length }} {{ _('Vorgang') if activity | length == 1 else _('Vorgänge') }}</span>
   </div>
   <ul class="activity-list">
     {% for job in activity %}
@@ -37,7 +37,7 @@
          die Information, statt dass ein Balken eine Zahl behauptet. #}
       {% if job.total %}
       <p class="activity-numbers">
-        {{ job.done | format_int }} von {{ job.total | format_int }}{% if job.unit %} {{ job.unit }}{% endif %}
+        {{ _('{done} von {total}', done=job.done | format_int, total=job.total | format_int) }}{% if job.unit %} {{ job.unit }}{% endif %}
       </p>
       <div class="activity-track">
         <div class="activity-fill" style="width:{{ job.percent }}%"></div>

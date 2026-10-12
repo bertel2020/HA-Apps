@@ -62,7 +62,7 @@
         offset = Math.floor(anchor.getFullYear() / 10) - Math.floor(now.getFullYear() / 10);
         break;
       default:
-        throw new Error(`Unbekannter Zeitraum: ${range}`);
+        throw new Error(t('Unbekannter Zeitraum: {range}',{range}));
     }
     // Die Query-Engine erlaubt bewusst keine Navigation in die Zukunft.
     return Math.min(offset, 0);

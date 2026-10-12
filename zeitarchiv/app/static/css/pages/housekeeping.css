@@ -187,3 +187,89 @@
   .hk-col-letzter-wert{width:176px;}
   .hk-col-vor{width:108px;}
   .hk-col-datenpunkte{width:118px;}
+
+/* Zählerrückgänge: Einordnung als kleine Marke, darunter die Begründung. */
+.counter-verdict{
+  display:inline-block;padding:1px 8px;border-radius:10px;font-weight:600;
+  font-size:calc(12px * var(--font-scale, 1));background:var(--surface-alt);color:var(--ink-muted);
+}
+.counter-verdict.returns{background:var(--warning-soft);color:var(--notice-warn);}
+.counter-verdict.stays{background:var(--accent-line-soft);color:var(--accent-line);}
+.counter-verdict.rule{background:var(--positive-soft, var(--surface-alt));color:var(--positive);margin-left:6px;}
+.counter-note{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin-top:2px;}
+/* Zählerrückgänge: Spalten wie bei den übrigen Tabellen dieser Seite — feste Breiten auf den Wertspalten,
+   die Entität bekommt den Rest. Die Karte ist auf dem Desktop rund 860px breit; die Breiten sind so gewählt,
+   dass dann noch gut 220px für Name und ID bleiben. Werte und Einheiten sind durch geschützte Leerzeichen
+   zusammengehalten (housekeeping_routes.py), umbrochen wird nur am Pfeil bzw. zwischen den Sätzen.
+   Gemessen: Rückgänge 100 (Kopf), Aktion 172 ("Als normal erlauben" 144 + 28 Zellabstand). */
+#zaehlerrueckgaenge table.stats-dt{min-width:840px;}
+.hk-col-cd-count{width:100px;}
+.hk-col-cd-last{width:168px;}
+.hk-col-cd-verdict{width:196px;}
+.hk-col-cd-action{width:172px;}
+#zaehlerrueckgaenge .cd-num{text-align:right;}
+/* Sammelaktion „Fehlwerte markieren“ über der Tabelle und der Hinweis danach. */
+.counter-bulk,.counter-result{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;
+  border-radius:8px;padding:8px 12px;margin-bottom:10px;
+  font-size:calc(13px * var(--font-scale, 1));
+}
+.counter-bulk{background:var(--surface-alt);}
+.counter-bulk p{margin:0;flex:1 1 220px;}
+.counter-result{background:var(--surface-alt);border-left:4px solid var(--positive);}
+.counter-result a{color:var(--accent-line);text-decoration:none;}
+.counter-result{align-items:flex-start;}
+.counter-result-main{flex:1 1 280px;min-width:0;}
+.counter-result-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:3px;}
+.counter-result-list li{display:flex;gap:4px 12px;flex-wrap:wrap;}
+.counter-result-note{margin:8px 0 0;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
+.counter-result-actions{display:flex;gap:8px;flex:none;}
+.counter-marked-total{margin:10px 0 0;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
+.counter-marked-total a{color:var(--accent-line);text-decoration:none;}
+
+
+/* Zähler mit erlaubten Rückgängen: ausklappbare Zeile unter der Tabelle. */
+.counter-allowed{margin-top:14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+/* Eigenes Dreieck statt des Browser-Standards; gedreht, wenn geöffnet. */
+.counter-allowed summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;cursor:pointer;list-style:none;padding:4px 0;}
+.counter-allowed summary::-webkit-details-marker{display:none;}
+.counter-allowed summary::before{content:"▸";display:inline-block;width:1em;color:var(--ink-faint);transition:transform .12s;}
+.counter-allowed[open] summary::before{transform:rotate(90deg);}
+.counter-allowed-count{font-weight:600;color:var(--ink);}
+.counter-allowed-hint{font-size:calc(12.5px * var(--font-scale, 1));}
+/* Wie die Tabelle darüber: gerahmt, Name mit ID darunter, die Aktion in einer Spalte von der Breite der
+   Aktionsspalte (172px), damit die Knöpfe untereinander bündig stehen. */
+.counter-allowed-list{list-style:none;margin:8px 0 0;padding:0;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden;}
+.counter-allowed-list li{display:grid;grid-template-columns:minmax(0,1fr) 172px;align-items:center;gap:8px;padding:8px 0 8px 14px;border-top:1px solid var(--border);}
+.counter-allowed-list li:first-child{border-top:0;}
+.counter-allowed-entity{display:block;min-width:0;color:inherit;text-decoration:none;}
+.counter-allowed-entity .name{display:block;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.counter-allowed-entity:hover .name{color:var(--accent-line);}
+.counter-allowed-entity .id{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.counter-allowed-action{padding-left:14px;}
+@media (max-width:640px){
+  .counter-allowed-list li{grid-template-columns:minmax(0,1fr);padding:10px 14px;}
+  .counter-allowed-action{padding-left:0;}
+}
+
+/* Bestätigungsdialog „Fehlwerte markieren“ (<template id="counter-bulk-confirm">, gezeigt von confirm-dialog.js):
+   Frage, ein Satz, Tabelle der betroffenen Werte, drei Folgen. */
+.cbc-title{margin:0 0 6px;font-size:calc(17px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+.cbc-lead{margin:0 0 14px;font-size:calc(13.5px * var(--font-scale, 1));line-height:1.5;color:var(--ink-muted);}
+.cbc-list{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:0 0 14px;}
+.cbc-head{padding:8px 14px;background:var(--surface-alt);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.cbc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:6px 14px;padding:10px 14px;border-top:1px solid var(--border);}
+.cbc-entity{min-width:0;}
+.cbc-name{display:block;font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);overflow-wrap:anywhere;}
+.cbc-id{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);overflow-wrap:anywhere;}
+.cbc-values{text-align:right;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);display:grid;gap:6px;flex:none;}
+.cbc-values strong{font-weight:600;}
+.cbc-values > div{display:grid;}
+.cbc-sub{color:var(--ink-muted);}
+.cbc-effects{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:calc(13.5px * var(--font-scale, 1));line-height:1.45;color:var(--ink);}
+.cbc-effects li{display:flex;gap:10px;}
+.cbc-effects li::before{content:"✓";flex:none;color:var(--positive);font-weight:700;}
+@media (max-width:480px){
+  .cbc-row{flex-direction:column;}
+  .cbc-values{text-align:left;}
+}
