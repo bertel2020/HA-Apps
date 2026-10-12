@@ -3787,6 +3787,57 @@ class Index:
                 (time.time(), entity_id),
             )
 
+    def clear_all_values(self) -> None:
+        """Wie clear_entity_data(), aber für alle Entitäten in einem Zug —
+        Konfiguration, Dashboards und Einstellungen bleiben."""
+        with self._lock, self._conn:
+            for table in (
+                "deleted_points", "ingested_events", "counter_mark_ignored",
+                "compacted_months", "stats_snapshots",
+            ):
+                self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
+            self._conn.execute(
+                """UPDATE entities
+                   SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
+                       deleted_count = 0, size_bytes = 0, counter_auto_since = NULL,
+                       counter_auto_halted_at = NULL, updated_at = ?""",
+                (time.time(),),
+            )
+
+    def reset_everything(self, keep_setting_prefixes: tuple[str, ...] = ()) -> None:
+        """Setzt den Index auf den Zustand einer frischen Installation zurück:
+        Werte, Entitäten, Charts, Tabellen, Dashboards, Aktivitätslog und
+        Einstellungen. Das Schema bleibt, die Verbindung bleibt offen (die
+        Datei selbst wird bewusst nicht gelöscht, die laufende Instanz hält sie).
+
+        Einstellungen, deren Schlüssel mit einem der keep_setting_prefixes
+        beginnt, bleiben erhalten — der Aufrufer nennt dort Token und
+        Backup-Konfiguration. backup_jobs bleibt unangetastet, weil die
+        Backup-Dateien selbst auch bleiben."""
+        self.clear_all_values()
+        with self._lock, self._conn:
+            for table in (
+                "dashboard_pins", "table_rows", "table_columns", "saved_tables",
+                "saved_charts", "entity_actions", "retention_jobs",
+                "memory_snapshots", "entities",
+            ):
+                self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
+            # Das Default-Dashboard (id 1) ist fest verankert und nicht
+            # löschbar — es wird auf Auslieferungszustand zurückgesetzt.
+            self._conn.execute("DELETE FROM dashboards WHERE id != 1")
+            self._conn.execute(
+                "UPDATE dashboards SET name = 'Übersicht', position = 0, is_default = 1, "
+                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0 WHERE id = 1"
+            )
+            if keep_setting_prefixes:
+                clause = " AND ".join("key NOT LIKE ?" for _ in keep_setting_prefixes)
+                self._conn.execute(
+                    f"DELETE FROM settings WHERE {clause}",  # noqa: S608 — nur Platzhalter
+                    tuple(f"{prefix}%" for prefix in keep_setting_prefixes),
+                )
+            else:
+                self._conn.execute("DELETE FROM settings")
+
     def delete_entity(self, entity_id: str) -> None:
         """Entfernt die Entität und alle direkt zugehörigen Indexdaten."""
         validate_entity_id(entity_id)

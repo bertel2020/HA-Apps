@@ -75,6 +75,7 @@ from .formatting import (
 )
 from .progress import JobBusy, JobProgress
 from .storage import cleanup, rotate
+from .storage import reset as reset_storage
 from .storage.coordinator import StorageCoordinator
 from .storage.index import (
     DEFAULT_GAP_THRESHOLD,
@@ -99,6 +100,10 @@ _purge_progress = JobProgress("purge", unit=N_("Monate"), label=N_("Bereinigung"
 #: weiterhin höchstens eine Bereinigung gleichzeitig, und sie steht in der
 #: Kopfleiste und in Housekeeping, egal von wo sie angestoßen wurde.
 purge_progress = _purge_progress
+#: Fortschritt des Zurücksetzens (Einstellungen → Zurücksetzen). Modulweit aus
+#: demselben Grund wie _purge_progress: das Polling muss denselben Auftrag
+#: sehen wie der Start, auch nach einem Seitenwechsel.
+_reset_progress = JobProgress("reset", label=N_("Zurücksetzen"))
 
 #: Fortschritt der manuellen Rotation. Sie bleibt bewusst synchron — wer sie
 #: auslöst, wartet auf die Antwort und braucht keine eigene Anzeige. In der
@@ -161,6 +166,11 @@ class HousekeepingDependencies:
     # None vom Programmstart eingefroren.
     host_disk_usage_cached: Callable[[], dict | None]
     storage_reconcile_last: Callable[[], dict | None]
+    # Für das optionale Vorab-Backup des Zurücksetzens. run_backup startet
+    # einen Hintergrund-Thread und kehrt sofort zurück; backup_progress ist
+    # das Objekt, an dem sich sein Ende ablesen lässt.
+    run_backup: Callable[..., bool]
+    backup_progress: object
 
 
 def demo_progress_context() -> dict:
@@ -1454,6 +1464,112 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         return HTMLResponse(
             '<div id="demo-nav-entry" hx-swap-oob="delete"></div>'
             "<script>refreshNoticePanel();</script>"
+        )
+
+    # -- Zurücksetzen (Einstellungen) --------------------------------------
+
+    def _reset_context(error: str | None = None, result: str | None = None) -> dict:
+        info = reset_storage.preview(deps.index)
+        return {
+            "reset_info": info,
+            "reset_size": format_size(info["size_bytes"]),
+            "reset_word": tr("LÖSCHEN"),
+            "reset_demo": deps.demo_mode_active,
+            "reset_error": error,
+            "reset_result": result,
+        }
+
+    def _reset_progress_context() -> dict:
+        return {
+            **_reset_progress.snapshot(),
+            "progress_id": "reset-progress",
+            "poll_url": "settings/reset/progress",
+        }
+
+    def _reset_worker(scope: str, with_backup: bool) -> str:
+        started_at = time.time()
+        if with_backup:
+            _reset_progress.set_phase(N_("Backup wird erstellt…"))
+            # Läuft schon ein Backup, erst dessen Ende abwarten und dann ein
+            # eigenes starten — ein fremder Lauf wäre kein Backup VOR dem Reset.
+            while True:
+                with deps.backup_progress.lock:
+                    busy = deps.backup_progress.running
+                if not busy:
+                    break
+                time.sleep(0.5)
+            if not deps.run_backup(trigger="manual"):
+                raise RuntimeError(tr("Backup konnte nicht gestartet werden"))
+            time.sleep(0.2)
+            while True:
+                with deps.backup_progress.lock:
+                    busy = deps.backup_progress.running
+                    error = deps.backup_progress.error
+                if not busy:
+                    break
+                time.sleep(0.5)
+            if error:
+                # Kein Backup, kein Löschen: genau dafür war die Option da.
+                raise RuntimeError(tr("Backup fehlgeschlagen, es wurde nichts gelöscht: {error}", error=error))
+        _reset_progress.set_phase(N_("Daten werden gelöscht…"))
+        with deps.coordinator.exclusive():
+            before = reset_storage.reset(deps.data_dir, deps.index, scope)
+        deps.invalidate_purge_preview()
+        logger.info(
+            "Zurücksetzen abgeschlossen · event=reset_completed scope=%s "
+            "entities=%d rows=%d duration_s=%.1f",
+            scope, before["entities"], before["rows"], time.time() - started_at,
+        )
+        if scope == reset_storage.SCOPE_FULL:
+            return tr("Zeitarchiv wurde komplett zurückgesetzt.")
+        return tr("Alle Messwerte wurden gelöscht.")
+
+    @router.get("/settings/reset", response_class=HTMLResponse)
+    def settings_reset_form(request: Request) -> HTMLResponse:
+        stand = _reset_progress.snapshot()
+        if stand["running"]:
+            return deps.templates.TemplateResponse(request, "_job_progress.html", _reset_progress_context())
+        return deps.templates.TemplateResponse(request, "_settings_reset_form.html", _reset_context())
+
+    @router.post("/settings/reset", response_class=HTMLResponse)
+    async def settings_reset(request: Request) -> HTMLResponse:
+        """Startet das Zurücksetzen im Hintergrund. Das Bestätigungswort wird
+        hier noch einmal geprüft — der deaktivierte Knopf im Formular ist nur
+        Bedienkomfort, kein Schutz. Zwei Umfänge: nur Messwerte oder alles."""
+        if deps.demo_mode_active:
+            raise HTTPException(status_code=409, detail=tr("Nicht möglich, während die Instanz im Demo-Modus läuft"))
+        form = await request.form()
+        scope = str(form.get("scope", ""))
+        with_backup = form.get("backup") == "1"
+        if scope not in reset_storage.SCOPES:
+            return deps.templates.TemplateResponse(
+                request, "_settings_reset_form.html",
+                _reset_context(error=tr("Bitte einen Umfang wählen.")), status_code=422,
+            )
+        if str(form.get("confirm", "")).strip() != tr("LÖSCHEN"):
+            return deps.templates.TemplateResponse(
+                request, "_settings_reset_form.html",
+                _reset_context(error=tr("Bestätigungswort stimmt nicht.")), status_code=422,
+            )
+        try:
+            _reset_progress.start(lambda: _reset_worker(scope, with_backup), logger)
+        except JobBusy:
+            logger.info("Zurücksetzen bereits aktiv · event=reset_already_running")
+        return deps.templates.TemplateResponse(request, "_job_progress.html", _reset_progress_context())
+
+    @router.get("/settings/reset/progress", response_class=HTMLResponse)
+    def settings_reset_progress(request: Request) -> HTMLResponse:
+        stand = _reset_progress.snapshot()
+        if not stand["started"]:
+            return HTMLResponse("")
+        if stand["running"]:
+            return deps.templates.TemplateResponse(request, "_job_progress.html", _reset_progress_context())
+        if stand["error"]:
+            return deps.templates.TemplateResponse(
+                request, "_settings_reset_form.html", _reset_context(error=stand["error"])
+            )
+        return deps.templates.TemplateResponse(
+            request, "_settings_reset_form.html", _reset_context(result=stand["result"])
         )
 
     return router

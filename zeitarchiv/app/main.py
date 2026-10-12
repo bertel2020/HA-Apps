@@ -5611,4 +5611,6 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     # ein Feldwert wäre für immer das None vom Programmstart.
     host_disk_usage_cached=lambda: _background.host_disk_usage_cached,
     storage_reconcile_last=lambda: _background.storage_reconcile_last,
+    run_backup=_background.run_backup,
+    backup_progress=_background.backup_progress,
 )))

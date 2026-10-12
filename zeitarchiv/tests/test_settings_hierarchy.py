@@ -32,6 +32,7 @@ def test_settings_main_areas_are_second_level_sections() -> None:
         "verbindung",
         "diagnose",
         "demo-daten",
+        "zuruecksetzen",
         "ueber",
     )
     for section_id in section_ids:

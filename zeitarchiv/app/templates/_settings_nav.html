@@ -15,5 +15,6 @@
   {% if demo_state %}
   <a href="{{ prefix }}settings#demo-daten" id="demo-nav-entry" {% if nav_active == 'demo-daten' %}class="active"{% endif %}>{{ _("Demo-Daten") }}</a>
   {% endif %}
+  <a href="{{ prefix }}settings#zuruecksetzen" {% if nav_active == 'zuruecksetzen' %}class="active"{% endif %}>{{ _("Zurücksetzen") }}</a>
   <a href="{{ prefix }}settings#ueber" {% if nav_active == 'ueber' %}class="active"{% endif %}>{{ _("Über Zeitarchiv") }}</a>
 </nav>

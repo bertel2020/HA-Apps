@@ -584,6 +584,7 @@ ERWARTETE_QUELLEN = {
     "retention": "Aufbewahrung",
     "backup": "Backup",
     "purge": "Bereinigung",
+    "reset": "Zurücksetzen",
     "symcon-import": "Symcon-Import",
     "symcon-dry-run": "Symcon-Vorschau",
     "csv-import": "CSV-Import",

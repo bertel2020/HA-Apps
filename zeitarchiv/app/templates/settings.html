@@ -138,6 +138,13 @@
         </section>
         {% endif %}
 
+        <section id="zuruecksetzen" class="settings-section">
+          <h2 class="settings-section-title">{{ _("Zurücksetzen") }}</h2>
+          <div id="reset-form" hx-get="settings/reset" hx-trigger="load" hx-swap="innerHTML">
+            <p class="hint hint-status">{{ _("wird geladen …") }}</p>
+          </div>
+        </section>
+
         <section id="ueber" class="settings-section">
           <h2 class="settings-section-title">{{ _("Über Zeitarchiv") }}</h2>
 
