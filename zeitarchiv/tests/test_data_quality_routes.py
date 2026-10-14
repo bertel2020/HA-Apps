@@ -26,6 +26,8 @@ def test_datenqualitaet_seite_zeigt_die_matrix_mit_link_auf_die_bereinigung(clie
     # Die Zeile lädt ihre Einzelbefunde über einen absoluten Pfad: die Seite
     # liegt unter /housekeeping/, ein relativer Link würde dort ins Leere laufen.
     assert 'hx-get="/entities/sensor.pytest_dq_matrix/data-quality"' in html
+    # Ohne htmx bliebe die aufgeklappte Zeile bei „Lädt …“ stehen.
+    assert "vendor/htmx" in html
 
 
 def test_housekeeping_verweist_auf_die_datenqualitaet_statt_sie_einzubetten(client) -> None:

@@ -70,6 +70,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
             "_settings_tips_form.html",
         ],
         "statistik_index.html": ["_statistik_index_body.html"],
+        "data_quality.html": [],
         "table_editor.html": [],
         "dashboard_editor.html": [],
     }

@@ -25,6 +25,7 @@ from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 from . import cleanup_stats, formats
+from .i18n import tr
 from .formatting import decimals_to_int, format_int, format_value
 from .storage import cleanup
 from .storage.index import Index, effective_outlier_threshold
@@ -65,6 +66,31 @@ def initial_cleanup_view(
 DETAIL_LIMIT = 5
 # Fenster der Duplikat- und Zählerrückgang-Schnappschüsse (Tage).
 SNAPSHOT_WINDOW_DAYS = 30
+
+
+PAGE_SIZES = (10, 20, 50, 100, 500)
+DEFAULT_PAGE_SIZE = 50
+
+
+def paginate(rows: list[dict], page: int, page_size: int) -> tuple[list[dict], dict]:
+    """Eine Seite der Matrix und die Angaben für den Pager (dieselben Felder wie
+    die Zeilentabelle der Bereinigungsseite). Unbekannte Seitengrößen fallen auf
+    DEFAULT_PAGE_SIZE zurück, eine Seite außerhalb des Bereichs wird eingeklemmt."""
+    if page_size not in PAGE_SIZES:
+        page_size = DEFAULT_PAGE_SIZE
+    total = len(rows)
+    total_pages = max(1, -(-total // page_size))
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * page_size
+    return rows[start:start + page_size], {
+        "page": page,
+        "page_size": page_size,
+        "page_sizes": PAGE_SIZES,
+        "total": total,
+        "total_pages": total_pages,
+        "start": start + 1 if total else 0,
+        "end": min(start + page_size, total),
+    }
 
 
 def cleanup_href(entity_id: str, filter_: str, range_: str) -> str:
@@ -156,6 +182,19 @@ def build_matrix(index: Index) -> dict:
     }
 
 
+# Beschriftung der Markierung je Spalte, wie sie cleanup.analyze_raw_rows_page vergibt.
+def _flag_labels() -> dict[str, str]:
+    return {"duplicates": "Duplikat", "counter_decreases": tr("Zählerrückgang"), "outliers": tr("Ausreißer")}
+
+
+def _reasons_for(key: str, flags: list[dict]) -> list[str]:
+    """Nur die Begründung der Markierung, um die es in der Spalte geht. Eine Zeile
+    kann zugleich Duplikat und Wiederholung sein; beide Begründungen nebeneinander
+    machen die Zeile unlesbar, und die übrigen stehen auf der Bereinigungsseite."""
+    own = [flag["reason"] for flag in flags if flag["label"] == _flag_labels()[key]]
+    return own or [flag["reason"] for flag in flags]
+
+
 def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime | None = None) -> list[dict]:
     """Die jüngsten Einzelbefunde EINER Entität für die aufgeklappte Zeile —
     höchstens DETAIL_LIMIT je Kategorie, neueste zuerst.
@@ -211,13 +250,14 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
             "key": key,
             "severity": column["severity"],
             "total": total,
+            "total_label": format_int(total),
             "more": max(0, total - len(analysis["rows"])),
             "href": cleanup_href(entity_id, column["filter"], column["range"]),
             "rows": [
                 {
                     "ts_label": formats.format_datetime(datetime.fromtimestamp(row["ts"], tz)),
                     "value_label": format_value(row["value"], decimals_int),
-                    "reasons": [flag["reason"] for flag in row["flags"]],
+                    "reasons": _reasons_for(key, row["flags"]),
                 }
                 for row in analysis["rows"]
             ],

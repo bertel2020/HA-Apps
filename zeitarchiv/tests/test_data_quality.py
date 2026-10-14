@@ -174,3 +174,29 @@ def test_startansicht_verwirft_filter_ohne_aktive_erkennung():
         "counter_decreases", "all", outliers=True, gaps=True, counter_decreases=False
     )
     assert ansicht == ("all", "all")
+
+
+def test_paginate_teilt_in_seiten_zu_50():
+    rows = [{"n": i} for i in range(120)]
+    seite, info = data_quality.paginate(rows, 1, data_quality.DEFAULT_PAGE_SIZE)
+    assert len(seite) == 50
+    assert (info["start"], info["end"], info["total"], info["total_pages"]) == (1, 50, 120, 3)
+    seite, info = data_quality.paginate(rows, 3, 50)
+    assert [r["n"] for r in seite] == list(range(100, 120))
+    assert (info["start"], info["end"]) == (101, 120)
+
+
+def test_paginate_klemmt_seite_und_verwirft_unbekannte_groessen():
+    rows = [{"n": i} for i in range(30)]
+    _, info = data_quality.paginate(rows, 99, 50)
+    assert info["page"] == 1
+    _, info = data_quality.paginate(rows, 1, 7)
+    assert info["page_size"] == data_quality.DEFAULT_PAGE_SIZE
+    _, info = data_quality.paginate(rows, 4, 10)
+    assert info["page"] == 3
+
+
+def test_paginate_leere_liste():
+    seite, info = data_quality.paginate([], 1, 50)
+    assert seite == []
+    assert (info["start"], info["end"], info["total_pages"]) == (0, 0, 1)

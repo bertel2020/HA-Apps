@@ -6,14 +6,13 @@
 {% set dq = data_quality %}
 {% set labels = {'duplicates': _("Duplikate"), 'counter_decreases': _("Zählerrückgänge"), 'outliers': _("Ausreißer")} %}
 {% set windows = {'duplicates': _("30 Tage"), 'counter_decreases': _("30 Tage"), 'outliers': _("gesamt")} %}
-<p class="settings-section-description">{{ _("Duplikate, Zählerrückgänge und Ausreißer aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigungsseite der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde.") }}</p>
 {% if dq.pending.duplicates or dq.pending.counter_decreases %}
 <p class="hint hint-status">{{ _("Duplikate und Zählerrückgänge werden stündlich im Hintergrund gezählt und liegen noch nicht vollständig vor.") }}</p>
 {% endif %}
-<div class="dq-sums">
-  <div class="dq-sum"><b>{{ dq.affected_label }}</b><span>{{ _("Entitäten betroffen") }}</span></div>
+<div class="stat-row">
+  <div class="stat"><div class="label">{{ _("Entitäten betroffen") }}</div><div class="value">{{ dq.affected_label }}</div><div class="sub-value">{{ _("von {total}", total=dq.entity_count) }}</div></div>
   {% for col in dq.columns %}
-  <div class="dq-sum"><b>{{ dq.totals[col.key].label }}</b><span>{{ labels[col.key] }}</span></div>
+  <div class="stat"><div class="label">{{ labels[col.key] }}</div><div class="value">{{ dq.totals[col.key].label }}</div><div class="sub-value">{{ windows[col.key] }}</div></div>
   {% endfor %}
 </div>
 <div class="tbl-wrap">
@@ -32,12 +31,16 @@
           hx-target="#dq-detail-{{ loop.index }}" hx-swap="innerHTML"
           @click="open = !open" @keydown.enter="open = !open">
         <td class="entity">
-          <span class="dq-caret" aria-hidden="true">▸</span>
-          <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
+          <div class="dq-entity-cell">
+            <span class="dq-caret" aria-hidden="true">▸</span>
+            <div class="dq-entity-text">
+              <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
+            </div>
+          </div>
         </td>
         {% for col in dq.columns %}
         {% set cell = row.cells[col.key] %}
-        <td class="dq-num">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% else %}<span class="dq-none">–</span>{% endif %}</td>
+        <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% else %}<span class="dq-none">–</span>{% endif %}</td>
         {% endfor %}
       </tr>
       <tr class="dq-detail" x-show="open" x-cloak>
@@ -50,6 +53,25 @@
   <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>
   {% endif %}
 </div>
+{% if pagination and pagination.total > 10 %}
+<form class="pager dq-pager" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+  <div class="dq-pager-nav">
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
+    {% set q = '?page_size=' ~ pagination.page_size %}
+    {% for label, target, off, title in [('«', 1, pagination.page <= 1, _('Erste Seite')), ('‹', pagination.page - 1, pagination.page <= 1, _('Vorherige Seite')), ('›', pagination.page + 1, pagination.page >= pagination.total_pages, _('Nächste Seite')), ('»', pagination.total_pages, pagination.page >= pagination.total_pages, _('Letzte Seite'))] %}
+    {% if loop.index == 3 %}
+    <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="this.form.submit()"> / {{ pagination.total_pages }}</span>
+    {% endif %}
+    {% if off %}<span class="btn navbtn is-disabled" aria-disabled="true">{{ label }}</span>{% else %}<a class="btn navbtn" href="{{ app_root }}/housekeeping/datenqualitaet{{ q }}&amp;page={{ target }}" title="{{ title }}">{{ label }}</a>{% endif %}
+    {% endfor %}
+  </div>
+  <select name="page_size" title="{{ _('Zeilen pro Seite') }}" onchange="this.form.page.value=1;this.form.submit()">
+    {% for size in pagination.page_sizes %}
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
 {% if dq.pending.outliers %}
 <p class="hint hint-status" style="margin-top:14px;">{{ _("Ausreißer: {pending} von {total} Entitäten sind noch nicht gemessen, die Messung läuft im Hintergrund.", pending=dq.pending.outliers, total=dq.entity_count) }}</p>
 {% endif %}

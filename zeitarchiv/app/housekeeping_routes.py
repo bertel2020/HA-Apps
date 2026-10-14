@@ -1296,13 +1296,15 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
 
     @router.get("/housekeeping/datenqualitaet", response_class=HTMLResponse)
-    def data_quality_view(request: Request) -> HTMLResponse:
+    def data_quality_view(request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE) -> HTMLResponse:
         """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
         (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
         mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
         liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
+        matrix = data_quality.build_matrix(deps.index)
+        matrix["rows"], pagination = data_quality.paginate(matrix["rows"], page, page_size)
         return deps.templates.TemplateResponse(
-            request, "data_quality.html", {"data_quality": data_quality.build_matrix(deps.index)}
+            request, "data_quality.html", {"data_quality": matrix, "pagination": pagination}
         )
 
     @router.get("/entities/{entity_id}/data-quality", response_class=HTMLResponse)
