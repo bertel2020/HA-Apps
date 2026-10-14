@@ -3588,21 +3588,28 @@ class Index:
         counts: dict,
         outlier_threshold: str | None = None,
         outlier_rule: int | None = None,
+        daily: dict | None = None,
     ) -> None:
-        """`outlier_threshold` ist die Schwelle, MIT DER gezählt wurde, und
+        """`daily` sind die Befunde je Kalendertag ({"JJJJ-MM-TT": {Kategorie:
+        Anzahl}}, nur Tage mit Befund), aus demselben Durchlauf wie `counts`.
+        Ohne sie (None) fehlt der Schlüssel: der Eintrag stammt dann aus einem
+        Pfad, der keine Tageszahlen liefert, und gilt für Tagesansichten als
+        nicht gemessen — nicht als "keine Befunde". `outlier_threshold` ist die Schwelle, MIT DER gezählt wurde, und
         `outlier_rule` die Regel (cleanup.OUTLIER_RULE_VERSION). Ohne beides
         ließe sich die gespeicherte Ausreißer-Zahl später keiner Einstellung
         zuordnen: wer die Schwelle ändert, bekäme eine Quote der alten zu sehen
         — und wer die App aktualisiert, eine der alten Regel, obwohl die
         Schwelle unverändert dasteht. Alte Einträge ohne die Felder gelten
         deshalb als 'unbekannt' (siehe outlier_rate() in cleanup_stats.py)."""
-        payload = json.dumps({
+        entry = {
             "computed_at": time.time(),
             "counts": counts,
             "outlier_threshold": outlier_threshold,
             "outlier_rule": outlier_rule,
-        })
-        self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, payload)
+        }
+        if daily is not None:
+            entry["daily"] = daily
+        self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, json.dumps(entry))
 
     def list_cleanup_alltime_stats(self) -> dict[str, dict]:
         """Alle gecachten Gesamt-Zählungen auf einmal, {entity_id: Eintrag}.

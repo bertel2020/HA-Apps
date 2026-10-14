@@ -267,6 +267,15 @@ def analyze_raw_rows_page(
         "repetitions": 0,
         "counter_decreases": 0,
     }
+    # Befunde je Kalendertag (nur Tage mit Befund): dieselben Einheiten wie
+    # ``counts``, damit die Tagessummen genau die Gesamtzahl ergeben.
+    daily: dict[str, dict[str, int]] = {}
+
+    def count_day(ts: float, key: str, amount: int = 1) -> None:
+        day = datetime.fromtimestamp(ts, tz).strftime("%Y-%m-%d")
+        bucket = daily.setdefault(day, {})
+        bucket[key] = bucket.get(key, 0) + amount
+
     total_matches = 0
     previous_ts: float | None = None
     previous_value: float | None = None
@@ -300,18 +309,23 @@ def analyze_raw_rows_page(
             duplicate_reason = tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
         if group_outlier is not None:
             counts["outliers"] += 1
+            count_day(group_ts, "outliers")
         if group_gap is not None:
             counts["gaps"] += 1
+            count_day(group_ts, "gaps")
         if duplicate_reason is not None:
             counts["duplicates"] += len(group_rows)
+            count_day(group_ts, "duplicates", len(group_rows))
 
         for row in group_rows:
             repetition_reason = row.pop("repetition_reason")
             counter_decrease_reason = row.pop("counter_decrease_reason")
             if repetition_reason is not None:
                 counts["repetitions"] += 1
+                count_day(group_ts, "repetitions")
             if counter_decrease_reason is not None:
                 counts["counter_decreases"] += 1
+                count_day(group_ts, "counter_decreases")
             row_matches = (
                 selected_filter == "all"
                 or (selected_filter == "outliers" and group_outlier is not None)
@@ -401,6 +415,7 @@ def analyze_raw_rows_page(
     return {
         "rows": page_rows,
         "counts": counts,
+        "daily": daily,
         "pagination": {
             "page": actual_page,
             "page_size": page_size,

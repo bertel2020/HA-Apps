@@ -5014,6 +5014,7 @@ def _rows_fragment(
             outlier_mode=cleanup_stats.outlier_mode(entity),
         )
         counts = analysis["counts"]
+        daily_counts = analysis["daily"]
         pagination = analysis["pagination"]
         display_rows = [
             {
@@ -5121,7 +5122,8 @@ def _rows_fragment(
         # engerem Zeitraum-Chip muss dann nicht sofort neu scannen).
         alltime_counts = counts
         index.set_cleanup_alltime_stats(
-            entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION
+            entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
+            daily=daily_counts,
         )
     else:
         alltime_counts = cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, now)

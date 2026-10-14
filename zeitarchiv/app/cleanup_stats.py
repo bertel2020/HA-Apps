@@ -139,7 +139,8 @@ def alltime_counts(
     )
     counts = analysis["counts"]
     index.set_cleanup_alltime_stats(
-        entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION
+        entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
+        daily=analysis["daily"],
     )
     return counts
 
