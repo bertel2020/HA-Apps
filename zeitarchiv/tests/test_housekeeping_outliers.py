@@ -331,3 +331,18 @@ def test_the_manual_names_the_same_mark_and_interval_as_the_code() -> None:
     # Zahl geprüft statt über den Wortlaut.
     assert cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS // 3600 == 6
     assert "etwa alle sechs Stunden auf" in flach
+
+
+def test_der_planer_misst_auch_entitaeten_ohne_ausreisser_erkennung(index):
+    """Ihre Gesamt-Zählung liefert Duplikate und Zählerrückgänge für die
+    Datenqualität; ohne Messung fehlten sie dort dauerhaft."""
+    _entity(index, "sensor.pytest_ohne_erkennung", schwelle="off")
+    index.set_first_ts_and_add_rows("sensor.pytest_ohne_erkennung", 1_700_000_000.0, 0)
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.pytest_ohne_erkennung"
+    index.set_cleanup_alltime_stats("sensor.pytest_ohne_erkennung", {"all": 10}, "off", OUTLIER_RULE_VERSION)
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
+
+
+def test_der_planer_ueberspringt_entitaeten_ohne_daten(index):
+    _entity(index, "sensor.pytest_leer", schwelle="50")
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None

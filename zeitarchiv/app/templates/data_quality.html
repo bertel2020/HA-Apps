@@ -8,7 +8,7 @@
 <div class="page">
   <p class="dq-back"><a href="{{ app_root }}/housekeeping">&larr; {{ _("Housekeeping") }}</a></p>
   <h1>{{ _("Datenqualität") }} {{ hint_button(_('Datenqualität')) }}</h1>
-  {% call hint_body('sub') %}{{ _("Duplikate, Zählerrückgänge und Ausreißer aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigung der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde. Duplikate und Zählerrückgänge zählen die letzten 30 Tage, Ausreißer die gesamte Historie.") }}{% endcall %}
+  {% call hint_body('sub') %}{{ _("Duplikate, Zählerrückgänge und Ausreißer aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigung der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde. Alle Zahlen zählen die gesamte Historie. Neu angelegte Entitäten erscheinen, sobald die Messung im Hintergrund sie erreicht hat.") }}{% endcall %}
   {% include "_data_quality.html" %}
 </div>
 <script src="{{ asset('vendor/htmx.min.js') }}"></script>

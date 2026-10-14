@@ -15,6 +15,7 @@ tr.dq-row.is-open .dq-caret{transform:rotate(90deg);}
 .dq-pill.crit{background:var(--danger-soft);color:var(--danger);}
 a.dq-pill:hover{text-decoration:underline;}
 .dq-none{color:var(--ink-faint);}
+.dq-allowed{color:var(--ink-faint);font-size:12px;font-style:italic;cursor:help;}
 tr.dq-detail td{background:var(--surface-alt);padding:12px 16px 14px 36px;white-space:normal;}
 .dq-group{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .dq-group + .dq-group{margin-top:10px;}

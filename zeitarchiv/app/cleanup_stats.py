@@ -268,19 +268,24 @@ def next_entity_for_outlier_rate(index: Index, now: float):
     erneuern soll — oder None, wenn nichts ansteht.
 
     Reihenfolge: erst die nie gemessenen bzw. die mit veralteter Schwelle
-    (deren Quote zeigt die Oberfläche gar nicht an), dann die ältesten. Eine je
+    (deren Quote zeigt die Oberfläche gar nicht an), dann die ältesten. Gemessen
+    werden alle Entitäten mit Daten, auch die ohne Ausreißer-Erkennung. Eine je
     Takt statt alle auf einmal, weil ein Durchgang über alle Entitäten an der
     Testinstallation 37 s dauert — das gehört nicht in einen 30-Sekunden-Takt
     am Stück, wohl aber verteilt darauf."""
     eintraege = index.list_cleanup_alltime_stats()
     faellig = []
     for entity in index.list_entities():
-        if effective_outlier_threshold(
-            entity["aggregation_type"], entity["outlier_threshold"]
-        ) == "off" or not entity["first_ts"]:
+        if not entity["first_ts"]:
             continue
         eintrag = eintraege.get(entity["entity_id"])
-        if _rate_from_entry(entity, eintrag) is None:
+        # Auch Entitäten ohne Ausreißer-Erkennung: ihre Zählung liefert
+        # Duplikate und Zählerrückgänge für die Datenqualität. Nur die
+        # Schwellen-Prüfung entfällt, sie gibt es dort nicht.
+        ohne_erkennung = effective_outlier_threshold(
+            entity["aggregation_type"], entity["outlier_threshold"]
+        ) == "off"
+        if eintrag is None or (not ohne_erkennung and _rate_from_entry(entity, eintrag) is None):
             faellig.append((0.0, entity))
             continue
         berechnet = eintrag.get("computed_at") or 0.0

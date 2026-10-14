@@ -30,47 +30,55 @@ def index():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def _entity(index, entity_id, *, name=None, schwelle="off"):
+def _entity(index, entity_id, *, name=None, schwelle="50"):
     index.get_or_create_entity(entity_id, "sensor", "measurement", "kWh")
     index.set_config(entity_id, outlier_threshold=schwelle, custom_name=name)
 
 
-def _outliers(index, entity_id, markiert, gesamt=1000, schwelle="50"):
-    index.set_config(entity_id, outlier_threshold=schwelle)
+def _gesamt(index, entity_id, *, duplicates=0, counter_decreases=0, outliers=0):
+    """Legt der Entität die Gesamt-Zählung unter, wie sie der Wartungsplaner nach einem
+    Lauf über die komplette Historie hinterlässt (dieselbe Quelle wie die
+    Trefferzahlen der Bereinigungsseite)."""
+    index.set_config(entity_id, outlier_threshold="50")
     index.set_cleanup_alltime_stats(
-        entity_id, {"all": gesamt, "outliers": markiert}, schwelle, OUTLIER_RULE_VERSION
+        entity_id,
+        {"all": 1000, "outliers": outliers, "gaps": 0, "duplicates": duplicates,
+         "repetitions": 0, "counter_decreases": counter_decreases},
+        "50", OUTLIER_RULE_VERSION,
     )
 
 
-def _row(entity_id, count):
-    return {"entity_id": entity_id, "friendly_name": entity_id, "count": count}
+def _mit_daten(index, entity_id, **kwargs):
+    """Eine Entität, die schon Werte hat (first_ts gesetzt) und damit gemessen werden soll."""
+    _entity(index, entity_id, **kwargs)
+    index.set_first_ts_and_add_rows(entity_id, 1_700_000_000.0, 0)
 
 
 def test_ohne_messung_ist_leer_und_ausstehend(index):
-    _entity(index, "sensor.a")
+    _mit_daten(index, "sensor.a")
     matrix = data_quality.build_matrix(index)
     assert matrix["rows"] == []
     assert matrix["affected"] == 0
-    # Kein Schnappschuss ist nicht "keine Duplikate".
-    assert matrix["pending"]["duplicates"] is True
-    assert matrix["pending"]["counter_decreases"] is True
+    # Keine Zählung ist nicht "keine Befunde".
+    assert matrix["pending"] == 1
 
 
-def test_leerer_schnappschuss_ist_gemessen_ohne_befund(index):
+def test_entitaet_ohne_daten_zaehlt_nicht_als_ausstehend(index):
     _entity(index, "sensor.a")
-    index.set_duplicate_snapshot([])
-    index.set_counter_decrease_snapshot([])
+    assert data_quality.build_matrix(index)["pending"] == 0
+
+
+def test_gemessen_ohne_befund_ist_nicht_ausstehend(index):
+    _mit_daten(index, "sensor.a")
+    _gesamt(index, "sensor.a")
     matrix = data_quality.build_matrix(index)
-    assert matrix["pending"]["duplicates"] is False
-    assert matrix["pending"]["counter_decreases"] is False
+    assert matrix["pending"] == 0
     assert matrix["rows"] == []
 
 
-def test_entitaet_in_allen_drei_quellen_eine_zeile(index):
-    _entity(index, "sensor.a", name="Gesamtenergie")
-    _outliers(index, "sensor.a", markiert=7)
-    index.set_duplicate_snapshot([_row("sensor.a", 12)])
-    index.set_counter_decrease_snapshot([_row("sensor.a", 3)])
+def test_entitaet_mit_allen_drei_befunden_eine_zeile(index):
+    _mit_daten(index, "sensor.a", name="Gesamtenergie")
+    _gesamt(index, "sensor.a", duplicates=12, counter_decreases=3, outliers=7)
     matrix = data_quality.build_matrix(index)
     assert len(matrix["rows"]) == 1
     zeile = matrix["rows"][0]
@@ -82,21 +90,33 @@ def test_entitaet_in_allen_drei_quellen_eine_zeile(index):
     assert matrix["totals"]["duplicates"]["count"] == 12
 
 
-def test_entitaet_nur_in_einer_quelle_hat_leere_zellen(index):
-    _entity(index, "sensor.a")
-    index.set_duplicate_snapshot([_row("sensor.a", 5)])
-    index.set_counter_decrease_snapshot([])
+def test_entitaet_nur_mit_einem_befund_hat_leere_zellen(index):
+    _mit_daten(index, "sensor.a")
+    _gesamt(index, "sensor.a", duplicates=5)
     zeile = data_quality.build_matrix(index)["rows"][0]
     assert zeile["cells"]["duplicates"]["count"] == 5
     assert zeile["cells"]["counter_decreases"] is None
     assert zeile["cells"]["outliers"] is None
 
 
+def test_ohne_ausreisser_erkennung_zaehlen_duplikate_trotzdem(index):
+    # Der Wartungsplaner misst auch Entitäten, deren Ausreißer-Erkennung aus ist,
+    # sonst fehlten ihre Duplikate und Zählerrückgänge in der Matrix.
+    _mit_daten(index, "sensor.a", schwelle="off")
+    index.set_cleanup_alltime_stats(
+        "sensor.a", {"all": 10, "duplicates": 4, "counter_decreases": 0}, "off", OUTLIER_RULE_VERSION
+    )
+    matrix = data_quality.build_matrix(index)
+    assert matrix["pending"] == 0
+    assert matrix["rows"][0]["cells"]["duplicates"]["count"] == 4
+
+
 def test_sortiert_nach_summe_absteigend(index):
     for eid in ("sensor.a", "sensor.b", "sensor.c"):
-        _entity(index, eid)
-    index.set_duplicate_snapshot([_row("sensor.a", 2), _row("sensor.b", 9), _row("sensor.c", 5)])
-    index.set_counter_decrease_snapshot([_row("sensor.a", 1)])
+        _mit_daten(index, eid)
+    _gesamt(index, "sensor.a", duplicates=2, counter_decreases=1)
+    _gesamt(index, "sensor.b", duplicates=9)
+    _gesamt(index, "sensor.c", duplicates=5)
     reihenfolge = [r["entity_id"] for r in data_quality.build_matrix(index)["rows"]]
     assert reihenfolge == ["sensor.b", "sensor.c", "sensor.a"]
 
@@ -104,49 +124,31 @@ def test_sortiert_nach_summe_absteigend(index):
 def test_ausreisser_unter_der_auffaelligkeitsmarke_zaehlen_mit(index):
     # 5 von 1000 = 0,5 %: für Housekeeping → Ausreißer unauffällig, als Anzahl
     # in der Matrix aber ein Befund.
-    _entity(index, "sensor.a")
-    _outliers(index, "sensor.a", markiert=5)
-    index.set_duplicate_snapshot([])
-    index.set_counter_decrease_snapshot([])
+    _mit_daten(index, "sensor.a")
+    _gesamt(index, "sensor.a", outliers=5)
     zeile = data_quality.build_matrix(index)["rows"][0]
     assert zeile["cells"]["outliers"]["count"] == 5
 
 
-def test_ausreisser_ohne_treffer_erzeugt_keine_zeile(index):
-    _entity(index, "sensor.a")
-    _outliers(index, "sensor.a", markiert=0)
-    index.set_duplicate_snapshot([])
-    index.set_counter_decrease_snapshot([])
-    assert data_quality.build_matrix(index)["rows"] == []
-
-
-def test_ausreisser_ohne_messung_werden_als_ausstehend_gezaehlt(index):
-    _entity(index, "sensor.a", schwelle="50")
-    _entity(index, "sensor.b", schwelle="50")
-    _outliers(index, "sensor.b", markiert=1)
-    assert data_quality.build_matrix(index)["pending"]["outliers"] == 1
+def test_ausreisser_mit_anderer_schwelle_gezaehlt_gilt_als_ausstehend(index):
+    _mit_daten(index, "sensor.a", schwelle="50")
+    index.set_cleanup_alltime_stats(
+        "sensor.a", {"all": 1000, "outliers": 9, "duplicates": 0, "counter_decreases": 0}, "100", OUTLIER_RULE_VERSION
+    )
+    matrix = data_quality.build_matrix(index)
+    assert matrix["pending"] == 1
+    assert matrix["rows"] == []
 
 
 def test_links_tragen_filter_und_zeitraum(index):
-    _entity(index, "sensor.a")
-    _outliers(index, "sensor.a", markiert=2)
-    index.set_duplicate_snapshot([_row("sensor.a", 1)])
-    index.set_counter_decrease_snapshot([_row("sensor.a", 1)])
+    _mit_daten(index, "sensor.a")
+    _gesamt(index, "sensor.a", duplicates=1, counter_decreases=1, outliers=2)
     zellen = data_quality.build_matrix(index)["rows"][0]["cells"]
     assert zellen["duplicates"]["href"] == "entities/sensor.a/cleanup?filter=duplicates&range=all"
     assert zellen["counter_decreases"]["href"] == (
         "entities/sensor.a/cleanup?filter=counter_decreases&range=all"
     )
     assert zellen["outliers"]["href"] == "entities/sensor.a/cleanup?filter=outliers&range=all"
-
-
-def test_schnappschuss_zeile_ohne_stammdaten_faellt_auf_entity_id_zurueck(index):
-    # Eine Entität kann aus dem Index verschwunden sein, während der
-    # Schnappschuss sie noch kennt.
-    index.set_duplicate_snapshot([_row("sensor.weg", 4)])
-    index.set_counter_decrease_snapshot([])
-    zeile = data_quality.build_matrix(index)["rows"][0]
-    assert zeile["friendly_name"] == "sensor.weg"
 
 
 @pytest.mark.parametrize(
@@ -200,3 +202,18 @@ def test_paginate_leere_liste():
     seite, info = data_quality.paginate([], 1, 50)
     assert seite == []
     assert (info["start"], info["end"], info["total_pages"]) == (0, 0, 1)
+
+
+def test_erlaubte_zaehlerrueckgaenge_werden_gekennzeichnet(index):
+    """Ein Zähler mit "Zählerrückgänge = Erlauben" zählt nie Rückgänge; die leere
+    Zelle soll nicht wie "nichts gefunden" aussehen. Gekennzeichnet wird nur dort,
+    wo es zutrifft (Zähler, Modus allow), und nur in Zeilen, die ohnehin einen Befund haben."""
+    for eid in ("sensor.zaehler", "sensor.normal"):
+        index.get_or_create_entity(eid, "sensor", "total_increasing", "kWh")
+        index.set_first_ts_and_add_rows(eid, 1_700_000_000.0, 0)
+        _gesamt(index, eid, duplicates=3)
+    index.set_counter_decreases("sensor.zaehler", "allow")
+    rows = {r["entity_id"]: r for r in data_quality.build_matrix(index)["rows"]}
+    assert rows["sensor.zaehler"]["counter_allowed"] is True
+    assert rows["sensor.zaehler"]["cells"]["counter_decreases"] is None
+    assert rows["sensor.normal"]["counter_allowed"] is False

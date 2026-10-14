@@ -1,25 +1,23 @@
 """Housekeeping → Datenqualität: Befunde aller Entitäten in einer Matrix.
 
-Reine Zusammenführung der drei vorhandenen Messungen (Duplikat-Schnappschuss,
-Zählerrückgang-Schnappschuss, Ausreißer-Quoten). Rechnet nichts nach und liest
-keine Rohdaten: dieselbe Zahl steht damit in der Matrix, im jeweiligen
-Housekeeping-Abschnitt und am Konfigurationsfeld der Entität. Zwei verschieden
-gemessene Zahlen für dasselbe wären genau die Verwirrung, die eine Übersicht
-auflösen soll.
+Alle drei Spalten zählen die GESAMTE Historie und kommen aus demselben Cache wie
+die Trefferzahlen der Bereinigungsseite (``cleanup_alltime_stats``, je Entität
+im Hintergrund erneuert, siehe cleanup_stats.next_entity_for_outlier_rate).
+Die Matrix rechnet nichts nach und liest keine Rohdaten: dieselbe Zahl steht
+damit hier und im Filter-Dropdown der Bereinigungsseite bei "Gesamt". Zwei
+verschieden gemessene Zahlen für dasselbe wären genau die Verwirrung, die eine
+Übersicht auflösen soll.
 
-Die Fenster der Quellen sind verschieden (Duplikate und Zählerrückgänge:
-30 Tage, Ausreißer: gesamte Historie). Die Spaltenköpfe nennen das. Der Link
-einer Zelle öffnet die Bereinigungsseite der Entität mit dem passenden Filter
-und dem Zeitraum "Gesamt": die Seite kennt nur Kalenderperioden, und ein
-Kalendermonat würde am Monatsanfang Befunde der letzten 30 Tage verschweigen.
-Der Filter hält die Tabelle trotzdem übersichtlich.
+Die Abschnitte Duplikate und Zählerrückgänge in Housekeeping zählen dagegen
+weiter die letzten 30 Tage (eigene Schnappschüsse, auch Grundlage der Meldungen).
+Die Zahlen dort sind deshalb kleiner oder gleich denen der Matrix.
 
 Ohne Routen-Bezug und ohne Zustand, wie cleanup_stats.py.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
@@ -64,8 +62,6 @@ def initial_cleanup_view(
 # Wie viele Einzelbefunde je Kategorie in der aufgeklappten Zeile stehen. Der
 # Rest steht hinter dem Link auf die Bereinigungsseite.
 DETAIL_LIMIT = 5
-# Fenster der Duplikat- und Zählerrückgang-Schnappschüsse (Tage).
-SNAPSHOT_WINDOW_DAYS = 30
 
 
 PAGE_SIZES = (10, 20, 50, 100, 500)
@@ -100,19 +96,6 @@ def cleanup_href(entity_id: str, filter_: str, range_: str) -> str:
     return f"entities/{quote(entity_id, safe='.')}/cleanup?{query}"
 
 
-def _snapshot_counts(snapshot: dict | None) -> dict[str, int] | None:
-    """{entity_id: Anzahl} eines Duplikat- oder Zählerrückgang-Schnappschusses,
-    None wenn es noch keinen gibt (vor dem ersten Lauf oder nach einem
-    Regelwechsel) — das ist etwas anderes als "nichts gefunden"."""
-    if snapshot is None:
-        return None
-    return {
-        row["entity_id"]: row["count"]
-        for row in snapshot.get("rows", [])
-        if row.get("count")
-    }
-
-
 def build_matrix(index: Index) -> dict:
     """Matrix Entität × Befundtyp, absteigend nach der Summe der Befunde.
 
@@ -120,32 +103,43 @@ def build_matrix(index: Index) -> dict:
       (je Spalte ``count``/``label``/``href``, oder None ohne Befund) und ``total``
     - ``totals``: Summe je Spalte
     - ``affected``: Zahl der Entitäten mit Befund
-    - ``pending``: Quellen ohne Messung, damit "nichts gefunden" nicht wie
-      "noch nicht gemessen" aussieht — ``duplicates``/``counter_decreases`` sind
-      True, solange ihr Schnappschuss fehlt, ``outliers`` ist die Zahl der
-      Entitäten ohne belastbare Quote
+    - ``pending``: Zahl der Entitäten mit Daten, die noch keine belastbare
+      Gesamt-Zählung haben (nie gemessen, oder die Ausreißer-Zahl gehört zu einer
+      anderen Schwelle). Ohne sie sähe "nichts gefunden" wie "noch nicht
+      gemessen" aus.
     """
-    counts: dict[str, dict[str, int]] = {}
-    pending: dict = {}
+    entries = index.list_cleanup_alltime_stats()
+    rates, _ = cleanup_stats.outlier_rates_measured(index)
+    measured_outliers = {r["entity_id"]: r["marked"] for r in rates}
 
-    for key, snapshot in (
-        ("duplicates", index.get_duplicate_snapshot()),
-        ("counter_decreases", index.get_counter_decrease_snapshot()),
-    ):
-        per_entity = _snapshot_counts(snapshot)
-        pending[key] = per_entity is None
-        counts[key] = per_entity or {}
+    counts: dict[str, dict[str, int]] = {column["key"]: {} for column in COLUMNS}
+    names: dict[str, str] = {}
+    # Zähler mit "Zählerrückgänge = Erlauben": ihre Rückgänge werden nie gezählt
+    # (counter_decreases_flagged), die Zelle bliebe also leer und sähe wie
+    # "geprüft, nichts gefunden" aus. Sie wird stattdessen als erlaubt gekennzeichnet.
+    allowed: set[str] = set()
+    pending = 0
+    for entity in index.list_entities():
+        entity_id = entity["entity_id"]
+        names[entity_id] = entity["custom_name"] or entity["friendly_name"] or entity_id
+        if not entity["first_ts"]:
+            continue  # keine Daten, nichts zu messen
+        if entity["state_class"] == "total_increasing" and entity["counter_decreases"] == "allow":
+            allowed.add(entity_id)
+        entry = entries.get(entity_id)
+        outliers_on = effective_outlier_threshold(
+            entity["aggregation_type"], entity["outlier_threshold"]
+        ) != "off"
+        if entry is None or (outliers_on and entity_id not in measured_outliers):
+            pending += 1
+        if entry is not None:
+            entry_counts = entry.get("counts") or {}
+            counts["duplicates"][entity_id] = entry_counts.get("duplicates") or 0
+            counts["counter_decreases"][entity_id] = entry_counts.get("counter_decreases") or 0
+        if entity_id in measured_outliers:
+            counts["outliers"][entity_id] = measured_outliers[entity_id]
 
-    rates, outliers_pending = cleanup_stats.outlier_rates_measured(index)
-    pending["outliers"] = outliers_pending
-    counts["outliers"] = {r["entity_id"]: r["marked"] for r in rates if r["marked"]}
-
-    names = {
-        e["entity_id"]: e["custom_name"] or e["friendly_name"] or e["entity_id"]
-        for e in index.list_entities()
-    }
-
-    entity_ids = set().union(*(c.keys() for c in counts.values()))
+    entity_ids = {eid for column in counts.values() for eid, n in column.items() if n}
     rows = []
     for entity_id in entity_ids:
         cells = {}
@@ -163,6 +157,7 @@ def build_matrix(index: Index) -> dict:
             "friendly_name": names.get(entity_id, entity_id),
             "cells": cells,
             "total": total,
+            "counter_allowed": entity_id in allowed,
         })
     rows.sort(key=lambda r: (-r["total"], r["entity_id"]))
 
@@ -202,9 +197,9 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
     Liest die Rohdaten, deshalb nur auf Klick und nur für diese Entität, nicht
     im Hintergrund. Verwendet dieselbe Analyse wie die Bereinigungsseite
     (analyze_raw_rows_page), damit Zeitpunkte, Werte und Begründungen exakt
-    dort wiederzufinden sind. Das Fenster ist je Kategorie das der Zahl in der
-    Matrix: 30 Tage für Duplikate und Zählerrückgänge, die gesamte Historie für
-    Ausreißer. Kategorien ohne Befund fehlen im Ergebnis."""
+    dort wiederzufinden sind. Fenster ist die gesamte Historie, wie bei den Zahlen
+    der Matrix. Kategorien ohne Befund fehlen im Ergebnis; solche, die der Cache
+    schon mit 0 kennt, werden gar nicht erst gescannt."""
     now = now or datetime.now(tz)
     entity_id = entity["entity_id"]
     decimals = entity["decimals"]
@@ -214,6 +209,8 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
         entity["aggregation_type"], entity["outlier_threshold"]
     )
     counter_enabled = cleanup_stats.counter_decreases_flagged(entity)
+    cached = (index.get_cleanup_alltime_stats(entity_id) or {}).get("counts") or {}
+    start = datetime.fromtimestamp(entity["first_ts"], tz) if entity["first_ts"] else now
     groups = []
     for column in COLUMNS:
         key = column["key"]
@@ -221,12 +218,10 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
             continue
         if key == "outliers" and outlier_threshold == "off":
             continue
-        if key == "outliers":
-            start = datetime.fromtimestamp(entity["first_ts"], tz) if entity["first_ts"] else now
-        else:
-            start = now - timedelta(days=SNAPSHOT_WINDOW_DAYS)
+        if cached and not cached.get(column["filter"]):
+            continue
 
-        def rows_factory(start=start):
+        def rows_factory():
             return cleanup.iter_raw_rows(
                 data_dir, index, entity_id, start.timestamp(), now.timestamp(), tz, now=now
             )

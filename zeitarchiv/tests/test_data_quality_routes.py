@@ -17,9 +17,13 @@ def _entity(index, entity_id: str) -> None:
 def test_datenqualitaet_seite_zeigt_die_matrix_mit_link_auf_die_bereinigung(client) -> None:
     from app.main import index
 
+    from app.storage.cleanup import OUTLIER_RULE_VERSION
+
     _entity(index, "sensor.pytest_dq_matrix")
-    index.set_duplicate_snapshot(
-        [{"entity_id": "sensor.pytest_dq_matrix", "friendly_name": None, "count": 12}]
+    index.set_first_ts_and_add_rows("sensor.pytest_dq_matrix", 1_700_000_000.0, 0)
+    index.set_cleanup_alltime_stats(
+        "sensor.pytest_dq_matrix", {"all": 100, "duplicates": 12, "counter_decreases": 0},
+        "off", OUTLIER_RULE_VERSION,
     )
     html = client.get("/housekeeping/datenqualitaet").text
     assert 'href="/entities/sensor.pytest_dq_matrix/cleanup?filter=duplicates&amp;range=all"' in html
