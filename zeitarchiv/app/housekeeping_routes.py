@@ -1296,15 +1296,30 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
 
     @router.get("/housekeeping/datenqualitaet", response_class=HTMLResponse)
-    def data_quality_view(request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE) -> HTMLResponse:
+    def data_quality_view(
+        request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE,
+        view: str = "table", days: int = data_quality.DEFAULT_HEATMAP_DAYS, kind: str = "all",
+    ) -> HTMLResponse:
         """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
         (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
         mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
         liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
         matrix = data_quality.build_matrix(deps.index)
-        matrix["rows"], pagination = data_quality.paginate(matrix["rows"], page, page_size)
+        heatmap = None
+        if view == "heatmap":
+            heatmap = data_quality.build_heatmap(
+                deps.index, days=days, kind=kind, today=datetime.now(deps.tz).date()
+            )
+            heatmap["rows"], pagination = data_quality.paginate(heatmap["rows"], page, page_size)
+        else:
+            view = "table"
+            matrix["rows"], pagination = data_quality.paginate(matrix["rows"], page, page_size)
         return deps.templates.TemplateResponse(
-            request, "data_quality.html", {"data_quality": matrix, "pagination": pagination}
+            request, "data_quality.html",
+            {
+                "data_quality": matrix, "heatmap": heatmap, "pagination": pagination, "view": view,
+                "heatmap_days": data_quality.HEATMAP_DAYS, "heatmap_kinds": data_quality.HEATMAP_KINDS,
+            },
         )
 
     @router.get("/entities/{entity_id}/data-quality", response_class=HTMLResponse)

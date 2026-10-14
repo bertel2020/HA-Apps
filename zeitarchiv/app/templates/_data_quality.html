@@ -11,6 +11,32 @@
   <div class="stat"><div class="label">{{ labels[col.key] }}</div><div class="value">{{ dq.totals[col.key].label }}</div></div>
   {% endfor %}
 </div>
+{% set is_heat = view == 'heatmap' %}
+{% set extra = ('&amp;view=heatmap&amp;days=' ~ heatmap.days ~ '&amp;kind=' ~ heatmap.kind) if is_heat else '' %}
+<div class="dq-toolbar">
+  <div class="dq-views" role="group">
+    <a class="btn btn-sm{% if not is_heat %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet">{{ _("Tabelle") }}</a>
+    <a class="btn btn-sm{% if is_heat %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet?view=heatmap">{{ _("Heatmap") }}</a>
+  </div>
+  {% if is_heat %}
+  <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+    <input type="hidden" name="view" value="heatmap">
+    <select name="kind" title="{{ _('Befundtyp') }}" onchange="this.form.submit()">
+      {% for k in heatmap_kinds %}
+      <option value="{{ k }}" {% if heatmap.kind == k %}selected{% endif %}>{{ _("Alle Befunde") if k == 'all' else labels[k] }}</option>
+      {% endfor %}
+    </select>
+    <select name="days" title="{{ _('Zeitraum') }}" onchange="this.form.submit()">
+      {% for d in heatmap_days %}
+      <option value="{{ d }}" {% if heatmap.days == d %}selected{% endif %}>{{ _("Letzte {days} Tage", days=d) }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+{% if is_heat %}
+{% include "_data_quality_heatmap.html" %}
+{% else %}
 <div class="tbl-wrap">
   {% if dq.rows %}
   <table class="dt dq-table">
@@ -49,11 +75,13 @@
   <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>
   {% endif %}
 </div>
+{% endif %}
 {% if pagination and pagination.total > 10 %}
 <form class="pager dq-pager" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+  {% if is_heat %}<input type="hidden" name="view" value="heatmap"><input type="hidden" name="days" value="{{ heatmap.days }}"><input type="hidden" name="kind" value="{{ heatmap.kind }}">{% endif %}
   <div class="dq-pager-nav">
     <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
-    {% set q = '?page_size=' ~ pagination.page_size %}
+    {% set q = '?page_size=' ~ pagination.page_size ~ extra %}
     {% for label, target, off, title in [('«', 1, pagination.page <= 1, _('Erste Seite')), ('‹', pagination.page - 1, pagination.page <= 1, _('Vorherige Seite')), ('›', pagination.page + 1, pagination.page >= pagination.total_pages, _('Nächste Seite')), ('»', pagination.total_pages, pagination.page >= pagination.total_pages, _('Letzte Seite'))] %}
     {% if loop.index == 3 %}
     <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="this.form.submit()"> / {{ pagination.total_pages }}</span>
@@ -68,6 +96,8 @@
   </select>
 </form>
 {% endif %}
-{% if dq.pending %}
+{% if is_heat and heatmap.pending %}
+<p class="hint hint-status" style="margin-top:14px;">{{ _("Für {pending} von {total} Entitäten liegen noch keine vollständigen Tageszahlen vor, die Messung läuft im Hintergrund.", pending=heatmap.pending, total=dq.entity_count) }}</p>
+{% elif dq.pending %}
 <p class="hint hint-status" style="margin-top:14px;">{{ _("Für {pending} von {total} Entitäten liegt noch keine vollständige Messung vor, sie läuft im Hintergrund.", pending=dq.pending, total=dq.entity_count) }}</p>
 {% endif %}

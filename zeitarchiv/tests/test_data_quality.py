@@ -285,3 +285,64 @@ def test_aufgeklappte_duplikate_fassen_ein_paar_zu_einem_eintrag_zusammen(tmp_pa
         assert duplikate["more"] == 0
     finally:
         idx.close()
+
+
+def test_offset_fuer_einen_tag():
+    from datetime import date
+
+    heute = date(2026, 10, 14)
+    assert data_quality.offset_for_day("2026-10-14", heute) == 0
+    assert data_quality.offset_for_day("2026-10-10", heute) == -4
+    assert data_quality.offset_for_day("2026-10-20", heute) == 0  # Zukunft
+    assert data_quality.offset_for_day("quatsch", heute) == 0
+    assert data_quality.offset_for_day(None, heute) == 0
+
+
+def _mit_tageszahlen(index, entity_id, daily, **counts):
+    _mit_daten(index, entity_id)
+    index.set_cleanup_alltime_stats(
+        entity_id,
+        {"all": 1000, "outliers": 0, "gaps": 0, "duplicates": 0, "repetitions": 0,
+         "counter_decreases": 0, **counts},
+        "50", OUTLIER_RULE_VERSION, daily=daily, gap_threshold="15",
+    )
+
+
+def test_heatmap_zaehlt_je_tag_und_verlinkt_den_tag(index):
+    from datetime import date
+
+    heute = date(2026, 10, 14)
+    _mit_tageszahlen(
+        index, "sensor.a",
+        {"2026-10-14": {"duplicates": 4, "gaps": 1}, "2026-10-12": {"counter_decreases": 2},
+         "2020-01-01": {"duplicates": 99}},  # außerhalb des Fensters
+        duplicates=103, counter_decreases=2, gaps=1,
+    )
+    alle = data_quality.build_heatmap(index, days=30, kind="all", today=heute)
+    assert alle["day_list"][-1] == "2026-10-14" and len(alle["day_list"]) == 30
+    zeile = alle["rows"][0]
+    assert zeile["total"] == 7  # 4 + 1 + 2, der Tag von 2020 zählt nicht
+    letzter = zeile["cells"][-1]
+    assert letzter["count"] == 5 and letzter["level"] == 4
+    assert letzter["href"] == "entities/sensor.a/cleanup?filter=all&range=day&date=2026-10-14"
+    assert zeile["cells"][-2]["href"] is None  # Tag ohne Befund: kein Link
+
+    nur_luecken = data_quality.build_heatmap(index, days=30, kind="gaps", today=heute)
+    assert nur_luecken["rows"][0]["total"] == 1
+    assert nur_luecken["rows"][0]["cells"][-1]["href"].startswith("entities/sensor.a/cleanup?filter=gaps")
+
+
+def test_heatmap_ohne_tageszahlen_gilt_als_nicht_gemessen(index):
+    from datetime import date
+
+    _mit_tageszahlen(index, "sensor.neu", None, duplicates=5)  # Eintrag ohne "daily"
+    heatmap = data_quality.build_heatmap(index, days=30, kind="all", today=date(2026, 10, 14))
+    assert heatmap["rows"] == []
+    assert heatmap["pending"] == 1
+
+
+def test_heatmap_ungueltige_angaben_fallen_auf_standard(index):
+    from datetime import date
+
+    heatmap = data_quality.build_heatmap(index, days=7, kind="quatsch", today=date(2026, 10, 14))
+    assert heatmap["days"] == data_quality.DEFAULT_HEATMAP_DAYS and heatmap["kind"] == "all"

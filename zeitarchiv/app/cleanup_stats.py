@@ -299,6 +299,7 @@ def next_entity_for_outlier_rate(index: Index, now: float):
             eintrag is None
             or (not ohne_erkennung and _rate_from_entry(entity, eintrag) is None)
             or not gaps_measured(entity, eintrag)
+            or "daily" not in eintrag  # vor den Tageszählern gemessen: für die Heatmap neu rechnen
         ):
             faellig.append((0.0, entity))
             continue

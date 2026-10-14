@@ -55,3 +55,33 @@ td.entity .id{display:block;font-family:var(--font-mono);font-size:calc(11px * v
 .dq-entity-cell{display:flex;align-items:flex-start;gap:6px;}
 .dq-entity-cell .dq-caret{margin-top:2px;}
 .dq-entity-text{min-width:0;}
+
+/* Umschalter Tabelle/Heatmap und Filter der Heatmap */
+.dq-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.dq-views{display:inline-flex;gap:6px;}
+.dq-views .btn.is-active{background:var(--accent-line-soft);color:var(--accent-line);border-color:var(--accent-line);}
+.dq-filters{display:flex;flex-wrap:wrap;gap:8px;}
+
+/* Heatmap Entität × Tag (_data_quality_heatmap.html); die Tabelle scrollt in ihrem Rahmen */
+.dq-heat-wrap{overflow-x:auto;}
+table.dq-heat{--hm:var(--accent-line);border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;}
+table.dq-heat.sev-info{--hm:var(--accent-line);}
+table.dq-heat.sev-warn{--hm:var(--notice-warn);}
+table.dq-heat.sev-crit{--hm:var(--danger);}
+table.dq-heat th,table.dq-heat td{padding:3px 2px;}
+table.dq-heat th.dq-heat-day{font-size:calc(10px * var(--font-scale, 1));font-weight:500;color:var(--ink-faint);text-align:center;font-variant-numeric:tabular-nums;}
+table.dq-heat th.dq-heat-day.first{color:var(--ink);font-weight:700;}
+table.dq-heat .dq-heat-entity{position:sticky;left:0;z-index:1;background:var(--surface);min-width:190px;max-width:260px;padding:6px 12px 6px 14px;text-align:left;}
+table.dq-heat .dq-num{padding:6px 12px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.dq-heat-cell{width:18px;min-width:18px;}
+.hm{display:block;width:16px;height:22px;border-radius:3px;background:color-mix(in srgb,var(--ink-faint) 14%,transparent);}
+a.hm{background:var(--hm);}
+a.hm.l1{background:color-mix(in srgb,var(--hm) 28%,transparent);}
+a.hm.l2{background:color-mix(in srgb,var(--hm) 52%,transparent);}
+a.hm.l3{background:color-mix(in srgb,var(--hm) 76%,transparent);}
+a.hm.l4{background:var(--hm);}
+a.hm:hover,a.hm:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
+@media (max-width:640px){
+  table.dq-heat .dq-heat-entity{min-width:130px;max-width:150px;padding:6px 8px;}
+  .dq-toolbar{flex-direction:column;align-items:stretch;}
+}

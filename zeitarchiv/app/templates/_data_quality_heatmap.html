@@ -1,0 +1,28 @@
+{# Heatmap der Datenqualität: eine Zeile je Entität, ein Feld je Tag, Farbe = Zahl der Befunde.
+   Ein Feld mit Befund öffnet die Bereinigung der Entität für genau diesen Tag. #}
+<div class="tbl-wrap dq-heat-wrap">
+  {% if heatmap.rows %}
+  <table class="dq-heat sev-{{ {'duplicates': 'info', 'counter_decreases': 'crit', 'outliers': 'warn', 'gaps': 'warn'}.get(heatmap.kind, 'all') }}">
+    <thead><tr>
+      <th class="dq-heat-entity">{{ _("Entität") }}</th>
+      {% for day in heatmap.day_list %}
+      <th class="dq-heat-day{% if day[8:] == '01' %} first{% endif %}" title="{{ day }}">{{ day[8:] | int }}</th>
+      {% endfor %}
+      <th class="dq-num">{{ _("Summe") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for row in heatmap.rows %}
+      <tr>
+        <td class="dq-heat-entity entity"><span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}</td>
+        {% for cell in row.cells %}
+        <td class="dq-heat-cell">{% if cell.href %}<a class="hm l{{ cell.level }}" href="{{ app_root }}/{{ cell.href }}" title="{{ cell.day }}: {{ cell.label }}" aria-label="{{ cell.day }}: {{ cell.label }}"></a>{% else %}<span class="hm l0"></span>{% endif %}</td>
+        {% endfor %}
+        <td class="dq-num">{{ row.total_label }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">{{ _("Keine Befunde im gewählten Zeitraum.") }}</div>
+  {% endif %}
+</div>

@@ -4825,6 +4825,7 @@ def entity_detail(
 @_storage_locked(lambda args: args["entity_id"])
 def entity_cleanup(
     request: Request, entity_id: str, filter: str = "all", range_key: str = Query("day", alias="range"),
+    date: str | None = None,
 ) -> HTMLResponse:
     entity = _require_entity(entity_id)
     outlier_detection_enabled = effective_outlier_threshold(
@@ -4836,6 +4837,10 @@ def entity_cleanup(
         outliers=outlier_detection_enabled,
         gaps=entity["gap_threshold"] != "off",
         counter_decreases=cleanup_stats.counter_decreases_flagged(entity),
+    )
+    # Heatmap: ?date=JJJJ-MM-TT öffnet den Zeitraum "Tag" für genau diesen Tag.
+    initial_offset = (
+        data_quality.offset_for_day(date, datetime.now(TZ).date()) if initial_range == "day" else 0
     )
     # first_date/last_date grenzen den Kalender-Sprung auf den Zeitraum ein, in
     # dem die Entität überhaupt Daten hat (Monatsnavigation im Widget) — welche
@@ -4861,6 +4866,7 @@ def entity_cleanup(
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "initial_filter": initial_filter,
             "initial_range": initial_range,
+            "initial_offset": initial_offset,
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),

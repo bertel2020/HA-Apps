@@ -17,7 +17,8 @@ Ohne Routen-Bezug und ohne Zustand, wie cleanup_stats.py.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
+import math
 from pathlib import Path
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
@@ -95,6 +96,117 @@ def cleanup_href(entity_id: str, filter_: str, range_: str) -> str:
     Bereinigungsseite einer Entität mit gesetztem Filter und Zeitraum."""
     query = urlencode({"filter": filter_, "range": range_})
     return f"entities/{quote(entity_id, safe='.')}/cleanup?{query}"
+
+
+HEATMAP_DAYS = (30, 90, 180)
+DEFAULT_HEATMAP_DAYS = 30
+HEATMAP_KINDS = ("all", "duplicates", "counter_decreases", "outliers", "gaps")
+HEATMAP_LEVELS = 4
+
+
+def offset_for_day(day: str | None, today: date) -> int:
+    """Wie viele Tage die Bereinigungsseite im Zeitraum "Tag" zurückgehen muss, um
+    ``day`` (JJJJ-MM-TT) zu zeigen: 0 für heute, negativ davor. Ungültig oder in
+    der Zukunft ergibt 0 (die Seite zeigt dann den heutigen Tag, wie ohne Angabe)."""
+    if not day:
+        return 0
+    try:
+        target = date.fromisoformat(day)
+    except ValueError:
+        return 0
+    return min(0, (target - today).days)
+
+
+def heatmap_href(entity_id: str, kind: str, day: str) -> str:
+    """Link eines Heatmap-Feldes: Bereinigungsseite der Entität, Zeitraum "Tag" mit
+    genau diesem Tag. Bei "alle Befunde" bleibt der Filter auf "Alle"."""
+    query = urlencode({"filter": kind, "range": "day", "date": day})
+    return f"entities/{quote(entity_id, safe='.')}/cleanup?{query}"
+
+
+def _level(count: int, peak: int) -> int:
+    """Farbstufe 1…HEATMAP_LEVELS, logarithmisch: Ausreißer-Tage mit Tausenden
+    Treffern würden sonst alle übrigen Tage auf Stufe 1 drücken."""
+    if count <= 0 or peak <= 0:
+        return 0
+    return max(1, min(HEATMAP_LEVELS, math.ceil(math.log1p(count) / math.log1p(peak) * HEATMAP_LEVELS)))
+
+
+def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
+    """Heatmap Entität × Tag aus den Tageszählern des Gesamt-Caches.
+
+    Liest nur den Cache (``daily``), keine Rohdaten. Dieselben Gültigkeitsregeln
+    wie die Matrix: Ausreißer- und Lücken-Tage zählen nur, wenn die Zahl mit der
+    aktuellen Schwelle gemessen wurde. Entitäten ohne ``daily`` (noch nicht
+    seit der Einführung der Tageszähler neu gemessen) sind ``pending``.
+    """
+    if days not in HEATMAP_DAYS:
+        days = DEFAULT_HEATMAP_DAYS
+    if kind not in HEATMAP_KINDS:
+        kind = "all"
+    keys = [kind] if kind != "all" else [column["key"] for column in COLUMNS]
+    day_list = [(today - timedelta(days=days - 1 - i)).isoformat() for i in range(days)]
+
+    entries = index.list_cleanup_alltime_stats()
+    rates, _ = cleanup_stats.outlier_rates_measured(index)
+    measured_outliers = {r["entity_id"] for r in rates}
+
+    rows = []
+    pending = 0
+    peak = 0
+    for entity in index.list_entities():
+        entity_id = entity["entity_id"]
+        if not entity["first_ts"]:
+            continue
+        entry = entries.get(entity_id)
+        outliers_on = effective_outlier_threshold(
+            entity["aggregation_type"], entity["outlier_threshold"]
+        ) != "off"
+        gaps_ok = cleanup_stats.gaps_measured(entity, entry)
+        if (
+            entry is None or "daily" not in entry
+            or (outliers_on and entity_id not in measured_outliers) or not gaps_ok
+        ):
+            pending += 1
+        if entry is None or "daily" not in entry:
+            continue
+        valid = {"duplicates", "counter_decreases"}
+        if entity_id in measured_outliers:
+            valid.add("outliers")
+        if gaps_ok:
+            valid.add("gaps")
+        use = [key for key in keys if key in valid]
+        daily = entry["daily"]
+        cells = []
+        total = 0
+        for day in day_list:
+            per_day = daily.get(day) or {}
+            count = sum(per_day.get(key, 0) for key in use)
+            total += count
+            peak = max(peak, count)
+            cells.append(count)
+        if total:
+            rows.append({
+                "entity_id": entity_id,
+                "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
+                "counts": cells,
+                "total": total,
+            })
+    rows.sort(key=lambda r: (-r["total"], r["entity_id"]))
+    for row in rows:
+        row["cells"] = [
+            {
+                "day": day, "count": count, "label": format_int(count),
+                "level": _level(count, peak),
+                "href": heatmap_href(row["entity_id"], kind, day) if count else None,
+            }
+            for day, count in zip(day_list, row["counts"])
+        ]
+        row["total_label"] = format_int(row["total"])
+    return {
+        "kind": kind, "days": days, "day_list": day_list, "rows": rows,
+        "pending": pending, "peak": peak,
+    }
 
 
 def build_matrix(index: Index) -> dict:
