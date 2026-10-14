@@ -40,7 +40,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import formats
 from . import cleanup_stats
-from . import cleanup_tile, counter_auto, counter_bulk
+from . import cleanup_tile, counter_auto, counter_bulk, data_quality
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -883,6 +883,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "duplicates_by_entity": duplicates_by_entity,
                 "duplicates_total": duplicates_total,
                 **_counter_decreases_context(),
+                "data_quality": data_quality.build_matrix(deps.index),
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(
@@ -1292,6 +1293,31 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 result = tr("Retention fehlgeschlagen: {error}", error=outcome['error'])
         return deps.templates.TemplateResponse(
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
+        )
+
+    @router.get("/housekeeping/datenqualitaet", response_class=HTMLResponse)
+    def data_quality_view(request: Request) -> HTMLResponse:
+        """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
+        (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
+        mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
+        liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
+        return deps.templates.TemplateResponse(
+            request, "data_quality.html", {"data_quality": data_quality.build_matrix(deps.index)}
+        )
+
+    @router.get("/entities/{entity_id}/data-quality", response_class=HTMLResponse)
+    @deps.storage_locked(lambda args: args["entity_id"])
+    def entity_data_quality(request: Request, entity_id: str) -> HTMLResponse:
+        """Aufgeklappte Zeile der Datenqualitäts-Übersicht: die jüngsten Einzelbefunde
+        dieser Entität (siehe data_quality.findings_for_entity). Wird erst beim Aufklappen geladen,
+        weil sie die Rohdaten liest."""
+        entity = deps.index.get_entity(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        return deps.templates.TemplateResponse(
+            request,
+            "_data_quality_detail.html",
+            {"groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity)},
         )
 
     @router.post("/entities/{entity_id}/counter-decreases", response_class=HTMLResponse)

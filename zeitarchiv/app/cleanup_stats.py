@@ -207,24 +207,12 @@ def rate_labels(rate: dict) -> dict:
     )
 
 
-def outlier_rate_overview(index: Index) -> dict:
-    """Markierungsquoten ALLER Entitäten aus dem vorhandenen Cache — Grundlage
-    für Housekeeping → Ausreißer und die zugehörige Meldung.
-
-    Rechnet selbst nichts nach: die Zahlen sind exakt die, die auch am
-    Konfigurationsfeld der jeweiligen Entität stehen (siehe outlier_rate()).
-    Zwei Stellen mit zwei verschieden gemessenen "Markierungsquoten" wären
-    genau die Verwirrung, die eine Übersicht auflösen soll.
-
-    Gefüllt wird der Cache vom Wartungsplaner (eine Entität je Takt, siehe
-    background.py) und nebenbei von jedem Besuch der Bereinigungsseite.
-
-    - ``rows``: auffällige Entitäten, absteigend nach Quote
-    - ``highest``: die höchste gemessene Quote überhaupt, auch unauffällig —
-      damit ein leerer Abschnitt belegen kann, dass gemessen wurde
-    - ``measured``/``pending``: wie weit der Hintergrundlauf ist. Ohne diese
-      Zahl sähe "nichts gefunden" genauso aus wie "noch nichts gemessen".
-    """
+def outlier_rates_measured(index: Index) -> tuple[list[dict], int]:
+    """Alle gemessenen Markierungsquoten (absteigend nach Quote) und die Zahl
+    der Entitäten, die noch keine belastbare Messung haben — ohne den
+    Auffälligkeits-Filter von outlier_rate_overview(). Gemeinsame Quelle für
+    Housekeeping → Ausreißer und die Datenqualitäts-Übersicht, damit beide
+    exakt dieselbe Messung zeigen."""
     eintraege = index.list_cleanup_alltime_stats()
     gemessen: list[dict] = []
     offen = 0
@@ -245,6 +233,28 @@ def outlier_rate_overview(index: Index) -> dict:
             **quote,
         }))
     gemessen.sort(key=lambda r: r["percent"], reverse=True)
+    return gemessen, offen
+
+
+def outlier_rate_overview(index: Index) -> dict:
+    """Markierungsquoten ALLER Entitäten aus dem vorhandenen Cache — Grundlage
+    für Housekeeping → Ausreißer und die zugehörige Meldung.
+
+    Rechnet selbst nichts nach: die Zahlen sind exakt die, die auch am
+    Konfigurationsfeld der jeweiligen Entität stehen (siehe outlier_rate()).
+    Zwei Stellen mit zwei verschieden gemessenen "Markierungsquoten" wären
+    genau die Verwirrung, die eine Übersicht auflösen soll.
+
+    Gefüllt wird der Cache vom Wartungsplaner (eine Entität je Takt, siehe
+    background.py) und nebenbei von jedem Besuch der Bereinigungsseite.
+
+    - ``rows``: auffällige Entitäten, absteigend nach Quote
+    - ``highest``: die höchste gemessene Quote überhaupt, auch unauffällig —
+      damit ein leerer Abschnitt belegen kann, dass gemessen wurde
+    - ``measured``/``pending``: wie weit der Hintergrundlauf ist. Ohne diese
+      Zahl sähe "nichts gefunden" genauso aus wie "noch nichts gemessen".
+    """
+    gemessen, offen = outlier_rates_measured(index)
     return {
         "rows": [r for r in gemessen if r["percent"] >= OUTLIER_RATE_NOTABLE_PERCENT],
         "highest": gemessen[0] if gemessen else None,

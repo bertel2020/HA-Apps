@@ -14,6 +14,23 @@
     {% include "_housekeeping_nav.html" %}
     <div class="settings-panel">
 
+      <section id="datenqualitaet" class="settings-section">
+        <h2 class="settings-section-title">{{ _("Datenqualität") }}</h2>
+        {% set dq = data_quality %}
+        <p class="settings-section-description">{{ _("Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Übersicht.") }}</p>
+        <div class="dq-teaser">
+          {% if dq.affected %}
+          <span><b>{{ dq.affected_label }}</b> {{ _("Entitäten betroffen") }}</span>
+          <span><b>{{ dq.totals.duplicates.label }}</b> {{ _("Duplikate") }}</span>
+          <span><b>{{ dq.totals.counter_decreases.label }}</b> {{ _("Zählerrückgänge") }}</span>
+          <span><b>{{ dq.totals.outliers.label }}</b> {{ _("Ausreißer") }}</span>
+          {% else %}
+          <span>{{ _("Keine Befunde gefunden.") }}</span>
+          {% endif %}
+          <a class="btn btn-sm" href="{{ app_root }}/housekeeping/datenqualitaet">{{ _("Übersicht öffnen") }}</a>
+        </div>
+      </section>
+
       <section id="entitaeten" class="settings-section">
         <div class="hk-section-head">
           <h2 class="settings-section-title">{{ _("Inaktive Entitäten") }} {{ hint_button(_('Inaktive Entitäten')) }}</h2>

@@ -155,7 +155,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats, cleanup_tile
+from . import cleanup_stats, cleanup_tile, data_quality
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
@@ -4823,8 +4823,20 @@ def entity_detail(
 
 @app.get("/entities/{entity_id}/cleanup", response_class=HTMLResponse)
 @_storage_locked(lambda args: args["entity_id"])
-def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
+def entity_cleanup(
+    request: Request, entity_id: str, filter: str = "all", range_key: str = Query("day", alias="range"),
+) -> HTMLResponse:
     entity = _require_entity(entity_id)
+    outlier_detection_enabled = effective_outlier_threshold(
+        entity["aggregation_type"], entity["outlier_threshold"]
+    ) != "off"
+    # Startwerte aus dem Link der Datenqualitäts-Übersicht (Housekeeping).
+    initial_filter, initial_range = data_quality.initial_cleanup_view(
+        filter, range_key,
+        outliers=outlier_detection_enabled,
+        gaps=entity["gap_threshold"] != "off",
+        counter_decreases=cleanup_stats.counter_decreases_flagged(entity),
+    )
     # first_date/last_date grenzen den Kalender-Sprung auf den Zeitraum ein, in
     # dem die Entität überhaupt Daten hat (Monatsnavigation im Widget) — welche
     # einzelnen Tage INNERHALB dieses Bereichs tatsächlich Daten haben, liefert
@@ -4845,10 +4857,10 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
-            "outlier_detection_enabled": effective_outlier_threshold(
-                entity["aggregation_type"], entity["outlier_threshold"]
-            ) != "off",
+            "outlier_detection_enabled": outlier_detection_enabled,
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
+            "initial_filter": initial_filter,
+            "initial_range": initial_range,
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),

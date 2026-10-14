@@ -1,0 +1,55 @@
+{# Seite Datenqualität (/housekeeping/datenqualitaet): eine Zeile je Entität mit Befund, eine Spalte je
+   Befundtyp. Rechnet nichts nach, die Zahlen kommen aus denselben
+   Schnappschüssen wie die Abschnitte darunter (siehe data_quality.py). Eine
+   Zahl führt auf die Bereinigungsseite der Entität mit gesetztem Filter, die
+   Zeile selbst klappt die jüngsten Einzelbefunde auf. #}
+{% set dq = data_quality %}
+{% set labels = {'duplicates': _("Duplikate"), 'counter_decreases': _("Zählerrückgänge"), 'outliers': _("Ausreißer")} %}
+{% set windows = {'duplicates': _("30 Tage"), 'counter_decreases': _("30 Tage"), 'outliers': _("gesamt")} %}
+<p class="settings-section-description">{{ _("Duplikate, Zählerrückgänge und Ausreißer aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigungsseite der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde.") }}</p>
+{% if dq.pending.duplicates or dq.pending.counter_decreases %}
+<p class="hint hint-status">{{ _("Duplikate und Zählerrückgänge werden stündlich im Hintergrund gezählt und liegen noch nicht vollständig vor.") }}</p>
+{% endif %}
+<div class="dq-sums">
+  <div class="dq-sum"><b>{{ dq.affected_label }}</b><span>{{ _("Entitäten betroffen") }}</span></div>
+  {% for col in dq.columns %}
+  <div class="dq-sum"><b>{{ dq.totals[col.key].label }}</b><span>{{ labels[col.key] }}</span></div>
+  {% endfor %}
+</div>
+<div class="tbl-wrap">
+  {% if dq.rows %}
+  <table class="dt dq-table">
+    <thead><tr>
+      <th>{{ _("Entität") }}</th>
+      {% for col in dq.columns %}
+      <th class="dq-num">{{ labels[col.key] }}<span class="dq-window">{{ windows[col.key] }}</span></th>
+      {% endfor %}
+    </tr></thead>
+    {% for row in dq.rows %}
+    <tbody class="dq-entity" x-data="{ open: false }">
+      <tr class="dq-row" :class="{ 'is-open': open }" tabindex="0"
+          hx-get="{{ app_root }}/entities/{{ row.entity_id }}/data-quality" hx-trigger="click once, keydown[key=='Enter'] once"
+          hx-target="#dq-detail-{{ loop.index }}" hx-swap="innerHTML"
+          @click="open = !open" @keydown.enter="open = !open">
+        <td class="entity">
+          <span class="dq-caret" aria-hidden="true">▸</span>
+          <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
+        </td>
+        {% for col in dq.columns %}
+        {% set cell = row.cells[col.key] %}
+        <td class="dq-num">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% else %}<span class="dq-none">–</span>{% endif %}</td>
+        {% endfor %}
+      </tr>
+      <tr class="dq-detail" x-show="open" x-cloak>
+        <td colspan="{{ dq.columns | length + 1 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body"><span class="hint">{{ _("Lädt …") }}</span></div></td>
+      </tr>
+    </tbody>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>
+  {% endif %}
+</div>
+{% if dq.pending.outliers %}
+<p class="hint hint-status" style="margin-top:14px;">{{ _("Ausreißer: {pending} von {total} Entitäten sind noch nicht gemessen, die Messung läuft im Hintergrund.", pending=dq.pending.outliers, total=dq.entity_count) }}</p>
+{% endif %}

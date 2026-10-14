@@ -15,7 +15,7 @@
   {% from "_icons.html" import custom_name_icon %}
   
   {% set display_name = custom_name or friendly_name or entity_id %}
-  <div class="page" x-data="{ range: 'day', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
+  <div class="page" x-data="{ range: '{{ initial_range }}', windowStart: null, windowEnd: null, isCurrent: true, rangeAnchorMs: null, tab: 'cleanup' }">
     <div class="h1-row">
       <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
@@ -108,12 +108,12 @@
          hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML">
       <div class="toolbar">
         <div class="seg" id="range-seg">
-          <button type="button" data-range="hour" onclick="setRange('hour')">{{ _("Stunde") }}</button>
-          <button type="button" class="active" data-range="day" onclick="setRange('day')">{{ _("Tag") }}</button>
-          <button type="button" data-range="week" onclick="setRange('week')">{{ _("Woche") }}</button>
-          <button type="button" data-range="month" onclick="setRange('month')">{{ _("Monat") }}</button>
-          <button type="button" data-range="year" onclick="setRange('year')">{{ _("Jahr") }}</button>
-          <button type="button" data-range="all" onclick="setRange('all')">{{ _("Gesamt") }}</button>
+          <button type="button" {% if initial_range == 'hour' %}class="active" {% endif %}data-range="hour" onclick="setRange('hour')">{{ _("Stunde") }}</button>
+          <button type="button" {% if initial_range == 'day' %}class="active" {% endif %}data-range="day" onclick="setRange('day')">{{ _("Tag") }}</button>
+          <button type="button" {% if initial_range == 'week' %}class="active" {% endif %}data-range="week" onclick="setRange('week')">{{ _("Woche") }}</button>
+          <button type="button" {% if initial_range == 'month' %}class="active" {% endif %}data-range="month" onclick="setRange('month')">{{ _("Monat") }}</button>
+          <button type="button" {% if initial_range == 'year' %}class="active" {% endif %}data-range="year" onclick="setRange('year')">{{ _("Jahr") }}</button>
+          <button type="button" {% if initial_range == 'all' %}class="active" {% endif %}data-range="all" onclick="setRange('all')">{{ _("Gesamt") }}</button>
         </div>
         <!-- Leer bis zum ersten hx-trigger="load"-Roundtrip — _rows_table.html
              füllt dieses Element per hx-swap-oob (gleiche id), obwohl es
@@ -142,8 +142,8 @@
            selectDDOption() nur hierhin (dd-picker.js erwartet die Id
            "{prefix}-input"), und der oob-Swap ersetzt danach nur noch Knopf
            und Einträge, nicht den Wert. -->
-      <input type="hidden" name="filter" id="rows-filter-input" value="all" onchange="resetPage()">
-      <input type="hidden" name="range" id="range-field" value="day">
+      <input type="hidden" name="filter" id="rows-filter-input" value="{{ initial_filter }}" onchange="resetPage()">
+      <input type="hidden" name="range" id="range-field" value="{{ initial_range }}">
       <input type="hidden" name="offset" id="offset-field" value="0">
       <input type="hidden" name="page" id="page-field" value="1">
       <!-- mode unterscheidet "Bereinigen" (Löschen-Checkboxen+Aktionsleiste)
