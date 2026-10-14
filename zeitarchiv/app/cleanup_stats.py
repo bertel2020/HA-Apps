@@ -140,7 +140,7 @@ def alltime_counts(
     counts = analysis["counts"]
     index.set_cleanup_alltime_stats(
         entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
-        daily=analysis["daily"],
+        daily=analysis["daily"], gap_threshold=gap_threshold,
     )
     return counts
 
@@ -190,6 +190,15 @@ def _rate_from_entry(entity, eintrag: dict | None) -> dict | None:
         "computed_at": eintrag.get("computed_at"),
         "threshold": schwelle,
     }
+
+
+def gaps_measured(entity, eintrag: dict | None) -> bool:
+    """Ob der Cache-Eintrag eine zur aktuellen Lücken-Schwelle passende Lücken-Zahl
+    enthält. Bei ausgeschalteter Erkennung gibt es nichts zu messen (True: der
+    Eintrag ist in diesem Punkt aktuell, die Zahl ist 0)."""
+    if entity["gap_threshold"] == "off":
+        return True
+    return eintrag is not None and eintrag.get("gap_threshold") == entity["gap_threshold"]
 
 
 def rate_labels(rate: dict) -> dict:
@@ -286,7 +295,11 @@ def next_entity_for_outlier_rate(index: Index, now: float):
         ohne_erkennung = effective_outlier_threshold(
             entity["aggregation_type"], entity["outlier_threshold"]
         ) == "off"
-        if eintrag is None or (not ohne_erkennung and _rate_from_entry(entity, eintrag) is None):
+        if (
+            eintrag is None
+            or (not ohne_erkennung and _rate_from_entry(entity, eintrag) is None)
+            or not gaps_measured(entity, eintrag)
+        ):
             faellig.append((0.0, entity))
             continue
         berechnet = eintrag.get("computed_at") or 0.0

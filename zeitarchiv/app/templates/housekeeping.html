@@ -18,7 +18,7 @@
         {% set dq = data_quality %}
         <div class="hk-section-head">
           <h2 class="settings-section-title">{{ _("Datenqualität") }} {{ hint_button(_('Datenqualität')) }}</h2>
-          {% call hint_body('settings-section-description') %}{{ _("Duplikate, Zählerrückgänge und Ausreißer aller Entitäten über die gesamte Historie. Die Abschnitte darunter zählen Duplikate und Zählerrückgänge nur für die letzten 30 Tage.") }}{% endcall %}
+          {% call hint_body('settings-section-description') %}{{ _("Duplikate, Zählerrückgänge, Ausreißer und Lücken aller Entitäten über die gesamte Historie. Die Abschnitte darunter zählen Duplikate und Zählerrückgänge nur für die letzten 30 Tage.") }}{% endcall %}
           <a class="btn btn-sm" href="{{ app_root }}/housekeeping/datenqualitaet">{{ _("Übersicht öffnen") }}</a>
         </div>
         {% if dq.affected %}
@@ -27,6 +27,7 @@
           <div class="stat"><div class="label">{{ _("Duplikate") }}</div><div class="value">{{ dq.totals.duplicates.label }}</div></div>
           <div class="stat"><div class="label">{{ _("Zählerrückgänge") }}</div><div class="value">{{ dq.totals.counter_decreases.label }}</div></div>
           <div class="stat"><div class="label">{{ _("Ausreißer") }}</div><div class="value">{{ dq.totals.outliers.label }}</div></div>
+          <div class="stat"><div class="label">{{ _("Lücken") }}</div><div class="value">{{ dq.totals.gaps.label }}</div></div>
         </div>
         {% else %}
         <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>

@@ -1,14 +1,14 @@
 {
   "app": {
     "Für {pending} von {total} Entitäten liegt noch keine vollständige Messung vor, sie läuft im Hintergrund.": "{pending} of {total} entities have no complete measurement yet, it continues in the background.",
-    "Duplikate, Zählerrückgänge und Ausreißer aller Entitäten über die gesamte Historie. Die Abschnitte darunter zählen Duplikate und Zählerrückgänge nur für die letzten 30 Tage.": "Duplicates, counter decreases and outliers of all entities over the entire history. The sections below count duplicates and counter decreases for the last 30 days only.",
-    "Duplikate, Zählerrückgänge und Ausreißer aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigung der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde. Alle Zahlen zählen die gesamte Historie. Neu angelegte Entitäten erscheinen, sobald die Messung im Hintergrund sie erreicht hat.": "Duplicates, counter decreases and outliers of all entities at a glance. A number opens the entity's cleanup with the matching filter, a click on the row shows the most recent findings. All numbers count the entire history. New entities appear once the background measurement has reached them.",
+    "Duplikate, Zählerrückgänge, Ausreißer und Lücken aller Entitäten über die gesamte Historie. Die Abschnitte darunter zählen Duplikate und Zählerrückgänge nur für die letzten 30 Tage.": "Duplicates, counter decreases, outliers and gaps of all entities over the entire history. The sections below count duplicates and counter decreases for the last 30 days only.",
+    "Duplikate, Zählerrückgänge, Ausreißer und Lücken aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigung der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde. Alle Zahlen zählen die gesamte Historie. Neu angelegte Entitäten erscheinen, sobald die Messung im Hintergrund sie erreicht hat.": "Duplicates, counter decreases, outliers and gaps of all entities at a glance. A number opens the entity's cleanup with the matching filter, a click on the row shows the most recent findings. All numbers count the entire history. New entities appear once the background measurement has reached them.",
     "Vorherige Seite": "Previous page",
     "Nächste Seite": "Next page",
     "{shown} von {total}": "{shown} of {total}",
     "gesamte Historie": "entire history",
     "von {total}": "of {total}",
-    "Duplikate, Zählerrückgänge und Ausreißer aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigung der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde.": "Duplicates, counter decreases and outliers of all entities at a glance. A number opens the entity's cleanup with the matching filter, a click on the row shows the most recent findings.",
+    "Duplikate, Zählerrückgänge, Ausreißer und Lücken aller Entitäten auf einen Blick. Eine Zahl öffnet die Bereinigung der Entität mit dem passenden Filter, ein Klick auf die Zeile zeigt die jüngsten Befunde.": "Duplicates, counter decreases, outliers and gaps of all entities at a glance. A number opens the entity's cleanup with the matching filter, a click on the row shows the most recent findings.",
     "Zeitarchiv — Datenqualität": "Zeitarchiv — Data quality",
     "Übersicht öffnen": "Open overview",
     "Datenqualität": "Data quality",

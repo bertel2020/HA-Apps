@@ -50,7 +50,7 @@ def _entity(index, entity_id, *, schwelle="50", markiert=None, gesamt=1000,
         index.set_cleanup_alltime_stats(
             entity_id, {"all": gesamt, "outliers": markiert},
             schwelle if gezaehlt_mit is None else gezaehlt_mit,
-            OUTLIER_RULE_VERSION,
+            OUTLIER_RULE_VERSION, gap_threshold="15",
         )
         if alter:
             eintrag = index.get_cleanup_alltime_stats(entity_id)
@@ -339,7 +339,7 @@ def test_der_planer_misst_auch_entitaeten_ohne_ausreisser_erkennung(index):
     _entity(index, "sensor.pytest_ohne_erkennung", schwelle="off")
     index.set_first_ts_and_add_rows("sensor.pytest_ohne_erkennung", 1_700_000_000.0, 0)
     assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.pytest_ohne_erkennung"
-    index.set_cleanup_alltime_stats("sensor.pytest_ohne_erkennung", {"all": 10}, "off", OUTLIER_RULE_VERSION)
+    index.set_cleanup_alltime_stats("sensor.pytest_ohne_erkennung", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="15")
     assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
 
 

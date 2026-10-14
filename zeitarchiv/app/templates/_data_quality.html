@@ -4,7 +4,7 @@
    Zahl führt auf die Bereinigungsseite der Entität mit gesetztem Filter, die
    Zeile selbst klappt die jüngsten Einzelbefunde auf. #}
 {% set dq = data_quality %}
-{% set labels = {'duplicates': _("Duplikate"), 'counter_decreases': _("Zählerrückgänge"), 'outliers': _("Ausreißer")} %}
+{% set labels = {'duplicates': _("Duplikate"), 'counter_decreases': _("Zählerrückgänge"), 'outliers': _("Ausreißer"), 'gaps': _("Lücken")} %}
 <div class="stat-row">
   <div class="stat"><div class="label">{{ _("Entitäten betroffen") }}</div><div class="value">{{ dq.affected_label }}</div><div class="sub-value">{{ _("von {total}", total=dq.entity_count) }}</div></div>
   {% for col in dq.columns %}

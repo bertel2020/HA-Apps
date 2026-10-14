@@ -5123,7 +5123,7 @@ def _rows_fragment(
         alltime_counts = counts
         index.set_cleanup_alltime_stats(
             entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
-            daily=daily_counts,
+            daily=daily_counts, gap_threshold=gap_threshold,
         )
     else:
         alltime_counts = cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, now)

@@ -3589,9 +3589,12 @@ class Index:
         outlier_threshold: str | None = None,
         outlier_rule: int | None = None,
         daily: dict | None = None,
+        gap_threshold: str | None = None,
     ) -> None:
         """`daily` sind die Befunde je Kalendertag ({"JJJJ-MM-TT": {Kategorie:
         Anzahl}}, nur Tage mit Befund), aus demselben Durchlauf wie `counts`.
+        `gap_threshold` ist die Lücken-Schwelle, MIT DER gezählt wurde (wie
+        `outlier_threshold`: eine Lücken-Zahl gehört nur zu genau dieser Schwelle).
         Ohne sie (None) fehlt der Schlüssel: der Eintrag stammt dann aus einem
         Pfad, der keine Tageszahlen liefert, und gilt für Tagesansichten als
         nicht gemessen — nicht als "keine Befunde". `outlier_threshold` ist die Schwelle, MIT DER gezählt wurde, und
@@ -3606,6 +3609,7 @@ class Index:
             "counts": counts,
             "outlier_threshold": outlier_threshold,
             "outlier_rule": outlier_rule,
+            "gap_threshold": gap_threshold,
         }
         if daily is not None:
             entry["daily"] = daily

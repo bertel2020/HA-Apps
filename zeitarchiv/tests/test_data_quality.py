@@ -44,7 +44,7 @@ def _gesamt(index, entity_id, *, duplicates=0, counter_decreases=0, outliers=0):
         entity_id,
         {"all": 1000, "outliers": outliers, "gaps": 0, "duplicates": duplicates,
          "repetitions": 0, "counter_decreases": counter_decreases},
-        "50", OUTLIER_RULE_VERSION,
+        "50", OUTLIER_RULE_VERSION, gap_threshold="15",
     )
 
 
@@ -104,7 +104,8 @@ def test_ohne_ausreisser_erkennung_zaehlen_duplikate_trotzdem(index):
     # sonst fehlten ihre Duplikate und Zählerrückgänge in der Matrix.
     _mit_daten(index, "sensor.a", schwelle="off")
     index.set_cleanup_alltime_stats(
-        "sensor.a", {"all": 10, "duplicates": 4, "counter_decreases": 0}, "off", OUTLIER_RULE_VERSION
+        "sensor.a", {"all": 10, "duplicates": 4, "counter_decreases": 0}, "off", OUTLIER_RULE_VERSION,
+        gap_threshold="15"
     )
     matrix = data_quality.build_matrix(index)
     assert matrix["pending"] == 0
@@ -217,3 +218,37 @@ def test_erlaubte_zaehlerrueckgaenge_werden_gekennzeichnet(index):
     assert rows["sensor.zaehler"]["counter_allowed"] is True
     assert rows["sensor.zaehler"]["cells"]["counter_decreases"] is None
     assert rows["sensor.normal"]["counter_allowed"] is False
+
+
+def test_luecken_zaehlen_nur_mit_passender_schwelle(index):
+    """Eine Lücken-Zahl gehört zu der Schwelle, mit der sie gezählt wurde. Nach einer
+    Änderung der Schwelle darf die alte Zahl nicht stehen bleiben; die Entität gilt
+    als nicht gemessen, bis der Planer sie neu gerechnet hat."""
+    _mit_daten(index, "sensor.a")
+    index.set_cleanup_alltime_stats(
+        "sensor.a", {"all": 100, "outliers": 0, "gaps": 7, "duplicates": 0, "repetitions": 0,
+                     "counter_decreases": 0},
+        "50", OUTLIER_RULE_VERSION, gap_threshold="15",
+    )
+    matrix = data_quality.build_matrix(index)
+    assert matrix["rows"][0]["cells"]["gaps"]["count"] == 7
+    assert matrix["rows"][0]["cells"]["gaps"]["href"].startswith("entities/sensor.a/cleanup?filter=gaps")
+    assert matrix["pending"] == 0
+
+    index.set_config("sensor.a", gap_threshold="60")
+    matrix = data_quality.build_matrix(index)
+    assert matrix["rows"] == []
+    assert matrix["pending"] == 1
+
+
+def test_luecken_ausgeschaltet_gibt_nichts_zu_messen(index):
+    _mit_daten(index, "sensor.a")
+    index.set_config("sensor.a", gap_threshold="off")
+    index.set_cleanup_alltime_stats(
+        "sensor.a", {"all": 100, "outliers": 0, "gaps": 0, "duplicates": 2, "repetitions": 0,
+                     "counter_decreases": 0},
+        "50", OUTLIER_RULE_VERSION, gap_threshold="off",
+    )
+    matrix = data_quality.build_matrix(index)
+    assert matrix["pending"] == 0
+    assert matrix["rows"][0]["cells"]["gaps"] is None

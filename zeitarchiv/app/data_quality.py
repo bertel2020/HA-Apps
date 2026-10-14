@@ -34,6 +34,7 @@ COLUMNS: tuple[dict, ...] = (
     {"key": "duplicates", "filter": "duplicates", "range": "all", "severity": "info"},
     {"key": "counter_decreases", "filter": "counter_decreases", "range": "all", "severity": "crit"},
     {"key": "outliers", "filter": "outliers", "range": "all", "severity": "warn"},
+    {"key": "gaps", "filter": "gaps", "range": "all", "severity": "warn"},
 )
 
 CLEANUP_FILTERS = ("all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases")
@@ -104,8 +105,8 @@ def build_matrix(index: Index) -> dict:
     - ``totals``: Summe je Spalte
     - ``affected``: Zahl der Entitäten mit Befund
     - ``pending``: Zahl der Entitäten mit Daten, die noch keine belastbare
-      Gesamt-Zählung haben (nie gemessen, oder die Ausreißer-Zahl gehört zu einer
-      anderen Schwelle). Ohne sie sähe "nichts gefunden" wie "noch nicht
+      Gesamt-Zählung haben (nie gemessen, oder die Ausreißer-/Lücken-Zahl gehört
+      zu einer anderen Schwelle). Ohne sie sähe "nichts gefunden" wie "noch nicht
       gemessen" aus.
     """
     entries = index.list_cleanup_alltime_stats()
@@ -130,12 +131,15 @@ def build_matrix(index: Index) -> dict:
         outliers_on = effective_outlier_threshold(
             entity["aggregation_type"], entity["outlier_threshold"]
         ) != "off"
-        if entry is None or (outliers_on and entity_id not in measured_outliers):
+        gaps_ok = cleanup_stats.gaps_measured(entity, entry)
+        if entry is None or (outliers_on and entity_id not in measured_outliers) or not gaps_ok:
             pending += 1
         if entry is not None:
             entry_counts = entry.get("counts") or {}
             counts["duplicates"][entity_id] = entry_counts.get("duplicates") or 0
             counts["counter_decreases"][entity_id] = entry_counts.get("counter_decreases") or 0
+            if gaps_ok:
+                counts["gaps"][entity_id] = entry_counts.get("gaps") or 0
         if entity_id in measured_outliers:
             counts["outliers"][entity_id] = measured_outliers[entity_id]
 
@@ -179,7 +183,7 @@ def build_matrix(index: Index) -> dict:
 
 # Beschriftung der Markierung je Spalte, wie sie cleanup.analyze_raw_rows_page vergibt.
 def _flag_labels() -> dict[str, str]:
-    return {"duplicates": "Duplikat", "counter_decreases": tr("Zählerrückgang"), "outliers": tr("Ausreißer")}
+    return {"duplicates": "Duplikat", "counter_decreases": tr("Zählerrückgang"), "outliers": tr("Ausreißer"), "gaps": tr("Lücke")}
 
 
 def _reasons_for(key: str, flags: list[dict]) -> list[str]:
@@ -209,7 +213,8 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
         entity["aggregation_type"], entity["outlier_threshold"]
     )
     counter_enabled = cleanup_stats.counter_decreases_flagged(entity)
-    cached = (index.get_cleanup_alltime_stats(entity_id) or {}).get("counts") or {}
+    entry = index.get_cleanup_alltime_stats(entity_id)
+    cached = (entry or {}).get("counts") or {}
     start = datetime.fromtimestamp(entity["first_ts"], tz) if entity["first_ts"] else now
     groups = []
     for column in COLUMNS:
@@ -218,7 +223,11 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
             continue
         if key == "outliers" and outlier_threshold == "off":
             continue
-        if cached and not cached.get(column["filter"]):
+        if key == "gaps" and gap_threshold == "off":
+            continue
+        # Der Cache gilt für die Kategorie nur, wenn er mit der aktuellen Schwelle gezählt ist.
+        cache_valid = cleanup_stats.gaps_measured(entity, entry) if key == "gaps" else True
+        if cached and cache_valid and not cached.get(column["filter"]):
             continue
 
         def rows_factory():
