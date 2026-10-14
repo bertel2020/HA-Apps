@@ -239,7 +239,9 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
             rows_factory,
             filter_=column["filter"],
             page=1,
-            page_size=DETAIL_LIMIT,
+            # Duplikate: ein Zeitstempel belegt mindestens zwei Zeilen, deshalb mehr
+            # holen und unten je Zeitstempel zu einem Eintrag zusammenfassen.
+            page_size=1000 if key == "duplicates" else DETAIL_LIMIT,
             gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
             outlier_factor=None if outlier_threshold == "off" else float(outlier_threshold),
             tz=tz,
@@ -250,12 +252,31 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
         total = analysis["pagination"]["total"]
         if not total:
             continue
+        found = analysis["rows"]
+        if key == "duplicates":
+            # Jedes Paar kommt als zwei Zeilen mit gleichem Zeitstempel (und gleicher
+            # Begründung "2× derselbe Zeitstempel"); eine genügt. Gezählt bleiben
+            # Zeilen, wie in der Matrix und im Filter der Bereinigungsseite.
+            merged: list[dict] = []
+            shown = 0
+            for row in found:
+                if merged and merged[-1]["ts"] == row["ts"]:
+                    shown += 1
+                    continue
+                if len(merged) == DETAIL_LIMIT:
+                    break
+                merged.append(row)
+                shown += 1
+            found = merged
+        else:
+            shown = len(found)
         groups.append({
             "key": key,
             "severity": column["severity"],
             "total": total,
             "total_label": format_int(total),
-            "more": max(0, total - len(analysis["rows"])),
+            "shown": shown,
+            "more": max(0, total - shown),
             "href": cleanup_href(entity_id, column["filter"], column["range"]),
             "rows": [
                 {
@@ -263,7 +284,7 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
                     "value_label": format_value(row["value"], decimals_int),
                     "reasons": _reasons_for(key, row["flags"]),
                 }
-                for row in analysis["rows"]
+                for row in found
             ],
         })
     return groups

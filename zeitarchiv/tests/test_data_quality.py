@@ -252,3 +252,36 @@ def test_luecken_ausgeschaltet_gibt_nichts_zu_messen(index):
     matrix = data_quality.build_matrix(index)
     assert matrix["pending"] == 0
     assert matrix["rows"][0]["cells"]["gaps"] is None
+
+
+def test_aufgeklappte_duplikate_fassen_ein_paar_zu_einem_eintrag_zusammen(tmp_path):
+    """Ein Duplikat-Paar besteht aus zwei Zeilen mit gleichem Zeitstempel; in der
+    aufgeklappten Zeile steht es einmal. Gezählt bleiben Zeilen (6 Zeilen = 3 Paare),
+    damit die Zahl mit Matrix und Filter der Bereinigungsseite übereinstimmt."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.storage import hotbuffer
+
+    tz = ZoneInfo("Europe/Berlin")
+    idx = Index(tmp_path / "index.sqlite")
+    try:
+        idx.get_or_create_entity("sensor.d", "sensor", "measurement", "kWh")
+        idx.set_config("sensor.d", outlier_threshold="off", gap_threshold="off")
+        first = datetime(2024, 7, 1, 8, tzinfo=tz).timestamp()
+        for hour, value in enumerate((1.0, 2.0, 3.0, 4.0)):
+            ts = first + hour * 3600
+            hotbuffer.append(tmp_path, "sensor.d", ts, value, tz)
+            if hour in (1, 2):  # zwei Paare
+                hotbuffer.append(tmp_path, "sensor.d", ts, value, tz)
+            idx.record_write("sensor.d", ts)
+        idx.set_first_ts_and_add_rows("sensor.d", first, 0)
+        now = datetime(2024, 7, 1, 12, tzinfo=tz)
+        groups = data_quality.findings_for_entity(tmp_path, idx, tz, idx.get_entity("sensor.d"), now=now)
+        duplikate = next(g for g in groups if g["key"] == "duplicates")
+        assert duplikate["total"] == 4
+        assert duplikate["shown"] == 4
+        assert len(duplikate["rows"]) == 2
+        assert duplikate["more"] == 0
+    finally:
+        idx.close()
