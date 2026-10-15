@@ -26,3 +26,10 @@
   <div class="empty">{{ _("Keine Befunde im gewählten Zeitraum.") }}</div>
   {% endif %}
 </div>
+{# Auf schmalen Bildschirmen scrollt die Tabelle: dann gleich die jüngsten Tage zeigen. #}
+<script>
+  (function () {
+    var wrap = document.querySelector('.dq-heat-wrap');
+    if (wrap) wrap.scrollLeft = wrap.scrollWidth;
+  })();
+</script>
