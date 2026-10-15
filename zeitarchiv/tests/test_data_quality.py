@@ -10,11 +10,15 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+from contextlib import nullcontext
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
 from app import data_quality
+from app.storage import hotbuffer
 from app.storage.cleanup import OUTLIER_RULE_VERSION
 from app.storage.index import Index
 
@@ -350,3 +354,91 @@ def test_heatmap_ungueltige_angaben_fallen_auf_standard(index):
 
     heatmap = data_quality.build_heatmap(index, days=7, kind="quatsch", today=date(2026, 10, 14))
     assert heatmap["days"] == data_quality.DEFAULT_HEATMAP_DAYS and heatmap["kind"] == "all"
+
+
+# --- Sammelaktion: Duplikate mehrerer Entitäten entfernen --------------------------------
+
+_TZ = ZoneInfo("Europe/Berlin")
+_JETZT = datetime(2024, 8, 15, 12, tzinfo=_TZ)
+
+
+def _lock(_entity_id):
+    return nullcontext()
+
+
+@pytest.fixture()
+def daten():
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-dq-bulk-"))
+    idx = Index(tmp / "index.sqlite")
+    try:
+        yield tmp, idx
+    finally:
+        idx.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _mit_duplikaten(tmp, idx, entity_id, zusaetzliche):
+    """Ein Zeitstempel, dessen Wert (1 + zusaetzliche)-mal geschrieben ist, dazu ein unauffälliger."""
+    idx.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    ts = datetime(2024, 8, 10, 8, tzinfo=_TZ).timestamp()
+    for _ in range(1 + zusaetzliche):
+        hotbuffer.append(tmp, entity_id, ts, 20.0, _TZ)
+        idx.record_write(entity_id, ts)
+    ts2 = ts + 3600
+    hotbuffer.append(tmp, entity_id, ts2, 21.0, _TZ)
+    idx.record_write(entity_id, ts2)
+    idx.set_cleanup_alltime_stats(
+        entity_id, {"all": 2 + zusaetzliche, "duplicates": zusaetzliche, "gaps": 0, "outliers": 0,
+                    "repetitions": 0, "counter_decreases": 0},
+        "50", OUTLIER_RULE_VERSION, daily={"2024-08-10": {"duplicates": zusaetzliche}}, gap_threshold="15",
+    )
+
+
+def test_sammel_vorschau_zaehlt_je_entitaet_und_laesst_saubere_weg(daten):
+    tmp, idx = daten
+    _mit_duplikaten(tmp, idx, "sensor.a", 2)
+    _mit_duplikaten(tmp, idx, "sensor.b", 1)
+    _mit_duplikaten(tmp, idx, "sensor.sauber", 0)
+    vorschau = data_quality.preview_duplicate_removal(
+        tmp, idx, _TZ, ["sensor.a", "sensor.b", "sensor.sauber", "sensor.gibt_es_nicht"], _lock, now=_JETZT
+    )
+    assert {r["entity_id"]: r["count"] for r in vorschau["rows"]} == {"sensor.a": 2, "sensor.b": 1}
+    assert vorschau["total"] == 3
+
+
+def test_sammel_vorschau_schreibt_nichts(daten):
+    tmp, idx = daten
+    _mit_duplikaten(tmp, idx, "sensor.a", 2)
+    data_quality.preview_duplicate_removal(tmp, idx, _TZ, ["sensor.a"], _lock, now=_JETZT)
+    assert data_quality.duplicate_timestamps(tmp, idx, _TZ, "sensor.a", idx.get_entity("sensor.a"), _JETZT)
+
+
+def test_sammel_loeschen_entfernt_nur_ueberzaehlige_und_gleicht_die_zahlen_an(daten):
+    tmp, idx = daten
+    _mit_duplikaten(tmp, idx, "sensor.a", 2)
+    _mit_duplikaten(tmp, idx, "sensor.b", 1)
+    ergebnis = data_quality.remove_duplicates(tmp, idx, _TZ, ["sensor.a", "sensor.b"], _lock, now=_JETZT)
+    assert ergebnis["total"] == 3
+    for entity_id in ("sensor.a", "sensor.b"):
+        assert data_quality.duplicate_timestamps(tmp, idx, _TZ, entity_id, idx.get_entity(entity_id), _JETZT) == []
+        eintrag = idx.get_cleanup_alltime_stats(entity_id)
+        assert eintrag["counts"]["duplicates"] == 0
+        assert "duplicates" not in eintrag["daily"]["2024-08-10"]
+        # veraltet, damit der Wartungsplaner den Rest neu misst
+        assert eintrag["computed_at"] == 0
+
+
+def test_sammel_loeschen_ueberspringt_entitaeten_ohne_duplikate(daten):
+    tmp, idx = daten
+    _mit_duplikaten(tmp, idx, "sensor.sauber", 0)
+    assert data_quality.remove_duplicates(tmp, idx, _TZ, ["sensor.sauber"], _lock, now=_JETZT)["rows"] == []
+
+
+def test_sammel_rueckgaengig_stellt_wieder_her_und_verwirft_die_zahlen(daten):
+    tmp, idx = daten
+    _mit_duplikaten(tmp, idx, "sensor.a", 2)
+    data_quality.remove_duplicates(tmp, idx, _TZ, ["sensor.a"], _lock, now=_JETZT)
+    assert data_quality.undo_duplicate_removal(idx, ["sensor.a"], _lock) == 2
+    assert len(data_quality.duplicate_timestamps(tmp, idx, _TZ, "sensor.a", idx.get_entity("sensor.a"), _JETZT)) == 2
+    eintrag = idx.get_cleanup_alltime_stats("sensor.a")
+    assert "daily" not in eintrag

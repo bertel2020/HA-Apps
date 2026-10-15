@@ -37,11 +37,21 @@
 {% if is_heat %}
 {% include "_data_quality_heatmap.html" %}
 {% else %}
+{% set dup_ids = dq.rows | selectattr('cells.duplicates') | map(attribute='entity_id') | list %}
+<div x-data="{ selected: [] }">
+<form id="dq-bulk-form" hx-post="{{ app_root }}/housekeeping/datenqualitaet/duplicates/preview"
+      hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
+<div class="dq-bulkbar" x-show="selected.length" x-cloak>
+  <span class="dq-bulkbar-count" x-text="selected.length + ' {{ _('gewählt') }}'"></span>
+  <button type="submit" form="dq-bulk-form" class="btn btn-sm">{{ _("Duplikate entfernen …") }}</button>
+  <button type="button" class="btn btn-sm" @click="selected = []">{{ _("Auswahl aufheben") }}</button>
+</div>
+<div id="dq-bulk-panel"></div>
 <div class="tbl-wrap">
   {% if dq.rows %}
   <table class="dt dq-table">
     <thead><tr>
-      <th>{{ _("Entität") }}</th>
+      <th>{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change="selected = $event.target.checked ? {{ dup_ids | tojson }} : []">{% endif %}{{ _("Entität") }}</th>
       {% for col in dq.columns %}
       <th class="dq-num">{{ labels[col.key] }}</th>
       {% endfor %}
@@ -54,6 +64,7 @@
           @click="open = !open" @keydown.enter="open = !open">
         <td class="entity">
           <div class="dq-entity-cell">
+            {% if row.cells.duplicates %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
             <span class="dq-caret" aria-hidden="true">▸</span>
             <div class="dq-entity-text">
               <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
@@ -74,6 +85,7 @@
   {% else %}
   <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>
   {% endif %}
+</div>
 </div>
 {% endif %}
 {% if pagination and pagination.total > 10 %}

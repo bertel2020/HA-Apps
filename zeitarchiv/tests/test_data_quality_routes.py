@@ -107,3 +107,59 @@ def test_heatmap_ansicht_und_startzeitraum_der_bereinigung(client) -> None:
     seite = client.get(f"/entities/sensor.pytest_dq_heat/cleanup?filter=duplicates&range=day&date={gestern}").text
     assert re.search(r'id="offset-field" value="-1"', seite)
     assert re.search(r'id="offset-field" value="0"', client.get("/entities/sensor.pytest_dq_heat/cleanup").text)
+
+
+def _mit_duplikaten(index, entity_id: str) -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.main import DATA_DIR, TZ
+    from app.storage import hotbuffer
+
+    _entity(index, entity_id)
+    ts = datetime.now(ZoneInfo(str(TZ))).replace(hour=3, minute=0, second=0, microsecond=0).timestamp() - 86_400
+    for _ in range(3):
+        hotbuffer.append(DATA_DIR, entity_id, ts, 5.0, TZ)
+        index.record_write(entity_id, ts)
+
+
+def test_sammelaktion_vorschau_loeschen_und_rueckgaengig(client) -> None:
+    from app.main import index
+
+    _mit_duplikaten(index, "sensor.pytest_dq_bulk")
+    daten = {"entity_id": ["sensor.pytest_dq_bulk", "sensor.pytest_dq_gibt_es_nicht"]}
+
+    vorschau = client.post("/housekeeping/datenqualitaet/duplicates/preview", data=daten).text
+    assert "Bestätigung" in vorschau
+    assert 'name="entity_id" value="sensor.pytest_dq_bulk"' in vorschau
+    assert "pytest_dq_gibt_es_nicht" not in vorschau
+    assert "/housekeeping/datenqualitaet/duplicates/delete" in vorschau
+
+    geloescht = client.post("/housekeeping/datenqualitaet/duplicates/delete", data=daten).text
+    assert "entfernt" in geloescht
+    assert "/housekeeping/datenqualitaet/duplicates/undo" in geloescht
+
+    nochmal = client.post("/housekeeping/datenqualitaet/duplicates/preview", data=daten).text
+    assert "keine Duplikate" in nochmal
+
+    zurueck = client.post("/housekeeping/datenqualitaet/duplicates/undo", data=daten).text
+    assert "wiederhergestellt" in zurueck
+    assert "Bestätigung" in client.post("/housekeeping/datenqualitaet/duplicates/preview", data=daten).text
+
+
+def test_tabelle_bietet_auswahl_nur_bei_duplikaten(client) -> None:
+    from app.main import index
+
+    from app.storage.cleanup import OUTLIER_RULE_VERSION
+
+    for name, dup in (("sensor.pytest_dq_mit", 4), ("sensor.pytest_dq_ohne", 0)):
+        _entity(index, name)
+        index.set_first_ts_and_add_rows(name, 1_700_000_000.0, 0)
+        index.set_cleanup_alltime_stats(
+            name, {"all": 100, "duplicates": dup, "outliers": 1, "gaps": 0, "counter_decreases": 0},
+            "off", OUTLIER_RULE_VERSION, daily={}, gap_threshold="15",
+        )
+    html = client.get("/housekeeping/datenqualitaet?page_size=500").text
+    assert 'name="entity_id" value="sensor.pytest_dq_mit"' in html
+    assert 'name="entity_id" value="sensor.pytest_dq_ohne"' not in html
+    assert 'id="dq-bulk-panel"' in html

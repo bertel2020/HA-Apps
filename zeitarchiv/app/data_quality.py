@@ -18,8 +18,10 @@ Ohne Routen-Bezug und ohne Zustand, wie cleanup_stats.py.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import json
 import math
 from pathlib import Path
+import time
 from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
@@ -192,7 +194,7 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
         if total:
             rows.append({
                 "entity_id": entity_id,
-                "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
+                "friendly_name": entity["custom_name"] or entity["custom_name"] or entity["friendly_name"] or entity_id,
                 "per_days": per_days,
                 "total": total,
             })
@@ -250,7 +252,7 @@ def build_matrix(index: Index) -> dict:
     pending = 0
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
-        names[entity_id] = entity["custom_name"] or entity["friendly_name"] or entity_id
+        names[entity_id] = entity["custom_name"] or entity["custom_name"] or entity["friendly_name"] or entity_id
         if not entity["first_ts"]:
             continue  # keine Daten, nichts zu messen
         if entity["state_class"] == "total_increasing" and entity["counter_decreases"] == "allow":
@@ -416,3 +418,116 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
             ],
         })
     return groups
+
+
+# --- Sammelaktion: Duplikate mehrerer Entitäten auf einmal entfernen -------------------------
+# Löschlogik und Rückgängig sind die der Bereinigungsseite (duplicate_rows_to_delete,
+# soft_delete, undo_last_delete); hier steht nur, was mehrere Entitäten zusammenführt.
+
+BULK_BATCH = 10_000
+
+
+def _alltime_rows(data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, entity, now: datetime):
+    """Alle Rohzeilen der Entität über die gesamte Historie, wie die Zählung der Matrix."""
+    start, end = cleanup_stats.rows_window("all", 0, now, entity["first_ts"], tz)
+    return cleanup.iter_raw_rows(data_dir, index, entity_id, start.timestamp(), end.timestamp(), tz, now=now)
+
+
+def duplicate_timestamps(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, entity, now: datetime | None = None
+) -> list[float]:
+    """Zeitstempel, die "Duplikate entfernen" in dieser Entität löschen würde (je Zeitstempel bleibt
+    das älteste Vorkommen). Aufrufer hält den Entitäts-Lock."""
+    now = now or datetime.now(tz)
+    return [ts for ts, _value in cleanup.duplicate_rows_to_delete(_alltime_rows(data_dir, index, tz, entity_id, entity, now))]
+
+
+def _stats_entry(index: Index, entity_id: str) -> dict | None:
+    return index.get_cleanup_alltime_stats(entity_id)
+
+
+def _write_stats_entry(index: Index, entity_id: str, entry: dict) -> None:
+    index.set_setting(index._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, json.dumps(entry))
+
+
+def mark_duplicates_removed(index: Index, entity_id: str) -> None:
+    """Gesamt-Zählung nach dem Entfernen angleichen: Duplikate stehen sofort auf 0, der Eintrag gilt
+    aber als veraltet (computed_at = 0), damit der Wartungsplaner alles Übrige neu misst."""
+    entry = _stats_entry(index, entity_id)
+    if not entry:
+        return
+    entry.setdefault("counts", {})["duplicates"] = 0
+    for day_counts in (entry.get("daily") or {}).values():
+        day_counts.pop("duplicates", None)
+    entry["computed_at"] = 0
+    _write_stats_entry(index, entity_id, entry)
+
+
+def mark_stats_unknown(index: Index, entity_id: str) -> None:
+    """Nach "Rückgängig": die alten Zahlen stimmen nicht mehr. Ohne Tageszahlen gilt der Eintrag in der
+    Matrix als nicht gemessen und wird im Hintergrund neu gerechnet."""
+    entry = _stats_entry(index, entity_id)
+    if not entry:
+        return
+    entry.pop("daily", None)
+    entry["computed_at"] = 0
+    _write_stats_entry(index, entity_id, entry)
+
+
+def preview_duplicate_removal(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity_ids: list[str],
+    entity_lock, now: datetime | None = None,
+) -> dict:
+    """Je gewählter Entität die Zahl der Zeilen, die entfernt würden. Entitäten ohne Duplikate fallen
+    heraus. `entity_lock(entity_id)` ist der Kontextmanager des StorageCoordinator."""
+    now = now or datetime.now(tz)
+    rows = []
+    for entity_id in dict.fromkeys(entity_ids):
+        entity = index.get_entity(entity_id)
+        if entity is None:
+            continue
+        with entity_lock(entity_id):
+            count = len(duplicate_timestamps(data_dir, index, tz, entity_id, entity, now))
+        if count:
+            rows.append({"entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id, "count": count})
+    return {"rows": rows, "total": sum(r["count"] for r in rows), "total_label": format_int(sum(r["count"] for r in rows))}
+
+
+def remove_duplicates(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity_ids: list[str],
+    entity_lock, now: datetime | None = None,
+) -> dict:
+    """Entfernt die Duplikate der gewählten Entitäten (Soft-Delete, source="duplicates") und rechnet
+    die Zahlen je Entität neu aus dem Löschlauf: gelöscht wird, was jetzt gefunden wird, nicht was die
+    Vorschau zeigte."""
+    now = now or datetime.now(tz)
+    rows = []
+    for entity_id in dict.fromkeys(entity_ids):
+        entity = index.get_entity(entity_id)
+        if entity is None:
+            continue
+        deleted = 0
+        with entity_lock(entity_id):
+            timestamps = duplicate_timestamps(data_dir, index, tz, entity_id, entity, now)
+            deleted_at = time.time()
+            for start in range(0, len(timestamps), BULK_BATCH):
+                batch = timestamps[start:start + BULK_BATCH]
+                cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="duplicates")
+                deleted += len(batch)
+        if deleted:
+            mark_duplicates_removed(index, entity_id)
+            rows.append({"entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id, "count": deleted})
+    total = sum(r["count"] for r in rows)
+    return {"rows": rows, "total": total, "total_label": format_int(total)}
+
+
+def undo_duplicate_removal(index: Index, entity_ids: list[str], entity_lock) -> int:
+    """Macht je Entität die zuletzt gelöschte Charge rückgängig, also den Lauf von eben."""
+    restored = 0
+    for entity_id in dict.fromkeys(entity_ids):
+        with entity_lock(entity_id):
+            count = cleanup.undo_last_delete(index, entity_id)
+        if count:
+            mark_stats_unknown(index, entity_id)
+        restored += count
+    return restored

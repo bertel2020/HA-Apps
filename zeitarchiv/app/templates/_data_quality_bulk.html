@@ -1,0 +1,50 @@
+{# Sammelaktion „Duplikate entfernen“ der Datenqualität: Vorschau, Ergebnis und Rückgängig als
+   Fragment in #dq-bulk-panel. Die Entitäten reisen als versteckte Felder von Schritt zu Schritt;
+   gelöscht wird erst nach der Bestätigung, und neu berechnet, nicht aus der Vorschau übernommen. #}
+{% set bulk_url = app_root ~ '/housekeeping/datenqualitaet/duplicates' %}
+<div class="dq-bulk-box">
+  {% if step == 'preview' %}
+  {% if bulk.rows %}
+  <h3 class="eyebrow">{{ _("Duplikate entfernen &mdash; Bestätigung") }}</h3>
+  <p class="dq-bulk-text">{{ _('<strong>{total}</strong> Zeile(n) in {entities} Entität(en) würden entfernt. Je mehrfach vorkommendem Zeitstempel bleibt ein Datensatz erhalten, alle weiteren werden gelöscht. Das lässt sich direkt danach rückgängig machen.', total=bulk.total_label, entities=bulk.rows | length) }}</p>
+  <div class="tbl-wrap dq-bulk-list">
+    <table class="dt compact">
+      <tr><th>{{ _("Entität") }}</th><th class="dq-num">{{ _("Zeilen") }}</th></tr>
+      {% for row in bulk.rows %}
+      <tr><td>{{ row.friendly_name }}</td><td class="dq-num">{{ row.count }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  <form id="dq-bulk-confirm">
+    {% for row in bulk.rows %}<input type="hidden" name="entity_id" value="{{ row.entity_id }}">{% endfor %}
+  </form>
+  <div class="actionbar">
+    <button type="button" class="btn btn-danger" hx-post="{{ bulk_url }}/delete" hx-include="#dq-bulk-confirm"
+            hx-target="#dq-bulk-panel" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Ja, {total} Zeile(n) entfernen", total=bulk.total_label) }}</button>
+    <button type="button" class="btn" onclick="document.getElementById('dq-bulk-panel').innerHTML=''">{{ _("Abbrechen") }}</button>
+  </div>
+  {% else %}
+  <p class="dq-bulk-text">{{ _("In den gewählten Entitäten gibt es keine Duplikate.") }}</p>
+  <button type="button" class="btn" onclick="document.getElementById('dq-bulk-panel').innerHTML=''">{{ _("Schließen") }}</button>
+  {% endif %}
+
+  {% elif step == 'done' %}
+  {% if bulk.rows %}
+  <p class="dq-bulk-text">{{ _('<strong>{total}</strong> Zeile(n) in {entities} Entität(en) entfernt. Die Zahlen oben aktualisieren sich beim nächsten Laden der Seite.', total=bulk.total_label, entities=bulk.rows | length) }}</p>
+  <form id="dq-bulk-confirm">
+    {% for row in bulk.rows %}<input type="hidden" name="entity_id" value="{{ row.entity_id }}">{% endfor %}
+  </form>
+  <div class="actionbar">
+    <button type="button" class="btn" hx-post="{{ bulk_url }}/undo" hx-include="#dq-bulk-confirm"
+            hx-target="#dq-bulk-panel" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Rückgängig") }}</button>
+    <a class="btn" href="">{{ _("Seite neu laden") }}</a>
+  </div>
+  {% else %}
+  <p class="dq-bulk-text">{{ _("Es gab nichts zu entfernen.") }}</p>
+  {% endif %}
+
+  {% else %}
+  <p class="dq-bulk-text">{{ _('<strong>{total}</strong> Zeile(n) wiederhergestellt.', total=bulk.total_label) }}</p>
+  <a class="btn" href="">{{ _("Seite neu laden") }}</a>
+  {% endif %}
+</div>

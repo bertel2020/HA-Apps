@@ -1337,6 +1337,46 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             {"groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity)},
         )
 
+    @router.post("/housekeeping/datenqualitaet/duplicates/preview", response_class=HTMLResponse)
+    async def data_quality_duplicates_preview(request: Request) -> HTMLResponse:
+        """Sammelaktion der Datenqualität, Schritt 1: zeigt je gewählter Entität, wie viele Duplikate
+        entfernt würden, ohne etwas zu schreiben. Gelöscht wird erst nach der Bestätigung."""
+        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        preview = await run_in_threadpool(
+            data_quality.preview_duplicate_removal, deps.data_dir, deps.index, deps.tz, entity_ids,
+            deps.coordinator.entity,
+        )
+        return deps.templates.TemplateResponse(
+            request, "_data_quality_bulk.html", {"step": "preview", "bulk": preview}
+        )
+
+    @router.post("/housekeeping/datenqualitaet/duplicates/delete", response_class=HTMLResponse)
+    async def data_quality_duplicates_delete(request: Request) -> HTMLResponse:
+        """Schritt 2: entfernt die Duplikate der bestätigten Entitäten (Soft-Delete, rückgängig machbar)."""
+        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        done = await run_in_threadpool(
+            data_quality.remove_duplicates, deps.data_dir, deps.index, deps.tz, entity_ids,
+            deps.coordinator.entity,
+        )
+        if done["total"]:
+            deps.invalidate_purge_preview()
+        return deps.templates.TemplateResponse(
+            request, "_data_quality_bulk.html", {"step": "done", "bulk": done}
+        )
+
+    @router.post("/housekeeping/datenqualitaet/duplicates/undo", response_class=HTMLResponse)
+    async def data_quality_duplicates_undo(request: Request) -> HTMLResponse:
+        """Nimmt den Sammellauf von eben wieder zurück (je Entität die zuletzt gelöschte Charge)."""
+        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        restored = await run_in_threadpool(
+            data_quality.undo_duplicate_removal, deps.index, entity_ids, deps.coordinator.entity
+        )
+        if restored:
+            deps.invalidate_purge_preview()
+        return deps.templates.TemplateResponse(
+            request, "_data_quality_bulk.html", {"step": "undone", "bulk": {"total_label": format_int(restored)}}
+        )
+
     @router.post("/entities/{entity_id}/counter-decreases", response_class=HTMLResponse)
     async def entity_counter_decreases(request: Request, entity_id: str) -> HTMLResponse:
         """Stellt einen Zähler auf „Melden“ oder „Erlauben“ (planmäßig zurücksetzender Zähler).
