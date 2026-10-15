@@ -1,8 +1,15 @@
-{# Heatmap der Datenqualität: eine Zeile je Entität, ein Feld je Tag, Farbe = Zahl der Befunde.
-   Ein Feld mit Befund öffnet die Bereinigung der Entität für genau diesen Tag. #}
+{# Heatmap der Datenqualität: eine Zeile je Entität, ein Feld je Tag. Der Farbton zeigt den
+   häufigsten Befundtyp des Tages, die Stärke die Zahl im Vergleich zu den übrigen Tagen
+   derselben Entität. Ein Feld mit Befund öffnet die Bereinigung der Entität für genau diesen Tag. #}
+{% if heatmap.rows %}
+<div class="dq-legend">
+  {% for item in heatmap.legend %}<span class="dq-legend-item"><span class="hm-dot k-{{ item.key }}"></span>{{ item.label }}</span>{% endfor %}
+  <span class="dq-legend-note">{{ _("Stärke = Befunde dieses Tags im Vergleich zu den übrigen Tagen der Entität") }}</span>
+</div>
+{% endif %}
 <div class="tbl-wrap dq-heat-wrap">
   {% if heatmap.rows %}
-  <table class="dq-heat sev-{{ {'duplicates': 'info', 'counter_decreases': 'crit', 'outliers': 'warn', 'gaps': 'warn'}.get(heatmap.kind, 'all') }}">
+  <table class="dq-heat">
     <thead><tr>
       <th class="dq-heat-entity">{{ _("Entität") }}</th>
       {% for day in heatmap.day_list %}
@@ -13,9 +20,9 @@
     <tbody>
       {% for row in heatmap.rows %}
       <tr>
-        <td class="dq-heat-entity entity"><span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}</td>
+        <td class="dq-heat-entity"><span class="name" title="{{ row.friendly_name }}">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id" title="{{ row.entity_id }}">{{ row.entity_id }}</span>{% endif %}</td>
         {% for cell in row.cells %}
-        <td class="dq-heat-cell">{% if cell.href %}<a class="hm l{{ cell.level }}" href="{{ app_root }}/{{ cell.href }}" title="{{ cell.day }}: {{ cell.label }}" aria-label="{{ cell.day }}: {{ cell.label }}"></a>{% else %}<span class="hm l0"></span>{% endif %}</td>
+        <td class="dq-heat-cell{% if cell.first %} first{% endif %}">{% if cell.href %}<a class="hm k-{{ cell.kind }} l{{ cell.level }}" href="{{ app_root }}/{{ cell.href }}" title="{{ cell.day }} — {{ cell.detail }}" aria-label="{{ cell.day }} — {{ cell.detail }}"></a>{% else %}<span class="hm l0"></span>{% endif %}</td>
         {% endfor %}
         <td class="dq-num">{{ row.total_label }}</td>
       </tr>

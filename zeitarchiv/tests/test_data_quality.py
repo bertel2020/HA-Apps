@@ -324,6 +324,10 @@ def test_heatmap_zaehlt_je_tag_und_verlinkt_den_tag(index):
     assert zeile["total"] == 7  # 4 + 1 + 2, der Tag von 2020 zählt nicht
     letzter = zeile["cells"][-1]
     assert letzter["count"] == 5 and letzter["level"] == 4
+    assert letzter["kind"] == "duplicates"  # Farbton = häufigster Typ des Tages
+    assert "Duplikate 4" in letzter["detail"] and "Lücken 1" in letzter["detail"]
+    # Stärke je Zeile: der kleinere Tag ist schwächer als der Höchstwert der Entität
+    assert zeile["cells"][-3]["level"] < letzter["level"]
     assert letzter["href"] == "entities/sensor.a/cleanup?filter=all&range=day&date=2026-10-14"
     assert zeile["cells"][-2]["href"] is None  # Tag ohne Befund: kein Link
 

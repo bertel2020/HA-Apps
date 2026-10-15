@@ -132,6 +132,13 @@ def _level(count: int, peak: int) -> int:
     return max(1, min(HEATMAP_LEVELS, math.ceil(math.log1p(count) / math.log1p(peak) * HEATMAP_LEVELS)))
 
 
+def _heatmap_labels() -> dict[str, str]:
+    return {
+        "duplicates": tr("Duplikate"), "counter_decreases": tr("Zählerrückgänge"),
+        "outliers": tr("Ausreißer"), "gaps": tr("Lücken"),
+    }
+
+
 def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
     """Heatmap Entität × Tag aus den Tageszählern des Gesamt-Caches.
 
@@ -153,7 +160,6 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
 
     rows = []
     pending = 0
-    peak = 0
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
         if not entity["first_ts"]:
@@ -177,35 +183,40 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
             valid.add("gaps")
         use = [key for key in keys if key in valid]
         daily = entry["daily"]
-        cells = []
-        total = 0
-        for day in day_list:
-            per_day = daily.get(day) or {}
-            count = sum(per_day.get(key, 0) for key in use)
-            total += count
-            peak = max(peak, count)
-            cells.append(count)
+        per_days = [{k: n for k in use if (n := (daily.get(day) or {}).get(k, 0))} for day in day_list]
+        total = sum(sum(per_day.values()) for per_day in per_days)
         if total:
             rows.append({
                 "entity_id": entity_id,
                 "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
-                "counts": cells,
+                "per_days": per_days,
                 "total": total,
             })
     rows.sort(key=lambda r: (-r["total"], r["entity_id"]))
+    labels = _heatmap_labels()
     for row in rows:
-        row["cells"] = [
-            {
+        # Stufe je ZEILE: die Heatmap soll zeigen, WANN es bei einer Entität auffällig
+        # war. Absolute Größen stehen in der Summe; ein gemeinsamer Höchstwert ließe
+        # alle Entitäten neben einer mit Hunderttausenden Lücken gleich blass aussehen.
+        row_peak = max((sum(p.values()) for p in row["per_days"]), default=0)
+        cells = []
+        for day, per_day in zip(day_list, row["per_days"]):
+            count = sum(per_day.values())
+            cells.append({
                 "day": day, "count": count, "label": format_int(count),
-                "level": _level(count, peak),
+                "level": _level(count, row_peak),
+                # Farbton = der häufigste Befundtyp des Tages
+                "kind": max(per_day, key=per_day.get) if per_day else None,
+                "detail": " · ".join(f"{labels[k]} {format_int(n)}" for k, n in per_day.items()),
+                "first": day.endswith("-01"),
                 "href": heatmap_href(row["entity_id"], kind, day) if count else None,
-            }
-            for day, count in zip(day_list, row["counts"])
-        ]
+            })
+        row["cells"] = cells
         row["total_label"] = format_int(row["total"])
+        del row["per_days"]
     return {
-        "kind": kind, "days": days, "day_list": day_list, "rows": rows,
-        "pending": pending, "peak": peak,
+        "kind": kind, "days": days, "day_list": day_list, "rows": rows, "pending": pending,
+        "legend": [{"key": key, "label": labels[key]} for key in keys],
     }
 
 

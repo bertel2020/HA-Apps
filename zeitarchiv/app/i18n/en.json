@@ -1,6 +1,7 @@
 {
   "app": {
     "Heatmap": "Heatmap",
+    "Stärke = Befunde dieses Tags im Vergleich zu den übrigen Tagen der Entität": "Intensity = findings of this day compared with the entity's other days",
     "Befundtyp": "Finding type",
     "Alle Befunde": "All findings",
     "Letzte {days} Tage": "Last {days} days",
