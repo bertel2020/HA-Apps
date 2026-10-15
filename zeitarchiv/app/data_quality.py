@@ -153,6 +153,10 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
         kind = "all"
     keys = [kind] if kind != "all" else [column["key"] for column in COLUMNS]
     day_list = [(today - timedelta(days=days - 1 - i)).isoformat() for i in range(days)]
+    day_labels = {
+        day: formats.format_date(datetime.combine(date.fromisoformat(day), datetime.min.time()))
+        for day in day_list
+    }
 
     entries = index.list_cleanup_alltime_stats()
     rates, _ = cleanup_stats.outlier_rates_measured(index)
@@ -203,7 +207,7 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
         for day, per_day in zip(day_list, row["per_days"]):
             count = sum(per_day.values())
             cells.append({
-                "day": day, "count": count, "label": format_int(count),
+                "day": day, "day_label": day_labels[day], "count": count, "label": format_int(count),
                 "level": _level(count, row_peak),
                 # Farbton = der häufigste Befundtyp des Tages
                 "kind": max(per_day, key=per_day.get) if per_day else None,
@@ -215,7 +219,8 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
         row["total_label"] = format_int(row["total"])
         del row["per_days"]
     return {
-        "kind": kind, "days": days, "day_list": day_list, "rows": rows, "pending": pending,
+        "kind": kind, "days": days, "day_list": day_list, "day_labels": day_labels,
+        "rows": rows, "pending": pending,
         "legend": [{"key": key, "label": labels[key]} for key in keys],
     }
 
