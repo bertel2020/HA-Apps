@@ -79,10 +79,11 @@ table.dq-heat{border-collapse:separate;border-spacing:0;width:100%;min-width:max
 table.dq-heat th,table.dq-heat td{padding:3px 1px;}
 table.dq-heat th.dq-heat-day{font-size:calc(10px * var(--font-scale, 1));font-weight:500;color:var(--ink-faint);text-align:center;font-variant-numeric:tabular-nums;}
 table.dq-heat th.dq-heat-day.first{color:var(--ink);font-weight:700;}
-table.dq-heat .first{border-left:1px solid var(--border);}
+table.dq-heat .first{border-left:1px solid color-mix(in srgb,var(--border) 60%,transparent);}
 table.dq-heat .dq-heat-entity{position:sticky;left:0;z-index:1;background:var(--surface);width:250px;min-width:250px;max-width:250px;padding:6px 12px 6px 14px;text-align:left;}
 table.dq-heat .dq-heat-entity .name,table.dq-heat .dq-heat-entity .id{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-table.dq-heat .dq-num{position:sticky;right:0;z-index:1;background:var(--surface);padding:6px 14px 6px 12px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;border-left:1px solid var(--border);}
+table.dq-heat .dq-num{position:sticky;right:0;z-index:1;background:var(--surface);width:84px;min-width:84px;max-width:84px;padding:6px 14px 6px 8px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;}
+.dq-heat-wrap.has-more table.dq-heat .dq-num{box-shadow:-8px 0 8px -8px color-mix(in srgb,var(--ink) 30%,transparent);}
 table.dq-heat thead th{padding-top:8px;padding-bottom:8px;border-bottom:1.5px solid var(--border-strong);}
 table.dq-heat thead th.dq-heat-entity,table.dq-heat thead th.dq-num{font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);white-space:nowrap;}
 table.dq-heat tbody td{border-bottom:1px solid var(--border);}
@@ -97,6 +98,6 @@ a.hm.l4{background:var(--hm);}
 a.hm:hover,a.hm:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
 @media (max-width:640px){
   table.dq-heat .dq-heat-entity{width:120px;min-width:120px;max-width:120px;padding:6px 8px;}
-  table.dq-heat .dq-num{padding:6px 8px;font-size:calc(12px * var(--font-scale, 1));}
+  table.dq-heat .dq-num{padding:6px 10px 6px 6px;}
   .dq-toolbar{flex-direction:column;align-items:stretch;}
 }

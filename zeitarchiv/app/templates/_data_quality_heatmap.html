@@ -45,10 +45,11 @@
     var arrows = document.getElementById('dq-heat-scroll');
     if (!wrap) return;
     wrap.scrollLeft = wrap.scrollWidth;
-    if (!arrows) return;
-    var buttons = arrows.querySelectorAll('button');
+    var buttons = arrows ? arrows.querySelectorAll('button') : [];
     function update() {
       var max = wrap.scrollWidth - wrap.clientWidth;
+      wrap.classList.toggle('has-more', wrap.scrollLeft < max - 1);
+      if (!arrows) return;
       arrows.hidden = max <= 1;
       buttons[0].disabled = wrap.scrollLeft <= 1;
       buttons[1].disabled = wrap.scrollLeft >= max - 1;
