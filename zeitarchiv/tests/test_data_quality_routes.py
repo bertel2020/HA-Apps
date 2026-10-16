@@ -29,7 +29,7 @@ def test_datenqualitaet_seite_zeigt_die_matrix_mit_link_auf_die_bereinigung(clie
     assert 'href="/entities/sensor.pytest_dq_matrix/cleanup?filter=duplicates&amp;range=all"' in html
     # Die Zeile lädt ihre Einzelbefunde über einen absoluten Pfad: die Seite
     # liegt unter /housekeeping/, ein relativer Link würde dort ins Leere laufen.
-    assert 'hx-get="/entities/sensor.pytest_dq_matrix/data-quality"' in html
+    assert 'hx-get="/entities/sensor.pytest_dq_matrix/data-quality?types=duplicates"' in html
     # Ohne htmx bliebe die aufgeklappte Zeile bei „Lädt …“ stehen.
     assert "vendor/htmx" in html
 
@@ -185,3 +185,25 @@ def test_alle_auswaehlen_liefert_gueltiges_attribut(client) -> None:
     # tojson maskiert keine doppelten Anführungszeichen: das Attribut muss in einfachen stehen,
     # sonst bricht die Entitätsliste es auf und die Kopf-Checkbox tut nichts.
     assert "@change='selected = $event.target.checked ? [" in html
+
+
+def test_ignorieren_ueber_die_route_und_umschalter(client) -> None:
+    from app.main import index
+
+    _mit_duplikaten(index, "sensor.pytest_dq_ignor")
+    antwort = client.post(
+        "/housekeeping/datenqualitaet/ignore",
+        data={"entity_id": "sensor.pytest_dq_ignor", "key": "duplicates", "value": "1"},
+    )
+    assert antwort.status_code == 200 and antwort.headers["HX-Refresh"] == "true"
+    detail = client.get("/entities/sensor.pytest_dq_ignor/data-quality?types=duplicates,quatsch").text
+    assert "wieder beachten" in detail and "ignorieren</button>" not in detail
+    assert 'value="quatsch"' not in detail
+    antwort = client.post(
+        "/housekeeping/datenqualitaet/ignore",
+        data={"entity_id": "sensor.pytest_dq_ignor", "key": "duplicates", "value": "0"},
+    )
+    assert "ignorieren</button>" in client.get("/entities/sensor.pytest_dq_ignor/data-quality?types=duplicates").text
+    assert client.post(
+        "/housekeeping/datenqualitaet/ignore", data={"entity_id": "sensor.gibt_es_nicht", "key": "gaps", "value": "1"}
+    ).status_code == 404

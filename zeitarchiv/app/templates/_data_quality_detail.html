@@ -20,3 +20,18 @@
 {% else %}
 <span class="hint">{{ _("Keine Einzelbefunde im betrachteten Zeitraum.") }}</span>
 {% endfor %}
+{% if types %}
+<div class="dq-ignore">
+  <span class="dq-ignore-label">{{ _("Befunde ignorieren") }}</span>
+  {% for key in types %}
+  {% set is_ignored = key in ignored_keys %}
+  <form hx-post="{{ app_root }}/housekeeping/datenqualitaet/ignore" hx-swap="none" hx-disabled-elt="find button">
+    <input type="hidden" name="entity_id" value="{{ entity_id }}">
+    <input type="hidden" name="key" value="{{ key }}">
+    <input type="hidden" name="value" value="{{ 0 if is_ignored else 1 }}">
+    <button type="submit" class="btn btn-sm">{% if is_ignored %}{{ _("{type} wieder beachten", type=labels[key]) }}{% else %}{{ _("{type} ignorieren", type=labels[key]) }}{% endif %}</button>
+  </form>
+  {% endfor %}
+  <span class="hint">{{ _("Ignorierte Befunde zählen in der Übersicht nicht mit. Die Bereinigungsseite zeigt sie weiter.") }}</span>
+</div>
+{% endif %}

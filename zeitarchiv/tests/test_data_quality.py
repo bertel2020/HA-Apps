@@ -465,3 +465,28 @@ def test_sammel_rueckgaengig_stellt_wieder_her_und_verwirft_die_zahlen(daten):
     assert len(data_quality.duplicate_timestamps(tmp, idx, _TZ, "sensor.a", idx.get_entity("sensor.a"), _JETZT)) == 2
     eintrag = idx.get_cleanup_alltime_stats("sensor.a")
     assert "daily" not in eintrag
+
+
+def test_ignorierte_befunde_zaehlen_nicht_mit_und_lassen_sich_anzeigen(index):
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=5, gaps=2)
+    _mit_tageszahlen(index, "sensor.b", {}, duplicates=3)
+
+    voll = data_quality.build_matrix(index)
+    assert voll["totals"]["duplicates"]["count"] == 8 and voll["affected"] == 2 and voll["ignored_count"] == 0
+
+    data_quality.set_ignored(index, "sensor.b", "duplicates", True)
+    data_quality.set_ignored(index, "sensor.a", "quatsch", True)  # unbekannter Typ wird verworfen
+    ohne = data_quality.build_matrix(index)
+    assert ohne["totals"]["duplicates"]["count"] == 5
+    assert ohne["affected"] == 1 and [r["entity_id"] for r in ohne["rows"]] == ["sensor.a"]
+    assert ohne["ignored_count"] == 1
+
+    mit = data_quality.build_matrix(index, show_ignored=True)
+    assert mit["totals"]["duplicates"]["count"] == 5 and mit["affected"] == 1  # zählt weiter nicht mit
+    zeile = next(r for r in mit["rows"] if r["entity_id"] == "sensor.b")
+    assert zeile["cells"]["duplicates"]["ignored"] is True and zeile["total"] == 0
+    assert zeile["removable_duplicates"] is False
+
+    data_quality.set_ignored(index, "sensor.b", "duplicates", False)
+    assert data_quality.build_matrix(index)["totals"]["duplicates"]["count"] == 8
+    assert data_quality.load_ignored(index) == {}

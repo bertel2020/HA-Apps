@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from . import formats
@@ -1298,14 +1298,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.get("/housekeeping/datenqualitaet", response_class=HTMLResponse)
     def data_quality_view(
         request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE,
-        period: str = data_quality.DEFAULT_PERIOD,
+        period: str = data_quality.DEFAULT_PERIOD, ignored: int = 0,
     ) -> HTMLResponse:
         """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
         (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
         mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
         liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
         matrix = data_quality.build_matrix(
-            deps.index, period=period, today=datetime.now(deps.tz).date()
+            deps.index, period=period, today=datetime.now(deps.tz).date(), show_ignored=bool(ignored)
         )
         # Die Heatmap-Ansicht (data_quality.build_heatmap, _data_quality_heatmap.html) ist vorerst
         # aus der Oberfläche genommen, siehe ROADMAP.md; Dienst und Vorlage bleiben bestehen.
@@ -1317,7 +1317,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
     @router.get("/entities/{entity_id}/data-quality", response_class=HTMLResponse)
     @deps.storage_locked(lambda args: args["entity_id"])
-    def entity_data_quality(request: Request, entity_id: str) -> HTMLResponse:
+    def entity_data_quality(request: Request, entity_id: str, types: str = "") -> HTMLResponse:
         """Aufgeklappte Zeile der Datenqualitäts-Übersicht: die jüngsten Einzelbefunde
         dieser Entität (siehe data_quality.findings_for_entity). Wird erst beim Aufklappen geladen,
         weil sie die Rohdaten liest."""
@@ -1327,8 +1327,25 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         return deps.templates.TemplateResponse(
             request,
             "_data_quality_detail.html",
-            {"groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity)},
+            {
+                "groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity),
+                "entity_id": entity_id,
+                # Befundtypen mit Zahl in der Matrix: für sie lässt sich "ignorieren" schalten
+                "types": [t for t in types.split(",") if t in {c["key"] for c in data_quality.COLUMNS}],
+                "ignored_keys": data_quality.load_ignored(deps.index).get(entity_id, set()),
+            },
         )
+
+    @router.post("/housekeeping/datenqualitaet/ignore")
+    async def data_quality_ignore(request: Request) -> Response:
+        """Befundtyp einer Entität ignorieren (value=1) oder wieder beachten (value=0). Die Seite
+        lädt danach neu (HX-Refresh), damit Summen und Zeilen zusammenpassen."""
+        form = await request.form()
+        entity_id = str(form.get("entity_id") or "")
+        if deps.index.get_entity(entity_id) is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        data_quality.set_ignored(deps.index, entity_id, str(form.get("key") or ""), form.get("value") == "1")
+        return Response(status_code=200, headers={"HX-Refresh": "true"})
 
     @router.post("/housekeeping/datenqualitaet/duplicates/preview", response_class=HTMLResponse)
     async def data_quality_duplicates_preview(request: Request) -> HTMLResponse:

@@ -227,17 +227,55 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
     }
 
 
+# Ignorierte Befunde: je Entität die Befundtypen, die in der Übersicht nicht mitzählen (gewollte
+# Lücken eines Schlafsensors etc.). Liegt als JSON in der Settings-Tabelle, ohne Schema-Änderung.
+IGNORE_SETTING = "data_quality_ignored"
+
+
+def load_ignored(index: Index) -> dict[str, set[str]]:
+    try:
+        raw = json.loads(index.get_setting(IGNORE_SETTING) or "{}")
+    except ValueError:
+        return {}
+    valid = {column["key"] for column in COLUMNS}
+    return {
+        str(entity_id): {k for k in keys if k in valid}
+        for entity_id, keys in raw.items() if isinstance(keys, list)
+    }
+
+
+def set_ignored(index: Index, entity_id: str, key: str, ignored: bool) -> None:
+    """Befundtyp ``key`` der Entität ignorieren oder wieder beachten. Unbekannte Typen
+    werden verworfen."""
+    if key not in {column["key"] for column in COLUMNS}:
+        return
+    current = load_ignored(index)
+    keys = current.get(entity_id, set())
+    keys = keys | {key} if ignored else keys - {key}
+    if keys:
+        current[entity_id] = keys
+    else:
+        current.pop(entity_id, None)
+    index.set_setting(IGNORE_SETTING, json.dumps({e: sorted(k) for e, k in sorted(current.items())}))
+
+
 # Zeitraum der Matrix: Schlüssel -> Tage (None = gesamte Historie). "all" ist der Standard.
 PERIODS: dict[str, int | None] = {"all": None, "year": 365, "30d": 30, "7d": 7}
 DEFAULT_PERIOD = "all"
 
 
-def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | None = None) -> dict:
+def build_matrix(
+    index: Index, *, period: str = DEFAULT_PERIOD, today: date | None = None, show_ignored: bool = False
+) -> dict:
     """Matrix Entität × Befundtyp, absteigend nach der Summe der Befunde.
 
     ``period``: "all" zählt die gesamte Historie aus ``counts``; die übrigen Zeiträume
     summieren die Tageszähler ``daily`` der letzten Tage (einschließlich heute). Entitäten
     ohne ``daily`` sind dort noch nicht gemessen (``pending``), wie in build_heatmap.
+
+    Ignorierte Befundtypen (siehe set_ignored) zählen in Summen, Zeilensummen und
+    "betroffen" nicht mit. Mit ``show_ignored`` stehen sie trotzdem in der Tabelle
+    (Zelle mit ``ignored``), sonst fehlen sie; ``ignored_count`` nennt, wie viele Zellen das sind.
 
     - ``rows``: nur Entitäten mit mindestens einem Befund; je Zeile ``cells``
       (je Spalte ``count``/``label``/``href``, oder None ohne Befund) und ``total``
@@ -305,27 +343,44 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
             if entity_id in measured_outliers:
                 counts["outliers"][entity_id] = measured_outliers[entity_id]
 
+    ignored = load_ignored(index)
+    ignored_counts: dict[str, dict[str, int]] = {column["key"]: {} for column in COLUMNS}
+    for key, column in counts.items():
+        for eid in list(column):
+            if column[eid] and key in ignored.get(eid, ()):
+                ignored_counts[key][eid] = column.pop(eid)
+    ignored_count = sum(len(column) for column in ignored_counts.values())
+
     entity_ids = {eid for column in counts.values() for eid, n in column.items() if n}
+    if show_ignored:
+        entity_ids |= {eid for column in ignored_counts.values() for eid in column}
     rows = []
     for entity_id in entity_ids:
         cells = {}
         total = 0
         for column in COLUMNS:
             count = counts[column["key"]].get(entity_id, 0)
+            hidden = show_ignored and ignored_counts[column["key"]].get(entity_id, 0)
             total += count
             cells[column["key"]] = {
-                "count": count,
-                "label": format_int(count),
+                "count": count or hidden,
+                "label": format_int(count or hidden),
                 "href": cleanup_href(entity_id, column["filter"], column["range"]),
-            } if count else None
+                "ignored": not count,
+            } if count or hidden else None
         rows.append({
             "entity_id": entity_id,
             "friendly_name": names.get(entity_id, entity_id),
             "cells": cells,
             "total": total,
+            # Die Sammelaktion betrifft nur Duplikate, die auch mitzählen.
+            "removable_duplicates": bool(counts["duplicates"].get(entity_id)),
+            "ignored_keys": sorted(ignored.get(entity_id, ())),
+            "types": ",".join(c["key"] for c in COLUMNS if cells[c["key"]]),
             "counter_allowed": entity_id in allowed,
         })
     rows.sort(key=lambda r: (-r["total"], r["entity_id"]))
+    affected = sum(1 for r in rows if r["total"])
 
     totals = {}
     for column in COLUMNS:
@@ -336,8 +391,10 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
         "columns": COLUMNS,
         "rows": rows,
         "totals": totals,
-        "affected": len(rows),
-        "affected_label": format_int(len(rows)),
+        "affected": affected,
+        "affected_label": format_int(affected),
+        "ignored_count": ignored_count,
+        "show_ignored": show_ignored,
         "entity_count": len(names),
         "pending": pending,
         "period": period,

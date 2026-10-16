@@ -121,3 +121,10 @@ a.hm:hover,a.hm:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
   table.dq-heat .dq-num{padding:6px 10px 6px 6px;}
   .dq-toolbar{flex-direction:column;align-items:stretch;}
 }
+
+/* Ignorierte Befunde: Schalter in der Toolbar, blasse Zelle, Zeile "Befunde ignorieren" im Detail */
+.dq-filters .dq-show-ignored{display:inline-flex;align-items:center;gap:6px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;text-transform:none;letter-spacing:0;font-family:inherit;font-weight:400;}
+.dq-pill.is-ignored{opacity:.45;text-decoration:line-through;}
+.dq-ignore{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+.dq-ignore form{margin:0;}
+.dq-ignore-label{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);}
