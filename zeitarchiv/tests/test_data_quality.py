@@ -224,6 +224,18 @@ def test_erlaubte_zaehlerrueckgaenge_werden_gekennzeichnet(index):
     assert rows["sensor.normal"]["counter_allowed"] is False
 
 
+def test_zaehler_der_klasse_total_werden_als_nicht_anwendbar_gekennzeichnet(index):
+    """state_class total darf sinken: Rückgänge werden dort nie geprüft. Die leere Zelle
+    soll nicht wie "nichts gefunden" aussehen, bei total_increasing bleibt sie unmarkiert."""
+    for eid, klasse in (("sensor.netto", "total"), ("sensor.zaehler", "total_increasing")):
+        index.get_or_create_entity(eid, "sensor", klasse, "kWh")
+        index.set_first_ts_and_add_rows(eid, 1_700_000_000.0, 0)
+        _gesamt(index, eid, duplicates=3)
+    rows = {r["entity_id"]: r for r in data_quality.build_matrix(index)["rows"]}
+    assert rows["sensor.netto"]["counter_na"] is True
+    assert rows["sensor.zaehler"]["counter_na"] is False
+
+
 def test_luecken_zaehlen_nur_mit_passender_schwelle(index):
     """Eine Lücken-Zahl gehört zu der Schwelle, mit der sie gezählt wurde. Nach einer
     Änderung der Schwelle darf die alte Zahl nicht stehen bleiben; die Entität gilt

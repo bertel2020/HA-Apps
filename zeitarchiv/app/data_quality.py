@@ -297,6 +297,8 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
     # (counter_decreases_flagged), die Zelle bliebe also leer und sähe wie
     # "geprüft, nichts gefunden" aus. Sie wird stattdessen als erlaubt gekennzeichnet.
     allowed: set[str] = set()
+    # state_class "total" darf laut Home Assistant sinken: Rückgänge werden dort nie geprüft.
+    not_applicable: set[str] = set()
     pending = 0
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
@@ -305,6 +307,8 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
             continue  # keine Daten, nichts zu messen
         if entity["state_class"] == "total_increasing" and entity["counter_decreases"] == "allow":
             allowed.add(entity_id)
+        elif entity["state_class"] == "total":
+            not_applicable.add(entity_id)
         entry = entries.get(entity_id)
         outliers_on = effective_outlier_threshold(
             entity["aggregation_type"], entity["outlier_threshold"]
@@ -357,6 +361,7 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
             "cells": cells,
             "total": total,
             "counter_allowed": entity_id in allowed,
+            "counter_na": entity_id in not_applicable,
         })
     rows.sort(key=lambda r: (-r["total"], r["entity_id"]))
 

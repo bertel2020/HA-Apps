@@ -83,6 +83,10 @@ def test_the_config_field_and_route_switch_the_mode(client) -> None:
         index.get_or_create_entity("sensor.pytest_temp", "sensor", "measurement", "°C")
         assert client.post("/entities/sensor.pytest_temp/counter-decreases", data={"counter_decreases": "allow"}).status_code == 404
         assert 'id="counter-decrease-field"' not in client.get("/entities/sensor.pytest_temp/config").text
+        # state_class total: kein Schalter, aber der Hinweis, dass Rückgänge nicht geprüft werden
+        index.get_or_create_entity("sensor.pytest_netto", "sensor", "total", "kWh")
+        netto = client.get("/entities/sensor.pytest_netto/config").text
+        assert 'id="counter-decrease-field"' in netto and "counter-decreases-btn" not in netto
     finally:
         index.set_counter_decreases("sensor.pytest_allow", "report")
         index.set_counter_decrease_snapshot([])

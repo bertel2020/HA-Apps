@@ -81,7 +81,7 @@
         </td>
         {% for col in dq.columns %}
         {% set cell = row.cells[col.key] %}
-        <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
+        <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% elif col.key == 'counter_decreases' and row.counter_na %}<span class="dq-allowed" title="{{ _('state_class total: Rückgänge sind bei diesem Zähler normal und werden nicht geprüft.') }}">{{ _("n. a.") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
         {% endfor %}
       </tr>
       <tr class="dq-detail" x-show="open" x-cloak>
