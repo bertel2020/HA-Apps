@@ -509,6 +509,8 @@ window.TableCompute = (() => {
   // Rest der Oberfläche (z. B. previousYearPeriodLabel in entity_detail.html),
   // hier nur als Kalender-Vokabular statt Zeitraum-Namen.
   const MONTH_NAMES = [t('Januar'), t('Februar'), t('März'), t('April'), t('Mai'), t('Juni'), t('Juli'), t('August'), t('September'), t('Oktober'), t('November'), t('Dezember')];
+  const WEEKDAY_NAMES = [t('Sonntag'), t('Montag'), t('Dienstag'), t('Mittwoch'), t('Donnerstag'), t('Freitag'), t('Samstag')];
+  const WEEKDAY_NAMES_SHORT = [t('So'), t('Mo'), t('Di'), t('Mi'), t('Do'), t('Fr'), t('Sa')];
   const MONTH_NAMES_SHORT = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
 
   // ISO-8601-Kalenderwoche (Woche 1 = die Woche mit dem ersten Donnerstag des
@@ -534,7 +536,7 @@ window.TableCompute = (() => {
   // deutschen Namen bleiben gültig, weil sie in bestehenden Tabellen stehen.
   const LABEL_TOKEN_ALIASES = {
     year: 'jahr', year_short: 'jahr_kurz', quarter: 'quartal', month: 'monat',
-    month_short: 'monat_kurz', month_no: 'monat_nr', week: 'woche', day: 'tag', decade: 'dekade',
+    month_short: 'monat_kurz', month_no: 'monat_nr', week: 'woche', day: 'tag', weekday: 'wochentag', weekday_short: 'wochentag_kurz', decade: 'dekade',
   };
   const LABEL_TOKEN_PATTERN = new RegExp(
     '\\{(' + [...Object.keys(LABEL_TOKEN_ALIASES), ...Object.values(LABEL_TOKEN_ALIASES)].join('|') + ')\\}', 'g');
@@ -567,6 +569,9 @@ window.TableCompute = (() => {
       // Zweistellig wie monat_nr (01 statt 1) — konsistent mit dem
       // "DD.MM."-Format, in dem Tag/Monat sonst überall in der App erscheinen.
       tag: String(d.getDate()).padStart(2, '0'),
+      // getDay(): 0 = Sonntag, daher beginnen die Namenslisten mit Sonntag.
+      wochentag: WEEKDAY_NAMES[d.getDay()],
+      wochentag_kurz: WEEKDAY_NAMES_SHORT[d.getDay()],
       dekade: t('{decade}er', {decade: Math.floor(d.getFullYear() / 10) * 10}),
     };
     return label.replace(LABEL_TOKEN_PATTERN, (match, token) => tokenValues[LABEL_TOKEN_ALIASES[token] || token]);
@@ -581,7 +586,8 @@ window.TableCompute = (() => {
   const LABEL_VARIABLES = [
     ['jahr', t('Jahr')], ['jahr_kurz', t('Jahr (kurz)')], ['quartal', t('Quartal')],
     ['monat', t('Monat')], ['monat_kurz', t('Monat (kurz)')], ['monat_nr', t('Monat (Nr.)')],
-    ['woche', t('Woche')], ['tag', t('Tag')], ['dekade', t('Dekade')],
+    ['woche', t('Woche')], ['tag', t('Tag')],
+    ['wochentag', t('Wochentag')], ['wochentag_kurz', t('Wochentag (kurz)')], ['dekade', t('Dekade')],
   ].map(([token, label]) => {
     const english = Object.keys(LABEL_TOKEN_ALIASES).find((key) => LABEL_TOKEN_ALIASES[key] === token);
     return [document.documentElement.lang === 'en' ? english : token, label];
