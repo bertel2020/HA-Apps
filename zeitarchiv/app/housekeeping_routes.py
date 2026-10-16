@@ -352,7 +352,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
     deps.templates.env.globals["counter_auto_state"] = _counter_auto_state
     # Einordnung der Zählerrückgänge in der Bereinigungsansicht (_rows_table.html).
-    deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdicts_for_rows(
+    deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdict_details_for_rows(
         deps.data_dir, deps.index, deps.tz, entity_id, rows
     )
 

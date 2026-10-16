@@ -2629,7 +2629,6 @@
     "Die Daten der gewählten Entitäten werden durch den Stand des Backups ersetzt. Deine Einstellungen je Entität (Name, Aufbewahrung, Auflösung) bleiben erhalten.": "The data of the chosen entities is replaced by the state of the backup. Your per-entity settings (name, retention, resolution) are kept.",
     "Das Backup enthält keine Entitätsdaten.": "The backup contains no entity data.",
     "Fehlt aktuell": "Missing now",
-    "Alle auf dieser Seite auswählen": "Select all on this page",
     "Alle {n} Treffer auswählen": "Select all {n} matches",
     "Keine Treffer": "No matches",
     "fehlt aktuell": "missing now",
@@ -2699,7 +2698,10 @@
     "Entitäten: {n}": "Entities: {n}",
     "Kacheln: {n}": "Tiles: {n}",
     "Spalten: {c} · Zeilen: {r}": "Columns: {c} · Rows: {r}",
-    "Namen: {n}": "Names: {n}"
+    "Namen: {n}": "Names: {n}",
+    "Stand blieb danach niedrig.": "The reading stayed low afterwards.",
+    "Die meisten Rückgänge sehen nach einem planmäßigen Reset aus. Setzt sich der Zähler von selbst zurück, erlaube die Rückgänge in der Konfiguration des Zählers.": "Most decreases look like a scheduled reset. If the counter resets on its own, allow the decreases in the counter’s configuration.",
+    "Konfiguration öffnen": "Open configuration"
   },
   "js": {
     "Meldungen": "Notices",

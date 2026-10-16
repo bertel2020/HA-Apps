@@ -122,6 +122,19 @@ def test_the_routes_mark_show_the_undo_hint_and_take_it_back(client) -> None:
         index.set_counter_decrease_snapshot([])
 
 
+def test_the_cleanup_page_gets_a_followup_note_with_each_verdict(tmp_path) -> None:
+    """Die Begründung zum Urteil kommt aus derselben Quelle wie in Housekeeping: je Rückgang ein
+    Satz, auch für Rückgänge ohne Entscheidung (dort „Zu wenig Folgewerte“)."""
+    index, now, base = _seed(tmp_path)
+    rows = [{"ts": base + 2 * 300, "flags": [{"label": "Zählerrückgang", "reason": "x"}]}]
+    zurueck = counter_bulk.verdict_details_for_rows(tmp_path, index, TZ, "sensor.z1", rows, now=now)[base + 2 * 300]
+    assert zurueck["returns"] is True
+    assert "Stand danach wieder bei" in zurueck["note"] and "Min." in zurueck["note"]
+    bleibt = counter_bulk.verdict_details_for_rows(tmp_path, index, TZ, "sensor.z2", rows, now=now)[base + 2 * 300]
+    assert bleibt == {"returns": False, "note": "Stand blieb danach niedrig."}
+    index.close()
+
+
 def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
     from app.main import DATA_DIR, index
 
@@ -131,5 +144,7 @@ def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
         html = client.get("/entities/sensor.pytest_bulk/rows?filter=counter_decreases&range=day").text
         assert "Zählerrückgang" in html
         assert "Vermutlich Fehlwert" in html
+        assert "Stand danach wieder bei" in html
+        assert 'class="flag-note"' in html
     finally:
         index.set_counter_decrease_snapshot([])

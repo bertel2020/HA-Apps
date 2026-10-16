@@ -173,6 +173,12 @@
 </div>
 
 {% if rows %}
+{% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
+{# Hinweis nur, wenn die Mehrheit der Rückgänge auf der Seite nach planmäßigem Reset aussieht: die Einstellung betrifft die ganze Entität, deshalb Link statt Knopf in der Zeile. #}
+{% set reset_count = counter_verdicts_map.values() | selectattr('returns', 'false') | list | length %}
+{% if counter_verdicts_map and reset_count * 2 > counter_verdicts_map | length %}
+<p class="rows-hint">{{ _("Die meisten Rückgänge sehen nach einem planmäßigen Reset aus. Setzt sich der Zähler von selbst zurück, erlaube die Rückgänge in der Konfiguration des Zählers.") }} <a href="{{ app_root }}/entities/{{ entity_id | urlencode }}">{{ _("Konfiguration öffnen") }}</a></p>
+{% endif %}
 <div class="tbl-wrap">
   {# data-cards="off": Diese Tabelle bleibt auf dem Telefon eine Tabelle und
      scrollt waagerecht, statt zu Zeilenkarten zu werden. Karten lohnen sich,
@@ -198,7 +204,6 @@
       {% endif %}
       <th>{{ _("Zeitstempel") }}</th><th>{{ _("Wert") }}</th><th>{{ _("Status") }}</th>
     </tr>
-    {% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
     {% for row in rows %}
     <tr class="{{ 'flag' if row.flags else '' }}">
       {% if mode == 'correct' %}
@@ -213,7 +218,7 @@
       <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
-        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}{% if flag.label == _("Zählerrückgang") and counter_verdicts_map and row.ts in counter_verdicts_map %} · {{ _("Vermutlich Fehlwert") if counter_verdicts_map[row.ts] else _("Vermutlich Reset") }}{% endif %}</span>{% endfor %}
+        {% for flag in row.flags %}{% set verdict = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}<span class="flag-badge" data-tooltip="{{ flag.reason }}{% if verdict %} {{ verdict.note }}{% endif %}">{{ flag.label }}{% if verdict %} · {{ _("Vermutlich Fehlwert") if verdict.returns else (_("Vermutlich Reset") if verdict.returns is false else _("Noch offen")) }}{% endif %}</span>{% if verdict %}<span class="flag-note">{{ verdict.note }}</span>{% endif %}{% endfor %}
         {% if not row.flags %}&mdash;{% endif %}
       </td>
     </tr>
