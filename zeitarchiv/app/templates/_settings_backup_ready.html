@@ -104,4 +104,7 @@
     </table>
   </div>
   {% endif %}
+  {# Teil-Rollbacks des Restore-Assistenten (selektive Wiederherstellung). Lädt
+     nach, damit main.py dafür keinen Kontext liefern muss. #}
+  <div id="selective-rollbacks" hx-get="{{ app_root }}/backup/selective/list" hx-trigger="load" hx-swap="outerHTML"></div>
 </div>

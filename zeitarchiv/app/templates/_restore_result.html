@@ -1,0 +1,27 @@
+<div class="rw-result">
+  <div class="rw-big">
+    <span class="rw-ok" aria-hidden="true">&#10003;</span>
+    <div>
+      {% if result.kind == 'all' %}
+      <h2>{{ _("Wiederherstellung vorgemerkt") }}</h2>
+      <p class="sub">{{ _("Das Backup wird beim nächsten Add-on-Start eingespielt. Der aktuelle Stand bleibt als Rollback erhalten.") }}</p>
+      {% elif result.kind == 'entities' %}
+      <h2>{{ _("Entitäten wiederhergestellt: {n}", n=result.entities | length) }}</h2>
+      <p class="sub">{{ _("Das Zeitarchiv hat nichts neu gestartet. Du kannst sofort weiterarbeiten.") }}{% if result.created %} {{ _("Davon neu angelegt: {n}.", n=result.created | length) }}{% endif %}</p>
+      {% else %}
+      <h2>{{ _("Änderungen angewendet: {n}", n=result.total) }}</h2>
+      <p class="sub">{{ _("Das Zeitarchiv hat nichts neu gestartet. Neue Dashboards, Charts und Tabellen findest du in den jeweiligen Listen.") }}{% if result.skipped_pins %} {{ _("Übersprungene Kacheln (Entität fehlt): {n}.", n=result.skipped_pins) }}{% endif %}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% if result.kind == 'all' %}
+  <button type="button" class="btn primary" hx-post="{{ app_root }}/system/restart" hx-target="#rw-restart" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Jetzt neu starten") }}</button>
+  <div id="rw-restart" class="rw-sub-note"></div>
+  {% else %}
+  <div id="selective-rollbacks">
+    <button type="button" class="btn" hx-post="{{ app_root }}/backup/selective/undo/{{ result.rollback }}" hx-target="#selective-rollbacks" hx-swap="outerHTML" hx-disabled-elt="this"
+            hx-confirm="{{ _('Wiederherstellung rückgängig machen? Der Stand davor wird wiederhergestellt.') }}">{{ _("Rückgängig machen") }}</button>
+    <span class="rw-sub-note">{{ _("Der Rollback bleibt auch auf der Backup-Seite verfügbar.") }}</span>
+  </div>
+  {% endif %}
+</div>

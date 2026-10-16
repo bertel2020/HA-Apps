@@ -1,0 +1,89 @@
+<div class="rw-review" data-apply-label="{% if mode == 'all' %}{{ _('Für Neustart vormerken') }}{% elif mode == 'entities' %}{{ _('Entitäten wiederherstellen ({n})', n=chosen | length) }}{% else %}{{ _('Änderungen anwenden ({n})', n=plan.total) }}{% endif %}">
+  <h2>{{ _("Prüfen und bestätigen") }}</h2>
+  <p class="rw-lead">{{ _("Noch wurde nichts verändert.") }}</p>
+
+  {% if mode == 'all' %}
+  <div class="rw-boxes">
+    <div class="rw-box rw-box--change">
+      <h3>{{ _("Wird ersetzt") }}</h3>
+      <ul>
+        <li>{{ _("Alle Entitäten mit Archiv, Rollup und Hot-Buffer") }}</li>
+        <li>{{ _("Dashboards, Charts, Tabellen und Einstellungen") }}</li>
+      </ul>
+    </div>
+    <div class="rw-box rw-box--keep">
+      <h3>{{ _("Bleibt erhalten") }}</h3>
+      <ul>
+        <li>{{ _("Der aktuelle Stand komplett als Rollback ({size})", size=estimate) }}</li>
+        <li>{{ _("Eingespielt wird beim nächsten Add-on-Start") }}</li>
+      </ul>
+    </div>
+  </div>
+  <div class="rw-note rw-note--warn">{{ _("Das Add-on muss neu starten, damit der Stand eingespielt wird. Währenddessen ist das Zeitarchiv kurz nicht erreichbar.") }}</div>
+
+  {% elif mode == 'entities' %}
+  <div class="rw-boxes">
+    <div class="rw-box rw-box--change">
+      <h3>{{ _("Wird ersetzt") }}</h3>
+      <ul>
+        <li>{{ _("Entitäten aus dem Backup: {n} ({rows} Zeilen)", n=chosen | length, rows=rows | format_int) }}</li>
+        <li>{{ _("Gelöschte Messpunkte dieser Entitäten gelten wie im Backup") }}</li>
+        {% if created %}<li>{{ _("Davon neu angelegt: {n}", n=created | length) }}</li>{% else %}<li>{{ _("Alle existieren bereits und werden ersetzt") }}</li>{% endif %}
+      </ul>
+    </div>
+    <div class="rw-box rw-box--keep">
+      <h3>{{ _("Bleibt erhalten") }}</h3>
+      <ul>
+        <li>{{ _("Alle anderen Entitäten, Dashboards und Einstellungen") }}</li>
+        <li>{{ _("Deine Einstellungen je Entität") }}</li>
+        <li>{{ _("Die aktuellen Dateien der Auswahl als Rollback ({size})", size=estimate) }}</li>
+      </ul>
+    </div>
+  </div>
+  <details class="rw-list"><summary>{{ _("Gewählte Entitäten anzeigen") }}</summary>
+    <ul>{% for r in chosen %}<li>{{ r.name }} <span class="rw-id">{{ r.entity_id }}</span></li>{% endfor %}</ul>
+  </details>
+  <div class="rw-note rw-note--info">{{ _("Das Zeitarchiv läuft weiter. Schreibzugriffe pausieren für die Dauer des Austauschs, in der Regel weniger als eine Minute. Beim Rückgängig-Machen gehen Messwerte verloren, die seitdem für diese Entitäten eingegangen sind.") }}</div>
+
+  {% else %}
+  {% macro names(items) %}{% for i in items %}{{ i.name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endmacro %}
+  <div class="rw-boxes rw-boxes--3">
+    <div class="rw-box rw-box--add">
+      <h3>{{ _("Wird hinzugefügt") }}</h3>
+      {% if plan.dashboards_add or plan.charts_add or plan.tables_add %}
+      <ul>
+        {% if plan.dashboards_add %}<li>{{ _("Dashboards: {n}", n=plan.dashboards_add | length) }}<span class="rw-sub">{{ names(plan.dashboards_add) }}</span></li>{% endif %}
+        {% if plan.charts_add %}<li>{{ _("Charts: {n}", n=plan.charts_add | length) }}<span class="rw-sub">{{ names(plan.charts_add) }}{% if plan.auto_charts %} ({{ _("davon {n} als Abhängigkeit", n=plan.auto_charts | length) }}){% endif %}</span></li>{% endif %}
+        {% if plan.tables_add %}<li>{{ _("Tabellen: {n}", n=plan.tables_add | length) }}<span class="rw-sub">{{ names(plan.tables_add) }}{% if plan.auto_tables %} ({{ _("davon {n} als Abhängigkeit", n=plan.auto_tables | length) }}){% endif %}</span></li>{% endif %}
+      </ul>
+      {% else %}<span class="rw-sub">{{ _("Nichts") }}</span>{% endif %}
+    </div>
+    <div class="rw-box rw-box--change">
+      <h3>{{ _("Wird geändert") }}</h3>
+      {% if plan.dashboards_over or plan.charts_over or plan.tables_over or plan.entity_count or plan.general or plan.extra %}
+      <ul>
+        {% if plan.dashboards_over %}<li>{{ _("Dashboards überschrieben: {n}", n=plan.dashboards_over | length) }}<span class="rw-sub">{{ names(plan.dashboards_over) }}</span></li>{% endif %}
+        {% if plan.charts_over %}<li>{{ _("Charts überschrieben: {n}", n=plan.charts_over | length) }}<span class="rw-sub">{{ names(plan.charts_over) }}</span></li>{% endif %}
+        {% if plan.tables_over %}<li>{{ _("Tabellen überschrieben: {n}", n=plan.tables_over | length) }}<span class="rw-sub">{{ names(plan.tables_over) }}</span></li>{% endif %}
+        {% if plan.entity_count %}<li>{{ _("Entitäten mit angepassten Feldgruppen: {n}", n=plan.entity_count) }}<span class="rw-sub">{{ plan.group_names | join(", ") }}</span></li>{% endif %}
+        {% if plan.general %}<li>{{ _("Allgemeine Einstellungen: {n}", n=plan.general | length) }}</li>{% endif %}
+        {% for x in plan.extra %}<li>{{ x.label }}</li>{% endfor %}
+      </ul>
+      {% else %}<span class="rw-sub">{{ _("Nichts") }}</span>{% endif %}
+    </div>
+    <div class="rw-box rw-box--keep">
+      <h3>{{ _("Bleibt erhalten") }}</h3>
+      <ul>
+        <li>{{ _("Alles, was du nicht gewählt hast") }}</li>
+        <li>{{ _("Alle Messdaten") }}</li>
+        <li>{{ _("Zugangsdaten und Betriebszustand") }}</li>
+        <li>{{ _("Rollback der betroffenen Einstellungen") }}<span class="rw-sub">{{ _("Rückgängig auf der nächsten Seite") }}</span></li>
+      </ul>
+    </div>
+  </div>
+  {% for w in plan.warnings %}<div class="rw-note rw-note--danger">{{ w }}</div>{% endfor %}
+  <div class="rw-note rw-note--info">{{ _("Das Zeitarchiv läuft weiter. Die Änderungen werden in einem Schritt angewendet, neue Objekte stehen danach sofort bereit.") }}</div>
+  {% endif %}
+
+  <label class="rw-confirm"><input type="checkbox" id="rw-confirm" name="confirm" value="1"> <span>{% if mode == 'all' %}{{ _("Ich habe gelesen, dass der aktuelle Stand ersetzt wird.") }}{% else %}{{ _("Ich habe gelesen, was hinzugefügt und geändert wird.") }}{% endif %}</span></label>
+</div>

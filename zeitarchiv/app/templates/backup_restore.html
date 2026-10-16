@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Zeitarchiv — Backup wiederherstellen") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/backup_restore.css') }}">
+{% endblock %}
+{% block content %}
+<div class="page rw" data-restore-url="{{ app_root }}/backup/restore/{{ filename }}">
+  <div class="rw-crumb"><a href="{{ app_root }}/backup">{{ _("Backup / Restore") }}</a> &rsaquo; {{ _("Wiederherstellen") }}</div>
+  <h1>{{ _("Backup vom {created_at} wiederherstellen", created_at=facts.created_at) }}</h1>
+  <p class="sub">{{ _("Wähle, was zurückgespielt werden soll. Vor jeder Änderung wird der aktuelle Stand als Rollback gesichert.") }}</p>
+
+  {% if rw_error %}
+  <div class="rw-note rw-note--danger" role="alert">{{ _("Das Backup lässt sich nicht öffnen: {error}", error=rw_error) }}</div>
+  <p><a class="btn" href="{{ app_root }}/backup">{{ _("Zurück zur Backup-Seite") }}</a></p>
+  {% else %}
+  <dl class="rw-facts">
+    <div><dt>{{ _("Größe") }}</dt><dd>{{ facts.size }}</dd></div>
+    <div><dt>{{ _("Entitäten") }}</dt><dd>{{ facts.entities | format_int }}</dd></div>
+    <div><dt>{{ _("Datenzeitraum") }}</dt><dd>{{ facts.range }}</dd></div>
+    <div><dt>{{ _("Format") }}</dt><dd>{{ facts.format }}</dd></div>
+  </dl>
+
+  <form id="rw" onsubmit="return false">
+    <ol class="rw-steps" id="rw-steps" aria-label="{{ _('Fortschritt') }}">
+      <li data-step="1"><span>{{ _("Art") }}</span></li>
+      <li data-step="2"><span>{{ _("Auswahl") }}</span></li>
+      <li data-step="3"><span>{{ _("Prüfen") }}</span></li>
+      <li data-step="4"><span>{{ _("Fertig") }}</span></li>
+    </ol>
+
+    <section class="rw-panel" data-panel="1">
+      <h2>{{ _("Was möchtest du wiederherstellen?") }}</h2>
+      <p class="rw-lead">{{ _("Die Art bestimmt, was ersetzt wird und ob ein Neustart nötig ist.") }}</p>
+      <div class="rw-cards" role="radiogroup" aria-label="{{ _('Art der Wiederherstellung') }}">
+        <label class="rw-card rw-card--warn">
+          <input type="radio" name="mode" value="all">
+          <span class="rw-tag">{{ _("Neustart nötig") }}</span>
+          <h3>{{ _("Alles wiederherstellen") }}</h3>
+          <p>{{ _("Ersetzt den kompletten Datenbestand durch den Stand des Backups.") }}</p>
+          <ul>
+            <li>{{ _("Alle Entitäten, Einstellungen und Dashboards") }}</li>
+            <li>{{ _("Der aktuelle Stand bleibt als Rollback erhalten") }}</li>
+            <li>{{ _("Wird beim nächsten Add-on-Start eingespielt") }}</li>
+          </ul>
+        </label>
+        <label class="rw-card">
+          <input type="radio" name="mode" value="entities">
+          <span class="rw-tag rw-tag--ok">{{ _("Kein Neustart") }}</span>
+          <h3>{{ _("Einzelne Entitäten") }}</h3>
+          <p>{{ _("Holt nur die gewählten Entitäten aus dem Backup zurück, zum Beispiel nach einer versehentlichen Bereinigung.") }}</p>
+          <ul>
+            <li>{{ _("Archiv, Rollup und Hot-Buffer der Auswahl") }}</li>
+            <li>{{ _("Deine Einstellungen je Entität bleiben") }}</li>
+            <li>{{ _("Rückgängig möglich") }}</li>
+          </ul>
+        </label>
+        <label class="rw-card">
+          <input type="radio" name="mode" value="settings">
+          <span class="rw-tag rw-tag--ok">{{ _("Kein Neustart") }}</span>
+          <h3>{{ _("Einstellungen") }}</h3>
+          <p>{{ _("Holt gezielt Dashboards, Charts, Tabellen und Einstellungen zurück. Messdaten bleiben unberührt.") }}</p>
+          <ul>
+            <li>{{ _("Einzelne Objekte wählbar, mit Vergleich") }}</li>
+            <li>{{ _("Standard: als Kopie hinzufügen, nichts geht verloren") }}</li>
+            <li>{{ _("Entitäts-Einstellungen nach Feldgruppen") }}</li>
+          </ul>
+        </label>
+      </div>
+    </section>
+
+    <section class="rw-panel" data-panel="2" hidden><div id="rw-options"></div></section>
+    <section class="rw-panel" data-panel="3" hidden><div id="rw-review"></div></section>
+    <section class="rw-panel" data-panel="4" hidden><div id="rw-result"></div></section>
+
+    <div class="rw-bar">
+      <div class="rw-bar-in">
+        <span class="rw-bar-info" id="rw-info"></span>
+        <a class="btn" id="rw-cancel" href="{{ app_root }}/backup">{{ _("Abbrechen") }}</a>
+        <button type="button" class="btn" id="rw-back" hidden>{{ _("Zurück") }}</button>
+        <button type="button" class="btn primary" id="rw-next" disabled>{{ _("Weiter") }}</button>
+        <button type="button" class="btn rw-apply" id="rw-apply" hidden disabled>{{ _("Wiederherstellen") }}</button>
+        <a class="btn primary" id="rw-done" href="{{ app_root }}/backup" hidden>{{ _("Zur Backup-Seite") }}</a>
+      </div>
+    </div>
+  </form>
+  {% endif %}
+</div>
+<script src="{{ asset('vendor/htmx.min.js') }}"></script>
+<script src="{{ asset('js/backup-restore.js') }}"></script>
+{% endblock %}

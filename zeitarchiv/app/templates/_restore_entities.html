@@ -1,0 +1,42 @@
+<div class="rw-options" data-kind="entities" data-total="{{ total }}">
+  <h2>{{ _("Welche Entitäten sollen zurückgeholt werden?") }}</h2>
+  <p class="rw-lead">{{ _("Die Daten der gewählten Entitäten werden durch den Stand des Backups ersetzt. Deine Einstellungen je Entität (Name, Aufbewahrung, Auflösung) bleiben erhalten.") }}</p>
+  {% if not rows %}
+  <div class="rw-note">{{ _("Das Backup enthält keine Entitätsdaten.") }}</div>
+  {% else %}
+  <div class="rw-tools">
+    <input type="search" class="rw-search" placeholder="{{ _('Entität suchen') }}" aria-label="{{ _('Entität suchen') }}">
+  </div>
+  <div class="rw-chips">
+    <button type="button" class="rw-chip" data-filter="all" aria-pressed="true">{{ _("Alle") }}<b>{{ total }}</b></button>
+    <button type="button" class="rw-chip" data-filter="diff" aria-pressed="false">{{ _("Weicht ab") }}<b>{{ counts.diff }}</b></button>
+    <button type="button" class="rw-chip" data-filter="new" aria-pressed="false">{{ _("Fehlt aktuell") }}<b>{{ counts.new }}</b></button>
+    <button type="button" class="rw-chip" data-filter="same" aria-pressed="false">{{ _("Identisch") }}<b>{{ counts.same }}</b></button>
+  </div>
+  <div class="tbl-wrap" data-filter="all">
+    <table class="dt rw-table">
+      <thead>
+        <tr>
+          <th class="rw-check"><input type="checkbox" class="rw-all" aria-label="{{ _('Alle sichtbaren auswählen') }}"></th>
+          <th>{{ _("Entität") }}</th>
+          <th>{{ _("Status") }}</th>
+          <th class="rw-num">{{ _("Aktuell") }}</th>
+          <th class="rw-num">{{ _("Backup") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr data-st="{{ r.status }}" data-text="{{ (r.name ~ ' ' ~ r.entity_id) | lower }}">
+          <td class="rw-check"><input type="checkbox" name="ent" value="{{ r.entity_id }}" aria-label="{{ r.name }}"></td>
+          <td>{{ r.name }}<span class="rw-id">{{ r.entity_id }}</span></td>
+          <td><span class="rw-pill rw-pill--{{ r.status }}">{% if r.status == 'new' %}{{ _("fehlt aktuell") }}{% elif r.status == 'diff' %}{{ _("weicht ab") }}{% else %}{{ _("identisch") }}{% endif %}</span></td>
+          <td class="rw-num">{% if r.cur %}{{ r.cur.rows | format_int }}<span class="rw-span">{{ r.cur.first }} – {{ r.cur.last }}</span>{% else %}<span class="rw-span">{{ _("nicht vorhanden") }}</span>{% endif %}</td>
+          <td class="rw-num">{{ r.bak.rows | format_int }}<span class="rw-span">{{ r.bak.first }} – {{ r.bak.last }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="rw-selbar"><span><b data-count>0</b> {{ _("von {total} ausgewählt", total=total) }}</span></div>
+  {% endif %}
+</div>

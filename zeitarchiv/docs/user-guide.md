@@ -2085,19 +2085,53 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   anzuwenden — sinnvoll, um die Integrität eines Backups vor einem
   tatsächlichen Wiederherstellungsbedarf zu bestätigen. Gilt gleichermaßen
   für selbst erstellte wie für importierte Backups.
-- **Wiederherstellen:** bereitet den Austausch nur vor — angewendet wird er
-  erst beim **nächsten Neustart des Zeitarchiv-Add-ons**, bevor die
-  Datenbank wieder geöffnet wird. Nach dem Klick fragt ein Dialog aktiv
-  „Jetzt neu starten?"; eine Bestätigung stößt den Neustart über den
-  Supervisor direkt an, „Später" verschiebt ihn (der Restore bleibt
-  trotzdem vorgemerkt und wird beim nächsten regulären Neustart
-  eingespielt). Ohne Neustart bleibt der aktuelle Datenbestand bis dahin
-  unverändert nutzbar. Der bisherige Stand wird beim Neustart vor dem
-  Überschreiben in ein Restore-Rollback verschoben, nicht gelöscht — bei
-  Bedarf lässt sich der Zustand vor der Wiederherstellung also zurückholen
-  (siehe unten). Nach einer Wiederherstellung empfiehlt sich ein kurzer
-  Blick auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
+- **Wiederherstellen:** öffnet den Restore-Assistenten, eine eigene Seite mit
+  vier Schritten (Art → Auswahl → Prüfen → Fertig). Zuerst wählst du, **was**
+  zurückgespielt werden soll:
+  - **Alles:** ersetzt den kompletten Datenbestand. Der Austausch wird nur
+    vorgemerkt und erst beim **nächsten Neustart des Zeitarchiv-Add-ons**
+    angewendet, bevor die Datenbank wieder geöffnet wird. Nach dem Klick
+    bietet die Seite „Jetzt neu starten“ an; „Später“ verschiebt den
+    Neustart (der Restore bleibt vorgemerkt). Der bisherige Stand wird beim
+    Neustart in ein Restore-Rollback verschoben, nicht gelöscht (siehe
+    unten).
+  - **Einzelne Entitäten:** holt nur die gewählten Entitäten (Archiv,
+    Rollup und Hot-Buffer) aus dem Backup zurück, **ohne Neustart**. Die
+    Liste vergleicht jede Entität mit dem aktuellen Stand (fehlt aktuell,
+    weicht ab, identisch; Zeilenzahl und Zeitspanne) und lässt sich
+    durchsuchen und filtern. Deine Einstellungen je Entität (Name,
+    Aufbewahrung, Filter …) bleiben erhalten; gibt es die Entität nicht mehr,
+    wird sie samt Einstellungen aus dem Backup neu angelegt. Gelöschte
+    Messpunkte der Entität gelten danach wie im Backup. Während des
+    Austauschs pausieren die Schreibzugriffe kurz.
+  - **Einstellungen:** holt Dashboards, Charts, Vergleichstabellen,
+    Feldgruppen der Entitäts-Einstellungen (Name, Aufbewahrung, Filter,
+    Zähler, Anzeige) und allgemeine Einstellungen einzeln zurück, ebenfalls
+    ohne Neustart. Der Abgleich läuft über den Namen. Standardmäßig kommt ein
+    Objekt, das es aktuell nicht oder anders gibt, als **Kopie** dazu und
+    nichts Bestehendes wird verändert; optional lässt sich ein abweichendes
+    Objekt **überschreiben**. Wählst du ein Dashboard, werden die Charts und
+    Tabellen, die es braucht, automatisch mitgeholt, und seine Kacheln
+    zeigen danach auf die richtigen Objekte. Kacheln auf Entitäten, die es
+    nicht mehr gibt, werden übersprungen. Zugangsdaten (API-Token,
+    WebDAV-Anmeldung) und Betriebszustand (letzte und nächste Läufe) werden
+    nie übernommen. **Vorsicht bei der Aufbewahrung:** ist sie im Backup
+    kürzer als jetzt, löscht der nächste Retention-Lauf ältere Daten
+    endgültig. Die Aufbewahrung ist deshalb nie vorausgewählt, und die
+    Prüfung warnt davor.
+
+  Vor jedem Ausführen zeigt der Schritt **Prüfen**, was hinzugefügt, geändert
+  und beibehalten wird; erst nach dem Ankreuzen der Bestätigung wird der
+  Button aktiv. Nach einer Wiederherstellung empfiehlt sich ein kurzer Blick
+  auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
   Datensatzmengen wieder vorhanden sind.
+- **Selektive Wiederherstellungen:** jede Wiederherstellung einzelner
+  Entitäten oder Einstellungen legt ein kleines Teil-Rollback an (Dateien der
+  Auswahl bzw. die überschriebenen Einstellungszeilen). Die Liste unter der
+  Backup-Tabelle zeigt die letzten drei mit Zeitpunkt, Quelle und Größe;
+  „Rückgängig machen“ stellt den Stand davor wieder her, „Rollback löschen“
+  entfernt ihn. Beim Rückgängig-Machen von Entitäten gehen Messwerte verloren,
+  die seit der Wiederherstellung für diese Entitäten eingegangen sind.
 - **Ausführungsverlauf:** listet jeden Backup-Lauf sowie jede tatsächlich
   angewendete Wiederherstellung (eigener Auslöser „Wiederherstellung") mit
   Zeitpunkt, Status, Dauer/„—" und Größe. Ein fehlgeschlagener oder

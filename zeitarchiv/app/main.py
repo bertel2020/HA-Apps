@@ -149,6 +149,7 @@ from .housekeeping_routes import (
     demo_data_context,
 )
 from .backup_external_routes import BackupExternalDependencies, create_backup_external_router
+from .restore_routes import RestoreDependencies, create_restore_router
 from .export_routes import ExportDependencies, create_export_router
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
@@ -5746,6 +5747,10 @@ app.include_router(_import_service.router())
 app.include_router(create_backup_external_router(BackupExternalDependencies(
     index=index, templates=templates, background=_background, tz=TZ, base_dir=BASE_DIR,
     backup_table_context=lambda: _backup_list_context(),
+)))
+app.include_router(create_restore_router(RestoreDependencies(
+    index=index, templates=templates, data_dir=DATA_DIR, backups_dir=BACKUPS_DIR,
+    coordinator=storage_coordinator, tz=TZ,
 )))
 app.include_router(create_export_router(ExportDependencies(
     index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,

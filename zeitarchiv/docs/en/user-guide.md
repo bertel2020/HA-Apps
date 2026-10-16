@@ -1937,17 +1937,47 @@ Menu item of its own **System → Backup / Restore** (not under Settings):
 - **Check:** checksum check of an existing backup without applying it — useful
   to confirm the integrity of a backup before an actual need for restoration
   arises. Applies equally to self-created and imported backups.
-- **Restore:** only prepares the swap — it is applied only at the **next
-  restart of the Zeitarchiv add-on**, before the database is opened again.
-  After the click, a dialog actively asks "Restart now?"; a confirmation
-  triggers the restart directly via the Supervisor, "Later" postpones it (the
-  restore remains scheduled anyway and is applied at the next regular restart).
-  Without a restart, the current inventory remains usable unchanged until
-  then. At restart, the previous state is moved into a restore rollback before
-  being overwritten, not deleted — so if needed the state before the
-  restoration can be brought back (see below). After a restore, a short look at
-  **Statistics** is recommended to check whether the expected entities and
-  record counts are back.
+- **Restore:** opens the restore assistant, a page of its own with four steps
+  (Type → Selection → Review → Done). First you choose **what** should be
+  restored:
+  - **Everything:** replaces the entire data set. The swap is only scheduled
+    and applied at the **next restart of the Zeitarchiv add-on**, before the
+    database is opened again. After the click the page offers "Restart now";
+    "Later" postpones the restart (the restore stays scheduled). At restart
+    the previous state is moved into a restore rollback, not deleted (see
+    below).
+  - **Individual entities:** brings back only the chosen entities (archive,
+    rollup and hot buffer) from the backup, **without a restart**. The list
+    compares every entity with the current state (missing now, differs,
+    identical; row count and time span) and can be searched and filtered. Your
+    per-entity settings (name, retention, filters …) are kept; if the entity
+    no longer exists it is created anew, with its settings, from the backup.
+    Deleted data points of the entity follow the backup afterwards. Writes
+    pause briefly during the swap.
+  - **Settings:** brings back dashboards, charts, comparison tables, field
+    groups of the entity settings (name, retention, filters, counter, display)
+    and general settings one by one, also without a restart. Matching is done
+    by name. By default an object that does not exist currently, or differs,
+    is added as a **copy** and nothing existing is changed; optionally a
+    differing object can be **overwritten**. If you pick a dashboard, the
+    charts and tables it needs are included automatically and its tiles then
+    point to the right objects. Tiles for entities that no longer exist are
+    skipped. Credentials (API token, WebDAV login) and operating state (last
+    and next runs) are never restored. **Be careful with retention:** if it is
+    shorter in the backup than now, the next retention run permanently deletes
+    older data. Retention is therefore never preselected and the review warns
+    about it.
+
+  Before anything runs, the **Review** step shows what will be added, changed
+  and kept; the button only becomes active once you tick the confirmation.
+  After a restore, a short look at **Statistics** is recommended to check
+  whether the expected entities and record counts are back.
+- **Selective restores:** every restore of individual entities or settings
+  creates a small partial rollback (the files of the selection or the
+  overwritten settings rows). The list below the backup table shows the last
+  three with time, source and size; "Undo" brings back the state before, "Delete
+  rollback" removes it. When undoing entities, values that arrived for these
+  entities since the restore are lost.
 - **Run history:** lists every backup run as well as every restoration actually
   applied (its own trigger "Restoration") with time, status, duration/"—" and
   size. A failed or interrupted run is marked red; a click on the row shows the
