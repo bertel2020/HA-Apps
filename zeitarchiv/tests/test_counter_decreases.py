@@ -164,3 +164,12 @@ def test_a_snapshot_computed_under_older_rules_is_stale_and_not_shown(tmp_path) 
     assert not index.is_counter_decrease_snapshot_stale()
     assert index.get_counter_decrease_snapshot()["rows"][0]["entity_id"] == "sensor.neu"
     index.close()
+
+
+def test_the_row_marker_skips_a_daily_reset_but_keeps_it_for_compaction() -> None:
+    day = datetime(2026, 10, 5, 23, 0, tzinfo=TZ).timestamp()
+    reset = [(day, 12.5), (day + 3600 + 1300, 0.0)]
+    assert len(cleanup.detect_counter_decreases(reset)) == 1  # ohne Zeitzone (Verdichtung): jeder Rückgang
+    assert cleanup.detect_counter_decreases(reset, TZ) == {}
+    midday = [(day + 40000, 12.5), (day + 40300, 0.0)]
+    assert len(cleanup.detect_counter_decreases(midday, TZ)) == 1

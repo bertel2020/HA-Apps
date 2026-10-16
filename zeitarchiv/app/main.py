@@ -5209,7 +5209,7 @@ def _rows_fragment(
         duplicates = cleanup.detect_duplicates(rows, entity["decimals"])
         repetitions = cleanup.detect_repetitions(rows, entity["decimals"], TZ)
         counter_decreases = (
-            cleanup.detect_counter_decreases(rows)
+            cleanup.detect_counter_decreases(rows, TZ)
             if cleanup_stats.counter_decreases_flagged(entity)
             else {}
         )

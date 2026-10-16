@@ -611,7 +611,7 @@ def _counter_decrease_reason(previous_value: float, value: float) -> str:
 
 
 def detect_counter_decreases(
-    rows: Iterable[tuple[float, float]],
+    rows: Iterable[tuple[float, float]], tz: ZoneInfo | None = None
 ) -> dict[float, str]:
     """Markiert den ersten niedrigeren Wert nach einem höheren Zählerstand.
 
@@ -619,13 +619,19 @@ def detect_counter_decreases(
     die Rückgangskante markiert; anschließend steigende Werte werden nicht
     gegen das historische Maximum geprüft. Bei Zeitstempel-Duplikaten bleibt
     das erste Vorkommen die Referenz, passend zur Duplikatbereinigung.
+
+    Mit ``tz`` werden planmäßige Rücksetzer um Mitternacht (siehe _is_periodic_reset) nicht
+    markiert, wie in classify_counter_decreases(). Ohne bleibt es bei jedem Rückgang — so
+    die Verdichtung, die jeden Reset-Zeitpunkt als Rohzeile behalten muss.
     """
     decreases: dict[float, str] = {}
     previous_ts: float | None = None
     previous_value: float | None = None
     for ts, value in rows:
         if previous_ts is not None and ts > previous_ts:
-            if previous_value is not None and value < previous_value:
+            if previous_value is not None and value < previous_value and not (
+                tz is not None and _is_periodic_reset(previous_ts, ts, previous_value, value, tz)
+            ):
                 decreases[ts] = _counter_decrease_reason(previous_value, value)
             previous_ts, previous_value = ts, value
         elif previous_ts is None:
