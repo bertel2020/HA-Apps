@@ -259,6 +259,40 @@ def set_ignored(index: Index, entity_id: str, key: str, ignored: bool) -> None:
     index.set_setting(IGNORE_SETTING, json.dumps({e: sorted(k) for e, k in sorted(current.items())}))
 
 
+SORT_KEYS = ("total", "name") + tuple(column["key"] for column in COLUMNS)
+KIND_KEYS = tuple(column["key"] for column in COLUMNS)
+
+
+def filter_and_sort(
+    rows: list[dict], *, q: str = "", kind: str = "all", sort: str = "total", direction: str = "desc"
+) -> list[dict]:
+    """Suche (Name oder Entity-ID), Befundtyp-Filter und Sortierung der Matrix-Zeilen.
+
+    ``kind`` zeigt nur Entitäten mit mitzählendem Befund dieses Typs; ignorierte Zellen
+    zählen nicht. Unbekannte Werte fallen auf die Standardansicht (alle, nach Summe absteigend)
+    zurück. Gleichstand ordnet die Entity-ID, damit die Reihenfolge stabil bleibt."""
+    q = q.strip().lower()
+    if q:
+        rows = [r for r in rows if q in r["friendly_name"].lower() or q in r["entity_id"].lower()]
+    if kind in KIND_KEYS:
+        rows = [r for r in rows if r["cells"].get(kind) and not r["cells"][kind]["ignored"]]
+    if sort not in SORT_KEYS:
+        sort = "total"
+    descending = direction != "asc"
+
+    def value(row):
+        if sort == "total":
+            return row["total"]
+        if sort == "name":
+            return row["friendly_name"].lower()
+        cell = row["cells"].get(sort)
+        return cell["count"] if cell and not cell["ignored"] else 0
+
+    if sort == "name":
+        return sorted(rows, key=lambda r: (value(r), r["entity_id"]), reverse=descending)
+    return sorted(rows, key=lambda r: (-value(r) if descending else value(r), r["entity_id"]))
+
+
 # Zeitraum der Matrix: Schlüssel -> Tage (None = gesamte Historie). "all" ist der Standard.
 PERIODS: dict[str, int | None] = {"all": None, "year": 365, "30d": 30, "7d": 7}
 DEFAULT_PERIOD = "all"

@@ -490,3 +490,28 @@ def test_ignorierte_befunde_zaehlen_nicht_mit_und_lassen_sich_anzeigen(index):
     data_quality.set_ignored(index, "sensor.b", "duplicates", False)
     assert data_quality.build_matrix(index)["totals"]["duplicates"]["count"] == 8
     assert data_quality.load_ignored(index) == {}
+
+
+def test_suche_filter_und_sortierung_der_matrix(index):
+    _entity(index, "sensor.alpha", name="Zebra")
+    _mit_tageszahlen(index, "sensor.alpha", {}, duplicates=1, gaps=9)
+    _entity(index, "sensor.beta", name="Anton")
+    _mit_tageszahlen(index, "sensor.beta", {}, duplicates=7)
+    _mit_tageszahlen(index, "sensor.gamma", {}, gaps=4)
+    zeilen = data_quality.build_matrix(index)["rows"]
+
+    def ids(**kw):
+        return [r["entity_id"] for r in data_quality.filter_and_sort(zeilen, **kw)]
+
+    assert ids() == ["sensor.alpha", "sensor.beta", "sensor.gamma"]  # Summe absteigend: 10, 7, 4
+    assert ids(direction="asc") == ["sensor.gamma", "sensor.beta", "sensor.alpha"]
+    assert ids(sort="duplicates") == ["sensor.beta", "sensor.alpha", "sensor.gamma"]
+    assert ids(sort="name", direction="asc") == ["sensor.beta", "sensor.gamma", "sensor.alpha"]  # Anton, sensor.gamma, Zebra
+    assert ids(kind="gaps") == ["sensor.alpha", "sensor.gamma"]
+    assert ids(q="ZEB") == ["sensor.alpha"]  # Name, ohne Groß-/Kleinschreibung
+    assert ids(q="sensor.gam") == ["sensor.gamma"]  # Entity-ID
+    assert ids(sort="quatsch", kind="quatsch") == ids()  # Unbekanntes fällt auf den Standard zurück
+
+    data_quality.set_ignored(index, "sensor.gamma", "gaps", True)
+    zeilen = data_quality.build_matrix(index, show_ignored=True)["rows"]
+    assert ids(kind="gaps") == ["sensor.alpha"]  # ignorierte Zellen zählen im Filter nicht

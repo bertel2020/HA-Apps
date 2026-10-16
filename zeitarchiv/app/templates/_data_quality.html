@@ -11,18 +11,33 @@
   <div class="stat"><div class="label">{{ labels[col.key] }}</div><div class="value">{{ dq.totals[col.key].label }}</div></div>
   {% endfor %}
 </div>
+{% macro sort_link(key, label) %}{% set active = dq_state.sort == key %}{% set next_dir = ('asc' if dq_state.dir == 'desc' else 'desc') if active else ('asc' if key == 'name' else 'desc') %}<a class="dq-sort{% if active %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(sort=key, dir=next_dir, page=1) }}" title="{{ _('Sortieren') }}">{{ label }}{% if active %}<span class="dq-sort-arrow" aria-hidden="true">{{ '▾' if dq_state.dir == 'desc' else '▴' }}</span>{% endif %}</a>{% endmacro %}
 {% set is_heat = view == 'heatmap' %}
 {% set period = dq.period %}
-{% set extra = ('&amp;period=' ~ period if period != 'all' else '') ~ ('&amp;ignored=1' if dq.show_ignored else '') %}
 {% set period_labels = {'7d': _("7 Tage"), '30d': _("30 Tage"), 'year': _("1 Jahr"), 'all': _("Gesamt")} %}
+{% set sort_labels = {'total': _("Summe"), 'name': _("Name"), 'duplicates': labels.duplicates, 'counter_decreases': labels.counter_decreases, 'outliers': labels.outliers, 'gaps': labels.gaps} %}
 <div class="dq-toolbar">
   <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+    <input type="search" class="dq-search" name="q" value="{{ dq_state.q }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
+    <label for="dq-kind">{{ _("Befund") }}</label>
+    <select id="dq-kind" name="kind" onchange="this.form.submit()">
+      <option value="all" {% if dq_state.kind == 'all' %}selected{% endif %}>{{ _("Alle Befunde") }}</option>
+      {% for col in dq.columns %}<option value="{{ col.key }}" {% if dq_state.kind == col.key %}selected{% endif %}>{{ labels[col.key] }}</option>{% endfor %}
+    </select>
     <label for="dq-period">{{ _("Zeitraum") }}</label>
     <select id="dq-period" name="period" onchange="this.form.submit()">
       {% for key, label in period_labels.items() %}
       <option value="{{ key }}" {% if period == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
+    <span class="dq-sort-mobile">
+      <label for="dq-sort">{{ _("Sortierung") }}</label>
+      <select id="dq-sort" name="sort" onchange="this.form.submit()">
+        {% for key, label in sort_labels.items() %}<option value="{{ key }}" {% if dq_state.sort == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </span>
+    <input type="hidden" name="dir" value="{{ dq_state.dir }}">
+    <input type="hidden" name="page_size" value="{{ dq_state.page_size }}">
     {% if dq.ignored_count or dq.show_ignored %}
     <label class="dq-show-ignored"><input type="checkbox" name="ignored" value="1" {% if dq.show_ignored %}checked{% endif %} onchange="this.form.submit()"> {{ _("Ignorierte anzeigen ({n})", n=dq.ignored_count) }}</label>
     {% endif %}
@@ -47,9 +62,9 @@
   {% if dq.rows %}
   <table class="dt dq-table">
     <thead><tr>
-      <th>{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% endif %}{{ _("Entität") }}</th>
+      <th>{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% endif %}{{ sort_link("name", _("Entität")) }}</th>
       {% for col in dq.columns %}
-      <th class="dq-num">{{ labels[col.key] }}</th>
+      <th class="dq-num">{{ sort_link(col.key, labels[col.key]) }}</th>
       {% endfor %}
     </tr></thead>
     {% for row in dq.rows %}
@@ -86,15 +101,14 @@
 {% endif %}
 {% if pagination and pagination.total > 10 %}
 <form class="pager dq-pager" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
-  {% if period != 'all' %}<input type="hidden" name="period" value="{{ period }}">{% endif %}{% if dq.show_ignored %}<input type="hidden" name="ignored" value="1">{% endif %}
+  {% for name, value in dq_state.items() if name != 'page_size' and value != '' %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
   <div class="dq-pager-nav">
     <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
-    {% set q = '?page_size=' ~ pagination.page_size ~ extra %}
     {% for label, target, off, title in [('«', 1, pagination.page <= 1, _('Erste Seite')), ('‹', pagination.page - 1, pagination.page <= 1, _('Vorherige Seite')), ('›', pagination.page + 1, pagination.page >= pagination.total_pages, _('Nächste Seite')), ('»', pagination.total_pages, pagination.page >= pagination.total_pages, _('Letzte Seite'))] %}
     {% if loop.index == 3 %}
     <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="this.form.submit()"> / {{ pagination.total_pages }}</span>
     {% endif %}
-    {% if off %}<span class="btn navbtn is-disabled" aria-disabled="true">{{ label }}</span>{% else %}<a class="btn navbtn" href="{{ app_root }}/housekeeping/datenqualitaet{{ q }}&amp;page={{ target }}" title="{{ title }}">{{ label }}</a>{% endif %}
+    {% if off %}<span class="btn navbtn is-disabled" aria-disabled="true">{{ label }}</span>{% else %}<a class="btn navbtn" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(page=target) }}" title="{{ title }}">{{ label }}</a>{% endif %}
     {% endfor %}
   </div>
   <select name="page_size" title="{{ _('Zeilen pro Seite') }}" onchange="this.form.page.value=1;this.form.submit()">

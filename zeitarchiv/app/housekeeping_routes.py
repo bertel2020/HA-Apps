@@ -31,6 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -1299,6 +1300,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     def data_quality_view(
         request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE,
         period: str = data_quality.DEFAULT_PERIOD, ignored: int = 0,
+        q: str = "", kind: str = "all", sort: str = "total", dir: str = "desc",
     ) -> HTMLResponse:
         """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
         (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
@@ -1309,10 +1311,37 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
         # Die Heatmap-Ansicht (data_quality.build_heatmap, _data_quality_heatmap.html) ist vorerst
         # aus der Oberfläche genommen, siehe ROADMAP.md; Dienst und Vorlage bleiben bestehen.
+        if sort not in data_quality.SORT_KEYS:
+            sort = "total"
+        if kind not in data_quality.KIND_KEYS:
+            kind = "all"
+        direction = "asc" if dir == "asc" else "desc"
+        matrix["rows"] = data_quality.filter_and_sort(
+            matrix["rows"], q=q, kind=kind, sort=sort, direction=direction
+        )
         matrix["rows"], pagination = data_quality.paginate(matrix["rows"], page, page_size)
+        # Zustand der Ansicht für Links, Pager und Formulare: nur, was vom Standard abweicht
+        state = {
+            "period": matrix["period"], "ignored": 1 if ignored else "", "q": q.strip(), "kind": kind,
+            "sort": sort, "dir": direction, "page_size": pagination["page_size"],
+        }
+        defaults = {
+            "period": data_quality.DEFAULT_PERIOD, "ignored": "", "q": "", "kind": "all", "sort": "total",
+            "dir": "desc", "page_size": data_quality.DEFAULT_PAGE_SIZE,
+        }
+
+        def dq_url(**changes) -> str:
+            """Query-String der Ansicht mit den übergebenen Änderungen (page, sort, …)."""
+            merged = {**state, **changes}
+            query = urlencode({k: v for k, v in merged.items() if v not in ("", None) and v != defaults.get(k)})
+            return f"?{query}" if query else ""  # ohne Pfad: die Vorlage setzt app_root davor
+
         return deps.templates.TemplateResponse(
             request, "data_quality.html",
-            {"data_quality": matrix, "heatmap": None, "pagination": pagination, "view": "table"},
+            {
+                "data_quality": matrix, "heatmap": None, "pagination": pagination, "view": "table",
+                "dq_state": state, "dq_url": dq_url,
+            },
         )
 
     @router.get("/entities/{entity_id}/data-quality", response_class=HTMLResponse)

@@ -207,3 +207,24 @@ def test_ignorieren_ueber_die_route_und_umschalter(client) -> None:
     assert client.post(
         "/housekeeping/datenqualitaet/ignore", data={"entity_id": "sensor.gibt_es_nicht", "key": "gaps", "value": "1"}
     ).status_code == 404
+
+
+def test_ansicht_behaelt_suche_filter_und_sortierung_in_den_links(client) -> None:
+    from app.main import index
+
+    from app.storage.cleanup import OUTLIER_RULE_VERSION
+
+    for n in range(12):
+        eid = f"sensor.pytest_dq_sort_{n:02d}"
+        _entity(index, eid)
+        index.set_first_ts_and_add_rows(eid, 1_700_000_000.0, 0)
+        index.set_cleanup_alltime_stats(
+            eid, {"all": 100, "duplicates": 2}, "off", OUTLIER_RULE_VERSION, daily={}, gap_threshold="15",
+        )
+    html = client.get("/housekeeping/datenqualitaet?q=pytest_dq_sort&kind=duplicates&sort=name&dir=asc&page_size=10").text
+    assert 'value="pytest_dq_sort"' in html
+    assert "q=pytest_dq_sort" in html and "kind=duplicates" in html and "sort=name" in html and "dir=asc" in html
+    assert "page=2" in html  # Pager
+    # Standardwerte tauchen nicht in den Links auf
+    standard = client.get("/housekeeping/datenqualitaet").text
+    assert "sort=total" not in standard and "kind=all" not in standard
