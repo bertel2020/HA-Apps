@@ -34,11 +34,11 @@
      Namen statt eine lesbare Zahlenspalte zu bilden. */
   .dd-picker-row-count{justify-content:space-between;gap:14px;}
   .dd-picker-row-count .n{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  /* Treffer rot wie in der Kennzahlen-Tabelle darüber (dort .has-issues) —
-     beide zeigen dieselben Zahlen und sollen dieselbe Aussage machen. Nur die
-     Zahl, nicht die ganze Zeile: rot eingefärbte Menüeinträge läsen sich als
-     gefährliche Aktion. */
-  .dd-picker-row-count.has-issues .n{color:var(--danger);font-weight:600;}
+  /* Treffer gelb wie in der Kennzahlen-Tabelle darüber (dort .has-issues) —
+     beide zeigen dieselben Zahlen und sollen dieselbe Aussage machen: hier lässt
+     sich aufräumen. Lücken bleiben ungefärbt (reine Information). Nur die Zahl,
+     nicht die ganze Zeile; rot ist dem Löschen und Fehlern vorbehalten. */
+  .dd-picker-row-count.has-issues .n{color:var(--warning);font-weight:600;}
   /* Ohne Treffer: gedämpft und nicht anklickbar (kein onclick im Template).
      Vorher sahen alle Kategorien gleich aus, und die Auswahl einer leeren
      endete zwangsläufig auf "Keine Werte in diesem Zeitraum/Filter". */
@@ -128,7 +128,7 @@
   .entity-stats-table td{white-space:nowrap;}
   .entity-stats-table td.label{color:var(--ink);font-weight:600;}
   .entity-stats-table td.val{color:var(--ink);font-weight:600;font-family:var(--font-mono);}
-  .entity-stats-table td.val.has-issues{color:var(--danger);}
+  .entity-stats-table td.val.has-issues{color:var(--warning);}
   .entity-stats-loading{padding:9px 13px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
 
   /* Drei Reiter für die drei bisher getrennten Werkzeuge (Bereinigen/
@@ -499,13 +499,18 @@
 }
 .marked-zone p a{color:var(--accent-line);white-space:nowrap;}
 
-/* Begründung zum Urteil eines Zählerrückgangs: am Desktop im Tooltip des Etiketts, auf dem
-   Telefon (kein Hover) als ruhige Zeile darunter. */
-/* Zählerrückgang mit Einordnung: wie die Urteile in Housekeeping (.counter-verdict) gefärbt.
-   Ein planmäßiger Reset ist kein Alarm, deshalb nicht rot; „Noch offen“ ist neutral. */
+/* Etiketten nach Bedeutung, nicht nach Fund: gelb = hier lässt sich aufräumen, grau = nur Information.
+   Rot bleibt dem Löschen und Fehlern vorbehalten. Zählerrückgänge tragen ihr Urteil wie in Housekeeping
+   (.counter-verdict); ein planmäßiger Reset ist kein Alarm, „Noch offen“ ist neutral. */
+.flag-badge.sev-act{background:var(--warning-soft);color:var(--warning);}
+.flag-badge.sev-info{background:var(--surface-alt);color:var(--ink-muted);}
+/* Zeilenhintergrund nur bei „Aufräumen möglich“; halbtransparent, damit er in langen Listen nicht schreit. */
+table.dt tr.flag-act td{background:color-mix(in srgb, var(--warning-soft) 55%, var(--surface));color:var(--ink);}
 .flag-badge.verdict-returns{background:var(--warning-soft);color:var(--notice-warn);}
 .flag-badge.verdict-stays{background:var(--accent-line-soft);color:var(--accent-line);}
 .flag-badge.verdict-open{background:var(--surface-alt);color:var(--ink-muted);}
+/* Begründung zum Urteil eines Zählerrückgangs: am Desktop im Tooltip des Etiketts, auf dem
+   Telefon (kein Hover) als ruhige Zeile darunter. */
 .flag-note{display:none;color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));margin-top:3px;}
 @media (max-width:640px){
   .flag-note{display:block;}

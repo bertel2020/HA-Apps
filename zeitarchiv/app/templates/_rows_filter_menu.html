@@ -40,7 +40,7 @@
        (Zeitraumwechsel kann ihn leeren) — sonst ließe er sich nicht mehr
        schließen bzw. wäre der Zustand nicht mehr erklärbar. #}
     {% set leer = opt.anzahl == 0 and opt.wert != filter %}
-    <div class="dd-picker-row dd-picker-row-count{{ ' active' if opt.wert == filter }}{{ ' is-empty' if leer }}{{ ' has-issues' if opt.anzahl and opt.wert != 'all' }}"
+    <div class="dd-picker-row dd-picker-row-count{{ ' active' if opt.wert == filter }}{{ ' is-empty' if leer }}{{ ' has-issues' if opt.anzahl and opt.wert not in ('all', 'gaps') }}"
          {% if not leer %}onclick="selectDDOption('rows-filter', '{{ opt.wert }}', 'Markierung: {{ opt.text }}'); resetPage();"{% endif %}>
       <span>{{ opt.text }}</span><span class="n">{{ opt.anzahl | format_int }}</span>
     </div>

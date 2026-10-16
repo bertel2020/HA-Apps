@@ -159,5 +159,6 @@ def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
         assert "Stand danach wieder bei" in html
         assert 'class="flag-note"' in html
         assert 'class="flag-badge verdict-returns"' in html
+        assert '<tr class="flag-act">' in html
     finally:
         index.set_counter_decrease_snapshot([])
