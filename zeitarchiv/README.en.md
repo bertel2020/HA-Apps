@@ -59,9 +59,9 @@ Zeitarchiv consists of two separate, independently versioned parts:
 | **Stays fast** | Charts over weeks, months or years load quickly, even with a very long history |
 | **Your own dashboards** | Freely combinable charts (line, bar, timeline) and comparison tables on any number of your own dashboards |
 | **Energy dashboard** | Dedicated Sankey view of the energy flow with self-sufficiency, cost and CO₂ analysis — enabled with one click if desired |
-| **Data maintenance** | Detect, correct or clean up outliers, gaps and duplicates |
+| **Data maintenance** | Detect, correct or clean up outliers, gaps, duplicates and counter decreases — with a data quality overview across all entities |
 | **Data import** | Import existing history from Symcon, CSV files or directly from Home Assistant |
-| **Backup** | Verifiable, portable ZIP backups with restore and schedule |
+| **Backup** | Verifiable, portable ZIP backups with schedule; a restore can bring back everything, single entities or just the settings |
 | **Demo mode** | Separate instance with synthetic showcase data, completely isolated from the real data — switchable via add-on option |
 | **Secured** | Runs behind Home Assistant's own login, write access strictly separated from the rest of the interface |
 
