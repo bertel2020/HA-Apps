@@ -3180,6 +3180,21 @@
     "Backup läuft … {n} %": "Backup running … {n} %",
     "Gelöscht wird erst, wenn das Backup fertig ist.": "Nothing is deleted until the backup has finished.",
     "{n} Entität endgültig löschen": "Permanently delete {n} entity",
-    "{n} Entität endgültig löschen?": "Permanently delete {n} entity?"
+    "{n} Entität endgültig löschen?": "Permanently delete {n} entity?",
+    "Mo": "Mon",
+    "Di": "Tue",
+    "Mi": "Wed",
+    "Do": "Thu",
+    "Fr": "Fri",
+    "Sa": "Sat",
+    "So": "Sun",
+    "Montag": "Monday",
+    "Dienstag": "Tuesday",
+    "Mittwoch": "Wednesday",
+    "Donnerstag": "Thursday",
+    "Freitag": "Friday",
+    "Samstag": "Saturday",
+    "Sonntag": "Sunday",
+    "Wochentag": "Weekday"
   }
 }
