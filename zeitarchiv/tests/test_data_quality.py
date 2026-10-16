@@ -533,7 +533,8 @@ def test_hinweis_auf_neue_befunde_seit_dem_letzten_besuch(index):
 def test_stand_je_zeile_und_gesamtstatus(index):
     """Jede Zeile trägt den Zeitpunkt ihrer Gesamt-Zählung; der Gesamtstatus zählt gemessene,
     veraltete und noch nicht gemessene Entitäten. Wer älter als die Erneuerungsgrenze des
-    Wartungsplaners ist, gilt als veraltet."""
+    Wartungsplaners ist UND seitdem neue Werte bekam, gilt als veraltet; eine stille Entität
+    erneuert der Planer nicht und sie bleibt aktuell."""
     import time
 
     from app import cleanup_stats
@@ -543,6 +544,7 @@ def test_stand_je_zeile_und_gesamtstatus(index):
     _mit_daten(index, "sensor.b")
     _gesamt(index, "sensor.b", duplicates=1)
     _mit_daten(index, "sensor.offen")  # nie gemessen
+    index.record_write("sensor.a", time.time() + 30)  # neue Werte nach der Messung; sensor.b bleibt still
 
     jetzt = time.time()
     matrix = data_quality.build_matrix(index, now=jetzt + 120)
@@ -556,8 +558,10 @@ def test_stand_je_zeile_und_gesamtstatus(index):
 
     spaeter = jetzt + cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS + 60
     matrix = data_quality.build_matrix(index, now=spaeter)
-    assert all(r["measured_old"] for r in matrix["rows"])
-    assert matrix["status"]["stale"] == 2
+    zeilen = {r["entity_id"]: r for r in matrix["rows"]}
+    assert zeilen["sensor.a"]["measured_old"] is True
+    assert zeilen["sensor.b"]["measured_old"] is False  # still: nichts zu erneuern
+    assert matrix["status"]["stale"] == 1
     assert matrix["status"]["stale_hours"] == 6
 
 

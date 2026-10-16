@@ -287,9 +287,12 @@ def build_matrix(
       zu einer anderen Schwelle). Ohne sie sähe "nichts gefunden" wie "noch nicht
       gemessen" aus.
     - ``status``: Gesamtstand der Messung (``total`` messbare Entitäten, ``measured``,
-      ``stale`` = älter als die Erneuerungsgrenze des Wartungsplaners, ``oldest_label``)
+      ``stale`` = älter als die Erneuerungsgrenze des Wartungsplaners UND seitdem neue Werte,
+      ``oldest_label`` = älteste Messung unter den Entitäten mit neuen Werten; stille
+      Entitäten werden nicht neu gemessen und gelten als aktuell)
     - je Zeile ``measured_at`` (Zeitpunkt der Gesamt-Zählung, None ohne), ``measured_label``
-      ("vor 2 Std.") und ``measured_old`` (älter als die Erneuerungsgrenze)
+      ("vor 2 Std.") und ``measured_old`` (wie ``stale``: älter als die Erneuerungsgrenze und
+      seitdem neue Werte)
     """
     now = time.time() if now is None else now
     stale_after = cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS
@@ -313,7 +316,11 @@ def build_matrix(
     not_applicable: set[str] = set()
     pending = 0
     measurable = 0
-    measured_times: list[float] = []
+    # Messzeitpunkte der Entitäten, die seit ihrer Messung neue Werte bekommen haben: nur deren
+    # Zahlen können veralten, der Planer erneuert nur sie (cleanup_stats.due_entities_for_outlier_rate).
+    # Eine stille Entität gilt dagegen unbegrenzt als aktuell.
+    ageing_times: list[float] = []
+    changed_since: set[str] = set()
     computed: dict[str, float | None] = {}
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
@@ -337,8 +344,9 @@ def build_matrix(
             or (window_start and "daily" not in entry)
         ):
             pending += 1
-        elif entry.get("computed_at"):
-            measured_times.append(entry["computed_at"])
+        elif entry.get("computed_at") and (entity["last_ts"] or 0) > entry["computed_at"]:
+            ageing_times.append(entry["computed_at"])
+            changed_since.add(entity_id)
         if entry is not None and window_start is not None:
             if "daily" in entry:
                 window = {key: 0 for key in counts}
@@ -389,7 +397,9 @@ def build_matrix(
                 formats.format_datetime(datetime.fromtimestamp(measured_at, tz), seconds=False, comma=True)
                 if measured_at and tz else ""
             ),
-            "measured_old": bool(measured_at and now - measured_at >= stale_after),
+            "measured_old": bool(
+                measured_at and entity_id in changed_since and now - measured_at >= stale_after
+            ),
             "counter_allowed": entity_id in allowed,
             "counter_na": entity_id in not_applicable,
         })
@@ -412,9 +422,9 @@ def build_matrix(
         "status": {
             "total": measurable,
             "measured": measurable - pending,
-            "stale": sum(1 for t in measured_times if now - t >= stale_after),
+            "stale": sum(1 for t in ageing_times if now - t >= stale_after),
             "oldest_label": (
-                tr("vor {dauer}", dauer=format_uptime(now - min(measured_times))) if measured_times else ""
+                tr("vor {dauer}", dauer=format_uptime(now - min(ageing_times))) if ageing_times else ""
             ),
             "stale_hours": round(stale_after / 3600),
         },
