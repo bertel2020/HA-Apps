@@ -223,7 +223,7 @@
 
     // Inhalt des Bestätigungsdialogs: Überschrift, die Gewählten als eine Liste (auch die, die gerade
     // nicht in der Suche stehen) und bei jeder Entität darunter, was nach dem Löschen ins Leere zeigt.
-    function buildDeleteConfirmTemplate(ids, usages) {
+    function buildDeleteConfirmTemplate(ids, usages, backupInfo) {
       const tpl = document.createElement('template');
       const el = (tag, text, cls) => {
         const node = document.createElement(tag);
@@ -268,7 +268,70 @@
       if (ids.some(id => (usages[id] || []).some(u => u.auto_cleaned))) notes.push(t('Wert-Kacheln auf Dashboards werden mit entfernt.'));
       notes.push(t('Sendet die Home-Assistant-Integration eine Entität weiter, wird sie automatisch neu angelegt.'));
       tpl.content.appendChild(el('p', notes.join(' '), 'del-foot'));
+
+      // Backup vorab anbieten. Ein Backup sichert das ganze Archiv; einzelne Entitäten lassen sich
+      // daraus nicht zurückholen, ein Restore setzt alles auf den Backup-Stand — das sagt der Text.
+      const box = el('div', undefined, 'del-backup');
+      const lastTs = backupInfo && backupInfo.last_success_ts;
+      box.appendChild(el('p', lastTs
+        ? t('Letztes Backup: {when}', {when: backupInfo.last_success_text})
+        : t('Es gibt noch kein Backup.'), 'del-backup-last'));
+      const label = el('label', undefined, 'del-backup-opt');
+      const check = el('input');
+      check.type = 'checkbox';
+      check.id = 'del-backup';
+      // Vorausgewählt, wenn es noch kein Backup gibt oder das letzte älter als eine Woche ist.
+      check.checked = !lastTs || (Date.now() / 1000 - lastTs) > 7 * 86400;
+      label.append(check, el('span', t('Vorher ein Backup erstellen')));
+      box.appendChild(label);
+      box.appendChild(el('p', t('Das Backup sichert das gesamte Archiv. Eine Wiederherstellung setzt alles auf diesen Stand zurück, auch die Daten der übrigen Entitäten.'), 'del-backup-hint'));
+      box.appendChild(el('p', undefined, 'del-backup-status'));
+      tpl.content.appendChild(box);
       return tpl;
+    }
+
+    // Wartet im offenen Dialog auf das Backup (falls gewünscht); erst danach wird gelöscht. Schlägt es
+    // fehl oder bricht man ab, bleibt alles, wie es ist.
+    async function runBackupIfWanted(ctl) {
+      const wanted = ctl.rich.querySelector('#del-backup');
+      if (!wanted || !wanted.checked) return true;
+      const status = ctl.rich.querySelector('.del-backup-status');
+      const okLabel = ctl.ok.textContent;
+      const fail = (text) => { status.textContent = text; status.classList.add('is-error'); ctl.ok.textContent = okLabel; return false; };
+      status.classList.remove('is-error');
+      status.textContent = '';
+      wanted.disabled = true;
+      try {
+        let jobId;
+        try {
+          const response = await fetch('entities/backup-start', {method: 'POST'});
+          if (!response.ok) throw new Error('backup start failed');
+          jobId = (await response.json()).job_id;
+        } catch (error) {
+          return fail(t('Das Backup konnte nicht gestartet werden. Es wurde nichts gelöscht.'));
+        }
+        while (!ctl.cancelled) {
+          let info;
+          try {
+            const response = await fetch('entities/backup-status?job_id=' + encodeURIComponent(jobId));
+            if (!response.ok) throw new Error('status failed');
+            info = await response.json();
+          } catch (error) {
+            return fail(t('Der Stand des Backups konnte nicht abgefragt werden. Es wurde nichts gelöscht.'));
+          }
+          const job = info.job;
+          if (job && job.final) {
+            if (job.status === 'success') return true;
+            return fail(t('Das Backup ist fehlgeschlagen. Es wurde nichts gelöscht.') + (job.error ? ' ' + job.error : ''));
+          }
+          ctl.ok.textContent = t('Backup läuft … {n} %', {n: info.percent});
+          status.textContent = t('Gelöscht wird erst, wenn das Backup fertig ist.');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        return false;
+      } finally {
+        wanted.disabled = false;
+      }
     }
 
     async function deleteSelection() {
@@ -280,10 +343,16 @@
         const usageForm = new FormData();
         ids.forEach(id => usageForm.append('entity_id', id));
         let check;
+        let backupInfo = null;
         try {
-          const response = await fetch('entities/usage-check', {method: 'POST', body: usageForm});
+          const [response, backupResponse] = await Promise.all([
+            fetch('entities/usage-check', {method: 'POST', body: usageForm}),
+            fetch('entities/backup-status').catch(() => null),
+          ]);
           if (!response.ok) throw new Error('usage check failed');
           check = await response.json();
+          // Ohne Backup-Stand läuft der Dialog trotzdem; die Option zeigt dann „noch kein Backup“.
+          backupInfo = backupResponse && backupResponse.ok ? await backupResponse.json() : null;
         } catch (error) {
           appAlert(t('Die Verwendung der Entitäten konnte nicht geprüft werden. Es wurde nichts gelöscht.'));
           return;
@@ -291,7 +360,8 @@
         const confirmed = await window.appConfirm('', {
           danger: true,
           confirmLabel: t('{n} Entitäten endgültig löschen', {n: ids.length}),
-          template: buildDeleteConfirmTemplate(ids, check.usages || {}),
+          template: buildDeleteConfirmTemplate(ids, check.usages || {}, backupInfo),
+          onConfirm: runBackupIfWanted,
         });
         if (!confirmed) return;
 

@@ -107,3 +107,35 @@ def test_selection_column_is_hidden_until_selection_mode_is_switched_on(client) 
     assert "#entities-panel:not(.is-selecting) .col-sel{display:none;}" in css
     # Beenden verwirft die Markierungen, sonst blieben unsichtbar markierte Entitäten stehen.
     assert "if (!selecting) {\n        selection.clear();" in JS
+
+
+def test_backup_status_reports_last_success_and_job_result(client) -> None:
+    from app import main
+
+    job_id = main.index.create_backup_job("manual")
+    main.index.update_backup_job(job_id, status="failed", error="Platte voll")
+
+    body = client.get(f"/entities/backup-status?job_id={job_id}").json()
+
+    assert body["job"] == {"status": "failed", "final": True, "error": "Platte voll"}
+    assert {"running", "percent", "last_success_ts", "last_success_text"} <= set(body)
+    assert client.get("/entities/backup-status?job_id=999999").json()["job"] is None
+
+
+def test_backup_start_returns_the_job_the_dialog_waits_for(client, monkeypatch) -> None:
+    from app import main
+
+    started = []
+    monkeypatch.setattr(main._background, "run_backup", lambda **kwargs: started.append(kwargs) or True)
+    main._background.backup_progress.job_id = 4711
+
+    assert client.post("/entities/backup-start").json() == {"job_id": 4711}
+    assert started == [{}]
+
+
+def test_delete_dialog_offers_a_backup_and_waits_for_it() -> None:
+    assert "del-backup" in JS and "entities/backup-start" in JS
+    # Gelöscht wird erst nach erfolgreichem Backup: onConfirm bremst das Schließen des Dialogs.
+    assert "onConfirm: runBackupIfWanted" in JS
+    dialog = (APP / "static/js/confirm-dialog.js").read_text(encoding="utf-8")
+    assert "opts.onConfirm" in dialog

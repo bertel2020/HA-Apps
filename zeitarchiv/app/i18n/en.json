@@ -2977,6 +2977,15 @@
     "Noch in Verwendung ({n}). Diese Stellen zeigen danach ins Leere:": "Still in use ({n}). These places will point to nothing afterwards:",
     "{n} Entitäten endgültig löschen?": "Permanently delete {n} entities?",
     "Mit allen Werten und ihrer Konfiguration. Das kann nicht rückgängig gemacht werden.": "With all values and configuration. This cannot be undone.",
-    "Sendet die Home-Assistant-Integration eine Entität weiter, wird sie automatisch neu angelegt.": "If the Home Assistant integration keeps sending an entity, it is created again automatically."
+    "Sendet die Home-Assistant-Integration eine Entität weiter, wird sie automatisch neu angelegt.": "If the Home Assistant integration keeps sending an entity, it is created again automatically.",
+    "Letztes Backup: {when}": "Last backup: {when}",
+    "Es gibt noch kein Backup.": "There is no backup yet.",
+    "Vorher ein Backup erstellen": "Create a backup first",
+    "Das Backup sichert das gesamte Archiv. Eine Wiederherstellung setzt alles auf diesen Stand zurück, auch die Daten der übrigen Entitäten.": "The backup covers the whole archive. A restore resets everything to that state, including the data of all other entities.",
+    "Das Backup konnte nicht gestartet werden. Es wurde nichts gelöscht.": "The backup could not be started. Nothing was deleted.",
+    "Der Stand des Backups konnte nicht abgefragt werden. Es wurde nichts gelöscht.": "The backup status could not be retrieved. Nothing was deleted.",
+    "Das Backup ist fehlgeschlagen. Es wurde nichts gelöscht.": "The backup failed. Nothing was deleted.",
+    "Backup läuft … {n} %": "Backup running … {n} %",
+    "Gelöscht wird erst, wenn das Backup fertig ist.": "Nothing is deleted until the backup has finished."
   }
 }

@@ -153,4 +153,13 @@
     .confirm-overlay:has(.del-list) .confirm-actions{flex-wrap:wrap;}
     .confirm-overlay:has(.del-list) .confirm-actions .btn{flex:1 1 100%;}
   }
+  .del-backup{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);text-align:left;}
+  .del-backup p{margin:0;}
+  .del-backup-last{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .del-backup-opt{display:flex;align-items:center;gap:8px;margin:6px 0 2px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);cursor:pointer;}
+  .del-backup-opt input{width:16px;height:16px;accent-color:var(--accent-line);}
+  .del-backup-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.45;}
+  .del-backup-status{margin-top:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .del-backup-status:empty{display:none;}
+  .del-backup-status.is-error{color:var(--danger);font-weight:600;}
   .del-foot{margin:10px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.5;text-align:left;}

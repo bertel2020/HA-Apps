@@ -3119,6 +3119,51 @@ async def entities_usage_check(request: Request) -> dict:
     return {"usages": usages, "summary": entity_usage.summarize(usages)}
 
 
+_BACKUP_FINAL_STATES = ("success", "failed", "interrupted", "skipped")
+
+
+@app.get("/entities/backup-status")
+def entities_backup_status(job_id: int | None = None) -> dict:
+    """Stand des Backups für den Löschdialog: Alter des letzten erfolgreichen Laufs und, mit
+    ``job_id``, Fortschritt und Ergebnis genau dieses Laufs."""
+    with _background.backup_progress.lock:
+        running = _background.backup_progress.running
+        done = _background.backup_progress.done
+        total = _background.backup_progress.total
+    last = index.get_last_successful_backup_job()
+    last_ts = last["finished_at"] if last is not None else None
+    result: dict = {
+        "running": running,
+        "percent": int(done / total * 100) if total else 0,
+        "last_success_ts": last_ts,
+        "last_success_text": (
+            f"{format_timestamp(last_ts, TZ)} {format_time(last_ts, TZ)} "
+            f"({tr('vor {format_uptime}', format_uptime=format_uptime(time.time() - last_ts))})"
+            if last_ts else None
+        ),
+        "job": None,
+    }
+    if job_id is not None:
+        for job in index.list_backup_jobs(20):
+            if job["id"] == job_id:
+                result["job"] = {
+                    "status": job["status"], "final": job["status"] in _BACKUP_FINAL_STATES,
+                    "error": job["error"],
+                }
+                break
+    return result
+
+
+@app.post("/entities/backup-start")
+def entities_backup_start() -> dict:
+    """Startet ein Backup vor dem Löschen (oder hängt sich an ein bereits laufendes). Die
+    ``job_id`` gehört dem Lauf, auf dessen Ende der Dialog dann wartet."""
+    _background.run_backup()
+    with _background.backup_progress.lock:
+        job_id = _background.backup_progress.job_id
+    return {"job_id": job_id}
+
+
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)
 @_storage_locked(lambda args: args["entity_id"])
 def entity_migrate_page(request: Request, entity_id: str) -> HTMLResponse:
