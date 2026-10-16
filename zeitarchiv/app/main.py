@@ -2596,6 +2596,7 @@ def _entities_table_response(
         if "type" in visible_columns:
             entry["aggregation_type"] = row["aggregation_type"]
             entry["type_label"] = format_type(row["aggregation_type"])
+            entry["state_class"] = row["state_class"] or ""
         if "first_ts" in visible_columns:
             entry["first_ts"] = format_timestamp(row["first_ts"], TZ)
             entry["first_ts_time"] = format_time(row["first_ts"], TZ)
@@ -2768,6 +2769,7 @@ def _entity_config_context(entity) -> dict:
         "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
+        "state_class": entity["state_class"] or "",
         "unit": entity["unit"] or "—",
         "row_count": format_int(_visible_row_count(entity)),
         "first_ts": format_timestamp(entity["first_ts"], TZ),
@@ -4900,6 +4902,7 @@ def entity_detail(
             "custom_name": entity["custom_name"] or "",
             "aggregation_type": entity["aggregation_type"],
             "type_label": format_type(entity["aggregation_type"]),
+            "state_class": entity["state_class"] or "",
             "unit": entity["unit"],
             "decimals": decimals_to_int(effective_decimals),
             "display_mode": entity["display_mode"],

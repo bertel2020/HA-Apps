@@ -1548,6 +1548,8 @@ button[data-tooltip]{cursor:pointer;}
    nur beim Erscheinen; das Verschwinden bleibt instant (transition-delay
    wird nur in der :hover-Regel gesetzt, nicht in der Basisregel). */
 [data-tooltip]:hover::after{opacity:1;visibility:visible;transition-delay:.6s;}
+/* Das Badge setzt Großbuchstaben und Sperrung; der Tooltip daran soll normal lesbar bleiben (state_class). */
+.badge[data-tooltip]::after{text-transform:none;letter-spacing:normal;}
 /* Entitäten-Tooltips brauchen echtes Markup statt content:attr(...), damit
    Friendly Name und Entity-ID unterschiedlich formatiert, aber immer als zwei
    getrennte Zeilen erscheinen. max-content richtet die Box an der längeren
