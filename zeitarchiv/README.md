@@ -274,6 +274,16 @@ gröberer Auflösung (Minute, Stunde, Tag) statt der kompletten Rohwerte.
   <br><sub>Vergleichstabelle &nbsp;·&nbsp; Meldungs-Center &nbsp;·&nbsp; Farbschema „Home Assistant"</sub>
 </p>
 
+<p align="center">
+  <a href="docs/img/datenqualitaet-light.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/datenqualitaet-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/datenqualitaet-light.png">
+    <img src="docs/img/datenqualitaet-light.png" alt="Datenqualität: Ausreißer, Lücken, Duplikate und Zählerrückgänge je Entität" width="270">
+  </picture></a>
+  <a href="docs/img/wiederherstellen-assistent-light.png"><img src="docs/img/wiederherstellen-assistent-light.png" alt="Wiederherstellen mit Auswahl: alles, einzelne Entitäten oder nur Einstellungen" width="270"></a>
+  <br><sub>Datenqualität &nbsp;·&nbsp; Wiederherstellen mit Auswahl</sub>
+</p>
+
 <p align="center"><sub>Passt sich automatisch Hell/Dunkel an (siehe Startseite/Energiedashboard oben); neben „Zeitarchiv" (Standard) und „Home Assistant" auch als „Modern" wählbar. Weitere Ansichten: <a href="docs/img">docs/img</a>.</sub></p>
 
 ## Speicherung und Aufbewahrung
