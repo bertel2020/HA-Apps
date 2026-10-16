@@ -1606,6 +1606,8 @@
     "90 Tage": "90 days",
     "365 Tage": "365 days",
     "1 Jahr": "1 year",
+    "In Housekeeping bündeln": "Handle in bulk in Housekeeping",
+    "Housekeeping bündelt die Zählerrückgänge der letzten 30 Tage und markiert oder entfernt sie gemeinsam.": "Housekeeping groups the counter decreases of the last 30 days and marks or removes them together.",
     "Neue Befunde in der Datenqualität": "New findings in data quality",
     "{new} neue Befunde in {entities} Entität(en) seit dem letzten Besuch der Datenqualität.": "{new} new findings in {entities} entity(ies) since your last visit to data quality.",
     "Alle Befunde": "All findings",
