@@ -1291,6 +1291,43 @@ def inject_data_quality_issues(
     return result
 
 
+# Ungewollte Zählerrückgänge im Boiler-Energiezähler (Testfall für
+# Reset-/Rückgang-Erkennung): alle COUNTER_DIP_EVERY_DAYS Tage fällt der
+# Zählerstand kurzzeitig um einige kWh unter den eigentlich simulierten Wert
+# und springt danach wieder auf die korrekte Linie zurück (typischer
+# Sensor-Aussetzer). Zeitpunkt, Tiefe und Dauer leiten sich allein aus der
+# Tagesnummer ab — kein rng-Verbrauch, damit alle übrigen Demo-Daten
+# unverändert bleiben, und --append-Läufe erzeugen dieselben Rückgänge.
+COUNTER_DIP_ENTITY_ID = "sensor.demo_boiler_energie"
+COUNTER_DIP_EVERY_DAYS = 9
+COUNTER_DIP_DEPTH_KWH = (0.4, 2.5)
+COUNTER_DIP_STEPS_RANGE = (2, 4)
+
+
+def inject_counter_dips(entity: DemoEntity, rows: list[Row]) -> list[Row]:
+    if entity.entity_id != COUNTER_DIP_ENTITY_ID or len(rows) < 20:
+        return rows
+    result = list(rows)
+    last_day = None
+    for i, (ts, _value) in enumerate(rows):
+        day = int(ts // 86400)
+        if day == last_day or day % COUNTER_DIP_EVERY_DAYS != 0:
+            continue
+        # Erste Zeile ab der pro Tag abgeleiteten Uhrzeit (08:00-20:59 UTC).
+        if (ts % 86400) < (8 + day % 13) * 3600:
+            continue
+        last_day = day
+        depth = COUNTER_DIP_DEPTH_KWH[0] + (day * 7 % 100) / 100 * (
+            COUNTER_DIP_DEPTH_KWH[1] - COUNTER_DIP_DEPTH_KWH[0]
+        )
+        steps = COUNTER_DIP_STEPS_RANGE[0] + day % (
+            COUNTER_DIP_STEPS_RANGE[1] - COUNTER_DIP_STEPS_RANGE[0] + 1
+        )
+        for j in range(i, min(i + steps, len(rows))):
+            result[j] = (rows[j][0], round(max(rows[j][1] - depth, 0.0), 3))
+    return result
+
+
 # Sprache der laufenden Erzeugung für die Lesehelfer unten (sie bekommen nur die deutschen IDs).
 _run_language: contextvars.ContextVar[str] = contextvars.ContextVar("demo_language", default=SOURCE_LANGUAGE)
 
@@ -1738,6 +1775,7 @@ def run_generation(
     total_rows = 0
     for index_in_list, entity in enumerate(DEMO_ENTITIES, start=1):
         rows = inject_data_quality_issues(entity, rows_by_key[entity.entity_id], rng, month_boundary_ts)
+        rows = inject_counter_dips(entity, rows)
         write_entity(data_dir, index, tz, entity, rows, language)
         total_rows += len(rows)
         if on_entity is not None:
