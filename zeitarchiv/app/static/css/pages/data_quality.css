@@ -122,3 +122,15 @@ a.hm:hover,a.hm:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
   table.dq-heat .dq-num{padding:6px 10px 6px 6px;}
   .dq-toolbar{flex-direction:column;align-items:stretch;}
 }
+
+/* Suche, Befund-Filter und sortierbare Spaltenköpfe */
+.dq-search{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:5px 8px;min-width:200px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--ink);}
+.dq-search:focus{outline:none;border-color:var(--accent-line);}
+a.dq-sort{color:inherit;text-decoration:none;white-space:nowrap;}
+a.dq-sort:hover,a.dq-sort.is-active{color:var(--ink);}
+.dq-sort-arrow{margin-left:4px;font-size:.85em;}
+.dq-sort-mobile{display:none;align-items:center;gap:8px;}
+@media (max-width:640px){
+  .dq-sort-mobile{display:inline-flex;}
+  .dq-search{flex:1 1 100%;min-width:0;}
+}
