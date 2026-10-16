@@ -65,27 +65,79 @@
       const rows = $$('tbody tr', scope);
       const all = $('.rw-all', scope);
       const search = $('.rw-search', scope);
-      const wrap = $('.tbl-wrap', scope);
-      const visible = () => rows.filter((r) => r.style.display !== 'none' && !r.hidden && getComputedStyle(r).display !== 'none');
-      const count = () => options.setCount(rows.filter((r) => $('input[name=ent]', r).checked).length);
-      const applySearch = () => {
-        const q = (search.value || '').trim().toLowerCase();
-        rows.forEach((r) => { r.hidden = !!q && !r.dataset.text.includes(q); });
-        syncAll();
+      const pickAll = $('.rw-pick-all', scope);
+      const clear = $('.rw-clear', scope);
+      const pager = $('.rw-pager', scope);
+      const sizeSel = $('.rw-size', pager);
+      const pageInput = $('.pager-page-input', pager);
+      const empty = $('.rw-empty', scope);
+      const box = (r) => $('input[name=ent]', r);
+      const st = { page: 1, size: Number(sizeSel.value), filter: 'all' };
+      let matches = [];
+      let pageRows = [];
+
+      const count = () => options.setCount(rows.filter((r) => box(r).checked).length);
+      const syncBar = () => {
+        all.checked = pageRows.length > 0 && pageRows.every((r) => box(r).checked);
+        const open = matches.filter((r) => !box(r).checked).length;
+        pickAll.hidden = !(matches.length > pageRows.length && open > 0);
+        pickAll.textContent = pickAll.dataset.tpl.replace('{n}', String(matches.length));
+        clear.hidden = !rows.some((r) => box(r).checked);
       };
-      const syncAll = () => { const v = visible(); all.checked = v.length > 0 && v.every((r) => $('input[name=ent]', r).checked); };
-      search.addEventListener('input', applySearch);
+      const render = () => {
+        const q = (search.value || '').trim().toLowerCase();
+        matches = rows.filter((r) => (st.filter === 'all' || r.dataset.st === st.filter) && (!q || r.dataset.text.includes(q)));
+        const pages = Math.max(1, Math.ceil(matches.length / st.size));
+        st.page = Math.min(Math.max(1, st.page), pages);
+        const from = (st.page - 1) * st.size;
+        pageRows = matches.slice(from, from + st.size);
+        const shown = new Set(pageRows);
+        rows.forEach((r) => { r.hidden = !shown.has(r); });
+        empty.hidden = matches.length > 0;
+        $('[data-range]', pager).textContent = matches.length
+          ? pager.dataset.rangeTpl.replace('{start}', String(from + 1)).replace('{end}', String(from + pageRows.length)).replace('{total}', String(matches.length))
+          : '';
+        $('[data-pages]', pager).textContent = String(pages);
+        pageInput.value = String(st.page);
+        pageInput.max = String(pages);
+        $$('[data-go]', pager).forEach((b) => {
+          const first = b.dataset.go === 'first' || b.dataset.go === 'prev';
+          b.disabled = first ? st.page <= 1 : st.page >= pages;
+        });
+        syncBar();
+      };
+      const goto = (n) => { st.page = n; render(); };
+
+      search.addEventListener('input', () => goto(1));
+      sizeSel.addEventListener('change', () => { st.size = Number(sizeSel.value); goto(1); });
+      pageInput.addEventListener('change', () => goto(parseInt(pageInput.value, 10) || 1));
+      $$('[data-go]', pager).forEach((b) => b.addEventListener('click', () => {
+        const to = { first: 1, prev: st.page - 1, next: st.page + 1, last: Infinity }[b.dataset.go];
+        goto(to);
+      }));
       all.addEventListener('change', () => {
-        visible().forEach((r) => { $('input[name=ent]', r).checked = all.checked; });
+        pageRows.forEach((r) => { box(r).checked = all.checked; });
         count();
+        syncBar();
       });
-      scope.addEventListener('change', (e) => { if (e.target.name === 'ent') { syncAll(); count(); } });
+      pickAll.addEventListener('click', () => {
+        matches.forEach((r) => { box(r).checked = true; });
+        count();
+        syncBar();
+      });
+      clear.addEventListener('click', () => {
+        rows.forEach((r) => { box(r).checked = false; });
+        count();
+        syncBar();
+      });
+      scope.addEventListener('change', (e) => { if (e.target.name === 'ent') { count(); syncBar(); } });
       $$('.rw-chip', scope).forEach((chip) => chip.addEventListener('click', () => {
         $$('.rw-chip', scope).forEach((c) => c.setAttribute('aria-pressed', String(c === chip)));
-        wrap.dataset.filter = chip.dataset.filter;
-        syncAll();
+        st.filter = chip.dataset.filter;
+        goto(1);
       }));
       count();
+      render();
     },
     initSettings(scope) {
       const boxes = () => $$('input[type=checkbox][data-key]', scope);

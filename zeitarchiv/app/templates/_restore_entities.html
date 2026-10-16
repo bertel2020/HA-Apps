@@ -6,18 +6,23 @@
   {% else %}
   <div class="rw-tools">
     <input type="search" class="rw-search" placeholder="{{ _('Entität suchen') }}" aria-label="{{ _('Entität suchen') }}">
+    <div class="rw-chips">
+      <button type="button" class="rw-chip" data-filter="all" aria-pressed="true">{{ _("Alle") }}<b>{{ total }}</b></button>
+      <button type="button" class="rw-chip" data-filter="diff" aria-pressed="false">{{ _("Weicht ab") }}<b>{{ counts.diff }}</b></button>
+      <button type="button" class="rw-chip" data-filter="new" aria-pressed="false">{{ _("Fehlt aktuell") }}<b>{{ counts.new }}</b></button>
+      <button type="button" class="rw-chip" data-filter="same" aria-pressed="false">{{ _("Identisch") }}<b>{{ counts.same }}</b></button>
+    </div>
   </div>
-  <div class="rw-chips">
-    <button type="button" class="rw-chip" data-filter="all" aria-pressed="true">{{ _("Alle") }}<b>{{ total }}</b></button>
-    <button type="button" class="rw-chip" data-filter="diff" aria-pressed="false">{{ _("Weicht ab") }}<b>{{ counts.diff }}</b></button>
-    <button type="button" class="rw-chip" data-filter="new" aria-pressed="false">{{ _("Fehlt aktuell") }}<b>{{ counts.new }}</b></button>
-    <button type="button" class="rw-chip" data-filter="same" aria-pressed="false">{{ _("Identisch") }}<b>{{ counts.same }}</b></button>
+  <div class="rw-selbar rw-selbar--top">
+    <span><b data-count>0</b> {{ _("von {total} ausgewählt", total=total) }}</span>
+    <button type="button" class="rw-link rw-pick-all" hidden data-tpl="{{ _('Alle {n} Treffer auswählen', n='{n}') }}"></button>
+    <button type="button" class="rw-link rw-clear" hidden>{{ _("Auswahl leeren") }}</button>
   </div>
-  <div class="tbl-wrap" data-filter="all">
+  <div class="tbl-wrap">
     <table class="dt rw-table">
       <thead>
         <tr>
-          <th class="rw-check"><input type="checkbox" class="rw-all" aria-label="{{ _('Alle sichtbaren auswählen') }}"></th>
+          <th class="rw-check"><input type="checkbox" class="rw-all" aria-label="{{ _('Alle auf dieser Seite auswählen') }}"></th>
           <th>{{ _("Entität") }}</th>
           <th>{{ _("Status") }}</th>
           <th class="rw-num">{{ _("Aktuell") }}</th>
@@ -36,7 +41,22 @@
         {% endfor %}
       </tbody>
     </table>
+    <p class="rw-empty" hidden>{{ _("Keine Treffer") }}</p>
   </div>
-  <div class="rw-selbar"><span><b data-count>0</b> {{ _("von {total} ausgewählt", total=total) }}</span></div>
+  <div class="pager rw-pager" data-range-tpl="{{ _('{start}&ndash;{end} von {total}', start='{start}', end='{end}', total='{total}') }}">
+    <select class="rw-size" title="{{ _('Zeilen pro Seite') }}">
+      {% for size in [20, 50, 100] %}
+      <option value="{{ size }}"{% if size == 20 %} selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
+      {% endfor %}
+    </select>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="pager-range" data-range></span>
+      <button type="button" class="btn navbtn" data-go="first" title="{{ _('Erste Seite') }}">«</button>
+      <button type="button" class="btn navbtn" data-go="prev" title="{{ _('Vorherige Seite') }}">‹</button>
+      <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" min="1" value="1"> / <span data-pages>1</span></span>
+      <button type="button" class="btn navbtn" data-go="next" title="{{ _('Nächste Seite') }}">›</button>
+      <button type="button" class="btn navbtn" data-go="last" title="{{ _('Letzte Seite') }}">»</button>
+    </div>
+  </div>
   {% endif %}
 </div>
