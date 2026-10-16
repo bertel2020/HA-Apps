@@ -31,13 +31,17 @@ from .formatting import decimals_to_int, format_int, format_uptime, format_value
 from .storage import cleanup
 from .storage.index import Index, effective_outlier_threshold
 
+# "severity" ist die Farbe der Zahl und folgt wie in Werte bearbeiten der Frage "lässt sich etwas
+# tun?": warn (gelb) = aufräumen möglich, mute (grau) = nur Information (Lücken). Rot bleibt Fehlern
+# vorbehalten. Bei den Zählerrückgängen steht im Cache nur eine Zahl ohne Urteil, deshalb gilt
+# gelb, sobald sie über null liegt; den Typ zeigt erst die Bereinigungsseite.
 # Reihenfolge = Spaltenreihenfolge. "filter" und "range" sind die Startwerte der
 # Bereinigungsseite (siehe initial_cleanup_view()).
 COLUMNS: tuple[dict, ...] = (
-    {"key": "duplicates", "filter": "duplicates", "range": "all", "severity": "info"},
-    {"key": "counter_decreases", "filter": "counter_decreases", "range": "all", "severity": "crit"},
+    {"key": "duplicates", "filter": "duplicates", "range": "all", "severity": "warn"},
+    {"key": "counter_decreases", "filter": "counter_decreases", "range": "all", "severity": "warn"},
     {"key": "outliers", "filter": "outliers", "range": "all", "severity": "warn"},
-    {"key": "gaps", "filter": "gaps", "range": "all", "severity": "warn"},
+    {"key": "gaps", "filter": "gaps", "range": "all", "severity": "mute"},
 )
 
 CLEANUP_FILTERS = ("all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases")
