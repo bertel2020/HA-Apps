@@ -2209,7 +2209,7 @@
     "Zählerrückgänge erkannt": "Counter decreases detected",
     "Vermutlich Reset oder Zählertausch": "Probably a reset or meter replacement",
     "Vermutlich Fehlwert": "Probably a bad value",
-    "Stand blieb danach niedrig. Setzt sich der Zähler planmäßig zurück, erlaube die Rückgänge.": "The reading stayed low afterwards. If the counter resets on a schedule, allow the decreases.",
+    "Stand blieb danach niedrig.": "The reading stayed low afterwards.",
     "Noch offen": "Still open",
     "Zu wenig Folgewerte für eine Einschätzung.": "Too few following values for an assessment.",
     "{previous} → {value}": "{previous} → {value}",
