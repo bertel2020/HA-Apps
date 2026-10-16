@@ -3406,11 +3406,13 @@ def charts_list(request: Request) -> HTMLResponse:
     charts = index.list_saved_charts()
     # Einmal alle Entitätstypen holen statt je Chart einzeln nachzuschlagen.
     aggregation_types = _aggregation_types()
+    existing = entity_usage.existing_entity_ids(index)
     rows = [
         {
             "id": c["id"],
             "name": c["name"],
             "entity_count": len(c["entity_ids"]),
+            "missing_ids": entity_usage.missing_entity_ids(c["entity_ids"], existing),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
             "type_label": chart_type_label(c, aggregation_types),
             "type_key": chart_type_key(c, aggregation_types),
@@ -3465,6 +3467,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
+        "missing_ids": entity_usage.missing_entity_ids(chart["entity_ids"], entity_usage.existing_entity_ids(index)) if chart else [],
         # compare/compare_mode sind (wie im Chart-Editor selbst) reine
         # Laufzeit-Ansichtseinstellungen, kein gespeichertes Chart-Feld — nur
         # der Anfangszustand eines gerade erst über prefill eröffneten neuen
@@ -3801,6 +3804,7 @@ def _dashboard_tiles_context(
     entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
     aggregation_types = _aggregation_types()
+    existing_ids = entity_usage.existing_entity_ids(index)
     tiles = []
     # Sektionen (item_type='section') gruppieren die Kacheln rein über ihre
     # Position in derselben Liste — keine Kachel trägt eine section_id. Die
@@ -3821,6 +3825,7 @@ def _dashboard_tiles_context(
                 continue
             tiles.append({
                 "kind": "chart", "id": c["id"], "name": c["name"],
+                "missing_ids": entity_usage.missing_entity_ids(c["entity_ids"], existing_ids),
                 "entity_ids": c["entity_ids"], "range_key": c["range_key"],
                 "continuous": c["continuous"], "entity_names": c["entity_names"],
                 # Ausgeblendete Serien reichen bis in die Kachel: sie sollen
@@ -3854,6 +3859,7 @@ def _dashboard_tiles_context(
                 continue
             tiles.append({
                 "kind": "table", "id": t["id"], "name": t["name"],
+                "missing_ids": entity_usage.missing_entity_ids(entity_usage.table_entity_ids(t), existing_ids),
                 "columns": t["columns"], "rows": t["rows"], "style": t["style"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
@@ -4687,8 +4693,13 @@ class _SaveTableBody(BaseModel):
 
 @app.get("/tables", response_class=HTMLResponse)
 def tables_list(request: Request) -> HTMLResponse:
-    tables = index.list_saved_tables()
-    return templates.TemplateResponse(request, "tables.html", {"rows": tables})
+    existing = entity_usage.existing_entity_ids(index)
+    rows = []
+    for table in index.list_saved_tables():
+        full = index.get_saved_table(table["id"])
+        missing = entity_usage.missing_entity_ids(entity_usage.table_entity_ids(full), existing) if full else []
+        rows.append({**table, "missing_ids": missing})
+    return templates.TemplateResponse(request, "tables.html", {"rows": rows})
 
 
 def _table_editor_context(table: dict | None) -> dict:
@@ -4710,6 +4721,7 @@ def _table_editor_context(table: dict | None) -> dict:
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("table", table["id"]) if table else [],
+        "missing_ids": entity_usage.missing_entity_ids(entity_usage.table_entity_ids(table), entity_usage.existing_entity_ids(index)) if table else [],
     }
 
 

@@ -2509,7 +2509,10 @@
     "Alle sichtbaren Entitäten wählen": "Select all visible entities",
     "Auswahl anzeigen": "Show selection",
     "Keine Entität gewählt": "No entity selected",
-    "Löschen …": "Delete …"
+    "Löschen …": "Delete …",
+    "Entität fehlt": "Entity missing",
+    "Fehlende Entitäten: {entities}": "Missing entities: {entities}",
+    "{count} Entitäten fehlen": "{count} entities missing"
   },
   "js": {
     "Meldungen": "Notices",

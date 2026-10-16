@@ -92,6 +92,24 @@ def find_usages(index: Index, entity_ids: Iterable[str]) -> dict[str, list[dict]
     return result
 
 
+def existing_entity_ids(index: Index) -> set[str]:
+    """Alle Entitäten, die das Archiv kennt — Vergleichsbasis für ``missing_entity_ids``."""
+    return {row["entity_id"] for row in index.list_entities()}
+
+
+def missing_entity_ids(entity_ids: Iterable[str], existing: set[str]) -> list[str]:
+    """Die genannten Entitäten, die es nicht (mehr) gibt, in Reihenfolge und ohne Doppelte.
+
+    Gespeicherte Diagramme und Tabellen behalten ihre Verweise, wenn eine Entität gelöscht wird
+    (die Integration legt sie wieder an, sobald sie weitersendet) — hier wird nur gemeldet."""
+    return [entity_id for entity_id in dict.fromkeys(entity_ids) if entity_id not in existing]
+
+
+def table_entity_ids(table: dict) -> list[str]:
+    """Alle Entitäten aus den Zeilen einer gespeicherten Tabelle."""
+    return [entity_id for row in table["rows"] for entity_id in row["entity_ids"]]
+
+
 def summarize(usages: dict[str, list[dict]]) -> dict:
     """Kurzfassung für die Oberfläche: wie viele Entitäten sind betroffen, wie viele blockieren."""
     in_use = [entity_id for entity_id, items in usages.items() if items]

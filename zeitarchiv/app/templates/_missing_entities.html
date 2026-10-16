@@ -1,0 +1,17 @@
+{# Hinweis auf Entitäten, die ein gespeichertes Diagramm/eine Tabelle noch nennt, das Archiv aber
+   nicht mehr kennt (z. B. gelöscht). ``ids`` ist die Liste der fehlenden Entitäten; leer = nichts anzeigen. #}
+{% macro badge(ids, tile=false) -%}
+{%- if ids -%}
+<span class="missing-badge{{ ' is-tile' if tile }}" tabindex="0"
+      title="{{ _('Fehlende Entitäten: {entities}', entities=ids | join(', ')) }}">{% if tile %}⚠{% else %}⚠ {{ _("Entität fehlt") if ids | length == 1 else _("{count} Entitäten fehlen", count=ids | length) }}{% endif %}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro note(ids) -%}
+{%- if ids -%}
+<div class="missing-note" role="status">
+  <span class="missing-badge">⚠ {{ _("Entität fehlt") if ids | length == 1 else _("{count} Entitäten fehlen", count=ids | length) }}</span>
+  <span class="missing-note-ids">{{ ids | join(', ') }}</span>
+</div>
+{%- endif -%}
+{%- endmacro %}

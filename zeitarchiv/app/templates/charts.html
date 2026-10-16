@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="{{ asset('css/pages/charts.css') }}">
 {% endblock %}
 {% block content %}
+  {% from "_missing_entities.html" import badge with context %}
   
   <div class="page">
     <h1>{{ _("Charts") }}</h1>
@@ -34,7 +35,7 @@
         </div>
         <div class="chart-grid" data-card-grid>
           {% for row in rows %}
-          <div class="card chart-card{% if row.type_key %} has-typ is-typ-{{ row.type_key }}{% endif %}" data-name="{{ row.name }}" data-created="{{ row.created_at }}"
+          <div class="card chart-card{% if row.missing_ids %} has-missing{% endif %}{% if row.type_key %} has-typ is-typ-{{ row.type_key }}{% endif %}" data-name="{{ row.name }}" data-created="{{ row.created_at }}"
                data-favorite="{{ 1 if row.is_favorite else 0 }}">
             <div class="card-top-actions">
               <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
@@ -60,7 +61,7 @@
               </div>
             </div>
             <h3><a href="charts/{{ row.id }}">{{ row.name }}</a></h3>
-            <div class="meta">{% if row.type_label %}{{ row.type_label }} &middot; {% endif %}{% if row.entity_count == 1 %}{{ _("{count} Entität", count=row.entity_count) }}{% else %}{{ _("{count} Entitäten", count=row.entity_count) }}{% endif %} &middot; {{ row.range_label }}</div>
+            <div class="meta">{% if row.type_label %}{{ row.type_label }} &middot; {% endif %}{% if row.entity_count == 1 %}{{ _("{count} Entität", count=row.entity_count) }}{% else %}{{ _("{count} Entitäten", count=row.entity_count) }}{% endif %} &middot; {{ row.range_label }}{% if row.missing_ids %} &middot; {{ badge(row.missing_ids) }}{% endif %}</div>
           </div>
           {% endfor %}
           <a class="card chart-grid-add card-browser-add" href="charts/new" title="{{ _('Neuer Chart') }}">
