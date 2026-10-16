@@ -288,7 +288,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 )
             elif last["returns"] is False:
                 verdict = "stays"
-                note = tr("Stand blieb danach niedrig.")
+                note = tr("Stand blieb danach niedrig. Setzt sich der Zähler planmäßig zurück?")
             else:
                 verdict = "open"
                 note = tr("Zu wenig Folgewerte für eine Einschätzung.")
