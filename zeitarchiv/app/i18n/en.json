@@ -2506,7 +2506,10 @@
     "Löschen …": "Delete …",
     "Entität fehlt": "Entity missing",
     "Fehlende Entitäten: {entities}": "Missing entities: {entities}",
-    "{count} Entitäten fehlen": "{count} entities missing"
+    "{count} Entitäten fehlen": "{count} entities missing",
+    "Auswahl beenden": "End selection",
+    "Auswählen": "Select",
+    "Entitäten markieren, um mehrere gemeinsam zu löschen": "Mark entities to delete several at once"
   },
   "js": {
     "Meldungen": "Notices",

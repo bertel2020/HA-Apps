@@ -97,3 +97,13 @@ def test_delete_asks_for_usage_before_confirming_and_keeps_failed_ids_selected()
     assert JS.index("window.appConfirm('', {") < JS.index("'entities/delete-selected'")
     assert "danger: true" in JS
     assert "(result.deleted || []).concat(result.missing || []).forEach(id => selection.delete(id));" in JS
+
+
+def test_selection_column_is_hidden_until_selection_mode_is_switched_on(client) -> None:
+    page = client.get("/entities").text
+    css = (APP / "static/css/pages/entities_list.css").read_text(encoding="utf-8")
+
+    assert 'id="entities-panel"' in page and 'id="sel-toggle"' in page
+    assert "#entities-panel:not(.is-selecting) .col-sel{display:none;}" in css
+    # Beenden verwirft die Markierungen, sonst blieben unsichtbar markierte Entitäten stehen.
+    assert "if (!selecting) {\n        selection.clear();" in JS

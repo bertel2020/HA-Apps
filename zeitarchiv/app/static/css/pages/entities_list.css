@@ -35,6 +35,10 @@
      Spalten sind entsprechend breiter gezogen, Entität überproportional
      stark, da sie der einzige Frei-Text (Name + ID) ist. */
   .col-sel{width:36px;}
+  /* Markierspalte nur im Auswahlmodus (Button „Auswählen“); die Klasse hängt am Rahmen außerhalb
+     des nachgeladenen Fragments, damit Suche und Sortierung sie nicht zurücksetzen. */
+  #entities-panel:not(.is-selecting) .col-sel{display:none;}
+  #sel-toggle[aria-pressed="true"]{border-color:var(--accent-line);color:var(--accent-line);background:var(--accent-line-soft);}
   .col-fav{width:40px;}
   .col-entity{width:330px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + deutlich mehr Puffer für den nun verfügbaren Platz */
   .col-type{width:112px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */

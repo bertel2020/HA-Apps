@@ -106,6 +106,22 @@
       if (Array.isArray(stored)) stored.forEach(([id, name]) => selection.set(String(id), String(name)));
     } catch (_) { /* leere Auswahl */ }
 
+    // Auswahlmodus: ohne ihn bleibt die Markierspalte ausgeblendet. Beenden verwirft die Markierungen,
+    // damit nichts unsichtbar markiert stehen bleibt und später ungesehen mitgelöscht wird.
+    const MODE_KEY = 'zeitarchiv.entities.selecting';
+    const panelEl = document.getElementById('entities-panel');
+    const toggleBtn = document.getElementById('sel-toggle');
+    let selecting = selection.size > 0;
+    try { selecting = selecting || sessionStorage.getItem(MODE_KEY) === '1'; } catch (_) { /* nur Komfort */ }
+
+    function applyMode() {
+      panelEl.classList.toggle('is-selecting', selecting);
+      toggleBtn.setAttribute('aria-pressed', String(selecting));
+      toggleBtn.classList.toggle('active', selecting);
+      toggleBtn.textContent = selecting ? toggleBtn.dataset.labelOn : toggleBtn.dataset.labelOff;
+      try { sessionStorage.setItem(MODE_KEY, selecting ? '1' : '0'); } catch (_) { /* nur Komfort */ }
+    }
+
     function persistSelection() {
       try { sessionStorage.setItem(SELECTION_KEY, JSON.stringify([...selection])); } catch (_) { /* nur Komfort */ }
     }
@@ -178,6 +194,17 @@
       syncSelectionUI();
     });
     entitiesTableEl.addEventListener('htmx:afterSwap', syncSelectionUI);
+
+    toggleBtn.addEventListener('click', () => {
+      selecting = !selecting;
+      if (!selecting) {
+        selection.clear();
+        persistSelection();
+        syncSelectionUI();
+      }
+      applyMode();
+    });
+    applyMode();
 
     document.getElementById('sel-clear').addEventListener('click', () => {
       selection.clear();
