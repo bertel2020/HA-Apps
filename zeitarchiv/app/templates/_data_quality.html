@@ -13,27 +13,8 @@
 </div>
 {% set is_heat = view == 'heatmap' %}
 {% set extra = ('&amp;view=heatmap&amp;days=' ~ heatmap.days ~ '&amp;kind=' ~ heatmap.kind) if is_heat else '' %}
-<div class="dq-toolbar">
-  <div class="dq-views" role="group">
-    <a class="btn btn-sm{% if not is_heat %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet">{{ _("Tabelle") }}</a>
-    <a class="btn btn-sm{% if is_heat %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet?view=heatmap">{{ _("Heatmap") }}</a>
-  </div>
-  {% if is_heat %}
-  <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
-    <input type="hidden" name="view" value="heatmap">
-    <select name="kind" title="{{ _('Befundtyp') }}" onchange="this.form.submit()">
-      {% for k in heatmap_kinds %}
-      <option value="{{ k }}" {% if heatmap.kind == k %}selected{% endif %}>{{ _("Alle Befunde") if k == 'all' else labels[k] }}</option>
-      {% endfor %}
-    </select>
-    <select name="days" title="{{ _('Zeitraum') }}" onchange="this.form.submit()">
-      {% for d in heatmap_days %}
-      <option value="{{ d }}" {% if heatmap.days == d %}selected{% endif %}>{{ _("Letzte {days} Tage", days=d) }}</option>
-      {% endfor %}
-    </select>
-  </form>
-  {% endif %}
-</div>
+{# Die Heatmap-Ansicht (Umschalter, Filter) ist vorerst aus der Seite genommen, siehe ROADMAP.md;
+   Vorlage, Dienst und Stile bleiben bestehen. #}
 {% if is_heat %}
 {% include "_data_quality_heatmap.html" %}
 {% else %}

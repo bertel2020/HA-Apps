@@ -87,7 +87,7 @@ def test_bereinigungsseite_verwirft_ungueltige_startwerte(client) -> None:
     assert _start(html) == ("all", "day")
 
 
-def test_heatmap_ansicht_und_startzeitraum_der_bereinigung(client) -> None:
+def test_startzeitraum_der_bereinigung_von_der_datenqualitaet(client) -> None:
     from datetime import datetime, timedelta
 
     from app.main import TZ, index
@@ -100,9 +100,9 @@ def test_heatmap_ansicht_und_startzeitraum_der_bereinigung(client) -> None:
         "sensor.pytest_dq_heat", {"all": 100, "duplicates": 2}, "off", OUTLIER_RULE_VERSION,
         daily={gestern: {"duplicates": 2}}, gap_threshold="15",
     )
-    html = client.get("/housekeeping/datenqualitaet?view=heatmap&kind=duplicates").text
-    assert f'href="/entities/sensor.pytest_dq_heat/cleanup?filter=duplicates&amp;range=day&amp;date={gestern}"' in html
-    assert "dq-heat" in html
+    # Die Heatmap ist vorerst nicht erreichbar (ROADMAP.md): auch mit view=heatmap kommt die Tabelle.
+    html = client.get("/housekeeping/datenqualitaet?view=heatmap").text
+    assert "dq-heat" not in html and "view=heatmap" not in html
     # Der Link öffnet die Bereinigung auf diesem Tag: einen Tag zurück.
     seite = client.get(f"/entities/sensor.pytest_dq_heat/cleanup?filter=duplicates&range=day&date={gestern}").text
     assert re.search(r'id="offset-field" value="-1"', seite)
