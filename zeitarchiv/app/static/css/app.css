@@ -1985,6 +1985,8 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
   border:1px solid var(--border);background:var(--surface);color:var(--ink);box-sizing:border-box;
 }
 .field input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
+.ignore-values-list{margin-top:10px;}
+.ignore-values-list input[type="text"]{width:100%;max-width:320px;font-family:var(--font-mono);}
 /* Drei Sorten Text trugen lange dieselbe Klasse. Die Rollenklassen kommen
    ZUSÄTZLICH zu .hint/.tbl-hint/.settings-compact-hint und sehen bewusst
    gleich aus — sie sind da, damit ansprechbar ist, was ausgeblendet werden

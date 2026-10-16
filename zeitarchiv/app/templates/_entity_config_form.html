@@ -100,6 +100,37 @@
   {% call hint_body() %}{{ _("Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.") }}{% endcall %}
 </div>
 <div class="field">
+  <label>{{ _("Werte ignorieren") }} {{ hint_button(_('Werte ignorieren')) }}</label>
+  {# Schalter: Wert 0 ist dort ein echter Zustand ("aus"), siehe
+     ignore_values_blocked in main.py. Dasselbe Muster wie beim Ausreißer-Feld. #}
+  {% if ignore_values_blocked %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" disabled>{{ _("Aus ▾") }}</button>
+  </span>
+  <p class="hint hint-status">{{ _("Für Schalter nicht verfügbar: 0 ist dort ein echter Zustand („aus“) und darf nicht verworfen werden.") }}</p>
+  {% else %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="ignore-values-mode-btn" onclick="toggleDDPicker('ignore-values-mode')">{% for k, l in ignore_values_options %}{% if k == ignore_values_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="ignore_values_mode" id="ignore-values-mode-input" value="{{ ignore_values_mode }}"
+           hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="ignore-values-mode-popover">
+      {% for key, label in ignore_values_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('ignore-values-mode', '{{ key }}', '{{ label }}')">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
+  {% if ignore_values_mode == 'on' %}
+  <div class="ignore-values-list">
+    <input type="text" name="ignore_values" value="{{ ignore_values }}" maxlength="120" inputmode="decimal"
+           aria-label="{{ _('Zu ignorierende Werte') }}" placeholder="0; -1"
+           hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
+    <p class="hint hint-status">{{ _("Mehrere Werte mit Semikolon trennen, z. B. 0; -1. Dezimalkomma ist erlaubt.") }}</p>
+  </div>
+  {% endif %}
+  {% call hint_body() %}{{ _("Verwirft Messwerte, die genau einem der eingetragenen Werte entsprechen, schon beim Erfassen. Sinnvoll, wenn ein Sensor beim Start kurz 0 meldet. Echte Werte dieser Art gehen dann ebenfalls verloren. Gilt nur für neue Werte, Importe sind ausgenommen.") }}{% endcall %}
+  {% endif %}
+</div>
+<div class="field">
   <label>{{ _("Lücken-Erkennung") }} {{ hint_button(_('Lücken-Erkennung')) }}</label>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="gap-threshold-btn" onclick="toggleDDPicker('gap-threshold')">{% for k, l in gap_threshold_options %}{% if k == gap_threshold %}{{ l }}{% endif %}{% endfor %} ▾</button>

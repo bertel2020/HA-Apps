@@ -1329,6 +1329,30 @@ Inaktivitäts-Meldung würde falsch anschlagen.
 
 Bei neu erkannten Entitäten standardmäßig aktiv.
 
+### Werte ignorieren
+
+Verwirft Messwerte, die **genau** einem der eingetragenen Werte entsprechen,
+schon beim Erfassen — sie landen gar nicht erst im Archiv. Gedacht für Sensoren,
+die beim Start von Home Assistant kurz **0** melden, bis die Integration den
+ersten echten Wert von der Hardware hat.
+
+Der Schalter steht standardmäßig auf **Aus**; dann gilt das bisherige Verhalten.
+Bei **Ein** erscheint ein Textfeld: mehrere Werte mit **Semikolon** trennen
+(`0; -1`), ein Dezimalkomma ist erlaubt, höchstens zehn Werte. Beim ersten
+Einschalten steht `0` darin. Ausschalten behält die Liste, sie gilt dann nur
+nicht mehr.
+
+- **Echte Werte gehen mit verloren.** Meldet die Entität auch im Betrieb
+  rechtmäßig 0 (PV-Leistung nachts, ein leerer Akku), fehlen diese Werte im
+  Archiv. Nur Werte eintragen, die nie echt vorkommen.
+- **Nur neue Werte.** Bereits gespeicherte bleiben, Importe (CSV, Home
+  Assistant, Symcon, VictoriaMetrics) ignorieren die Liste.
+- **Nicht für Schalter.** Dort ist 0 ein echter Zustand („aus"); das Feld ist
+  gesperrt.
+- Bei Zählern fängt die Regel *Fehlwerte automatisch markieren* (siehe
+  *Zählerrückgänge*) Nullwerte beim Start bereits nachträglich ab. *Werte
+  ignorieren* verhindert sie von vornherein.
+
 ### Lücken-Erkennung
 
 Ab welcher Pause zwischen zwei Werten die Bereinigungs-Seite eine **Lücke**

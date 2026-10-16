@@ -216,6 +216,10 @@ VALUE_FILTER_LABELS = {
     "off": N_("Aus"),
     "decimals": N_("Gleiche gerundete Werte filtern"),
 }
+IGNORE_VALUES_LABELS = {
+    "off": N_("Aus"),
+    "on": N_("Ein"),
+}
 GAP_THRESHOLD_LABELS = {
     "1": N_("1 Minute"),
     "5": N_("5 Minuten"),

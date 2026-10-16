@@ -1228,6 +1228,28 @@ would trigger wrongly.
 
 Active by default for newly detected entities.
 
+### Ignore values
+
+Discards measurements that **exactly** match one of the entered values as soon
+as they arrive — they never reach the archive. Meant for sensors that briefly
+report **0** when Home Assistant starts, until the integration has the first
+real value from the hardware.
+
+The switch is **Off** by default; the previous behavior applies. With **On** a
+text field appears: separate several values with a **semicolon** (`0; -1`), a
+decimal comma is allowed, at most ten values. It starts out with `0`. Turning
+it off keeps the list; it just no longer applies.
+
+- **Genuine values are lost too.** If the entity legitimately reports 0 during
+  normal operation (PV power at night, an empty battery), those values are
+  missing from the archive. Only enter values that never occur for real.
+- **New values only.** Stored values stay; imports (CSV, Home Assistant,
+  Symcon, VictoriaMetrics) ignore the list.
+- **Not for switches.** 0 is a real state there ("off"); the field is locked.
+- For counters, the *Mark bad values automatically* rule (see *Counter
+  decreases*) already catches zeros at startup after the fact. *Ignore values*
+  prevents them in the first place.
+
 ### Gap detection
 
 From which pause between two values the cleanup page marks a **gap**: 1, 5, 15,

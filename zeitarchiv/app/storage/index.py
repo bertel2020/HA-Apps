@@ -179,6 +179,59 @@ def should_accept_value(
     return new_ts - last_ts >= VALUE_FILTER_HEARTBEAT_SECONDS
 
 
+MAX_IGNORE_VALUES = 10
+
+
+class TooManyIgnoreValues(ValueError):
+    """Mehr als MAX_IGNORE_VALUES Werte in der Liste."""
+
+
+def parse_ignore_values(text: str) -> list[float]:
+    """Zerlegt die Eingabe „0; -1; 0,5“ in Zahlen. Trenner ist das Semikolon,
+    weil das Komma das deutsche Dezimalzeichen ist; ein Dezimalkomma wird wie
+    ein Punkt gelesen. Leere Teile (``0;;1``, abschließendes ``;``) zählen
+    nicht. Wirft ValueError mit dem Teil, der keine endliche Zahl ist, bzw.
+    TooManyIgnoreValues bei mehr als MAX_IGNORE_VALUES Werten."""
+    values: list[float] = []
+    for part in text.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            number = float(part.replace(",", "."))
+        except ValueError:
+            raise ValueError(part) from None
+        if not math.isfinite(number):
+            raise ValueError(part)
+        if number not in values:
+            values.append(number)
+    if len(values) > MAX_IGNORE_VALUES:
+        raise TooManyIgnoreValues(len(values))
+    return values
+
+
+def normalize_ignore_values(values: list[float]) -> str:
+    """Speicherform der Liste: ``0;-1;0.5`` (Punkt, ohne Leerzeichen, ``-0``
+    als ``0``). Gegenstück zu parse_ignore_values()."""
+    return ";".join(format(v + 0.0, "g") for v in values)
+
+
+def should_ignore_value(enabled: int | bool, ignore_values: str, value: float) -> bool:
+    """True, wenn der Wert beim Erfassen verworfen werden soll: Schalter an und
+    der Wert steht (exakt) in der Liste. Gespeichert wird die Liste im
+    normalisierten Text; ein unlesbarer Eintrag bricht den Schreibpfad nicht
+    ab, sondern wird übersprungen."""
+    if not enabled or not ignore_values:
+        return False
+    for part in ignore_values.split(";"):
+        try:
+            if float(part) == value:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
     """Engste Lücken-Erkennung (Minuten), die bei dieser Auflösung/diesem
     Wertänderungsfilter noch NICHT bei jedem normalen Zyklus fälschlich als
@@ -290,6 +343,8 @@ CREATE TABLE IF NOT EXISTS entities (
     retention TEXT NOT NULL DEFAULT 'unlimited',
     decimals TEXT NOT NULL DEFAULT 'auto',
     value_filter TEXT NOT NULL DEFAULT 'off',
+    ignore_values_enabled INTEGER NOT NULL DEFAULT 0,
+    ignore_values TEXT NOT NULL DEFAULT '',
     gap_threshold TEXT NOT NULL DEFAULT '15',
     outlier_threshold TEXT NOT NULL DEFAULT '50',
     counter_decreases TEXT NOT NULL DEFAULT 'report',
@@ -852,6 +907,10 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
         if "value_filter" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN value_filter TEXT NOT NULL DEFAULT 'off'")
+        if "ignore_values_enabled" not in columns:
+            self._conn.execute("ALTER TABLE entities ADD COLUMN ignore_values_enabled INTEGER NOT NULL DEFAULT 0")
+        if "ignore_values" not in columns:
+            self._conn.execute("ALTER TABLE entities ADD COLUMN ignore_values TEXT NOT NULL DEFAULT ''")
         if "last_value" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN last_value REAL")
         if "gap_threshold" not in columns:
@@ -1631,6 +1690,8 @@ class Index:
         display_mode: str | None = None,
         custom_name: str | None = None,
         compact_target: str | None = None,
+        ignore_values_enabled: bool | None = None,
+        ignore_values: str | None = None,
     ) -> None:
         """Ändert Auflösung, Aufbewahrung, Nachkommastellen und/oder die Lücken-/
         Ausreißer-Schwellwerte einer Entität (Konzept Abschnitt 03/04). Alle
@@ -1638,7 +1699,7 @@ class Index:
         Gültigkeitsprüfung der Werte liegt bewusst beim Aufrufer (main.py) — der
         Index ist hier bewusst dünn und kennt die Anzeige-Labels nicht."""
         updates: list[str] = []
-        params: list[str] = []
+        params: list[str | int] = []
         if resolution is not None:
             updates.append("resolution = ?")
             params.append(resolution)
@@ -1651,6 +1712,12 @@ class Index:
         if value_filter is not None:
             updates.append("value_filter = ?")
             params.append(value_filter)
+        if ignore_values_enabled is not None:
+            updates.append("ignore_values_enabled = ?")
+            params.append(int(ignore_values_enabled))
+        if ignore_values is not None:
+            updates.append("ignore_values = ?")
+            params.append(ignore_values)
         if gap_threshold is not None:
             updates.append("gap_threshold = ?")
             params.append(gap_threshold)

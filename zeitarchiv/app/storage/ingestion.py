@@ -19,7 +19,7 @@ import pyarrow.parquet as pq
 
 from . import hotbuffer, resolution, rollup, rotate
 from .coordinator import StorageCoordinator
-from .index import Index, resolution_seconds, should_accept_value, should_accept_write
+from .index import Index, resolution_seconds, should_accept_value, should_accept_write, should_ignore_value
 from ..limits import MAX_EVENT_TS, MIN_EVENT_TS
 from ..logging_setup import log_rate_limited
 from ..progress import JobProgress
@@ -390,6 +390,15 @@ class IngestionService:
         ):
             self._complete(event, recorded=False)
             return "duplicate"
+
+        # Pro Entität abschaltbare Liste von Werten, die nie gespeichert werden
+        # (z. B. 0 beim Start, solange eine Integration noch keinen echten Wert
+        # kennt). Wie beim Wertänderungsfilter bleiben last_value/last_ts
+        # unberührt; gezählt wird als "filtered", damit die Antwort von
+        # /api/write ihre Form behält.
+        if should_ignore_value(entity["ignore_values_enabled"], entity["ignore_values"], event.value):
+            self._complete(event, recorded=False)
+            return "filtered"
 
         # Standard-Entitäten mit Auflösung != raw drosseln nicht über
         # should_accept_write (verwirft Werte ersatzlos), sondern lassen

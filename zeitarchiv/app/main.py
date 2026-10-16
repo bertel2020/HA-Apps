@@ -62,6 +62,7 @@ from .formatting import (
     RESOLUTION_LABELS,
     RETENTION_LABELS,
     VALUE_FILTER_LABELS,
+    IGNORE_VALUES_LABELS,
     decimals_to_int,
     entity_display_name,
     format_compact_target,
@@ -116,7 +117,11 @@ from .storage.index import (
     DEFAULT_RETENTION,
     DEFAULT_VALUE_FILTER,
     effective_outlier_threshold,
+    MAX_IGNORE_VALUES,
+    TooManyIgnoreValues,
+    normalize_ignore_values,
     outlier_detection_applies,
+    parse_ignore_values,
     should_raise_gap_threshold,
     MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
@@ -2779,6 +2784,10 @@ def _entity_config_context(entity) -> dict:
         "retention": entity["retention"],
         "decimals": decimals,
         "value_filter": entity["value_filter"],
+        "ignore_values_mode": "on" if entity["ignore_values_enabled"] else "off",
+        "ignore_values": entity["ignore_values"].replace(";", "; "),
+        "ignore_values_blocked": entity["aggregation_type"] == "switch",
+        "ignore_values_options": list(IGNORE_VALUES_LABELS.items()),
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
         "outlier_blocked_reason": OUTLIER_BLOCKED_REASONS.get(entity["aggregation_type"]),
@@ -2848,6 +2857,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     retention = form.get("retention")
     decimals = form.get("decimals")
     value_filter = form.get("value_filter")
+    ignore_values_mode = form.get("ignore_values_mode")
+    ignore_values_text = form.get("ignore_values")
     gap_threshold = form.get("gap_threshold")
     outlier_threshold = form.get("outlier_threshold")
     display_mode = form.get("display_mode")
@@ -2868,6 +2879,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Angabe"))
     if value_filter is not None and value_filter not in VALUE_FILTER_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Wertänderungsfilter"))
+    if ignore_values_mode is not None and ignore_values_mode not in IGNORE_VALUES_LABELS:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Angabe bei „Werte ignorieren“"))
     if gap_threshold is not None and gap_threshold not in GAP_THRESHOLD_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Lücken-Schwellwert"))
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
@@ -2890,6 +2903,37 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Anzeigemodus"))
+    # Werte ignorieren: für Schalter gesperrt (0 ist dort ein echter Zustand);
+    # ein trotzdem mitgeschickter Wert wird wie bei outlier_threshold verworfen.
+    # Die Liste bleibt beim Ausschalten gespeichert. Beim ersten Einschalten
+    # ohne Liste wird "0" vorbelegt, der Hauptfall (Wert 0 beim HA-Start).
+    ignore_values_enabled: bool | None = None
+    ignore_values_normalized: str | None = None
+    if entity["aggregation_type"] == "switch":
+        ignore_values_mode = None
+        ignore_values_text = None
+    if ignore_values_text is not None:
+        try:
+            ignore_values_normalized = normalize_ignore_values(parse_ignore_values(ignore_values_text))
+        except TooManyIgnoreValues:
+            raise HTTPException(
+                status_code=400, detail=tr("Höchstens {max} Werte erlaubt", max=MAX_IGNORE_VALUES)
+            ) from None
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=tr("„{part}“ ist keine Zahl. Bitte nur Zahlen eintragen, getrennt durch Semikolon.", part=str(exc)),
+            ) from None
+    if ignore_values_mode is not None:
+        ignore_values_enabled = ignore_values_mode == "on"
+    effective_list = ignore_values_normalized if ignore_values_normalized is not None else entity["ignore_values"]
+    if ignore_values_enabled is None and entity["ignore_values_enabled"] and ignore_values_normalized == "":
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Bei eingeschaltetem „Werte ignorieren“ muss mindestens ein Wert eingetragen sein."),
+        )
+    if ignore_values_enabled and not effective_list:
+        ignore_values_normalized = "0"
     def update_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
             index.set_config(
@@ -2903,6 +2947,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 display_mode=str(display_mode) if display_mode is not None else None,
                 custom_name=custom_name if custom_name is not None else None,
                 compact_target=str(compact_target) if compact_target is not None else None,
+                ignore_values_enabled=ignore_values_enabled,
+                ignore_values=ignore_values_normalized,
             )
             if retention is not None:
                 _background.invalidate_retention_overview()
