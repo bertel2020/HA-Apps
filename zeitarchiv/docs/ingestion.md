@@ -26,28 +26,34 @@ siehe [architecture.md](architecture.md)):
    monoton steigenden Live-Pfad genügt ein Vergleich mit `entities.last_ts`
    (kein Datei-I/O); nur wenn der neue Zeitstempel nicht hinter dem Index-
    Maximum liegt, wird die Datei tatsächlich durchsucht.
-4. **Auflösungsfilter**, typabhängig (siehe [data-model.md](data-model.md#auflösung-schreib-drossel)):
+4. **Werte ignorieren** (`should_ignore_value`) — nur wenn die Entität den
+   Schalter eingeschaltet hat: ein Wert, der exakt in ihrer Liste steht (z. B.
+   die 0, die ein Sensor beim HA-Start meldet), wird verworfen, bevor
+   Auflösung und Wertänderungsfilter ihn sehen. `last_value`/`last_ts` bleiben
+   unberührt. Gezählt wird als `filtered`. Importe laufen nicht durch diesen
+   Pfad.
+5. **Auflösungsfilter**, typabhängig (siehe [data-model.md](data-model.md#auflösung-schreib-drossel)):
    bei Zählern und Switches drosselt `should_accept_write` auf ein festes
    Zeitraster und verwirft dazwischenliegende Werte ersatzlos (Switch-
    Auflösung ist ohnehin fest auf `raw` gesperrt, drosselt also nie).
    Standard-Entitäten mit Auflösung ≠ `raw` lassen dagegen jeden Wert durch
    und fassen ihn erst nachträglich fensterweise zu einer Ø/Min/Max-Zeile
    zusammen (`resolution.py`) — kein `skipped` hier.
-5. **Wertänderungsfilter** (`should_accept_value`) — überspringt gerundet
+6. **Wertänderungsfilter** (`should_accept_value`) — überspringt gerundet
    gleiche Folgewerte, behält aber mindestens alle sechs Stunden ein
    Lebenszeichen (verhindert, dass ein Chart bei einem seit Tagen
    unveränderten Sensor eine Lücke zeigt).
-6. **Zähler-Rückgang-Erkennung**: bei `state_class = total_increasing` wird
+7. **Zähler-Rückgang-Erkennung**: bei `state_class = total_increasing` wird
    ein niedrigerer Folgewert nur **protokolliert** (`logger.warning`,
    sichtbar unter "Zählerrückgänge" in der Bereinigung), niemals blockiert —
    ein echter Zähler-Reset (Gerätetausch, Neustart) ist ein valider Wert.
-7. **Rotation-Check** (`rotate.rotate_if_needed()`) — Monatswechsel seit dem
+8. **Rotation-Check** (`rotate.rotate_if_needed()`) — Monatswechsel seit dem
    letzten Schreibvorgang dieser Entität?
-8. **Anhängen** an die Hot-CSV (`hotbuffer.append()`), Claim auf `done`.
+9. **Anhängen** an die Hot-CSV (`hotbuffer.append()`), Claim auf `done`.
 
 Rückgabewerte (auch die HTTP-Antwort von `/api/write` je Event, aggregiert
 als Zähler): `written`, `duplicate`, `recovered`, `skipped` (Auflösung),
-`filtered` (Wertänderung).
+`filtered` (Wertänderung oder ignorierter Wert).
 
 ## Crash-Recovery
 

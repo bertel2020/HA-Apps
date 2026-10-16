@@ -209,7 +209,7 @@ Existenz-Check in `Index.__init__()`.
 
 | Tabelle | Zweck |
 | --- | --- |
-| `entities` | Eine Zeile je bekannter Entität: Aggregationstyp, Auflösung, `compact_target` (Verdichtungsziel, siehe oben), Aufbewahrung, Nachkommastellen, Wertfilter, Ausreißer-/Lücken-Schwellen, `first_ts`/`last_ts`/`last_value` (Zustand für Idempotenz- und Filterprüfungen), `row_count`/`size_bytes`/`deleted_count` (für die Statistik, inkrementell gepflegt statt bei jeder Anzeige neu gezählt bzw. gegen `deleted_points` gejoint) |
+| `entities` | Eine Zeile je bekannter Entität: Aggregationstyp, Auflösung, `compact_target` (Verdichtungsziel, siehe oben), Aufbewahrung, Nachkommastellen, Wertfilter, „Werte ignorieren“ (`ignore_values_enabled`, `ignore_values`), Ausreißer-/Lücken-Schwellen, `first_ts`/`last_ts`/`last_value` (Zustand für Idempotenz- und Filterprüfungen), `row_count`/`size_bytes`/`deleted_count` (für die Statistik, inkrementell gepflegt statt bei jeder Anzeige neu gezählt bzw. gegen `deleted_points` gejoint) |
 | `deleted_points` | Soft-Delete-Markierungen, siehe oben. Indiziert auf `(entity_id, ts)` und `(entity_id, deleted_at)` |
 | `compacted_months` | Ein Eintrag je bereits verdichtetem Monat (`entity_id, year, month` → `target_resolution`, `compacted_at`) — verhindert eine erneute Verdichtung (siehe oben) und ist Grundlage des Löschmarkierungs-Nachzieh-Laufs beim App-Start |
 | `entity_actions` | Log der Korrektur-/Hinzufügen-/Bereinigen-/Verdichten-Vorgänge (Housekeeping → Aktivität): `entity_id` (nullable — Bereinigung/automatisches Verdichten betreffen oft mehrere), `action`/`trigger`/`status`/`rows_affected`, `detail` als freies JSON statt einer Spalte je Aktionstyp |

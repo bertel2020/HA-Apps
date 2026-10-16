@@ -195,7 +195,7 @@ column gets a default and an explicit existence check in `Index.__init__()`.
 
 | Table | Purpose |
 | --- | --- |
-| `entities` | One row per known entity: aggregation type, resolution, `compact_target` (compaction target, see above), retention, decimal places, value filter, outlier/gap thresholds, `first_ts`/`last_ts`/`last_value` (state for idempotency and filter checks), `row_count`/`size_bytes`/`deleted_count` (for the statistics, maintained incrementally instead of being recounted on every display or joined against `deleted_points`) |
+| `entities` | One row per known entity: aggregation type, resolution, `compact_target` (compaction target, see above), retention, decimal places, value filter, “ignore values” (`ignore_values_enabled`, `ignore_values`), outlier/gap thresholds, `first_ts`/`last_ts`/`last_value` (state for idempotency and filter checks), `row_count`/`size_bytes`/`deleted_count` (for the statistics, maintained incrementally instead of being recounted on every display or joined against `deleted_points`) |
 | `deleted_points` | Soft-delete marks, see above. Indexed on `(entity_id, ts)` and `(entity_id, deleted_at)` |
 | `compacted_months` | One entry per already compacted month (`entity_id, year, month` → `target_resolution`, `compacted_at`) — prevents a renewed compaction (see above) and is the basis of the deletion mark catch-up run at app start |
 | `entity_actions` | Log of the Correct/Add/Clean up/Compact operations (Housekeeping → Activity): `entity_id` (nullable — cleanup/automatic compaction often affect several), `action`/`trigger`/`status`/`rows_affected`, `detail` as free JSON instead of one column per action type |
