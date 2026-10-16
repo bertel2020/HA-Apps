@@ -78,7 +78,7 @@ def test_one_meter_names_the_meter_and_links_to_its_cleanup_page() -> None:
 
 def test_a_meter_that_stays_low_is_described_as_a_possible_replacement() -> None:
     notice = notices.counter_decrease_notice([_row(returning=0, returns=False)], TZ)
-    assert "Zählerwechsel" in notice["detail"]
+    assert "Zählertausch" in notice["detail"]
 
 
 def test_several_meters_give_one_counting_notice_linking_to_housekeeping() -> None:
@@ -132,7 +132,7 @@ def test_the_housekeeping_page_lists_the_meters_with_their_assessment(client) ->
     html = client.get("/housekeeping").text
     assert 'id="zaehlerrueckgaenge"' in html
     assert "sensor.pytest_zaehler" in html
-    assert "kehrt zurück" in html
+    assert "Vermutlich Fehlwert" in html
     assert "housekeeping#zaehlerrueckgaenge" in html  # Eintrag in der Navigation
     index.set_counter_decrease_snapshot([])  # keine Spuren für andere Tests
 

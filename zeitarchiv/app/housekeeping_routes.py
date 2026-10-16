@@ -282,16 +282,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             if last["returns"]:
                 verdict = "returns"
                 note = tr(
-                    "nach {minutes} Min. wieder bei {value}",
+                    "Stand danach wieder bei {value} (nach {minutes} Min.)",
                     minutes=max(1, round((last["recovered_after"] or 0) / 60)),
                     value=_keep_together(notices_mod.counter_value_label(last["recovered_value"], row)),
                 )
             elif last["returns"] is False:
                 verdict = "stays"
-                note = tr("kein Wiederanstieg auf den Vorwert in den folgenden 30 Minuten")
+                note = tr("Stand blieb danach niedrig. Setzt sich der Zähler planmäßig zurück, erlaube die Rückgänge.")
             else:
                 verdict = "open"
-                note = tr("noch zu wenige Folgewerte")
+                note = tr("Zu wenig Folgewerte für eine Einschätzung.")
             rows.append({
                 "entity_id": row["entity_id"],
                 "friendly_name": row["friendly_name"],
@@ -381,7 +381,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             what = tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)
             title = tr("{what} markieren?", what=what)
             bulk = {
-                "lead": tr("{returning} von {total} Rückgängen kehren sofort zurück", returning=returning, total=total),
+                "lead": tr("{returning} von {total} Rückgängen kehren zurück", returning=returning, total=total),
                 "rest": tr("und sehen nach Fehlwerten aus."),
                 "button": tr("1 Fehlwert markieren …") if returning == 1 else tr("{returning} Fehlwerte markieren …", returning=returning),
                 "confirm_label": tr("1 Fehlwert markieren") if returning == 1 else tr("{returning} Fehlwerte markieren", returning=returning),

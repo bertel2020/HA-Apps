@@ -130,6 +130,6 @@ def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
     try:
         html = client.get("/entities/sensor.pytest_bulk/rows?filter=counter_decreases&range=day").text
         assert "Zählerrückgang" in html
-        assert "kehrt zurück" in html
+        assert "Vermutlich Fehlwert" in html
     finally:
         index.set_counter_decrease_snapshot([])

@@ -1088,9 +1088,9 @@ def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
         )
         if returning:
             detail += " " + (
-                tr("Bei einem davon kehrt der Stand sofort zurück, das sieht nach einem Fehlwert aus.")
+                tr("Bei einem davon kehrt der Stand zurück, das sieht nach einem Fehlwert aus.")
                 if returning == 1
-                else tr("Bei {count} davon kehrt der Stand sofort zurück, das sieht nach Fehlwerten aus.", count=format_int(returning))
+                else tr("Bei {count} davon kehrt der Stand zurück, das sieht nach Fehlwerten aus.", count=format_int(returning))
             )
         return {
             "id": "housekeeping.counter_decreases", "severity": "warn", "title": title, "detail": detail,
@@ -1117,7 +1117,7 @@ def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
                 recovered=counter_value_label(last["recovered_value"], row),
             )
         elif last["returns"] is False:
-            detail += " " + tr("Er blieb danach niedrig. Möglicherweise ein Zählerwechsel.")
+            detail += " " + tr("Er blieb danach niedrig, vermutlich ein Reset oder Zählertausch.")
     return {
         "id": "housekeeping.counter_decreases", "severity": "warn", "title": title, "detail": detail,
         "meta": tr("Zählerrückgänge"), "link": f"/entities/{row['entity_id']}/cleanup",
