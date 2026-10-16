@@ -62,7 +62,7 @@
   {% if dq.rows %}
   <table class="dt dq-table">
     <thead><tr>
-      <th>{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% endif %}{{ sort_link("name", _("Entität")) }}</th>
+      <th><div class="dq-entity-cell dq-head-cell">{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}<span class="dq-caret" aria-hidden="true"></span>{{ sort_link("name", _("Entität")) }}</div></th>
       {% for col in dq.columns %}
       <th class="dq-num">{{ sort_link(col.key, labels[col.key]) }}</th>
       {% endfor %}
