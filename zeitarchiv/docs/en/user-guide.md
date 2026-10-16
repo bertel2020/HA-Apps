@@ -520,8 +520,10 @@ entries; with more consumers, **"show more"** reveals the rest — the donut
 next to it always shows all, independently of that. If you have created
 groups, you can additionally switch in the role assignment under **"Consumer
 shares" → "Show by group"** whether the table shows each consumer
-individually or grouped (one row per group, ungrouped devices stay
-individual).
+individually or grouped. Grouped, each group gets a total row (with an arrow
+to collapse it) and its devices indented below; ungrouped devices stay
+individual. If a sub-meter is in a group, its devices belong to it too and
+sit one level deeper. The donut always shows only the individual devices.
 
 ### Devices behind a sub-meter
 

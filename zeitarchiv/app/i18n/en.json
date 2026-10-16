@@ -495,7 +495,7 @@
     "Farblegende unter dem Energiefluss, inklusive des Mischtons für den Anteil aus eigener Erzeugung.": "Color legend below the energy flow, including the blended tone for the share from own generation.",
     "Verbraucheranteile-Gruppierung": "Consumer share grouping",
     "Nach Gruppe anzeigen": "Show by group",
-    "Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann als eine gemeinsame Zeile statt einzeln — Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.": "Consumers with an assigned group (see below) then appear as one combined row instead of individually — devices without a group remain listed individually.",
+    "Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann unter einer gemeinsamen Summenzeile, die sich zuklappen lässt. Geräte hinter einem Zwischenzähler gehören zur Gruppe des Zählers. Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.": "Consumers with an assigned group (see below) then appear under a shared total row that can be collapsed. Devices behind a sub-meter belong to the meter's group. Devices without a group remain listed individually.",
     "Netz": "Grid",
     "Netzbezug ist die einzige Pflicht-Rolle. Alles andere bleibt leer, bis passende Sensoren zugeordnet sind.": "Grid import is the only required role. Everything else stays empty until suitable sensors are assigned.",
     "Pflicht": "Required",

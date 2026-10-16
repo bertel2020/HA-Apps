@@ -1778,28 +1778,23 @@ class EnergieDashboardService:
             verbraucher_breakdown.extend(kind_eintraege)
             verbraucher_series_by_name[name] = series
         if config.get("verbraucheranteile_gruppieren"):
-            # Verbraucheranteile-Tabelle/-Donut optional nach Gruppe statt je
-            # Einzelgerät — dieselbe (bereits auf >=2 Mitglieder gefilterte)
-            # gruppe wie im Sankey oben, hier nur zusätzlich zu einer Zeile
-            # aufsummiert. Bucket-Serien werden mitgemerged, damit die
-            # Kosten-Spalte weiter unten (verbraucher_series_by_name) für die
-            # Gruppen-Zeile genauso bucket-genau bewertet wird wie für ein
-            # einzelnes Gerät.
+            # Verbraucheranteile-Tabelle optional nach Gruppe: dieselbe (bereits
+            # auf >=2 Mitglieder gefilterte) gruppe wie im Sankey oben. Die
+            # Gruppe ist eine Summenzeile OBEN, ihre Mitglieder hängen mit
+            # parent=Gruppe darunter — wie die Geräte hinter einem Zwischenzähler,
+            # statt in der Gruppenzeile zu verschwinden. Ein Zwischenzähler in der
+            # Gruppe ist ein Mitglied wie jedes andere; seine Geräte behalten ihren
+            # parent (den Zähler) und rücken eine Ebene tiefer. Der Gruppenwert
+            # ist die Summe der MITGLIEDER (Zähler inklusive seiner Geräte), nie
+            # zusätzlich der Geräte — sonst zählten sie doppelt. Bucket-Serien
+            # werden mitgemerged, damit die Kosten-Spalte weiter unten
+            # (verbraucher_series_by_name) die Gruppenzeile bucket-genau bewertet.
             grouped_values: dict[str, float] = {}
             grouped_series: dict[str, list[dict[float, float]]] = {}
             grouped_order: list[str] = []
-            ungrouped_breakdown: list[dict] = []
-            # Ein Zwischenzähler in einer Gruppe geht samt Wert in die Gruppenzeile ein; seine Geräte
-            # und der Rest würden daneben als verwaiste Zeilen stehen und doppelt zählen.
-            gruppierte_zaehler = {
-                item["name"] for item in verbraucher_breakdown if item.get("kind") == "meter" and item.get("gruppe")
-            }
             for item in verbraucher_breakdown:
-                if item.get("parent") in gruppierte_zaehler:
-                    continue
                 gruppe_name = item.get("gruppe")
-                if not gruppe_name:
-                    ungrouped_breakdown.append(item)
+                if item.get("parent") or not gruppe_name:
                     continue
                 if gruppe_name not in grouped_values:
                     grouped_values[gruppe_name] = 0.0
@@ -1807,12 +1802,12 @@ class EnergieDashboardService:
                     grouped_order.append(gruppe_name)
                 grouped_values[gruppe_name] += item["value"]
                 grouped_series[gruppe_name].append(verbraucher_series_by_name.get(item["name"], {}))
+                item["parent"] = gruppe_name
             for gruppe_name in grouped_order:
                 verbraucher_series_by_name[gruppe_name] = self._series_merge(*grouped_series[gruppe_name])
-            verbraucher_breakdown = ungrouped_breakdown + [
-                {"name": gruppe_name, "value": round(grouped_values[gruppe_name], 3)}
-                for gruppe_name in grouped_order
-            ]
+                verbraucher_breakdown.append(
+                    {"name": gruppe_name, "value": round(grouped_values[gruppe_name], 3), "kind": "group"}
+                )
         for gruppe_name in sorted(gruppen_totals, key=gruppen_totals.get, reverse=True):  # type: ignore[arg-type]
             total = gruppen_totals[gruppe_name]
             if total <= 0:
@@ -1907,17 +1902,28 @@ class EnergieDashboardService:
         verbraucher_breakdown.append({"name": "Grundlast", "value": round(grundlast_display, 3)})
         for item in verbraucher_breakdown:
             item["share"] = round(item["value"] / verbrauch_total * 100, 1) if verbrauch_total > 0 else None
-        # Oberste Ebene nach Wert; hinter einem Zwischenzähler stehen seine Geräte (Wert absteigend) und
-        # zuletzt der Rest, genau in der Reihenfolge, in der sie berechnet wurden.
-        all_breakdown_children = [item for item in verbraucher_breakdown if item.get("parent")]
+        # Oberste Ebene nach Wert; darunter (eingerückt per "level") die Mitglieder einer Gruppe nach Wert,
+        # bzw. hinter einem Zwischenzähler seine Geräte (Wert absteigend) und zuletzt der Rest, genau in der
+        # Reihenfolge, in der sie berechnet wurden.
+        kinder_je_eltern: dict[str, list[dict]] = {}
+        for item in verbraucher_breakdown:
+            if item.get("parent"):
+                kinder_je_eltern.setdefault(item["parent"], []).append(item)
         oberste = [item for item in verbraucher_breakdown if not item.get("parent")]
         oberste.sort(key=lambda item: item["value"], reverse=True)
         verbraucher_breakdown = []
-        for item in oberste:
+
+        def _emit_breakdown(item: dict, level: int) -> None:
+            item["level"] = level
             verbraucher_breakdown.append(item)
-            verbraucher_breakdown.extend(
-                kind for kind in all_breakdown_children if kind.get("parent") == item["name"]
-            )
+            kinder = kinder_je_eltern.get(item["name"], [])
+            if item.get("kind") == "group":
+                kinder = sorted(kinder, key=lambda kind: kind["value"], reverse=True)
+            for kind in kinder:
+                _emit_breakdown(kind, level + 1)
+
+        for item in oberste:
+            _emit_breakdown(item, 0)
 
         # Versorgungsanteile: Pendant zu Verbraucheranteile für die
         # Angebotsseite — Erzeuger bleiben mit ihrem VOLLEN Ertrag stehen

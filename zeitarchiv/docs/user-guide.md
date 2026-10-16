@@ -562,8 +562,11 @@ größten Einträge; bei mehr Verbrauchern blendet **„weitere anzeigen"** den
 Rest ein — der Donut daneben zeigt unabhängig davon immer alle. Wer Gruppen
 angelegt hat, kann zusätzlich in der Rollenzuordnung unter
 **„Verbraucheranteile" → „Nach Gruppe anzeigen"** umschalten, ob die Tabelle
-jeden Verbraucher einzeln oder gruppiert (eine Zeile je Gruppe, ungruppierte
-Geräte bleiben einzeln) zeigt.
+jeden Verbraucher einzeln oder gruppiert zeigt. Gruppiert steht je Gruppe eine
+Summenzeile (mit Pfeil zum Zuklappen), darunter eingerückt ihre Geräte;
+ungruppierte Geräte bleiben einzeln. Hängt ein Zwischenzähler in einer Gruppe,
+gehören auch seine Geräte dazu und stehen eine Ebene tiefer. Der Donut zeigt
+unabhängig davon immer nur die einzelnen Geräte.
 
 ### Geräte hinter einem Zwischenzähler
 
