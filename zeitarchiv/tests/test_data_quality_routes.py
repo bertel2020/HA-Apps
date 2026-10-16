@@ -206,3 +206,25 @@ def test_ansicht_behaelt_suche_filter_und_sortierung_in_den_links(client) -> Non
     # Standardwerte tauchen nicht in den Links auf
     standard = client.get("/housekeeping/datenqualitaet").text
     assert "sort=total" not in standard and "kind=all" not in standard
+
+
+def test_seite_zeigt_gesamtstatus_und_stand_je_zeile(client) -> None:
+    from app.main import index
+
+    from app.storage.cleanup import OUTLIER_RULE_VERSION
+
+    _entity(index, "sensor.pytest_dq_stand")
+    index.set_first_ts_and_add_rows("sensor.pytest_dq_stand", 1_700_000_000.0, 0)
+    index.set_cleanup_alltime_stats(
+        "sensor.pytest_dq_stand", {"all": 100, "duplicates": 3, "counter_decreases": 0},
+        "off", OUTLIER_RULE_VERSION,
+    )
+    html = client.get("/housekeeping/datenqualitaet").text
+    assert 'class="dq-status' in html
+    assert "Entitäten gemessen" in html
+    assert 'class="dq-stand"' in html
+    assert "dq-age" in html
+    # Die Sortierung nach Stand beginnt mit der ältesten Messung.
+    assert "sort=measured&amp;dir=asc" in html
+    antwort = client.get("/housekeeping/datenqualitaet?sort=measured&dir=asc")
+    assert antwort.status_code == 200

@@ -528,3 +528,59 @@ def test_hinweis_auf_neue_befunde_seit_dem_letzten_besuch(index):
     _mit_tageszahlen(index, "sensor.a", {}, duplicates=3)
     neu_lesen()
     assert hinweis() == {"new": 2, "entities": 1}
+
+
+def test_stand_je_zeile_und_gesamtstatus(index):
+    """Jede Zeile trägt den Zeitpunkt ihrer Gesamt-Zählung; der Gesamtstatus zählt gemessene,
+    veraltete und noch nicht gemessene Entitäten. Wer älter als die Erneuerungsgrenze des
+    Wartungsplaners ist, gilt als veraltet."""
+    import time
+
+    from app import cleanup_stats
+
+    _mit_daten(index, "sensor.a")
+    _gesamt(index, "sensor.a", duplicates=2)
+    _mit_daten(index, "sensor.b")
+    _gesamt(index, "sensor.b", duplicates=1)
+    _mit_daten(index, "sensor.offen")  # nie gemessen
+
+    jetzt = time.time()
+    matrix = data_quality.build_matrix(index, now=jetzt + 120)
+    zeilen = {r["entity_id"]: r for r in matrix["rows"]}
+    assert zeilen["sensor.a"]["measured_label"] == "vor 2 Min."
+    assert zeilen["sensor.a"]["measured_old"] is False
+    assert matrix["status"]["total"] == 3
+    assert matrix["status"]["measured"] == 2
+    assert matrix["status"]["stale"] == 0
+    assert matrix["status"]["oldest_label"] == "vor 2 Min."
+
+    spaeter = jetzt + cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS + 60
+    matrix = data_quality.build_matrix(index, now=spaeter)
+    assert all(r["measured_old"] for r in matrix["rows"])
+    assert matrix["status"]["stale"] == 2
+    assert matrix["status"]["stale_hours"] == 6
+
+
+def test_entitaet_ohne_daten_zaehlt_nicht_im_gesamtstatus(index):
+    _entity(index, "sensor.leer")
+    assert data_quality.build_matrix(index)["status"]["total"] == 0
+
+
+def test_sortierung_nach_stand_aelteste_zuerst(index):
+    import time
+
+    for name, duplikate in (("sensor.alt", 1), ("sensor.neu", 5)):
+        _mit_daten(index, name)
+        _gesamt(index, name, duplicates=duplikate)
+    # Die ältere Messung nachträglich zurückdatieren.
+    eintrag = index.get_cleanup_alltime_stats("sensor.alt")
+    eintrag["computed_at"] = time.time() - 3 * 3600
+    import json
+
+    index.set_setting(index._CLEANUP_ALLTIME_STATS_PREFIX + "sensor.alt", json.dumps(eintrag))
+
+    rows = data_quality.build_matrix(index)["rows"]
+    aufsteigend = data_quality.filter_and_sort(rows, sort="measured", direction="asc")
+    assert [r["entity_id"] for r in aufsteigend] == ["sensor.alt", "sensor.neu"]
+    absteigend = data_quality.filter_and_sort(rows, sort="measured", direction="desc")
+    assert [r["entity_id"] for r in absteigend] == ["sensor.neu", "sensor.alt"]

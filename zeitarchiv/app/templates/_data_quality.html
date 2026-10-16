@@ -11,11 +11,30 @@
   <div class="stat"><div class="label">{{ labels[col.key] }}</div><div class="value">{{ dq.totals[col.key].label }}</div></div>
   {% endfor %}
 </div>
-{% macro sort_link(key, label) %}{% set active = dq_state.sort == key %}{% set next_dir = ('asc' if dq_state.dir == 'desc' else 'desc') if active else ('asc' if key == 'name' else 'desc') %}<a class="dq-sort{% if active %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(sort=key, dir=next_dir, page=1) }}" title="{{ _('Sortieren') }}">{{ label }}{% if active %}<span class="dq-sort-arrow" aria-hidden="true">{{ '▾' if dq_state.dir == 'desc' else '▴' }}</span>{% endif %}</a>{% endmacro %}
+{# Gesamtstand der Messung: wie viele Entitäten eine belastbare Zählung haben und wie alt die älteste ist.
+   Die Zahlen darunter sind Cache-Stände des Wartungsplaners (siehe data_quality.build_matrix). #}
+{% set st = dq.status %}
+{% if st.total %}
+<div class="dq-status{% if st.measured < st.total %} is-running{% elif st.stale %} is-stale{% endif %}" role="status">
+  <span class="dq-status-dot" aria-hidden="true"></span>
+  {% if st.measured < st.total %}
+  <strong>{{ _("{measured} von {total} Entitäten gemessen", measured=st.measured | format_int, total=st.total | format_int) }}</strong>
+  <span class="dq-status-bar" aria-hidden="true"><i style="width:{{ (st.measured * 100 / st.total) | round(0, 'floor') | int }}%"></i></span>
+  <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("Messung läuft im Hintergrund") }}</span>
+  {% elif st.stale %}
+  <strong>{{ _("{total} Entitäten gemessen", total=st.total | format_int) }}</strong>
+  <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("{stale} älter als {hours} Std., älteste {oldest}", stale=st.stale | format_int, hours=st.stale_hours, oldest=st.oldest_label) }}</span>
+  {% else %}
+  <strong>{{ _("Alle {total} Entitäten gemessen", total=st.total | format_int) }}</strong>
+  {% if st.oldest_label %}<span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("älteste Messung {oldest}", oldest=st.oldest_label) }}</span>{% endif %}
+  {% endif %}
+</div>
+{% endif %}
+{% macro sort_link(key, label) %}{% set active = dq_state.sort == key %}{% set next_dir = ('asc' if dq_state.dir == 'desc' else 'desc') if active else ('asc' if key in ('name', 'measured') else 'desc') %}<a class="dq-sort{% if active %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(sort=key, dir=next_dir, page=1) }}" title="{{ _('Sortieren') }}">{{ label }}{% if active %}<span class="dq-sort-arrow" aria-hidden="true">{{ '▾' if dq_state.dir == 'desc' else '▴' }}</span>{% endif %}</a>{% endmacro %}
 {% set is_heat = view == 'heatmap' %}
 {% set period = dq.period %}
 {% set period_labels = {'7d': _("7 Tage"), '30d': _("30 Tage"), 'year': _("1 Jahr"), 'all': _("Gesamt")} %}
-{% set sort_labels = {'total': _("Summe"), 'name': _("Name"), 'duplicates': labels.duplicates, 'counter_decreases': labels.counter_decreases, 'outliers': labels.outliers, 'gaps': labels.gaps} %}
+{% set sort_labels = {'total': _("Summe"), 'name': _("Name"), 'duplicates': labels.duplicates, 'counter_decreases': labels.counter_decreases, 'outliers': labels.outliers, 'gaps': labels.gaps, 'measured': _("Stand (älteste zuerst)")} %}
 <div class="dq-toolbar">
   <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
     <input type="search" class="dq-search" name="q" value="{{ dq_state.q }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
@@ -63,6 +82,7 @@
       {% for col in dq.columns %}
       <th class="dq-num">{{ sort_link(col.key, labels[col.key]) }}</th>
       {% endfor %}
+      <th class="dq-stand">{{ sort_link("measured", _("Stand")) }}</th>
     </tr></thead>
     {% for row in dq.rows %}
     <tbody class="dq-entity" x-data="{ open: false }">
@@ -83,9 +103,10 @@
         {% set cell = row.cells[col.key] %}
         <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% elif col.key == 'counter_decreases' and row.counter_na %}<span class="dq-allowed" title="{{ _('state_class total: Rückgänge sind bei diesem Zähler normal und werden nicht geprüft.') }}">{{ _("n. a.") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
         {% endfor %}
+        <td class="dq-stand" data-label="{{ _('Stand') }}"><span class="dq-age{% if row.measured_old %} is-old{% endif %}"{% if row.measured_title %} title="{{ _('Gemessen am {ts}', ts=row.measured_title) }}"{% endif %}>{{ row.measured_label }}</span></td>
       </tr>
       <tr class="dq-detail" x-show="open" x-cloak>
-        <td colspan="{{ dq.columns | length + 1 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body"><span class="hint">{{ _("Lädt …") }}</span></div></td>
+        <td colspan="{{ dq.columns | length + 2 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body"><span class="hint">{{ _("Lädt …") }}</span></div></td>
       </tr>
     </tbody>
     {% endfor %}
@@ -117,6 +138,4 @@
 {% endif %}
 {% if is_heat and heatmap.pending %}
 <p class="hint hint-status" style="margin-top:14px;">{{ _("Für {pending} von {total} Entitäten liegen noch keine vollständigen Tageszahlen vor, die Messung läuft im Hintergrund.", pending=heatmap.pending, total=dq.entity_count) }}</p>
-{% elif dq.pending %}
-<p class="hint hint-status" style="margin-top:14px;">{{ _("Für {pending} von {total} Entitäten liegt noch keine vollständige Messung vor, sie läuft im Hintergrund.", pending=dq.pending, total=dq.entity_count) }}</p>
 {% endif %}

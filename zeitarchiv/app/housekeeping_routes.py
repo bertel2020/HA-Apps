@@ -1307,7 +1307,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
         liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
         matrix = data_quality.build_matrix(
-            deps.index, period=period, today=datetime.now(deps.tz).date()
+            deps.index, period=period, today=datetime.now(deps.tz).date(), tz=deps.tz
         )
         # Die Heatmap-Ansicht (data_quality.build_heatmap, _data_quality_heatmap.html) ist vorerst
         # aus der Oberfläche genommen, siehe ROADMAP.md; Dienst und Vorlage bleiben bestehen.

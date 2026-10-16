@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 
 from . import cleanup_stats, formats
 from .i18n import tr
-from .formatting import decimals_to_int, format_int, format_value
+from .formatting import decimals_to_int, format_int, format_uptime, format_value
 from .storage import cleanup
 from .storage.index import Index, effective_outlier_threshold
 
@@ -227,7 +227,7 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
     }
 
 
-SORT_KEYS = ("total", "name") + tuple(column["key"] for column in COLUMNS)
+SORT_KEYS = ("total", "name", "measured") + tuple(column["key"] for column in COLUMNS)
 KIND_KEYS = tuple(column["key"] for column in COLUMNS)
 
 
@@ -252,10 +252,13 @@ def filter_and_sort(
             return row["total"]
         if sort == "name":
             return row["friendly_name"].lower()
+        if sort == "measured":
+            # Ohne Messzeit (nie gemessen) gilt als ältestes, damit sie bei "älteste zuerst" oben stehen.
+            return row["measured_at"] or 0.0
         cell = row["cells"].get(sort)
         return cell["count"] if cell else 0
 
-    if sort == "name":
+    if sort in ("name", "measured"):
         return sorted(rows, key=lambda r: (value(r), r["entity_id"]), reverse=descending)
     return sorted(rows, key=lambda r: (-value(r) if descending else value(r), r["entity_id"]))
 
@@ -265,7 +268,10 @@ PERIODS: dict[str, int | None] = {"all": None, "year": 365, "30d": 30, "7d": 7}
 DEFAULT_PERIOD = "all"
 
 
-def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | None = None) -> dict:
+def build_matrix(
+    index: Index, *, period: str = DEFAULT_PERIOD, today: date | None = None, now: float | None = None,
+    tz: ZoneInfo | None = None,
+) -> dict:
     """Matrix Entität × Befundtyp, absteigend nach der Summe der Befunde.
 
     ``period``: "all" zählt die gesamte Historie aus ``counts``; die übrigen Zeiträume
@@ -280,7 +286,13 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
       Gesamt-Zählung haben (nie gemessen, oder die Ausreißer-/Lücken-Zahl gehört
       zu einer anderen Schwelle). Ohne sie sähe "nichts gefunden" wie "noch nicht
       gemessen" aus.
+    - ``status``: Gesamtstand der Messung (``total`` messbare Entitäten, ``measured``,
+      ``stale`` = älter als die Erneuerungsgrenze des Wartungsplaners, ``oldest_label``)
+    - je Zeile ``measured_at`` (Zeitpunkt der Gesamt-Zählung, None ohne), ``measured_label``
+      ("vor 2 Std.") und ``measured_old`` (älter als die Erneuerungsgrenze)
     """
+    now = time.time() if now is None else now
+    stale_after = cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS
     if period not in PERIODS:
         period = DEFAULT_PERIOD
     window_days = PERIODS[period]
@@ -300,6 +312,9 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
     # state_class "total" darf laut Home Assistant sinken: Rückgänge werden dort nie geprüft.
     not_applicable: set[str] = set()
     pending = 0
+    measurable = 0
+    measured_times: list[float] = []
+    computed: dict[str, float | None] = {}
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
         names[entity_id] = entity["custom_name"] or entity["custom_name"] or entity["friendly_name"] or entity_id
@@ -314,11 +329,16 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
             entity["aggregation_type"], entity["outlier_threshold"]
         ) != "off"
         gaps_ok = cleanup_stats.gaps_measured(entity, entry)
+        measurable += 1
+        if entry is not None:
+            computed[entity_id] = entry.get("computed_at")
         if (
             entry is None or (outliers_on and entity_id not in measured_outliers) or not gaps_ok
             or (window_start and "daily" not in entry)
         ):
             pending += 1
+        elif entry.get("computed_at"):
+            measured_times.append(entry["computed_at"])
         if entry is not None and window_start is not None:
             if "daily" in entry:
                 window = {key: 0 for key in counts}
@@ -355,11 +375,21 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
                 "label": format_int(count),
                 "href": cleanup_href(entity_id, column["filter"], column["range"]),
             } if count else None
+        measured_at = computed.get(entity_id)
         rows.append({
             "entity_id": entity_id,
             "friendly_name": names.get(entity_id, entity_id),
             "cells": cells,
             "total": total,
+            "measured_at": measured_at,
+            "measured_label": (
+                tr("vor {dauer}", dauer=format_uptime(now - measured_at)) if measured_at else tr("unbekannt")
+            ),
+            "measured_title": (
+                formats.format_datetime(datetime.fromtimestamp(measured_at, tz), seconds=False, comma=True)
+                if measured_at and tz else ""
+            ),
+            "measured_old": bool(measured_at and now - measured_at >= stale_after),
             "counter_allowed": entity_id in allowed,
             "counter_na": entity_id in not_applicable,
         })
@@ -379,6 +409,15 @@ def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | No
         "entity_count": len(names),
         "pending": pending,
         "period": period,
+        "status": {
+            "total": measurable,
+            "measured": measurable - pending,
+            "stale": sum(1 for t in measured_times if now - t >= stale_after),
+            "oldest_label": (
+                tr("vor {dauer}", dauer=format_uptime(now - min(measured_times))) if measured_times else ""
+            ),
+            "stale_hours": round(stale_after / 3600),
+        },
     }
 
 
