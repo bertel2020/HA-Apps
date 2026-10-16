@@ -2490,7 +2490,11 @@
     "Daten werden gelöscht…": "Deleting data…",
     "Zeitarchiv wurde komplett zurückgesetzt.": "Zeitarchiv has been reset completely.",
     "Alle Messwerte wurden gelöscht.": "All measured values have been deleted.",
-    "Das lässt sich nicht rückgängig machen.": "This cannot be undone."
+    "Das lässt sich nicht rückgängig machen.": "This cannot be undone.",
+    "Alle sichtbaren Entitäten wählen": "Select all visible entities",
+    "Auswahl anzeigen": "Show selection",
+    "Keine Entität gewählt": "No entity selected",
+    "Löschen …": "Delete …"
   },
   "js": {
     "Meldungen": "Notices",
@@ -2941,6 +2945,19 @@
     "Kein Zwischenzähler": "No sub-meter",
     "Dieser Verbraucher ist selbst Zwischenzähler (1 Gerät) und kann nirgends dahinterhängen.": "This consumer is itself a sub-meter (1 device) and cannot hang behind another.",
     "Dieser Verbraucher ist selbst Zwischenzähler ({count} Geräte) und kann nirgends dahinterhängen.": "This consumer is itself a sub-meter ({count} devices) and cannot hang behind another.",
-    "Die {count} Geräte dahinter bleiben als eigene Verbraucher erhalten.": "The {count} devices behind it stay as separate consumers."
+    "Die {count} Geräte dahinter bleiben als eigene Verbraucher erhalten.": "The {count} devices behind it stay as separate consumers.",
+    "{n} gewählt": "{n} selected",
+    "Aus der Auswahl entfernen": "Remove from selection",
+    "Diagramm": "Chart",
+    "Tabelle": "Table",
+    "Dashboard-Kachel": "Dashboard tile",
+    "Energiedashboard": "Energy dashboard",
+    "{n} Entitäten werden mit allen Werten und ihrer Konfiguration endgültig gelöscht. Das kann nicht rückgängig gemacht werden. Sendet die Home-Assistant-Integration eine Entität weiter, wird sie automatisch neu angelegt.": "{n} entities will be permanently deleted with all their values and configuration. This cannot be undone. If the Home Assistant integration keeps sending an entity, it is created again automatically.",
+    "Wert-Kacheln auf Dashboards werden mit entfernt.": "Value tiles on dashboards are removed as well.",
+    "Die Verwendung der Entitäten konnte nicht geprüft werden. Es wurde nichts gelöscht.": "Could not check where the entities are used. Nothing was deleted.",
+    "{n} Entitäten endgültig löschen": "Permanently delete {n} entities",
+    "Das Löschen ist fehlgeschlagen.": "Deleting failed.",
+    "{ok} gelöscht, {failed} fehlgeschlagen: {names}": "{ok} deleted, {failed} failed: {names}",
+    "Noch in Verwendung ({n}). Diese Stellen zeigen danach ins Leere:": "Still in use ({n}). These places will point to nothing afterwards:"
   }
 }

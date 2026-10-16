@@ -160,7 +160,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats, cleanup_tile, data_quality
+from . import cleanup_stats, cleanup_tile, data_quality, entity_usage
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
@@ -3065,6 +3065,56 @@ def entity_delete(entity_id: str) -> dict:
     entity_removal.delete_entity(DATA_DIR, index, entity_id)
     _background.invalidate_retention_overview()
     return {"ok": True}
+
+
+@_storage_locked(lambda args: args["entity_ids"])
+def _delete_entities_locked(entity_ids: list[str]) -> dict:
+    deleted: list[str] = []
+    missing: list[str] = []
+    failed: list[dict] = []
+    for entity_id in entity_ids:
+        try:
+            if index.get_entity(entity_id) is None:
+                missing.append(entity_id)
+                continue
+            entity_removal.delete_entity(DATA_DIR, index, entity_id)
+            deleted.append(entity_id)
+        except Exception as exc:  # eine fehlerhafte Entität bricht die übrigen nicht ab
+            logger.exception("Entität %s konnte nicht gelöscht werden", entity_id)
+            failed.append({"entity_id": entity_id, "error": str(exc)})
+    if deleted:
+        _background.invalidate_retention_overview()
+    return {"deleted": deleted, "missing": missing, "failed": failed}
+
+
+@app.post("/entities/delete-selected")
+async def entities_delete_selected(request: Request) -> dict:
+    """Löscht mehrere Entitäten endgültig (Auswahl in der Entitäten-Übersicht)."""
+    entity_ids = list(dict.fromkeys(
+        str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"
+    ))
+    if not entity_ids:
+        raise HTTPException(status_code=400, detail=tr("Keine Entität gewählt"))
+    # Ungültige IDs vorab aussortieren: die Sperre prüft das Format und würde sonst die ganze Anfrage abbrechen.
+    valid: list[str] = []
+    invalid: list[dict] = []
+    for entity_id in entity_ids:
+        try:
+            validate_entity_id(entity_id)
+            valid.append(entity_id)
+        except ValueError as exc:
+            invalid.append({"entity_id": entity_id, "error": str(exc)})
+    result = await run_in_threadpool(_delete_entities_locked, valid) if valid else {"deleted": [], "missing": [], "failed": []}
+    result["failed"] = invalid + result["failed"]
+    return result
+
+
+@app.post("/entities/usage-check")
+async def entities_usage_check(request: Request) -> dict:
+    """Prüft vor dem Löschen, wo die gewählten Entitäten noch verwendet werden (nur lesend)."""
+    entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+    usages = await run_in_threadpool(entity_usage.find_usages, index, entity_ids)
+    return {"usages": usages, "summary": entity_usage.summarize(usages)}
 
 
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)

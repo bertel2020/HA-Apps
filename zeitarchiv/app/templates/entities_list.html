@@ -58,6 +58,17 @@
           </div>
         </div>
 
+        <!-- Auswahl für „Löschen …“: lebt außerhalb von #entities-table, damit sie das Neuladen
+             der Tabelle (Suche, Filter, Seite) übersteht — die Haken setzt entities_list.js nach
+             jedem Laden aus dem gemerkten Bestand neu. -->
+        <div id="sel-bar" class="sel-bar" hidden>
+          <span id="sel-count" class="sel-count"></span>
+          <button type="button" class="btn btn-sm" id="sel-show" aria-expanded="false">{{ _("Auswahl anzeigen") }}</button>
+          <button type="button" class="btn btn-sm" id="sel-clear">{{ _("Auswahl aufheben") }}</button>
+          <button type="button" class="btn btn-sm btn-danger" id="sel-delete">{{ _("Löschen …") }}</button>
+        </div>
+        <div id="sel-panel" class="sel-panel" hidden></div>
+
         <div id="entities-table"></div>
     </div>
   </div>
@@ -66,6 +77,7 @@
   <script src="{{ asset('js/resizable-tables.js') }}"></script>
   <script src="{{ asset('js/favorite-toggle.js') }}"></script>
   <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
   <script src="{{ asset('js/table-cards.js') }}"></script>
   <!-- Nach table-cards.js: das Sortiermenü, das dieses Skript mit einsammelt,
        entsteht dort. -->

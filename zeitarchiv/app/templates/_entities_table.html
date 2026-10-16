@@ -10,7 +10,7 @@
      entities_list.html). Passt sich dadurch bei jedem htmx-Reload dieses
      Fragments automatisch der jeweils aktiven Auswahl an. #}
   {% set _col_widths = {'type': 112, 'first_ts': 126, 'last_ts': 126, 'resolution': 104, 'retention': 118, 'unit': 84, 'rows': 114, 'size': 96, 'value_filter': 96, 'gap_threshold': 92, 'outlier_threshold': 92} %}
-  {% set ns = namespace(min_width = 40 + 330) %}
+  {% set ns = namespace(min_width = 40 + 36 + 330) %}
   {% for col, px in _col_widths.items() %}
     {% if col in visible_columns %}{% set ns.min_width = ns.min_width + px %}{% endif %}
   {% endfor %}
@@ -20,6 +20,7 @@
        etwas geliefert hat. Siehe table-cards.js. -->
   <table class="dt entities-dt" data-card-lead="Letzter Wert" style="min-width:{{ ns.min_width }}px;">
     <colgroup>
+      <col class="col-sel">
       <col class="col-fav">
       <col class="col-entity">
       {% if 'type' in visible_columns %}<col class="col-type">{% endif %}
@@ -35,6 +36,7 @@
       {% if 'outlier_threshold' in visible_columns %}<col class="col-outlier-threshold">{% endif %}
     </colgroup>
     <tr>
+      <th class="col-sel"><input type="checkbox" class="sel-all" title="{{ _('Alle sichtbaren Entitäten wählen') }}" aria-label="{{ _('Alle sichtbaren Entitäten wählen') }}"></th>
       <th class="col-fav"></th>
       {% for col in columns %}
       <th class="{{ col.col_class }}">
@@ -49,6 +51,7 @@
     </tr>
     {% for row in rows %}
     <tr{% if row.pending_purge %} class="has-pending-purge"{% endif %}>
+      <td class="col-sel"><input type="checkbox" class="sel-row" value="{{ row.entity_id }}" data-name="{{ row.display_name }}" aria-label="{{ _('Für Sammelaktion wählen') }}"></td>
       <td class="fav-cell col-fav">
         <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
                 title="{{ _('Favorit') }}" onclick="toggleFavorite('entities/{{ row.entity_id }}/favorite', this)">★</button>
