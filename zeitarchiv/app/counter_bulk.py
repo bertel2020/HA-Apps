@@ -120,7 +120,8 @@ def verdict_details_for_rows(
     ``{"returns": True | False | None, "note": Satz}``. True = kehrt zurück (wahrscheinlich
     Fehlwert), False = bleibt niedrig (wahrscheinlich Zählerwechsel oder Reset), None = die Daten
     enden, bevor sich das entscheiden lässt. Ein Durchlauf über das Fenster der angezeigten
-    Rückgänge statt je Zeile einer; planmäßige Rücksetzer um Mitternacht fehlen im Ergebnis."""
+    Rückgänge statt je Zeile einer. Jede markierte Zeile kommt im Ergebnis vor; findet die
+    Einordnung sie nicht, gilt sie als offen."""
     label = tr("Zählerrückgang")
     stamps = {row["ts"] for row in rows if any(flag["label"] == label for flag in row.get("flags") or [])}
     entity = index.get_entity(entity_id)
@@ -134,10 +135,14 @@ def verdict_details_for_rows(
         ),
         tz,
     )
-    return {
+    details = {
         item["ts"]: {"returns": item["returns"], "note": followup_note(item, entity)}
         for item in decreases if item["ts"] in stamps
     }
+    # Eine markierte Zeile ohne Einordnung gibt es nicht: was die Einordnung nicht findet
+    # (Markierung und Einordnung rechnen getrennt), steht als „Noch offen“ da.
+    offen = {"returns": None, "note": followup_note({"returns": None}, entity)}
+    return {ts: details.get(ts, offen) for ts in stamps}
 
 
 def verdicts_for_rows(

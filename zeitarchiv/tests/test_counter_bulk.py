@@ -81,6 +81,18 @@ def test_the_cleanup_page_gets_a_verdict_for_each_flagged_decrease(tmp_path) -> 
     index.close()
 
 
+def test_a_flagged_row_without_assessment_counts_as_open(tmp_path) -> None:
+    """Markierung und Einordnung rechnen getrennt. Findet die Einordnung eine markierte Zeile
+    nicht, steht sie als „Noch offen“ da, nicht ohne Einordnung."""
+    index, now, base = _seed(tmp_path)
+    rows = [{"ts": base + 1 * 300, "flags": [{"label": "Zählerrückgang", "reason": "x"}]}]
+    details = counter_bulk.verdict_details_for_rows(tmp_path, index, TZ, "sensor.z1", rows, now=now)
+    assert details[base + 1 * 300]["returns"] is None
+    assert details[base + 1 * 300]["note"] == "Zu wenig Folgewerte für eine Einschätzung."
+    assert counter_bulk.verdicts_for_rows(tmp_path, index, TZ, "sensor.z1", rows, now=now) == {}
+    index.close()
+
+
 def _seed_live(index, data_dir, now):
     # Nur 40 Minuten zurück: die Ansicht „Tag“ beginnt um Mitternacht, mehr Abstand ließe den
     # Test in den ersten Stunden des Tages ins Leere laufen.

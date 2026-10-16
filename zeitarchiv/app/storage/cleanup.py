@@ -388,6 +388,7 @@ def analyze_raw_rows_page(
                 and counter_previous_value is not None
                 and ts > counter_previous_ts
                 and value < counter_previous_value
+                and not _is_periodic_reset(counter_previous_ts, ts, counter_previous_value, value, tz)
             ):
                 counter_decrease_reason = _counter_decrease_reason(
                     counter_previous_value, value

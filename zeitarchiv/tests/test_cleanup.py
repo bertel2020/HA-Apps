@@ -111,6 +111,25 @@ def test_both_row_paths_use_the_same_outlier_rule() -> None:
     ]
 
 
+def test_both_row_paths_skip_the_scheduled_midnight_reset() -> None:
+    """Ein Tageszähler setzt sich um Mitternacht auf 0 zurück. detect_counter_decreases()
+    überspringt das, der Streaming-Weg ("Jahr"/"Gesamt") markierte es einmal trotzdem —
+    bei Tageszählern jede Nacht, ohne dass Meldung und Housekeeping es zählten."""
+    rows = [
+        (_ts(2024, 7, 1, 22), 8.0), (_ts(2024, 7, 2, 0), 0.0),   # planmäßiger Reset
+        (_ts(2024, 7, 2, 12), 6.0), (_ts(2024, 7, 2, 13), 1.0),  # Rückgang am selben Tag
+    ]
+    direkt = cleanup.detect_counter_decreases(rows, TZ)
+    streaming = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="counter_decreases", page=1, page_size=50,
+        gap_threshold_minutes=None, outlier_factor=None, tz=TZ,
+        counter_decrease_enabled=True,
+    )
+    assert set(direkt) == {_ts(2024, 7, 2, 13)}
+    assert {row["ts"] for row in streaming["rows"]} == set(direkt)
+    assert streaming["counts"]["counter_decreases"] == 1
+
+
 def test_daily_counts_add_up_to_the_totals() -> None:
     """Die Tageszahlen kommen aus demselben Durchlauf wie die Gesamtzahlen und
     müssen in jeder Kategorie genau deren Summe ergeben, sonst zeigte eine
