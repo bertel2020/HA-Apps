@@ -136,19 +136,22 @@
       selection.forEach((name, id) => {
         const row = document.createElement('div');
         row.className = 'sel-item';
+        const text = document.createElement('div');
+        text.className = 'sel-item-text';
         const label = document.createElement('span');
         label.className = 'sel-item-name';
         label.textContent = name;
         const idEl = document.createElement('span');
         idEl.className = 'sel-item-id';
         idEl.textContent = id;
+        text.append(label, idEl);
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = '×';
         remove.title = t('Aus der Auswahl entfernen');
         remove.setAttribute('aria-label', t('Aus der Auswahl entfernen'));
         remove.addEventListener('click', () => { selection.delete(id); persistSelection(); syncSelectionUI(); });
-        row.append(label, idEl, remove);
+        row.append(text, remove);
         panel.appendChild(row);
       });
     }
@@ -218,16 +221,9 @@
       if (!panel.hidden) renderSelectionPanel();
     });
 
-    function usageLine(usage) {
-      const kinds = {chart: t('Diagramm'), table: t('Tabelle'), tile: t('Dashboard-Kachel'), energy: t('Energiedashboard')};
-      let text = (kinds[usage.kind] || usage.kind) + ': ' + usage.name;
-      if (usage.detail && usage.kind !== 'energy') text += ' (' + usage.detail + ')';
-      return text;
-    }
-
-    // Inhalt des Bestätigungsdialogs: Anzahl, Verwendungen, die nach dem Löschen ins Leere zeigen,
-    // und die vollständige Liste der Gewählten (auch die, die gerade nicht in der Suche stehen).
-    function buildDeleteConfirmTemplate(ids, usages, summary) {
+    // Inhalt des Bestätigungsdialogs: Überschrift, die Gewählten als eine Liste (auch die, die gerade
+    // nicht in der Suche stehen) und bei jeder Entität darunter, was nach dem Löschen ins Leere zeigt.
+    function buildDeleteConfirmTemplate(ids, usages) {
       const tpl = document.createElement('template');
       const el = (tag, text, cls) => {
         const node = document.createElement(tag);
@@ -235,27 +231,43 @@
         if (cls) node.className = cls;
         return node;
       };
-      tpl.content.appendChild(el('p', t('{n} Entitäten werden mit allen Werten und ihrer Konfiguration endgültig gelöscht. Das kann nicht rückgängig gemacht werden. Sendet die Home-Assistant-Integration eine Entität weiter, wird sie automatisch neu angelegt.', {n: ids.length}), 'cbc-title'));
+      const kinds = {chart: t('Diagramm'), table: t('Tabelle'), tile: t('Dashboard-Kachel'), energy: t('Energiedashboard')};
+      const blocking = id => (usages[id] || []).filter(u => !u.auto_cleaned);
+      const attention = ids.filter(id => blocking(id).length);
 
-      const attention = ids.filter(id => (usages[id] || []).some(u => !u.auto_cleaned));
+      tpl.content.appendChild(el('p', t('{n} Entitäten endgültig löschen?', {n: ids.length}), 'del-head'));
+      tpl.content.appendChild(el('p', t('Mit allen Werten und ihrer Konfiguration. Das kann nicht rückgängig gemacht werden.'), 'del-sub'));
       if (attention.length) {
-        const warn = el('div', undefined, 'sel-confirm-warn');
-        warn.appendChild(el('strong', t('Noch in Verwendung ({n}). Diese Stellen zeigen danach ins Leere:', {n: attention.length})));
-        const list = el('ul');
-        attention.forEach(id => {
-          const lines = (usages[id] || []).filter(u => !u.auto_cleaned).map(usageLine);
-          list.appendChild(el('li', (selection.get(id) || id) + ' — ' + lines.join('; ')));
-        });
-        warn.appendChild(list);
-        tpl.content.appendChild(warn);
-      }
-      if (ids.some(id => (usages[id] || []).some(u => u.auto_cleaned))) {
-        tpl.content.appendChild(el('p', t('Wert-Kacheln auf Dashboards werden mit entfernt.')));
+        tpl.content.appendChild(el('p', '⚠ ' + t('Noch in Verwendung ({n}). Diese Stellen zeigen danach ins Leere:', {n: attention.length}), 'del-warn'));
       }
 
-      const names = el('div', undefined, 'sel-confirm-list');
-      ids.forEach(id => names.appendChild(el('div', (selection.get(id) || id) + '  ·  ' + id)));
-      tpl.content.appendChild(names);
+      const list = el('ul', undefined, 'del-list');
+      // Entitäten mit offenen Verwendungen zuerst, damit sie nicht in einer langen Liste untergehen.
+      const ordered = attention.concat(ids.filter(id => !attention.includes(id)));
+      ordered.forEach(id => {
+        const used = blocking(id);
+        const item = el('li', undefined, 'del-item' + (used.length ? ' is-used' : ''));
+        item.appendChild(el('span', selection.get(id) || id, 'del-name'));
+        item.appendChild(el('span', id, 'del-id'));
+        if (used.length) {
+          const uses = el('ul', undefined, 'del-uses');
+          used.forEach(u => {
+            const line = el('li');
+            line.appendChild(el('span', kinds[u.kind] || u.kind, 'del-kind'));
+            line.appendChild(document.createTextNode(u.name));
+            if (u.detail && u.kind !== 'energy') line.appendChild(el('span', ' (' + u.detail + ')', 'del-detail'));
+            uses.appendChild(line);
+          });
+          item.appendChild(uses);
+        }
+        list.appendChild(item);
+      });
+      tpl.content.appendChild(list);
+
+      const notes = [];
+      if (ids.some(id => (usages[id] || []).some(u => u.auto_cleaned))) notes.push(t('Wert-Kacheln auf Dashboards werden mit entfernt.'));
+      notes.push(t('Sendet die Home-Assistant-Integration eine Entität weiter, wird sie automatisch neu angelegt.'));
+      tpl.content.appendChild(el('p', notes.join(' '), 'del-foot'));
       return tpl;
     }
 
@@ -279,7 +291,7 @@
         const confirmed = await window.appConfirm('', {
           danger: true,
           confirmLabel: t('{n} Entitäten endgültig löschen', {n: ids.length}),
-          template: buildDeleteConfirmTemplate(ids, check.usages || {}, check.summary || {}),
+          template: buildDeleteConfirmTemplate(ids, check.usages || {}),
         });
         if (!confirmed) return;
 

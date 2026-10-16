@@ -127,13 +127,30 @@
   .sel-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:10px;padding:8px 12px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-line-soft);font-size:calc(13px * var(--font-scale, 1));}
   .sel-bar[hidden],.sel-panel[hidden]{display:none;}
   .sel-count{font-weight:600;color:var(--accent-line);margin-right:auto;}
-  .sel-panel{margin-bottom:10px;max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:4px 0;}
-  .sel-item{display:flex;align-items:center;gap:10px;padding:4px 12px;font-size:calc(13px * var(--font-scale, 1));}
-  .sel-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .sel-item-id{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
-  .sel-item button{background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:calc(16px * var(--font-scale, 1));line-height:1;}
-  .sel-item button:hover{color:var(--accent-line);}
-  .sel-confirm-list{max-height:200px;overflow:auto;margin:8px 0;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:calc(12px * var(--font-scale, 1));text-align:left;}
-  .sel-confirm-list div{padding:1px 0;}
-  .sel-confirm-warn{margin:8px 0;padding:8px 10px;border-radius:6px;background:var(--accent-line-soft);text-align:left;font-size:calc(12px * var(--font-scale, 1));}
-  .sel-confirm-warn ul{margin:4px 0 0;padding-left:18px;}
+  .sel-panel{margin-bottom:10px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .sel-item{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--border);}
+  .sel-item:last-child{border-bottom:none;}
+  .sel-item:hover{background:var(--surface-alt);}
+  .sel-item-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  .sel-item-name{font-weight:600;font-size:calc(13px * var(--font-scale, 1));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sel-item-id{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sel-item button{flex:none;width:28px;height:28px;border-radius:50%;background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:calc(18px * var(--font-scale, 1));line-height:1;}
+  .sel-item button:hover{color:var(--danger);background:var(--danger-soft);}
+  /* Bestätigungsdialog „Löschen …“ */
+  .del-head{margin:0 0 4px;font-size:calc(17px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+  .del-sub{margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.5;}
+  .del-warn{margin:0 0 8px;padding:8px 10px;border-radius:8px;background:var(--warning-soft);color:var(--warning);font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;line-height:1.4;}
+  .del-list{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px;text-align:left;}
+  .del-item{display:flex;flex-direction:column;gap:1px;padding:8px 12px;border-bottom:1px solid var(--border);}
+  .del-item:last-child{border-bottom:none;}
+  .del-item.is-used{border-left:3px solid var(--warning);background:var(--warning-soft);}
+  .del-name{font-weight:600;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+  .del-id{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow-wrap:anywhere;}
+  .del-uses{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink);}
+  .del-kind{display:inline-block;margin-right:6px;padding:0 6px;border-radius:999px;border:1px solid var(--warning);color:var(--warning);font-size:calc(10.5px * var(--font-scale, 1));}
+  .del-detail{color:var(--ink-muted);}
+  @media (max-width:480px){
+    .confirm-overlay:has(.del-list) .confirm-actions{flex-wrap:wrap;}
+    .confirm-overlay:has(.del-list) .confirm-actions .btn{flex:1 1 100%;}
+  }
+  .del-foot{margin:10px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.5;text-align:left;}

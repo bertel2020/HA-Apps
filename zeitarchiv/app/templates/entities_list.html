@@ -15,6 +15,9 @@
              hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">
           <input type="search" name="search" placeholder="{{ _('Entität suchen …') }}" onchange="resetEntitiesPage()">
           <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>{{ _("★ Nur Favoriten") }}</span></label>
+          <button type="button" class="btn" id="sel-toggle" aria-pressed="false"
+                  data-label-on="{{ _('Auswahl beenden') }}" data-label-off="{{ _('Auswählen') }}"
+                  title="{{ _('Entitäten markieren, um mehrere gemeinsam zu löschen') }}">{{ _("Auswählen") }}</button>
           <span id="type-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'type' in visible_columns else 'none' }};">
             <button type="button" class="btn" id="type-filter-btn" onclick="toggleDDPicker('type-filter')">{{ _("Typ: Alle ▾") }}</button>
             <div class="dd-picker-popover" id="type-filter-popover">
@@ -44,9 +47,6 @@
                gespeicherte Auswahl versehentlich auf "keine Spalte sichtbar"
                zurücksetzen, siehe Kommentar bei der Route in main.py. -->
           <input type="hidden" name="columns_submitted" value="1">
-          <button type="button" class="btn" id="sel-toggle" aria-pressed="false"
-                  data-label-on="{{ _('Auswahl beenden') }}" data-label-off="{{ _('Auswählen') }}"
-                  title="{{ _('Entitäten markieren, um mehrere gemeinsam zu löschen') }}">{{ _("Auswählen") }}</button>
           <div class="dd-picker-wrap">
             <button type="button" class="btn" onclick="toggleDDPicker('col-picker')">{{ _("Spalten ▾") }}</button>
             <div class="dd-picker-popover" id="col-picker-popover">
