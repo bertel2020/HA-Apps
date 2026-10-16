@@ -1,5 +1,109 @@
 # Changelog
 
+## 1.6.0 - 2026-10-16
+
+### Neu
+
+- **Datenqualität**: Eine neue Seite zeigt je Entität Ausreißer, Lücken,
+  Duplikate und Zählerrückgänge, mit Suche, Befund-Filter, Sortierung und
+  Zeitraum (7 Tage bis Gesamt). Eine Statuszeile und die Spalte „Stand“ sagen,
+  wie aktuell die Zahlen sind, und eine Meldung weist auf neue Befunde hin. Die
+  Farben folgen der Frage „Kann ich etwas tun?“: Gelb heißt aufräumen, Grau ist
+  nur Information.
+- **Duplikate entfernen** als Sammelaktion über mehrere Entitäten, mit Vorschau
+  und Rückgängig.
+- **Wiederherstellen mit Auswahl**: Ein Assistent führt in vier Schritten durch
+  die Wiederherstellung. Zur Wahl stehen die ganze Sicherung, einzelne
+  Entitäten oder nur die Einstellungen. Die beiden letzten laufen ohne Neustart,
+  fügen Diagramme und Tabellen standardmäßig als Kopie hinzu und lassen sich
+  rückgängig machen.
+- **Entitäten mehrfach löschen**: Mit „Auswählen“ in der Entitäten-Übersicht
+  markierst du mehrere Entitäten. Der Dialog nennt vorher, wo sie noch benutzt
+  werden (Diagramme, Tabellen, Kacheln, Energiedashboard), und bietet ein Backup
+  an. Diagramme und Tabellen, die eine gelöschte Entität nennen, zeigen
+  „Entität fehlt“.
+- **Werte ignorieren** je Entität: Sensoren, die beim Start kurz 0 melden,
+  lassen sich so filtern. Du gibst die Werte an, die nicht gespeichert werden
+  sollen.
+- **Werte bearbeiten**: Zählerrückgänge tragen eine Einordnung („Vermutlich
+  Fehlwert“, „Vermutlich Reset“, „Noch offen“) samt Begründung. Die Markierungen
+  sind nach Bedeutung gefärbt statt alles in Rot.
+- **Einstellungen → Zurücksetzen**: Du kannst nur die Messwerte oder den
+  kompletten Datenbestand löschen. Das Löschen verlangt eine Tipp-Bestätigung
+  und bietet vorher ein Backup an. API-Token, Backup-Einstellungen und die
+  Backup-Dateien bleiben erhalten.
+- Die Beschriftung von Tabellenspalten kennt die Platzhalter `{wochentag}` und
+  `{wochentag_kurz}`.
+- Die Typ-Anzeige nennt die `state_class` einer Entität. Bei der Klasse `total`
+  steht in der Datenqualität „n. a.“, weil sie nicht auf Rückgänge geprüft wird.
+- Energiedashboard: „Nach Gruppe anzeigen“ bei den Verbraucheranteilen zeigt
+  jede Gruppe als Summenzeile mit ihren Geräten, zum Auf- und Zuklappen.
+
+### Geändert
+
+- Die Messung der Datenqualität läuft im Hintergrund mit Zeitbudget und nur
+  noch bei Entitäten mit neuen Werten. Stille Entitäten gelten nicht als
+  veraltet.
+- Die Einordnung der Zählerrückgänge ist verständlicher formuliert. Die Aktion
+  heißt jetzt „Rückgänge erlauben“.
+
+### Behoben
+
+- Diagramme, die eine gelöschte Entität nennen, laden wieder, statt auf „Lädt …“
+  zu bleiben.
+- Tageszähler („… heute“) zeigen den planmäßigen Reset um Mitternacht nicht mehr
+  als Zählerrückgang, auch nicht bei großen Entitäten im Zeitraum Gesamt.
+
+---
+
+### English
+
+#### New
+
+- **Data quality**: A new page shows outliers, gaps, duplicates and counter
+  decreases per entity, with search, finding filter, sorting and period (7 days
+  to all time). A status line and the “As of” column tell you how current the
+  numbers are, and a notice points to new findings. The colors follow the
+  question “Can I do something?”: yellow means you can clean up, grey is
+  information only.
+- **Remove duplicates** as a bulk action across several entities, with preview
+  and undo.
+- **Restore with selection**: A wizard guides you through the restore in four
+  steps. You can restore the whole backup, single entities or just the
+  settings. The last two run without a restart, add charts and tables as a copy
+  by default and can be undone.
+- **Delete several entities**: With “Select” in the entities overview you mark
+  several entities. The dialog first tells you where they are still used
+  (charts, tables, tiles, energy dashboard) and offers a backup. Charts and
+  tables that mention a deleted entity show “Entity missing”.
+- **Ignore values** per entity: Sensors that briefly report 0 at startup can be
+  filtered this way. You name the values that should not be stored.
+- **Edit values**: Counter decreases carry an assessment (“Probably a bad
+  value”, “Probably a reset”, “Still open”) with a reason. The markings are
+  colored by meaning instead of everything in red.
+- **Settings → Reset**: You can delete just the measured values or the entire
+  data set. Deleting requires typing a confirmation and offers a backup first.
+  The API token, backup settings and the backup files are kept.
+- Table column labels know the placeholders `{weekday}` and `{weekday_short}`.
+- The type display names the entity’s `state_class`. For the class `total`,
+  data quality shows “n/a” because it is not checked for decreases.
+- Energy dashboard: “Show by group” in the consumer shares shows each group as a
+  total row with its devices, collapsible.
+
+#### Changed
+
+- Data quality is measured in the background within a time budget and only for
+  entities with new values. Silent entities no longer count as outdated.
+- The assessment of counter decreases is worded more clearly. The action is now
+  called “Allow decreases”.
+
+#### Fixed
+
+- Charts that mention a deleted entity load again instead of staying on
+  “Loading …”.
+- Daily counters (“… today”) no longer show the scheduled reset at midnight as a
+  counter decrease, even for large entities over the period All time.
+
 ## 1.5.0 - 2026-10-11
 
 ### Neu
