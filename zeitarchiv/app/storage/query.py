@@ -860,6 +860,38 @@ def _query_year_level(
     return sorted(completed, key=lambda r: r.bucket_start)
 
 
+def _missing_entity_result(
+    entity_id: str,
+    range_key: str,
+    tz: ZoneInfo,
+    now: datetime,
+    offset: int,
+    continuous: bool,
+    year_over_year: bool = False,
+    cap_to: timedelta | None = None,
+) -> dict:
+    """Antwort für eine Entität, die es nicht (mehr) gibt — z. B. weil sie gelöscht wurde, das
+    gespeicherte Diagramm sie aber noch nennt. Gleiche Form wie eine normale Antwort (inkl.
+    Zeitfenster), nur ohne Punkte: Aufrufer lesen ``window_start`` & Co. unbedingt, ein
+    verkürztes Ergebnis endete dort als KeyError (HTTP 500) und das Diagramm hing auf „Lädt …"."""
+    window_start, window_end, period_end = _window(range_key, now.astimezone(tz), offset, continuous, elapsed=cap_to)
+    if year_over_year:
+        window_start = _shift_year(window_start, -1)
+        window_end = _shift_year(window_end, -1)
+        period_end = _shift_year(period_end, -1)
+    return {
+        "entity_id": entity_id,
+        "aggregation_type": None,
+        "chart_type": "line",
+        "points": [],
+        "window_start": window_start.timestamp(),
+        "window_end": window_end.timestamp(),
+        "period_end": period_end.timestamp(),
+        "is_current": offset == 0,
+        "elapsed_seconds": None,
+    }
+
+
 def query_series(
     data_dir: Path,
     index: Index,
@@ -883,7 +915,7 @@ def query_series(
 
     entity = index.get_entity(entity_id)
     if entity is None:
-        return {"entity_id": entity_id, "aggregation_type": None, "chart_type": "line", "points": []}
+        return _missing_entity_result(entity_id, range_key, tz, now, offset, continuous, year_over_year, cap_to)
 
     aggregation_type = entity["aggregation_type"]
     resolved_chart_type = _resolved_chart_type(aggregation_type, chart_type)
@@ -1044,7 +1076,7 @@ def query_raw_series(
 
     entity = index.get_entity(entity_id)
     if entity is None:
-        return {"entity_id": entity_id, "aggregation_type": None, "chart_type": "line", "points": []}
+        return _missing_entity_result(entity_id, range_key, tz, now, offset, continuous)
 
     aggregation_type = entity["aggregation_type"]
     now_local = now.astimezone(tz)
