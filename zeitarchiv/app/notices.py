@@ -581,7 +581,7 @@ def build_notices(
         })
 
     # Grundlage ist ausschließlich der ohnehin vorhandene Cache (der
-    # Wartungsplaner füllt ihn, eine Entität je Takt) — die Meldung rechnet
+    # Wartungsplaner füllt ihn, je Takt im Zeitbudget) — die Meldung rechnet
     # nichts nach und kostet damit einen SELECT. Genau EINE Meldung für die
     # ganze Installation, egal ob eine oder hundert Entitäten betroffen sind:
     # das Meldungs-Center trägt Titel, zwei Sätze und einen Link, hundert

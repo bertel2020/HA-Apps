@@ -6,7 +6,7 @@ selbst, sondern dass sie DIESELBEN Zahlen zeigt wie das Schwellenfeld der
 jeweiligen Entität — zwei Stellen mit zwei verschieden gemessenen
 „Markierungsquoten" wären genau die Verwirrung, die eine Übersicht auflösen
 soll. Deshalb rechnet hier nichts nach; gefüllt wird der Cache vom
-Wartungsplaner, eine Entität je Takt.
+Wartungsplaner, je Takt im Zeitbudget.
 """
 
 from __future__ import annotations
@@ -285,8 +285,8 @@ def test_the_scheduler_actually_runs_this_step() -> None:
     import app.background as background
 
     quelle = _Path(background.__file__).read_text(encoding="utf-8")
-    assert "self._refresh_one_outlier_rate()" in quelle
-    assert "next_entity_for_outlier_rate" in quelle
+    assert "self._refresh_due_outlier_rates()" in quelle
+    assert "due_entities_for_outlier_rate" in quelle
 
 
 # --- Die Seite selbst --------------------------------------------------------
@@ -353,3 +353,88 @@ def test_eintraege_ohne_tageszahlen_werden_neu_gemessen(index):
     index.set_first_ts_and_add_rows("sensor.pytest_ohne_tage", 1_700_000_000.0, 0)
     index.set_cleanup_alltime_stats("sensor.pytest_ohne_tage", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="15")
     assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.pytest_ohne_tage"
+
+
+# --- Nur bei Bedarf messen, im Zeitbudget ------------------------------------
+
+
+def test_eine_stille_entitaet_wird_nicht_neu_gemessen(index):
+    """Ohne neue Werte ergäbe ein Vollscan dieselben Zahlen — bei vielen
+    Konfigurationswerten wäre das die meiste Arbeit des Planers."""
+    _entity(index, "sensor.still", markiert=5, gesamt=1000,
+            alter=cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS + 3600)
+    index.set_first_ts_and_add_rows("sensor.still", 1_700_000_000.0, 0)
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
+
+
+def test_neue_werte_machen_eine_alte_messung_faellig(index):
+    _entity(index, "sensor.aktiv", markiert=5, gesamt=1000,
+            alter=cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS + 3600)
+    index.record_write("sensor.aktiv", time.time())
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.aktiv"
+
+
+def test_neue_werte_allein_genuegen_nicht_vor_ablauf_der_altersgrenze(index):
+    _entity(index, "sensor.frisch_aktiv", markiert=5, gesamt=1000, alter=60)
+    index.record_write("sensor.frisch_aktiv", time.time())
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
+
+
+def test_ein_zurueckgesetzter_eintrag_ist_auch_ohne_neue_werte_faellig(index):
+    """Duplikate entfernen und „Rückgängig“ setzen computed_at auf 0 und
+    verlassen sich darauf, dass der Planer neu misst."""
+    _entity(index, "sensor.zurueckgesetzt", markiert=5, gesamt=1000)
+    index.set_first_ts_and_add_rows("sensor.zurueckgesetzt", 1_700_000_000.0, 0)
+    eintrag = index.get_cleanup_alltime_stats("sensor.zurueckgesetzt")
+    eintrag["computed_at"] = 0
+    index.set_setting("cleanup_alltime_stats:sensor.zurueckgesetzt", json.dumps(eintrag))
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.zurueckgesetzt"
+
+
+def test_faellige_entitaeten_kommen_nie_gemessene_zuerst_dann_die_aeltesten(index):
+    alt = cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS
+    _entity(index, "sensor.juenger", markiert=5, gesamt=1000, alter=alt + 60)
+    _entity(index, "sensor.aelter", markiert=5, gesamt=1000, alter=alt + 3600)
+    _entity(index, "sensor.nie")
+    for eid in ("sensor.juenger", "sensor.aelter", "sensor.nie"):
+        index.record_write(eid, time.time())
+    reihenfolge = [e["entity_id"] for e in cleanup_stats.due_entities_for_outlier_rate(index, time.time())]
+    assert reihenfolge == ["sensor.nie", "sensor.aelter", "sensor.juenger"]
+
+
+def _planer_mit(index, faellige, monkeypatch, *, budget, dauer):
+    """BackgroundService-Rumpf, der nur _refresh_due_outlier_rates braucht;
+    jede „Messung“ kostet `dauer` Sekunden auf der (gefälschten) Uhr."""
+    import threading
+
+    import app.background as background
+
+    uhr = {"jetzt": 1000.0}
+    gemessen: list[str] = []
+    monkeypatch.setattr(background.time, "monotonic", lambda: uhr["jetzt"])
+    monkeypatch.setattr(cleanup_stats, "OUTLIER_RATE_TICK_BUDGET_SECONDS", budget)
+    monkeypatch.setattr(cleanup_stats, "due_entities_for_outlier_rate", lambda _i, _n: faellige)
+
+    def messen(_d, _i, _tz, entity, _now, force=False):
+        gemessen.append(entity["entity_id"])
+        uhr["jetzt"] += dauer
+
+    monkeypatch.setattr(cleanup_stats, "alltime_counts", messen)
+    dienst = background.BackgroundService.__new__(background.BackgroundService)
+    dienst.index, dienst.data_dir, dienst.tz = index, Path("."), TZ
+    dienst._maintenance_scheduler_stop = threading.Event()
+    return dienst, gemessen
+
+
+def test_der_takt_misst_bis_das_zeitbudget_verbraucht_ist(index, monkeypatch):
+    faellige = [{"entity_id": f"sensor.e{i}"} for i in range(10)]
+    dienst, gemessen = _planer_mit(index, faellige, monkeypatch, budget=10.0, dauer=3.0)
+    dienst._refresh_due_outlier_rates()
+    assert gemessen == ["sensor.e0", "sensor.e1", "sensor.e2", "sensor.e3"]  # nach 12 s Schluss
+
+
+def test_der_takt_misst_mindestens_eine_entitaet_auch_wenn_sie_das_budget_sprengt(index, monkeypatch):
+    faellige = [{"entity_id": "sensor.gross"}, {"entity_id": "sensor.zweite"}]
+    dienst, gemessen = _planer_mit(index, faellige, monkeypatch, budget=10.0, dauer=60.0)
+    dienst._refresh_due_outlier_rates()
+    assert gemessen == ["sensor.gross"]

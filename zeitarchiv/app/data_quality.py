@@ -2,7 +2,7 @@
 
 Alle drei Spalten zählen die GESAMTE Historie und kommen aus demselben Cache wie
 die Trefferzahlen der Bereinigungsseite (``cleanup_alltime_stats``, je Entität
-im Hintergrund erneuert, siehe cleanup_stats.next_entity_for_outlier_rate).
+im Hintergrund erneuert, siehe cleanup_stats.due_entities_for_outlier_rate).
 Die Matrix rechnet nichts nach und liest keine Rohdaten: dieselbe Zahl steht
 damit hier und im Filter-Dropdown der Bereinigungsseite bei "Gesamt". Zwei
 verschieden gemessene Zahlen für dasselbe wären genau die Verwirrung, die eine

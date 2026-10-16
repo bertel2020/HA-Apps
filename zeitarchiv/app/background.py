@@ -970,25 +970,29 @@ class BackgroundService:
             cleanup.scan_counter_decreases(self.data_dir, self.index, self.tz)
         )
 
-    def _refresh_one_outlier_rate(self) -> None:
-        """Erneuert die Gesamt-Zählung EINER Entität je Takt — Grundlage für
-        Housekeeping → Ausreißer und die zugehörige Meldung.
+    def _refresh_due_outlier_rates(self) -> None:
+        """Erneuert die Gesamt-Zählung fälliger Entitäten — Grundlage für
+        Housekeeping → Ausreißer, die Datenqualität und die zugehörige Meldung.
 
         Die Liste dort zeigt genau die Zahlen, die auch am Schwellenfeld der
         Entität stehen. Ohne diesen Lauf stünden dort nur die Entitäten, deren
         Bereinigungsseite jemand von Hand geöffnet hat — also fast keine, und
         eine leere Liste sähe aus wie "alles in Ordnung".
 
-        Bewusst nur eine Entität: ein kompletter Durchgang kostete an der
-        Testinstallation 37 s, verteilt auf 30-Sekunden-Takte fällt das nicht
-        auf. Welche als Nächste drankommt, entscheidet cleanup_stats (nie
-        gemessene zuerst)."""
-        entity = cleanup_stats.next_entity_for_outlier_rate(self.index, time.time())
-        if entity is None:
-            return
-        cleanup_stats.alltime_counts(
-            self.data_dir, self.index, self.tz, entity, datetime.now(self.tz), force=True
-        )
+        Je Takt nur so lange, wie das Zeitbudget reicht (mindestens eine
+        Entität): ein kompletter Durchgang kostete an der Testinstallation 37 s.
+        Welche drankommen und in welcher Reihenfolge, entscheidet cleanup_stats
+        (nie gemessene zuerst, dann nur Entitäten mit neuen Werten)."""
+        begonnen = time.monotonic()
+        for entity in cleanup_stats.due_entities_for_outlier_rate(self.index, time.time()):
+            cleanup_stats.alltime_counts(
+                self.data_dir, self.index, self.tz, entity, datetime.now(self.tz), force=True
+            )
+            if (
+                time.monotonic() - begonnen >= cleanup_stats.OUTLIER_RATE_TICK_BUDGET_SECONDS
+                or self._maintenance_scheduler_stop.is_set()
+            ):
+                return
 
     def _flush_stale_resolution_windows(self, now: datetime) -> None:
         """Sicherheitsnetz für die Standard-Live-Auflösung (resolution.py):
@@ -1189,7 +1193,7 @@ class BackgroundService:
                 with self._maintenance_step("counter_auto_mark"):
                     counter_auto.run_if_due(self.data_dir, self.index, self.tz, self.coordinator.entity)
                 with self._maintenance_step("outlier_rate"):
-                    self._refresh_one_outlier_rate()
+                    self._refresh_due_outlier_rates()
                 with self._maintenance_step("stale_entity_count"):
                     self._refresh_stale_entity_count()
                 with self._maintenance_step("host_disk_usage"):
