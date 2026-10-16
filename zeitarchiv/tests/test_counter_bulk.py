@@ -158,5 +158,6 @@ def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
         assert "Vermutlich Fehlwert" in html
         assert "Stand danach wieder bei" in html
         assert 'class="flag-note"' in html
+        assert 'class="flag-badge verdict-returns"' in html
     finally:
         index.set_counter_decrease_snapshot([])

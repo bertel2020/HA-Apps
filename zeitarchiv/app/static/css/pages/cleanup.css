@@ -501,6 +501,11 @@
 
 /* Begründung zum Urteil eines Zählerrückgangs: am Desktop im Tooltip des Etiketts, auf dem
    Telefon (kein Hover) als ruhige Zeile darunter. */
+/* Zählerrückgang mit Einordnung: wie die Urteile in Housekeeping (.counter-verdict) gefärbt.
+   Ein planmäßiger Reset ist kein Alarm, deshalb nicht rot; „Noch offen“ ist neutral. */
+.flag-badge.verdict-returns{background:var(--warning-soft);color:var(--notice-warn);}
+.flag-badge.verdict-stays{background:var(--accent-line-soft);color:var(--accent-line);}
+.flag-badge.verdict-open{background:var(--surface-alt);color:var(--ink-muted);}
 .flag-note{display:none;color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));margin-top:3px;}
 @media (max-width:640px){
   .flag-note{display:block;}

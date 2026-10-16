@@ -218,7 +218,7 @@
       <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
-        {% for flag in row.flags %}{% set verdict = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}<span class="flag-badge" data-tooltip="{{ flag.reason }}{% if verdict %} {{ verdict.note }}{% endif %}">{{ flag.label }}{% if verdict %} · {{ _("Vermutlich Fehlwert") if verdict.returns else (_("Vermutlich Reset") if verdict.returns is false else _("Noch offen")) }}{% endif %}</span>{% if verdict %}<span class="flag-note">{{ verdict.note }}</span>{% endif %}{% endfor %}
+        {% for flag in row.flags %}{% set verdict = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}<span class="flag-badge{% if verdict %} {{ 'verdict-returns' if verdict.returns else ('verdict-stays' if verdict.returns is false else 'verdict-open') }}{% endif %}" data-tooltip="{{ flag.reason }}{% if verdict %} {{ verdict.note }}{% endif %}">{{ flag.label }}{% if verdict %} · {{ _("Vermutlich Fehlwert") if verdict.returns else (_("Vermutlich Reset") if verdict.returns is false else _("Noch offen")) }}{% endif %}</span>{% if verdict %}<span class="flag-note">{{ verdict.note }}</span>{% endif %}{% endfor %}
         {% if not row.flags %}&mdash;{% endif %}
       </td>
     </tr>
