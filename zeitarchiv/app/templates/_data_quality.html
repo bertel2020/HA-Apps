@@ -38,9 +38,6 @@
     </span>
     <input type="hidden" name="dir" value="{{ dq_state.dir }}">
     <input type="hidden" name="page_size" value="{{ dq_state.page_size }}">
-    {% if dq.ignored_count or dq.show_ignored %}
-    <label class="dq-show-ignored"><input type="checkbox" name="ignored" value="1" {% if dq.show_ignored %}checked{% endif %} onchange="this.form.submit()"> {{ _("Ignorierte anzeigen ({n})", n=dq.ignored_count) }}</label>
-    {% endif %}
   </form>
 </div>
 {# Die Heatmap-Ansicht (Umschalter, Filter) ist vorerst aus der Seite genommen, siehe ROADMAP.md;
@@ -48,7 +45,7 @@
 {% if is_heat %}
 {% include "_data_quality_heatmap.html" %}
 {% else %}
-{% set dup_ids = (dq.rows | selectattr('removable_duplicates') | map(attribute='entity_id') | list) if period == 'all' else [] %}
+{% set dup_ids = (dq.rows | selectattr('cells.duplicates') | map(attribute='entity_id') | list) if period == 'all' else [] %}
 <div x-data="{ selected: [] }">
 <form id="dq-bulk-form" hx-post="{{ app_root }}/housekeeping/datenqualitaet/duplicates/preview"
       hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
@@ -70,12 +67,12 @@
     {% for row in dq.rows %}
     <tbody class="dq-entity" x-data="{ open: false }">
       <tr class="dq-row" :class="{ 'is-open': open }" tabindex="0"
-          hx-get="{{ app_root }}/entities/{{ row.entity_id }}/data-quality?types={{ row.types }}" hx-trigger="click once, keydown[key=='Enter'] once"
+          hx-get="{{ app_root }}/entities/{{ row.entity_id }}/data-quality" hx-trigger="click once, keydown[key=='Enter'] once"
           hx-target="#dq-detail-{{ loop.index }}" hx-swap="innerHTML"
           @click="open = !open" @keydown.enter="open = !open">
         <td class="entity">
           <div class="dq-entity-cell">
-            {% if row.removable_duplicates and period == 'all' %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
+            {% if row.cells.duplicates and period == 'all' %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
             <span class="dq-caret" aria-hidden="true">▸</span>
             <div class="dq-entity-text">
               <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
@@ -84,7 +81,7 @@
         </td>
         {% for col in dq.columns %}
         {% set cell = row.cells[col.key] %}
-        <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}{% if cell.ignored %} is-ignored{% endif %}"{% if cell.ignored %} title="{{ _('Ignoriert: zählt in den Summen nicht mit') }}"{% endif %} href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
+        <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
         {% endfor %}
       </tr>
       <tr class="dq-detail" x-show="open" x-cloak>

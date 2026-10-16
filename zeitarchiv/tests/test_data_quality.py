@@ -467,31 +467,6 @@ def test_sammel_rueckgaengig_stellt_wieder_her_und_verwirft_die_zahlen(daten):
     assert "daily" not in eintrag
 
 
-def test_ignorierte_befunde_zaehlen_nicht_mit_und_lassen_sich_anzeigen(index):
-    _mit_tageszahlen(index, "sensor.a", {}, duplicates=5, gaps=2)
-    _mit_tageszahlen(index, "sensor.b", {}, duplicates=3)
-
-    voll = data_quality.build_matrix(index)
-    assert voll["totals"]["duplicates"]["count"] == 8 and voll["affected"] == 2 and voll["ignored_count"] == 0
-
-    data_quality.set_ignored(index, "sensor.b", "duplicates", True)
-    data_quality.set_ignored(index, "sensor.a", "quatsch", True)  # unbekannter Typ wird verworfen
-    ohne = data_quality.build_matrix(index)
-    assert ohne["totals"]["duplicates"]["count"] == 5
-    assert ohne["affected"] == 1 and [r["entity_id"] for r in ohne["rows"]] == ["sensor.a"]
-    assert ohne["ignored_count"] == 1
-
-    mit = data_quality.build_matrix(index, show_ignored=True)
-    assert mit["totals"]["duplicates"]["count"] == 5 and mit["affected"] == 1  # zählt weiter nicht mit
-    zeile = next(r for r in mit["rows"] if r["entity_id"] == "sensor.b")
-    assert zeile["cells"]["duplicates"]["ignored"] is True and zeile["total"] == 0
-    assert zeile["removable_duplicates"] is False
-
-    data_quality.set_ignored(index, "sensor.b", "duplicates", False)
-    assert data_quality.build_matrix(index)["totals"]["duplicates"]["count"] == 8
-    assert data_quality.load_ignored(index) == {}
-
-
 def test_suche_filter_und_sortierung_der_matrix(index):
     _entity(index, "sensor.alpha", name="Zebra")
     _mit_tageszahlen(index, "sensor.alpha", {}, duplicates=1, gaps=9)
@@ -511,10 +486,6 @@ def test_suche_filter_und_sortierung_der_matrix(index):
     assert ids(q="ZEB") == ["sensor.alpha"]  # Name, ohne Groß-/Kleinschreibung
     assert ids(q="sensor.gam") == ["sensor.gamma"]  # Entity-ID
     assert ids(sort="quatsch", kind="quatsch") == ids()  # Unbekanntes fällt auf den Standard zurück
-
-    data_quality.set_ignored(index, "sensor.gamma", "gaps", True)
-    zeilen = data_quality.build_matrix(index, show_ignored=True)["rows"]
-    assert ids(kind="gaps") == ["sensor.alpha"]  # ignorierte Zellen zählen im Filter nicht
 
 
 def test_hinweis_auf_neue_befunde_seit_dem_letzten_besuch(index):
