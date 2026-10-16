@@ -82,7 +82,7 @@
               <td class="cd-num" data-sort="{{ row.count }}">{{ row.count_label }}</td>
               <td data-sort="{{ row.last_ts }}">{{ row.last_label }}{% if row.change %}<div class="counter-note">{{ row.change }}</div>{% endif %}</td>
               {# Die Einordnung nennt die Deutung („Vermutlich …“), die Begründung steht in jedem Fall sichtbar darunter. #}
-              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}">{% if row.verdict == 'returns' %}{{ _("Vermutlich Fehlwert") }}{% elif row.verdict == 'stays' %}{{ _("Vermutlich Reset oder Zählertausch") }}{% else %}{{ _("Noch offen") }}{% endif %}</span>{% endif %}<div class="counter-note">{{ row.note }}</div>{% if row.verdict == 'stays' %}<button type="button" class="counter-allow-link" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
+              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}">{% if row.verdict == 'returns' %}{{ _("Vermutlich Fehlwert") }}{% elif row.verdict == 'stays' %}{{ _("Vermutlich Reset") }}{% else %}{{ _("Noch offen") }}{% endif %}</span>{% endif %}<div class="counter-note">{{ row.note }}</div>{% if row.verdict == 'stays' %}<button type="button" class="counter-allow-link" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
                       hx-target="#counter-decreases" hx-swap="innerHTML" title="{{ _('Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden') }}">{{ _("Rückgänge erlauben") }}</button>{% endif %}</td>
             </tr>
             {% endfor %}

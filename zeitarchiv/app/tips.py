@@ -172,7 +172,7 @@ TIPS = [
     {
         "slug": "zaehlerrueckgaenge",
         "title": N_("Tipp: Zählerrückgänge werden gemeldet"),
-        "detail": N_("Sinkt ein Zählerstand, meldet das Meldungs-Center es und ordnet es ein: „Vermutlich Fehlwert“ heißt: der Stand kehrt zurück, „Vermutlich Reset oder Zählertausch“: er bleibt niedrig. Housekeeping → Zählerrückgänge listet alle Fälle."),
+        "detail": N_("Sinkt ein Zählerstand, meldet das Meldungs-Center es und ordnet es ein: „Vermutlich Fehlwert“ heißt: der Stand kehrt zurück, „Vermutlich Reset“: er bleibt niedrig. Housekeeping → Zählerrückgänge listet alle Fälle."),
         "meta": N_("Bereinigung"),
         "link": "/housekeeping#zaehlerrueckgaenge",
     },

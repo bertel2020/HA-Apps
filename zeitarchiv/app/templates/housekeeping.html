@@ -111,7 +111,7 @@
 
       <section id="zaehlerrueckgaenge" class="settings-section">
         <h2 class="settings-section-title">{{ _("Zählerrückgänge") }} {{ hint_button(_('Zählerrückgänge')) }}</h2>
-        {% call hint_body('settings-section-description') %}{{ _("Zähler, deren Stand in den letzten 30 Tagen gefallen ist. „Vermutlich Fehlwert“ heißt: ein Folgewert erreicht den Vorwert innerhalb von 30 Minuten oder 10 Werten wieder. „Vermutlich Reset oder Zählertausch“ heißt: der Stand blieb danach niedrig. Das ist nur eine Einschätzung, gelöscht wird nichts. Die Bereinigungs-Seite der Entität markiert die Rückgänge.") }}{% endcall %}
+        {% call hint_body('settings-section-description') %}{{ _("Zähler, deren Stand in den letzten 30 Tagen gefallen ist. „Vermutlich Fehlwert“ heißt: ein Folgewert erreicht den Vorwert innerhalb von 30 Minuten oder 10 Werten wieder. „Vermutlich Reset“ heißt: der Stand blieb danach niedrig, der Zähler wurde also zurückgesetzt oder getauscht. Das ist nur eine Einschätzung, gelöscht wird nichts. Die Bereinigungs-Seite der Entität markiert die Rückgänge.") }}{% endcall %}
         <div id="counter-decreases">{% include "_counter_decreases.html" %}</div>
       </section>
 

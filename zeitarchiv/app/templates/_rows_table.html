@@ -213,7 +213,7 @@
       <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
-        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}{% if flag.label == _("Zählerrückgang") and counter_verdicts_map and row.ts in counter_verdicts_map %} · {{ _("Vermutlich Fehlwert") if counter_verdicts_map[row.ts] else _("Vermutlich Reset oder Zählertausch") }}{% endif %}</span>{% endfor %}
+        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}{% if flag.label == _("Zählerrückgang") and counter_verdicts_map and row.ts in counter_verdicts_map %} · {{ _("Vermutlich Fehlwert") if counter_verdicts_map[row.ts] else _("Vermutlich Reset") }}{% endif %}</span>{% endfor %}
         {% if not row.flags %}&mdash;{% endif %}
       </td>
     </tr>

@@ -197,13 +197,13 @@
 .counter-verdict.stays{background:var(--accent-line-soft);color:var(--accent-line);}
 .counter-verdict.rule{background:var(--positive-soft, var(--surface-alt));color:var(--positive);margin-left:6px;}
 .counter-note{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin-top:2px;}
-/* „Rückgänge erlauben“: Textlink unter der Begründung, nur bei „Vermutlich Reset oder Zählertausch“. */
+/* „Rückgänge erlauben“: Textlink unter der Begründung, nur bei „Vermutlich Reset“. */
 .counter-allow-link{font:inherit;font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);background:none;border:0;padding:0;margin-top:5px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 /* Zählerrückgänge: Spalten wie bei den übrigen Tabellen dieser Seite — feste Breiten auf den Wertspalten,
    die Entität bekommt den Rest. Die Karte ist auf dem Desktop rund 860px breit; die Breiten sind so gewählt,
    dass dann noch gut 220px für Name und ID bleiben. Werte und Einheiten sind durch geschützte Leerzeichen
    zusammengehalten (housekeeping_routes.py), umbrochen wird nur am Pfeil bzw. zwischen den Sätzen.
-   Gemessen: Rückgänge 100 (Kopf), Einordnung 290 (Etikett „Vermutlich Reset oder Zählertausch“ in einer Zeile, Aktion als Link darunter). */
+   Gemessen: Rückgänge 100 (Kopf), Einordnung 290 (Hinweistext und Aktion als Link unter dem Etikett). */
 #zaehlerrueckgaenge table.stats-dt{min-width:780px;}
 .hk-col-cd-count{width:100px;}
 .hk-col-cd-last{width:168px;}
