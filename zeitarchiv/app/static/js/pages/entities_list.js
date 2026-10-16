@@ -235,7 +235,7 @@
       const blocking = id => (usages[id] || []).filter(u => !u.auto_cleaned);
       const attention = ids.filter(id => blocking(id).length);
 
-      tpl.content.appendChild(el('p', t('{n} Entitäten endgültig löschen?', {n: ids.length}), 'del-head'));
+      tpl.content.appendChild(el('p', ids.length === 1 ? t('{n} Entität endgültig löschen?', {n: 1}) : t('{n} Entitäten endgültig löschen?', {n: ids.length}), 'del-head'));
       tpl.content.appendChild(el('p', t('Mit allen Werten und ihrer Konfiguration. Das kann nicht rückgängig gemacht werden.'), 'del-sub'));
       if (attention.length) {
         tpl.content.appendChild(el('p', '⚠ ' + t('Noch in Verwendung ({n}). Diese Stellen zeigen danach ins Leere:', {n: attention.length}), 'del-warn'));
@@ -359,7 +359,7 @@
         }
         const confirmed = await window.appConfirm('', {
           danger: true,
-          confirmLabel: t('{n} Entitäten endgültig löschen', {n: ids.length}),
+          confirmLabel: ids.length === 1 ? t('{n} Entität endgültig löschen', {n: 1}) : t('{n} Entitäten endgültig löschen', {n: ids.length}),
           template: buildDeleteConfirmTemplate(ids, check.usages || {}, backupInfo),
           onConfirm: runBackupIfWanted,
         });

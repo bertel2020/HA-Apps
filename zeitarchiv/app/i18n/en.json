@@ -2986,6 +2986,8 @@
     "Der Stand des Backups konnte nicht abgefragt werden. Es wurde nichts gelöscht.": "The backup status could not be retrieved. Nothing was deleted.",
     "Das Backup ist fehlgeschlagen. Es wurde nichts gelöscht.": "The backup failed. Nothing was deleted.",
     "Backup läuft … {n} %": "Backup running … {n} %",
-    "Gelöscht wird erst, wenn das Backup fertig ist.": "Nothing is deleted until the backup has finished."
+    "Gelöscht wird erst, wenn das Backup fertig ist.": "Nothing is deleted until the backup has finished.",
+    "{n} Entität endgültig löschen": "Permanently delete {n} entity",
+    "{n} Entität endgültig löschen?": "Permanently delete {n} entity?"
   }
 }
