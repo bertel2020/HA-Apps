@@ -206,18 +206,3 @@ def test_ansicht_behaelt_suche_filter_und_sortierung_in_den_links(client) -> Non
     # Standardwerte tauchen nicht in den Links auf
     standard = client.get("/housekeeping/datenqualitaet").text
     assert "sort=total" not in standard and "kind=all" not in standard
-
-
-def test_detail_der_zaehlerrueckgaenge_verweist_auf_die_buendelung_in_housekeeping(client, monkeypatch) -> None:
-    from app import data_quality
-    from app.main import index
-
-    _entity(index, "sensor.pytest_dq_zaehler")
-    gruppe = {
-        "key": "counter_decreases", "severity": "crit", "total": 3, "total_label": "3", "shown": 1,
-        "href": "entities/sensor.pytest_dq_zaehler/cleanup?filter=counter_decreases&range=all",
-        "rows": [{"ts_label": "01.10.", "value_label": "5", "reasons": ["Rückgang"]}],
-    }
-    monkeypatch.setattr(data_quality, "findings_for_entity", lambda *a, **k: [gruppe, {**gruppe, "key": "gaps"}])
-    html = client.get("/entities/sensor.pytest_dq_zaehler/data-quality").text
-    assert html.count("/housekeeping#zaehlerrueckgaenge") == 1  # nur bei Zählerrückgängen, nicht bei Lücken

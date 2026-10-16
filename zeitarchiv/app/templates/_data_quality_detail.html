@@ -6,9 +6,6 @@
     <span class="dq-pill {{ group.severity }}">{{ labels[group.key] }}</span>
     <span class="dq-group-count">{{ _("{shown} von {total}", shown=group.shown, total=group.total_label) }}</span>
     <a class="btn btn-sm dq-open" href="{{ app_root }}/{{ group.href }}">{{ _("In der Bereinigung öffnen") }}</a>
-    {% if group.key == 'counter_decreases' %}
-    <a class="btn btn-sm dq-open" href="{{ app_root }}/housekeeping#zaehlerrueckgaenge" title="{{ _('Housekeeping bündelt die Zählerrückgänge der letzten 30 Tage und markiert oder entfernt sie gemeinsam.') }}">{{ _("In Housekeeping bündeln") }}</a>
-    {% endif %}
   </div>
   <div class="dq-findings">
     {% for row in group.rows %}
