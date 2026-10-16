@@ -227,8 +227,17 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
     }
 
 
-def build_matrix(index: Index) -> dict:
+# Zeitraum der Matrix: Schlüssel -> Tage (None = gesamte Historie). "all" ist der Standard.
+PERIODS: dict[str, int | None] = {"all": None, "year": 365, "30d": 30, "7d": 7}
+DEFAULT_PERIOD = "all"
+
+
+def build_matrix(index: Index, *, period: str = DEFAULT_PERIOD, today: date | None = None) -> dict:
     """Matrix Entität × Befundtyp, absteigend nach der Summe der Befunde.
+
+    ``period``: "all" zählt die gesamte Historie aus ``counts``; die übrigen Zeiträume
+    summieren die Tageszähler ``daily`` der letzten Tage (einschließlich heute). Entitäten
+    ohne ``daily`` sind dort noch nicht gemessen (``pending``), wie in build_heatmap.
 
     - ``rows``: nur Entitäten mit mindestens einem Befund; je Zeile ``cells``
       (je Spalte ``count``/``label``/``href``, oder None ohne Befund) und ``total``
@@ -239,6 +248,12 @@ def build_matrix(index: Index) -> dict:
       zu einer anderen Schwelle). Ohne sie sähe "nichts gefunden" wie "noch nicht
       gemessen" aus.
     """
+    if period not in PERIODS:
+        period = DEFAULT_PERIOD
+    window_days = PERIODS[period]
+    window_start = (
+        ((today or date.today()) - timedelta(days=window_days - 1)).isoformat() if window_days else None
+    )
     entries = index.list_cleanup_alltime_stats()
     rates, _ = cleanup_stats.outlier_rates_measured(index)
     measured_outliers = {r["entity_id"]: r["marked"] for r in rates}
@@ -262,16 +277,33 @@ def build_matrix(index: Index) -> dict:
             entity["aggregation_type"], entity["outlier_threshold"]
         ) != "off"
         gaps_ok = cleanup_stats.gaps_measured(entity, entry)
-        if entry is None or (outliers_on and entity_id not in measured_outliers) or not gaps_ok:
+        if (
+            entry is None or (outliers_on and entity_id not in measured_outliers) or not gaps_ok
+            or (window_start and "daily" not in entry)
+        ):
             pending += 1
-        if entry is not None:
-            entry_counts = entry.get("counts") or {}
-            counts["duplicates"][entity_id] = entry_counts.get("duplicates") or 0
-            counts["counter_decreases"][entity_id] = entry_counts.get("counter_decreases") or 0
-            if gaps_ok:
-                counts["gaps"][entity_id] = entry_counts.get("gaps") or 0
-        if entity_id in measured_outliers:
-            counts["outliers"][entity_id] = measured_outliers[entity_id]
+        if entry is not None and window_start is not None:
+            if "daily" in entry:
+                window = {key: 0 for key in counts}
+                for day, per_day in entry["daily"].items():
+                    if day >= window_start:
+                        for key in window:
+                            window[key] += per_day.get(key, 0)
+                counts["duplicates"][entity_id] = window["duplicates"]
+                counts["counter_decreases"][entity_id] = window["counter_decreases"]
+                if gaps_ok:
+                    counts["gaps"][entity_id] = window["gaps"]
+                if entity_id in measured_outliers:
+                    counts["outliers"][entity_id] = window["outliers"]
+        else:
+            if entry is not None:
+                entry_counts = entry.get("counts") or {}
+                counts["duplicates"][entity_id] = entry_counts.get("duplicates") or 0
+                counts["counter_decreases"][entity_id] = entry_counts.get("counter_decreases") or 0
+                if gaps_ok:
+                    counts["gaps"][entity_id] = entry_counts.get("gaps") or 0
+            if entity_id in measured_outliers:
+                counts["outliers"][entity_id] = measured_outliers[entity_id]
 
     entity_ids = {eid for column in counts.values() for eid, n in column.items() if n}
     rows = []
@@ -308,6 +340,7 @@ def build_matrix(index: Index) -> dict:
         "affected_label": format_int(len(rows)),
         "entity_count": len(names),
         "pending": pending,
+        "period": period,
     }
 
 

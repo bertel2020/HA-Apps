@@ -66,11 +66,21 @@ span.dq-check{display:inline-block;}
 .dq-bulk-text strong{color:var(--ink);}
 .dq-bulk-list{max-height:240px;overflow-y:auto;margin-bottom:12px;}
 
-/* Umschalter Tabelle/Heatmap und Filter der Heatmap */
+/* Zeitraum-Auswahl (und der vorerst nicht eingebundene Umschalter der Heatmap) */
 .dq-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .dq-views{display:inline-flex;gap:6px;}
 .dq-views .btn.is-active{background:var(--accent-line-soft);color:var(--accent-line);border-color:var(--accent-line);}
-.dq-filters{display:flex;flex-wrap:wrap;gap:8px;}
+.dq-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.dq-filters label{font-family:var(--font-mono);font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);}
+.dq-filters select{
+  font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));padding:5px 8px;
+  border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--ink);cursor:pointer;
+  -webkit-appearance:none;appearance:none;padding-right:26px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%238a93a6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E")!important;
+  /* !important: die globale select-Regel in app.css setzt background samt Bild zurück */
+  background-repeat:no-repeat!important;background-position:right 9px center!important;
+}
+.dq-filters select:hover{border-color:var(--accent-line);}
 
 /* Heatmap Entität × Tag (_data_quality_heatmap.html); die Tabelle scrollt in ihrem Rahmen */
 .dq-heat-wrap{overflow-x:auto;}

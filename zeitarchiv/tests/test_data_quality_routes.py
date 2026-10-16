@@ -163,3 +163,25 @@ def test_tabelle_bietet_auswahl_nur_bei_duplikaten(client) -> None:
     assert 'name="entity_id" value="sensor.pytest_dq_mit"' in html
     assert 'name="entity_id" value="sensor.pytest_dq_ohne"' not in html
     assert 'id="dq-bulk-panel"' in html
+
+
+def test_zeitraum_auswahl_standard_gesamt_und_ohne_sammelaktion_im_fenster(client) -> None:
+    from app.main import index
+
+    _mit_duplikaten(index, "sensor.pytest_dq_zeitraum")
+    html = client.get("/housekeeping/datenqualitaet").text
+    assert re.search(r'<option value="all"\s+selected>', html)
+    assert 'class="dq-check" name="entity_id"' in html
+    fenster = client.get("/housekeeping/datenqualitaet?period=7d").text
+    assert re.search(r'<option value="7d"\s+selected>', fenster)
+    assert 'name="entity_id"' not in fenster  # Entfernen gilt für die ganze Historie
+
+
+def test_alle_auswaehlen_liefert_gueltiges_attribut(client) -> None:
+    from app.main import index
+
+    _mit_duplikaten(index, "sensor.pytest_dq_alle")
+    html = client.get("/housekeeping/datenqualitaet").text
+    # tojson maskiert keine doppelten Anführungszeichen: das Attribut muss in einfachen stehen,
+    # sonst bricht die Entitätsliste es auf und die Kopf-Checkbox tut nichts.
+    assert "@change='selected = $event.target.checked ? [" in html

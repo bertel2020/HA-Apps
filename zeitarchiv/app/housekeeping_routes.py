@@ -1298,12 +1298,15 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.get("/housekeeping/datenqualitaet", response_class=HTMLResponse)
     def data_quality_view(
         request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE,
+        period: str = data_quality.DEFAULT_PERIOD,
     ) -> HTMLResponse:
         """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
         (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
         mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
         liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
-        matrix = data_quality.build_matrix(deps.index)
+        matrix = data_quality.build_matrix(
+            deps.index, period=period, today=datetime.now(deps.tz).date()
+        )
         # Die Heatmap-Ansicht (data_quality.build_heatmap, _data_quality_heatmap.html) ist vorerst
         # aus der Oberfläche genommen, siehe ROADMAP.md; Dienst und Vorlage bleiben bestehen.
         matrix["rows"], pagination = data_quality.paginate(matrix["rows"], page, page_size)

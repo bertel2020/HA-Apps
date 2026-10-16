@@ -356,6 +356,29 @@ def test_heatmap_ungueltige_angaben_fallen_auf_standard(index):
     assert heatmap["days"] == data_quality.DEFAULT_HEATMAP_DAYS and heatmap["kind"] == "all"
 
 
+def test_zeitraum_der_matrix_summiert_die_tageszahlen(index):
+    from datetime import date
+
+    heute = date(2026, 10, 14)
+    _mit_tageszahlen(
+        index, "sensor.a",
+        {"2026-10-14": {"duplicates": 4}, "2026-10-05": {"duplicates": 2},
+         "2026-06-01": {"duplicates": 10}, "2020-01-01": {"duplicates": 100}},
+        duplicates=116,
+    )
+    _mit_tageszahlen(index, "sensor.alt", None, duplicates=5)  # nie mit Tageszahlen gemessen
+
+    def dup(period):
+        matrix = data_quality.build_matrix(index, period=period, today=heute)
+        return matrix["totals"]["duplicates"]["count"], matrix["pending"]
+
+    assert dup("all") == (121, 0)  # Standard: gesamte Historie aus den Gesamtzahlen
+    assert dup("year") == (16, 1)
+    assert dup("30d") == (6, 1)
+    assert dup("7d") == (4, 1)
+    assert data_quality.build_matrix(index, period="quatsch", today=heute)["period"] == "all"
+
+
 # --- Sammelaktion: Duplikate mehrerer Entitäten entfernen --------------------------------
 
 _TZ = ZoneInfo("Europe/Berlin")

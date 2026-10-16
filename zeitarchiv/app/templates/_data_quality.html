@@ -12,13 +12,25 @@
   {% endfor %}
 </div>
 {% set is_heat = view == 'heatmap' %}
-{% set extra = ('&amp;view=heatmap&amp;days=' ~ heatmap.days ~ '&amp;kind=' ~ heatmap.kind) if is_heat else '' %}
+{% set period = dq.period %}
+{% set extra = '&amp;period=' ~ period if period != 'all' else '' %}
+{% set period_labels = {'7d': _("7 Tage"), '30d': _("30 Tage"), 'year': _("1 Jahr"), 'all': _("Gesamt")} %}
+<div class="dq-toolbar">
+  <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+    <label for="dq-period">{{ _("Zeitraum") }}</label>
+    <select id="dq-period" name="period" onchange="this.form.submit()">
+      {% for key, label in period_labels.items() %}
+      <option value="{{ key }}" {% if period == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
 {# Die Heatmap-Ansicht (Umschalter, Filter) ist vorerst aus der Seite genommen, siehe ROADMAP.md;
    Vorlage, Dienst und Stile bleiben bestehen. #}
 {% if is_heat %}
 {% include "_data_quality_heatmap.html" %}
 {% else %}
-{% set dup_ids = dq.rows | selectattr('cells.duplicates') | map(attribute='entity_id') | list %}
+{% set dup_ids = (dq.rows | selectattr('cells.duplicates') | map(attribute='entity_id') | list) if period == 'all' else [] %}
 <div x-data="{ selected: [] }">
 <form id="dq-bulk-form" hx-post="{{ app_root }}/housekeeping/datenqualitaet/duplicates/preview"
       hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
@@ -32,7 +44,7 @@
   {% if dq.rows %}
   <table class="dt dq-table">
     <thead><tr>
-      <th>{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change="selected = $event.target.checked ? {{ dup_ids | tojson }} : []">{% endif %}{{ _("Entität") }}</th>
+      <th>{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% endif %}{{ _("Entität") }}</th>
       {% for col in dq.columns %}
       <th class="dq-num">{{ labels[col.key] }}</th>
       {% endfor %}
@@ -45,7 +57,7 @@
           @click="open = !open" @keydown.enter="open = !open">
         <td class="entity">
           <div class="dq-entity-cell">
-            {% if row.cells.duplicates %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
+            {% if row.cells.duplicates and period == 'all' %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
             <span class="dq-caret" aria-hidden="true">▸</span>
             <div class="dq-entity-text">
               <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
@@ -71,7 +83,7 @@
 {% endif %}
 {% if pagination and pagination.total > 10 %}
 <form class="pager dq-pager" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
-  {% if is_heat %}<input type="hidden" name="view" value="heatmap"><input type="hidden" name="days" value="{{ heatmap.days }}"><input type="hidden" name="kind" value="{{ heatmap.kind }}">{% endif %}
+  {% if period != 'all' %}<input type="hidden" name="period" value="{{ period }}">{% endif %}
   <div class="dq-pager-nav">
     <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
     {% set q = '?page_size=' ~ pagination.page_size ~ extra %}
