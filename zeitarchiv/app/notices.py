@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import cleanup_stats, counter_auto
+from . import cleanup_stats, counter_auto, data_quality
 from . import purge_auto
 from . import ha_integration
 from . import tips as tips_mod
@@ -770,6 +770,20 @@ def build_notices(
     counter_notice = counter_decrease_notice([row for row in counter_rows if row not in pattern_rows], tz)
     if counter_notice:
         notices.append(counter_notice)
+
+    new_quality = data_quality.new_findings(index)
+    if new_quality:
+        notices.append({
+            "id": "housekeeping.data_quality_new",
+            "severity": "info",
+            "title": tr("Neue Befunde in der Datenqualität"),
+            "detail": tr(
+                "{new} neue Befunde in {entities} Entität(en) seit dem letzten Besuch der Datenqualität.",
+                new=format_int(new_quality["new"]), entities=format_int(new_quality["entities"]),
+            ),
+            "meta": tr("Datenqualität"),
+            "link": "/housekeeping/datenqualitaet",
+        })
 
     if stale_entity_count:
         notices.append({

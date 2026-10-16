@@ -1606,6 +1606,8 @@
     "90 Tage": "90 days",
     "365 Tage": "365 days",
     "1 Jahr": "1 year",
+    "Neue Befunde in der Datenqualität": "New findings in data quality",
+    "{new} neue Befunde in {entities} Entität(en) seit dem letzten Besuch der Datenqualität.": "{new} new findings in {entities} entity(ies) since your last visit to data quality.",
     "Alle Befunde": "All findings",
     "Entität suchen": "Search entity",
     "Befund": "Finding",

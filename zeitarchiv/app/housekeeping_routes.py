@@ -1336,6 +1336,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             query = urlencode({k: v for k, v in merged.items() if v not in ("", None) and v != defaults.get(k)})
             return f"?{query}" if query else ""  # ohne Pfad: die Vorlage setzt app_root davor
 
+        # Besuch merken, bevor die Seite (samt Meldungen) gerendert wird: der Hinweis "neue Befunde
+        # seit dem letzten Besuch" soll auf dieser Seite selbst nicht mehr erscheinen.
+        data_quality.mark_seen(deps.index)
         return deps.templates.TemplateResponse(
             request, "data_quality.html",
             {

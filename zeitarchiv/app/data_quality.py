@@ -655,3 +655,65 @@ def undo_duplicate_removal(index: Index, entity_ids: list[str], entity_lock) -> 
             mark_stats_unknown(index, entity_id)
         restored += count
     return restored
+
+
+# --- Hinweis auf neue Befunde seit dem letzten Besuch ------------------------------------------
+
+SEEN_SETTING = "data_quality_seen"
+_TOTALS_MAX_AGE = 120.0
+_totals_cache: dict = {"at": 0.0, "key": None, "data": {}}
+
+
+def current_totals(index: Index, *, max_age: float = _TOTALS_MAX_AGE) -> dict[str, int]:
+    """Mitzählende Befunde (gesamte Historie) je gemessener Entität, für den Vergleich mit dem
+    Stand des letzten Besuchs. Entitäten ohne Befund stehen mit 0 darin, damit "gemessen, nichts
+    gefunden" von "noch nicht gemessen" unterscheidbar bleibt. Kurz zwischengespeichert, weil die
+    Meldungen bei jeder Seite neu gebaut werden."""
+    now = time.monotonic()
+    key = id(index)
+    if _totals_cache["key"] == key and now - _totals_cache["at"] < max_age:
+        return _totals_cache["data"]
+    totals = {entity_id: 0 for entity_id in index.list_cleanup_alltime_stats()}
+    for row in build_matrix(index)["rows"]:
+        totals[row["entity_id"]] = row["total"]
+    _totals_cache.update(at=now, key=key, data=totals)
+    return totals
+
+
+def mark_seen(index: Index) -> None:
+    """Merkt sich den aktuellen Stand als "gesehen" (beim Öffnen der Datenqualität-Seite)."""
+    index.set_setting(SEEN_SETTING, json.dumps(current_totals(index, max_age=0)))
+
+
+def new_findings(index: Index) -> dict | None:
+    """Neue mitzählende Befunde seit dem letzten Besuch: ``{"new": n, "entities": k}`` oder None.
+
+    Verglichen wird je Entität, nicht die Gesamtsumme: sonst ließe schon das Nachmessen bisher
+    unvermessener Entitäten die Zahl springen, ohne dass etwas Neues passiert wäre. Entitäten, die
+    beim letzten Besuch nicht gemessen waren, kommen ohne Meldung in den Stand. Sinkt eine Zahl
+    (Bereinigung), sinkt auch der Stand mit, sonst blieben spätere neue Befunde unter ihm verborgen.
+    Ohne Stand (nie besucht) wird der aktuelle als Anfang gemerkt."""
+    raw = index.get_setting(SEEN_SETTING)
+    if not raw:
+        mark_seen(index)
+        return None
+    try:
+        seen = {str(k): int(v) for k, v in json.loads(raw).items()}
+    except (ValueError, TypeError, AttributeError):
+        mark_seen(index)
+        return None
+    now_totals = current_totals(index)
+    new = entities = 0
+    updated = dict(seen)
+    for entity_id, total in now_totals.items():
+        base = seen.get(entity_id)
+        if base is None:
+            updated[entity_id] = total
+        elif total > base:
+            new += total - base
+            entities += 1
+        elif total < base:
+            updated[entity_id] = total
+    if updated != seen:
+        index.set_setting(SEEN_SETTING, json.dumps(updated))
+    return {"new": new, "entities": entities} if new else None

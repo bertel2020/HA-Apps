@@ -515,3 +515,33 @@ def test_suche_filter_und_sortierung_der_matrix(index):
     data_quality.set_ignored(index, "sensor.gamma", "gaps", True)
     zeilen = data_quality.build_matrix(index, show_ignored=True)["rows"]
     assert ids(kind="gaps") == ["sensor.alpha"]  # ignorierte Zellen zählen im Filter nicht
+
+
+def test_hinweis_auf_neue_befunde_seit_dem_letzten_besuch(index):
+    def hinweis():
+        return data_quality.new_findings(index)
+
+    def neu_lesen():
+        data_quality._totals_cache["key"] = None  # Zwischenspeicher der Meldungen leeren
+
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=5)
+    neu_lesen()
+    assert hinweis() is None  # nie besucht: der aktuelle Stand ist der Anfang
+
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=9)
+    _mit_tageszahlen(index, "sensor.neu", {}, duplicates=100)  # beim Besuch nicht gemessen
+    neu_lesen()
+    assert hinweis() == {"new": 4, "entities": 1}  # nur der Zuwachs bei sensor.a
+
+    # Besuch merken: danach nichts mehr, auch nicht für die nachgemessene Entität
+    data_quality.mark_seen(index)
+    neu_lesen()
+    assert hinweis() is None
+
+    # Bereinigung senkt den Stand mit, spätere neue Befunde fallen wieder auf
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=1)
+    neu_lesen()
+    assert hinweis() is None
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=3)
+    neu_lesen()
+    assert hinweis() == {"new": 2, "entities": 1}
