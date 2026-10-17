@@ -86,7 +86,7 @@
             {% for row in duplicates_by_entity %}
             <tr>
               <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
-                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+                <a href="entities/{{ row.entity_id }}/cleanup?filter=duplicates&amp;range=all" class="entity-tooltip-host">
                   {% if row.friendly_name %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
                   {% else %}
@@ -132,7 +132,7 @@
             {% for row in outlier_rates.rows %}
             <tr>
               <td class="entity" data-sort="{{ row.friendly_name }}">
-                <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+                <a href="entities/{{ row.entity_id }}/cleanup?filter=outliers&amp;range=all" class="entity-tooltip-host">
                   {% if row.friendly_name != row.entity_id %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
                   {% else %}
