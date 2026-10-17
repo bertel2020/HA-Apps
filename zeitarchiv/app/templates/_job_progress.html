@@ -7,6 +7,9 @@
    Der Aufrufer übergibt aus JobProgress.snapshot() plus zwei eigene Werte:
 
      progress_id  id des Containers, den das Polling per outerHTML ersetzt
+     note         optional: Hinweiszeile unter dem Balken. Muss im Container
+                  stehen — ein Geschwister des Containers würde bei jedem
+                  Poll (outerHTML) ein weiteres Mal angehängt.
      poll_url     Endpunkt, der entweder wieder diese Anzeige liefert oder,
                   sobald der Auftrag durch ist, das Endergebnis OHNE
                   hx-trigger — dadurch endet das Polling von selbst, ohne
@@ -40,4 +43,5 @@
   <div class="job-progress-track">
     <div class="job-progress-fill" style="width:{{ percent }}%"></div>
   </div>
+  {% if note %}<p class="marked-danger-note">{{ note }}</p>{% endif %}
 </div>
