@@ -21,6 +21,7 @@
     {re: /^\/charts(\/|$)/, text: t('zu den Charts')},
     {re: /^\/tables(\/|$)/, text: t('zu den Tabellen')},
     {re: /^\/statistik(\/|$)/, text: t('zur Statistik')},
+    {re: /^\/housekeeping\/datenqualitaet(\/|$)/, text: t('zur Datenqualität')},
     {re: /^\/housekeeping(\/|$)/, text: t('zum Housekeeping')},
     {re: /^\/import(\/|$)/, text: t('zum Import')},
   ];
@@ -54,7 +55,27 @@
     const AUF_ENTITAET = /^\/entities\/([^/]+)/;
     const refEntitaet = (refRel.match(AUF_ENTITAET) || [])[1];
     const hierEntitaet = (hereRel.match(AUF_ENTITAET) || [])[1];
-    if (refEntitaet && refEntitaet === hierEntitaet) return;
+    // Die Herkunft wird je Entität in sessionStorage gemerkt: Wer aus der
+    // Datenqualität (oder dem Housekeeping, einem Dashboard …) kommt und dann
+    // zwischen den Reitern wechselt, soll den Rücklink dorthin behalten statt
+    // nur "zurück zu Entitäten" zu sehen.
+    const memoKey = 'za-back:' + hierEntitaet;
+    const remember = (href, text) => { if (!hierEntitaet) return; try { sessionStorage.setItem(memoKey, JSON.stringify({href, text})); } catch (e) { /* ohne Speicher: kein Merken */ } };
+    const forget = () => { if (!hierEntitaet) return; try { sessionStorage.removeItem(memoKey); } catch (e) { /* s. o. */ } };
+    const render = (href, text) => {
+      container.appendChild(document.createTextNode(' · '));
+      const a = document.createElement('a');
+      a.href = href;
+      a.textContent = t('← zurück {ziel}', {ziel: text});
+      container.appendChild(a);
+    };
+    if (refEntitaet && refEntitaet === hierEntitaet) {
+      try {
+        const memo = JSON.parse(sessionStorage.getItem(memoKey) || 'null');
+        if (memo && memo.href && memo.text) render(memo.href, memo.text);
+      } catch (e) { /* kein gemerkter Rücklink */ }
+      return;
+    }
 
     // Nicht doppeln, wenn der statische Link daneben schon exakt dorthin zeigt.
     const alreadyLinked = Array.from(container.querySelectorAll('a')).some((a) => {
@@ -63,19 +84,16 @@
     if (alreadyLinked) return;
 
     const match = ROUTES.find((r) => r.re.test(refRel));
-    if (!match) return;
+    if (!match) { forget(); return; }
 
-    container.appendChild(document.createTextNode(' · '));
-    const a = document.createElement('a');
     // document.referrer trägt inzwischen selbst den zuletzt gewählten
     // Zeitraum/Offset, sofern die Herkunftsseite ihn in die URL spiegelt
     // (siehe syncUrlWithPeriod() in energiedashboard.js) — ein normaler
     // Link-Klick landet dadurch wieder genau dort, ohne auf Browser-
     // Verlauf/bfcache angewiesen zu sein (funktioniert auch in einem neuen
     // Tab oder nach einem harten Reload).
-    a.href = document.referrer;
-    a.textContent = t('← zurück {ziel}', {ziel: match.text});
-    container.appendChild(a);
+    remember(document.referrer, match.text);
+    render(document.referrer, match.text);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

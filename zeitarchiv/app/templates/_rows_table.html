@@ -150,6 +150,15 @@
       {{ _("Wiederholungen verdichten") }}
     </button>
     {% endif %}
+    {% if filter == 'counter_decreases' %}
+    <button class="btn btn-danger-outline"
+            {% if counts.counter_decreases == 0 %}disabled title="{{ _('Keine Zählerrückgänge im aktuellen Zeitraum') }}"{% endif %}
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/counter-returning-delete"
+            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this"
+            hx-confirm="{{ _('Alle Rückgänge, die zurückkehren („Vermutlich Fehlwert“), zur Löschung markieren? Rückgänge, nach denen der Stand niedrig bleibt, bleiben unberührt. Es wird nichts endgültig gelöscht; im Reiter „Markiert“ lässt sich alles wiederherstellen.') }}">
+      {{ _("Fehlwert-Rückgänge markieren") }}
+    </button>
+    {% endif %}
     {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
        (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
        über seinen Beschriftungstext suchen. #}
