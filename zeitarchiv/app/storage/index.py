@@ -3578,6 +3578,26 @@ class Index:
         # Nach anderen Regeln berechnet: lieber keine Zahlen als falsche, bis der nächste Lauf neu rechnet.
         return snapshot if snapshot.get("rules") == self._COUNTER_DECREASE_RULES else None
 
+    def invalidate_finding_caches(self, entity_id: str) -> None:
+        """Nach dem Markieren oder Zurückholen von Werten: die zwischengespeicherten Befunde
+        (globale Duplikat-Zählung, Gesamt-Zählung dieser Entität) gelten nicht mehr. Ohne das
+        stünden Meldungen wie „Duplikate gefunden“ oder „Ausreißer-Erkennung markiert auffällig
+        viel“ bis zu eine Stunde weiter da, obwohl die Ursache behoben ist. Der nächste
+        Wartungstakt rechnet neu; die alten Zahlen bleiben bis dahin stehen (Ausreißer) bzw. die
+        Duplikat-Liste ist leer (wie beim Zählerrückgang-Schnappschuss)."""
+        if self.get_setting(self._DUPLICATE_SNAPSHOT_KEY) is not None:
+            self.set_setting(self._DUPLICATE_SNAPSHOT_KEY, json.dumps({"checked_at": 0, "rows": []}))
+        key = self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id
+        raw = self.get_setting(key)
+        if raw is not None:
+            try:
+                entry = json.loads(raw)
+            except json.JSONDecodeError:
+                return
+            if isinstance(entry, dict):
+                entry["computed_at"] = 0
+                self.set_setting(key, json.dumps(entry))
+
     def invalidate_counter_decrease_snapshot(self) -> None:
         """Nach dem Markieren: die Meldung soll nicht eine Stunde lang auf einen Rückgang
         zeigen, den man gerade zur Löschung markiert hat. Der nächste Wartungstakt rechnet neu."""
@@ -3955,6 +3975,8 @@ class Index:
                 "UPDATE entities SET deleted_count = deleted_count + ? WHERE entity_id = ?",
                 (len(timestamps), entity_id),
             )
+        if timestamps:
+            self.invalidate_finding_caches(entity_id)
 
     def oldest_deleted_at(self, entity_id: str | None = None) -> float | None:
         """Zeitpunkt der ältesten noch bestehenden Markierung (einer Entität oder insgesamt) — für die
@@ -3987,7 +4009,10 @@ class Index:
                 "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
                 (cursor.rowcount, entity_id),
             )
-            return cursor.rowcount
+            restored = cursor.rowcount
+        if restored:
+            self.invalidate_finding_caches(entity_id)
+        return restored
 
     def _undo_deleted_where(self, entity_id: str, where: str, params: tuple) -> int:
         """Nimmt Markierungen zurück, die `where` trifft, und führt deleted_count
@@ -4001,7 +4026,10 @@ class Index:
                 "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
                 (cursor.rowcount, entity_id),
             )
-            return cursor.rowcount
+            restored = cursor.rowcount
+        if restored:
+            self.invalidate_finding_caches(entity_id)
+        return restored
 
     def undo_deleted_ids(self, entity_id: str, ids: list[int]) -> int:
         """Nimmt einzelne Markierungen zurück (deleted_points.id, nicht der

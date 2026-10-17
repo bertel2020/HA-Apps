@@ -161,8 +161,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats, cleanup_tile, data_quality, entity_usage
-from . import counter_bulk
+from . import cleanup_stats, cleanup_tile, counter_bulk, data_quality, entity_usage
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
@@ -5720,33 +5719,14 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
 
 @app.post("/entities/{entity_id}/rows/counter-returning-delete", response_class=HTMLResponse)
 async def counter_returning_delete(request: Request, entity_id: str) -> HTMLResponse:
-    """Markiert bei einem Zähler alle Rückgänge zur Löschung, die zurückkehren
-    („Vermutlich Fehlwert“) — dieselbe Regel und dasselbe Fenster wie die Sammelaktion
-    in Housekeeping, nur für diese eine Entität. Rückgänge, die niedrig bleiben
-    (Reset/Zählerwechsel), bleiben unberührt."""
-    _require_entity(entity_id)
-    form = await request.form()
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
-    marked = 0
-
-    def mark_locked() -> HTMLResponse:
-        nonlocal marked
+    _require_entity(entity_id)  # markiert die zurückkehrenden Rückgänge (counter_bulk)
+    args = _rows_form_common(await request.form())
+    def run() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
-            before = index.get_counter_decrease_snapshot()
-            timestamps = counter_bulk.returning_timestamps(DATA_DIR, index, TZ, entity_id)
-            if timestamps:
-                cleanup.soft_delete(index, entity_id, timestamps, source="counter_bulk")
-                marked = len(timestamps)
-                counter_bulk.refresh_snapshot(DATA_DIR, index, TZ, before, {entity_id})
-            return _rows_fragment(
-                request, entity_id, filter_, range_key, offset, page, page_size, mode,
-                deleted_count=marked or None,
-            )
-
-    result = await run_in_threadpool(mark_locked)
-    if marked:
-        _background.invalidate_purge_preview()
-    return result
+            n = counter_bulk.mark_entity_returning(DATA_DIR, index, TZ, entity_id)
+            n and _background.invalidate_purge_preview()
+            return _rows_fragment(request, entity_id, *args, deleted_count=n or None)
+    return await run_in_threadpool(run)
 
 
 # Symcon-/CSV-/Home-Assistant-Import (Upload, Scan, Dry-Run/Start, /import

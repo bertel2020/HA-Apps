@@ -17,7 +17,7 @@ JS = (APP / "static/js/dynamic-back-link.js").read_text(encoding="utf-8")
 
 
 def test_link_navigates_to_the_referrer_url_as_is() -> None:
-    assert "a.href = document.referrer;" in JS
+    assert "render(document.referrer, match.text);" in JS
 
 
 def test_energiedashboard_route_is_recognized() -> None:

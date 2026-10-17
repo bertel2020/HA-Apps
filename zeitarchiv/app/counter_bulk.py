@@ -66,6 +66,18 @@ def mark_returning(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | N
     return {"batch_at": batch_at, "entities": marked, "values": sum(marked.values())}
 
 
+def mark_entity_returning(data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str) -> int:
+    """Wie mark_returning, aber nur für einen Zähler (Bereinigungsansicht der Entität, Filter
+    „Zählerrückgänge“). Rückgänge, die niedrig bleiben (Reset, Zählerwechsel), bleiben unberührt.
+    Liefert die Anzahl markierter Werte."""
+    before = index.get_counter_decrease_snapshot()
+    timestamps = returning_timestamps(data_dir, index, tz, entity_id)
+    if timestamps:
+        cleanup.soft_delete(index, entity_id, timestamps, source="counter_bulk")
+        refresh_snapshot(data_dir, index, tz, before, {entity_id})
+    return len(timestamps)
+
+
 def undo_batch(
     data_dir: Path, index: Index, tz: ZoneInfo, batch_at: float, entity_ids: list[str]
 ) -> int:

@@ -133,6 +133,15 @@ def refresh_import_leftovers_if_stale(*dirs: Path) -> None:
     total_bytes, newest_mtime = dir_size_and_newest_mtime(dirs)
     _import_leftovers = {"bytes": total_bytes, "newest_mtime": newest_mtime}
     _import_leftovers_checked_at = time.time()
+
+
+def forget_import_leftovers() -> None:
+    """Nach „Daten löschen“ im Import: Die Meldung steht sonst bis zur nächsten
+    stündlichen Messung weiter da, obwohl die Quelldaten schon weg sind."""
+    global _import_leftovers
+    _import_leftovers = None
+
+
 # Täglich statt mehrtägig (Konzept-Entscheidung): nur so garantiert "morgen"
 # auch wirklich einen ANDEREN Tipp, wenn der heutige ausgeblendet wurde —
 # siehe hide_tip_today(). Bei einem mehrtägigen Fenster wäre der übernächste

@@ -35,6 +35,7 @@ from starlette.background import BackgroundTask
 import pyarrow.parquet as pq
 
 from . import formats
+from . import notices as notices_mod
 from .formatting import (
     entity_display_name,
     format_int,
@@ -2166,6 +2167,7 @@ class ImportService:
                     self.deps.symcon_scan_cache_path.unlink(missing_ok=True)
                     with self._scan_cache.lock:
                         self._scan_cache.variables = None
+            notices_mod.forget_import_leftovers()
             logger.info("Symcon-Quelldaten gelöscht")
             # Post/Redirect/Get: Die vollständige Importseite darf nicht direkt unter
             # /import/delete gerendert werden. Ihre relativen CSS-/JS-Pfade würden dort
@@ -2333,6 +2335,7 @@ class ImportService:
             with self.deps.coordinator.exclusive():
                 if self.deps.csv_import_dir.exists():
                     shutil.rmtree(self.deps.csv_import_dir)
+            notices_mod.forget_import_leftovers()
             logger.info("CSV-Quelldaten gelöscht")
             return self.deps.templates.TemplateResponse(request, "_csv_import_section.html", self._csv_import_context())
 
