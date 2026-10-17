@@ -66,7 +66,7 @@
             {% for row in counter_decreases %}
             <tr>
               <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
-                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+                <a href="entities/{{ row.entity_id }}/cleanup?filter=counter_decreases&amp;range=all" class="entity-tooltip-host">
                   {% if row.friendly_name %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
                   {% else %}
