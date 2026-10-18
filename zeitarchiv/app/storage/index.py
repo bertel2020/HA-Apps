@@ -333,6 +333,7 @@ SORTABLE_COLUMNS = {
     # — CAST auf INTEGER für den natürlichen Größenvergleich.
     "gap_threshold": "CASE WHEN gap_threshold = 'off' THEN 999999 ELSE CAST(gap_threshold AS INTEGER) END",
     "outlier_threshold": "CASE WHEN outlier_threshold = 'off' THEN 999999 ELSE CAST(outlier_threshold AS INTEGER) END",
+    "historic": "historic",
 }
 
 _SCHEMA = """

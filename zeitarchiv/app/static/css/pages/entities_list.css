@@ -51,6 +51,7 @@
   .col-value-filter{width:96px;}    /* Header "Wertfilter" ≈ 62px + Puffer */
   .col-gap-threshold{width:92px;}   /* "6 Stunden" ≈ 58px + Puffer */
   .col-outlier-threshold{width:92px;} /* Header "Ausreißer" ≈ 58px + Puffer */
+  .col-historic{width:96px;}        /* Header "Historisch" ≈ 66px + Puffer */
   /* Ausrichtung je Spalte statt Position (:not(:first-child)) — dieselbe
      Klasse steuert oben schon die Breite, für th UND td gemeinsam, damit
      Kopf- und Datenzeile nie auseinanderlaufen. Favorit + Typ + Einheit
@@ -69,7 +70,8 @@
   .entities-dt th.col-retention,.entities-dt td.col-retention,
   .entities-dt th.col-value-filter,.entities-dt td.col-value-filter,
   .entities-dt th.col-gap-threshold,.entities-dt td.col-gap-threshold,
-  .entities-dt th.col-outlier-threshold,.entities-dt td.col-outlier-threshold{text-align:right;}
+  .entities-dt th.col-outlier-threshold,.entities-dt td.col-outlier-threshold,
+  .entities-dt th.col-historic,.entities-dt td.col-historic{text-align:right;}
   /* Einfache (einzeilige) Spalten zusätzlich vertikal zentrieren — Entität
      und Erster/Letzter Wert bleiben oben ausgerichtet (vertical-align:top,
      geerbt von table.dt td), weil sie zweizeiligen Inhalt (Name+ID bzw.

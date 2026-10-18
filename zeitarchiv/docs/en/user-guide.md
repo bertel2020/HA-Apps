@@ -629,9 +629,9 @@ report, like everything in Zeitarchiv, stays exclusively local.
 ## Entities and histories
 
 **Entities** lists all known entities, searchable via the name or the entity
-ID. Via **Columns ▾**, eleven additional columns can be shown/hidden (type,
+ID. Via **Columns ▾**, twelve additional columns can be shown/hidden (type,
 first/last value, resolution, retention, unit, records, size, value filter,
-gap/outlier threshold) — the selection applies globally to the whole add-on,
+gap/outlier threshold, Historic; the last one is off by default) — the selection applies globally to the whole add-on,
 not just in the current browser. If the columns **Type** or **Unit** are
 shown, a matching filter appears next to them (type: default/counter/switch,
 multiple selection possible; unit: one of the units actually occurring). A

@@ -96,3 +96,17 @@ def test_a_historic_entity_that_still_delivers_values_is_flagged_but_stays_histo
 
     client.post("/housekeeping/entities/sensor.hist_lebt/historic?value=0")
     assert index.get_entity("sensor.hist_lebt")["historic_since"] is None
+
+
+def test_the_entity_list_offers_a_historic_column_that_is_off_by_default(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.hist_col", "sensor", "standard", "°C")
+    index.set_entity_historic("sensor.hist_col", True)
+    try:
+        assert "col-historic" not in client.get("/entities-table?search=hist_col").text
+        shown = client.get("/entities-table?search=hist_col&columns_submitted=1&columns=type&columns=historic&sort=historic&dir=desc").text
+        assert 'class="va-mid col-historic">Ja<' in shown
+    finally:
+        client.get("/entities-table?columns_submitted=1&columns=type&columns=first_ts&columns=last_ts&columns=unit&columns=rows&columns=size")
+        index.set_entity_historic("sensor.hist_col", False)

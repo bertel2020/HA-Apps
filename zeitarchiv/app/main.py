@@ -2540,6 +2540,7 @@ ENTITIES_OPTIONAL_COLUMNS = [
     ("value_filter", N_("Wertfilter")),
     ("gap_threshold", N_("Lücken")),
     ("outlier_threshold", N_("Ausreißer")),
+    ("historic", N_("Historisch")),
 ]
 # Nur Auflösung/Aufbewahrung initial aus — diese beiden Konfigurationsdetails
 # sind für den ersten Überblick am ehesten verzichtbar. Alle übrigen Spalten,
@@ -2631,6 +2632,8 @@ def _entities_table_response(
                 if outlier_detection_applies(row["aggregation_type"])
                 else "—"
             )
+        if "historic" in visible_columns:
+            entry["historic_label"] = tr("Ja") if row["historic"] else "—"
         rows.append(entry)
 
     def _next_dir(column: str) -> str:
@@ -2644,20 +2647,7 @@ def _entities_table_response(
     # Ausrichtung (Entität links, Typ zentriert, alles andere rechts) in
     # genau einer Regel je Klasse statt Positions-Selektoren, die bei
     # ein-/ausgeblendeten optionalen Spalten sonst verrutschen würden.
-    col_class = {
-        "entity_id": "col-entity",
-        "type": "col-type",
-        "first_ts": "col-date",
-        "last_ts": "col-date",
-        "resolution": "col-resolution",
-        "retention": "col-retention",
-        "unit": "col-unit",
-        "rows": "col-rows",
-        "size": "col-size",
-        "value_filter": "col-value-filter",
-        "gap_threshold": "col-gap-threshold",
-        "outlier_threshold": "col-outlier-threshold",
-    }
+    col_class = {"entity_id": "col-entity", "first_ts": "col-date", "last_ts": "col-date"}
     header_links = [
         {
             "key": key,
@@ -2665,7 +2655,7 @@ def _entities_table_response(
             "next_dir": _next_dir(key),
             "active": sort == key,
             "arrow": ("↓" if direction == "asc" else "↑") if sort == key else "",
-            "col_class": col_class[key],
+            "col_class": col_class.get(key) or "col-" + key.replace("_", "-"),
         }
         for key, label in columns
     ]

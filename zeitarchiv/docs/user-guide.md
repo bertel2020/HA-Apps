@@ -678,9 +678,10 @@ der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
 ## Entitäten und Verläufe
 
 **Entitäten** listet alle bekannten Entitäten, durchsuchbar über den Namen
-oder die Entity-ID. Über **Spalten ▾** lassen sich elf zusätzliche Spalten
+oder die Entity-ID. Über **Spalten ▾** lassen sich zwölf zusätzliche Spalten
 ein-/ausblenden (Typ, Erster/Letzter Wert, Auflösung, Aufbewahrung, Einheit,
-Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle) — die Auswahl
+Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle, Historisch; letztere
+ist standardmäßig aus) — die Auswahl
 gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Sind die
 Spalten **Typ** oder **Einheit** eingeblendet, erscheint daneben ein
 passender Filter (Typ: Standard/Zähler/Schalter, mehrfach wählbar; Einheit:
