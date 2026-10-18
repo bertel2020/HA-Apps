@@ -16,6 +16,7 @@
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       Typ: <strong>{{ type_label }}</strong>{% if state_class %} ({{ state_class }}){% endif %} &middot; <a href="{{ app_root }}/entities">{{ _("&larr; zurück zu Entitäten") }}</a>
+      {% if historic %}&middot; <span class="chip" title="{{ _('Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet') }}">{{ _("Historisch") }}</span>{% endif %}
       {% if used_in_energiedashboard %}
       {# Statisch statt referrer-basiert (dynamic-back-link.js unten deckt
          die übrigen Herkunftsseiten ab) — unter Home-Assistant-Ingress fehlt
@@ -268,6 +269,8 @@
                zugleich zeigt, auf welcher der drei Seiten man gerade ist.
                "Als Chart speichern" bleibt: das tut etwas auf DIESER Seite. #}
             <a class="menu-row" :href="saveAsChartUrl">{{ _("Als Chart speichern") }} <span class="menu-row-arrow">→</span></a>
+            <button type="button" class="menu-row" title="{{ _('Keine neuen Werte mehr erwartet: nicht mehr als inaktiv melden') }}"
+                    onclick="fetch('{{ app_root }}/housekeeping/entities/{{ entity_id }}/historic?value={{ '0' if historic else '1' }}', {method: 'POST'}).then(() => location.reload())">{{ _("Historisch aufheben") if historic else _("Als historisch markieren") }}</button>
             <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">{{ _("Optionen auf Standard zurücksetzen") }}</button>
           </div>
         </div>

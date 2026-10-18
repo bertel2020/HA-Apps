@@ -51,14 +51,17 @@ def items(index, tz: ZoneInfo) -> list[dict]:
 
 
 #: Ab so vielen Tagen ohne neuen Wert gilt eine Entität als inaktiv — die Voreinstellung von Housekeeping →
-#: Inaktive Entitäten (nie empfangene zählen immer mit).
+#: Inaktive Entitäten (nie empfangene zählen immer mit; als „historisch“ markierte nie).
 INACTIVE_AFTER_DAYS = 3
 
 
 def inactive_entities(index, now: float | None = None) -> int:
     now = time.time() if now is None else now
     limit = INACTIVE_AFTER_DAYS * 86400
-    return sum(1 for entity in index.list_entities() if entity["last_ts"] is None or now - entity["last_ts"] >= limit)
+    return sum(
+        1 for entity in index.list_entities()
+        if not entity["historic"] and (entity["last_ts"] is None or now - entity["last_ts"] >= limit)
+    )
 
 
 def status(index, tz: ZoneInfo) -> dict:

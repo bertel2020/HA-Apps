@@ -9,9 +9,9 @@
        Entitätsspalte bekommt damit alles Übrige und die Ellipsis greift an
        der echten Spaltenkante statt an einer festen Obergrenze. #}
     <colgroup>
-      <col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte">
+      <col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte"><col>
     </colgroup>
-    <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Vor") }}</th><th class="num">{{ _("Datenpunkte") }}</th></tr></thead>
+    <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Vor") }}</th><th class="num">{{ _("Datenpunkte") }}</th><th></th></tr></thead>
     <tbody>
     {% for row in stale_entities %}
     <tr>
@@ -28,6 +28,11 @@
       <td>{{ row.last_value_label }}</td>
       <td class="num" data-sort="{{ row.days_ago_raw }}">{{ row.days_ago_label }}</td>
       <td class="num" data-sort="{{ row.row_count_raw }}">{{ row.row_count }}</td>
+      <td class="num">
+        <button type="button" class="btn btn-sm" title="{{ _('Keine neuen Werte mehr erwartet: nicht mehr als inaktiv melden') }}"
+                hx-post="housekeeping/entities/{{ row.entity_id }}/historic?value=1&days={{ stale_entities_days }}&hist_open={{ '1' if historic_open else '0' }}"
+                hx-target="#stale-entities-body" hx-swap="innerHTML">{{ _("Historisch") }}</button>
+      </td>
     </tr>
     {% endfor %}
     </tbody>
@@ -36,3 +41,39 @@
 {% else %}
 <div class="empty">{{ _("Alle Entitäten haben in den letzten {stale_entities_days} Tagen neue Werte geliefert.", stale_entities_days=stale_entities_days) }}</div>
 {% endif %}
+
+{# Alle als „historisch“ markierten Entitäten, unabhängig vom Schwellwert. Im
+   selben Partial wie die Inaktiv-Liste, damit ein Klick auf „Historisch“ bzw.
+   „Wieder aufnehmen“ beide Listen mit einer einzigen Antwort aktualisiert. #}
+<details class="hk-historic"{% if historic_open or (historic_entities and not stale_entities) %} open{% endif %}>
+  <summary>{{ _("Historische Entitäten") }} <span class="chip">{{ historic_entities|length }}</span></summary>
+  <p class="settings-section-description">{{ _("Diese Entitäten bekommen bewusst keine neuen Werte mehr und zählen nicht als inaktiv. Daten und Charts bleiben unverändert.") }}</p>
+  {% if historic_entities %}
+  <div class="tbl-wrap">
+    <table class="dt">
+      <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Datenpunkte") }}</th><th></th></tr></thead>
+      <tbody>
+      {% for row in historic_entities %}
+      <tr>
+        <td class="entity">
+          <a href="entities/{{ row.entity_id }}">
+            {% if row.has_name %}<span class="name">{{ row.display_name }}</span><span class="id">{{ row.entity_id }}</span>
+            {% else %}<span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>{% endif %}
+          </a>
+        </td>
+        <td>{{ row.last_value_label }}</td>
+        <td class="num">{{ row.row_count }}</td>
+        <td class="num">
+          <button type="button" class="btn btn-sm"
+                  hx-post="housekeeping/entities/{{ row.entity_id }}/historic?value=0&days={{ stale_entities_days }}&hist_open=1"
+                  hx-target="#stale-entities-body" hx-swap="innerHTML">{{ _("Wieder aufnehmen") }}</button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">{{ _("Noch keine Entität als historisch markiert.") }}</div>
+  {% endif %}
+</details>

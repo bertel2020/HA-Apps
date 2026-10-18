@@ -1,5 +1,14 @@
 {
   "app": {
+    "Historisch": "Historic",
+    "Historische Entitäten": "Historic entities",
+    "Wieder aufnehmen": "Resume",
+    "Als historisch markieren": "Mark as historic",
+    "Historisch aufheben": "Remove historic mark",
+    "Keine neuen Werte mehr erwartet: nicht mehr als inaktiv melden": "No new values expected: stop reporting as inactive",
+    "Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet": "No new values expected: not reported as inactive",
+    "Diese Entitäten bekommen bewusst keine neuen Werte mehr und zählen nicht als inaktiv. Daten und Charts bleiben unverändert.": "These entities intentionally receive no new values and are not counted as inactive. Data and charts stay unchanged.",
+    "Noch keine Entität als historisch markiert.": "No entity marked as historic yet.",
     "Heatmap": "Heatmap",
     "Stärke = Befunde dieses Tags im Vergleich zu den übrigen Tagen der Entität": "Intensity = findings of this day compared with the entity's other days",
     "Früher": "Earlier",

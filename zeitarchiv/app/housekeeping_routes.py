@@ -790,33 +790,29 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     _STALE_ENTITIES_DEFAULT_DAYS = "3"
 
 
-    def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> dict:
+    def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS, hist_open: bool = False) -> dict:
         """Entitäten, deren letzter Wert (entities.last_ts, ohnehin vorhanden —
         kein neuer Hintergrundjob nötig) länger als der gewählte Schwellwert
         zurückliegt. Meist harmlos (Gerät im Standby, seltener Sensor), aber ein
         früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte
         HA-Entität. Nie empfangene Entitäten (last_ts NULL) erscheinen unabhängig
         vom gewählten Schwellwert immer — für sie gibt es kein sinnvolles "seit
-        wann", das sich unter- oder überschreiten ließe."""
+        wann", das sich unter- oder überschreiten ließe.
+
+        Als „historisch“ markierte Entitäten (entities.historic) fehlen in dieser
+        Liste und stehen stattdessen vollständig — unabhängig vom Schwellwert,
+        auch wenn sie gerade Werte liefern — im eigenen Abschnitt darunter, damit
+        sich die Markierung dort wieder zurücknehmen lässt."""
         if days not in dict(_STALE_ENTITIES_DAY_OPTIONS):
             days = _STALE_ENTITIES_DEFAULT_DAYS
         threshold_seconds = int(days) * 86400
         now_ts = time.time()
-        rows = []
-        for entity in deps.index.list_entities():
-            last_ts = entity["last_ts"]
-            if last_ts is None:
-                days_ago = None
-            else:
-                age_seconds = now_ts - last_ts
-                if age_seconds < threshold_seconds:
-                    continue
-                days_ago = age_seconds / 86400
-            has_name = bool(entity["custom_name"] or entity["friendly_name"])
-            rows.append({
+
+        def _row(entity, last_ts, days_ago) -> dict:
+            return {
                 "entity_id": entity["entity_id"],
                 "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
-                "has_name": has_name,
+                "has_name": bool(entity["custom_name"] or entity["friendly_name"]),
                 "last_value_label": (
                     formats.format_datetime(datetime.fromtimestamp(last_ts, deps.tz), seconds=False, comma=True) if last_ts is not None else "Nie empfangen"
                 ),
@@ -828,13 +824,43 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "days_ago_label": tr("{format_value} Tage", format_value=format_value(days_ago, 1)) if days_ago is not None else "—",
                 "row_count": format_int(entity["row_count"]),
                 "row_count_raw": entity["row_count"],
-            })
+            }
+
+        rows = []
+        historic_rows = []
+        for entity in deps.index.list_entities():
+            last_ts = entity["last_ts"]
+            days_ago = None if last_ts is None else (now_ts - last_ts) / 86400
+            if entity["historic"]:
+                historic_rows.append(_row(entity, last_ts, days_ago))
+            elif last_ts is None or now_ts - last_ts >= threshold_seconds:
+                rows.append(_row(entity, last_ts, days_ago))
         rows.sort(key=lambda r: r["days_ago_raw"], reverse=True)
+        historic_rows.sort(key=lambda r: r["display_name"].lower())
         return {
             "stale_entities": rows,
             "stale_entities_days": days,
             "stale_entities_day_options": _STALE_ENTITIES_DAY_OPTIONS,
+            "historic_entities": historic_rows,
+            "historic_open": hist_open,
         }
+
+
+    @router.post("/housekeeping/entities/{entity_id}/historic", response_class=HTMLResponse)
+    def housekeeping_set_historic(
+        request: Request, entity_id: str, value: str = Query("1"), days: str = Query(_STALE_ENTITIES_DEFAULT_DAYS),
+        hist_open: str = Query("0"),
+    ) -> HTMLResponse:
+        """Setzt bzw. entfernt die Markierung „historisch“. Antwortet mit dem
+        Inhalt von #stale-entities-body, damit die Liste und der Abschnitt
+        darunter in einem Zug aktualisiert werden; die Entitätsseite lädt nach
+        dem Aufruf neu und ignoriert den Rumpf."""
+        if deps.index.get_entity(entity_id) is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        deps.index.set_entity_historic(entity_id, value == "1")
+        return deps.templates.TemplateResponse(
+            request, "_stale_entities_body.html", _stale_entities_context(days, hist_open == "1")
+        )
 
 
     @router.get("/housekeeping/stale-entities", response_class=HTMLResponse)

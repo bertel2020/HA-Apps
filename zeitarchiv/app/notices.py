@@ -875,6 +875,8 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
     now_ts = datetime.now(tz).timestamp()
     counts = {"info": 0, "warn": 0, "error": 0}
     for entity in index.list_entities():
+        if entity["historic"]:
+            continue
         last_ts = entity["last_ts"]
         if last_ts is None:
             counts["error"] += 1

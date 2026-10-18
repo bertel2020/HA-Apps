@@ -4954,7 +4954,7 @@ def entity_detail(
             "display_mode": entity["display_mode"],
             "first_date": first_date,
             "last_date": last_date,
-            "is_favorite": bool(entity["is_favorite"]),
+            "is_favorite": bool(entity["is_favorite"]), "historic": bool(entity["historic"]),
             "chart_options": chart_options,
             "entity_chart_defaults": _get_entity_chart_defaults(),
             "initial_range": initial_range,

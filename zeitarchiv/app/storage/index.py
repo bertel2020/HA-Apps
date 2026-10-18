@@ -938,6 +938,13 @@ class Index:
             # als Dauer (h/m) oder als Rohwert/AN-Anteil anzeigen. 'onoff' erhält
             # das bisherige Verhalten für alle bestehenden Entitäten bei.
             self._conn.execute("ALTER TABLE entities ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'onoff'")
+        if "historic" not in columns:
+            # „Historisch“: die Entität bekommt bewusst keine neuen Werte mehr
+            # (archivierte Zähler, stillgelegte Geräte). Sie zählt dann nicht
+            # mehr als inaktiv (Housekeeping-Liste, Status-Kachel, Meldung).
+            # Daten, Charts und Rotation bleiben unberührt. Default 0 = bisheriges
+            # Verhalten.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN historic INTEGER NOT NULL DEFAULT 0")
         if "chart_options" not in columns:
             # Individuelle Übersteuerung der Chart-Optionen (Optionen-Menü auf
             # der Entität-eigenen Chart-Seite, entity_detail.html) — ein
@@ -1948,6 +1955,15 @@ class Index:
                 "SELECT entity_id FROM entities WHERE hourly_rollup = 1"
             ).fetchall()
             return [row["entity_id"] for row in rows]
+
+    def set_entity_historic(self, entity_id: str, historic: bool) -> None:
+        """Markiert eine Entität als „historisch“ bzw. nimmt die Markierung zurück
+        (siehe Spalten-Migration oben). Berührt updated_at nicht: das ist keine
+        Änderung an der Entität selbst, sondern an der Inaktiv-Erkennung."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE entities SET historic = ? WHERE entity_id = ?", (int(historic), entity_id)
+            )
 
     def set_entity_chart_options(self, entity_id: str, options: dict) -> None:
         """Speichert den vollständigen Chart-Optionen-Stand einer Entität
