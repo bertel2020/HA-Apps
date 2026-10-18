@@ -177,7 +177,7 @@ and rounding. An optional, purely app-internal display name overrides Home
 Assistant's own name in the presentation only, if needed.
 
 **Housekeeping.** A dedicated area for things that are otherwise easy to
-overlook: detected duplicates, inactive entities, contradictory configuration
+overlook: detected duplicates, inactive entities (deliberately retired ones can be excluded as “Historic”), contradictory configuration
 combinations (e.g. a gap detection that can never trigger because of the
 resolution or a value-change filter), unused charts/tables, free space on the
 host file system, as well as storage, retention and rotation management in one
@@ -457,7 +457,7 @@ Zeitarchiv therefore provides these tasks directly in the interface:
 - correct individual measurements after the fact
 - hide suspicious values via soft delete first
 - review changes before data is permanently removed
-- detect inactive entities
+- detect inactive entities (exclude retired ones as “Historic”)
 - close historical gaps through imports
 - not re-create existing timestamps on import
 - show contradictory settings and unused analyses

@@ -186,7 +186,7 @@ Aufbewahrung und Rundung. Ein optionaler, rein app-interner Anzeigename
 Darstellung.
 
 **Housekeeping.** Eigener Bereich für Dinge, die sonst leicht übersehen
-werden: erkannte Duplikate, inaktive Entitäten, widersprüchliche
+werden: erkannte Duplikate, inaktive Entitäten (bewusst stillgelegte lassen sich als „Historisch“ ausnehmen), widersprüchliche
 Konfigurationskombinationen (z. B. eine Lücken-Erkennung, die durch
 Auflösung oder Wertänderungsfilter nie zutreffen kann), ungenutzte
 Charts/Tabellen, freier Speicherplatz auf dem Host-Dateisystem, sowie
@@ -495,7 +495,7 @@ Zeitarchiv stellt diese Aufgaben deshalb direkt in der Oberfläche bereit:
 - einzelne Messwerte nachträglich korrigieren
 - verdächtige Werte zunächst per Soft Delete ausblenden
 - Änderungen prüfen, bevor Daten endgültig entfernt werden
-- inaktive Entitäten erkennen
+- inaktive Entitäten erkennen (stillgelegte als „Historisch“ ausnehmen)
 - historische Lücken durch Importe schließen
 - vorhandene Zeitstempel beim Import nicht erneut anlegen
 - widersprüchliche Einstellungen und ungenutzte Auswertungen anzeigen
