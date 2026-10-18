@@ -274,6 +274,13 @@ TIPS = [
         "meta": N_("Charts"),
         "link": None,
     },
+    {
+        "slug": "historisch_markieren",
+        "title": N_("Tipp: Stillgelegte Entitäten als historisch markieren"),
+        "detail": N_("Liefert eine Entität bewusst keine Werte mehr (z. B. ein ausgemusterter Zähler), nimmt „Historisch“ sie aus der Inaktiv-Erkennung — Daten und Charts bleiben unverändert. Zu finden im Reiter „Konfiguration“ der Entität."),
+        "meta": N_("Entitäten"),
+        "link": "/housekeeping#entitaeten",
+    },
 ]
 
 
