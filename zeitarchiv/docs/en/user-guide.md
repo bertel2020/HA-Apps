@@ -1151,7 +1151,7 @@ defaults never apply retroactively to entities that already exist.
 
 ### Where do I start?
 
-The eight fields act at very different points. This classification matters
+The fields act at very different points. This classification matters
 more when configuring than the order in the form:
 
 | Acts on … | Fields | Reversible? |
@@ -1159,7 +1159,7 @@ more when configuring than the order in the form:
 | **What is stored at all** | Resolution, value change filter | No — what was not stored is gone |
 | **How long it stays** | Retention | Yes, until the next deletion |
 | **What is shown** | Display name, decimal places, display mode | At any time |
-| **What cleanup marks** | Gap detection, outlier detection | At any time |
+| **What cleanup marks** | Gap detection, outlier detection, historic | At any time |
 
 The first two fields discard measurements on arrival. Everything below can be
 changed as often as you like without losing anything.

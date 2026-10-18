@@ -16,7 +16,7 @@
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
       Typ: <strong>{{ type_label }}</strong>{% if state_class %} ({{ state_class }}){% endif %} &middot; <a href="{{ app_root }}/entities">{{ _("&larr; zurück zu Entitäten") }}</a>
-      {% if historic %}&middot; <span class="chip" title="{{ _('Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet') }}">{{ _("Historisch") }}</span>{% endif %}
+      {% if historic %}&middot; <span class="badge historic" title="{{ _('Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet') }}">{{ _("Historisch") }}</span>{% endif %}
       {% if used_in_energiedashboard %}
       {# Statisch statt referrer-basiert (dynamic-back-link.js unten deckt
          die übrigen Herkunftsseiten ab) — unter Home-Assistant-Ingress fehlt

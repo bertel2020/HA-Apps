@@ -73,4 +73,4 @@ def test_the_entity_config_page_offers_the_mark_and_the_chart_page_shows_it(clie
     client.post("/housekeeping/entities/sensor.hist_seite/historic?value=1")
     assert "Historisch aufheben" in client.get("/entities/sensor.hist_seite/config").text
     html = client.get("/entities/sensor.hist_seite").text
-    assert 'class="chip" title="Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet">Historisch' in html
+    assert 'class="badge historic" title="Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet">Historisch' in html

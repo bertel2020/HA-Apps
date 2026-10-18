@@ -1249,7 +1249,7 @@ globale Standards wirken nie rückwirkend auf bereits angelegte Entitäten.
 
 ### Womit fange ich an?
 
-Die acht Felder greifen an sehr unterschiedlichen Stellen an. Diese Einteilung
+Die Felder greifen an sehr unterschiedlichen Stellen an. Diese Einteilung
 ist beim Einstellen wichtiger als die Reihenfolge im Formular:
 
 | Wirkt auf … | Felder | Rückgängig? |
@@ -1257,7 +1257,7 @@ ist beim Einstellen wichtiger als die Reihenfolge im Formular:
 | **Was überhaupt gespeichert wird** | Auflösung, Wertänderungsfilter | Nein — was nicht gespeichert wurde, ist weg |
 | **Wie lange es bleibt** | Aufbewahrung | Bis zur nächsten Löschung ja |
 | **Was gezeigt wird** | Anzeigename, Nachkommastellen, Anzeigemodus | Jederzeit |
-| **Was die Bereinigung markiert** | Lücken-Erkennung, Ausreißer-Erkennung | Jederzeit |
+| **Was die Bereinigung markiert** | Lücken-Erkennung, Ausreißer-Erkennung, Historisch | Jederzeit |
 
 Die beiden ersten Felder verwerfen Messwerte beim Eintreffen. Alles darunter
 lässt sich beliebig oft ändern, ohne etwas zu verlieren.
