@@ -1,5 +1,78 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Historisch**: Entitäten, die bewusst keine Werte mehr bekommen (etwa ein
+  ausgemusterter Zähler), lassen sich als „Historisch“ markieren. Sie zählen
+  dann nicht mehr als inaktiv, weder in der Housekeeping-Liste noch in der
+  Status-Kachel oder der Meldung. Daten und Charts bleiben unverändert. Gesetzt
+  wird es im Reiter „Konfiguration“ der Entität oder direkt in der Liste der
+  inaktiven Entitäten. Eine Kennzeichnung an der Entität zeigt es an, ein
+  eigener Abschnitt im Housekeeping listet alle markierten.
+- **Warnung bei neuen Werten**: Kommen nach der Markierung wieder Werte, bleibt
+  die Markierung bestehen, aber der Abschnitt „Historische Entitäten“ warnt
+  (auch zugeklappt), und eine Meldung weist darauf hin.
+- **Entitäten-Übersicht**: Neue optionale Spalte „Historisch“ (standardmäßig
+  ausgeblendet, sortierbar).
+- **Zählerrückgänge**: Ein Sammelknopf löscht alle Rückgänge, die als „Vermutlich
+  Fehlwert“ eingeordnet sind. Echte Resets und Zählerwechsel bleiben unberührt.
+
+### Geändert
+
+- Meldungen bleiben aktuell: Zum Beispiel verschwindet „Import-Quelldaten liegen
+  noch“ nach dem Löschen sofort, und Duplikate und Ausreißer werden nach dem
+  Markieren oder Zurückholen neu bewertet.
+- Die Links für Duplikate, Ausreißer und Zählerrückgänge in Housekeeping öffnen
+  die Bereinigung mit dem passenden Filter.
+- Aus der Datenqualität bleibt der Rücklink auch nach Bereinigen und Korrigieren
+  erhalten.
+
+### Behoben
+
+- Die Chart-Option „Punkte“ wird gespeichert und wirkt auch auf den Kacheln der
+  Übersicht.
+- Der Hinweis „Du kannst die Seite verlassen …“ im Fortschritt der
+  Entitäts-Bereinigung erscheint nicht mehr mehrfach untereinander.
+
+---
+
+### English
+
+#### New
+
+- **Historic**: Entities that deliberately stop receiving values (for example a
+  decommissioned meter) can be marked as “Historic”. They then no longer count
+  as inactive, neither in the housekeeping list nor in the status tile or the
+  notice. Data and charts stay unchanged. You set it on the entity's
+  “Configuration” tab or directly in the list of inactive entities. A badge on
+  the entity shows it, and a separate housekeeping section lists all marked
+  entities.
+- **Warning on new values**: If values arrive after the mark, the mark stays,
+  but the “Historic entities” section warns (even when collapsed) and a notice
+  points it out.
+- **Entities overview**: New optional column “Historic” (hidden by default,
+  sortable).
+- **Counter decreases**: A bulk button deletes all decreases rated “Probably a
+  bad value”. Genuine resets and meter replacements are left untouched.
+
+#### Changed
+
+- Notices stay up to date: for example “Import source data still present”
+  disappears right after deleting it, and duplicates and outliers are
+  re-evaluated after marking or restoring.
+- The links for duplicates, outliers and counter decreases in housekeeping open
+  the cleanup with the matching filter.
+- The back link from data quality is kept after cleaning up and correcting.
+
+#### Fixed
+
+- The chart option “Points” is saved and also applies to the tiles on the
+  overview.
+- The note “You can leave the page …” in the progress of an entity cleanup no
+  longer appears several times in a row.
+
 ## 1.6.0 - 2026-10-16
 
 ### Neu
