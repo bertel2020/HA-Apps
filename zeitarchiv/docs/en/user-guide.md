@@ -1183,7 +1183,9 @@ With **Mark as historic** the entity no longer counts as inactive: it is missing
 from the "Inactive entities" list, from the number on the status tile and from
 the notice about them. Data, charts and rotation stay unchanged, and the mark
 can be removed at any time. All marked entities are listed in Housekeeping under
-"Historic entities", where the mark can also be removed.
+"Historic entities", where the mark can also be removed. If values still arrive after marking, the
+list shows "still delivers values" with the number of new values; the mark stays
+in place anyway, so a running sensor marked by mistake gets noticed.
 
 ### Resolution
 

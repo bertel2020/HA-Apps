@@ -74,3 +74,25 @@ def test_the_entity_config_page_offers_the_mark_and_the_chart_page_shows_it(clie
     assert "Historisch aufheben" in client.get("/entities/sensor.hist_seite/config").text
     html = client.get("/entities/sensor.hist_seite").text
     assert 'class="badge historic" title="Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet">Historisch' in html
+
+
+def test_a_historic_entity_that_still_delivers_values_is_flagged_but_stays_historic(client) -> None:
+    """Die Markierung bleibt trotz neuer Werte (sonst fiele ein versehentlich
+    markierter, laufender Sensor nie auf), aber die Liste warnt."""
+    from app.main import index
+
+    _old_entity(index, "sensor.hist_lebt")
+    antwort = client.post("/housekeeping/entities/sensor.hist_lebt/historic?value=1").text
+    assert "liefert noch Werte" not in antwort  # frisch markiert: noch nichts seitdem eingetroffen
+
+    index._conn.execute(
+        "UPDATE entities SET last_ts = ?, row_count = row_count + 5 WHERE entity_id = 'sensor.hist_lebt'", (time.time() + 60,)
+    )
+    index._conn.commit()
+    antwort = client.get("/housekeeping/stale-entities").text
+    assert "liefert noch Werte" in antwort
+    assert "· 5 neu" in antwort
+    assert index.get_entity("sensor.hist_lebt")["historic"] == 1
+
+    client.post("/housekeeping/entities/sensor.hist_lebt/historic?value=0")
+    assert index.get_entity("sensor.hist_lebt")["historic_since"] is None

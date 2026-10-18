@@ -1282,7 +1282,10 @@ inaktiv: Sie fehlt in der Liste „Inaktive Entitäten“, in der Zahl der
 Status-Kachel und in der Meldung darüber. Daten, Charts und Rotation bleiben
 unverändert, die Markierung lässt sich jederzeit aufheben. Alle markierten
 Entitäten stehen in Housekeeping im Abschnitt „Historische Entitäten“, wo sich
-die Markierung auch zurücknehmen lässt.
+die Markierung auch zurücknehmen lässt. Kommen nach der Markierung noch Werte
+an, steht dort „liefert noch Werte“ mit der Zahl der neuen Werte; die Markierung
+bleibt trotzdem bestehen, damit ein versehentlich markierter, laufender Sensor
+auffällt.
 
 ### Auflösung
 

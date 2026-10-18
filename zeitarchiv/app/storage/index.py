@@ -945,6 +945,15 @@ class Index:
             # Daten, Charts und Rotation bleiben unberührt. Default 0 = bisheriges
             # Verhalten.
             self._conn.execute("ALTER TABLE entities ADD COLUMN historic INTEGER NOT NULL DEFAULT 0")
+        if "historic_since" not in columns:
+            # Zeitpunkt der Markierung und Zeilenzahl dazu: Grundlage der Warnung
+            # „liefert noch Werte“ (Housekeeping → Historische Entitäten). Die
+            # Markierung selbst bleibt trotz neuer Werte bestehen, damit eine
+            # zu Unrecht markierte, laufende Entität auffällt statt stillschweigend
+            # wieder in der Inaktiv-Liste zu landen. NULL bei Markierungen aus der
+            # Zeit davor: dort gibt es keinen Bezugspunkt, also keine Warnung.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN historic_since REAL")
+            self._conn.execute("ALTER TABLE entities ADD COLUMN historic_rows INTEGER")
         if "chart_options" not in columns:
             # Individuelle Übersteuerung der Chart-Optionen (Optionen-Menü auf
             # der Entität-eigenen Chart-Seite, entity_detail.html) — ein
@@ -1961,9 +1970,16 @@ class Index:
         (siehe Spalten-Migration oben). Berührt updated_at nicht: das ist keine
         Änderung an der Entität selbst, sondern an der Inaktiv-Erkennung."""
         with self._lock, self._conn:
-            self._conn.execute(
-                "UPDATE entities SET historic = ? WHERE entity_id = ?", (int(historic), entity_id)
-            )
+            if historic:
+                self._conn.execute(
+                    "UPDATE entities SET historic = 1, historic_since = ?, historic_rows = row_count WHERE entity_id = ?",
+                    (time.time(), entity_id),
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE entities SET historic = 0, historic_since = NULL, historic_rows = NULL WHERE entity_id = ?",
+                    (entity_id,),
+                )
 
     def set_entity_chart_options(self, entity_id: str, options: dict) -> None:
         """Speichert den vollständigen Chart-Optionen-Stand einer Entität

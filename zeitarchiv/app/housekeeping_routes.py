@@ -809,7 +809,15 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         now_ts = time.time()
 
         def _row(entity, last_ts, days_ago) -> dict:
+            since = entity["historic_since"] if entity["historic"] else None
+            # „Liefert noch Werte“: seit der Markierung ist ein Wert eingetroffen.
+            # Die Zahl ist der Zuwachs von row_count (kann durch Löschen kleiner
+            # werden, daher nie unter 0); ohne Markierzeitpunkt keine Aussage.
+            alive = since is not None and last_ts is not None and last_ts > since
             return {
+                "since_label": formats.format_date(datetime.fromtimestamp(since, deps.tz)) if since is not None else "—",
+                "alive": alive,
+                "new_values": format_int(max((entity["row_count"] or 0) - (entity["historic_rows"] or 0), 0)) if alive else "0",
                 "entity_id": entity["entity_id"],
                 "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
                 "has_name": bool(entity["custom_name"] or entity["friendly_name"]),
@@ -836,13 +844,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             elif last_ts is None or now_ts - last_ts >= threshold_seconds:
                 rows.append(_row(entity, last_ts, days_ago))
         rows.sort(key=lambda r: r["days_ago_raw"], reverse=True)
-        historic_rows.sort(key=lambda r: r["display_name"].lower())
+        historic_rows.sort(key=lambda r: (not r["alive"], r["display_name"].lower()))
         return {
             "stale_entities": rows,
             "stale_entities_days": days,
             "stale_entities_day_options": _STALE_ENTITIES_DAY_OPTIONS,
             "historic_entities": historic_rows,
             "historic_open": hist_open,
+            "historic_alive_count": sum(1 for r in historic_rows if r["alive"]),
         }
 
 
