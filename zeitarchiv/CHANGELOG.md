@@ -9,13 +9,12 @@
   dann nicht mehr als inaktiv, weder in der Housekeeping-Liste noch in der
   Status-Kachel oder der Meldung. Daten und Charts bleiben unverändert. Gesetzt
   wird es im Reiter „Konfiguration“ der Entität oder direkt in der Liste der
-  inaktiven Entitäten. Eine Kennzeichnung an der Entität zeigt es an, ein
-  eigener Abschnitt im Housekeeping listet alle markierten.
-- **Warnung bei neuen Werten**: Kommen nach der Markierung wieder Werte, bleibt
-  die Markierung bestehen, aber der Abschnitt „Historische Entitäten“ warnt
-  (auch zugeklappt), und eine Meldung weist darauf hin.
-- **Entitäten-Übersicht**: Neue optionale Spalte „Historisch“ (standardmäßig
-  ausgeblendet, sortierbar).
+  inaktiven Entitäten; eine Kennzeichnung an der Entität zeigt es an, ein
+  eigener Abschnitt im Housekeeping listet alle markierten. Kommen nach der
+  Markierung wieder Werte, bleibt sie bestehen, aber der Abschnitt warnt (auch
+  zugeklappt) und eine Meldung weist darauf hin. In der Entitäten-Übersicht gibt
+  es dazu eine optionale, sortierbare Spalte „Historisch“ (standardmäßig
+  ausgeblendet).
 - **Zählerrückgänge**: Ein Sammelknopf löscht alle Rückgänge, die als „Vermutlich
   Fehlwert“ eingeordnet sind. Echte Resets und Zählerwechsel bleiben unberührt.
 
@@ -46,14 +45,11 @@
   decommissioned meter) can be marked as “Historic”. They then no longer count
   as inactive, neither in the housekeeping list nor in the status tile or the
   notice. Data and charts stay unchanged. You set it on the entity's
-  “Configuration” tab or directly in the list of inactive entities. A badge on
+  “Configuration” tab or directly in the list of inactive entities; a badge on
   the entity shows it, and a separate housekeeping section lists all marked
-  entities.
-- **Warning on new values**: If values arrive after the mark, the mark stays,
-  but the “Historic entities” section warns (even when collapsed) and a notice
-  points it out.
-- **Entities overview**: New optional column “Historic” (hidden by default,
-  sortable).
+  entities. If values arrive after the mark, the mark stays, but the section
+  warns (even when collapsed) and a notice points it out. The entities overview
+  gets an optional, sortable column “Historic” (hidden by default).
 - **Counter decreases**: A bulk button deletes all decreases rated “Probably a
   bad value”. Genuine resets and meter replacements are left untouched.
 
