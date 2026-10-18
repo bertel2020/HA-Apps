@@ -1977,6 +1977,8 @@ Zeitarchiv unter anderem:
 - Endgültige Bereinigung möglich, Duplikate gefunden, Rotation ausstehend
 - Inaktive Entitäten, dreistufig nach Alter (1/3/7 Tage, mit steigendem
   Schweregrad)
+- Als „Historisch“ markierte Entitäten, die seit der Markierung wieder Werte
+  geliefert haben
 - Lücken-Erkennung einer Entität kann durch ihre Auflösung oder den aktiven
   Wertänderungsfilter strukturell nie zutreffen (siehe
   [Housekeeping → Konfiguration](#housekeeping) und

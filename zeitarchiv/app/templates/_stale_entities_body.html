@@ -46,7 +46,7 @@
    selben Partial wie die Inaktiv-Liste, damit ein Klick auf „Historisch“ bzw.
    „Wieder aufnehmen“ beide Listen mit einer einzigen Antwort aktualisiert. #}
 <details class="hk-historic counter-allowed"{% if historic_open or (historic_entities and not stale_entities) %} open{% endif %}>
-  <summary>{{ _("Historische Entitäten") }} <span class="counter-verdict">{{ historic_entities|length }}</span></summary>
+  <summary>{{ _("Historische Entitäten") }} <span class="counter-verdict">{{ historic_entities|length }}</span>{% if historic_alive_count %} <span class="badge-warn">{{ _("⚠ {count} liefern noch Werte", count=historic_alive_count) }}</span>{% endif %}</summary>
   <p class="settings-section-description">{{ _("Diese Entitäten bekommen bewusst keine neuen Werte mehr und zählen nicht als inaktiv. Daten und Charts bleiben unverändert.") }}</p>
   {% if historic_alive_count %}
   <div class="alert-warn" role="alert">

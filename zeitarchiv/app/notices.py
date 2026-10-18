@@ -828,6 +828,22 @@ def build_notices(
             "link": "/housekeeping#entitaeten",
         })
 
+    # „Historisch“-Markierung, obwohl wieder Werte kommen: die Markierung bleibt
+    # bewusst stehen (siehe Handbuch „Historisch“), also muss jemand hinsehen.
+    alive_historic = _count_alive_historic_entities(index)
+    if alive_historic:
+        notices.append({
+            "id": "housekeeping.historic_alive",
+            "severity": "warn",
+            "title": tr("Historische Entitäten liefern wieder Werte"),
+            "detail": (
+                tr("{count} als historisch markierte Entität hat seit der Markierung neue Werte geliefert. Prüfen, ob die Markierung noch stimmt.", count=alive_historic) if alive_historic == 1
+                else tr("{count} als historisch markierte Entitäten haben seit der Markierung neue Werte geliefert. Prüfen, ob die Markierung noch stimmt.", count=alive_historic)
+            ),
+            "meta": tr("Housekeeping"),
+            "link": "/housekeeping#entitaeten",
+        })
+
     # Demo-Modus (DEMO_MODUS_PLAN.md) — nur wenn main.py überhaupt einen
     # demo_dir_info übergibt: das passiert ausschließlich, wenn DIESE
     # Instanz NICHT selbst im Demo-Modus läuft (siehe demo_mode.py-Moduldoc)
@@ -889,6 +905,16 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
         elif days >= INACTIVE_ENTITY_INFO_DAYS:
             counts["info"] += 1
     return counts
+
+
+def _count_alive_historic_entities(index) -> int:
+    """Historisch markierte Entitäten mit einem Wert NACH dem Markierzeitpunkt —
+    dieselbe Bedingung wie „liefert noch Werte“ in der Housekeeping-Liste.
+    Ohne Markierzeitpunkt (ältere Markierungen) keine Aussage, also nicht gezählt."""
+    return sum(
+        1 for e in index.list_entities()
+        if e["historic"] and e["historic_since"] is not None and e["last_ts"] is not None and e["last_ts"] > e["historic_since"]
+    )
 
 
 def tips_enabled(index) -> bool:

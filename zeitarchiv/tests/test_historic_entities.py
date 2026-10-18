@@ -110,3 +110,17 @@ def test_the_entity_list_offers_a_historic_column_that_is_off_by_default(client)
     finally:
         client.get("/entities-table?columns_submitted=1&columns=type&columns=first_ts&columns=last_ts&columns=unit&columns=rows&columns=size")
         index.set_entity_historic("sensor.hist_col", False)
+
+
+def test_a_historic_entity_that_delivers_again_raises_a_notice_and_a_collapsed_hint(tmp_path) -> None:
+    index = Index(tmp_path / "index.sqlite")
+    _old_entity(index, "sensor.archiv")
+    index.set_entity_historic("sensor.archiv", True)
+    assert notices_mod._count_alive_historic_entities(index) == 0
+
+    index._conn.execute("UPDATE entities SET last_ts = ? WHERE entity_id = 'sensor.archiv'", (time.time() + 60,))
+    index._conn.commit()
+    assert notices_mod._count_alive_historic_entities(index) == 1
+    index.set_entity_historic("sensor.archiv", False)
+    assert notices_mod._count_alive_historic_entities(index) == 0
+    index.close()

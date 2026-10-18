@@ -1837,6 +1837,8 @@ backup/retention runs, Zeitarchiv checks, among other things:
 - Final cleanup possible, duplicates found, rotation pending
 - Inactive entities, three-tiered by age (1/3/7 days, with increasing
   severity)
+- Entities marked as "Historic" that have delivered values again since being
+  marked
 - Gap detection of an entity can structurally never apply because of its
   resolution or the active value change filter (see [Housekeeping →
   Configuration](#housekeeping) and [Configuring an
