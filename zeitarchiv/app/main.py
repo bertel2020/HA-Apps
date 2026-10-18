@@ -3502,9 +3502,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "legend_style": chart["legend_style"] if chart else "chips",
         "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else "auto",
         "decimals": chart["decimals"] if chart else "auto",
-        "show_values": chart["show_values"] if chart else False,
-        "average_line": chart["average_line"] if chart else False,
-        "area_fill": chart["area_fill"] if chart else True,
+        "show_values": chart["show_values"] if chart else False, "average_line": chart["average_line"] if chart else False,
+        "area_fill": chart["area_fill"] if chart else True, "show_points": chart["show_points"] if chart else False,
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
         "average_style": chart["average_style"] if chart else "flat",
@@ -3572,6 +3571,7 @@ class _SaveChartBody(BaseModel):
     show_values: bool = False
     average_line: bool = False
     area_fill: bool = True
+    show_points: bool = False
     stacked: bool = False
     normalize: bool = False
     average_style: str = "flat"
@@ -3619,7 +3619,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line, area_fill=body.area_fill,
+        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
     )
@@ -3666,7 +3666,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line, area_fill=body.area_fill,
+        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
     )
@@ -3706,7 +3706,7 @@ def charts_duplicate(chart_id: int) -> dict:
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
-        average_line=chart["average_line"], area_fill=chart["area_fill"],
+        average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
     )
@@ -3896,7 +3896,7 @@ def _dashboard_tiles_context(
                 "legend_style": c["legend_style"],
                 "chart_type": effective_chart_type(c, aggregation_types),
                 "show_values": c["show_values"], "decimals": c["decimals"],
-                "average_line": c["average_line"], "area_fill": c["area_fill"],
+                "average_line": c["average_line"], "area_fill": c["area_fill"], "show_points": c["show_points"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
                 "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"],
             })

@@ -397,6 +397,7 @@
     // dezente Füllfläche wie auf der eigenen Chart-Seite, damit ein
     // angeheftetes Chart nicht anders aussieht als dasselbe Chart dort.
     const areaFill = el.dataset.areaFill !== 'false';
+    const showPoints = el.dataset.showPoints === 'true';
     // "Gestapelt"/"Anteile (%)" (Optionen-Menü der Chart-Seite) — dieselbe
     // stacked-Kachel-Vorschau wie auf der eigenen Chart-Seite, siehe
     // stackedActive/normalizeActive weiter unten (chart_editor.js-Parität).
@@ -775,7 +776,7 @@
       };
       if (s.chart_type === 'line') {
         cfg.smooth = true;
-        cfg.symbol = 'none';
+        if (!showPoints) cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
         // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,

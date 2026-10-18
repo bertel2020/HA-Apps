@@ -544,7 +544,7 @@
         // — entscheidet, ob clearSollEntity() sie beim Leeren des Feldes
         // wieder entfernen darf (siehe dort).
         sollAutoAdded: false,
-        showPoints: false,
+        showPoints: SHOW_POINTS,
         showValues: SHOW_VALUES,
         averageLine: AVERAGE_LINE,
         areaFill: AREA_FILL,
@@ -2226,6 +2226,7 @@
             show_values: this.showValues,
             average_line: this.averageLine,
             area_fill: this.areaFill,
+            show_points: this.showPoints,
             stacked: this.stacked,
             normalize: this.normalize,
             average_style: this.averageStyle,

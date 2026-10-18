@@ -1129,6 +1129,14 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN area_fill INTEGER NOT NULL DEFAULT 1"
             )
+        if "show_points" not in sc_columns:
+            # "Punkte" (Optionen-Menü, "Darstellung") — Datenpunkte auf der
+            # Linie markieren. Wurde bislang nur im Editor-Zustand gehalten und
+            # beim Speichern verworfen; die Dashboard-Kachel zeichnete deshalb
+            # nie Punkte. Default AUS: das entspricht dem bisherigen Aussehen.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN show_points INTEGER NOT NULL DEFAULT 0"
+            )
         if "decimals" not in sc_columns:
             # Nachkommastellen-Übersteuerung (Optionen-Menü, "Darstellung") —
             # "auto" übernimmt weiterhin je Serie deren eigene entities.decimals-
@@ -2282,6 +2290,7 @@ class Index:
         show_values: bool = False,
         average_line: bool = False,
         area_fill: bool = True,
+        show_points: bool = False,
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
@@ -2296,9 +2305,9 @@ class Index:
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, decimals, show_values, average_line, area_fill, stacked, normalize, "
+                "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
                 "average_style, horizontal, donut_aggregation, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2306,7 +2315,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(stacked), int(normalize),
+                    int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, now, now,
                 ),
             )
@@ -2332,6 +2341,7 @@ class Index:
         show_values: bool = False,
         average_line: bool = False,
         area_fill: bool = True,
+        show_points: bool = False,
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
@@ -2345,7 +2355,7 @@ class Index:
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, average_line = ?, area_fill = ?, stacked = ?, normalize = ?, "
+                "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
                 "average_style = ?, horizontal = ?, donut_aggregation = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
@@ -2354,7 +2364,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(stacked), int(normalize),
+                    int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, time.time(), chart_id,
                 ),
             )
@@ -2373,6 +2383,7 @@ class Index:
         d["show_values"] = bool(d.get("show_values", 0))
         d["average_line"] = bool(d.get("average_line", 0))
         d["area_fill"] = bool(d.get("area_fill", 1))
+        d["show_points"] = bool(d.get("show_points", 0))
         d["stacked"] = bool(d.get("stacked", 0))
         d["normalize"] = bool(d.get("normalize", 0))
         d["average_style"] = d.get("average_style") or "flat"
