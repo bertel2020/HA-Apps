@@ -39,6 +39,9 @@
      des nachgeladenen Fragments, damit Suche und Sortierung sie nicht zurücksetzen. */
   #entities-panel:not(.is-selecting) .col-sel{display:none;}
   #sel-toggle[aria-pressed="true"]{border-color:var(--accent-line);color:var(--accent-line);background:var(--accent-line-soft);}
+  /* Zwölf Zeilen sind höher als das allgemeine max-height des Popovers (360px)
+     und die letzte läge sonst unsichtbar hinter dem Scrollbereich. */
+  #col-picker-popover{max-height:min(480px, 80vh);}
   .col-fav{width:40px;}
   .col-entity{width:330px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + deutlich mehr Puffer für den nun verfügbaren Platz */
   .col-type{width:112px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
