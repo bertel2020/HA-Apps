@@ -187,6 +187,9 @@
   .hk-col-letzter-wert{width:176px;}
   .hk-col-vor{width:108px;}
   .hk-col-datenpunkte{width:118px;}
+  /* Aktionsknopf ("Historisch" / "Wieder aufnehmen"): schmal, rechtsbündig, damit der Name den Platz bekommt. */
+  .hk-col-aktion{width:132px;}
+  #stale-entities-body td.num:last-child,#stale-entities-body th.num:last-child{text-align:right;}
 
 /* Zählerrückgänge: Einordnung als kleine Marke, darunter die Begründung. */
 .counter-verdict{

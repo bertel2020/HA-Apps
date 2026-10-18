@@ -9,7 +9,7 @@
        Entitätsspalte bekommt damit alles Übrige und die Ellipsis greift an
        der echten Spaltenkante statt an einer festen Obergrenze. #}
     <colgroup>
-      <col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte"><col>
+      <col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte"><col class="hk-col-aktion">
     </colgroup>
     <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Vor") }}</th><th class="num">{{ _("Datenpunkte") }}</th><th></th></tr></thead>
     <tbody>
@@ -45,13 +45,14 @@
 {# Alle als „historisch“ markierten Entitäten, unabhängig vom Schwellwert. Im
    selben Partial wie die Inaktiv-Liste, damit ein Klick auf „Historisch“ bzw.
    „Wieder aufnehmen“ beide Listen mit einer einzigen Antwort aktualisiert. #}
-<details class="hk-historic"{% if historic_open or (historic_entities and not stale_entities) %} open{% endif %}>
-  <summary>{{ _("Historische Entitäten") }} <span class="chip">{{ historic_entities|length }}</span></summary>
+<details class="hk-historic counter-allowed"{% if historic_open or (historic_entities and not stale_entities) %} open{% endif %}>
+  <summary>{{ _("Historische Entitäten") }} <span class="counter-verdict">{{ historic_entities|length }}</span></summary>
   <p class="settings-section-description">{{ _("Diese Entitäten bekommen bewusst keine neuen Werte mehr und zählen nicht als inaktiv. Daten und Charts bleiben unverändert.") }}</p>
   {% if historic_entities %}
   <div class="tbl-wrap">
     <table class="dt">
-      <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Datenpunkte") }}</th><th></th></tr></thead>
+      <colgroup><col><col class="hk-col-letzter-wert"><col class="hk-col-vor"><col class="hk-col-datenpunkte"><col class="hk-col-aktion"></colgroup>
+      <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Letzter Wert") }}</th><th class="num">{{ _("Vor") }}</th><th class="num">{{ _("Datenpunkte") }}</th><th></th></tr></thead>
       <tbody>
       {% for row in historic_entities %}
       <tr>
@@ -62,6 +63,7 @@
           </a>
         </td>
         <td>{{ row.last_value_label }}</td>
+        <td class="num" data-sort="{{ row.days_ago_raw }}">{{ row.days_ago_label }}</td>
         <td class="num">{{ row.row_count }}</td>
         <td class="num">
           <button type="button" class="btn btn-sm"

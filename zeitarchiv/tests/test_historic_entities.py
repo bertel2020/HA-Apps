@@ -44,13 +44,13 @@ def test_the_housekeeping_list_moves_the_entity_to_the_historic_section(client) 
     assert "sensor.hist_liste" in client.get("/housekeeping/stale-entities").text
 
     antwort = client.post("/housekeeping/entities/sensor.hist_liste/historic?value=1&days=3").text
-    stale_teil, historic_teil = antwort.split('<details class="hk-historic"')
+    stale_teil, historic_teil = antwort.split('<details class="hk-historic')
     assert "sensor.hist_liste" not in stale_teil
     assert "sensor.hist_liste" in historic_teil
     assert "Wieder aufnehmen" in historic_teil
 
     antwort = client.post("/housekeeping/entities/sensor.hist_liste/historic?value=0&days=3&hist_open=1").text
-    assert "sensor.hist_liste" in antwort.split('<details class="hk-historic"')[0]
+    assert "sensor.hist_liste" in antwort.split('<details class="hk-historic')[0]
 
 
 def test_historic_ignores_the_day_threshold_and_unknown_entities_404(client) -> None:
