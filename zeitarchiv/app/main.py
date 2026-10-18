@@ -2766,7 +2766,7 @@ def _entity_config_context(entity) -> dict:
         "custom_name": entity["custom_name"] or "",
         # Für den Favoritenstern im Seitenkopf: die drei Entitätsseiten tragen
         # seit der Reiterzeile denselben Kopf, und dort gehört er dazu.
-        "is_favorite": bool(entity["is_favorite"]),
+        "is_favorite": bool(entity["is_favorite"]), "historic": bool(entity["historic"]),
         "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),

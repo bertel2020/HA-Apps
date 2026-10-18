@@ -1,5 +1,6 @@
 {
   "app": {
+    "Für Entitäten, die bewusst keine neuen Werte mehr bekommen (z. B. archivierte Zähler): sie zählen dann nicht mehr als inaktiv. Daten und Charts bleiben unverändert.": "For entities that intentionally receive no new values (e.g. archived meters): they are then no longer counted as inactive. Data and charts stay unchanged.",
     "Historisch": "Historic",
     "Historische Entitäten": "Historic entities",
     "Wieder aufnehmen": "Resume",

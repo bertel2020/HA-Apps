@@ -64,12 +64,13 @@ def test_historic_ignores_the_day_threshold_and_unknown_entities_404(client) -> 
     assert client.post("/housekeeping/entities/sensor.gibt_es_nicht/historic?value=1").status_code == 404
 
 
-def test_the_entity_page_offers_the_mark_and_shows_it(client) -> None:
+def test_the_entity_config_page_offers_the_mark_and_the_chart_page_shows_it(client) -> None:
     from app.main import index
 
     index.get_or_create_entity("sensor.hist_seite", "sensor", "total", "kWh")
-    assert "Als historisch markieren" in client.get("/entities/sensor.hist_seite").text
+    assert "Als historisch markieren" in client.get("/entities/sensor.hist_seite/config").text
+    assert "Als historisch markieren" not in client.get("/entities/sensor.hist_seite").text  # nicht im Optionen-Menü
     client.post("/housekeeping/entities/sensor.hist_seite/historic?value=1")
+    assert "Historisch aufheben" in client.get("/entities/sensor.hist_seite/config").text
     html = client.get("/entities/sensor.hist_seite").text
-    assert "Historisch aufheben" in html
     assert 'class="chip" title="Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet">Historisch' in html

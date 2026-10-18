@@ -1274,6 +1274,16 @@ Optional, bis 40 Zeichen. Überschreibt die Darstellung **nur in Zeitarchiv**
 markiert überall, wo ein eigener Name aktiv ist. Leer lassen stellt den
 HA-Namen wieder her.
 
+### Historisch
+
+Für Entitäten, die bewusst keine neuen Werte mehr bekommen, etwa archivierte
+Zähler. Mit **Als historisch markieren** zählt die Entität nicht mehr als
+inaktiv: Sie fehlt in der Liste „Inaktive Entitäten“, in der Zahl der
+Status-Kachel und in der Meldung darüber. Daten, Charts und Rotation bleiben
+unverändert, die Markierung lässt sich jederzeit aufheben. Alle markierten
+Entitäten stehen in Housekeeping im Abschnitt „Historische Entitäten“, wo sich
+die Markierung auch zurücknehmen lässt.
+
 ### Auflösung
 
 **Mindestabstand zwischen zwei gespeicherten Werten.** Wählbar: Rohdaten,

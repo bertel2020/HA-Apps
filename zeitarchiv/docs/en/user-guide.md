@@ -1176,6 +1176,15 @@ Zeitarchiv** (lists, selection fields, diagrams, tables) — Home Assistant's ow
 everywhere where a custom name is active. Leaving it empty restores the HA
 name.
 
+### Historic
+
+For entities that intentionally receive no new values, such as archived meters.
+With **Mark as historic** the entity no longer counts as inactive: it is missing
+from the "Inactive entities" list, from the number on the status tile and from
+the notice about them. Data, charts and rotation stay unchanged, and the mark
+can be removed at any time. All marked entities are listed in Housekeeping under
+"Historic entities", where the mark can also be removed.
+
 ### Resolution
 
 **Minimum interval between two stored values.** Selectable: raw data, 30

@@ -269,8 +269,6 @@
                zugleich zeigt, auf welcher der drei Seiten man gerade ist.
                "Als Chart speichern" bleibt: das tut etwas auf DIESER Seite. #}
             <a class="menu-row" :href="saveAsChartUrl">{{ _("Als Chart speichern") }} <span class="menu-row-arrow">→</span></a>
-            <button type="button" class="menu-row" title="{{ _('Keine neuen Werte mehr erwartet: nicht mehr als inaktiv melden') }}"
-                    onclick="fetch('{{ app_root }}/housekeeping/entities/{{ entity_id }}/historic?value={{ '0' if historic else '1' }}', {method: 'POST'}).then(() => location.reload())">{{ _("Historisch aufheben") if historic else _("Als historisch markieren") }}</button>
             <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">{{ _("Optionen auf Standard zurücksetzen") }}</button>
           </div>
         </div>

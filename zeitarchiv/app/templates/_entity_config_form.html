@@ -7,6 +7,13 @@
   {% call hint_body() %}{{ _("Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {custom_name_max_length} Zeichen.", custom_name_max_length=custom_name_max_length) }}{% endcall %}
 </div>
 <div class="field">
+  <label>{{ _("Historisch") }} {{ hint_button(_('Historisch')) }}</label>
+  {% if historic %}<span class="chip">{{ _("Historisch") }}</span>{% endif %}
+  <button type="button" class="btn" hx-post="{{ app_root }}/housekeeping/entities/{{ entity_id }}/historic?value={{ '0' if historic else '1' }}"
+          hx-swap="none" hx-on::after-request="location.reload()">{{ _("Historisch aufheben") if historic else _("Als historisch markieren") }}</button>
+  {% call hint_body() %}{{ _("Für Entitäten, die bewusst keine neuen Werte mehr bekommen (z. B. archivierte Zähler): sie zählen dann nicht mehr als inaktiv. Daten und Charts bleiben unverändert.") }}{% endcall %}
+</div>
+<div class="field">
   <label>{{ _("Auflösung") }} {{ hint_button(_('Auflösung')) }}</label>
   {# Switch: fest gesperrt, siehe RESOLUTION_BLOCKED_REASONS-Kommentar
      (formatting.py) — dasselbe Muster wie outlier_blocked_reason oben im
