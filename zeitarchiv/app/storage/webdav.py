@@ -37,6 +37,18 @@ def unique_part_name(name: str) -> str:
     das Aufräummuster ``.zeitarchiv-backup-*.part``."""
     return f".{name}.{secrets.token_hex(4)}.part"
 
+
+UPLOAD_PREFIX = ".zeitarchiv-upload-"
+
+
+def unique_upload_name(name: str) -> str:
+    """Temporärer Name am WebDAV-Ziel, eindeutig je Versuch wie
+    unique_part_name — aber mit derselben Endung wie der Endname. Nextcloud
+    verbietet ab Version 31 Dateinamen auf .part grundsätzlich (intern belegt)
+    und lehnt den PUT mit 400 ab; frei konfigurierbare Endungsverbote treffen
+    so den Zwischennamen nie, ohne auch den Endnamen zu treffen."""
+    return f"{UPLOAD_PREFIX}{secrets.token_hex(4)}-{name}"
+
 SOCKET_TIMEOUT_SECONDS = 30.0
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 DAV_NS = "{DAV:}"
@@ -212,10 +224,10 @@ class WebDavClient:
         beat: Callable[[], None] = lambda: None,
         on_progress: Callable[[int, int], None] | None = None,
     ) -> int:
-        """Lädt unter .part-Namen hoch, prüft die Größe und benennt per MOVE
-        um — unter dem Endnamen liegt nie eine halbe Datei."""
+        """Lädt unter temporärem Namen hoch, prüft die Größe und benennt per
+        MOVE um — unter dem Endnamen liegt nie eine halbe Datei."""
         size = source.stat().st_size
-        part = unique_part_name(name)
+        part = unique_upload_name(name)
         body = _UploadBody(source, beat, on_progress)
         try:
             self._request(

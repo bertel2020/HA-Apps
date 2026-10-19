@@ -430,7 +430,10 @@ def transfer_webdav(
         client.ensure_folder()
         beat()
         for leftover in client.list_files():  # abgebrochene Uploads dieser App
-            if leftover.name.startswith(".zeitarchiv-backup-") and leftover.name.endswith(".part"):
+            # .part-Namen stammen aus Versionen vor dem Umstieg auf unique_upload_name
+            if leftover.name.startswith(webdav.UPLOAD_PREFIX) or (
+                leftover.name.startswith(".zeitarchiv-backup-") and leftover.name.endswith(".part")
+            ):
                 client.delete(leftover.name, missing_ok=True)
         return client.upload(source, source.name, beat, on_progress)
     except webdav.WebDavError as exc:
