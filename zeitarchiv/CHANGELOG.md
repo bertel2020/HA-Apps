@@ -17,14 +17,17 @@
   später 2025, beim Ansehen und auf dem Dashboard; in der laufenden Periode
   gespeichert, bleibt es immer aktuell. „Als Chart speichern“ auf der Seite
   einer Entität übernimmt die dort angezeigte Periode.
-- **Vergleich wird mit dem Chart gespeichert**: „Vorjahr“, „Langzeit“ und die
-  übrigen Vergleiche samt Laufsumme, Soll Entität, Jahren und Ø-Linie bleiben
-  am Chart erhalten und sind beim nächsten Öffnen wieder da. Dashboard-Kacheln
-  zeigen den Vergleich noch nicht.
 - **Zurück zu jetzt**: Die Seite einer Entität hat wie der Chart-Editor einen
   Knopf „Zurück zu jetzt“, sobald eine vergangene Periode angezeigt wird. Im
   Chart-Editor steht die Navigation jetzt wie dort rechts neben der
   Zeitraumauswahl.
+
+### Behoben
+
+- **Vergleich im Chart wurde nicht gespeichert**: „Vorjahr“, „Langzeit“ und die
+  übrigen Vergleiche samt Laufsumme, Soll Entität, Jahren und Ø-Linie standen
+  beim nächsten Öffnen eines Charts wieder auf „Aus“. Sie bleiben jetzt am Chart
+  erhalten. Dashboard-Kacheln zeigen den Vergleich noch nicht.
 
 ---
 
@@ -44,13 +47,16 @@
   entity. A chart saved at 2025 still shows 2025 later, when viewing and on the
   dashboard; saved in the current period, it always stays current. “Save as
   chart” on an entity's page takes over the period shown there.
-- **Comparison is saved with the chart**: “Previous year”, “Long-term” and the
-  other comparisons, including running total, target entity, years and Ø line,
-  stay with the chart and are back the next time it opens. Dashboard tiles do
-  not show the comparison yet.
 - **Back to now**: Like the chart editor, an entity's page now has a “Back to
   now” button whenever a past period is shown. In the chart editor, the
   navigation now sits next to the period selection, as it does there.
+
+#### Fixed
+
+- **Chart comparison was not saved**: “Previous year”, “Long-term” and the other
+  comparisons, including running total, target entity, years and Ø line, were
+  back to “Off” the next time a chart was opened. They now stay with the chart.
+  Dashboard tiles do not show the comparison yet.
 
 ## 1.7.0 - 2026-10-19
 
