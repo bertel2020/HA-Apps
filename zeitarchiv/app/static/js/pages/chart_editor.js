@@ -527,10 +527,11 @@
         // bis wohin der letzte bekannte Linienwert gehalten wird — dort wird
         // bewusst NICHT in die Zukunft fortgeschrieben.
         periodEnd: null,
-        // Zeitraum-Navigation (‹ › und Kalender an der Zeitraumanzeige) wie
-        // auf der Entitätsseite: 0 = laufende Periode, -1 = eine davor usw.
-        // Reine Ansicht, nie mit dem Chart gespeichert — ein gespeichertes
-        // Chart öffnet immer mit der laufenden Periode (siehe save()).
+        // Zeitraum-Navigation (‹ › und Kalender an der Zeitraumanzeige, nur
+        // beim Anpassen) wie auf der Entitätsseite: 0 = laufende Periode,
+        // -1 = eine davor usw. Nie mit dem Chart gespeichert — ein
+        // gespeichertes Chart öffnet immer mit der laufenden Periode, und
+        // save() springt beim Verlassen des Modus dorthin zurück.
         offset: 0,
         // Zeitlicher Anker beim Wechsel des Zeitraums (siehe setRange()), wie
         // _rangeAnchorMs in entity_detail.js.
@@ -2623,6 +2624,9 @@
             }
             this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
+            // Die Navigation gibt es nur beim Anpassen; beim Ansehen soll das
+            // Chart wieder die laufende Periode zeigen, wie nach dem Öffnen.
+            if (this.offset !== 0) this.goToNow();
             setTimeout(() => { this.savedMessage = ''; }, 2000);
           } finally {
             this.saving = false;

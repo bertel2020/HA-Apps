@@ -915,12 +915,12 @@ compared with the average up to the same day. Long-term is not available with
 
 ### Differences from the history view of a single entity
 
-A chart always opens with the **current period**. With ‹ and › next to the
-period label you page back to past periods, as on the page of a single
-entity, both when viewing and when customizing; clicking the label opens a
-calendar for a direct jump. **Back to now** (or, when customizing, clicking
-the selected period again) returns to the current period. Only the kind of
-period is saved, not the period shown. Comparisons refer to the period shown.
+When viewing, a chart always shows the **current period**. When
+**customizing**, ‹ and › next to the period label page back to past periods,
+as on the page of a single entity; clicking the label opens a calendar for a
+direct jump. **Back to now** or clicking the selected period again returns to
+the current period. Only the kind of period is saved, not the period shown;
+after saving, the chart shows the current period again. Comparisons refer to the period shown.
 Unlike there, zooming into a section is missing (see [Zooming into a
 section](#zooming-into-a-section)) — a chart can only be narrowed via period
 and resolution, not by mouse/touch.

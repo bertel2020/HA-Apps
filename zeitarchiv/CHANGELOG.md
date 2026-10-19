@@ -11,10 +11,11 @@
   10 oder Alle). Unter dem Chart zeigt eine Tabelle Jahr × Monat die Werte und
   die Abweichung zum Durchschnitt; das laufende Jahr wird mit dem Durchschnitt
   bis zum gleichen Tag verglichen.
-- **Charts durchblättern**: Gespeicherte Charts lassen sich wie die Seite einer
-  einzelnen Entität mit ‹ und › oder über einen Kalender zu vergangenen
-  Perioden blättern, etwa zum Jahr 2025. „Zurück zu jetzt“ führt zur laufenden
-  Periode zurück. Gespeichert wird weiterhin nur die Art des Zeitraums.
+- **Charts durchblättern**: Beim Anpassen eines Charts lässt sich wie auf der
+  Seite einer einzelnen Entität mit ‹ und › oder über einen Kalender zu
+  vergangenen Perioden blättern, etwa zum Jahr 2025. „Zurück zu jetzt“ führt
+  zur laufenden Periode zurück. Gespeichert wird weiterhin nur die Art des
+  Zeitraums.
 
 ---
 
@@ -29,10 +30,10 @@
   All). Below the chart, a year × month table shows the values and the deviation
   from the average; the current year is compared with the average up to the
   same day.
-- **Page through charts**: Saved charts can be paged back to past periods with
-  ‹ and › or a calendar, like the page of a single entity, for example to the
-  year 2025. “Back to now” returns to the current period. Only the kind of
-  period is still saved.
+- **Page through charts**: When customizing a chart, you can page back to past
+  periods with ‹ and › or a calendar, like on the page of a single entity, for
+  example to the year 2025. “Back to now” returns to the current period. Only
+  the kind of period is still saved.
 
 ## 1.7.0 - 2026-10-19
 

@@ -1,5 +1,6 @@
 """Zeitraum-Navigation im Chart-Editor (‹ Zeitraum ›, Kalender, „Zurück zu
-jetzt“) — dieselben Bausteine wie auf der Entitätsseite, nie gespeichert."""
+jetzt“) — nur beim Anpassen, dieselben Bausteine wie auf der Entitätsseite,
+nie gespeichert."""
 
 from __future__ import annotations
 
@@ -10,17 +11,27 @@ EDITOR_TEMPLATE = (TEMPLATES / "chart_editor.html").read_text(encoding="utf-8")
 CALENDAR_JS = (APP / "static" / "js" / "calendar-picker.js").read_text(encoding="utf-8")
 
 
-def test_navigation_sits_at_the_period_label_in_both_modes() -> None:
-    """Die Zeitraumanzeige steht beim Ansehen und beim Anpassen; die
-    Navigation hängt an ihr, nicht an der Zeitraum-Leiste (x-show="editing")."""
+def test_navigation_only_while_customizing_and_plain_label_when_viewing() -> None:
+    """Beim Ansehen steht wie bisher nur die Zeitraumanzeige; ‹ ›, Kalender und
+    „Zurück zu jetzt“ gibt es nur im Modus „Anpassen“."""
     row = EDITOR_TEMPLATE.split('<div class="chart-title-row chart-title-row-end">', 1)[1].split("<template x-if", 1)[0]
-    assert 'class="nav chart-nav"' in row
-    assert "editing" not in row
+    assert '<span class="period-label" x-show="!editing" x-text="periodLabel"></span>' in row
+    assert '<span class="nav chart-nav" x-show="editing">' in row
     assert '@click="goBack()"' in row
     assert ':disabled="!canGoForward" @click="goForward()"' in row
     assert 'x-data=\'calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})\'' in row
     assert '{% include "_calendar_popover.html" %}' in row
     assert 'x-show="offset !== 0"' in row and '@click="goToNow()"' in row
+
+
+def test_leaving_customize_mode_returns_to_the_current_period() -> None:
+    """Nach dem Speichern zeigt die Ansicht wieder die laufende Periode;
+    „Abbrechen“ lädt die Seite ohnehin neu."""
+    save = EDITOR_JS.split("async save() {", 1)[1].split("\n        },", 1)[0]
+    assert "this.editing = false;" in save
+    assert save.index("this.editing = false;") < save.index("if (this.offset !== 0) this.goToNow();")
+    cancel = EDITOR_JS.split("cancelEdit() {", 1)[1].split("\n        },", 1)[0]
+    assert "window.location.reload();" in cancel
 
 
 def test_navigation_scripts_are_loaded_before_the_editor() -> None:
@@ -33,8 +44,8 @@ def test_navigation_scripts_are_loaded_before_the_editor() -> None:
 def test_offset_goes_into_the_query_but_never_into_the_saved_chart() -> None:
     assert "offset: String(this.offset)" in EDITOR_JS
     assert "offset: '0'" not in EDITOR_JS
-    save = EDITOR_JS.split("async save() {", 1)[1].split("\n        },", 1)[0]
-    assert "offset" not in save
+    body = EDITOR_JS.split("async save() {", 1)[1].split("const body = {", 1)[1].split("};", 1)[0]
+    assert "offset" not in body
     assert 'x-show="editing && offset !== 0"' in EDITOR_TEMPLATE  # Hinweis neben „Speichern“
 
 

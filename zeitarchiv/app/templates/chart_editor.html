@@ -464,22 +464,25 @@
              Label-über-Wert wie .menu-section-label (app.css), keine neuen
              Farben. -->
         <div class="chart-title-row chart-title-row-end">
+          <!-- Beim Ansehen nur die Anzeige der laufenden Periode, wie bisher. -->
+          <span class="period-label" x-show="!editing" x-text="periodLabel"></span>
           <!-- Zeitraum-Navigation wie auf der Entitätsseite (entity_detail.html):
-               ‹ ›, Klick auf die Anzeige öffnet den Kalender. In beiden Modi
-               (Ansehen und Anpassen), nie gespeichert (offset in
-               chart_editor.js). calendarPicker(null, …): ein Chart hat mehrere
-               Entitäten, deshalb keine Tages-Abfrage je Entität und als
-               Grenzen das ganze Archiv (calendar_first/last_date). -->
-          <span class="nav chart-nav">
+               ‹ ›, Klick auf die Anzeige öffnet den Kalender. Nur beim
+               Anpassen, nie gespeichert (offset in chart_editor.js; save()
+               springt beim Verlassen des Modus zurück zur laufenden Periode).
+               calendarPicker(null, …): ein Chart hat mehrere Entitäten,
+               deshalb keine Tages-Abfrage je Entität und als Grenzen das
+               ganze Archiv (calendar_first/last_date). -->
+          <span class="nav chart-nav" x-show="editing">
             <button type="button" class="btn navbtn" @click="goBack()" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
             <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
               <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : t('Zu einem bestimmten Zeitpunkt springen')" x-text="periodLabel"></button>
               {% include "_calendar_popover.html" %}
             </span>
             <button type="button" class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
-            <!-- Beim Ansehen gibt es keine Zeitraum-Leiste, deren erneuter
-                 Klick zurückführt — deshalb dieser Chip, nur außerhalb der
-                 laufenden Periode. -->
+            <!-- Derselbe Rückweg wie ein erneuter Klick auf den aktiven
+                 Zeitraum, aber sichtbar — nur außerhalb der laufenden
+                 Periode. -->
             <button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">{{ _("Zurück zu jetzt") }}</button>
           </span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
