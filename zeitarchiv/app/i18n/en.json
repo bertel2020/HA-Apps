@@ -2815,6 +2815,7 @@
     "Zeile {letter} ist hier nicht verfügbar": "Row {letter} is not available here",
     "Zeile {letter} hat keinen Wert": "Row {letter} has no value",
     "Unerwarteter Rest in der Formel": "Unexpected remainder in the formula",
+    "Ungültige Zahl „{number}“": "Invalid number “{number}”",
     "Keine Daten": "No data",
     "in der laufenden Kalenderwoche": "in the current calendar week",
     "im laufenden Monat": "in the current month",

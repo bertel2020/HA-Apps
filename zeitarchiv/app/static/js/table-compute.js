@@ -64,7 +64,13 @@ window.TableCompute = (() => {
       while (peek() && (/[0-9.]/.test(peek()) || peek() === FORMULA_DECIMAL_SEP)) pos++;
       if (pos === start) throw new Error(t('Unerwartetes Zeichen „{char}“',{char: peek() ?? ''}));
       const numText = s.slice(start, pos);
-      return parseFloat(FORMULA_DECIMAL_SEP === '.' ? numText : numText.replace(FORMULA_DECIMAL_SEP, '.'));
+      const normalized = FORMULA_DECIMAL_SEP === '.' ? numText : numText.replace(FORMULA_DECIMAL_SEP, '.');
+      // parseFloat() allein nähme nur den gültigen Anfang: "1.2.3" wäre 1,2,
+      // "2..5" wäre 2 — ein Tippfehler ergäbe eine plausible, falsche Zahl.
+      if (!/^(\d+\.?\d*|\.\d+)$/.test(normalized)) {
+        throw new Error(t('Ungültige Zahl „{number}“', {number: numText}));
+      }
+      return parseFloat(normalized);
     }
     const result = parseExpr();
     if (pos < s.length) throw new Error(t('Unerwarteter Rest in der Formel'));

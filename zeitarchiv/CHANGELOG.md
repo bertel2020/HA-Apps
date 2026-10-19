@@ -43,6 +43,9 @@
   Netzwerkspeicher zurück, während schon ein neuer Versuch lief, konnten sich
   beide Übertragungen in die Quere kommen und die Kopie am Ziel beschädigen.
   Jeder Versuch schreibt jetzt in eine eigene temporäre Datei.
+- **Tippfehler in Tabellenformeln**: Eine Zahl wie „1,2,3“ oder „2..5“ in
+  einer berechneten Zeile ergab bisher still einen falschen Wert. Jetzt zeigt
+  die Zelle einen Formelfehler.
 
 ---
 
@@ -85,6 +88,9 @@
   came back while a new attempt was already running, the two transfers could
   get in each other's way and damage the copy at the target. Each attempt now
   writes to its own temporary file.
+- **Typos in table formulas**: A number such as “1,2,3” or “2..5” in a
+  calculated row used to give a wrong value without notice. The cell now shows
+  a formula error.
 
 ## 1.7.0 - 2026-10-19
 
