@@ -39,6 +39,7 @@ class _State:
         self.credentials = ("roberto", "geheim")
         self.max_size: int | None = None
         self.redirect_to: str | None = None
+        self.put_error: tuple[int, bytes] | None = None
         self.requests: list[str] = []
 
 
@@ -91,6 +92,8 @@ def _make_handler(state: _State):
             if not state.folder:
                 return self._reply(404)
             if method == "PUT":
+                if state.put_error is not None:
+                    return self._reply(state.put_error[0], state.put_error[1], {"Content-Type": "application/xml"})
                 if state.max_size is not None and len(body) > state.max_size:
                     return self._reply(413)
                 state.files[name] = body
@@ -214,6 +217,37 @@ def test_a_too_large_file_is_explained(server, tmp_path) -> None:
     with pytest.raises(webdav.WebDavError, match="413"):
         _client(server).upload(source, source.name)
     assert server.files == {}
+
+
+SABRE_BAD_REQUEST = (
+    b'<?xml version="1.0" encoding="utf-8"?>'
+    b'<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">'
+    b"<s:exception>Sabre\\DAV\\Exception\\BadRequest</s:exception>"
+    b"<s:message>Expected filesize of 1000 bytes but read (from Nextcloud client)\n"
+    b"  and wrote (to Nextcloud storage) 400 bytes.</s:message></d:error>"
+)
+
+
+def test_a_failed_upload_names_the_step_and_the_server_message(server, tmp_path) -> None:
+    server.put_error = (400, SABRE_BAD_REQUEST)
+    source = tmp_path / "zeitarchiv-backup-x.zip"
+    source.write_bytes(b"z" * 1000)
+    with pytest.raises(webdav.WebDavError) as caught:
+        _client(server).upload(source, source.name)
+    assert str(caught.value) == (
+        "Hochladen fehlgeschlagen: Der WebDAV-Server antwortete mit Status 400. "
+        "Meldung des Servers: Expected filesize of 1000 bytes but read (from Nextcloud client) "
+        "and wrote (to Nextcloud storage) 400 bytes."
+    )
+
+
+def test_an_error_page_that_is_not_sabre_xml_adds_no_server_message(server, tmp_path) -> None:
+    server.put_error = (400, b"<html><body>Bad Request</body></html>")
+    source = tmp_path / "zeitarchiv-backup-x.zip"
+    source.write_bytes(b"z" * 10)
+    with pytest.raises(webdav.WebDavError) as caught:
+        _client(server).upload(source, source.name)
+    assert str(caught.value) == "Hochladen fehlgeschlagen: Der WebDAV-Server antwortete mit Status 400."
 
 
 def test_transfer_clears_leftover_part_files_of_this_app(server, tmp_path) -> None:

@@ -40,6 +40,8 @@ def unique_part_name(name: str) -> str:
 SOCKET_TIMEOUT_SECONDS = 30.0
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 DAV_NS = "{DAV:}"
+SABRE_NS = "{http://sabredav.org/ns}"
+SERVER_MESSAGE_MAX_CHARS = 500
 
 PROPFIND_BODY = (
     '<?xml version="1.0" encoding="utf-8"?>'
@@ -152,7 +154,25 @@ class WebDavClient:
         status = response.status
         if status in expect:
             return status, {k.lower(): v for k, v in response.getheaders()}, data
-        raise self._status_error(status, response.getheader("Location"))
+        raise self._failed_step_error(method, status, response.getheader("Location"), data)
+
+    @classmethod
+    def _failed_step_error(cls, method: str, status: int, location: str | None, data: bytes) -> WebDavError:
+        """Fehlertext mit dem gescheiterten Schritt und, falls vorhanden, der
+        Begründung des Servers — ein bloßer Statuscode (etwa 400 von Nextcloud
+        bei einem abgebrochenen Upload) lässt sonst nicht erkennen, was schiefging."""
+        steps = {
+            "PROPFIND": tr("Abfragen"),
+            "MKCOL": tr("Ordner anlegen"),
+            "PUT": tr("Hochladen"),
+            "MOVE": tr("Umbenennen"),
+            "DELETE": tr("Löschen"),
+        }
+        text = tr("{step} fehlgeschlagen: {error}", step=steps.get(method, method), error=cls._status_error(status, location))
+        server_message = _server_message(data)
+        if server_message:
+            text += " " + tr("Meldung des Servers: {message}", message=server_message)
+        return WebDavError(text)
 
     @staticmethod
     def _status_error(status: int, location: str | None) -> WebDavError:
@@ -247,6 +267,17 @@ class WebDavClient:
         finally:
             self.delete(name, missing_ok=True)
         return {"free_bytes": None}
+
+
+def _server_message(data: bytes) -> str:
+    """<s:message> aus einer SabreDAV-Fehlerantwort (Nextcloud, ownCloud), sonst
+    leer. HTML-Fehlerseiten anderer Server bleiben bewusst draußen."""
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        return ""
+    message = " ".join((root.findtext(f".//{SABRE_NS}message") or "").split())
+    return message[:SERVER_MESSAGE_MAX_CHARS]
 
 
 def _parse_multistatus(data: bytes) -> list[RemoteFile]:
