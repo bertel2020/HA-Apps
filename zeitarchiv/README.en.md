@@ -261,6 +261,11 @@ a coarser resolution (minute, hour, day) instead of the complete raw values.
   <br><sub>Comparison table &nbsp;·&nbsp; Notice center &nbsp;·&nbsp; "Home Assistant" color scheme</sub>
 </p>
 
+<p align="center">
+  <a href="docs/img/en/long-term-comparison-dark.png"><img src="docs/img/en/long-term-comparison-dark.png" alt="Long-term comparison: one line per year with average line and year × month table" width="270"></a>
+  <br><sub>Long-term comparison</sub>
+</p>
+
 <p align="center"><sub>Adapts automatically to light/dark (see home page/energy dashboard above); besides "Zeitarchiv" (default) and "Home Assistant" also selectable as "Modern". More views: <a href="docs/img/en">docs/img/en</a>.</sub></p>
 
 ## Storage and retention
