@@ -30,7 +30,23 @@ async function _loadPreview(target, factor, overlapResolution) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({target_entity_id: target, factor, overlap_resolution: overlapResolution}),
   });
+  // fetch() wirft bei 4xx/5xx nicht — ohne diese Prüfung landete die
+  // Fehlerantwort im Vorschaufenster und der Assistent ging zu Schritt 2.
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const data = await response.json();
+      if (typeof data.detail === 'string') detail = data.detail;
+    } catch (e) {
+      // kein JSON (z. B. Gateway-Fehler) — dann nur die allgemeine Meldung
+    }
+    throw Object.assign(new Error(detail), {serverDetail: detail});
+  }
   document.getElementById('migrate-preview').innerHTML = await response.text();
+}
+
+function _previewErrorMessage(message, error) {
+  return error && error.serverDetail ? `${message} ${error.serverDetail}` : message;
 }
 
 async function migratePreview() {
@@ -48,7 +64,7 @@ async function migratePreview() {
     await _loadPreview(target, 1, 'target');
     goToStep(2);
   } catch (error) {
-    appAlert(t('Die Vorschau konnte nicht geladen werden.'));
+    appAlert(_previewErrorMessage(t('Die Vorschau konnte nicht geladen werden.'), error));
   } finally {
     button.disabled = false;
   }
@@ -63,7 +79,7 @@ async function migrateRecalculate() {
   try {
     await _loadPreview(target, _currentFactor(), overlapResolution);
   } catch (error) {
-    appAlert(t('Die Vorschau konnte nicht neu berechnet werden.'));
+    appAlert(_previewErrorMessage(t('Die Vorschau konnte nicht neu berechnet werden.'), error));
   } finally {
     // Bei Erfolg hat _loadPreview() den Knopf längst durch ein frisches
     // Fragment ersetzt — dieses disabled=false trifft dann ins Leere,

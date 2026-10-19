@@ -46,6 +46,10 @@
 - **Tippfehler in Tabellenformeln**: Eine Zahl wie „1,2,3“ oder „2..5“ in
   einer berechneten Zeile ergab bisher still einen falschen Wert. Jetzt zeigt
   die Zelle einen Formelfehler.
+- **Migrationsassistent bei Fehlern**: Konnte die Vorschau nicht berechnet
+  werden (etwa bei unbekannter Ziel-Entität), wechselte der Assistent trotzdem
+  zu Schritt 2 und zeigte dort die Fehlerantwort. Jetzt bleibt er in Schritt 1
+  und nennt den Grund.
 
 ---
 
@@ -91,6 +95,10 @@
 - **Typos in table formulas**: A number such as “1,2,3” or “2..5” in a
   calculated row used to give a wrong value without notice. The cell now shows
   a formula error.
+- **Migration wizard on errors**: If the preview could not be calculated
+  (for example for an unknown target entity), the wizard still moved to step 2
+  and showed the error response there. It now stays in step 1 and names the
+  reason.
 
 ## 1.7.0 - 2026-10-19
 
