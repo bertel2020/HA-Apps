@@ -363,7 +363,7 @@ def transfer(
     if free is not None and free < size:
         raise ExternalTargetError(tr("Zu wenig Platz am Ziel."))
     final = target_dir / source.name
-    part = target_dir / f".{source.name}.part"
+    part = target_dir / webdav.unique_part_name(source.name)
     try:
         copied = 0
         with source.open("rb") as src, part.open("wb") as dst:

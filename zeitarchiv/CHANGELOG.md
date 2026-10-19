@@ -39,6 +39,10 @@
 - **Auswahllisten mit Apostroph**: Enthielt eine Einheit, ein Spaltenkopf beim
   CSV-Import oder ein Entitätsname im Aktivitätsfilter einen Apostroph, ließ
   sich der Eintrag nicht auswählen. Das funktioniert jetzt.
+- **Externes Backup nach Verbindungsabbruch**: Kam ein hängender
+  Netzwerkspeicher zurück, während schon ein neuer Versuch lief, konnten sich
+  beide Übertragungen in die Quere kommen und die Kopie am Ziel beschädigen.
+  Jeder Versuch schreibt jetzt in eine eigene temporäre Datei.
 
 ---
 
@@ -77,6 +81,10 @@
 - **Selection lists with apostrophes**: If a unit, a column header in the CSV
   import or an entity name in the activity filter contained an apostrophe, the
   entry could not be selected. This now works.
+- **External backup after a lost connection**: If a stalled network storage
+  came back while a new attempt was already running, the two transfers could
+  get in each other's way and damage the copy at the target. Each attempt now
+  writes to its own temporary file.
 
 ## 1.7.0 - 2026-10-19
 

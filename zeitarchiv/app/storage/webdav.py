@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import http.client
 import re
+import secrets
 import socket
 import ssl
 import xml.etree.ElementTree as ET
@@ -24,6 +25,17 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 from ..i18n import tr
+
+
+def unique_part_name(name: str) -> str:
+    """Temporärer Name für genau einen Übertragungsversuch.
+
+    Eindeutig je Versuch, weil der Watchdog (backup_external.run_with_watchdog)
+    einen hängenden Versuch nur aufgibt, nicht beendet: kehrt das Netz zurück,
+    schreibt der alte Thread weiter, während der Retry schon läuft. Mit einem
+    gemeinsamen .part-Namen schrieben beide in dieselbe Datei. Passt weiter auf
+    das Aufräummuster ``.zeitarchiv-backup-*.part``."""
+    return f".{name}.{secrets.token_hex(4)}.part"
 
 SOCKET_TIMEOUT_SECONDS = 30.0
 UPLOAD_CHUNK_BYTES = 1024 * 1024
@@ -183,7 +195,7 @@ class WebDavClient:
         """Lädt unter .part-Namen hoch, prüft die Größe und benennt per MOVE
         um — unter dem Endnamen liegt nie eine halbe Datei."""
         size = source.stat().st_size
-        part = f".{name}.part"
+        part = unique_part_name(name)
         body = _UploadBody(source, beat, on_progress)
         try:
             self._request(
