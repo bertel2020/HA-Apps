@@ -32,6 +32,13 @@
   und Housekeeping lassen sich jetzt ohne Maus bedienen: Enter, Leertaste oder
   Pfeil nach unten öffnet die Liste, die Pfeiltasten wählen den Eintrag, Enter
   übernimmt ihn, Escape schließt.
+- **Fehlermeldungen beim WebDAV-Ziel**: Scheitert eine Übertragung, nennt die
+  Meldung jetzt den Schritt, der fehlschlug (etwa „Hochladen“), und bei
+  Nextcloud auch die Begründung des Servers.
+- **Importdaten nicht im Home-Assistant-Backup**: Hochgeladene Symcon- und
+  CSV-Importdaten landen nicht mehr im Backup von Home Assistant – wie schon
+  bisher beim eigenen Zeitarchiv-Backup. Sie lassen sich jederzeit neu
+  hochladen.
 
 ### Behoben
 
@@ -67,6 +74,9 @@
 - **Englische Oberfläche**: Die Auswahl „Kopfzeile“ beim CSV-Import zeigte
   „Ja“/„Nein“ und der Markierungsfilter „Markierung:“ auf Deutsch. Beides ist
   jetzt übersetzt.
+- **WebDAV-Backup auf Nextcloud**: Ab Nextcloud 31 scheiterte die Übertragung
+  mit „Status 400“, obwohl der Verbindungstest erfolgreich war. Backups landen
+  jetzt wieder am Ziel.
 
 ---
 
@@ -100,6 +110,12 @@
   and housekeeping can now be used without a mouse: Enter, Space or Arrow Down
   opens the list, the arrow keys move through the entries, Enter picks one,
   Escape closes it.
+- **Error messages for the WebDAV target**: If a transfer fails, the message
+  now names the step that failed (such as “Upload”) and, with Nextcloud, the
+  server's reason.
+- **Import data not in the Home Assistant backup**: Uploaded Symcon and CSV
+  import data no longer ends up in Home Assistant's backup – as was already
+  the case for Zeitarchiv's own backup. It can be uploaded again at any time.
 
 #### Fixed
 
@@ -132,6 +148,9 @@
 - **English interface**: The “Header row” selection in the CSV import showed
   “Ja”/“Nein” and the mark filter showed “Markierung:” in German. Both are now
   translated.
+- **WebDAV backup to Nextcloud**: From Nextcloud 31 on, the transfer failed
+  with “status 400” even though the connection test succeeded. Backups reach
+  the target again.
 
 ## 1.7.0 - 2026-10-19
 
