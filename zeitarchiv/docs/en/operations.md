@@ -60,8 +60,12 @@ worker.
 with `os.replace`, so a half-written file never exists under the final name.
 The modification time is preserved so retention ordering stays correct.
 Leftover `.part` files (abort, crash) are removed from the target after 24 h.
-With WebDAV the intermediate file is `.<name>.part`, completed via `PUT`,
-`PROPFIND` (size comparison) and `MOVE`; the client does not follow redirects
+With WebDAV the intermediate file is `.zeitarchiv-upload-<random>-<name>` —
+it deliberately ends in `.zip` like the final name, because Nextcloud 31 and
+later rejects file names ending in `.part` with status 400 — and is completed
+via `PUT`, `PROPFIND` (size comparison) and `MOVE`. Leftovers of aborted
+uploads (including old `.part` names) are removed before every transfer. The
+client does not follow redirects
 but names the destination address in the error text.
 
 **Retention.** Locally the same count/age rule applies as before, with one

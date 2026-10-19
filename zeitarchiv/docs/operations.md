@@ -62,8 +62,12 @@ Mount belegt also einen Thread, aber nicht den Worker.
 `os.replace` umbenannt, unter dem Endnamen liegt nie eine halbe Datei. Die
 Änderungszeit wird übernommen, damit die Reihenfolge der Aufbewahrung stimmt.
 Übrig gebliebene `.part`-Dateien (Abbruch, Absturz) räumt die App nach 24 h
-am Ziel weg. Bei WebDAV heißt der Zwischenstand `.<name>.part` und wird per
-`PUT`, `PROPFIND` (Größenvergleich) und `MOVE` abgeschlossen; Weiterleitungen
+am Ziel weg. Bei WebDAV heißt der Zwischenstand
+`.zeitarchiv-upload-<zufall>-<name>` — er endet bewusst wie der Endname auf
+`.zip`, weil Nextcloud ab Version 31 Dateinamen auf `.part` mit Status 400
+ablehnt — und wird per `PUT`, `PROPFIND` (Größenvergleich) und `MOVE`
+abgeschlossen. Reste abgebrochener Uploads (auch alte `.part`-Namen) räumt
+die App vor jeder Übertragung weg. Weiterleitungen
 folgt der Client nicht, sondern nennt die Zieladresse im Fehlertext.
 
 **Aufbewahrung.** Lokal gilt dieselbe Anzahl-/Alters-Regel wie bisher, mit einer
