@@ -60,6 +60,10 @@
 - **Löschen im Chart- und Tabellen-Editor**: Schlug das Löschen fehl, ging
   es trotzdem zur Liste zurück, in der das Chart bzw. die Tabelle weiter stand.
   Jetzt bleibt der Editor offen und meldet „Löschen fehlgeschlagen.“
+- **Chart-Optionen einer Entität**: Konnte eine Änderung im Optionen-Menü
+  nicht gespeichert werden, sah sie trotzdem gespeichert aus und war beim
+  nächsten Besuch weg. Jetzt erscheint eine Meldung; dasselbe gilt für „Auf
+  Standard zurücksetzen“.
 
 ---
 
@@ -119,6 +123,9 @@
 - **Deleting in the chart and table editor**: If deleting failed, the editor
   still went back to the list, where the chart or table was still there. The
   editor now stays open and reports “Deleting failed.”
+- **Chart options of an entity**: If a change in the options menu could not
+  be saved, it still looked saved and was gone on the next visit. A message now
+  appears; the same applies to “Reset to default”.
 
 ## 1.7.0 - 2026-10-19
 

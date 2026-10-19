@@ -3117,6 +3117,8 @@
     "Zeitraum-Anzeige konnte nicht gespeichert werden": "Period display could not be saved",
     "Nachkommastellen konnten nicht gespeichert werden": "Decimal places could not be saved",
     "Titel konnte nicht gespeichert werden": "Title could not be saved",
+    "Chart-Optionen konnten nicht gespeichert werden": "Chart options could not be saved",
+    "Chart-Optionen konnten nicht zurückgesetzt werden": "Chart options could not be reset",
     "{decade}er": "{decade}s",
     "Erzeuger": "Producer",
     "Speicher": "Storage",

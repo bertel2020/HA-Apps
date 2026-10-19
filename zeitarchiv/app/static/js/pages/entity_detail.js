@@ -584,15 +584,17 @@ function selectBrush() {
         goToNow() { this._rangeAnchorMs = null; this.offset = 0; this.load(); },
         // Optionen-Menü (Konzept "Pro Entität speicherbare Chart-Optionen") —
         // kein Speichern-Button, jede Änderung im Menü sendet sofort den
-        // gesamten aktuellen Options-Stand. Fire-and-forget wie
-        // toggleFavorite() (favorite-toggle.js): ein Netzwerkfehler soll die
-        // Bedienung nicht blockieren, die Anzeige selbst hat sich ja schon
-        // (optimistisch, über die reaktiven Alpine-Felder) geändert — beim
-        // nächsten Laden der Seite greift dann wieder der zuletzt tatsächlich
-        // gespeicherte Stand.
+        // gesamten aktuellen Options-Stand. Die Anzeige hat sich schon
+        // (optimistisch, über die reaktiven Alpine-Felder) geändert und wird
+        // bei einem Fehler nicht zurückgedreht — beim nächsten Laden der
+        // Seite greift wieder der zuletzt tatsächlich gespeicherte Stand.
+        // Gesagt wird es aber: vorher blieb ein 4xx/5xx (fetch() wirft dabei
+        // nicht) wie ein Netzwerkfehler völlig stumm, die Einstellung sah
+        // gespeichert aus und war beim nächsten Besuch weg.
         async saveChartOptions() {
+          let response = null;
           try {
-            await fetch(`${BASE}/entities/${ENTITY_ID}/chart-options`, {
+            response = await fetch(`${BASE}/entities/${ENTITY_ID}/chart-options`, {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
@@ -606,8 +608,10 @@ function selectBrush() {
               }),
             });
           } catch (e) {
-            // Netzwerkfehler: nächster Seitenaufruf lädt wieder den zuletzt
-            // gespeicherten Stand, siehe Kommentar oben.
+            // Netzwerkfehler: wie ein Fehlerstatus, siehe unten.
+          }
+          if (!response || !response.ok) {
+            appAlert(t('Chart-Optionen konnten nicht gespeichert werden'));
           }
         },
         // "Auf Standard zurücksetzen" (Optionen-Menü, Aktionen) — wirft die
@@ -615,11 +619,19 @@ function selectBrush() {
         // neu, damit alle Felder wieder die (dann wieder live geltenden)
         // globalen Defaults zeigen, statt sie hier einzeln nachzubauen.
         async resetChartOptions() {
+          let response = null;
           try {
-            await fetch(`${BASE}/entities/${ENTITY_ID}/chart-options/reset`, {method: 'POST'});
-          } finally {
-            location.reload();
+            response = await fetch(`${BASE}/entities/${ENTITY_ID}/chart-options/reset`, {method: 'POST'});
+          } catch (e) {
+            // Netzwerkfehler: wie ein Fehlerstatus, siehe unten.
           }
+          // Neu laden in jedem Fall — die Seite zeigt danach den tatsächlich
+          // gespeicherten Stand. Ein Fehlschlag wird vorher gemeldet, sonst
+          // sähe ein unverändertes Neuladen wie ein gelungenes Zurücksetzen aus.
+          if (!response || !response.ok) {
+            await appAlert(t('Chart-Optionen konnten nicht zurückgesetzt werden'));
+          }
+          location.reload();
         },
         // Vergleicht den aktuellen (reaktiven) Options-Stand gegen die
         // globalen Startwerte — chart_type dabei aufgelöst wie oben bei
