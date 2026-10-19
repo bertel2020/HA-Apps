@@ -185,7 +185,7 @@ def test_longterm_options_and_availability() -> None:
     assert [line.strip().split("value: ", 1)[1].split(",", 1)[0] for line in options.splitlines() if "value:" in line] == [
         "2", "5", "10", "0",
     ]
-    assert "compareYears: 5," in EDITOR_JS
+    assert "compareYears: COMPARE_SETTINGS.years ?? 5," in EDITOR_JS
     getter = EDITOR_JS.split("get longtermAvailable() {", 1)[1].split("\n        },", 1)[0]
     assert "this.range === 'year'" in getter
     assert "!this.continuous" in getter

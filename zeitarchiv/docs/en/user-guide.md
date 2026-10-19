@@ -959,9 +959,12 @@ for donut), period including the Rolling switch, resolution (including
 orientation for the ranking comparison), dynamic Y axis, show values, average
 line (including flat/moving), decimal places, legend statistics, area,
 stacked/shares (%) and timeline are all saved with the chart and then also
-apply to its preview on dashboards. **Points on/off, raw values and Compare,
-on the other hand, are not** — these three are pure view settings for the
-current visit and are back to their initial value on the next opening.
+apply to its preview on dashboards. A past period shown and **Compare**
+(including running total and target entity, or years and Ø line for
+long-term) are saved too; for now the comparison only appears on the chart
+page, not on the dashboard tile. **Points on/off and raw values, on the other
+hand, are not** — both are pure view settings for the current visit and are
+back to their initial value on the next opening.
 
 A saved chart always shows the currently available data when viewed, not a
 frozen snapshot from the time of saving. The opened view shows under **Used

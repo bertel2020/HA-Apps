@@ -1218,6 +1218,12 @@ class Index:
             # Jahr zurück" mit der Zeit weiterwandern würde (siehe
             # periodAnchorForSave in chart_editor.js).
             self._conn.execute("ALTER TABLE saved_charts ADD COLUMN period_anchor TEXT")
+        if "compare_settings" not in sc_columns:
+            # Vergleich des Charts (Vorjahr/Langzeit samt Laufsumme, Soll,
+            # Jahren, Ø-Linie) als JSON — bis dahin eine reine Ansicht, die
+            # beim nächsten Öffnen wieder "Aus" war. Aufbau siehe
+            # compare_settings_or_400() in chart_period.py; '{}' = kein Vergleich.
+            self._conn.execute("ALTER TABLE saved_charts ADD COLUMN compare_settings TEXT NOT NULL DEFAULT '{}'")
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -2337,6 +2343,7 @@ class Index:
         horizontal: bool = False,
         donut_aggregation: str = "sum",
         period_anchor: str | None = None,
+        compare_settings: dict | None = None,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -2347,8 +2354,9 @@ class Index:
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
-                "average_style, horizontal, donut_aggregation, period_anchor, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "average_style, horizontal, donut_aggregation, period_anchor, compare_settings, "
+                "created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2357,7 +2365,8 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
-                    average_style, int(horizontal), donut_aggregation, period_anchor, now, now,
+                    average_style, int(horizontal), donut_aggregation, period_anchor,
+                    json.dumps(compare_settings or {}), now, now,
                 ),
             )
             return cur.lastrowid
@@ -2389,6 +2398,7 @@ class Index:
         horizontal: bool = False,
         donut_aggregation: str = "sum",
         period_anchor: str | None = None,
+        compare_settings: dict | None = None,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -2399,7 +2409,7 @@ class Index:
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
                 "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
-                "updated_at = ? WHERE id = ?",
+                "compare_settings = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2408,7 +2418,8 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
-                    average_style, int(horizontal), donut_aggregation, period_anchor, time.time(), chart_id,
+                    average_style, int(horizontal), donut_aggregation, period_anchor,
+                    json.dumps(compare_settings or {}), time.time(), chart_id,
                 ),
             )
 
@@ -2433,6 +2444,7 @@ class Index:
         d["horizontal"] = bool(d.get("horizontal", 0))
         d["donut_aggregation"] = d.get("donut_aggregation") or "sum"
         d["period_anchor"] = d.get("period_anchor") or None
+        d["compare_settings"] = json.loads(d["compare_settings"]) if d.get("compare_settings") else {}
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []

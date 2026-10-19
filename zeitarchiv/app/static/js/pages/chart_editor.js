@@ -563,12 +563,15 @@
         // Ein gespeichertes Chart kann compare_mode="year" mit einem Zeitraum
         // tragen, der den Vorjahresvergleich nicht (mehr) anbietet — dann wäre
         // im Menü keine Zeile aktiv und der Knopf zeigte ein Wort, das nirgends
-        // mehr auswählbar ist.
-        compareMode: compareYearAvailable(RANGE_KEY) ? COMPARE_MODE : 'previous',
+        // mehr auswählbar ist. "longterm" gibt es nur bei "Jahr"; passt der
+        // Rest nicht (Rollierend, mehrere Entitäten), fällt load() auf
+        // "Vorjahr" zurück.
+        compareMode: COMPARE_MODE === 'longterm'
+          ? (RANGE_KEY === 'year' ? 'longterm' : 'previous')
+          : (compareYearAvailable(RANGE_KEY) ? COMPARE_MODE : 'previous'),
         // Laufsumme/Soll — Erweiterungen von "Vorjahr" bei range='year',
-        // keine eigene Vergleichsoption (siehe render()) — reine Laufzeit-
-        // Ansichtseinstellungen, nie mit dem Chart gespeichert (wie compare/
-        // compareMode selbst auch nicht, siehe COMPARE/COMPARE_MODE oben).
+        // keine eigene Vergleichsoption (siehe render()). Wie der Vergleich
+        // selbst mit dem Chart gespeichert (compare_settings, siehe save()).
         // compareSollEntityId braucht KEINE eigene Backend-Anbindung: die
         // Soll-Entität ist ganz normal Teil von selectedEntityIds (wird über
         // denselben entityPicker() ausgewählt, der sie bei Bedarf mit
@@ -581,8 +584,11 @@
         // Laufsumme aktiv ist (yearsCompareActive) — die kalendermonatsweise
         // Kumulierung (monthlyBuckets()/cumulate()) läuft ohnehin nur dort,
         // die Schattenlinie kennt keine Monats-Buckets.
-        compareSollEntityId: '',
-        compareCumsum: false,
+        // Eine gespeicherte Soll-Entität gilt nur, solange sie noch zur
+        // Auswahl des Charts gehört; sie steckt dort schon (wurde mit
+        // gespeichert), deshalb sollAutoAdded false — Leeren entfernt sie nicht.
+        compareSollEntityId: (COMPARE_SETTINGS.target && SELECTED_ENTITY_IDS.includes(COMPARE_SETTINGS.target)) ? COMPARE_SETTINGS.target : '',
+        compareCumsum: !!COMPARE_SETTINGS.cumsum,
         // true, solange die aktuelle compareSollEntityId NUR deshalb in
         // selectedEntityIds steckt, weil setSollEntity() sie dort hinein
         // genommen hat (nicht, weil sie schon vorher regulär gewählt war)
@@ -590,12 +596,11 @@
         // wieder entfernen darf (siehe dort).
         sollAutoAdded: false,
         // Mehrjahresvergleich (compareMode 'longterm', "Jahre" siehe
-        // COMPARE_YEARS_OPTIONS) — wie Laufsumme/Soll eine reine
-        // Ansichtseinstellung, nie mit dem Chart gespeichert, weil der
-        // Vergleich selbst es auch nicht ist.
+        // COMPARE_YEARS_OPTIONS) — wie Laufsumme/Soll mit dem Chart
+        // gespeichert (compare_settings).
         compareYearsOptions: COMPARE_YEARS_OPTIONS,
-        compareYears: 5,
-        multiYearAverage: true,
+        compareYears: COMPARE_SETTINGS.years ?? 5,
+        multiYearAverage: COMPARE_SETTINGS.average ?? true,
         multiYearTableMode: 'values',
         multiYearMonths: [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')],
         showPoints: SHOW_POINTS,
@@ -2614,6 +2619,13 @@
             range_key: this.range,
             continuous: this.continuous,
             period_anchor: this.periodAnchorForSave,
+            // Vergleich samt Langzeit-/Vorjahr-Erweiterungen, siehe
+            // compare_settings_or_400() in chart_period.py.
+            compare_settings: {
+              compare: this.compare, mode: this.compareMode,
+              years: this.compareYears, average: this.multiYearAverage,
+              cumsum: this.compareCumsum, target: this.compareSollEntityId || null,
+            },
             entity_names: entityNames,
             // Nur ausgeblendete IDs mitschicken, die überhaupt noch ausgewählt
             // sind — sonst hielte eine abgewählte Entität ihren Ausblend-Zustand

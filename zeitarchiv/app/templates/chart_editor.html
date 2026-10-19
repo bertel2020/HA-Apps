@@ -888,12 +888,14 @@
     const AVERAGE_STYLE = {{ average_style | tojson }};
     const HORIZONTAL = {{ horizontal | tojson }};
     const DONUT_AGGREGATION = {{ donut_aggregation | tojson }};
-    // Nur beim initialen Öffnen relevant (z. B. von "Als Chart speichern" auf
-    // der Entität-eigenen Chart-Seite übernommen) — compare/compareMode sind
-    // reine Laufzeit-Ansichtseinstellungen, werden nie mit dem Chart
-    // gespeichert (siehe save()-Body weiter unten).
+    // Vergleich beim Öffnen: gespeichert am Chart (compare_settings) bzw. bei
+    // einem neuen Chart von "Als Chart speichern" übernommen; save() schreibt
+    // ihn zurück.
     const COMPARE = {{ compare | tojson }};
     const COMPARE_MODE = {{ compare_mode | tojson }};
+    // Gespeicherter Vergleich (saved_charts.compare_settings): Jahre/Ø-Linie
+    // bei Langzeit, Laufsumme/Soll bei Vorjahr. {} bei einem neuen Chart.
+    const COMPARE_SETTINGS = {{ compare_settings | tojson }};
   </script>
   <script src="{{ asset('js/pages/chart_editor.js') }}"></script>
 {% endblock %}

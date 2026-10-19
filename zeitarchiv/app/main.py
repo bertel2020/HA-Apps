@@ -166,7 +166,7 @@ from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, s
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
-from .chart_period import calendar_bounds, period_anchor_or_400
+from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
 from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
 from .progress import activity_snapshot, register_source
 
@@ -3509,12 +3509,10 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
         "missing_ids": entity_usage.missing_entity_ids(chart["entity_ids"], entity_usage.existing_entity_ids(index)) if chart else [],
-        # compare/compare_mode sind (wie im Chart-Editor selbst) reine
-        # Laufzeit-Ansichtseinstellungen, kein gespeichertes Chart-Feld — nur
-        # der Anfangszustand eines gerade erst über prefill eröffneten neuen
-        # Charts kann sie daher überhaupt sinnvoll setzen.
-        "compare": prefill.get("compare", False) if not chart else False,
-        "compare_mode": prefill.get("compare_mode", "previous") if not chart else "previous",
+        # Vergleich: gespeichert am Chart (compare_settings), bei einem neuen Chart aus dem prefill.
+        "compare": chart["compare_settings"].get("compare", False) if chart else prefill.get("compare", False),
+        "compare_mode": chart["compare_settings"].get("mode", "previous") if chart else prefill.get("compare_mode", "previous"),
+        "compare_settings": chart["compare_settings"] if chart else {},
     }
 
 
@@ -3574,6 +3572,7 @@ class _SaveChartBody(BaseModel):
     horizontal: bool = False
     donut_aggregation: str = "sum"
     period_anchor: str | None = None  # fester Zeitraum, siehe chart_period.py
+    compare_settings: dict = {}  # Vergleich, siehe chart_period.py
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3619,7 +3618,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
-        period_anchor=period_anchor_or_400(body.period_anchor),
+        period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
     )
     return {"id": chart_id}
 
@@ -3667,7 +3666,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
-        period_anchor=period_anchor_or_400(body.period_anchor),
+        period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
     )
     return {"id": chart_id}
 
@@ -3708,7 +3707,7 @@ def charts_duplicate(chart_id: int) -> dict:
         average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
-        period_anchor=chart["period_anchor"],
+        period_anchor=chart["period_anchor"], compare_settings=chart["compare_settings"],
     )
     return {"id": new_id}
 

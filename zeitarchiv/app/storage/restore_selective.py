@@ -142,6 +142,7 @@ _CHART_FIELD_LABELS = {
     "range_key": N_("Zeitraum"),
     "continuous": N_("Zeitraum"),
     "period_anchor": N_("Zeitraum"),
+    "compare_settings": N_("Vergleich"),
     "chart_type": N_("Typ"),
     "resolution_preset": N_("Auflösung"),
 }

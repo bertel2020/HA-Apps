@@ -175,8 +175,11 @@ def test_a_stale_year_mode_does_not_survive_a_range_switch() -> None:
 def test_a_saved_chart_cannot_start_in_a_mode_its_range_does_not_offer() -> None:
     """Der Chart-Editor bekommt compare_mode vom Server. Ein Chart, das mit
     „Dekade" + Vorjahresvergleich gespeichert wurde, hätte sonst keine aktive
-    Zeile im Menü und einen Knopf, dessen Wort nirgends mehr anwählbar ist."""
-    assert "compareMode: compareYearAvailable(RANGE_KEY) ? COMPARE_MODE : 'previous'," in EDITOR_JS
+    Zeile im Menü und einen Knopf, dessen Wort nirgends mehr anwählbar ist.
+    Seit der Vergleich mit dem Chart gespeichert wird, gilt dasselbe für
+    „Langzeit“ außerhalb von „Jahr“."""
+    assert "(compareYearAvailable(RANGE_KEY) ? COMPARE_MODE : 'previous')," in EDITOR_JS
+    assert "? (RANGE_KEY === 'year' ? 'longterm' : 'previous')" in EDITOR_JS
 
 
 def test_years_compare_is_not_a_separate_menu_option() -> None:

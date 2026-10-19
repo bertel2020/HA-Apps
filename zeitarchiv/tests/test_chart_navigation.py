@@ -170,3 +170,42 @@ def test_comparison_option_fields_are_right_aligned() -> None:
     for marker in ("compareMode === 'previous' && range === 'year'", "compareMode === 'longterm'"):
         block = EDITOR_TEMPLATE.split(f'x-if="compare && {marker}">', 1)[1]
         assert block.lstrip().startswith('<span style="display:flex;gap:16px;margin-left:auto;">'), marker
+
+
+def test_comparison_is_saved_and_restored_with_the_chart(client) -> None:
+    """Vorjahr/Langzeit samt Jahren, Ø-Linie, Laufsumme und Soll gehen mit dem
+    Chart; beim Öffnen stehen sie wieder so da."""
+    from app import main
+
+    settings = {"compare": True, "mode": "longterm", "years": 10, "average": False, "cumsum": False, "target": None}
+    payload = {"name": "Vergleich gespeichert Test", "entity_ids": ["sensor.gibt_es_nicht"], "range_key": "year",
+               "compare_settings": settings}
+    chart_id = client.post("/charts", json=payload).json()["id"]
+    try:
+        assert main.index.get_saved_chart(chart_id)["compare_settings"] == settings
+        page = client.get(f"/charts/{chart_id}").text
+        assert "const COMPARE = true;" in page
+        assert 'const COMPARE_MODE = "longterm";' in page
+        assert '"years": 10' in page
+
+        copy_id = client.post(f"/charts/{chart_id}/duplicate").json()["id"]
+        assert main.index.get_saved_chart(copy_id)["compare_settings"] == settings
+        main.index.delete_saved_chart(copy_id)
+
+        for bad in ({"mode": "irgendwas"}, {"years": 3}, {"target": "kein gueltiger name"}):
+            response = client.post(f"/charts/{chart_id}", json={**payload, "compare_settings": {**settings, **bad}})
+            assert response.status_code == 400, bad
+    finally:
+        main.index.delete_saved_chart(chart_id)
+
+
+def test_editor_restores_and_saves_the_comparison() -> None:
+    assert "const COMPARE_SETTINGS = {{ compare_settings | tojson }};" in EDITOR_TEMPLATE
+    assert "multiYearAverage: COMPARE_SETTINGS.average ?? true," in EDITOR_JS
+    assert "compareCumsum: !!COMPARE_SETTINGS.cumsum," in EDITOR_JS
+    assert "SELECTED_ENTITY_IDS.includes(COMPARE_SETTINGS.target)" in EDITOR_JS
+    body = EDITOR_JS.split("async save() {", 1)[1].split("const body = {", 1)[1].split("\n          };", 1)[0]
+    assert "compare_settings: {" in body
+    for key in ("compare: this.compare", "mode: this.compareMode", "years: this.compareYears",
+                "average: this.multiYearAverage", "cumsum: this.compareCumsum", "target: this.compareSollEntityId || null"):
+        assert key in body, key

@@ -1,4 +1,4 @@
-"""Fester Zeitraum gespeicherter Charts und Grenzen des Kalender-Sprungs.
+"""Fester Zeitraum und Vergleich gespeicherter Charts, Grenzen des Kalender-Sprungs.
 
 Aus main.py herausgelöst (dessen Längengrenze, siehe test_route_modules.py):
 reine Regeln ohne Zugriff auf App oder Index. Der feste Zeitraum ist ein Tag
@@ -15,6 +15,14 @@ from zoneinfo import ZoneInfo
 from fastapi import HTTPException
 
 from .i18n import tr
+from .storage.paths import validate_entity_id
+
+# Vergleich eines gespeicherten Charts (saved_charts.compare_settings, JSON):
+# an/aus, Art ("previous" = Vorperiode/Vorjahr, "year" = Vorjahres…,
+# "longterm" = Langzeit), bei Langzeit Zahl der Vorjahre (0 = alle) und
+# Ø-Linie, bei Vorjahr die Laufsumme und welche Entität die Soll-Linie ist.
+COMPARE_MODES = ("previous", "year", "longterm")
+LONGTERM_YEARS = (0, 2, 5, 10)
 
 
 def period_anchor_or_400(value: str | None) -> str | None:
@@ -38,4 +46,24 @@ def calendar_bounds(entity_rows, tz: ZoneInfo) -> dict:
     return {
         "calendar_first_date": day(min(firsts)) if firsts else None,
         "calendar_last_date": day(max(lasts)) if lasts else None,
+    }
+
+
+def compare_settings_or_400(value: dict | None) -> dict:
+    """Prüft und normalisiert den gespeicherten Vergleich. Unbekannte Schlüssel
+    fallen weg, fehlende bekommen den Ausgangswert des Editors."""
+    value = value or {}
+    mode = value.get("mode", "previous")
+    years = value.get("years", 5)
+    target = value.get("target") or None
+    if mode not in COMPARE_MODES or years not in LONGTERM_YEARS:
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Vergleich"))
+    if target is not None:
+        try:
+            target = validate_entity_id(target)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Vergleich")) from None
+    return {
+        "compare": bool(value.get("compare", False)), "mode": mode, "years": years,
+        "average": bool(value.get("average", True)), "cumsum": bool(value.get("cumsum", False)), "target": target,
     }

@@ -1043,10 +1043,12 @@ Rollierend-Schalter, Auflösung (samt Ausrichtung beim Ranking-Vergleich),
 dynamische Y-Achse, Werte anzeigen, Durchschnittslinie (samt Flach/Gleitend),
 Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie
 Zeitstrahl werden alle mit dem Chart gespeichert und
-gelten dann auch für dessen Vorschau auf Dashboards. **Punkte an/aus,
-Rohwerte und Vergleichen dagegen nicht** — diese drei sind reine
-Ansichtseinstellungen für den aktuellen Besuch und stehen beim nächsten
-Öffnen wieder auf ihrem Ausgangswert.
+gelten dann auch für dessen Vorschau auf Dashboards. Ebenfalls gespeichert
+werden eine angezeigte vergangene Periode und **Vergleichen** (samt Laufsumme
+und Soll Entität bzw. Jahren und Ø-Linie bei Langzeit); den Vergleich zeigt
+vorerst nur die Chart-Seite, nicht die Dashboard-Kachel. **Punkte an/aus und
+Rohwerte dagegen nicht** — beides sind reine Ansichtseinstellungen für den
+aktuellen Besuch und steht beim nächsten Öffnen wieder auf dem Ausgangswert.
 
 Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
 Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt. Die geöffnete
