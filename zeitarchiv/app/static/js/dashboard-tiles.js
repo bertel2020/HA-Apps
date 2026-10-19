@@ -260,10 +260,6 @@
   // war bis jetzt der einzige verbliebene Text-Ausreißer.
   const LEGEND_METRIC_LABELS = {last: t('Aktuell'), min: t('Min'), max: t('Max'), average: 'Ø', sum: 'Σ'};
 
-  function escLegend(s) {
-    return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  }
-
   // Chip-Variante (Standard) — dieselben Chips/Kennzahlen wie chart_editor.html
   // (.chart-legend-item aus app.css), hier zusätzlich klickbar (siehe
   // toggleTileLegendItem()), anders als die "static" (nicht umschaltbare)
@@ -279,21 +275,21 @@
   function renderLegendChips(items, legendMetrics, showStats, hiddenSet) {
     return items.map(item => {
       // "+N Jahre" (Langzeit-Kachel): nur ein Hinweis, kein Serien-Umschalter.
-      if (item.more) return `<span class="chart-legend-item is-more">${escLegend(item.more)}</span>`;
+      if (item.more) return `<span class="chart-legend-item is-more">${escapeHtml(item.more)}</span>`;
       let values = '';
       if (showStats) {
         const parts = [];
         for (const key of ['last', 'min', 'max', 'average', 'sum']) {
           if (!legendMetrics.includes(key)) continue;
           if (key === 'sum' && item.sum === null) continue;
-          parts.push(`<span>${LEGEND_METRIC_LABELS[key]} <strong>${escLegend(item[key])}</strong></span>`);
+          parts.push(`<span>${LEGEND_METRIC_LABELS[key]} <strong>${escapeHtml(item[key])}</strong></span>`);
         }
         if (parts.length) values = `<span class="values">${parts.join('')}</span>`;
       }
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
-      return `<span class="chart-legend-item${inactive}" data-series="${escLegend(item.name)}" role="button" tabindex="0">`
+      return `<span class="chart-legend-item${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + legendSwatch(item)
-           + `<span class="name">${escLegend(item.name)}</span>${values}</span>`;
+           + `<span class="name">${escapeHtml(item.name)}</span>${values}</span>`;
     }).join('');
   }
 
@@ -305,12 +301,12 @@
     const cols = showStats ? ['last', 'min', 'max', 'average', 'sum'].filter(k => legendMetrics.includes(k)) : [];
     const headerCells = cols.map(key => `<th>${LEGEND_METRIC_LABELS[key]}</th>`).join('');
     const rows = items.filter(item => !item.more).map(item => {
-      const cells = cols.map(key => `<td>${escLegend(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
+      const cells = cols.map(key => `<td>${escapeHtml(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
-      return `<tr class="chart-legend-table-row${inactive}" data-series="${escLegend(item.name)}" role="button" tabindex="0">`
+      return `<tr class="chart-legend-table-row${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + `<td class="legend-name-col"><span class="legend-name-cell">`
            + legendSwatch(item)
-           + `<span class="name">${escLegend(item.name)}</span></span></td>${cells}</tr>`;
+           + `<span class="name">${escapeHtml(item.name)}</span></span></td>${cells}</tr>`;
     }).join('');
     return `<div class="tbl-wrap"><table class="dt compact chart-legend-table">`
          + `<thead><tr><th class="legend-name-col">Name</th>${headerCells}</tr></thead>`
@@ -1741,14 +1737,6 @@
       const groupH = (groupRow && groupRow.offsetParent !== null) ? groupRow.getBoundingClientRect().height : 0;
       tableEl.style.setProperty('--tbl-group-header-h', groupH + 'px');
     }
-  }
-
-  // Auch für Attributwerte (data-tooltip-fixed="…"): der frühere Umweg über
-  // textContent/innerHTML maskiert nur & < >, keine Anführungszeichen — eine
-  // Spaltenbeschriftung mit " brach dort aus dem Attribut aus.
-  const HTML_ESCAPES = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
-  function escapeHtml(s) {
-    return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
   }
 
   // Baut dieselbe Linie+Füllfläche-Sparkline (SVG-Pfade, gerade Segmente) wie

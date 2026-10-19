@@ -1,8 +1,8 @@
-"""escapeHtml() in dashboard-tiles.js muss auch für Attributwerte taugen.
+"""Der gemeinsame HTML-Maskierer (html-escape.js) taugt für Text und Attribute.
 
 Die Tabellen-Kacheln setzen damit u. a. data-tooltip-fixed="…" aus frei
-wählbaren Spaltenbeschriftungen zusammen. Die frühere Variante über
-textContent/innerHTML maskierte keine Anführungszeichen.
+wählbaren Spaltenbeschriftungen zusammen. Früher hatte jede Datei ihren
+eigenen Helfer; einer maskierte keine Anführungszeichen, einer kein &.
 """
 
 from __future__ import annotations
@@ -11,19 +11,26 @@ import json
 import re
 import subprocess
 
-from _paths import APP_JS
+from _paths import APP_JS, TEMPLATES
 
 
-SCRIPT = APP_JS / "dashboard-tiles.js"
+SCRIPT = APP_JS / "html-escape.js"
+
+_RUNNER = r"""
+const [script, value] = process.argv.slice(1);
+const vm = require('vm');
+const ctx = {window: {}};
+vm.createContext(ctx);
+vm.runInContext(require('fs').readFileSync(script, 'utf8'), ctx);
+console.log(JSON.stringify(ctx.window.escapeHtml(JSON.parse(value))));
+"""
 
 
-def _escape_html(value: str) -> str:
-    source = SCRIPT.read_text(encoding="utf-8")
-    table = re.search(r"^  const HTML_ESCAPES = .*?;$", source, re.M)
-    func = re.search(r"^  function escapeHtml\(s\) \{.*?^  \}$", source, re.M | re.S)
-    assert table and func, "escapeHtml() nicht gefunden"
-    code = f"{table.group(0)}\n{func.group(0)}\nconsole.log(JSON.stringify(escapeHtml({json.dumps(value)})));"
-    result = subprocess.run(["node", "-e", code], check=True, capture_output=True, text=True)
+def _escape_html(value) -> str:
+    result = subprocess.run(
+        ["node", "-e", _RUNNER, str(SCRIPT), json.dumps(value)],
+        check=True, capture_output=True, text=True,
+    )
     return json.loads(result.stdout)
 
 
@@ -32,5 +39,21 @@ def test_escape_html_covers_attribute_delimiters() -> None:
 
 
 def test_escaped_label_cannot_leave_the_attribute() -> None:
-    label = 'x" onmouseover="alert(1)'
-    assert '"' not in _escape_html(label)
+    assert '"' not in _escape_html('x" onmouseover="alert(1)')
+
+
+def test_null_becomes_empty_text() -> None:
+    assert _escape_html(None) == ""
+
+
+def test_no_script_keeps_its_own_escape_helper() -> None:
+    own = re.compile(r"function\s+_?esc\w*\s*\(|\bescLegend\b|replace\(/\[&<>")
+    for path in sorted(APP_JS.rglob("*.js")):
+        if "vendor" in path.parts or path.name == "html-escape.js":
+            continue
+        assert not own.search(path.read_text(encoding="utf-8")), path.name
+
+
+def test_every_page_loads_the_shared_helper_early() -> None:
+    base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    assert base.index("js/i18n.js") < base.index("js/html-escape.js") < base.index("{% block content")

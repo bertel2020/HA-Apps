@@ -42,6 +42,7 @@
 <script src="{{ asset('js/server-time.js') }}"></script>
 {% if lang | default('de') != 'de' %}<script>window.ZA_CATALOG = {{ js_catalog | tojson }};</script>{% endif %}
 <script src="{{ asset('js/i18n.js') }}"></script>
+<script src="{{ asset('js/html-escape.js') }}"></script>
 <style>:root{--font-scale:{{ font_scale_value }};{% block root_vars %}{% endblock %}}</style>
 {% block page_css %}{% endblock %}
 </head>

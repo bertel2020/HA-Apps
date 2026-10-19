@@ -148,11 +148,6 @@ async function migrateExecute() {
   }
 }
 
-function _escapeHtml(value) {
-  const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
-  return String(value).replace(/[&<>"']/g, (c) => map[c]);
-}
-
 const _POST_ACTION_RESULT_LABELS = {delete: t('Quelle entfernt'), clear: t('Quelle geleert'), keep: t('Quelle erhalten')};
 
 function showResult(result) {
@@ -178,7 +173,7 @@ function showResult(result) {
   if (result.repointed_dashboards.length) {
     notes.push(`<div class="migrate-banner positive">✓ ${t('{count} Dashboard-Kachel(n) automatisch auf die neue Entität umgehängt — Titel, Rundung und Sparkline-Einstellungen bleiben dabei erhalten.', {count: result.repointed_dashboards.length})}</div>`);
     notes.push('<div class="migrate-result-list">' + result.repointed_dashboards.map((name) =>
-      `<div class="migrate-result-row"><span>${_escapeHtml(name)}</span><span class="tag">→ ${_escapeHtml(result.target_entity_id)}</span></div>`
+      `<div class="migrate-result-row"><span>${escapeHtml(name)}</span><span class="tag">→ ${escapeHtml(result.target_entity_id)}</span></div>`
     ).join('') + '</div>');
   }
   document.getElementById('migrate-result-dashboards').innerHTML = notes.join('');
