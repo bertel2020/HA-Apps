@@ -28,9 +28,10 @@
 
 ### Geändert
 
-- **Auswahllisten per Tastatur**: Die Auswahllisten der App lassen sich jetzt
-  ohne Maus bedienen: Enter, Leertaste oder Pfeil nach unten öffnet die Liste,
-  die Pfeiltasten wählen den Eintrag, Enter übernimmt ihn, Escape schließt.
+- **Auswahllisten per Tastatur**: Die Auswahllisten in Filtern, Einstellungen
+  und Housekeeping lassen sich jetzt ohne Maus bedienen: Enter, Leertaste oder
+  Pfeil nach unten öffnet die Liste, die Pfeiltasten wählen den Eintrag, Enter
+  übernimmt ihn, Escape schließt.
 
 ### Behoben
 
@@ -56,6 +57,9 @@
   werden (etwa bei unbekannter Ziel-Entität), wechselte der Assistent trotzdem
   zu Schritt 2 und zeigte dort die Fehlerantwort. Jetzt bleibt er in Schritt 1
   und nennt den Grund.
+- **Löschen im Chart- und Tabellen-Editor**: Schlug das Löschen fehl, ging
+  es trotzdem zur Liste zurück, in der das Chart bzw. die Tabelle weiter stand.
+  Jetzt bleibt der Editor offen und meldet „Löschen fehlgeschlagen.“
 
 ---
 
@@ -85,9 +89,10 @@
 
 #### Changed
 
-- **Selection lists by keyboard**: The app's selection lists can now be used
-  without a mouse: Enter, Space or Arrow Down opens the list, the arrow keys
-  move through the entries, Enter picks one, Escape closes it.
+- **Selection lists by keyboard**: The selection lists in filters, settings
+  and housekeeping can now be used without a mouse: Enter, Space or Arrow Down
+  opens the list, the arrow keys move through the entries, Enter picks one,
+  Escape closes it.
 
 #### Fixed
 
@@ -111,6 +116,9 @@
   (for example for an unknown target entity), the wizard still moved to step 2
   and showed the error response there. It now stays in step 1 and names the
   reason.
+- **Deleting in the chart and table editor**: If deleting failed, the editor
+  still went back to the list, where the chart or table was still there. The
+  editor now stays open and reports “Deleting failed.”
 
 ## 1.7.0 - 2026-10-19
 

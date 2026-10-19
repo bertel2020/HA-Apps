@@ -2673,7 +2673,18 @@
 
         async deleteChart() {
           if (!await appConfirm(t('Dieses Chart wirklich löschen?'), {danger: true})) return;
-          await fetch(`${BASE}/charts/${CHART_ID}/delete`, {method: 'POST'});
+          // Wie deleteTable() in table_editor.js: bei einem Fehler auf der
+          // Seite bleiben, statt zur Liste zu springen, in der das Chart steht.
+          let response;
+          try {
+            response = await fetch(`${BASE}/charts/${CHART_ID}/delete`, {method: 'POST'});
+          } catch (e) {
+            response = null;
+          }
+          if (!response || !response.ok) {
+            appAlert(t('Löschen fehlgeschlagen.'));
+            return;
+          }
           window.location.href = `${BASE}/charts`;
         },
 

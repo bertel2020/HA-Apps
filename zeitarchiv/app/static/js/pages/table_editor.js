@@ -856,7 +856,19 @@
 
         async deleteTable() {
           if (!await appConfirm(t('Diese Tabelle wirklich löschen?'), {danger: true})) return;
-          await fetch(`${BASE}/tables/${TABLE_ID}/delete`, {method: 'POST'});
+          // fetch() wirft bei 4xx/5xx nicht — ohne Prüfung führte ein
+          // fehlgeschlagenes Löschen kommentarlos zur Liste, die Tabelle
+          // stand dort weiter. Dieselbe Meldung wie in tables.js.
+          let response;
+          try {
+            response = await fetch(`${BASE}/tables/${TABLE_ID}/delete`, {method: 'POST'});
+          } catch (e) {
+            response = null;
+          }
+          if (!response || !response.ok) {
+            appAlert(t('Löschen fehlgeschlagen.'));
+            return;
+          }
           window.location.href = `${BASE}/tables`;
         },
 
