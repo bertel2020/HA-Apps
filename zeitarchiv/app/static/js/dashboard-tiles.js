@@ -160,6 +160,12 @@
   }
 
   const instances = new Map();  // chartId -> echarts instance
+  // Einmal für die ganze Seite statt in setup(): das läuft nach jedem
+  // htmx-Austausch des Dashboard-Gitters erneut, und jeder Lauf legte einen
+  // weiteren Listener an — nach n Austauschen n Resize-Durchläufe je Ereignis.
+  // Die Sammlung wird beim Austausch geleert und neu befüllt, der eine
+  // Listener sieht so immer die aktuellen Instanzen.
+  window.addEventListener('resize', () => instances.forEach(c => c.resize()));
   // chartId -> {items, legendMetrics, showStats} — die zuletzt geladenen und
   // berechneten Legenden-Kennzahlen einer Chart-Kachel, unabhängig vom
   // aktuellen Sichtbarkeitszustand der Legende zwischengespeichert. Ein
@@ -2028,7 +2034,6 @@
     chartTiles.forEach(el => observer.observe(el));
     tableTiles.forEach(el => observer.observe(el));
     entityTiles.forEach(el => observer.observe(el));
-    window.addEventListener('resize', () => instances.forEach(c => c.resize()));
     setupSizePickers();
     setupDragAndDrop();
     setupLegendToggles();
