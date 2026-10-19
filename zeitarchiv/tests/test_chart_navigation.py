@@ -165,11 +165,15 @@ def test_choosing_a_comparison_returns_to_the_current_period() -> None:
 
 
 def test_comparison_option_fields_are_right_aligned() -> None:
-    """Laufsumme/Soll (Vorjahr) und Jahre/Ø-Linie (Langzeit) stehen rechtsbündig,
-    auch beim Anpassen, wenn links keine Zeitraumanzeige steht."""
+    """Laufsumme/Soll (Vorjahr) und Jahre/Ø-Linie (Langzeit) stehen rechtsbündig
+    und nur beim Anpassen; beim Ansehen wird der Vergleich nur gezeichnet."""
     for marker in ("compareMode === 'previous' && range === 'year'", "compareMode === 'longterm'"):
         block = EDITOR_TEMPLATE.split(f'x-if="compare && {marker}">', 1)[1]
-        assert block.lstrip().startswith('<span style="display:flex;gap:16px;margin-left:auto;">'), marker
+        assert block.lstrip().startswith('<span class="compare-ext-fields" x-show="editing">'), marker
+    # Layout in der Klasse, nicht im style-Attribut: x-show entfernt beim
+    # Einblenden die display-Angabe daraus.
+    css = (APP / "static" / "css" / "pages" / "chart_editor.css").read_text(encoding="utf-8")
+    assert ".compare-ext-fields{display:flex;gap:16px;flex-wrap:wrap;margin-left:auto;}" in css
 
 
 def test_comparison_is_saved_and_restored_with_the_chart(client) -> None:

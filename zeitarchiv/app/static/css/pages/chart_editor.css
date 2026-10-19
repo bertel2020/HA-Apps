@@ -221,3 +221,9 @@
   .calendar-day:disabled{cursor:default;}
   .calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
   .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+
+  /* Felder von Vorjahr (Laufsumme, Soll) bzw. Langzeit (Jahre, Ø-Linie) in der
+     Zeile der Zeitraumanzeige: rechtsbündig, nebeneinander. Als Klasse statt
+     Inline-Style, weil x-show="editing" beim Einblenden die display-Angabe im
+     style-Attribut entfernt — die Felder standen dann untereinander. */
+  .compare-ext-fields{display:flex;gap:16px;flex-wrap:wrap;margin-left:auto;}

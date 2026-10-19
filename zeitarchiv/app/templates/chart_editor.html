@@ -488,10 +488,12 @@
           <!-- Beim Ansehen nur die Anzeige der laufenden Periode, wie bisher. Die
                Felder von Vorjahr/Langzeit daneben stehen per margin-left:auto
                rechtsbündig — beim Anpassen ist diese Anzeige ausgeblendet, und
-               space-between allein ließe ein einzelnes Element links stehen. -->
+               space-between allein ließe ein einzelnes Element links stehen.
+               Die Felder selbst gibt es nur beim Anpassen; beim Ansehen wird
+               der gespeicherte Vergleich nur gezeichnet. -->
           <span class="period-label" x-show="!editing" x-text="periodLabel"></span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
-            <span style="display:flex;gap:16px;margin-left:auto;">
+            <span class="compare-ext-fields" x-show="editing">
               <!-- Reine Render-Einstellung, keine neue Abfrage (Laufsumme wird
                    client-seitig aus den schon geladenen Monatswerten gebildet,
                    siehe cumulate() in chart_editor.js) — deshalb render() statt
@@ -538,7 +540,7 @@
                Vorjahre und Ø-Linie für renderMultiYear() — "Vorjahr" darüber
                bleibt davon unberührt. -->
           <template x-if="compare && compareMode === 'longterm'">
-            <span style="display:flex;gap:16px;margin-left:auto;">
+            <span class="compare-ext-fields" x-show="editing">
               <span class="toolbar-field">
                 <span class="toolbar-field-label">{{ _("Jahre") }}</span>
                 <div class="seg">
