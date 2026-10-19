@@ -150,6 +150,16 @@ Like `/api/query`, but `entity_ids` (comma-separated, max.
 is_current}`, one entry in `series` per entity with `friendly_name`, `unit`,
 `decimals`, `display_mode`, `aggregation_type`, `chart_type`, `points`.
 
+Here `compare_mode` additionally accepts `longterm` (“Long-term” in the
+chart editor), together with `previous_years` (default `1`, `0` = all
+previous years, negative → `400`). It only applies with `compare=true`,
+`range=year`, not `continuous`, without `raw` and with exactly one entity;
+otherwise there is no comparison. Instead of `compare_points`, the entry then
+carries `years`: `[{year, points, cut_points}]`, most recent previous year
+first, years without any value are left out. `cut_points` is only set in the
+current year (`offset=0`) and holds each previous year up to the same day,
+otherwise `null`.
+
 ## `POST /api/query-table` (Ingress-internal)
 
 Loads all periods of a comparison table in one shared request (at most 25

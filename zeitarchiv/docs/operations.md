@@ -35,6 +35,19 @@ Sowohl Backup als auch Restore laufen unter
 `StorageCoordinator.exclusive()` (siehe [architecture.md](architecture.md)) —
 kein gleichzeitiger Schreibverkehr während der Operation.
 
+### Home-Assistant-Backup
+
+Ein Backup von Home Assistant, das das Add-on einschließt, enthält auch den
+Zeitarchiv-Datenbestand. `backup: cold` in `config.yaml` hält das Add-on
+dafür kurz an, damit Index und Parquet-Dateien in einem konsistenten Zustand
+gesichert werden. `backup_exclude` nimmt aus: die eigenen Backup-ZIPs
+(`backups/`), die Arbeitsverzeichnisse einer laufenden Wiederherstellung
+(`.zeitarchiv-restore-staging/`, `.zeitarchiv-restore-rollback-*`) und, wie
+im eigenen Backup, die hochgeladenen Importdaten (`symcon_import/`,
+`csv_import/`). Die Liste liest der Supervisor aus der `config.yaml` der
+installierten Version; eine Änderung greift also erst mit dem nächsten
+Update.
+
 ### Externes Ziel
 
 Implementierung: `storage/backup_external.py` (Netzwerkspeicher),

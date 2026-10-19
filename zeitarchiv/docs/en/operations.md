@@ -33,6 +33,18 @@ Both backup and restore run under `StorageCoordinator.exclusive()` (see
 [architecture.md](architecture.md)) — no concurrent write traffic
 during the operation.
 
+### Home Assistant backup
+
+A Home Assistant backup that includes the add-on also contains the
+Zeitarchiv data. `backup: cold` in `config.yaml` briefly stops the add-on for
+this, so that the index and Parquet files are saved in a consistent state.
+`backup_exclude` leaves out: Zeitarchiv's own backup ZIPs (`backups/`), the
+working directories of a running restore (`.zeitarchiv-restore-staging/`,
+`.zeitarchiv-restore-rollback-*`) and, as in Zeitarchiv's own backup, the
+uploaded import data (`symcon_import/`, `csv_import/`). The Supervisor reads
+this list from the `config.yaml` of the installed version, so a change only
+takes effect with the next update.
+
 ### External target
 
 Implementation: `storage/backup_external.py` (network share),
