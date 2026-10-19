@@ -175,10 +175,11 @@
 
   /* Zeitraum-Navigation an der Zeitraumanzeige (‹ Zeitraum ›, Kalender,
      "Zurück zu jetzt") — dieselbe Bauart wie .nav/.period-label in
-     entity_detail.css. Die Anzeige selbst war hier bisher ein Block mit
-     eigenem Abstand nach unten (.period-label oben); als Knopf in der
-     Navigation übernimmt .chart-nav diesen Abstand. */
-  .chart-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+     entity_detail.css, wie dort in der Zeitraum-Leiste rechts neben der
+     Zeitraumauswahl. Die Anzeige selbst ist hier sonst ein Block mit eigenem
+     Abstand nach unten (.period-label oben); als Knopf in der Navigation
+     gelten diese Regeln nicht. */
+  .chart-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .chart-nav .period-label{
     display:inline;margin:0;min-width:130px;text-align:center;white-space:nowrap;
     background:none;border:none;padding:0;cursor:pointer;border-radius:6px;

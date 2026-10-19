@@ -17,6 +17,10 @@
   später 2025, beim Ansehen und auf dem Dashboard; in der laufenden Periode
   gespeichert, bleibt es immer aktuell. „Als Chart speichern“ auf der Seite
   einer Entität übernimmt die dort angezeigte Periode.
+- **Zurück zu jetzt**: Die Seite einer Entität hat wie der Chart-Editor einen
+  Knopf „Zurück zu jetzt“, sobald eine vergangene Periode angezeigt wird. Im
+  Chart-Editor steht die Navigation jetzt wie dort rechts neben der
+  Zeitraumauswahl.
 
 ---
 
@@ -36,6 +40,9 @@
   entity. A chart saved at 2025 still shows 2025 later, when viewing and on the
   dashboard; saved in the current period, it always stays current. “Save as
   chart” on an entity's page takes over the period shown there.
+- **Back to now**: Like the chart editor, an entity's page now has a “Back to
+  now” button whenever a past period is shown. In the chart editor, the
+  navigation now sits next to the period selection, as it does there.
 
 ## 1.7.0 - 2026-10-19
 

@@ -13,15 +13,26 @@ CALENDAR_JS = (APP / "static" / "js" / "calendar-picker.js").read_text(encoding=
 
 def test_navigation_only_while_customizing_and_plain_label_when_viewing() -> None:
     """Beim Ansehen steht wie bisher nur die Zeitraumanzeige; ‹ ›, Kalender und
-    „Zurück zu jetzt“ gibt es nur im Modus „Anpassen“."""
+    „Zurück zu jetzt“ gibt es nur im Modus „Anpassen“ — in der Zeitraum-Leiste
+    rechts neben der Zeitraumauswahl, wie auf der Entitätsseite."""
     row = EDITOR_TEMPLATE.split('<div class="chart-title-row chart-title-row-end">', 1)[1].split("<template x-if", 1)[0]
     assert '<span class="period-label" x-show="!editing" x-text="periodLabel"></span>' in row
-    assert '<span class="nav chart-nav" x-show="editing">' in row
-    assert '@click="goBack()"' in row
-    assert ':disabled="!canGoForward" @click="goForward()"' in row
-    assert 'x-data=\'calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})\'' in row
-    assert '{% include "_calendar_popover.html" %}' in row
-    assert 'x-show="offset !== 0"' in row and '@click="goToNow()"' in row
+    assert "chart-nav" not in row
+    toolbar = EDITOR_TEMPLATE.split('<div class="toolbar" x-show="editing">', 1)[1].split('<div class="toolbar-right">', 1)[0]
+    assert toolbar.index('<div class="seg">') < toolbar.index('<span class="nav chart-nav">')
+    assert '@click="goBack()"' in toolbar
+    assert ':disabled="!canGoForward" @click="goForward()"' in toolbar
+    assert 'x-data=\'calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})\'' in toolbar
+    assert '{% include "_calendar_popover.html" %}' in toolbar
+    assert 'x-show="offset !== 0"' in toolbar and '@click="goToNow()"' in toolbar
+
+
+def test_entity_page_has_the_same_back_to_now_chip() -> None:
+    tpl = (TEMPLATES / "entity_detail.html").read_text(encoding="utf-8")
+    nav = tpl.split('<div class="nav">', 1)[1]
+    nav = nav[:nav.index('Zurück zu jetzt') + 40]
+    assert '<button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">' in nav
+    assert nav.index("goForward()") < nav.index("now-chip")
 
 
 def test_saving_keeps_the_shown_period_without_jumping_back() -> None:

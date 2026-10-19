@@ -64,6 +64,10 @@
             {% include "_calendar_popover.html" %}
           </div>
           <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
+          {# Sichtbarer Rückweg zur laufenden Periode, wie im Chart-Editor — der
+             erneute Klick auf den aktiven Zeitraum (setRange()) bleibt als
+             Zweitweg bestehen. Nur außerhalb der laufenden Periode. #}
+          <button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">{{ _("Zurück zu jetzt") }}</button>
         </div>
         {# Markierungs-Chip. Nur wenn die Anzeige läuft und es im Zeitraum
            tatsächlich Markierungen gibt — sonst stünde dort dauerhaft ein

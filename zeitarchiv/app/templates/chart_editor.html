@@ -109,6 +109,27 @@
             <button :class="{active: range === '{{ key }}'}" @click="setRange('{{ key }}')">{{ label }}</button>
             {% endfor %}
           </div>
+          <!-- Zeitraum-Navigation wie auf der Entitätsseite (entity_detail.html):
+               ‹ ›, Klick auf die Anzeige öffnet den Kalender, rechts neben der
+               Zeitraumauswahl wie dort. Nur beim Anpassen (die Leiste steht
+               nur dann). Gespeichert wird die angezeigte Periode: eine
+               vergangene als fester Zeitraum, die laufende als "immer
+               aktuell" (periodAnchorForSave in chart_editor.js).
+               calendarPicker(null, …): ein Chart hat mehrere Entitäten,
+               deshalb keine Tages-Abfrage je Entität und als Grenzen das
+               ganze Archiv (calendar_first/last_date). -->
+          <span class="nav chart-nav">
+            <button type="button" class="btn navbtn" @click="goBack()" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
+            <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
+              <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : t('Zu einem bestimmten Zeitpunkt springen')" x-text="periodLabel"></button>
+              {% include "_calendar_popover.html" %}
+            </span>
+            <button type="button" class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
+            <!-- Derselbe Rückweg wie ein erneuter Klick auf den aktiven
+                 Zeitraum, aber sichtbar — nur außerhalb der laufenden
+                 Periode. -->
+            <button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">{{ _("Zurück zu jetzt") }}</button>
+          </span>
           <!-- Beide Menüs rechtsbündig ans Ende der Leiste, wie im
                Entitäts-Chart (.toolbar-right in app.css). -->
           <div class="toolbar-right">
@@ -466,26 +487,6 @@
         <div class="chart-title-row chart-title-row-end">
           <!-- Beim Ansehen nur die Anzeige der laufenden Periode, wie bisher. -->
           <span class="period-label" x-show="!editing" x-text="periodLabel"></span>
-          <!-- Zeitraum-Navigation wie auf der Entitätsseite (entity_detail.html):
-               ‹ ›, Klick auf die Anzeige öffnet den Kalender. Nur beim
-               Anpassen. Gespeichert wird die angezeigte Periode: eine
-               vergangene als fester Zeitraum, die laufende als "immer
-               aktuell" (periodAnchorForSave in chart_editor.js).
-               calendarPicker(null, …): ein Chart hat mehrere Entitäten,
-               deshalb keine Tages-Abfrage je Entität und als Grenzen das
-               ganze Archiv (calendar_first/last_date). -->
-          <span class="nav chart-nav" x-show="editing">
-            <button type="button" class="btn navbtn" @click="goBack()" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
-            <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
-              <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : t('Zu einem bestimmten Zeitpunkt springen')" x-text="periodLabel"></button>
-              {% include "_calendar_popover.html" %}
-            </span>
-            <button type="button" class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
-            <!-- Derselbe Rückweg wie ein erneuter Klick auf den aktiven
-                 Zeitraum, aber sichtbar — nur außerhalb der laufenden
-                 Periode. -->
-            <button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">{{ _("Zurück zu jetzt") }}</button>
-          </span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
             <span style="display:flex;gap:16px;">
               <!-- Reine Render-Einstellung, keine neue Abfrage (Laufsumme wird

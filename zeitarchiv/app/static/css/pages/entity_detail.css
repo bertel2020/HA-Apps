@@ -44,6 +44,9 @@
   }
   .period-label:hover:not(:disabled){color:var(--accent-line);}
   .period-label:disabled{cursor:default;}
+  /* "Zurück zu jetzt" in der Navigation — dieselben Maße wie im Chart-Editor
+     (.chart-nav .now-chip in chart_editor.css). */
+  .nav .now-chip{font-family:var(--font-display);font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
   /* Markierungs-Chip. Erscheint nur, wenn es im Zeitraum tatsächlich
      Markierungen gibt — deshalb darf er auffallen, ohne zu drängen: Rand und
      Schrift in --danger, aber ohne gefüllte Fläche, damit er neben den

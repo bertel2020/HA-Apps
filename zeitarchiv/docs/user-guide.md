@@ -733,7 +733,8 @@ Editor des Charts bzw. der Tabelle heraus.
   Vor-/Zurück-Pfeile blättern jeweils um eine Einheit.
 - **Ein erneuter Klick auf die bereits gewählte Einheit springt zurück in die
   laufende Periode** — „Tag" auf heute, „Monat" auf den aktuellen Monat.
-  Dieselbe Geste wie im Energiedashboard.
+  Dieselbe Geste wie im Energiedashboard. Außerhalb der laufenden Periode
+  führt auch der Knopf **Zurück zu jetzt** neben den Pfeilen dorthin.
 - **Laufend** ("bis heute") zeigt den aktuellen, noch nicht abgeschlossenen
   Zeitraum, z. B. "diese Woche bis jetzt" — auch bevor für die restliche
   Periode überhaupt Daten vorliegen, reicht die Achse bis zur vollen

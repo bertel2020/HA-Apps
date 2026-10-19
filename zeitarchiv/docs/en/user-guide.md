@@ -680,7 +680,8 @@ take it out in the editor of the chart or table.
   back arrows page by one unit each.
 - **Clicking the already selected unit again jumps back to the current
   period** — "Day" to today, "Month" to the current month. The same gesture as
-  in the energy dashboard.
+  in the energy dashboard. Outside the current period, the **Back to now**
+  button next to the arrows takes you there too.
 - **Current** ("up to today") shows the current, not yet completed period,
   e.g. "this week so far" — even before any data exists for the rest of the
   period, the axis extends to the full calendar boundary (e.g. to Sunday for
