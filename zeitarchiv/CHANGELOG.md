@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0 - 2026-10-19
 
 ### Neu
 
@@ -39,6 +39,8 @@
   CSV-Importdaten landen nicht mehr im Backup von Home Assistant – wie schon
   bisher beim eigenen Zeitarchiv-Backup. Sie lassen sich jederzeit neu
   hochladen.
+- **Neues Logo**: Zeitarchiv hat ein neues Logo; die Kopfzeile zeigt dessen
+  Schriftzug, passend zum hellen und dunklen Farbschema.
 
 ### Behoben
 
@@ -116,6 +118,8 @@
 - **Import data not in the Home Assistant backup**: Uploaded Symcon and CSV
   import data no longer ends up in Home Assistant's backup – as was already
   the case for Zeitarchiv's own backup. It can be uploaded again at any time.
+- **New logo**: Zeitarchiv has a new logo; the header shows its wordmark,
+  matching the light and dark color scheme.
 
 #### Fixed
 
