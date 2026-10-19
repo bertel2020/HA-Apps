@@ -162,3 +162,11 @@ def test_choosing_a_comparison_returns_to_the_current_period() -> None:
     assert "this._rangeAnchorMs = null;" in fn
     assert fn.index("this.offset = 0;") < fn.index("this.load();")
     assert "this.setCompareMode('longterm');" in EDITOR_JS.split("setLongterm() {", 1)[1].split("\n        },", 1)[0]
+
+
+def test_comparison_option_fields_are_right_aligned() -> None:
+    """Laufsumme/Soll (Vorjahr) und Jahre/Ø-Linie (Langzeit) stehen rechtsbündig,
+    auch beim Anpassen, wenn links keine Zeitraumanzeige steht."""
+    for marker in ("compareMode === 'previous' && range === 'year'", "compareMode === 'longterm'"):
+        block = EDITOR_TEMPLATE.split(f'x-if="compare && {marker}">', 1)[1]
+        assert block.lstrip().startswith('<span style="display:flex;gap:16px;margin-left:auto;">'), marker

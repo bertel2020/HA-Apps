@@ -485,10 +485,13 @@
              Label-über-Wert wie .menu-section-label (app.css), keine neuen
              Farben. -->
         <div class="chart-title-row chart-title-row-end">
-          <!-- Beim Ansehen nur die Anzeige der laufenden Periode, wie bisher. -->
+          <!-- Beim Ansehen nur die Anzeige der laufenden Periode, wie bisher. Die
+               Felder von Vorjahr/Langzeit daneben stehen per margin-left:auto
+               rechtsbündig — beim Anpassen ist diese Anzeige ausgeblendet, und
+               space-between allein ließe ein einzelnes Element links stehen. -->
           <span class="period-label" x-show="!editing" x-text="periodLabel"></span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
-            <span style="display:flex;gap:16px;">
+            <span style="display:flex;gap:16px;margin-left:auto;">
               <!-- Reine Render-Einstellung, keine neue Abfrage (Laufsumme wird
                    client-seitig aus den schon geladenen Monatswerten gebildet,
                    siehe cumulate() in chart_editor.js) — deshalb render() statt
@@ -535,7 +538,7 @@
                Vorjahre und Ø-Linie für renderMultiYear() — "Vorjahr" darüber
                bleibt davon unberührt. -->
           <template x-if="compare && compareMode === 'longterm'">
-            <span style="display:flex;gap:16px;">
+            <span style="display:flex;gap:16px;margin-left:auto;">
               <span class="toolbar-field">
                 <span class="toolbar-field-label">{{ _("Jahre") }}</span>
                 <div class="seg">
