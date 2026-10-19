@@ -1,4 +1,4 @@
-"""Mehrjahresvergleich im Chart-Editor ("Jahre" neben Laufsumme/Soll):
+"""Mehrjahresvergleich im Chart-Editor (Vergleich "Langzeit"):
 query_previous_years() in app/storage/query.py, der Parameter previous_years
 von /api/query-multi und die Anbindung in chart_editor.js/.html."""
 
@@ -126,22 +126,25 @@ def test_unknown_entity_or_entity_without_first_value_gives_no_years() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def test_api_returns_years_only_for_previous_year_compare_of_one_calendar_year(client) -> None:
-    """previous_years wirkt nur dort, wo das Feld "Jahre" erscheint: Vorjahr,
-    Zeitraum Jahr, kalendarisch, genau eine Entität. previous_years=1 ist der
-    bisherige Vorjahresvergleich und ändert an der Antwort nichts."""
+def test_api_returns_years_only_for_longterm_compare_of_one_calendar_year(client) -> None:
+    """Die Vorjahre kommen nur bei compare_mode=longterm, Zeitraum Jahr,
+    kalendarisch und genau einer Entität. "Vorjahr" (previous) bleibt, wie es
+    war — auch mit previous_years."""
     ghost = "sensor.gibt_es_nicht"
-    base = f"/api/query-multi?entity_ids={ghost}&range=year&offset=0&compare=true&compare_mode=previous"
+    base = f"/api/query-multi?entity_ids={ghost}&range=year&offset=0&compare=true"
 
-    with_years = client.get(base + "&previous_years=5").json()["series"][0]
-    assert with_years["years"] == []
+    longterm = client.get(base + "&compare_mode=longterm&previous_years=5").json()["series"][0]
+    assert longterm["years"] == []
+    assert "compare_points" not in longterm
+
+    previous = client.get(base + "&compare_mode=previous&previous_years=5").json()["series"][0]
+    assert "years" not in previous
+    assert "compare_points" in previous
 
     for url in (
-        base,
-        base + "&previous_years=1",
-        base + "&previous_years=5&continuous=true",
-        f"/api/query-multi?entity_ids={ghost}&range=month&offset=0&compare=true&previous_years=5",
-        f"/api/query-multi?entity_ids={ghost},sensor.auch_nicht&range=year&offset=0&compare=true&previous_years=5",
+        base + "&compare_mode=longterm&previous_years=5&continuous=true",
+        f"/api/query-multi?entity_ids={ghost}&range=month&offset=0&compare=true&compare_mode=longterm",
+        f"/api/query-multi?entity_ids={ghost},sensor.auch_nicht&range=year&offset=0&compare=true&compare_mode=longterm",
     ):
         response = client.get(url)
         assert response.status_code == 200, (url, response.text)
@@ -150,38 +153,53 @@ def test_api_returns_years_only_for_previous_year_compare_of_one_calendar_year(c
 
 def test_api_rejects_negative_previous_years(client) -> None:
     response = client.get(
-        "/api/query-multi?entity_ids=sensor.gibt_es_nicht&range=year&offset=0&compare=true&previous_years=-1"
+        "/api/query-multi?entity_ids=sensor.gibt_es_nicht&range=year&offset=0&compare=true"
+        "&compare_mode=longterm&previous_years=-1"
     )
     assert response.status_code == 400
 
 
-def test_multi_year_fields_sit_in_the_previous_year_row() -> None:
-    """Kein dritter Eintrag im Vergleichen-Menü (siehe
-    test_years_compare_is_not_a_separate_menu_option): "Jahre" und "Ø-Linie"
-    stehen in derselben Zeile wie Laufsumme/Soll, die ab 2 Jahren verschwinden."""
-    zeile = EDITOR_TEMPLATE.split(
+def test_longterm_is_its_own_menu_entry_and_previous_year_stays_untouched() -> None:
+    """"Langzeit" ist ein eigener Eintrag im Vergleichen-Menü mit eigener
+    Zeile (Jahre, Ø-Linie). Die Zeile von "Vorjahr" (Laufsumme, Soll) kennt
+    den Mehrjahresvergleich nicht."""
+    popover = EDITOR_TEMPLATE.split('class="menu-popover menu-popover-narrow"', 1)[1].split("</div>", 1)[0]
+    assert '@click="setLongterm()" x-show="longtermAvailable"' in popover
+
+    vorjahr = EDITOR_TEMPLATE.split(
         'x-if="compare && compareMode === \'previous\' && range === \'year\'"', 1
-    )[1].split('<div class="card">', 1)[0]
-    assert 'x-show="multiYearAvailable"' in zeile
-    assert "setCompareYears(opt.value)" in zeile
-    assert 'x-show="multiYearRequested"' in zeile
-    assert zeile.count('x-show="!multiYearRequested"') == 2
+    )[1].split("</template>\n", 1)[0]
+    assert "multiYear" not in vorjahr and "compareYears" not in vorjahr
+
+    # Direkt NACH dem Vorjahr-Template, auf derselben Ebene — nicht etwa in
+    # dessen Soll-Auswahl verschachtelt (so geschehen beim ersten Einbau: das
+    # Feld erschien dann nie, weil es nur im offenen Soll-Popover existierte).
+    assert "          </template>\n          <!-- \"Langzeit\"" in EDITOR_TEMPLATE
+    langzeit = EDITOR_TEMPLATE.split('x-if="compare && compareMode === \'longterm\'"', 1)[1].split('<div class="card">', 1)[0]
+    assert "setCompareYears(opt.value)" in langzeit
+    assert "multiYearAverage = false; render()" in langzeit
 
 
-def test_multi_year_options_default_to_the_existing_previous_year() -> None:
+def test_longterm_options_and_availability() -> None:
     options = EDITOR_JS.split("const COMPARE_YEARS_OPTIONS = [", 1)[1].split("];", 1)[0]
     assert [line.strip().split("value: ", 1)[1].split(",", 1)[0] for line in options.splitlines() if "value:" in line] == [
-        "1", "2", "5", "10", "0",
+        "2", "5", "10", "0",
     ]
-    assert "compareYears: 1," in EDITOR_JS
+    assert "compareYears: 5," in EDITOR_JS
+    getter = EDITOR_JS.split("get longtermAvailable() {", 1)[1].split("\n        },", 1)[0]
+    assert "this.range === 'year'" in getter
+    assert "!this.continuous" in getter
+    assert "this.orderableEntityIds.length === 1" in getter
+    # Fällt auf "Vorjahr" zurück, sobald Langzeit nicht mehr möglich ist.
+    assert "if (this.compare && this.compareMode === 'longterm' && !this.longtermAvailable) this.compareMode = 'previous';" in EDITOR_JS
 
 
-def test_switching_to_several_years_resets_running_total_and_target_entity() -> None:
-    fn = EDITOR_JS.split("setCompareYears(value) {", 1)[1].split("\n        },", 1)[0]
+def test_choosing_longterm_resets_running_total_and_target_entity() -> None:
+    fn = EDITOR_JS.split("setLongterm() {", 1)[1].split("\n        },", 1)[0]
     assert "this.compareCumsum = false;" in fn
     assert "this.compareSollEntityId = '';" in fn
     assert "if (this.sollAutoAdded)" in fn
-    assert "this.load();" in fn
+    assert "this.setCompareMode('longterm');" in fn
 
 
 def test_multi_year_render_path_comes_before_the_existing_ones() -> None:

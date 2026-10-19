@@ -168,12 +168,10 @@
       return COMPARE_YEAR_RANGES.includes(range);
     }
 
-    // "Jahre" neben Laufsumme/Soll (Mehrjahresvergleich): Zahl der Vorjahre
-    // zusätzlich zum angezeigten Jahr, 0 = alle Jahre mit Daten. 1 ist der
-    // bisherige Vorjahresvergleich und bleibt der Standard — erst ab 2
-    // übernimmt renderMultiYear().
+    // Feld "Jahre" beim Vergleich "Langzeit" (Mehrjahresvergleich): Zahl der
+    // Vorjahre zusätzlich zum angezeigten Jahr, 0 = alle Jahre mit Daten. Ein
+    // einzelnes Vorjahr gibt es hier nicht — das ist "Vorjahr".
     const COMPARE_YEARS_OPTIONS = [
-      {value: 1, label: '1'},
       {value: 2, label: '2'},
       {value: 5, label: '5'},
       {value: 10, label: '10'},
@@ -556,11 +554,12 @@
         // — entscheidet, ob clearSollEntity() sie beim Leeren des Feldes
         // wieder entfernen darf (siehe dort).
         sollAutoAdded: false,
-        // Mehrjahresvergleich ("Jahre", siehe COMPARE_YEARS_OPTIONS) — wie
-        // Laufsumme/Soll eine reine Ansichtseinstellung, nie mit dem Chart
-        // gespeichert, weil der Vergleich selbst es auch nicht ist.
+        // Mehrjahresvergleich (compareMode 'longterm', "Jahre" siehe
+        // COMPARE_YEARS_OPTIONS) — wie Laufsumme/Soll eine reine
+        // Ansichtseinstellung, nie mit dem Chart gespeichert, weil der
+        // Vergleich selbst es auch nicht ist.
         compareYearsOptions: COMPARE_YEARS_OPTIONS,
-        compareYears: 1,
+        compareYears: 5,
         multiYearAverage: true,
         multiYearTableMode: 'values',
         multiYearMonths: [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')],
@@ -863,9 +862,7 @@
         // die beiden Label-Getter oben automatisch an den Zeitraum an.
         get compareButtonLabel() {
           if (!this.compare) return t('Vergleichen');
-          if (this.multiYearRequested) {
-            return this.compareYears === 0 ? t('Alle Jahre') : t('{n} Jahre', {n: this.compareYears});
-          }
+          if (this.compareMode === 'longterm') return t('Langzeit');
           return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
         // EIN Ort für "zeichnet render() gerade über renderYearsCompare()"
@@ -880,17 +877,16 @@
           return this.compare && this.compareMode === 'previous' && this.range === 'year'
             && (this.compareCumsum || !!this.compareSollEntityId);
         },
-        // Wo das Feld "Jahre" erscheint: "Vorjahr" bei Zeitraum "Jahr",
-        // kalendarisch, genau eine Entität (die Soll-Entität zählt nicht mit,
-        // sie wird beim Umschalten ohnehin entfernt, siehe setCompareYears()).
-        // Dieselben Bedingungen prüft api_query_multi() auf dem Server.
-        get multiYearAvailable() {
-          return this.compare && this.compareMode === 'previous' && this.range === 'year'
-            && !this.continuous && this.orderableEntityIds.length === 1;
+        // Wann der Menüeintrag "Langzeit" erscheint: Zeitraum "Jahr",
+        // kalendarisch, genau eine Entität (eine Soll-Entität zählt nicht mit,
+        // setLongterm() entfernt sie). Dieselben Bedingungen prüft
+        // api_query_multi() auf dem Server.
+        get longtermAvailable() {
+          return this.range === 'year' && !this.continuous && this.orderableEntityIds.length === 1;
         },
-        // Mehr als ein Vorjahr gewählt — ab hier fragt load() die Vorjahre mit ab.
+        // "Langzeit" gewählt und möglich — dann fragt load() die Vorjahre mit ab.
         get multiYearRequested() {
-          return this.multiYearAvailable && this.compareYears !== 1;
+          return this.compare && this.compareMode === 'longterm' && this.longtermAvailable;
         },
         // ... und die Antwort ist da: render() zeichnet über renderMultiYear().
         get multiYearActive() {
@@ -1116,27 +1112,27 @@
           if (autoAdded && previous) this.toggleEntity(previous, false);
           else this.render();
         },
-        // Feld "Jahre". Ab 2 Jahren gibt es weder Laufsumme noch Soll-Linie
-        // (Laufsumme über mehrere Jahre ist ein späterer Schritt) — beide
-        // werden deshalb zurückgesetzt statt unsichtbar weiterzuwirken. Eine
-        // nur fürs Soll-Feld hinzugefügte Entität fliegt dabei wieder raus,
-        // wie beim Leeren des Felds (setSollEntity('')), aber ohne dessen
-        // eigenes load()/render() — hier folgt ohnehin genau ein load().
         setCompareYears(value) {
           this.compareYears = value;
-          if (value !== 1) {
-            this.compareCumsum = false;
-            if (this.compareSollEntityId) {
-              const previous = this.compareSollEntityId;
-              if (this.sollAutoAdded) {
-                const idx = this.selectedEntityIds.indexOf(previous);
-                if (idx !== -1) this.selectedEntityIds.splice(idx, 1);
-              }
-              this.compareSollEntityId = '';
-              this.sollAutoAdded = false;
-            }
-          }
           this.load();
+        },
+        // Menüeintrag "Langzeit". Laufsumme und Soll-Linie gehören zu "Vorjahr"
+        // und werden zurückgesetzt statt unsichtbar weiterzuwirken. Eine nur
+        // fürs Soll-Feld hinzugefügte Entität fliegt dabei wieder raus, wie
+        // beim Leeren des Felds (setSollEntity('')), aber ohne dessen eigenes
+        // load()/render() — setCompareMode() lädt ohnehin genau einmal.
+        setLongterm() {
+          this.compareCumsum = false;
+          if (this.compareSollEntityId) {
+            const previous = this.compareSollEntityId;
+            if (this.sollAutoAdded) {
+              const idx = this.selectedEntityIds.indexOf(previous);
+              if (idx !== -1) this.selectedEntityIds.splice(idx, 1);
+            }
+            this.compareSollEntityId = '';
+            this.sollAutoAdded = false;
+          }
+          this.setCompareMode('longterm');
         },
         // Für "Angezeigte Namen & Reihenfolge" (Template): die Soll-Entität
         // ist dort keine Zeile zum Umbenennen/Verschieben/Ausblenden — sie
@@ -1375,6 +1371,12 @@
           // wurde — Bucket-Werte würde renderTimelineMulti() sonst fälschlich
           // als durchgehende AN-Intervalle statt echter Übergänge zeichnen.
           if (this.timeline) this.raw = true;
+          // "Langzeit" gibt es nur bei Zeitraum "Jahr", kalendarisch und mit
+          // genau einer Entität. Ändert sich eins davon (Zeitraum, Rollierend,
+          // Entitätenauswahl — alles endet hier in load()), fällt der Vergleich
+          // auf "Vorjahr" zurück, statt einen nicht mehr möglichen Modus
+          // weiterzutragen. Ein Ort statt je einer Prüfung in jedem Umschalter.
+          if (this.compare && this.compareMode === 'longterm' && !this.longtermAvailable) this.compareMode = 'previous';
           const requestId = ++this._requestId;
           this.loading = true;
           const params = new URLSearchParams({
@@ -1426,9 +1428,9 @@
           // das braucht auch die Laufsumme (cumulate()), unabhängig von Soll.
           // OHNE beides bleibt "Vorjahr" für JEDEN Zeitraum — auch 'year' —
           // die gewohnte Schattenlinie unten in render().
-          // Mehrjahresvergleich ("Jahre" ab 2) vor allem anderen — er blendet
-          // Laufsumme/Soll aus (setCompareYears()), yearsCompareActive kann
-          // daneben also gar nicht wahr sein; die Reihenfolge sichert es ab.
+          // Mehrjahresvergleich ("Langzeit") vor allem anderen. yearsCompareActive
+          // verlangt compareMode 'previous' und kann daneben gar nicht wahr
+          // sein; die Reihenfolge sichert es zusätzlich ab.
           if (this.multiYearActive) {
             this.renderMultiYear();
             return;

@@ -1,5 +1,6 @@
 {
   "app": {
+    "Langzeit": "Long-term",
     "Jahre": "Years",
     "Ø-Linie": "Ø line",
     "Jahr × Monat": "Year × month",
@@ -2736,8 +2737,7 @@
     "Konfiguration öffnen": "Open configuration"
   },
   "js": {
-    "Alle Jahre": "All years",
-    "{n} Jahre": "{n} years",
+    "Langzeit": "Long-term",
     "bis {cut}: {delta} zum Ø": "until {cut}: {delta} vs. Ø",
     "{delta} zum Ø": "{delta} vs. Ø",
     "Ø {from}–{to}": "Ø {from}–{to}",

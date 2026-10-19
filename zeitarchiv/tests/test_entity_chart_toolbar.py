@@ -184,9 +184,11 @@ def test_years_compare_is_not_a_separate_menu_option() -> None:
     neben "Aus"/"Vorjahr" — zwei Optionen, die beide irgendwie "Vorjahr"
     meinten, aber komplett verschieden aussahen (Schattenlinie vs. Balkenpaare
     mit eigener Legende), war die eigentliche Quelle der Unübersichtlichkeit.
-    Seither gibt es nur noch "Aus"/"Vorjahr" im Menü; Laufsumme/Soll sind
-    Erweiterungen VON "Vorjahr" (siehe test_previous_year_extension_row_*),
-    kein dritter Menüpunkt."""
+    Seither sind Laufsumme/Soll Erweiterungen VON "Vorjahr" (siehe
+    test_previous_year_extension_row_*), kein eigener Menüpunkt. Der später
+    hinzugekommene Eintrag "Langzeit" (Mehrjahresvergleich) ist bewusst
+    eigenständig und sieht anders aus als "Vorjahr" (Linien je Jahr), siehe
+    test_multi_year_compare.py."""
     assert "setCompareMode('years')" not in EDITOR_TEMPLATE
     assert 'x-model.number="compareYearA"' not in EDITOR_TEMPLATE
     assert 'x-model.number="compareYearB"' not in EDITOR_TEMPLATE
@@ -205,9 +207,9 @@ def test_previous_year_extension_row_gates_on_previous_and_year_range() -> None:
     trägt zusätzlich chart-title-row-end (bottom statt center ausgerichtet,
     siehe chart_editor.css) — der zweistöckige Feld-Stack (Beschriftung über
     Bedienelement) sonst mittig zwischen den eigenen Zeilen hängt statt an
-    einer von beiden auszurichten. Seit dem Mehrjahresvergleich stehen dort
-    vier Felder: Jahre und Ø-Linie davor, Laufsumme und Soll ab 2 Jahren
-    ausgeblendet (siehe test_multi_year_fields_*)."""
+    einer von beiden auszurichten. Die zwei weiteren toolbar-fields im
+    Template gehören zur eigenen Zeile von "Langzeit" (Jahre, Ø-Linie), siehe
+    test_multi_year_compare.py."""
     assert EDITOR_TEMPLATE.count('class="toolbar-field"') == 4
     title_row = EDITOR_TEMPLATE.split('<div class="chart-title-row chart-title-row-end">', 1)[1]
     period_and_fields = title_row.split("</div>", 1)[0]
@@ -273,8 +275,8 @@ def test_move_entity_swaps_within_the_orderable_list_not_the_raw_array() -> None
 
 
 def test_compare_popover_stays_pure_selection() -> None:
-    """Das Popover bietet für range='year' ausschließlich "Aus"/"Vorjahr" —
-    keine Konfiguration (Jahr A/B gab es früher, siehe
+    """Das Popover bietet für range='year' nur Auswahl ("Aus"/"Vorjahr"/
+    "Langzeit") — keine Konfiguration (Jahr A/B gab es früher, siehe
     test_years_compare_is_not_a_separate_menu_option). Jede Wahl schließt es
     sofort, wie bei den übrigen Menüs auch."""
     popover = EDITOR_TEMPLATE.split('class="menu-popover menu-popover-narrow"', 1)[1].split("</div>", 1)[0]

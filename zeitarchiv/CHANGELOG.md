@@ -4,13 +4,13 @@
 
 ### Neu
 
-- **Mehrere Jahre vergleichen**: Im Chart-Editor gibt es beim Zeitraum „Jahr“
-  mit Vergleich „Vorjahr“ und einer Entität das neue Feld „Jahre“ (1, 2, 5, 10
-  oder Alle). Ab 2 liegt jedes Jahr als eigene Linie über Januar bis Dezember,
-  dazu der Durchschnitt der Vorjahre als gestrichelte Linie. Unter dem Chart
-  zeigt eine Tabelle Jahr × Monat die Werte und die Abweichung zum
-  Durchschnitt; das laufende Jahr wird mit dem Durchschnitt bis zum gleichen Tag
-  verglichen. Der bisherige Vorjahresvergleich bleibt unverändert.
+- **Langzeit-Vergleich**: Im Chart-Editor bietet „Vergleichen“ beim Zeitraum
+  „Jahr“ mit einer Entität den neuen Eintrag „Langzeit“. Jedes Jahr liegt dann
+  als eigene Linie über Januar bis Dezember, dazu der Durchschnitt der Vorjahre
+  als gestrichelte Linie; wie viele Vorjahre, legt das Feld „Jahre“ fest (2, 5,
+  10 oder Alle). Unter dem Chart zeigt eine Tabelle Jahr × Monat die Werte und
+  die Abweichung zum Durchschnitt; das laufende Jahr wird mit dem Durchschnitt
+  bis zum gleichen Tag verglichen.
 
 ---
 
@@ -18,13 +18,13 @@
 
 #### New
 
-- **Compare several years**: In the chart editor, the period “Year” with
-  comparison “Previous year” and one entity now offers a “Years” field (1, 2,
-  5, 10 or All). From 2 on, every year is drawn as its own line from January to
-  December, with the average of the previous years as a dashed line. Below the
-  chart, a year × month table shows the values and the deviation from the
-  average; the current year is compared with the average up to the same day.
-  The existing previous-year comparison is unchanged.
+- **Long-term comparison**: In the chart editor, “Compare” now offers
+  “Long-term” for the period “Year” with one entity. Every year is drawn as its
+  own line from January to December, with the average of the previous years as
+  a dashed line; the “Years” field sets how many previous years (2, 5, 10 or
+  All). Below the chart, a year × month table shows the values and the deviation
+  from the average; the current year is compared with the average up to the
+  same day.
 
 ## 1.7.0 - 2026-10-19
 

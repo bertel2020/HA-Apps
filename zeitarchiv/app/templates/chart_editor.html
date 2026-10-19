@@ -121,6 +121,9 @@
                 <button type="button" class="menu-row" :class="{active: !compare}" @click="disableCompare()">{{ _("Aus") }}</button>
                 <button type="button" class="menu-row" :class="{active: compare && compareMode === 'previous'}" @click="setCompareMode('previous')" x-text="comparePreviousLabel"></button>
                 <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-show="compareYearAvailable" x-text="compareYearLabel"></button>
+                <!-- Mehrjahresvergleich: nur bei Zeitraum "Jahr", kalendarisch und
+                     genau einer Entität (longtermAvailable in chart_editor.js). -->
+                <button type="button" class="menu-row" :class="{active: compare && compareMode === 'longterm'}" @click="setLongterm()" x-show="longtermAvailable">{{ _("Langzeit") }}</button>
               </div>
             </div>
             <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
@@ -448,7 +451,9 @@
              richtet ihn stattdessen an der Bedienelement-Zeile aus, wie ein
              Formular-Label seinen Wert.
              Nicht im Vergleichen-Popover (siehe setCompareMode()): keine
-             eigene Vergleichsoption mehr (das frühere "Jahre" gab es hier
+             eigene Vergleichsoption (der Mehrjahresvergleich ist dagegen ein
+             eigener Menüeintrag "Langzeit" mit eigener Zeile, siehe unten;
+             das frühere "Jahre" mit Jahr A/B gab es hier
              früher als dritte Popover-Zeile mit frei wählbaren Jahren, siehe
              Git-Historie), sondern eine Erweiterung von "Vorjahr" bei
              range='year': Vorjahr bleibt für ALLE Zeiträume die gewohnte
@@ -461,33 +466,13 @@
         <div class="chart-title-row chart-title-row-end">
           <span class="period-label" x-text="periodLabel"></span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
-            <span style="display:flex;gap:16px;flex-wrap:wrap;">
-              <!-- Mehrjahresvergleich: "1" ist der bisherige Vorjahresvergleich
-                   (Standard), ab 2 zeichnet renderMultiYear() eine Linie je
-                   Jahr — nur bei genau einer Entität und kalendarisch, siehe
-                   multiYearAvailable in chart_editor.js. Laufsumme und Soll
-                   gibt es dann nicht (setCompareYears() setzt beide zurück). -->
-              <span class="toolbar-field" x-show="multiYearAvailable">
-                <span class="toolbar-field-label">{{ _("Jahre") }}</span>
-                <div class="seg">
-                  <template x-for="opt in compareYearsOptions" :key="opt.value">
-                    <button type="button" :class="{active: compareYears === opt.value}" @click="setCompareYears(opt.value)" x-text="opt.label"></button>
-                  </template>
-                </div>
-              </span>
-              <span class="toolbar-field" x-show="multiYearRequested">
-                <span class="toolbar-field-label">{{ _("Ø-Linie") }}</span>
-                <div class="seg">
-                  <button type="button" :class="{active: !multiYearAverage}" @click="multiYearAverage = false; render()">{{ _("Aus") }}</button>
-                  <button type="button" :class="{active: multiYearAverage}" @click="multiYearAverage = true; render()">{{ _("Ein") }}</button>
-                </div>
-              </span>
+            <span style="display:flex;gap:16px;">
               <!-- Reine Render-Einstellung, keine neue Abfrage (Laufsumme wird
                    client-seitig aus den schon geladenen Monatswerten gebildet,
                    siehe cumulate() in chart_editor.js) — deshalb render() statt
                    load(). Wirkt jetzt auch ohne Soll-Entität (siehe
                    yearsCompareActive). -->
-              <span class="toolbar-field" x-show="!multiYearRequested">
+              <span class="toolbar-field">
                 <span class="toolbar-field-label">{{ _("Laufsumme") }}</span>
                 <div class="seg">
                   <button type="button" :class="{active: !compareCumsum}" @click="compareCumsum = false; render()">{{ _("Aus") }}</button>
@@ -505,7 +490,7 @@
                    (.csv-entity-picker) statt der reinen Inhaltsbreite des
                    Knopftexts, die sonst mit jeder Auswahl neu ausgemessen
                    würde. -->
-              <span class="toolbar-field" x-show="!multiYearRequested">
+              <span class="toolbar-field">
                 <span class="toolbar-field-label">{{ _("Soll Entität") }}</span>
                 <span class="dd-picker-wrap soll-entity-picker" x-data="entityPicker(ENTITY_OPTIONS, compareSollEntityId, (id) => setSollEntity(id))" @click.outside="open = false">
                   <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}" @click="toggleOpen($refs.sollEntitySearch)">
@@ -521,6 +506,28 @@
                     </template>
                   </div>
                 </span>
+              </span>
+            </span>
+          </template>
+          <!-- "Langzeit" (eigener Eintrag im Vergleichen-Menü): Zahl der
+               Vorjahre und Ø-Linie für renderMultiYear() — "Vorjahr" darüber
+               bleibt davon unberührt. -->
+          <template x-if="compare && compareMode === 'longterm'">
+            <span style="display:flex;gap:16px;">
+              <span class="toolbar-field">
+                <span class="toolbar-field-label">{{ _("Jahre") }}</span>
+                <div class="seg">
+                  <template x-for="opt in compareYearsOptions" :key="opt.value">
+                    <button type="button" :class="{active: compareYears === opt.value}" @click="setCompareYears(opt.value)" x-text="opt.label"></button>
+                  </template>
+                </div>
+              </span>
+              <span class="toolbar-field">
+                <span class="toolbar-field-label">{{ _("Ø-Linie") }}</span>
+                <div class="seg">
+                  <button type="button" :class="{active: !multiYearAverage}" @click="multiYearAverage = false; render()">{{ _("Aus") }}</button>
+                  <button type="button" :class="{active: multiYearAverage}" @click="multiYearAverage = true; render()">{{ _("Ein") }}</button>
+                </div>
               </span>
             </span>
           </template>

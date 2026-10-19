@@ -633,15 +633,16 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             _validate_entity_id_or_400(entity_id)
         if previous_years < 0:
             raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl Vergleichsjahre"))
-        # Mehrjahresvergleich ("Jahre" neben Laufsumme/Soll): eine Erweiterung
-        # von "Vorjahr" bei Zeitraum "Jahr", nur für genau eine Entität und nur
-        # kalendarisch — bei mehr Entitäten wüchse der Aufwand mit Entitäten mal
-        # Jahren, und ein rollierendes Fenster hat keine Kalendermonate, die
-        # sich übereinanderlegen ließen. previous_years=1 ist der bisherige
-        # Vorjahresvergleich und ändert an der Antwort nichts; 0 heißt "alle".
+        # Mehrjahresvergleich (compare_mode "longterm", im Chart-Editor
+        # "Langzeit"): nur Zeitraum "Jahr", genau eine Entität, kalendarisch —
+        # bei mehr Entitäten wüchse der Aufwand mit Entitäten mal Jahren, und
+        # ein rollierendes Fenster hat keine Kalendermonate, die sich
+        # übereinanderlegen ließen. previous_years = Zahl der Vorjahre, 0 heißt
+        # "alle". Die übliche Vergleichsreihe (compare_points) entfällt dann,
+        # die Vorjahre stehen in "years".
         multi_year = (
-            compare and not raw and compare_mode == "previous" and range == "year"
-            and not continuous and previous_years != 1 and len(ids) == 1
+            compare and not raw and compare_mode == "longterm" and range == "year"
+            and not continuous and len(ids) == 1
         )
         read_cache = query_mod.QueryReadCache() if multi_year else None
         series = []
@@ -673,7 +674,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 "chart_type": result["chart_type"],
                 "points": result["points"],
             }
-            if compare and not raw:
+            if compare and not raw and compare_mode != "longterm":
                 compare_result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,
