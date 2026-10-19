@@ -36,6 +36,9 @@
   Spaltenbeschriftung ein Anführungszeichen, war der Hinweis zur Abweichung in
   der Dashboard-Kachel abgeschnitten oder fehlte. Er wird jetzt vollständig
   angezeigt.
+- **Auswahllisten mit Apostroph**: Enthielt eine Einheit, ein Spaltenkopf beim
+  CSV-Import oder ein Entitätsname im Aktivitätsfilter einen Apostroph, ließ
+  sich der Eintrag nicht auswählen. Das funktioniert jetzt.
 
 ---
 
@@ -71,6 +74,9 @@
 - **Table tiles with quotation marks in column names**: If a column label
   contained a quotation mark, the deviation hint in the dashboard tile was cut
   off or missing. It is now shown in full.
+- **Selection lists with apostrophes**: If a unit, a column header in the CSV
+  import or an entity name in the activity filter contained an apostrophe, the
+  entry could not be selected. This now works.
 
 ## 1.7.0 - 2026-10-19
 

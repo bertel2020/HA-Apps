@@ -33,7 +33,7 @@
             <div class="dd-picker-popover" id="unit-filter-popover">
               <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', t('Alle')); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
               {% for opt in unit_options %}
-              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetEntitiesPage();">{{ opt.label }}</div>
+              <div class="dd-picker-row" data-value="{{ opt.value }}" data-label="{{ opt.label }}" onclick="selectDDOption('unit-filter', this.dataset.value, this.dataset.label); resetEntitiesPage();">{{ opt.label }}</div>
               {% endfor %}
             </div>
           </span>

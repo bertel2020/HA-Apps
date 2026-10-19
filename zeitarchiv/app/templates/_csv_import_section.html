@@ -63,7 +63,7 @@
         <input type="hidden" name="ts_col" id="ts-col-input" value="{{ ts_col }}">
         <div class="dd-picker-popover" id="ts-col-popover">
           {% for col in columns %}
-          <div class="dd-picker-row" onclick="selectDDOption('ts-col', '{{ loop.index0 }}', '{{ col }}')">{{ col }}</div>
+          <div class="dd-picker-row" data-label="{{ col }}" onclick="selectDDOption('ts-col', '{{ loop.index0 }}', this.dataset.label)">{{ col }}</div>
           {% endfor %}
         </div>
       </span>
@@ -75,7 +75,7 @@
         <input type="hidden" name="value_col" id="value-col-input" value="{{ value_col }}">
         <div class="dd-picker-popover" id="value-col-popover">
           {% for col in columns %}
-          <div class="dd-picker-row" onclick="selectDDOption('value-col', '{{ loop.index0 }}', '{{ col }}')">{{ col }}</div>
+          <div class="dd-picker-row" data-label="{{ col }}" onclick="selectDDOption('value-col', '{{ loop.index0 }}', this.dataset.label)">{{ col }}</div>
           {% endfor %}
         </div>
       </span>
