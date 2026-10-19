@@ -26,6 +26,12 @@
   Chart-Editor steht die Navigation jetzt wie dort rechts neben der
   Zeitraumauswahl.
 
+### Geändert
+
+- **Auswahllisten per Tastatur**: Die Auswahllisten der App lassen sich jetzt
+  ohne Maus bedienen: Enter, Leertaste oder Pfeil nach unten öffnet die Liste,
+  die Pfeiltasten wählen den Eintrag, Enter übernimmt ihn, Escape schließt.
+
 ### Behoben
 
 - **Vergleich im Chart wurde nicht gespeichert**: „Vorjahr“, „Langzeit“ und die
@@ -76,6 +82,12 @@
 - **Back to now**: Like the chart editor, an entity's page now has a “Back to
   now” button whenever a past period is shown. In the chart editor, the
   navigation now sits next to the period selection, as it does there.
+
+#### Changed
+
+- **Selection lists by keyboard**: The app's selection lists can now be used
+  without a mouse: Enter, Space or Arrow Down opens the list, the arrow keys
+  move through the entries, Enter picks one, Escape closes it.
 
 #### Fixed
 
