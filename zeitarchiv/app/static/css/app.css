@@ -406,7 +406,13 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
    64er-Viewbox (knapp 22%), 7px auf 30px trifft das, 6px hätte bei der neuen
    Größe eine sichtbar eckigere CSS-Kante über die runde SVG-Ecke gelegt. */
 .topnav-brand svg{width:30px;height:30px;border-radius:7px;flex-shrink:0;}
-.topnav-brand span{font-weight:600;font-size:calc(15px * var(--font-scale, 1));color:var(--ink);}
+/* Schriftzug aus dem Logo (logo.png, Variante 18) statt gesetzter Schrift.
+   Als Maske eingefärbt, damit er mit --ink zwischen hell und dunkel wechselt —
+   das Original ist dunkelgrün und wäre im dunklen Schema unsichtbar. Höhe
+   20px: im Logo ist die Wortmarke gut zwei Drittel so hoch wie das Icon. Der
+   Dateiname trägt die Variante, weil url() keinen Cache-Buster mitführt
+   (siehe @font-face oben). */
+.topnav-wordmark{display:block;height:20px;aspect-ratio:358/66;flex-shrink:0;background:var(--ink);-webkit-mask:url(../img/wortmarke-v18.png) center/contain no-repeat;mask:url(../img/wortmarke-v18.png) center/contain no-repeat;}
 .topnav-icon{width:16px;height:16px;flex-shrink:0;}
 .topnav-links{display:flex;align-items:center;gap:22px;height:100%;margin-left:auto;}
 .topnav-link{position:relative;display:flex;align-items:center;gap:6px;height:100%;font-size:calc(13.5px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);text-decoration:none;}
