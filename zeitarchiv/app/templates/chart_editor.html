@@ -461,13 +461,33 @@
         <div class="chart-title-row chart-title-row-end">
           <span class="period-label" x-text="periodLabel"></span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
-            <span style="display:flex;gap:16px;">
+            <span style="display:flex;gap:16px;flex-wrap:wrap;">
+              <!-- Mehrjahresvergleich: "1" ist der bisherige Vorjahresvergleich
+                   (Standard), ab 2 zeichnet renderMultiYear() eine Linie je
+                   Jahr — nur bei genau einer Entität und kalendarisch, siehe
+                   multiYearAvailable in chart_editor.js. Laufsumme und Soll
+                   gibt es dann nicht (setCompareYears() setzt beide zurück). -->
+              <span class="toolbar-field" x-show="multiYearAvailable">
+                <span class="toolbar-field-label">{{ _("Jahre") }}</span>
+                <div class="seg">
+                  <template x-for="opt in compareYearsOptions" :key="opt.value">
+                    <button type="button" :class="{active: compareYears === opt.value}" @click="setCompareYears(opt.value)" x-text="opt.label"></button>
+                  </template>
+                </div>
+              </span>
+              <span class="toolbar-field" x-show="multiYearRequested">
+                <span class="toolbar-field-label">{{ _("Ø-Linie") }}</span>
+                <div class="seg">
+                  <button type="button" :class="{active: !multiYearAverage}" @click="multiYearAverage = false; render()">{{ _("Aus") }}</button>
+                  <button type="button" :class="{active: multiYearAverage}" @click="multiYearAverage = true; render()">{{ _("Ein") }}</button>
+                </div>
+              </span>
               <!-- Reine Render-Einstellung, keine neue Abfrage (Laufsumme wird
                    client-seitig aus den schon geladenen Monatswerten gebildet,
                    siehe cumulate() in chart_editor.js) — deshalb render() statt
                    load(). Wirkt jetzt auch ohne Soll-Entität (siehe
                    yearsCompareActive). -->
-              <span class="toolbar-field">
+              <span class="toolbar-field" x-show="!multiYearRequested">
                 <span class="toolbar-field-label">{{ _("Laufsumme") }}</span>
                 <div class="seg">
                   <button type="button" :class="{active: !compareCumsum}" @click="compareCumsum = false; render()">{{ _("Aus") }}</button>
@@ -485,7 +505,7 @@
                    (.csv-entity-picker) statt der reinen Inhaltsbreite des
                    Knopftexts, die sonst mit jeder Auswahl neu ausgemessen
                    würde. -->
-              <span class="toolbar-field">
+              <span class="toolbar-field" x-show="!multiYearRequested">
                 <span class="toolbar-field-label">{{ _("Soll Entität") }}</span>
                 <span class="dd-picker-wrap soll-entity-picker" x-data="entityPicker(ENTITY_OPTIONS, compareSollEntityId, (id) => setSollEntity(id))" @click.outside="open = false">
                   <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}" @click="toggleOpen($refs.sollEntitySearch)">
@@ -523,7 +543,7 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && !yearsCompareActive && (legendStyle === 'chips' || !chartStats)">
+        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
@@ -588,7 +608,7 @@
         <!-- Der Soll-/Laufsummen-Balkenvergleich (yearsCompareActive) hat seine
              eigene Tabelle direkt darunter (yearsSeriesStats): eine Zeile je
              Entität und Jahr, nicht klickbar wie die Chips dort. -->
-        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && !yearsCompareActive">
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
           <table class="dt compact chart-legend-table">
             <thead>
               <tr>
@@ -675,6 +695,107 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Mehrjahresvergleich (multiYearActive): Legende wie gewohnt als
+             Chips oder Tabelle (Legenden-Stil), ein Eintrag je Jahr plus Ø,
+             nicht klickbar wie beim Soll-Balkenvergleich darüber. Darunter
+             zusätzlich die Tabelle Jahr × Monat. -->
+        <div class="chart-legend" x-show="hasData && multiYearActive && (legendStyle === 'chips' || !chartStats)">
+          <template x-for="stat in multiYearSeriesStats" :key="stat.key">
+            <span class="chart-legend-item static">
+              <span :class="stat.isAverage ? 'dash' : 'dot'" :style="stat.isAverage ? {borderColor: stat.color} : {background: stat.color}"></span>
+              <span class="name" x-text="stat.name"></span>
+              <span class="values" x-show="chartStats">
+                <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
+                <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
+                <span class="compare-cut" x-show="stat.delta" x-text="stat.delta"></span>
+              </span>
+            </span>
+          </template>
+        </div>
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && multiYearActive">
+          <table class="dt compact chart-legend-table">
+            <thead>
+              <tr>
+                <th class="legend-name-col">{{ _("Name") }}</th>
+                <th x-show="legendMetrics.includes('last')">{{ _("Aktuell") }}</th>
+                <th x-show="legendMetrics.includes('min')">{{ _("Min") }}</th>
+                <th x-show="legendMetrics.includes('max')">{{ _("Max") }}</th>
+                <th x-show="legendMetrics.includes('average')">Ø</th>
+                <th x-show="legendMetrics.includes('sum')">Σ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="stat in multiYearSeriesStats" :key="stat.key">
+                <tr class="chart-legend-table-row static">
+                  <td class="legend-name-col">
+                    <span class="legend-name-cell">
+                      <span :class="stat.isAverage ? 'dash' : 'dot'" :style="stat.isAverage ? {borderColor: stat.color} : {background: stat.color}"></span>
+                      <span x-text="stat.name"></span>
+                    </span>
+                    <span class="legend-compare-label" x-show="stat.delta" x-text="stat.delta"></span>
+                  </td>
+                  <td x-show="legendMetrics.includes('last')" x-text="stat.last"></td>
+                  <td x-show="legendMetrics.includes('min')" x-text="stat.min"></td>
+                  <td x-show="legendMetrics.includes('max')" x-text="stat.max"></td>
+                  <td x-show="legendMetrics.includes('average')" x-text="stat.average"></td>
+                  <td x-show="legendMetrics.includes('sum')" x-text="stat.sum ?? '—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <template x-if="hasData && multiYearActive && multiYearTable">
+          <div class="multi-year-table-block">
+            <div class="multi-year-table-head">
+              <span class="toolbar-field-label">{{ _("Jahr × Monat") }}</span>
+              <div class="seg">
+                <button type="button" :class="{active: multiYearTableMode === 'values'}" @click="multiYearTableMode = 'values'">{{ _("Werte") }}</button>
+                <button type="button" :class="{active: multiYearTableMode === 'delta'}" @click="multiYearTableMode = 'delta'">{{ _("Abweichung zum Ø") }}</button>
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table class="dt compact multi-year-table">
+                <thead>
+                  <tr>
+                    <th>{{ _("Jahr") }}</th>
+                    <template x-for="m in multiYearMonths" :key="m">
+                      <th x-text="m"></th>
+                    </template>
+                    <th class="total" x-text="multiYearTable.totalLabel"></th>
+                    <th>{{ _("Δ zum Ø") }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="row in multiYearTable.rows" :key="row.year">
+                    <tr :class="{current: row.isCurrent}">
+                      <td x-text="row.year"></td>
+                      <template x-for="(cell, m) in row.cells" :key="m">
+                        <td :class="cell.cls" :style="cell.style" :title="cell.title" x-text="cell.text"></td>
+                      </template>
+                      <td class="total" x-text="row.total"></td>
+                      <td x-text="row.delta"></td>
+                    </tr>
+                  </template>
+                </tbody>
+                <tfoot x-show="multiYearTable.average">
+                  <tr>
+                    <td x-text="multiYearTable.average?.label"></td>
+                    <template x-for="(v, m) in (multiYearTable.average?.cells || [])" :key="m">
+                      <td x-text="v"></td>
+                    </template>
+                    <td class="total" x-text="multiYearTable.average?.total"></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <p class="multi-year-table-note" x-show="multiYearTable.cutNote" x-text="multiYearTable.cutNote"></p>
+          </div>
+        </template>
 
         <div class="save-row" x-show="editing">
           <input type="text" placeholder="{{ _('Name des Charts …') }}" maxlength="{{ max_name_length }}" x-model="name">

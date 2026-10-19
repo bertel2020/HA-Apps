@@ -902,6 +902,19 @@ donut, stacked, orientation and resolution "Full" are disabled as long as
 Compare is active — Compare takes precedence instead of being silently
 switched off in the background when toggling.
 
+**Comparing several years:** With the period **Year**, comparison "Previous
+year" and exactly one entity, a **Years** field (1, 2, 5, 10 or All) appears
+next to the period label. 1 is the usual previous-year comparison. From 2 on,
+every year is drawn as its own line from January to December: the current
+year bold, older years paler, plus the average of the previous years as a
+dashed line (**Ø line**, can be switched off). The number counts the previous
+years in addition to the current year; years without data are left out.
+Below the chart, a year × month table shows each year's value and its
+deviation from the average, either as values or as deviation per month. The
+current year is compared with the average up to the same day. Running total
+and target entity are not available in the multi-year comparison; with
+"Rolling" the field is not offered.
+
 ### Differences from the history view of a single entity
 
 When viewing, a chart always shows the **current period** — unlike the

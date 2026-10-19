@@ -146,3 +146,29 @@
     .save-row input[type=text]{flex-basis:100%;}
     .save-row button:first-of-type{margin-left:auto;}
   }
+
+  /* Mehrjahresvergleich ("Jahre" ab 2, siehe renderMultiYear()): Ø-Eintrag
+     der Legende als gestrichelter Strich statt Farbpunkt — wie die Ø-Linie
+     im Chart selbst. Dieselben Maße wie .dot, damit Namen bündig bleiben. */
+  .chart-legend-item .dash,.chart-legend-table .legend-name-cell .dash{
+    width:14px;height:0;border-top:2px dashed;flex:none;align-self:center;
+  }
+  .chart-legend-item .values .compare-cut{
+    color:var(--accent-line);background:var(--accent-line-soft);border-radius:8px;padding:0 7px;
+  }
+  /* Tabelle Jahr × Monat: Zahlen rechtsbündig, Jahresspalte beim seitlichen
+     Scrollen (mobil) fest — die Tabelle hat 15 Spalten und passt auf keinem
+     Telefon ganz ins Bild. */
+  .multi-year-table-block{margin-top:20px;}
+  .multi-year-table-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+  .multi-year-table th,.multi-year-table td{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .multi-year-table th:first-child,.multi-year-table td:first-child{
+    text-align:left;position:sticky;left:0;z-index:1;background:var(--surface);font-weight:600;color:var(--ink);
+  }
+  .multi-year-table .total{font-weight:600;border-left:1px solid var(--border);}
+  .multi-year-table tr.current td{color:var(--accent-line);}
+  .multi-year-table td.partial{font-style:italic;}
+  .multi-year-table td.empty{color:var(--ink-faint);}
+  .multi-year-table tfoot td{font-weight:600;background:var(--surface-alt);}
+  .multi-year-table tfoot td:first-child{background:var(--surface-alt);}
+  .multi-year-table-note{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin:6px 2px 0;}

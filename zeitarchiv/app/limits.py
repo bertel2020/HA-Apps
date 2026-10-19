@@ -18,6 +18,11 @@ MAX_EVENT_TS = 4_102_444_800.0  # 2100-01-01T00:00:00Z
 # Vokabular nachzubilden.
 MAX_EVENT_TEXT_LENGTH = 255
 MAX_MULTI_QUERY_ENTITIES = 25
+# Mehrjahresvergleich im Chart-Editor ("Jahre: Alle"): höchstens so viele
+# Vorjahre. Jedes Jahr kostet bis zu zwei Jahresabfragen (Werte + "bis zum
+# gleichen Tag"); die Grenze fängt ein fehlerhaftes, uralt wirkendes first_ts
+# ab, nicht eine echte Historie.
+MAX_COMPARE_YEARS = 50
 MAX_RAW_QUERY_POINTS = 100_000
 # Wie viele zusammenhängende Markierungs-Bänder ein Chart höchstens zeichnet.
 # Gekappt werden BÄNDER, nicht Markierungen: benachbarte Zeitstempel werden

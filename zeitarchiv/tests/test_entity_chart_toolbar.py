@@ -205,8 +205,10 @@ def test_previous_year_extension_row_gates_on_previous_and_year_range() -> None:
     trägt zusätzlich chart-title-row-end (bottom statt center ausgerichtet,
     siehe chart_editor.css) — der zweistöckige Feld-Stack (Beschriftung über
     Bedienelement) sonst mittig zwischen den eigenen Zeilen hängt statt an
-    einer von beiden auszurichten."""
-    assert EDITOR_TEMPLATE.count('class="toolbar-field"') == 2
+    einer von beiden auszurichten. Seit dem Mehrjahresvergleich stehen dort
+    vier Felder: Jahre und Ø-Linie davor, Laufsumme und Soll ab 2 Jahren
+    ausgeblendet (siehe test_multi_year_fields_*)."""
+    assert EDITOR_TEMPLATE.count('class="toolbar-field"') == 4
     title_row = EDITOR_TEMPLATE.split('<div class="chart-title-row chart-title-row-end">', 1)[1]
     period_and_fields = title_row.split("</div>", 1)[0]
     assert 'class="period-label"' in period_and_fields

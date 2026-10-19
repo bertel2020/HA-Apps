@@ -1,5 +1,11 @@
 {
   "app": {
+    "Jahre": "Years",
+    "Ø-Linie": "Ø line",
+    "Jahr × Monat": "Year × month",
+    "Abweichung zum Ø": "Deviation from Ø",
+    "Δ zum Ø": "Δ to Ø",
+    "Ungültige Anzahl Vergleichsjahre": "Invalid number of comparison years",
     "{count} historische Entität liefert noch Werte. Prüfen, ob die Markierung noch stimmt.": "{count} historic entity still delivers values. Check whether the mark is still right.",
     "{count} historische Entitäten liefern noch Werte. Prüfen, ob die Markierung noch stimmt.": "{count} historic entities still deliver values. Check whether the mark is still right.",
     "Seit Markierung": "Since marked",
@@ -2730,6 +2736,15 @@
     "Konfiguration öffnen": "Open configuration"
   },
   "js": {
+    "Alle Jahre": "All years",
+    "{n} Jahre": "{n} years",
+    "bis {cut}: {delta} zum Ø": "until {cut}: {delta} vs. Ø",
+    "{delta} zum Ø": "{delta} vs. Ø",
+    "Ø {from}–{to}": "Ø {from}–{to}",
+    "Ø {value}": "Ø {value}",
+    "Ø Jahr": "Ø year",
+    "* {year} bis {cut}; „Δ zum Ø“ vergleicht mit dem Ø bis zum gleichen Tag.": "* {year} until {cut}; “Δ to Ø” compares with the Ø up to the same day.",
+    "{year} zum Ø: {delta}": "{year} vs. Ø: {delta}",
     "Meldungen": "Notices",
     "Vorgang läuft": "task running",
     "Vorgänge laufen": "tasks running",

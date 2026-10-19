@@ -27,7 +27,7 @@ from . import cleanup, rollup
 from .hotbuffer import hot_path, read_rows
 from .index import Index, filter_deleted_occurrences
 from .paths import entity_dir
-from ..limits import MAX_RAW_QUERY_POINTS
+from ..limits import MAX_COMPARE_YEARS, MAX_RAW_QUERY_POINTS
 
 RANGE_KEYS = ("hour", "day", "week", "month", "year", "decade")
 
@@ -1053,6 +1053,65 @@ def query_compare_cut(
         chart_type=chart_type, read_cache=read_cache, cap_to=now_local - current_start,
     )
     return {"points": result["points"], "window_end": result["window_end"]}
+
+
+def query_previous_years(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    tz: ZoneInfo,
+    now: datetime,
+    *,
+    offset: int,
+    years: int,
+    read_cache: QueryReadCache | None = None,
+) -> list[dict]:
+    """Die Kalenderjahre VOR dem angezeigten Jahr, jedes für sich als Zeitraum
+    "Jahr" abgefragt — für den Mehrjahresvergleich im Chart-Editor ("Jahre"
+    neben Laufsumme/Soll). years=0 heißt "alle", sonst die Zahl der Vorjahre.
+
+    Neuestes Vorjahr zuerst. Jahre ohne einen einzigen Wert fehlen ganz (Lücken
+    werden ausgeblendet, nicht als leere Linie gezeigt), und vor dem Jahr von
+    first_ts wird gar nicht erst gesucht. Läuft das angezeigte Jahr noch
+    (offset 0), bekommt jedes Vorjahr zusätzlich cut_points: dasselbe Jahr nur
+    bis zum selben Abstand vom 1. Januar, wie query_compare_cut() es für das
+    eine Vorjahr tut — die Gegenzahl für "bis zum gleichen Tag".
+
+    Bewusst über query_series() statt über eine eigene Lesefunktion: so zeigen
+    Mehrjahresvergleich und bestehender Vorjahresvergleich für dasselbe Jahr
+    dieselben Monatswerte. monat.parquet liest der read_cache nur einmal.
+    chart_type="bar" für alle Typen: Beim Zeitraum "Jahr" liest Linie wie
+    Balken dieselbe Monatsstufe, nur hängt die Linie einer Standard-Entität
+    einen Randpunkt am 1. Januar an (_boundary_value) — ein Jahr ganz ohne
+    Messwerte sähe dadurch aus, als hätte es einen Januar, und fiele nicht
+    als Lücke heraus."""
+    entity = index.get_entity(entity_id)
+    if entity is None or entity["first_ts"] is None:
+        return []
+    now_local = now.astimezone(tz)
+    shown_start, _shown_end, _shown_natural = _window("year", now_local, offset, False)
+    first_year = datetime.fromtimestamp(entity["first_ts"], tz).year
+    count = MAX_COMPARE_YEARS if years <= 0 else min(years, MAX_COMPARE_YEARS)
+    cap_to = now_local - shown_start if min(offset, 0) == 0 else None
+    out = []
+    for back in range(1, count + 1):
+        year = shown_start.year - back
+        if year < first_year:
+            break
+        result = query_series(
+            data_dir, index, entity_id, "year", tz, now,
+            offset=offset - back, chart_type="bar", read_cache=read_cache,
+        )
+        if not any(p["value"] is not None for p in result["points"]):
+            continue
+        entry = {"year": year, "points": result["points"], "cut_points": None}
+        if cap_to is not None:
+            entry["cut_points"] = query_series(
+                data_dir, index, entity_id, "year", tz, now,
+                offset=offset - back, chart_type="bar", read_cache=read_cache, cap_to=cap_to,
+            )["points"]
+        out.append(entry)
+    return out
 
 
 def query_raw_series(

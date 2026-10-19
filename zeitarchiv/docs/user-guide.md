@@ -979,6 +979,19 @@ Auflösung „Voll" sind deaktiviert, solange Vergleichen aktiv ist —
 Vergleichen hat Vorrang, statt beim Umschalten still im Hintergrund
 abgeschaltet zu werden.
 
+**Mehrere Jahre vergleichen:** Beim Zeitraum **Jahr** mit Vergleich
+„Vorjahr" und genau einer Entität steht neben der Zeitraumanzeige das Feld
+**Jahre** (1, 2, 5, 10 oder Alle). 1 ist der gewohnte Vorjahresvergleich. Ab 2
+liegt jedes Jahr als eigene Linie über Januar bis Dezember: das laufende Jahr
+kräftig, ältere Jahre blasser, dazu gestrichelt der Durchschnitt der Vorjahre
+(**Ø-Linie**, abschaltbar). Die Zahl zählt die Vorjahre zusätzlich zum
+laufenden Jahr; Jahre ohne Daten werden ausgelassen. Unter dem Chart steht
+zusätzlich eine Tabelle Jahr × Monat mit Jahreswert und Abweichung zum
+Durchschnitt, wahlweise als Werte oder als Abweichung je Monat. Für das
+laufende Jahr wird dabei mit dem Durchschnitt bis zum gleichen Tag
+verglichen. Laufsumme und Soll Entität gibt es im Mehrjahresvergleich nicht;
+bei „Rollierend" steht das Feld nicht zur Verfügung.
+
 ### Unterschiede zur Verlaufsansicht einer einzelnen Entität
 
 Ein Chart zeigt beim Ansehen immer die **aktuelle Periode** — anders als die

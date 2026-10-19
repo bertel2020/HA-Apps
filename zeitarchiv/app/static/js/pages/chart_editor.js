@@ -168,6 +168,18 @@
       return COMPARE_YEAR_RANGES.includes(range);
     }
 
+    // "Jahre" neben Laufsumme/Soll (Mehrjahresvergleich): Zahl der Vorjahre
+    // zusätzlich zum angezeigten Jahr, 0 = alle Jahre mit Daten. 1 ist der
+    // bisherige Vorjahresvergleich und bleibt der Standard — erst ab 2
+    // übernimmt renderMultiYear().
+    const COMPARE_YEARS_OPTIONS = [
+      {value: 1, label: '1'},
+      {value: 2, label: '2'},
+      {value: 5, label: '5'},
+      {value: 10, label: '10'},
+      {value: 0, label: t('Alle')},
+    ];
+
     // Durchschnitt der GEZEICHNETEN Werte, oder null wenn es keine gibt.
     // Selbst gerechnet statt ECharts' eigenem Durchschnitts-Typ für markLine
     // — Begründung in entity_detail.js (dort steht dieselbe Funktion).
@@ -544,6 +556,14 @@
         // — entscheidet, ob clearSollEntity() sie beim Leeren des Feldes
         // wieder entfernen darf (siehe dort).
         sollAutoAdded: false,
+        // Mehrjahresvergleich ("Jahre", siehe COMPARE_YEARS_OPTIONS) — wie
+        // Laufsumme/Soll eine reine Ansichtseinstellung, nie mit dem Chart
+        // gespeichert, weil der Vergleich selbst es auch nicht ist.
+        compareYearsOptions: COMPARE_YEARS_OPTIONS,
+        compareYears: 1,
+        multiYearAverage: true,
+        multiYearTableMode: 'values',
+        multiYearMonths: [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')],
         showPoints: SHOW_POINTS,
         showValues: SHOW_VALUES,
         averageLine: AVERAGE_LINE,
@@ -843,6 +863,9 @@
         // die beiden Label-Getter oben automatisch an den Zeitraum an.
         get compareButtonLabel() {
           if (!this.compare) return t('Vergleichen');
+          if (this.multiYearRequested) {
+            return this.compareYears === 0 ? t('Alle Jahre') : t('{n} Jahre', {n: this.compareYears});
+          }
           return this.compareMode === 'year' ? this.compareYearLabel : this.comparePreviousLabel;
         },
         // EIN Ort für "zeichnet render() gerade über renderYearsCompare()"
@@ -856,6 +879,197 @@
         get yearsCompareActive() {
           return this.compare && this.compareMode === 'previous' && this.range === 'year'
             && (this.compareCumsum || !!this.compareSollEntityId);
+        },
+        // Wo das Feld "Jahre" erscheint: "Vorjahr" bei Zeitraum "Jahr",
+        // kalendarisch, genau eine Entität (die Soll-Entität zählt nicht mit,
+        // sie wird beim Umschalten ohnehin entfernt, siehe setCompareYears()).
+        // Dieselben Bedingungen prüft api_query_multi() auf dem Server.
+        get multiYearAvailable() {
+          return this.compare && this.compareMode === 'previous' && this.range === 'year'
+            && !this.continuous && this.orderableEntityIds.length === 1;
+        },
+        // Mehr als ein Vorjahr gewählt — ab hier fragt load() die Vorjahre mit ab.
+        get multiYearRequested() {
+          return this.multiYearAvailable && this.compareYears !== 1;
+        },
+        // ... und die Antwort ist da: render() zeichnet über renderMultiYear().
+        get multiYearActive() {
+          return this.multiYearRequested && this.series.length === 1 && Array.isArray(this.series[0].years);
+        },
+        // Gemeinsame Rechengrundlage für Chart, Legende und Tabelle des
+        // Mehrjahresvergleichs: je Jahr zwölf Kalendermonatswerte (dieselben
+        // monthlyBuckets() wie renderYearsCompare()), der Jahreswert, und der
+        // Ø je Monat über die Vorjahre — das angezeigte Jahr zählt nicht mit,
+        // sonst mittelte es sich selbst. Läuft das Jahr noch, kommen die
+        // Vergleichswerte "bis zum gleichen Tag" aus den cut_points jedes
+        // Vorjahres (siehe query_previous_years()) statt aus ganzen Monaten.
+        get multiYear() {
+          if (!this.multiYearActive) return null;
+          const s = this.series[0];
+          const agg = s.aggregation_type;
+          const mean = values => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+          const yearValue = monthly => {
+            const values = monthly.filter(v => v != null);
+            if (!values.length) return null;
+            return agg === 'standard' ? mean(values) : values.reduce((a, b) => a + b, 0);
+          };
+          const monthlyMean = rows => Array.from({length: 12}, (_, m) => mean(rows.map(r => r[m]).filter(v => v != null)));
+          const currentYear = this.windowStart ? new Date(this.windowStart * 1000).getFullYear() : new Date().getFullYear();
+          const running = this.isCurrent && this.windowEnd != null;
+          const cutMonth = running ? new Date(this.windowEnd * 1000 - 1).getMonth() : null;
+          const cutLabel = running ? fmtDayMonth(new Date(this.windowEnd * 1000)) : null;
+          const current = {year: currentYear, points: s.points, monthly: monthlyBuckets(s.points, agg), isCurrent: true};
+          const previous = s.years.map(y => ({
+            year: y.year,
+            points: y.points,
+            monthly: monthlyBuckets(y.points, agg),
+            cutMonthly: y.cut_points ? monthlyBuckets(y.cut_points, agg) : null,
+            isCurrent: false,
+          }));
+          previous.forEach(y => { y.value = yearValue(y.monthly); });
+          current.value = yearValue(current.monthly);
+          const average = previous.length ? monthlyMean(previous.map(y => y.monthly)) : null;
+          const cutAverage = running && previous.length ? monthlyMean(previous.filter(y => y.cutMonthly).map(y => y.cutMonthly)) : null;
+          return {
+            entity: s,
+            agg,
+            isDuration: agg === 'switch',
+            years: [current, ...previous],
+            previous,
+            average,
+            averageValue: average ? yearValue(average) : null,
+            averageFrom: previous.length ? previous[previous.length - 1].year : null,
+            averageTo: previous.length ? previous[0].year : null,
+            cutMonth,
+            cutLabel,
+            // Vergleichsbasis des angezeigten Jahres: je Monat der Ø, im
+            // angeschnittenen laufenden Monat der Ø "bis zum gleichen Tag".
+            currentReference: average
+              ? average.map((v, m) => (m === cutMonth && cutAverage ? cutAverage[m] : v))
+              : null,
+            // Je Monat gemittelt und dann aufaddiert (bzw. gemittelt), nicht
+            // je Jahr: ein angeschnittenes erstes Archivjahr (Daten erst ab
+            // Dezember) hätte "bis heute" sonst als 0 mitgezählt und den Ø
+            // nach unten gezogen — gemessen mit einer PV-Anlage ab 21.12.2013.
+            currentAverageToDate: running ? (cutAverage ? yearValue(cutAverage) : null) : (average ? yearValue(average) : null),
+          };
+        },
+        // Abweichung zum Ø als Text: Zähler/Schalter in Prozent, Messwerte als
+        // Differenz in ihrer Einheit — 2 °C über dem Ø sind keine "+18 %".
+        multiYearDelta(value, reference) {
+          const my = this.multiYear;
+          if (!my || value == null || reference == null) return '';
+          if (my.agg === 'standard') {
+            const diff = value - reference;
+            const unit = my.entity.unit ? ` ${my.entity.unit}` : '';
+            return `${diff >= 0 ? '+' : '−'}${fmtNum(Math.abs(diff), this.effectiveDecimals(my.entity))}${unit}`;
+          }
+          if (!reference) return '';
+          const pct = (value / reference - 1) * 100;
+          return `${pct >= 0 ? '+' : '−'}${fmtNum(Math.abs(pct), 0)} %`;
+        },
+        multiYearFormat(value) {
+          const my = this.multiYear;
+          if (!my || value == null) return '—';
+          return my.isDuration ? NumberFormat.fmtDuration(value) : fmtNum(value, this.effectiveDecimals(my.entity));
+        },
+        // Ältere Jahre blasser, das angezeigte Jahr in voller Farbe — eine
+        // Farbe je Entität wie überall im Editor, nach Alter abgestuft, damit
+        // auch "Alle" mit vielen Linien lesbar bleibt.
+        multiYearColor(index, total) {
+          const color = PALETTE[this.colorIndexFor(this.series[0].entity_id) % PALETTE.length];
+          if (index === 0) return color;
+          const steps = Math.max(total - 1, 1);
+          return withOpacity(color, total === 2 ? 0.55 : 0.75 - 0.5 * (index - 1) / Math.max(steps - 1, 1));
+        },
+        // Legende (Chips wie Tabelle, je nach "Legenden-Stil"): ein Eintrag je
+        // Jahr, neuestes zuerst, plus der Ø — dieselben Kennzahlen wie jede
+        // andere Legende über seriesStatsFor().
+        get multiYearSeriesStats() {
+          const my = this.multiYear;
+          if (!my) return [];
+          const s = my.entity;
+          const out = my.years.map((y, i) => {
+            const entry = {
+              key: `${s.entity_id}-${y.year}`,
+              color: this.multiYearColor(i, my.years.length),
+              name: String(y.year),
+              ...this.seriesStatsFor(s, y.points, null),
+              delta: null,
+            };
+            if (y.isCurrent && my.currentAverageToDate != null) {
+              const delta = this.multiYearDelta(y.value, my.currentAverageToDate);
+              if (delta) {
+                entry.delta = my.cutLabel
+                  ? t('bis {cut}: {delta} zum Ø', {cut: my.cutLabel, delta})
+                  : t('{delta} zum Ø', {delta});
+              }
+            }
+            return entry;
+          });
+          if (my.average && this.multiYearAverage) {
+            out.push({
+              key: `${s.entity_id}-average`,
+              color: getComputedStyle(document.body).getPropertyValue('--ink-muted').trim(),
+              name: t('Ø {from}–{to}', {from: my.averageFrom, to: my.averageTo}),
+              ...this.seriesStatsFor(s, my.average.filter(v => v != null).map(v => ({value: v})), null),
+              delta: null,
+              isAverage: true,
+            });
+          }
+          return out;
+        },
+        // Tabelle Jahr × Monat unter dem Chart. Zellen dezent nach Abweichung
+        // vom Monats-Ø eingefärbt — zwei neutrale Akzentfarben statt grün/rot,
+        // weil "mehr" je nach Entität gut (PV-Ertrag) oder schlecht
+        // (Stromverbrauch) ist.
+        get multiYearTable() {
+          const my = this.multiYear;
+          if (!my) return null;
+          const showDelta = this.multiYearTableMode === 'delta';
+          const shade = (value, reference) => {
+            if (value == null || reference == null) return '';
+            const ratio = my.agg === 'standard'
+              ? (value - reference) / Math.max(Math.abs(reference), 5)
+              : (reference ? value / reference - 1 : 0);
+            const pct = Math.round(Math.min(Math.abs(ratio) / 0.25, 1) * 30);
+            if (!pct) return '';
+            return `background:color-mix(in srgb, var(${ratio >= 0 ? '--accent-bar' : '--accent-line'}) ${pct}%, transparent);`;
+          };
+          const rows = my.years.map(y => {
+            const reference = y.isCurrent ? my.currentReference : my.average;
+            const cells = y.monthly.map((value, m) => {
+              const ref = reference ? reference[m] : null;
+              const partial = y.isCurrent && m === my.cutMonth;
+              if (value == null) return {text: '–', style: '', cls: 'empty', title: ''};
+              return {
+                text: (showDelta ? (this.multiYearDelta(value, ref) || '–') : this.multiYearFormat(value)) + (partial ? '*' : ''),
+                style: shade(value, ref),
+                cls: partial ? 'partial' : '',
+                title: ref != null ? t('Ø {value}', {value: this.multiYearFormat(ref)}) : '',
+              };
+            });
+            const totalReference = y.isCurrent ? my.currentAverageToDate : my.averageValue;
+            return {
+              year: y.year,
+              isCurrent: y.isCurrent,
+              cells,
+              total: this.multiYearFormat(y.value) + (y.isCurrent && my.cutMonth != null ? '*' : ''),
+              delta: my.average ? this.multiYearDelta(y.value, totalReference) : '',
+            };
+          });
+          return {
+            rows,
+            average: my.average ? {
+              label: t('Ø {from}–{to}', {from: my.averageFrom, to: my.averageTo}),
+              cells: my.average.map(v => this.multiYearFormat(v)),
+              total: this.multiYearFormat(my.averageValue),
+            } : null,
+            totalLabel: my.agg === 'standard' ? t('Ø Jahr') : t('Summe'),
+            cutNote: my.cutMonth != null
+              ? t('* {year} bis {cut}; „Δ zum Ø“ vergleicht mit dem Ø bis zum gleichen Tag.', {year: my.years[0].year, cut: my.cutLabel})
+              : '',
+          };
         },
 
         toggleEntity(entityId, checked) {
@@ -901,6 +1115,28 @@
           this.sollAutoAdded = false;
           if (autoAdded && previous) this.toggleEntity(previous, false);
           else this.render();
+        },
+        // Feld "Jahre". Ab 2 Jahren gibt es weder Laufsumme noch Soll-Linie
+        // (Laufsumme über mehrere Jahre ist ein späterer Schritt) — beide
+        // werden deshalb zurückgesetzt statt unsichtbar weiterzuwirken. Eine
+        // nur fürs Soll-Feld hinzugefügte Entität fliegt dabei wieder raus,
+        // wie beim Leeren des Felds (setSollEntity('')), aber ohne dessen
+        // eigenes load()/render() — hier folgt ohnehin genau ein load().
+        setCompareYears(value) {
+          this.compareYears = value;
+          if (value !== 1) {
+            this.compareCumsum = false;
+            if (this.compareSollEntityId) {
+              const previous = this.compareSollEntityId;
+              if (this.sollAutoAdded) {
+                const idx = this.selectedEntityIds.indexOf(previous);
+                if (idx !== -1) this.selectedEntityIds.splice(idx, 1);
+              }
+              this.compareSollEntityId = '';
+              this.sollAutoAdded = false;
+            }
+          }
+          this.load();
         },
         // Für "Angezeigte Namen & Reihenfolge" (Template): die Soll-Entität
         // ist dort keine Zeile zum Umbenennen/Verschieben/Ausblenden — sie
@@ -1147,6 +1383,7 @@
             compare: String(this.compare), compare_mode: this.compareMode,
             raw: String(this.raw),
           });
+          if (this.multiYearRequested) params.set('previous_years', String(this.compareYears));
           const res = await fetch(`${BASE}/api/query-multi?${params}`);
           const data = await res.json();
           if (requestId !== this._requestId) return;
@@ -1189,6 +1426,13 @@
           // das braucht auch die Laufsumme (cumulate()), unabhängig von Soll.
           // OHNE beides bleibt "Vorjahr" für JEDEN Zeitraum — auch 'year' —
           // die gewohnte Schattenlinie unten in render().
+          // Mehrjahresvergleich ("Jahre" ab 2) vor allem anderen — er blendet
+          // Laufsumme/Soll aus (setCompareYears()), yearsCompareActive kann
+          // daneben also gar nicht wahr sein; die Reihenfolge sichert es ab.
+          if (this.multiYearActive) {
+            this.renderMultiYear();
+            return;
+          }
           if (this.yearsCompareActive) {
             this.renderYearsCompare();
             return;
@@ -2072,6 +2316,92 @@
             xAxis: {type: 'category', data: MONTHS},
             yAxis,
             tooltip: {trigger: 'axis'},
+            series: echartsSeries,
+          }, true);
+          chartInstance.resize();
+        },
+
+        // Mehrjahresvergleich: eine Linie je Jahr über Jan–Dez (immer Linien,
+        // auch für Zähler — zehn und mehr Balken je Monat wären nicht mehr
+        // lesbar), das angezeigte Jahr kräftig, ältere blasser, dazu der Ø
+        // der Vorjahre gestrichelt. Eigener Renderpfad wie renderYearsCompare(),
+        // der bestehende Vorjahresvergleich bleibt davon unberührt.
+        renderMultiYear() {
+          const my = this.multiYear;
+          const MONTHS = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
+          const s = my.entity;
+          const unit = s.unit ? ` ${s.unit}` : '';
+          const format = v => v == null ? '—' : (my.isDuration ? NumberFormat.fmtDuration(v) : `${fmtNum(v, this.effectiveDecimals(s))}${unit}`);
+          const style = getComputedStyle(document.body);
+          const averageColor = style.getPropertyValue('--ink-muted').trim();
+          const total = my.years.length;
+          // Älteste Jahre zuerst, damit das angezeigte Jahr obenauf liegt.
+          const echartsSeries = my.years.map((y, i) => {
+            const color = this.multiYearColor(i, total);
+            return {
+              name: String(y.year),
+              type: 'line',
+              data: y.monthly.map((v, m) => (y.isCurrent && m === my.cutMonth && v != null
+                ? {value: v, symbol: 'emptyCircle', symbolSize: 8}
+                : v)),
+              lineStyle: {color, width: y.isCurrent ? 3 : 1.5},
+              itemStyle: {color},
+              symbol: y.isCurrent ? 'circle' : 'none',
+              symbolSize: 5,
+              z: y.isCurrent ? 4 : 2,
+              emphasis: {focus: 'series'},
+            };
+          }).reverse();
+          if (my.average && this.multiYearAverage) {
+            echartsSeries.push({
+              name: t('Ø {from}–{to}', {from: my.averageFrom, to: my.averageTo}),
+              type: 'line',
+              data: my.average,
+              lineStyle: {color: averageColor, type: 'dashed', width: 2},
+              itemStyle: {color: averageColor},
+              symbol: 'emptyCircle',
+              symbolSize: 6,
+              z: 5,
+            });
+          }
+          const uiFontScale = parseFloat(style.getPropertyValue('--font-scale')) || 1;
+          chartInstance.setOption({
+            toolbox: toolboxOption(this.exportFilename, style.getPropertyValue('--surface'), style.getPropertyValue('--ink-faint')),
+            textStyle: {
+              fontFamily: style.getPropertyValue('--font-mono'),
+              color: style.getPropertyValue('--ink-muted'),
+              fontSize: Math.round(12 * uiFontScale * 10) / 10,
+            },
+            grid: {left: 10, right: 24, top: 36, bottom: 40, containLabel: true},
+            xAxis: {type: 'category', data: MONTHS},
+            yAxis: {
+              type: 'value',
+              name: my.isDuration ? t('Dauer') : (s.unit || undefined),
+              nameLocation: 'end',
+              scale: my.agg === 'standard',
+              min: my.agg === 'standard' ? undefined : 0,
+              axisLabel: {formatter: v => my.isDuration ? NumberFormat.fmtDuration(v) : fmtNum(v, this.effectiveDecimals(s))},
+            },
+            tooltip: {
+              trigger: 'axis',
+              formatter: params => {
+                const m = params[0].dataIndex;
+                const rows = params
+                  .filter(p => p.value != null && p.value !== '-')
+                  // Neuestes Jahr oben, der Ø (letzte Serie) ganz unten.
+                  .sort((a, b) => (a.seriesIndex === total) - (b.seriesIndex === total) || b.seriesIndex - a.seriesIndex)
+                  .map(p => {
+                    const value = typeof p.value === 'object' ? p.value.value : p.value;
+                    const partial = p.seriesName === String(my.years[0].year) && m === my.cutMonth
+                      ? ` (${t('bis {cut}', {cut: my.cutLabel})})` : '';
+                    return `${p.marker}${p.seriesName}: <strong>${format(value)}</strong>${partial}`;
+                  });
+                const reference = my.currentReference ? my.currentReference[m] : null;
+                const delta = this.multiYearDelta(my.years[0].monthly[m], reference);
+                const deltaRow = delta ? `<br>${t('{year} zum Ø: {delta}', {year: my.years[0].year, delta})}` : '';
+                return `<strong>${MONTHS[m]}</strong><br>${rows.join('<br>')}${deltaRow}`;
+              },
+            },
             series: echartsSeries,
           }, true);
           chartInstance.resize();

@@ -625,11 +625,25 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         compare: bool = False,
         compare_mode: str = "previous",
         raw: bool = False,
+        previous_years: int = 1,
     ) -> dict:
         now = datetime.now(deps.tz)
         ids = limited_multi_entity_ids({"entity_ids": entity_ids})
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
+        if previous_years < 0:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl Vergleichsjahre"))
+        # Mehrjahresvergleich ("Jahre" neben Laufsumme/Soll): eine Erweiterung
+        # von "Vorjahr" bei Zeitraum "Jahr", nur für genau eine Entität und nur
+        # kalendarisch — bei mehr Entitäten wüchse der Aufwand mit Entitäten mal
+        # Jahren, und ein rollierendes Fenster hat keine Kalendermonate, die
+        # sich übereinanderlegen ließen. previous_years=1 ist der bisherige
+        # Vorjahresvergleich und ändert an der Antwort nichts; 0 heißt "alle".
+        multi_year = (
+            compare and not raw and compare_mode == "previous" and range == "year"
+            and not continuous and previous_years != 1 and len(ids) == 1
+        )
+        read_cache = query_mod.QueryReadCache() if multi_year else None
         series = []
         window_start = window_end = period_end = None
         is_current = True
@@ -680,6 +694,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     )
                     if cut:
                         entry.update(compare_cut_points=cut["points"], compare_cut_end=cut["window_end"])
+            if multi_year:
+                entry["years"] = query_mod.query_previous_years(
+                    deps.data_dir, deps.index, entity_id, deps.tz, now,
+                    offset=offset, years=previous_years, read_cache=read_cache,
+                )
             series.append(entry)
             if window_start is None:
                 window_start, window_end = result["window_start"], result["window_end"]
