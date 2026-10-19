@@ -11,6 +11,10 @@
   10 oder Alle). Unter dem Chart zeigt eine Tabelle Jahr × Monat die Werte und
   die Abweichung zum Durchschnitt; das laufende Jahr wird mit dem Durchschnitt
   bis zum gleichen Tag verglichen.
+- **Vergleich in Dashboard-Kacheln**: Die Kachel eines Charts zeigt jetzt den
+  mit ihm gespeicherten Vergleich wie die Chart-Seite – Vorjahr, Laufsumme mit
+  Soll und Langzeit. Bei Langzeit nennt die Legende das laufende Jahr und den
+  Durchschnitt; eine 1×1-Kachel zeichnet nur diese beiden.
 - **Charts mit festem Zeitraum**: Beim Anpassen eines Charts lässt sich wie auf
   der Seite einer einzelnen Entität mit ‹ und › oder über einen Kalender zu
   vergangenen Perioden blättern. Ein bei 2025 gespeichertes Chart zeigt auch
@@ -27,7 +31,7 @@
 - **Vergleich im Chart wurde nicht gespeichert**: „Vorjahr“, „Langzeit“ und die
   übrigen Vergleiche samt Laufsumme, Soll Entität, Jahren und Ø-Linie standen
   beim nächsten Öffnen eines Charts wieder auf „Aus“. Sie bleiben jetzt am Chart
-  erhalten. Dashboard-Kacheln zeigen den Vergleich noch nicht.
+  erhalten.
 
 ---
 
@@ -42,6 +46,10 @@
   All). Below the chart, a year × month table shows the values and the deviation
   from the average; the current year is compared with the average up to the
   same day.
+- **Comparison in dashboard tiles**: A chart's tile now shows the comparison
+  saved with it, like the chart page – previous year, running total with target
+  and long-term. For long-term, the legend names the current year and the
+  average; a 1×1 tile draws only these two.
 - **Charts with a fixed period**: When customizing a chart, you can page back
   to past periods with ‹ and › or a calendar, like on the page of a single
   entity. A chart saved at 2025 still shows 2025 later, when viewing and on the
@@ -56,7 +64,6 @@
 - **Chart comparison was not saved**: “Previous year”, “Long-term” and the other
   comparisons, including running total, target entity, years and Ø line, were
   back to “Off” the next time a chart was opened. They now stay with the chart.
-  Dashboard tiles do not show the comparison yet.
 
 ## 1.7.0 - 2026-10-19
 

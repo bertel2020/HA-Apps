@@ -917,6 +917,12 @@ average, either as values or as deviation per month. The current year is
 compared with the average up to the same day. Long-term is not available with
 "Rolling".
 
+**Comparison on the dashboard:** A chart's tile shows the comparison saved
+with it, like the chart page, without a setting of its own. For long-term, the
+year × month table is left out, and the legend names only the current year and
+the average, the other years as "+N years". A 1×1 tile draws only the current
+year and the average.
+
 ### Differences from the history view of a single entity
 
 When viewing, a chart always shows the **current period**. When
@@ -961,8 +967,8 @@ line (including flat/moving), decimal places, legend statistics, area,
 stacked/shares (%) and timeline are all saved with the chart and then also
 apply to its preview on dashboards. A past period shown and **Compare**
 (including running total and target entity, or years and Ø line for
-long-term) are saved too; for now the comparison only appears on the chart
-page, not on the dashboard tile. **Points on/off and raw values, on the other
+long-term) are saved too; the dashboard tile shows the comparison as well
+(see below). **Points on/off and raw values, on the other
 hand, are not** — both are pure view settings for the current visit and are
 back to their initial value on the next opening.
 

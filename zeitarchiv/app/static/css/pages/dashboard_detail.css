@@ -277,6 +277,10 @@
      volle Kachelbreite füllen statt (wie ein Chip) auf Inhaltsbreite zu
      schrumpfen. */
   .dtile-legend .tbl-wrap{width:100%;}
+  /* Langzeit-Kachel: gestrichelte Markierung für den Ø (wie auf der
+     Chart-Seite) und "+N Jahre" als ruhiger Hinweis ohne Umschalter. */
+  .dtile-legend .dash{width:14px;height:0;border-top:2px dashed;flex:none;align-self:center;}
+  .dtile-legend .chart-legend-item.is-more{background:transparent;border-style:dashed;color:var(--ink-muted);cursor:default;}
   .dtile-add{display:flex;align-items:center;justify-content:center;min-height:206px;grid-column:span 1;grid-row:span 1;border-style:dashed;overflow:visible;}
   /* Präziser Modus: Spalten und Zeilenhöhe sind halbiert (s.o.), eine 1x1-
      Zelle wäre also nur ein Sechstel breit und halb so hoch — die feste

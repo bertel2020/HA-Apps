@@ -994,6 +994,12 @@ und Abweichung zum Durchschnitt, wahlweise als Werte oder als Abweichung je
 Monat. Das laufende Jahr wird dabei mit dem Durchschnitt bis zum gleichen
 Tag verglichen. Bei „Rollierend" gibt es Langzeit nicht.
 
+**Vergleich auf dem Dashboard:** Die Kachel eines Charts zeigt den mit ihm
+gespeicherten Vergleich wie die Chart-Seite, ohne eigene Einstellung. Bei
+Langzeit fehlt die Tabelle Jahr × Monat, und die Legende nennt nur das
+laufende Jahr und den Durchschnitt, die übrigen Jahre als „+N Jahre“. Eine
+1×1-Kachel zeichnet nur das laufende Jahr und den Durchschnitt.
+
 ### Unterschiede zur Verlaufsansicht einer einzelnen Entität
 
 Ein Chart zeigt beim Ansehen immer die **aktuelle Periode**. Beim
@@ -1045,8 +1051,8 @@ Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie
 Zeitstrahl werden alle mit dem Chart gespeichert und
 gelten dann auch für dessen Vorschau auf Dashboards. Ebenfalls gespeichert
 werden eine angezeigte vergangene Periode und **Vergleichen** (samt Laufsumme
-und Soll Entität bzw. Jahren und Ø-Linie bei Langzeit); den Vergleich zeigt
-vorerst nur die Chart-Seite, nicht die Dashboard-Kachel. **Punkte an/aus und
+und Soll Entität bzw. Jahren und Ø-Linie bei Langzeit); die Dashboard-Kachel zeigt
+den Vergleich mit (siehe unten). **Punkte an/aus und
 Rohwerte dagegen nicht** — beides sind reine Ansichtseinstellungen für den
 aktuellen Besuch und steht beim nächsten Öffnen wieder auf dem Ausgangswert.
 

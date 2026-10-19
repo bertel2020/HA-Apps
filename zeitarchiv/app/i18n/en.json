@@ -2743,6 +2743,7 @@
     "bis {cut}: {delta} zum Ø": "until {cut}: {delta} vs. Ø",
     "{delta} zum Ø": "{delta} vs. Ø",
     "Ø {from}–{to}": "Ø {from}–{to}",
+    "+{n} Jahre": "+{n} years",
     "Ø {value}": "Ø {value}",
     "Ø Jahr": "Ø year",
     "* {year} bis {cut}; „Δ zum Ø“ vergleicht mit dem Ø bis zum gleichen Tag.": "* {year} until {cut}; “Δ to Ø” compares with the Ø up to the same day.",
