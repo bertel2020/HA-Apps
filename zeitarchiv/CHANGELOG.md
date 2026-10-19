@@ -64,6 +64,9 @@
   nicht gespeichert werden, sah sie trotzdem gespeichert aus und war beim
   nächsten Besuch weg. Jetzt erscheint eine Meldung; dasselbe gilt für „Auf
   Standard zurücksetzen“.
+- **Englische Oberfläche**: Die Auswahl „Kopfzeile“ beim CSV-Import zeigte
+  „Ja“/„Nein“ und der Markierungsfilter „Markierung:“ auf Deutsch. Beides ist
+  jetzt übersetzt.
 
 ---
 
@@ -126,6 +129,9 @@
 - **Chart options of an entity**: If a change in the options menu could not
   be saved, it still looked saved and was gone on the next visit. A message now
   appears; the same applies to “Reset to default”.
+- **English interface**: The “Header row” selection in the CSV import showed
+  “Ja”/“Nein” and the mark filter showed “Markierung:” in German. Both are now
+  translated.
 
 ## 1.7.0 - 2026-10-19
 

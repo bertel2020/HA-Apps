@@ -289,6 +289,7 @@
     "Wirkt sofort, Zugangsdaten werden immer maskiert": "Takes effect immediately; credentials are always masked",
     "✓ Gespeichert und aktiviert": "✓ Saved and activated",
     "Markierungen": "Marks",
+    "Markierung: {label}": "Mark: {label}",
     "Zuletzt markiert": "Last marked",
     "Markierungen von {v1} anzeigen": "Show marks of {v1}",
     "Keine passenden markierten Entitäten gefunden.": "No matching marked entities found.",
